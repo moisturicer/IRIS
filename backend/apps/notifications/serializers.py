@@ -1,0 +1,16 @@
+from rest_framework import serializers
+from .models import Notification, NotificationType
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    notif_type_name = serializers.CharField(source="notif_type.name", read_only=True)
+    record_title    = serializers.CharField(source="record.title", read_only=True, default=None)
+    sender_name     = serializers.CharField(source="sender.get_full_name", read_only=True, default=None)
+
+    class Meta:
+        model  = Notification
+        fields = [
+            "id", "notif_type", "notif_type_name", "message",
+            "record", "record_title", "sender", "sender_name",
+            "recipient", "broadcast_to_role", "created_at",
+        ]
