@@ -2,7 +2,7 @@
 
 This document tracks what we can build **now** against the SRS/SDD and current backend, aligned with the auth wireframes (login default, invalid credentials, session expired, account locked) and the Discover dashboard mockup.
 
-> **Full stack process:** see the repo-wide [Development guide](../../docs/DEVELOPMENT_GUIDE.md) for environment setup, backend phases, testing, and deployment.
+> **Full stack process:** see the [Documentation hub](../../docs/README.md), [Software engineering plan](../../docs/SOFTWARE_ENGINEERING_PLAN.md), [SDLC process](../../docs/SDLC_PROCESS.md), [Security](../../docs/SECURITY.md), and [Development guide](../../docs/DEVELOPMENT_GUIDE.md).
 
 **Stack:** React 18 · Vite · TypeScript · Tailwind · Zustand · React Router v6 · Axios
 
@@ -153,3 +153,5 @@ Open `http://localhost:5173/login`. Backend: `python manage.py runserver` on por
 - `IRIS Software Engineering_SRS.pdf` — FR-M1-01 (login), FR-M6-01/02/03, NFR-S2, NFR-U3
 - `IRIS Software Engineering_SDD.pdf` — Module 1 login UI, Module 6 session/lockout
 - Wireframes: login default, invalid credentials, session expired, account locked, Discover dashboard
+- [Traceability matrix](../../docs/TRACEABILITY_MATRIX.md) — FR/NFR implementation status
+- [Test plan](../../docs/TEST_PLAN.md) — role matrix and auth test cases (AUTH-*)

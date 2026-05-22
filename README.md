@@ -6,8 +6,16 @@ A web-based platform for Cebu Institute of Technology - University (CIT-U) that 
 
 | Guide | Description |
 |-------|-------------|
-| [Development guide](docs/DEVELOPMENT_GUIDE.md) | Step-by-step build order, phases, testing, and doc map |
+| [Documentation hub](docs/README.md) | Index of all engineering, SDLC, security, and QA docs |
+| [Software engineering plan](docs/SOFTWARE_ENGINEERING_PLAN.md) | Scope, phases, milestones, RACI, open decisions (M5/M7) |
+| [SDLC process](docs/SDLC_PROCESS.md) | Lifecycle, branching, PR workflow, quality gates, release |
+| [Security overview](docs/SECURITY.md) | Threat model, controls, NFR-S mapping, deploy checklist |
+| [Security risk register](docs/SECURITY_RISK_REGISTER.md) | Threats, scores, mitigations, review log |
+| [Test plan](docs/TEST_PLAN.md) | Test levels, role matrix, UAT, automation roadmap |
+| [Traceability matrix](docs/TRACEABILITY_MATRIX.md) | SRS FR/NFR → code, UI, tests, status |
+| [Development guide](docs/DEVELOPMENT_GUIDE.md) | Step-by-step build order, phases, local setup |
 | [Frontend implementation plan](frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI tasks, wireframes, routes, design tokens |
+| [Changelog](CHANGELOG.md) | Version history |
 | SRS / SDD (repo root) | Official requirements and software design PDFs |
 
 ---

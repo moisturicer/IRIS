@@ -10,7 +10,15 @@ Keep these in sync as you build. When behavior changes, update the doc in the sa
 
 | Document | Location | Purpose |
 |----------|----------|---------|
+| **Documentation hub** | `docs/README.md` | Index of all engineering docs |
 | **This guide** | `docs/DEVELOPMENT_GUIDE.md` | End-to-end dev process & phases |
+| **Software engineering plan** | `docs/SOFTWARE_ENGINEERING_PLAN.md` | Scope, WBS, milestones, open decisions |
+| **SDLC process** | `docs/SDLC_PROCESS.md` | Phases, gates, branching, release |
+| **Security overview** | `docs/SECURITY.md` | Controls, threat summary, NFR-S |
+| **Security risk register** | `docs/SECURITY_RISK_REGISTER.md` | Rated risks and mitigations |
+| **Test plan** | `docs/TEST_PLAN.md` | Verification strategy, role matrix, UAT |
+| **Traceability matrix** | `docs/TRACEABILITY_MATRIX.md` | FR/NFR → implementation & test status |
+| **Changelog** | `CHANGELOG.md` | Release notes |
 | **README** | `README.md` | Quick start, env vars, run commands |
 | **SRS** | `IRIS Software Engineering_SRS.pdf` | *What* the system must do (FR-*, NFR-*) |
 | **SDD** | `IRIS Software Engineering_SDD.pdf` | *How* to implement (UI, APIs, components) |
@@ -25,8 +33,7 @@ Keep these in sync as you build. When behavior changes, update the doc in the sa
 | API reference | `docs/API.md` or OpenAPI/Swagger | After auth + records APIs stabilize |
 | Database seed guide | `docs/DATABASE_SEED.md` | When colleges/courses/roles are seeded |
 | Wireframes / Figma | `docs/design/` or external link | Link from frontend plan |
-| Changelog | `CHANGELOG.md` | First release candidate |
-| Test plan | `docs/TEST_PLAN.md` | Before UAT with stakeholders |
+| UAT results | `docs/test-results/` | After each UAT cycle |
 
 ---
 
