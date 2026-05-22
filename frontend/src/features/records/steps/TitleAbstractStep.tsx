@@ -3,7 +3,6 @@
  * Collects title and abstract.
  */
 import { useFormContext } from "react-hook-form";
-import { Input }  from "@/components/ui/Input";
 import type { RecordFormValues } from "../recordFormSchema";
 
 export function TitleAbstractStep() {
