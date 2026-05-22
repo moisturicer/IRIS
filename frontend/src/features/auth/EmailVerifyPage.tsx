@@ -1,8 +1,48 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { authApi } from "@/api/auth";
+import irisLogo from "@/assets/images/iris_logo.png";
 
 type Status = "loading" | "success" | "error";
+
+function StatusIcon({ status }: { status: "loading" | "success" | "error" }) {
+  if (status === "loading") {
+    return (
+      <svg
+        className="animate-spin h-12 w-12 text-brand"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        aria-hidden
+      >
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+        />
+      </svg>
+    );
+  }
+
+  if (status === "success") {
+    return (
+      <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+        <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+      <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </div>
+  );
+}
 
 export default function EmailVerifyPage() {
   const { uidb64, token } = useParams<{ uidb64: string; token: string }>();
@@ -19,7 +59,7 @@ export default function EmailVerifyPage() {
     authApi.activate(uidb64, token)
       .then(() => {
         setStatus("success");
-        setMessage("Your email has been verified! You can now sign in.");
+        setMessage("Your email has been verified. You can now sign in to IRIS.");
       })
       .catch((err: unknown) => {
         const detail = (err as { response?: { data?: { detail?: string } } })
@@ -29,112 +69,129 @@ export default function EmailVerifyPage() {
       });
   }, [uidb64, token]);
 
-  return (
-    <div className="min-h-screen flex" style={{ fontFamily: "'Inter', sans-serif" }}>
+  const titles: Record<Status, string> = {
+    loading: "Verifying Email",
+    success: "Email Verified",
+    error:   "Verification Failed",
+  };
 
-      {/* ── Left panel ─────────────────────────────────── */}
-      <div
-        className="hidden md:flex md:w-[38%] bg-[#6B0F12] flex-col justify-between relative overflow-hidden"
-        style={{ padding: "60px 48px", minHeight: "100vh" }}
-      >
-        <div className="absolute rounded-full bg-white/[0.04]"
-             style={{ width: 340, height: 340, top: -80, right: -100 }} />
-        <div className="absolute rounded-full bg-white/[0.06]"
-             style={{ width: 260, height: 260, bottom: 60, left: -80 }} />
-        <div className="absolute rounded-full bg-white/[0.04]"
-             style={{ width: 180, height: 180, bottom: 200, right: 20 }} />
+  const subtitles: Record<Status, string> = {
+    loading: "Please wait while we confirm your account.",
+    success: message,
+    error:   message,
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col lg:flex-row font-sans">
+
+      {/* ── Left: branding (matches login) ─────────────────────────── */}
+      <div className="relative lg:w-1/2 bg-cream flex flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 lg:px-14 lg:py-12 min-h-[320px] lg:min-h-screen">
+
+        <div className="absolute rounded-full bg-white/60 pointer-events-none"
+             style={{ width: 280, height: 280, top: -60, right: -40 }} />
+        <div className="absolute rounded-full bg-white/40 pointer-events-none"
+             style={{ width: 200, height: 200, bottom: 120, left: -50 }} />
+        <div className="absolute rounded-full bg-white/50 pointer-events-none"
+             style={{ width: 140, height: 140, bottom: 280, right: 60 }} />
 
         <div className="relative z-10">
-          <h1 className="text-[52px] font-extrabold text-white leading-tight">
-            Email<br />Verification
-          </h1>
-          <p className="text-[14px] mt-3 leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>
-            Confirming your identity before<br />granting access to IRIS.
+          <img src={irisLogo} alt="IRIS" className="h-14 w-14 object-contain" />
+
+          <p className="mt-5 text-[11px] font-semibold tracking-[0.12em] text-gold uppercase leading-snug max-w-[280px]">
+            Cebu Institute of Technology – University
           </p>
+
+          <h1 className="mt-6 font-serif leading-[1.05]">
+            <span className="block text-[40px] sm:text-[44px] font-bold text-gold">Secure</span>
+            <span className="block text-[40px] sm:text-[44px] font-bold text-brand">
+              Your Access.
+            </span>
+          </h1>
+
+          <p className="mt-5 text-[14px] text-brand/90 leading-relaxed max-w-md">
+            Email verification protects your research records and ensures only authorized
+            CIT-U members can access the IRIS digital vault.
+          </p>
+
+          <blockquote className="mt-8 pl-5 border-l-4 border-gold max-w-md">
+            <p className="font-serif italic text-[14px] text-brand leading-relaxed">
+              &ldquo;One verified identity, one trusted gateway to your intellectual property.&rdquo;
+            </p>
+          </blockquote>
         </div>
 
-        <div className="relative z-10 text-[11px] leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
-          <div>Intelligent Research &amp; IP System</div>
-          <div>© 2026 Cebu Institute of Technology - University</div>
-        </div>
+        <p className="relative z-10 text-[11px] text-gray-400 mt-10 lg:mt-0">
+          © 2026 Cebu Institute of Technology - University
+        </p>
       </div>
 
-      {/* ── Right panel ─────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center overflow-y-auto"
-           style={{ padding: "48px 40px" }}>
-        <div style={{ width: "100%", maxWidth: 420 }} className="text-center">
+      {/* ── Right: verification status ─────────────────────────────── */}
+      <div className="flex-1 lg:w-1/2 bg-white flex items-center justify-center px-8 py-12 sm:px-12 lg:px-16">
+        <div className="w-full max-w-[400px]">
 
-          {/* Logo */}
-          <div className="mb-8">
-            <div className="text-[38px] font-extrabold tracking-[6px] text-[#6B0F12]">IRIS</div>
-            <p className="text-[13px] text-gray-500 mt-1">Intelligent Research &amp; IP System</p>
+          <div className="mb-6">
+            <StatusIcon status={status} />
           </div>
 
+          <h2 className="text-[28px] font-bold text-gray-900">{titles[status]}</h2>
+          <p className="mt-2 text-[14px] text-gray-500 leading-relaxed mb-8">
+            {subtitles[status]}
+          </p>
+
           {status === "loading" && (
-            <div className="flex flex-col items-center gap-4">
-              {/* Spinner */}
-              <svg
-                className="animate-spin"
-                style={{ width: 48, height: 48, color: "#6B0F12" }}
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle className="opacity-25" cx="12" cy="12" r="10"
-                  stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <p className="text-[15px] text-gray-600">Verifying your email…</p>
-            </div>
+            <p className="text-[13px] text-gray-400">
+              This usually takes only a moment…
+            </p>
           )}
 
           {status === "success" && (
-            <div className="flex flex-col items-center gap-5">
-              {/* Success icon */}
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-[22px] font-bold text-gray-900">Email Verified!</h2>
-              <p className="text-[14px] text-gray-500 leading-relaxed">{message}</p>
+            <Link
+              to="/login"
+              className="inline-flex w-full items-center justify-center py-3.5 rounded-lg text-[15px] font-semibold text-white
+                bg-gold hover:bg-gold-dark transition-colors"
+            >
+              Sign In
+            </Link>
+          )}
+
+          {status === "error" && (
+            <div className="flex flex-col gap-3">
+              <Link
+                to="/signup"
+                className="inline-flex w-full items-center justify-center py-3.5 rounded-lg text-[15px] font-semibold text-white
+                  bg-gold hover:bg-gold-dark transition-colors"
+              >
+                Register Again
+              </Link>
               <Link
                 to="/login"
-                className="inline-block mt-2 px-8 py-3 rounded-lg bg-[#6B0F12] text-white
-                  text-[15px] font-semibold hover:bg-[#7d1215] transition-colors"
+                className="inline-flex w-full items-center justify-center py-3 rounded-lg text-[14px] font-semibold text-brand
+                  border border-gray-300 hover:bg-gray-50 transition-colors"
               >
                 Sign In
               </Link>
             </div>
           )}
 
-          {status === "error" && (
-            <div className="flex flex-col items-center gap-5">
-              {/* Error icon */}
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
-                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <h2 className="text-[22px] font-bold text-gray-900">Verification Failed</h2>
-              <p className="text-[14px] text-gray-500 leading-relaxed">{message}</p>
-              <div className="flex gap-3 mt-2">
-                <Link
-                  to="/login"
-                  className="px-6 py-2.5 rounded-lg border border-gray-300 text-gray-700
-                    text-[14px] font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/signup"
-                  className="px-6 py-2.5 rounded-lg bg-[#6B0F12] text-white
-                    text-[14px] font-semibold hover:bg-[#7d1215] transition-colors"
-                >
-                  Sign Up Again
-                </Link>
-              </div>
+          {status !== "loading" && (
+            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+              <p className="text-[14px] text-gray-500">
+                {status === "success" ? (
+                  <>
+                    Need a new account?{" "}
+                    <Link to="/signup" className="font-semibold text-brand hover:underline">
+                      Register here
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    Already verified?{" "}
+                    <Link to="/login" className="font-semibold text-brand hover:underline">
+                      Sign in
+                    </Link>
+                  </>
+                )}
+              </p>
             </div>
           )}
 

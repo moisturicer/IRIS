@@ -15,6 +15,7 @@ sdist/
 develop-eggs/
 .installed.cfg
 lib/
+!frontend/src/lib/
 lib64/
 
 # Virtual environments
