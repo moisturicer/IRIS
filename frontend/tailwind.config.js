@@ -9,6 +9,12 @@ export default {
     extend: {
       colors: {
         // Primary brand color -- deep maroon
+        gold: {
+          DEFAULT: "#C59334",
+          dark:    "#A87B2A",
+          light:   "#D4A84A",
+        },
+        cream: "#F5F0E8",
         brand: {
           DEFAULT: "#6B0F12",
           light:   "#8B1316",
@@ -27,7 +33,8 @@ export default {
       },
 
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        sans:  ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        serif: ["Georgia", "Cambria", '"Times New Roman"', "Times", "serif"],
       },
 
       fontSize: {

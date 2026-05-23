@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
 import { API_BASE } from "@/lib/constants";
+import { redirectToLoginSessionExpired } from "@/lib/authSession";
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
@@ -30,11 +31,14 @@ apiClient.interceptors.response.use(
           original.headers!.Authorization = `Bearer ${data.access}`;
           return apiClient(original);
         } catch {
-          // Refresh failed -- clear tokens and redirect
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
-          window.location.href = "/login";
+          redirectToLoginSessionExpired();
         }
+      } else {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        redirectToLoginSessionExpired();
       }
     }
     return Promise.reject(error);
