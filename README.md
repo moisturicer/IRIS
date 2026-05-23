@@ -2,6 +2,14 @@
 
 A web-based platform for Cebu Institute of Technology - University (CIT-U) that centralises the management of student and faculty research outputs and intellectual property records. It supports the full lifecycle — submission, peer review, IP tagging, document storage, download requests, and AI-assisted discovery — across all colleges and departments.
 
+**Documentation**
+
+| Guide | Description |
+|-------|-------------|
+| [Development guide](docs/DEVELOPMENT_GUIDE.md) | Step-by-step build order, phases, testing, and doc map |
+| [Frontend implementation plan](frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI tasks, wireframes, routes, design tokens |
+| SRS / SDD (repo root) | Official requirements and software design PDFs |
+
 ---
 
 ## Tech Stack
