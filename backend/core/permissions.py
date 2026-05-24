@@ -22,6 +22,11 @@ def get_role_name(user) -> str:
         return ""
 
 
+def is_django_staff(user) -> bool:
+    """True for Django superusers and staff accounts (no role required)."""
+    return bool(getattr(user, "is_superuser", False) or getattr(user, "is_staff", False))
+
+
 class IsStudent(BasePermission):
     def has_permission(self, request, view):
         return get_role_name(request.user) == ROLE_STUDENT
@@ -34,40 +39,40 @@ class IsAdviser(BasePermission):
 
 class IsKTTO(BasePermission):
     def has_permission(self, request, view):
-        return get_role_name(request.user) == ROLE_KTTO
+        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_KTTO
 
 
 class IsRDCO(BasePermission):
     def has_permission(self, request, view):
-        return get_role_name(request.user) == ROLE_RDCO
+        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_RDCO
 
 
 class IsITSO(BasePermission):
     def has_permission(self, request, view):
-        return get_role_name(request.user) == ROLE_ITSO
+        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_ITSO
 
 
 class IsTBI(BasePermission):
     def has_permission(self, request, view):
-        return get_role_name(request.user) == ROLE_TBI
+        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_TBI
 
 
 class IsReviewer(BasePermission):
-    """Adviser, KTTO, RDCO, or TBI."""
+    """Adviser, KTTO, RDCO, or TBI — or any Django staff account."""
     def has_permission(self, request, view):
-        return get_role_name(request.user) in REVIEWER_ROLES
+        return is_django_staff(request.user) or get_role_name(request.user) in REVIEWER_ROLES
 
 
 class IsStaff(BasePermission):
-    """KTTO, RDCO, ITSO, or TBI (dashboard access)."""
+    """KTTO, RDCO, ITSO, or TBI — or any Django staff account."""
     def has_permission(self, request, view):
-        return get_role_name(request.user) in STAFF_ROLES
+        return is_django_staff(request.user) or get_role_name(request.user) in STAFF_ROLES
 
 
 class IsAdmin(BasePermission):
-    """KTTO or RDCO only (account management, delete approvals)."""
+    """KTTO, RDCO, or any Django staff/superuser (account management, delete approvals)."""
     def has_permission(self, request, view):
-        return get_role_name(request.user) in ADMIN_ROLES
+        return is_django_staff(request.user) or get_role_name(request.user) in ADMIN_ROLES
 
 
 class IsOwnerOrStaff(BasePermission):
@@ -76,6 +81,6 @@ class IsOwnerOrStaff(BasePermission):
     The view must attach `obj.owners` as a queryset or list of users.
     """
     def has_object_permission(self, request, view, obj):
-        if get_role_name(request.user) in STAFF_ROLES:
+        if is_django_staff(request.user) or get_role_name(request.user) in STAFF_ROLES:
             return True
         return obj.owners.filter(user=request.user).exists()

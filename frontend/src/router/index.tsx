@@ -27,6 +27,7 @@ import DocumentsPage        from "@/features/documents/DocumentsPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import UserListPage         from "@/features/accounts/UserListPage";
+import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
 import FolderBrowserPage    from "@/features/storage/FolderBrowserPage";
 import AIHubPage            from "@/features/ai/AIHubPage";
 import HelpPage             from "@/features/help/HelpPage";
@@ -72,9 +73,10 @@ export const router = createBrowserRouter([
           {
             element: <RoleRoute allowed={STAFF_ROLES} />,
             children: [
-              { path: "admin/users", element: <UserListPage />, handle: { crumb: "Manage Users" } },
-              { path: "admin/audit", element: <AuditLogPage />, handle: { crumb: "Audit Log" } },
-              { path: "admin/sessions", element: <div className="p-6 text-[13px] text-gray-500">Active sessions — coming soon.</div>, handle: { crumb: "Sessions" } },
+              { path: "admin/users",        element: <UserListPage />,      handle: { crumb: "Manage Users" } },
+              { path: "admin/role-requests",element: <RoleRequestsPage />,  handle: { crumb: "Role Requests" } },
+              { path: "admin/audit",        element: <AuditLogPage />,      handle: { crumb: "Audit Log" } },
+              { path: "admin/sessions",     element: <div className="p-6 text-[13px] text-gray-500">Active sessions — coming soon.</div>, handle: { crumb: "Sessions" } },
             ],
           },
 

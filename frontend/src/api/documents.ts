@@ -15,15 +15,16 @@ export const documentsApi = {
   uploads:        (recordId: number) =>
     apiClient.get<RecordUpload[]>("/documents/uploads/", { params: { record: recordId } }),
 
-  // Upload a file to a slot for a record
+  // Upload a PDF to a slot — triggers Celery extraction task
   upload:         (recordId: number, slotId: number, file: File) => {
     const fd = new FormData();
     fd.append("record", String(recordId));
     fd.append("slot",   String(slotId));
     fd.append("file",   file);
-    return apiClient.post<RecordUpload>("/documents/uploads/", fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return apiClient.post<{ upload: RecordUpload; extraction: { id: number; status: string } }>(
+      "/documents/submit/", fd,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
   },
 
   // Legacy alias kept for any existing callers

@@ -68,6 +68,34 @@ class UploadReview(models.Model):
         return f"Review of upload {self.upload_id} by {self.reviewed_by_id}"
 
 
+class PdfExtraction(models.Model):
+    """
+    Tracks the Celery PDF text-extraction task for a RecordUpload.
+    Created immediately when a PDF is submitted; updated by the background task.
+    """
+    STATUS = [
+        ("queued",  "Queued"),
+        ("running", "Running"),
+        ("done",    "Done"),
+        ("failed",  "Failed"),
+    ]
+    upload         = models.OneToOneField(
+        RecordUpload, on_delete=models.CASCADE, related_name="pdf_extraction"
+    )
+    status         = models.CharField(max_length=10, choices=STATUS, default="queued", db_index=True)
+    extracted_text = models.TextField(blank=True)
+    celery_task_id = models.CharField(max_length=200, blank=True)
+    error          = models.TextField(blank=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    completed_at   = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"PdfExtraction upload={self.upload_id} status={self.status}"
+
+
 class RecordFile(models.Model):
     """
     Direct file attachment to a record (not tied to an UploadSlot).

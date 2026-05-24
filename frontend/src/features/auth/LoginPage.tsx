@@ -1,26 +1,10 @@
-import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { useUIStore } from "@/store/ui.store";
-import { AuthAlert } from "@/components/auth/AuthAlert";
-import { AccountLockedModal } from "@/components/auth/AccountLockedModal";
-import {
-  clearLockout,
-  getLockoutUntil,
-  getLoginAttempts,
-  incrementLoginAttempts,
-  isAccountLocked,
-  LOGIN_FAILURE_LIMIT,
-  resetLoginAttempts,
-  setLockoutUntil,
-} from "@/lib/authSession";
-import { AuthLayout } from "@/components/auth/AuthLayout";
-
-const LOCKOUT_MS = 15 * 60 * 1000;
 
 const schema = z.object({
   email:    z.string().min(1, "Email is required.").email("Enter a valid email address."),
@@ -29,265 +13,132 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-type LoginAlert =
-  | { kind: "credentials" }
-  | { kind: "unverified" }
-  | { kind: "generic"; message: string };
-
-const inputBase =
-  "w-full rounded-lg px-4 py-3 text-[14px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-400 text-gray-900 border focus:bg-white";
-const inputOk   = "border-transparent focus:border-brand";
-const inputErr  = "border-brand bg-red-50/50 focus:border-brand";
-
 export default function LoginPage() {
-  const navigate       = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { login }      = useAuth();
-  const { addToast }   = useUIStore();
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginAlert, setLoginAlert]     = useState<LoginAlert | null>(null);
-  const [failedAttempts, setFailedAttempts] = useState(0);
-  const [lockoutOpen, setLockoutOpen]   = useState(false);
-  const [lockoutUntil, setLockoutUntilState] = useState<number | undefined>();
-  const [lockoutEmail, setLockoutEmail] = useState("");
-  const [sessionAlert, setSessionAlert] = useState(
-    () => searchParams.get("reason") === "session_expired"
-  );
+  const navigate     = useNavigate();
+  const { login }    = useAuth();
+  const { addToast } = useUIStore();
 
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  const email = watch("email");
-
-  useEffect(() => {
-    if (searchParams.get("reason") === "session_expired") {
-      setSessionAlert(true);
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (!email) return;
-    const until = getLockoutUntil(email);
-    if (until) {
-      setLockoutEmail(email);
-      setLockoutUntilState(until);
-      setLockoutOpen(true);
-    }
-    setFailedAttempts(getLoginAttempts(email));
-  }, [email]);
-
-  const dismissSessionAlert = () => {
-    setSessionAlert(false);
-    if (searchParams.get("reason")) {
-      searchParams.delete("reason");
-      setSearchParams(searchParams, { replace: true });
-    }
-  };
-
-  const openLockout = (forEmail: string, untilMs: number) => {
-    setLockoutUntil(forEmail, untilMs);
-    setLockoutEmail(forEmail);
-    setLockoutUntilState(untilMs);
-    setLockoutOpen(true);
-    setLoginAlert(null);
-  };
-
-  const closeLockout = () => {
-    setLockoutOpen(false);
-    if (lockoutEmail && lockoutUntil && lockoutUntil <= Date.now()) {
-      clearLockout(lockoutEmail);
-    }
-  };
-
   const onSubmit = async (data: FormData) => {
-    setLoginAlert(null);
-
-    if (isAccountLocked(data.email)) {
-      openLockout(data.email, getLockoutUntil(data.email)!);
-      return;
-    }
-
     try {
-      const res = await authApi.login({ username: data.email, password: data.password });
-      resetLoginAttempts(data.email);
-      clearLockout(data.email);
+      const res = await authApi.login(data);
       login(res.data.user, res.data.access, res.data.refresh);
       navigate("/");
     } catch (err: unknown) {
-      const res = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
-      const detail = res?.data?.detail ?? "Invalid email or password.";
-      const status = res?.status;
-      const detailLower = detail.toLowerCase();
-
-      const locked =
-        status === 403 &&
-        (detailLower.includes("locked") || detailLower.includes("locked out"));
-
-      if (locked) {
-        openLockout(data.email, Date.now() + LOCKOUT_MS);
-        return;
-      }
-
-      if (status === 403 && detailLower.includes("not verified")) {
-        setLoginAlert({ kind: "unverified" });
-        return;
-      }
-
-      const attempts = incrementLoginAttempts(data.email);
-      setFailedAttempts(attempts);
-
-      if (attempts >= LOGIN_FAILURE_LIMIT) {
-        openLockout(data.email, Date.now() + LOCKOUT_MS);
-        return;
-      }
-
-      if (detail === "Invalid credentials." || status === 401) {
-        setLoginAlert({ kind: "credentials" });
-      } else {
-        setLoginAlert({ kind: "generic", message: detail });
-      }
+      const detail =
+        (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      addToast({ type: "error", message: detail ?? "Invalid credentials." });
     }
   };
 
-  const showFieldError = loginAlert !== null && !lockoutOpen;
-  const inputState = showFieldError ? inputErr : inputOk;
-
   return (
-    <AuthLayout
-      variant="login"
-      before={
-        <AccountLockedModal
-          open={lockoutOpen}
-          onClose={closeLockout}
-          unlockAt={lockoutUntil}
-        />
-      }
-    >
-          {sessionAlert && (
-            <AuthAlert
-              variant="session"
-              title="Session Expired"
-              onDismiss={dismissSessionAlert}
-            >
-              Your session timed out after 30 minutes of inactivity. Please sign in again.
-            </AuthAlert>
-          )}
+    <div className="min-h-screen flex" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-          <h2 className="text-[28px] font-bold text-gray-900">Welcome Back</h2>
-          <p className="mt-2 text-[14px] text-gray-500 mb-6">
-            Please enter your credentials to access your records.
+      {/* ── Left panel ─────────────────────────────────────────────── */}
+      <div className="hidden md:flex md:w-[38%] bg-[#6B0F12] flex-col justify-between relative overflow-hidden"
+           style={{ padding: "60px 48px", minHeight: "100vh" }}>
+        {/* Decorative blobs */}
+        <div className="absolute rounded-full bg-white/[0.04]"
+             style={{ width: 340, height: 340, top: -80, right: -100 }} />
+        <div className="absolute rounded-full bg-white/[0.06]"
+             style={{ width: 260, height: 260, bottom: 60, left: -80 }} />
+        <div className="absolute rounded-full bg-white/[0.04]"
+             style={{ width: 180, height: 180, bottom: 200, right: 20 }} />
+
+        <div className="relative z-10">
+          <h1 className="text-[52px] font-extrabold text-white leading-tight">
+            Welcome<br />Back
+          </h1>
+          <p className="text-[14px] mt-3 leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>
+            Sign in to access your research<br />and IP records.
           </p>
+        </div>
 
-          {loginAlert?.kind === "credentials" && (
-            <AuthAlert variant="error" title="Invalid email or password">
-              Please check your credentials and try again.
-              {failedAttempts > 0 && failedAttempts < LOGIN_FAILURE_LIMIT && (
-                <>
-                  {" "}
-                  One more failed attempt will lock your account.{" "}
-                  <strong>Attempt {failedAttempts} of {LOGIN_FAILURE_LIMIT}</strong>
-                </>
-              )}
-            </AuthAlert>
-          )}
+        <div className="relative z-10 text-[11px] leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
+          <div>Intelligent Research &amp; IP System</div>
+          <div>© 2026 Cebu Institute of Technology - University</div>
+        </div>
+      </div>
 
-          {loginAlert?.kind === "unverified" && (
-            <AuthAlert variant="warning" title="Email not verified">
-              Check your inbox for the verification link, or register again if it expired.
-            </AuthAlert>
-          )}
+      {/* ── Right panel ─────────────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center overflow-y-auto"
+           style={{ padding: "48px 40px" }}>
+        <div style={{ width: "100%", maxWidth: 420 }}>
 
-          {loginAlert?.kind === "generic" && (
-            <AuthAlert variant="error" title="Unable to sign in">
-              {loginAlert.message}
-            </AuthAlert>
-          )}
+          {/* Logo / brand */}
+          <div className="text-center mb-7">
+            <div className="text-[38px] font-extrabold tracking-[6px] text-[#6B0F12]">IRIS</div>
+            <p className="text-[13px] text-gray-500 mt-1">Intelligent Research &amp; IP System</p>
+          </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5" noValidate>
+          <h2 className="text-[22px] font-bold text-gray-900 text-center mb-6">Sign In</h2>
 
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+
+            {/* Email */}
             <div>
-              <label htmlFor="login-email" className="block text-[13px] font-semibold text-gray-900 mb-2">
+              <label className="block text-[12px] font-semibold text-gray-700 mb-1.5">
                 Email Address
               </label>
               <input
-                id="login-email"
                 {...register("email")}
                 type="email"
-                autoComplete="email"
-                placeholder="student@cit.edu"
-                disabled={lockoutOpen}
-                className={`${inputBase} ${inputState} ${errors.email ? inputErr : ""}`}
+                placeholder="you@cit.edu"
+                className={`w-full border rounded-lg px-3.5 py-2.5 text-[14px] bg-gray-50 outline-none
+                  transition-colors placeholder:text-gray-400
+                  ${errors.email
+                    ? "border-red-400 bg-red-50 focus:border-red-500"
+                    : "border-gray-300 focus:border-[#6B0F12] focus:bg-white"}`}
               />
               {errors.email && (
-                <p className="text-[12px] text-red-600 mt-1.5">{errors.email.message}</p>
+                <p className="text-[11px] text-red-600 mt-1">{errors.email.message}</p>
               )}
             </div>
 
+            {/* Password */}
             <div>
-              <label htmlFor="login-password" className="block text-[13px] font-semibold text-gray-900 mb-2">
+              <label className="block text-[12px] font-semibold text-gray-700 mb-1.5">
                 Password
               </label>
-              <div className="relative">
-                <input
-                  id="login-password"
-                  {...register("password")}
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  disabled={lockoutOpen}
-                  className={`${inputBase} pr-16 ${inputState} ${errors.password ? inputErr : ""}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-brand hover:underline"
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
+              <input
+                {...register("password")}
+                type="password"
+                placeholder="Your password"
+                className={`w-full border rounded-lg px-3.5 py-2.5 text-[14px] bg-gray-50 outline-none
+                  transition-colors placeholder:text-gray-400
+                  ${errors.password
+                    ? "border-red-400 bg-red-50 focus:border-red-500"
+                    : "border-gray-300 focus:border-[#6B0F12] focus:bg-white"}`}
+              />
               {errors.password && (
-                <p className="text-[12px] text-red-600 mt-1.5">{errors.password.message}</p>
+                <p className="text-[11px] text-red-600 mt-1">{errors.password.message}</p>
               )}
-            </div>
-
-            <div className="flex justify-end -mt-1">
-              <button
-                type="button"
-                className="text-[13px] font-semibold text-brand hover:underline"
-                onClick={() =>
-                  addToast({
-                    type: "info",
-                    message: "Password reset is not available yet. Contact your administrator.",
-                  })
-                }
-              >
-                Forgot password?
-              </button>
             </div>
 
             <button
               type="submit"
-              disabled={isSubmitting || lockoutOpen}
-              className="w-full py-3.5 rounded-lg text-[15px] font-semibold text-white transition-colors
-                bg-gold hover:bg-gold-dark disabled:bg-gray-300 disabled:cursor-not-allowed"
+              disabled={isSubmitting}
+              className="w-full py-3 rounded-lg text-[15px] font-semibold text-white transition-colors
+                bg-[#6B0F12] hover:bg-[#7d1215] disabled:bg-gray-300 disabled:cursor-not-allowed mt-1"
             >
-              {isSubmitting ? "Signing in…" : "Sign In"}
+              {isSubmitting ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-            <p className="text-[14px] text-gray-500">
-              Don&apos;t have an account?{" "}
-              <Link to="/signup" className="font-semibold text-brand hover:underline">
-                Register here
-              </Link>
-            </p>
-          </div>
+          <p className="text-[13px] text-gray-500 text-center mt-5">
+            No account?{" "}
+            <Link to="/signup" className="text-[#6B0F12] font-semibold hover:underline">
+              Sign up
+            </Link>
+          </p>
 
-    </AuthLayout>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { useUIStore } from "@/store/ui.store";
 import { useNotifications } from "@/hooks/useNotifications";
 import { apiClient } from "@/api/client";
 import { cn } from "@/lib/utils";
+import { STAFF_ROLES } from "@/lib/constants";
 import irisLogo from "@/assets/images/iris_logo.png";
 
 interface NavItem {
@@ -64,7 +65,13 @@ export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
-  const [workspaceBadge, setWorkspaceBadge] = useState(0);
+  const [workspaceBadge,    setWorkspaceBadge]    = useState(0);
+  const [roleRequestBadge, setRoleRequestBadge] = useState(0);
+
+  const isStaff =
+    user?.is_staff === true ||
+    user?.is_superuser === true ||
+    (user?.role_name != null && STAFF_ROLES.includes(user.role_name as typeof STAFF_ROLES[number]));
 
   useEffect(() => {
     apiClient
@@ -72,6 +79,14 @@ export function Sidebar({ className }: SidebarProps) {
       .then(({ data }) => setWorkspaceBadge(data.pending_mine ?? 0))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isStaff) return;
+    apiClient
+      .get<{ count: number; results: unknown[] }>("/users/role-requests/")
+      .then(({ data }) => setRoleRequestBadge(data.count ?? 0))
+      .catch(() => {});
+  }, [isStaff]);
 
   const initials = `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.toUpperCase();
   const onNavigate = () => closeSidebar();
@@ -135,6 +150,17 @@ export function Sidebar({ className }: SidebarProps) {
         <NavSection title="Research Exploration" items={explorationNav} onNavigate={onNavigate} />
         <NavSection title="IP Management" items={ipNav} onNavigate={onNavigate} />
         <NavSection title="Tools" items={toolsNav} onNavigate={onNavigate} />
+        {isStaff && (
+          <NavSection
+            title="Administration"
+            onNavigate={onNavigate}
+            items={[
+              { to: "/admin/users",         label: "Manage Users",   icon: "fa-users" },
+              { to: "/admin/role-requests",  label: "Role Requests",  icon: "fa-user-check", badge: roleRequestBadge },
+              { to: "/admin/audit",          label: "Audit Log",      icon: "fa-clipboard-list" },
+            ]}
+          />
+        )}
       </nav>
 
       <div className="px-4 py-3 border-t border-gray-100">
@@ -147,7 +173,7 @@ export function Sidebar({ className }: SidebarProps) {
               {user?.first_name} {user?.last_name}
             </div>
             <div className="text-[11px] text-gray-500 truncate">
-              {user?.role_name ?? user?.username}
+              {user?.role_name ?? user?.email}
             </div>
           </div>
         </div>
