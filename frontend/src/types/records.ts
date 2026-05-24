@@ -3,7 +3,7 @@ import type { PipelineStatus } from "@/lib/constants";
 export interface RecordOwner {
   id:         number;
   user:       number;
-  username:   string;
+  email:      string;
   full_name:  string;
   is_primary: boolean;
 }
@@ -17,6 +17,7 @@ export interface Author {
 export interface RecordListItem {
   id:                    number;
   title:                 string;
+  abstract:              string;
   year_accomplished:     number | null;
   classification_name:   string | null;
   record_type_name:      string | null;

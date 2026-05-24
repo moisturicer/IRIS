@@ -42,16 +42,16 @@ export default function EditRecordPage() {
   // Load existing record data
   useEffect(() => {
     if (!id) return;
-    recordsApi.get(Number(id)).then(({ data }) => {
+    recordsApi.detail(Number(id)).then(({ data }) => {
       methods.reset({
         title:         data.title,
-        abstract:      data.abstract,
-        year:          data.year,
+        abstract:      data.abstract ?? "",
+        year:          data.year_accomplished ?? new Date().getFullYear(),
         record_type:   data.record_type?.toString() ?? "",
-        research_type: data.research_type?.toString() ?? "",
-        authors:       data.authors ?? [],
-        keywords:      data.keywords ?? [],
-        owners:        data.owners?.map((o: { user_id: number }) => o.user_id) ?? [],
+        research_type: "",
+        authors:       data.authors?.map((a) => a.name) ?? [],
+        keywords:      [],
+        owners:        data.owners?.map((o) => o.user) ?? [],
       });
     }).finally(() => setLoading(false));
   }, [id]);
@@ -59,7 +59,12 @@ export default function EditRecordPage() {
   const handleSave = methods.handleSubmit(async (values) => {
     setSaving(true);
     try {
-      await recordsApi.update(Number(id), values);
+      await recordsApi.update(Number(id), {
+        title:             values.title,
+        abstract:          values.abstract,
+        year_accomplished: values.year,
+        record_type:       values.record_type ? Number(values.record_type) : undefined,
+      });
       addToast({ type: "success", message: "Record updated." });
       navigate(`/records/${id}`);
     } catch {

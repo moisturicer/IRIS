@@ -11,7 +11,7 @@ from .serializers import (
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer,
 )
-from .services import send_verification_email, activate_user, approve_role_request
+from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 
 
 class RegisterView(generics.CreateAPIView):
@@ -19,20 +19,22 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
     def perform_create(self, serializer):
-        user = serializer.save()
+        from django.db import transaction
+        with transaction.atomic():
+            user = serializer.save()
 
-        # Create a RoleRequest so admins can approve/decline
-        role_name = getattr(serializer, "_role_name", None)
-        if role_name:
-            from .models import Role
-            try:
-                role = Role.objects.get(name=role_name)
-                RoleRequest.objects.create(user=user, requested_role=role)
-            except Role.DoesNotExist:
-                pass  # Unknown role — skip silently; profile was not created either
+            # Create a RoleRequest so admins can approve/decline
+            role_name = getattr(serializer, "_role_name", None)
+            if role_name:
+                from .models import Role
+                try:
+                    role = Role.objects.get(name=role_name)
+                    RoleRequest.objects.create(user=user, requested_role=role)
+                except Role.DoesNotExist:
+                    pass  # Unknown role — skip silently
 
-        # Send email verification link
-        send_verification_email(user, self.request)
+            # Send email verification link (inside transaction so a crash rolls back the user)
+            send_verification_email(user, self.request)
 
 
 class LoginView(APIView):
@@ -40,9 +42,9 @@ class LoginView(APIView):
 
     def post(self, request):
         from django.contrib.auth import authenticate
-        username = request.data.get("username")
+        email    = request.data.get("email")
         password = request.data.get("password")
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=email, password=password)
         if not user:
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if not user.is_verified:
@@ -196,24 +198,24 @@ class RoleRequestDetailView(APIView):
         if action == "approve":
             approve_role_request(role_request, reviewed_by=request.user)
         elif action == "decline":
-            role_request.status = "declined"
-            role_request.reviewed_by = request.user
-            role_request.save()
+            decline_role_request(role_request, reviewed_by=request.user)
         return Response(RoleRequestSerializer(role_request).data)
 
 
 # ---- Reference data views -----------------------------------------------
 
 class CollegeListView(generics.ListAPIView):
+    """Public — needed on the signup page before the user has a token."""
     serializer_class   = CollegeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class   = LargeResultsPagination
     queryset           = College.objects.all()
 
 
 class DepartmentListView(generics.ListAPIView):
+    """Public — needed on the signup page before the user has a token."""
     serializer_class   = DepartmentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class   = LargeResultsPagination
 
     def get_queryset(self):
@@ -225,8 +227,9 @@ class DepartmentListView(generics.ListAPIView):
 
 
 class CourseListView(generics.ListAPIView):
+    """Public — needed on the signup page before the user has a token."""
     serializer_class   = CourseSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class   = LargeResultsPagination
 
     def get_queryset(self):

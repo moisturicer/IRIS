@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -66,7 +66,17 @@ export default function RecordDetailPage() {
           </div>
         </div>
 
-        {/* TODO: add Documents section (RecordFile list with download buttons) */}
+        {/* Documents link */}
+        <div className="pt-2 border-t border-gray-100 flex gap-2">
+          <Link
+            to={`/records/${id}/documents`}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#6B0F12] text-white text-[13px] font-semibold hover:bg-[#7d1215] transition-colors"
+          >
+            <i className="fas fa-folder-open text-[12px]" />
+            View Documents
+          </Link>
+        </div>
+
         {/* TODO: add Review History section for staff/reviewer roles */}
       </div>
     </div>

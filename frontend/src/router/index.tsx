@@ -27,8 +27,10 @@ import DocumentsPage        from "@/features/documents/DocumentsPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import UserListPage         from "@/features/accounts/UserListPage";
+import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
 import FolderBrowserPage    from "@/features/storage/FolderBrowserPage";
 import AIHubPage            from "@/features/ai/AIHubPage";
+import HelpPage             from "@/features/help/HelpPage";
 
 export const router = createBrowserRouter([
   // Public routes
@@ -43,49 +45,46 @@ export const router = createBrowserRouter([
       {
         element: <AppShell />,
         children: [
-          { index: true,          element: <DashboardPage /> },
-          { path: "records",      element: <PublishedRecordsPage /> },
-          { path: "records/:id",  element: <RecordDetailPage /> },
-          { path: "records/add",       element: <AddRecordPage /> },
-          { path: "records/mine",      element: <MyRecordsPage /> },
-          { path: "records/:id/edit",  element: <EditRecordPage /> },
-          { path: "records/:id/documents", element: <DocumentsPage /> },
+          { index: true, element: <DashboardPage />, handle: { crumb: "Discover" } },
+          { path: "records", element: <PublishedRecordsPage />, handle: { crumb: "Published Records" } },
+          { path: "records/:id", element: <RecordDetailPage />, handle: { crumb: "Record Detail" } },
+          { path: "records/add", element: <AddRecordPage />, handle: { crumb: "Add Record" } },
+          { path: "records/mine", element: <MyRecordsPage />, handle: { crumb: "My Records" } },
+          { path: "records/:id/edit", element: <EditRecordPage />, handle: { crumb: "Edit Record" } },
+          { path: "records/:id/documents", element: <DocumentsPage />, handle: { crumb: "Documents" } },
 
-          // Import -- reviewer+ only
           {
             element: <RoleRoute allowed={[ROLES.ADVISER, ROLES.KTTO, ROLES.RDCO, ROLES.ITSO, ROLES.TBI]} />,
             children: [
-              { path: "records/import", element: <ImportRecordsPage /> },
+              { path: "records/import", element: <ImportRecordsPage />, handle: { crumb: "Import Records" } },
             ],
           },
 
-          // Review pipeline -- reviewer+ only
           {
             element: <RoleRoute allowed={REVIEWER_ROLES} />,
             children: [
-              { path: "review/pending",         element: <PendingRecordsPage /> },
-              { path: "review/approved",        element: <ApprovedRecordsPage /> },
-              { path: "review/declined",        element: <DeclinedRecordsPage /> },
-              { path: "review/:id/evaluate",    element: <EvaluationPage /> },
+              { path: "review/pending", element: <PendingRecordsPage />, handle: { crumb: "Pending Review" } },
+              { path: "review/approved", element: <ApprovedRecordsPage />, handle: { crumb: "Approved" } },
+              { path: "review/declined", element: <DeclinedRecordsPage />, handle: { crumb: "Declined" } },
+              { path: "review/:id/evaluate", element: <EvaluationPage />, handle: { crumb: "Evaluate" } },
             ],
           },
 
-          // Admin / staff -- KTTO, RDCO, ITSO, TBI
           {
             element: <RoleRoute allowed={STAFF_ROLES} />,
             children: [
-              { path: "admin/users",    element: <UserListPage /> },
-              { path: "admin/audit",    element: <AuditLogPage /> },
-              { path: "admin/sessions", element: <div>TODO: ActiveSessionsPage</div> },
-              // TODO: add RoleRequestsPage, LockedAccountsPage routes
+              { path: "admin/users",        element: <UserListPage />,      handle: { crumb: "Manage Users" } },
+              { path: "admin/role-requests",element: <RoleRequestsPage />,  handle: { crumb: "Role Requests" } },
+              { path: "admin/audit",        element: <AuditLogPage />,      handle: { crumb: "Audit Log" } },
+              { path: "admin/sessions",     element: <div className="p-6 text-[13px] text-gray-500">Active sessions — coming soon.</div>, handle: { crumb: "Sessions" } },
             ],
           },
 
-          { path: "notifications", element: <NotificationsPage /> },
-          { path: "storage",             element: <FolderBrowserPage /> },
-          { path: "storage/:folderId",   element: <FolderBrowserPage /> },
-          { path: "ai",            element: <AIHubPage /> },
-          { path: "help",          element: <div>TODO: HelpPage (static manual content)</div> },
+          { path: "notifications", element: <NotificationsPage />, handle: { crumb: "Notifications" } },
+          { path: "storage", element: <FolderBrowserPage />, handle: { crumb: "Storage" } },
+          { path: "storage/:folderId", element: <FolderBrowserPage />, handle: { crumb: "Storage" } },
+          { path: "ai", element: <AIHubPage />, handle: { crumb: "AI Research Hub" } },
+          { path: "help", element: <HelpPage />, handle: { crumb: "Help" } },
         ],
       },
     ],

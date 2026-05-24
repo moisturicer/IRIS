@@ -80,7 +80,7 @@ export default function FolderBrowserPage() {
       <PageHeader
         title="File Storage"
         description="Organize and manage your uploaded files."
-        action={
+        actions={
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <i className="fa fa-folder-plus" /> New Folder
           </Button>
