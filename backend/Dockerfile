@@ -15,10 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements/base.txt requirements/base.txt
 COPY requirements/production.txt requirements/production.txt
+COPY requirements/development.txt requirements/development.txt
+
+ARG REQUIREMENT_FILE=production.txt
 
 # Install into a local prefix so we can COPY it to the runtime stage
 RUN pip install --prefix=/install --no-cache-dir \
-    -r requirements/production.txt
+    -r requirements/${REQUIREMENT_FILE}
 
 # ------ runtime ------
 FROM python:3.12-slim
@@ -39,6 +42,12 @@ COPY --from=builder /install /usr/local
 
 # Copy application code
 COPY . .
+
+# Create a non-root user and change ownership of the app directory
+RUN useradd -m appuser && chown -R appuser:appuser /app
+
+# Switch to the non-root user
+USER appuser
 
 # Collect static files (WhiteNoise will serve them)
 # TODO: run this during CI/CD, not at image build time in production

@@ -12,4 +12,5 @@ export interface Notification {
   recipient:         number | null;
   broadcast_to_role: number | null;
   created_at:        string;
+  is_read:           boolean;
 }

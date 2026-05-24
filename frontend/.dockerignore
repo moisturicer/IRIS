@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

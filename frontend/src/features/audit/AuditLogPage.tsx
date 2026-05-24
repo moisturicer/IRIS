@@ -13,8 +13,7 @@ import { Button }        from "@/components/ui/Button";
 import { Badge }         from "@/components/ui/Badge";
 import { formatDate }    from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { AuditEventType } from "@/types/audit";
-import type { AuditEvent } from "@/types/audit";
+import type { AuditEvent, AuditEventType } from "@/types/audit";
 
 const EVENT_COLORS: Record<string, Parameters<typeof Badge>[0]["variant"]> = {
   LOGIN:    "success",
@@ -81,7 +80,7 @@ export default function AuditLogPage() {
   const [total, setTotal]       = useState(0);
   const [page, setPage]         = useState(1);
   const [search, setSearch]     = useState("");
-  const [eventType, setEventType] = useState("");
+  const [eventType, setEventType] = useState<AuditEventType | "">("");
 
   const load = (p = page) => {
     setLoading(true);
@@ -118,7 +117,7 @@ export default function AuditLogPage() {
         />
         <select
           value={eventType}
-          onChange={(e) => { setEventType(e.target.value); setPage(1); }}
+          onChange={(e) => { setEventType(e.target.value as AuditEventType | ""); setPage(1); }}
           className="border border-gray-300 rounded-lg px-3 text-[13px] text-gray-700 outline-none
             focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12]"
         >
