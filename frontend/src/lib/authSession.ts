@@ -45,8 +45,7 @@ export function clearLockout(email: string): void {
 
 /** NFR-S2 — send user to login with session-expired banner */
 export function redirectToLoginSessionExpired(): void {
-  const path = "/login?reason=session_expired";
   if (window.location.pathname !== "/login") {
-    window.location.href = path;
+    window.location.href = "/login?reason=session_expired";
   }
 }

@@ -5,7 +5,6 @@ import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useUIStore } from "@/store/ui.store";
-import { COURSES } from "@/lib/signupData";
 import irisLogo from "@/assets/images/iris_logo.png";
 
 const schema = z
@@ -62,7 +61,6 @@ export default function SignupPage() {
         password:         data.password,
         confirm_password: data.confirmPassword,
         role_name:        "Student",
-        course_id:        COURSES[0]?.id,
       });
 
       addToast({

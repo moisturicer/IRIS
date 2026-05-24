@@ -4,12 +4,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/api/auth";
 
 export function Header() {
-  const { logout, user }     = useAuth();
-  const { unreadCount }      = useNotifications();
+  const { logout, refreshToken } = useAuth();
+  const { unreadCount }          = useNotifications();
 
   const handleLogout = async () => {
-    const refresh = localStorage.getItem("refresh_token") ?? "";
-    await authApi.logout(refresh).catch(() => {});
+    await authApi.logout(refreshToken ?? "").catch(() => {});
     logout();
   };
 
