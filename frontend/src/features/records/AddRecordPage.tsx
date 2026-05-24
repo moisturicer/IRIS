@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 
 /**
@@ -14,7 +13,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
  */
 export default function AddRecordPage() {
   const [step, setStep]  = useState(1);
-  const navigate         = useNavigate();
 
   const steps = ["Title & Abstract", "Record Details", "Uploads"];
 

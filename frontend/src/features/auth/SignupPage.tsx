@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useUIStore } from "@/store/ui.store";
 import { COURSES } from "@/lib/signupData";
-import irisLogo from "@/assets/images/iris_logo.png";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 
 const schema = z
   .object({
@@ -96,59 +96,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row font-sans">
-
-      {/* ── Left: branding ─────────────────────────────────────────── */}
-      <div className="relative lg:w-1/2 bg-cream flex flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 lg:px-14 lg:py-12 min-h-[360px] lg:min-h-screen">
-
-        <div className="absolute rounded-full bg-white/60 pointer-events-none"
-             style={{ width: 280, height: 280, top: -60, right: -40 }} />
-        <div className="absolute rounded-full bg-white/40 pointer-events-none"
-             style={{ width: 200, height: 200, bottom: 100, left: -50 }} />
-        <div className="absolute rounded-full bg-white/50 pointer-events-none"
-             style={{ width: 160, height: 160, top: "45%", right: 30 }} />
-
-        <div className="relative z-10 flex-1 flex flex-col">
-          <div className="flex items-center gap-3">
-            <img src={irisLogo} alt="" className="h-11 w-11 object-contain shrink-0" />
-            <span className="text-[22px] font-extrabold text-brand tracking-wide">IRIS</span>
-          </div>
-
-          <h1 className="mt-10 sm:mt-14 font-serif leading-[1.05]">
-            <span className="block text-[42px] sm:text-[48px] font-bold text-gold">The</span>
-            <span className="block text-[42px] sm:text-[48px] font-bold text-brand">
-              Academic
-            </span>
-            <span className="block text-[42px] sm:text-[48px] font-bold text-brand">
-              Curator.
-            </span>
-          </h1>
-
-          <p className="mt-6 text-[14px] sm:text-[15px] text-brand/90 leading-relaxed max-w-md">
-            Welcome to the Digital Vault of CIT-U Intellectual Property. A prestigious archive
-            for students and researchers to safeguard and manage their academic assets.
-          </p>
-
-          <blockquote className="mt-8 pl-5 border-l-4 border-gold max-w-md">
-            <p className="font-serif italic text-[15px] sm:text-[16px] text-brand leading-relaxed">
-              &ldquo;Transforming complex IP data into a high-end editorial experience that feels
-              as permanent as a physical archive.&rdquo;
-            </p>
-            <footer className="mt-3 text-[11px] font-semibold tracking-[0.1em] text-gold uppercase">
-              Cebu Institute of Technology – University
-            </footer>
-          </blockquote>
-        </div>
-
-        <p className="relative z-10 text-[11px] text-gray-400 mt-10">
-          © 2026 Cebu Institute of Technology - University
-        </p>
-      </div>
-
-      {/* ── Right: signup form ─────────────────────────────────────── */}
-      <div className="flex-1 lg:w-1/2 bg-white flex items-center justify-center px-8 py-12 sm:px-12 lg:px-16">
-        <div className="w-full max-w-[400px]">
-
+    <AuthLayout variant="signup">
           <h2 className="text-[28px] font-bold text-gray-900">Create an Account</h2>
           <p className="mt-2 text-[14px] text-gray-500 mb-8">
             Enter your details to register for IRIS.
@@ -251,8 +199,6 @@ export default function SignupPage() {
             </p>
           </div>
 
-        </div>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

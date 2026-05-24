@@ -164,13 +164,13 @@ export default function UserListPage() {
       <ConfirmDialog
         open={!!lockTarget}
         title={lockTarget?.is_locked ? "Unlock account?" : "Lock account?"}
-        description={
+        message={
           lockTarget?.is_locked
             ? `${lockTarget.username} will be able to log in again.`
             : `${lockTarget?.username} will be prevented from logging in.`
         }
         confirmLabel={lockTarget?.is_locked ? "Unlock" : "Lock"}
-        variant={lockTarget?.is_locked ? "default" : "danger"}
+        danger={!lockTarget?.is_locked}
         onConfirm={handleToggleLock}
         onCancel={() => setLockTarget(null)}
       />

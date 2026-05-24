@@ -11,7 +11,6 @@ import { documentsApi } from "@/api/documents";
 import { PageHeader }   from "@/components/layout/PageHeader";
 import { EmptyState }   from "@/components/shared/EmptyState";
 import { FileUploadZone } from "@/components/shared/FileUploadZone";
-import { Button }       from "@/components/ui/Button";
 import { Badge }        from "@/components/ui/Badge";
 import { useUIStore }   from "@/store/ui.store";
 import { formatDate }   from "@/lib/utils";

@@ -18,7 +18,7 @@ import {
   resetLoginAttempts,
   setLockoutUntil,
 } from "@/lib/authSession";
-import irisLogo from "@/assets/images/iris_logo.png";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 
 const LOCKOUT_MS = 15 * 60 * 1000;
 
@@ -157,67 +157,16 @@ export default function LoginPage() {
   const inputState = showFieldError ? inputErr : inputOk;
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row font-sans relative">
-
-      <AccountLockedModal
-        open={lockoutOpen}
-        onClose={closeLockout}
-        unlockAt={lockoutUntil}
-      />
-
-      {/* ── Left: branding ─────────────────────────────────────────── */}
-      <div className="relative lg:w-1/2 bg-cream flex flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 lg:px-14 lg:py-12 min-h-[320px] lg:min-h-screen">
-
-        <div className="absolute rounded-full bg-white/60 pointer-events-none"
-             style={{ width: 280, height: 280, top: -60, right: -40 }} />
-        <div className="absolute rounded-full bg-white/40 pointer-events-none"
-             style={{ width: 200, height: 200, bottom: 120, left: -50 }} />
-        <div className="absolute rounded-full bg-white/50 pointer-events-none"
-             style={{ width: 140, height: 140, bottom: 280, right: 60 }} />
-
-        <div className="relative z-10">
-          <img src={irisLogo} alt="IRIS" className="h-14 w-14 object-contain" />
-
-          <p className="mt-5 text-[11px] font-semibold tracking-[0.12em] text-gold uppercase leading-snug max-w-[280px]">
-            Cebu Institute of Technology – University
-          </p>
-
-          <h1 className="mt-4 text-[56px] sm:text-[64px] font-extrabold text-brand leading-none tracking-tight">
-            IRIS
-          </h1>
-
-          <p className="mt-3 text-[15px] font-medium text-gray-700">
-            Intelligent Research &amp; IP System
-          </p>
-          <p className="mt-2 text-[13px] text-gray-500 leading-relaxed max-w-sm">
-            Securely managing the university&apos;s innovation and research assets.
-          </p>
-        </div>
-
-        <div className="relative z-10 flex gap-12 sm:gap-16 mt-10 lg:mt-0">
-          <div>
-            <div className="text-[32px] font-bold text-brand leading-none">1,200+</div>
-            <div className="mt-1 text-[10px] font-bold tracking-[0.14em] text-brand uppercase">
-              Registered Assets
-            </div>
-          </div>
-          <div>
-            <div className="text-[32px] font-bold text-brand leading-none">450+</div>
-            <div className="mt-1 text-[10px] font-bold tracking-[0.14em] text-brand uppercase">
-              Active Patents
-            </div>
-          </div>
-        </div>
-
-        <p className="relative z-10 text-[11px] text-gray-400 mt-8 lg:mt-0 text-center lg:text-left">
-          © 2026 Cebu Institute of Technology - University
-        </p>
-      </div>
-
-      {/* ── Right: login form ──────────────────────────────────────── */}
-      <div className="flex-1 lg:w-1/2 bg-white flex items-center justify-center px-8 py-12 sm:px-12 lg:px-16 relative">
-        <div className="w-full max-w-[400px]">
-
+    <AuthLayout
+      variant="login"
+      before={
+        <AccountLockedModal
+          open={lockoutOpen}
+          onClose={closeLockout}
+          unlockAt={lockoutUntil}
+        />
+      }
+    >
           {sessionAlert && (
             <AuthAlert
               variant="session"
@@ -339,8 +288,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-        </div>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

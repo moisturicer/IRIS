@@ -45,32 +45,44 @@ This document tracks what we can build **now** against the SRS/SDD and current b
 
 ---
 
-## Phase 1 — App shell & navigation (next)
+## Phase 1 — App shell & navigation (done)
 
-Matches Discover dashboard wireframe structure; reuse existing `AppShell`, `Sidebar`, `Header`.
+Matches Discover dashboard wireframe structure; `AppShell`, `Sidebar`, `Header`, `Breadcrumbs`, `ForbiddenPage`.
 
-| Task | Priority | SRS module |
-|------|----------|------------|
-| Rebrand sidebar (IR logo, “CIT-U Research Hub”, grouped nav) | High | FR-M1 responsive UI |
-| Discover / Home route as default landing | High | — |
-| Sign out in header | High | FR-M6-01 |
-| Breadcrumbs (`Home / Discover`) | Medium | — |
-| Mobile sidebar drawer | High | NFR-U3 (360px+) |
+| Task | Priority | SRS module | Status |
+|------|----------|------------|--------|
+| Rebrand sidebar (IR logo, “CIT-U Research Hub”, grouped nav) | High | FR-M1 responsive UI | Done |
+| Discover / Home route as default landing | High | — | Done (nav label + dashboard title) |
+| Sign out in header | High | FR-M6-01 | Done |
+| Breadcrumbs (`Home / Discover`) | Medium | — | Done (`Breadcrumbs` + route `handle.crumb`) |
+| Mobile sidebar drawer | High | NFR-U3 (360px+) | Done (overlay + hamburger) |
+| HTTP 403 forbidden page | High | FR-M6-03 | Done (`ForbiddenPage`, `RoleRoute`) |
+| Help page stub | Low | — | Done (`HelpPage`) |
+
+**How to test**
+
+1. Resize to &lt;1024px → open menu with hamburger; tap overlay or × to close.
+2. Log in as **Student** → open `/review/pending` → 403 diagnostic (STUDENT vs required role badges).
+3. Breadcrumbs on `/records`, `/ai`, etc. show `Home / …`.
+4. Sidebar shows logo, **CIT-U Research Hub**, grouped sections (Discover, Research, …).
 
 **Routes to wire (already in router):** Dashboard, Published Records, My Records, Review queue, AI Hub, Storage, Notifications, Admin users/audit.
 
 ---
 
-## Phase 2 — Discover / dashboard (wireframe)
+## Phase 2 — Discover / dashboard (done)
 
-| Task | API (if any) | Notes |
-|------|----------------|-------|
-| Hero + RAG tagline | — | Static copy from mockup |
-| Global search bar (UI only) | `GET /api/...` semantic search later | Submit → AI hub or search results page |
-| Filter chips (CS, Patents, etc.) | — | Client-side filter stub |
-| Spotlight research cards | `GET /api/records/?status=published` | Read full text → record detail; Summarize → AI hub |
-| Recently indexed list | Same list, `ordering=-created_at` | |
-| Trending topics sidebar | Static or tags from records | |
+| Task | API (if any) | Status |
+|------|----------------|--------|
+| Hero + RAG tagline | — | Done |
+| Search + chips | `GET /api/records/?search=` | Done (DRF search) |
+| Spotlight cards | `GET /api/records/` (published) | Done — dynamic |
+| Recently indexed | `ordering=-created_at` | Done |
+| Trending topics | From classifications + defaults | Done |
+| Discover sub-header (bell + sign out) | `/notifications/` | Done |
+| Sidebar wireframe nav | `/dashboard/stats/` badge | Done |
+
+**Notifications UX:** Bell dropdown on Discover + other pages; sidebar **Notifications** link with unread badge (no second dropdown in sidebar).
 
 ---
 

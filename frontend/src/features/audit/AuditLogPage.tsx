@@ -13,6 +13,7 @@ import { Button }        from "@/components/ui/Button";
 import { Badge }         from "@/components/ui/Badge";
 import { formatDate }    from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
+import type { AuditEventType } from "@/types/audit";
 import type { AuditEvent } from "@/types/audit";
 
 const EVENT_COLORS: Record<string, Parameters<typeof Badge>[0]["variant"]> = {
@@ -85,7 +86,7 @@ export default function AuditLogPage() {
   const load = (p = page) => {
     setLoading(true);
     auditApi
-      .list({ page: p, search, event_type: eventType || undefined })
+      .list({ page: p, search, event_type: (eventType || undefined) as AuditEventType | undefined })
       .then(({ data }) => {
         setEvents(data.results);
         setTotal(data.count);
