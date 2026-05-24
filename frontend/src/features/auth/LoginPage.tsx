@@ -1,134 +1,263 @@
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import type { FormikHelpers } from "formik";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
-import { useUIStore } from "@/store/ui.store";
+import { AuthAlert } from "@/components/auth/AuthAlert";
+import { AccountLockedModal } from "@/components/auth/AccountLockedModal";
+import { LoginForm, type LoginFormValues } from "@/components/auth/LoginForm";
+import {
+  clearLockout,
+  getLockoutUntil,
+  getLoginAttempts,
+  incrementLoginAttempts,
+  isAccountLocked,
+  LOGIN_FAILURE_LIMIT,
+  resetLoginAttempts,
+  setLockoutUntil,
+} from "@/lib/authSession";
+import { getRoleDashboardPath } from "@/lib/roleDashboard";
+import irisLogo from "@/assets/images/iris_logo.png";
 
-const schema = z.object({
-  email:    z.string().min(1, "Email is required.").email("Enter a valid email address."),
-  password: z.string().min(1, "Password is required."),
-});
+const LOCKOUT_MS = 15 * 60 * 1000;
 
-type FormData = z.infer<typeof schema>;
+type LoginAlert =
+  | { kind: "credentials" }
+  | { kind: "unverified" }
+  | { kind: "generic"; message: string };
 
 export default function LoginPage() {
-  const navigate     = useNavigate();
-  const { login }    = useAuth();
-  const { addToast } = useUIStore();
+  const navigate       = useNavigate();
+  const location       = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { login }      = useAuth();
+  const [loginAlert, setLoginAlert]     = useState<LoginAlert | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutOpen, setLockoutOpen]   = useState(false);
+  const [lockoutUntil, setLockoutUntilState] = useState<number | undefined>();
+  const [lockoutIdentifier, setLockoutIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const sessionExpiredFromState =
+    (location.state as { reason?: string } | null)?.reason === "session_expired";
+  const [sessionAlert, setSessionAlert] = useState(
+    () => searchParams.get("reason") === "session_expired" || sessionExpiredFromState
+  );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  useEffect(() => {
+    if (
+      searchParams.get("reason") === "session_expired" ||
+      (location.state as { reason?: string } | null)?.reason === "session_expired"
+    ) {
+      setSessionAlert(true);
+    }
+  }, [searchParams, location.state]);
 
-  const onSubmit = async (data: FormData) => {
-    try {
-      const res = await authApi.login(data);
-      login(res.data.user, res.data.access, res.data.refresh);
-      navigate("/");
-    } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
-      addToast({ type: "error", message: detail ?? "Invalid credentials." });
+  useEffect(() => {
+    if (!identifier) return;
+    const until = getLockoutUntil(identifier);
+    if (until) {
+      setLockoutIdentifier(identifier);
+      setLockoutUntilState(until);
+      setLockoutOpen(true);
+    }
+    setFailedAttempts(getLoginAttempts(identifier));
+  }, [identifier]);
+
+  const dismissSessionAlert = () => {
+    setSessionAlert(false);
+    if (searchParams.get("reason")) {
+      searchParams.delete("reason");
+      setSearchParams(searchParams, { replace: true });
+    }
+    if ((location.state as { reason?: string } | null)?.reason === "session_expired") {
+      navigate("/login", { replace: true, state: null });
     }
   };
 
-  return (
-    <div className="min-h-screen flex" style={{ fontFamily: "'Inter', sans-serif" }}>
+  const openLockout = (forIdentifier: string, untilMs: number) => {
+    setLockoutUntil(forIdentifier, untilMs);
+    setLockoutIdentifier(forIdentifier);
+    setLockoutUntilState(untilMs);
+    setLockoutOpen(true);
+    setLoginAlert(null);
+  };
 
-      {/* ── Left panel ─────────────────────────────────────────────── */}
-      <div className="hidden md:flex md:w-[38%] bg-[#6B0F12] flex-col justify-between relative overflow-hidden"
-           style={{ padding: "60px 48px", minHeight: "100vh" }}>
-        {/* Decorative blobs */}
-        <div className="absolute rounded-full bg-white/[0.04]"
-             style={{ width: 340, height: 340, top: -80, right: -100 }} />
-        <div className="absolute rounded-full bg-white/[0.06]"
-             style={{ width: 260, height: 260, bottom: 60, left: -80 }} />
-        <div className="absolute rounded-full bg-white/[0.04]"
-             style={{ width: 180, height: 180, bottom: 200, right: 20 }} />
+  const closeLockout = () => {
+    setLockoutOpen(false);
+    if (lockoutIdentifier && lockoutUntil && lockoutUntil <= Date.now()) {
+      clearLockout(lockoutIdentifier);
+    }
+  };
+
+  const handleLogin = async (
+    data: LoginFormValues,
+    { setSubmitting }: FormikHelpers<LoginFormValues>
+  ) => {
+    setLoginAlert(null);
+
+    const loginId = data.identifier.trim();
+
+    if (isAccountLocked(loginId)) {
+      openLockout(loginId, getLockoutUntil(loginId)!);
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await authApi.login({ email: loginId, password: data.password });
+      resetLoginAttempts(loginId);
+      clearLockout(loginId);
+      login(res.data.user, res.data.access, res.data.refresh);
+      navigate(getRoleDashboardPath(res.data.user.role_name), { replace: true });
+    } catch (err: unknown) {
+      const res = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
+      const detail = res?.data?.detail ?? "Invalid email or password.";
+      const status = res?.status;
+      const detailLower = detail.toLowerCase();
+
+      const locked =
+        status === 403 &&
+        (detailLower.includes("locked") || detailLower.includes("locked out"));
+
+      if (locked) {
+        openLockout(loginId, Date.now() + LOCKOUT_MS);
+        setSubmitting(false);
+        return;
+      }
+
+      if (status === 403 && detailLower.includes("not verified")) {
+        setLoginAlert({ kind: "unverified" });
+        setSubmitting(false);
+        return;
+      }
+
+      const attempts = incrementLoginAttempts(loginId);
+      setFailedAttempts(attempts);
+
+      if (attempts >= LOGIN_FAILURE_LIMIT) {
+        openLockout(loginId, Date.now() + LOCKOUT_MS);
+        setSubmitting(false);
+        return;
+      }
+
+      if (detail === "Invalid credentials." || status === 401) {
+        setLoginAlert({ kind: "credentials" });
+      } else {
+        setLoginAlert({ kind: "generic", message: detail });
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const showFieldError = loginAlert !== null && !lockoutOpen;
+
+  return (
+    <div className="min-h-screen flex flex-col lg:flex-row font-sans relative">
+
+      <AccountLockedModal
+        open={lockoutOpen}
+        onClose={closeLockout}
+        unlockAt={lockoutUntil}
+      />
+
+      <div className="relative lg:w-1/2 bg-cream flex flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 lg:px-14 lg:py-12 min-h-[320px] lg:min-h-screen">
+
+        <div className="absolute rounded-full bg-white/60 pointer-events-none"
+             style={{ width: 280, height: 280, top: -60, right: -40 }} />
+        <div className="absolute rounded-full bg-white/40 pointer-events-none"
+             style={{ width: 200, height: 200, bottom: 120, left: -50 }} />
+        <div className="absolute rounded-full bg-white/50 pointer-events-none"
+             style={{ width: 140, height: 140, bottom: 280, right: 60 }} />
 
         <div className="relative z-10">
-          <h1 className="text-[52px] font-extrabold text-white leading-tight">
-            Welcome<br />Back
+          <img src={irisLogo} alt="IRIS" className="h-14 w-14 object-contain" />
+
+          <p className="mt-5 text-[11px] font-semibold tracking-[0.12em] text-gold uppercase leading-snug max-w-[280px]">
+            Cebu Institute of Technology – University
+          </p>
+
+          <h1 className="mt-4 text-[56px] sm:text-[64px] font-extrabold text-brand leading-none tracking-tight">
+            IRIS
           </h1>
-          <p className="text-[14px] mt-3 leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>
-            Sign in to access your research<br />and IP records.
+
+          <p className="mt-3 text-[15px] font-medium text-gray-700">
+            Intelligent Research &amp; IP System
+          </p>
+          <p className="mt-2 text-[13px] text-gray-500 leading-relaxed max-w-sm">
+            Securely managing the university&apos;s innovation and research assets.
           </p>
         </div>
 
-        <div className="relative z-10 text-[11px] leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
-          <div>Intelligent Research &amp; IP System</div>
-          <div>© 2026 Cebu Institute of Technology - University</div>
+        <div className="relative z-10 flex gap-12 sm:gap-16 mt-10 lg:mt-0">
+          <div>
+            <div className="text-[32px] font-bold text-brand leading-none">1,200+</div>
+            <div className="mt-1 text-[10px] font-bold tracking-[0.14em] text-brand uppercase">
+              Registered Assets
+            </div>
+          </div>
+          <div>
+            <div className="text-[32px] font-bold text-brand leading-none">450+</div>
+            <div className="mt-1 text-[10px] font-bold tracking-[0.14em] text-brand uppercase">
+              Active Patents
+            </div>
+          </div>
         </div>
+
+        <p className="relative z-10 text-[11px] text-gray-400 mt-8 lg:mt-0 text-center lg:text-left">
+          © 2026 Cebu Institute of Technology - University
+        </p>
       </div>
 
-      {/* ── Right panel ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center overflow-y-auto"
-           style={{ padding: "48px 40px" }}>
-        <div style={{ width: "100%", maxWidth: 420 }}>
+      <div className="flex-1 lg:w-1/2 bg-white flex items-center justify-center px-8 py-12 sm:px-12 lg:px-16 relative">
+        <div className="w-full max-w-[400px]">
 
-          {/* Logo / brand */}
-          <div className="text-center mb-7">
-            <div className="text-[38px] font-extrabold tracking-[6px] text-[#6B0F12]">IRIS</div>
-            <p className="text-[13px] text-gray-500 mt-1">Intelligent Research &amp; IP System</p>
-          </div>
-
-          <h2 className="text-[22px] font-bold text-gray-900 text-center mb-6">Sign In</h2>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-
-            {/* Email */}
-            <div>
-              <label className="block text-[12px] font-semibold text-gray-700 mb-1.5">
-                Email Address
-              </label>
-              <input
-                {...register("email")}
-                type="email"
-                placeholder="you@cit.edu"
-                className={`w-full border rounded-lg px-3.5 py-2.5 text-[14px] bg-gray-50 outline-none
-                  transition-colors placeholder:text-gray-400
-                  ${errors.email
-                    ? "border-red-400 bg-red-50 focus:border-red-500"
-                    : "border-gray-300 focus:border-[#6B0F12] focus:bg-white"}`}
-              />
-              {errors.email && (
-                <p className="text-[11px] text-red-600 mt-1">{errors.email.message}</p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-[12px] font-semibold text-gray-700 mb-1.5">
-                Password
-              </label>
-              <input
-                {...register("password")}
-                type="password"
-                placeholder="Your password"
-                className={`w-full border rounded-lg px-3.5 py-2.5 text-[14px] bg-gray-50 outline-none
-                  transition-colors placeholder:text-gray-400
-                  ${errors.password
-                    ? "border-red-400 bg-red-50 focus:border-red-500"
-                    : "border-gray-300 focus:border-[#6B0F12] focus:bg-white"}`}
-              />
-              {errors.password && (
-                <p className="text-[11px] text-red-600 mt-1">{errors.password.message}</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 rounded-lg text-[15px] font-semibold text-white transition-colors
-                bg-[#6B0F12] hover:bg-[#7d1215] disabled:bg-gray-300 disabled:cursor-not-allowed mt-1"
+          {sessionAlert && (
+            <AuthAlert
+              variant="session"
+              title="Session Expired"
+              onDismiss={dismissSessionAlert}
             >
-              {isSubmitting ? "Signing in..." : "Sign In"}
-            </button>
-          </form>
+              Your session timed out after 30 minutes of inactivity. Please sign in again.
+            </AuthAlert>
+          )}
+
+          <h2 className="text-[28px] font-bold text-gray-900">Welcome Back</h2>
+          <p className="mt-2 text-[14px] text-gray-500 mb-6">
+            Please enter your credentials to access your records.
+          </p>
+
+          {loginAlert?.kind === "credentials" && (
+            <AuthAlert variant="error" title="Invalid email or password">
+              Please check your credentials and try again.
+              {failedAttempts > 0 && failedAttempts < LOGIN_FAILURE_LIMIT && (
+                <>
+                  {" "}
+                  One more failed attempt will lock your account.{" "}
+                  <strong>Attempt {failedAttempts} of {LOGIN_FAILURE_LIMIT}</strong>
+                </>
+              )}
+            </AuthAlert>
+          )}
+
+          {loginAlert?.kind === "unverified" && (
+            <AuthAlert variant="warning" title="Email not verified">
+              Check your inbox for the verification link, or register again if it expired.
+            </AuthAlert>
+          )}
+
+          {loginAlert?.kind === "generic" && (
+            <AuthAlert variant="error" title="Unable to sign in">
+              {loginAlert.message}
+            </AuthAlert>
+          )}
+
+          <LoginForm
+            onSubmit={handleLogin}
+            disabled={lockoutOpen}
+            showCredentialsError={showFieldError}
+            onIdentifierChange={setIdentifier}
+          />
 
           <p className="text-[13px] text-gray-500 text-center mt-5">
             No account?{" "}
