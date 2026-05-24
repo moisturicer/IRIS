@@ -39,33 +39,30 @@ class Course(models.Model):
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, username, email, password=None, **extra_fields):
+    def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required.")
         email = self.normalize_email(email)
-        user  = self.model(username=username, email=email, **extra_fields)
+        user  = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, username, email, password=None, **extra_fields):
+    def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        return self.create_user(username, email, password, **extra_fields)
+        return self.create_user(email, password, **extra_fields)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
     """
-    Custom user model.
-    username holds the student / employee ID number.
+    Custom user model. Email is the login identifier.
     """
-    username    = models.CharField(max_length=50, unique=True)
-    first_name  = models.CharField(max_length=100)
-    middle_name = models.CharField(max_length=100, blank=True)
-    last_name   = models.CharField(max_length=100)
-    email       = models.EmailField(unique=True)
-    contact_no  = models.CharField(max_length=20, blank=True)
-    role        = models.ForeignKey(
+    email          = models.EmailField(unique=True)
+    first_name     = models.CharField(max_length=100)
+    middle_initial = models.CharField(max_length=20, blank=True)
+    last_name      = models.CharField(max_length=100)
+    role           = models.ForeignKey(
         Role, on_delete=models.SET_NULL, null=True, blank=True, related_name="users"
     )
 
@@ -77,14 +74,14 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = UserManager()
 
-    USERNAME_FIELD  = "username"
-    REQUIRED_FIELDS = ["email", "first_name", "last_name"]
+    USERNAME_FIELD  = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name"]
 
     def __str__(self):
-        return f"{self.username} ({self.get_full_name()})"
+        return f"{self.email} ({self.get_full_name()})"
 
     def get_full_name(self):
-        parts = [self.first_name, self.middle_name, self.last_name]
+        parts = [self.first_name, self.middle_initial, self.last_name]
         return " ".join(p for p in parts if p)
 
 
@@ -94,7 +91,7 @@ class StudentProfile(models.Model):
     course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, related_name="students")
 
     def __str__(self):
-        return f"Student: {self.user.username}"
+        return f"Student: {self.user.email}"
 
 
 class AdviserProfile(models.Model):
@@ -104,7 +101,7 @@ class AdviserProfile(models.Model):
     college    = models.ForeignKey(College, on_delete=models.SET_NULL, null=True, related_name="advisers")
 
     def __str__(self):
-        return f"Adviser: {self.user.username}"
+        return f"Adviser: {self.user.email}"
 
 
 class RoleRequest(models.Model):
@@ -127,7 +124,7 @@ class RoleRequest(models.Model):
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.username} -> {self.requested_role.name} ({self.status})"
+        return f"{self.user.email} -> {self.requested_role.name} ({self.status})"
 
 
 class SystemSetting(models.Model):

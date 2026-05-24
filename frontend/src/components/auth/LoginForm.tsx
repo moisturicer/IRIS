@@ -11,18 +11,8 @@ export interface LoginFormValues {
 const validationSchema = Yup.object({
   identifier: Yup.string()
     .trim()
-    .required("Username or email is required.")
-    .test(
-      "identifier",
-      "Enter a valid username or email address.",
-      (value) => {
-        if (!value) return false;
-        if (value.includes("@")) {
-          return Yup.string().email().isValidSync(value);
-        }
-        return value.length >= 2;
-      }
-    ),
+    .required("Email is required.")
+    .email("Enter a valid email address."),
   password: Yup.string().required("Password is required."),
 });
 
@@ -61,16 +51,16 @@ export function LoginForm({
         <Form className="flex flex-col gap-5" noValidate>
           <div>
             <label htmlFor="login-identifier" className="block text-[13px] font-semibold text-gray-900 mb-2">
-              Username or Email
+              Email Address
             </label>
             <Field name="identifier">
               {({ field }: FieldProps<string>) => (
                 <input
                   {...field}
                   id="login-identifier"
-                  type="text"
-                  autoComplete="username"
-                  placeholder="student ID or student@cit.edu"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@cit.edu"
                   disabled={disabled}
                   onChange={(e) => {
                     field.onChange(e);

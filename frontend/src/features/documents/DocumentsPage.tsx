@@ -11,7 +11,6 @@ import { documentsApi } from "@/api/documents";
 import { PageHeader }   from "@/components/layout/PageHeader";
 import { EmptyState }   from "@/components/shared/EmptyState";
 import { FileUploadZone } from "@/components/shared/FileUploadZone";
-import { Button }       from "@/components/ui/Button";
 import { Badge }        from "@/components/ui/Badge";
 import { useUIStore }   from "@/store/ui.store";
 import { formatDate }   from "@/lib/utils";
@@ -44,8 +43,11 @@ export default function DocumentsPage() {
     if (!recordId || !files[0]) return;
     setUploading((prev) => ({ ...prev, [slotId]: true }));
     try {
-      await documentsApi.upload(Number(recordId), slotId, files[0]);
-      addToast({ type: "success", message: "File uploaded successfully." });
+      const { data } = await documentsApi.upload(Number(recordId), slotId, files[0]);
+      addToast({
+        type: "success",
+        message: `File uploaded. Text extraction: ${data.extraction.status}.`,
+      });
       load();
     } catch {
       addToast({ type: "error", message: "Upload failed. Please try again." });

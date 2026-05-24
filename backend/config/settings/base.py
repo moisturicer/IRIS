@@ -138,7 +138,7 @@ REST_FRAMEWORK = {
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=config("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=60, cast=int)
+        minutes=config("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=30, cast=int)
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(
         days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=7, cast=int)
@@ -150,9 +150,9 @@ SIMPLE_JWT = {
 
 # ---- CORS ---------------------------------------------------------------
 
-CORS_ALLOWED_ORIGINS = [
-    config("FRONTEND_URL", default="http://localhost:5173"),
-]
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+
+CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
 CORS_ALLOW_CREDENTIALS = True
 
 # ---- Email --------------------------------------------------------------

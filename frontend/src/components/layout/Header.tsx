@@ -1,88 +1,51 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useNotifications } from "@/hooks/useNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/api/auth";
-import { useHeaderSearchVisible } from "@/contexts/DiscoverSearchContext";
-import { cn } from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
+import { NotificationBell } from "./NotificationBell";
 
 export function Header() {
-  const navigate = useNavigate();
-  const { logout, refreshToken } = useAuth();
-  const { unreadCount } = useNotifications();
-  const showSearch = useHeaderSearchVisible();
-  const [query, setQuery] = useState("");
+  const { logout, user, refreshToken } = useAuth();
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const handleLogout = async () => {
     await authApi.logout(refreshToken ?? "").catch(() => {});
     logout();
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    navigate(`/ai?q=${encodeURIComponent(trimmed)}`);
-  };
-
   return (
-    <header className="fixed top-0 left-[230px] right-0 h-[58px] bg-white border-b border-gray-200 flex items-center px-6 gap-4 z-40">
-      <div className="flex-1 flex items-center min-w-0">
-        <form
-          onSubmit={handleSearch}
-          className={cn(
-            "relative w-full max-w-md transition-all duration-300",
-            showSearch
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 pointer-events-none max-w-0 overflow-hidden"
-          )}
-          aria-hidden={!showSearch}
-        >
-          <i
-            className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[12px]"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search records, authors, topics..."
-            className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[13px] bg-gray-50 focus:outline-none focus:border-brand"
-          />
-        </form>
+    <header className="fixed top-0 left-0 lg:left-[230px] right-0 h-[58px] bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 gap-3 z-40">
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        className="lg:hidden w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+        aria-label="Open menu"
+      >
+        <i className="fas fa-bars text-[14px]" />
+      </button>
+
+      <div className="relative flex-1 max-w-md min-w-0 hidden md:block">
+        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[12px]" />
+        <input
+          type="text"
+          placeholder="Search records, authors, topics..."
+          className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[13px] bg-gray-50 focus:outline-none focus:border-[#6B0F12]"
+        />
       </div>
 
-      <div className="flex items-center gap-2 shrink-0 ml-auto">
-        <Link
-          to="/notifications"
-          title="Notifications"
-          aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-          className="relative w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:text-brand transition-colors"
-        >
-          <i className="fa-solid fa-bell text-[15px]" aria-hidden />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </Link>
+      <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+        <span className="hidden sm:inline text-[12px] text-gray-500 truncate max-w-[120px]">
+          {user?.first_name}
+        </span>
 
-        <Link
-          to="/settings"
-          title="Settings"
-          aria-label="Settings and profile"
-          className="w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:text-brand transition-colors"
-        >
-          <i className="fa-solid fa-gear text-[15px]" aria-hidden />
-        </Link>
+        <NotificationBell />
 
         <button
           type="button"
           onClick={handleLogout}
-          className="px-3 py-1.5 rounded-lg bg-brand text-white text-[12px] font-semibold hover:bg-brand-dark transition-colors inline-flex items-center gap-1.5"
+          className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-[12px] font-semibold transition-colors whitespace-nowrap"
         >
-          <i className="fa-solid fa-right-from-bracket text-[12px]" aria-hidden />
-          Sign Out
+          <i className="fas fa-sign-out-alt text-[13px]" />
+          <span className="hidden sm:inline">Sign Out</span>
         </button>
       </div>
     </header>

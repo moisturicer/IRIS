@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    SubmitDocumentView,
     UploadSlotListView, RecordSlotListView,
     RecordUploadListView, RecordUploadCreateView,
     RecordUploadDownloadView, RecordFileListView, RecordFileUploadView,
@@ -7,6 +8,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("submit/", SubmitDocumentView.as_view(), name="document-submit"),
     path("slots/",                             UploadSlotListView.as_view(),          name="upload-slots"),
     # Combined slot+uploads view for DocumentsPage
     path("records/<int:pk>/slots/",            RecordSlotListView.as_view(),          name="record-slot-list"),

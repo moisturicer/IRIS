@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormikHelpers } from "formik";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthAlert } from "@/components/auth/AuthAlert";
@@ -104,14 +104,14 @@ export default function LoginPage() {
     }
 
     try {
-      const res = await authApi.login({ username: loginId, password: data.password });
+      const res = await authApi.login({ email: loginId, password: data.password });
       resetLoginAttempts(loginId);
       clearLockout(loginId);
       login(res.data.user, res.data.access, res.data.refresh);
       navigate(getRoleDashboardPath(res.data.user.role_name), { replace: true });
     } catch (err: unknown) {
       const res = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
-      const detail = res?.data?.detail ?? "Invalid username or password.";
+      const detail = res?.data?.detail ?? "Invalid email or password.";
       const status = res?.status;
       const detailLower = detail.toLowerCase();
 
@@ -161,7 +161,6 @@ export default function LoginPage() {
         unlockAt={lockoutUntil}
       />
 
-      {/* ── Left: branding ─────────────────────────────────────────── */}
       <div className="relative lg:w-1/2 bg-cream flex flex-col justify-between overflow-hidden px-8 py-10 sm:px-12 lg:px-14 lg:py-12 min-h-[320px] lg:min-h-screen">
 
         <div className="absolute rounded-full bg-white/60 pointer-events-none"
@@ -210,7 +209,6 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* ── Right: login form ──────────────────────────────────────── */}
       <div className="flex-1 lg:w-1/2 bg-white flex items-center justify-center px-8 py-12 sm:px-12 lg:px-16 relative">
         <div className="w-full max-w-[400px]">
 
@@ -230,7 +228,7 @@ export default function LoginPage() {
           </p>
 
           {loginAlert?.kind === "credentials" && (
-            <AuthAlert variant="error" title="Invalid username or password">
+            <AuthAlert variant="error" title="Invalid email or password">
               Please check your credentials and try again.
               {failedAttempts > 0 && failedAttempts < LOGIN_FAILURE_LIMIT && (
                 <>
@@ -260,6 +258,13 @@ export default function LoginPage() {
             showCredentialsError={showFieldError}
             onIdentifierChange={setIdentifier}
           />
+
+          <p className="text-[13px] text-gray-500 text-center mt-5">
+            No account?{" "}
+            <Link to="/signup" className="text-[#6B0F12] font-semibold hover:underline">
+              Sign up
+            </Link>
+          </p>
 
         </div>
       </div>

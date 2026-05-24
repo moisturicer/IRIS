@@ -5,7 +5,7 @@
  * TODO: replace keyword input with a tag-chips component.
  */
 import { useState } from "react";
-import { useFormContext, Controller } from "react-hook-form";
+import { useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/Input";
 import type { RecordFormValues } from "../recordFormSchema";
 
@@ -27,7 +27,6 @@ const RESEARCH_TYPE_OPTIONS = [
 export function RecordDetailsStep() {
   const {
     register,
-    control,
     formState: { errors },
     watch,
     setValue,
