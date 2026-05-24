@@ -150,9 +150,9 @@ SIMPLE_JWT = {
 
 # ---- CORS ---------------------------------------------------------------
 
-CORS_ALLOWED_ORIGINS = [
-    config("FRONTEND_URL", default="http://localhost:5173"),
-]
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+
+CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
 CORS_ALLOW_CREDENTIALS = True
 
 # ---- Email --------------------------------------------------------------

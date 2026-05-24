@@ -13,12 +13,12 @@ class AuthorSerializer(serializers.ModelSerializer):
 
 
 class RecordOwnerSerializer(serializers.ModelSerializer):
-    username   = serializers.CharField(source="user.username", read_only=True)
+    email      = serializers.CharField(source="user.email", read_only=True)
     full_name  = serializers.CharField(source="user.get_full_name", read_only=True)
 
     class Meta:
         model  = RecordOwner
-        fields = ["id", "user", "username", "full_name", "is_primary"]
+        fields = ["id", "user", "email", "full_name", "is_primary"]
 
 
 class RecordListSerializer(serializers.ModelSerializer):

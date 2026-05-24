@@ -1,22 +1,22 @@
 import type { RoleName } from "@/lib/constants";
 
 export interface User {
-  id:          number;
-  username:    string;
-  first_name:  string;
-  middle_name: string;
-  last_name:   string;
-  email:       string;
-  contact_no:  string;
-  role:        number | null;
-  role_name:   RoleName | null;
-  is_verified: boolean;
-  is_locked:   boolean;
-  date_joined: string;
+  id:             number;
+  email:          string;
+  first_name:     string;
+  middle_initial: string;
+  last_name:      string;
+  role:           number | null;
+  role_name:      RoleName | null;
+  is_staff:       boolean;
+  is_superuser:   boolean;
+  is_verified:    boolean;
+  is_locked:      boolean;
+  date_joined:    string;
 }
 
 export interface LoginPayload {
-  username: string;
+  email:    string;
   password: string;
 }
 
@@ -27,12 +27,10 @@ export interface LoginResponse {
 }
 
 export interface RegisterPayload {
-  username:         string;
-  first_name:       string;
-  middle_name?:     string;
-  last_name:        string;
   email:            string;
-  contact_no?:      string;
+  first_name:       string;
+  middle_initial?:  string;
+  last_name:        string;
   password:         string;
   confirm_password: string;
   /** "Student" or "Faculty Adviser" */
@@ -63,10 +61,9 @@ export interface RoleRequest {
 /** Lightweight user row used in the admin UserListPage table */
 export interface UserListItem {
   id:         number;
-  username:   string;
+  email:      string;
   first_name: string;
   last_name:  string;
-  email:      string;
   role_name:  string;
   is_active:  boolean;
   is_locked:  boolean;

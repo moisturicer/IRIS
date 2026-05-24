@@ -79,8 +79,8 @@ export default function UserListPage() {
 
   const columns: ColumnDef<UserListItem, unknown>[] = [
     {
-      header: "Username",
-      accessorKey: "username",
+      header: "Email",
+      accessorKey: "email",
       cell: ({ getValue }) => (
         <span className="font-medium text-gray-900">{getValue<string>()}</span>
       ),
@@ -138,7 +138,7 @@ export default function UserListPage() {
 
       <div className="flex gap-3 mb-4">
         <Input
-          placeholder="Search username or name..."
+          placeholder="Search email or name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -166,8 +166,8 @@ export default function UserListPage() {
         title={lockTarget?.is_locked ? "Unlock account?" : "Lock account?"}
         message={
           lockTarget?.is_locked
-            ? `${lockTarget.username} will be able to log in again.`
-            : `${lockTarget?.username} will be prevented from logging in.`
+            ? `${lockTarget.email} will be able to log in again.`
+            : `${lockTarget?.email} will be prevented from logging in.`
         }
         confirmLabel={lockTarget?.is_locked ? "Unlock" : "Lock"}
         danger={!lockTarget?.is_locked}
@@ -183,7 +183,7 @@ export default function UserListPage() {
       >
         <div className="flex flex-col gap-4">
           <p className="text-[13px] text-gray-600">
-            Changing role for <strong>{roleTarget?.username}</strong>.
+            Changing role for <strong>{roleTarget?.email}</strong>.
           </p>
           <div>
             <label className="text-[13px] font-medium text-gray-700 block mb-1">New Role</label>

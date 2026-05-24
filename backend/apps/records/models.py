@@ -140,7 +140,7 @@ class RecordOwner(models.Model):
 
     def __str__(self):
         tag = " (primary)" if self.is_primary else ""
-        return f"{self.user.username} -> {self.record.title[:40]}{tag}"
+        return f"{self.user.email} -> {self.record.title[:40]}{tag}"
 
 
 class ResearchLink(models.Model):

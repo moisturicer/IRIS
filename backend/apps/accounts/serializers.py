@@ -8,11 +8,12 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model  = User
         fields = [
-            "id", "username", "first_name", "middle_name", "last_name",
-            "email", "contact_no", "role", "role_name",
+            "id", "email", "first_name", "middle_initial", "last_name",
+            "role", "role_name",
+            "is_staff", "is_superuser",
             "is_verified", "is_locked", "date_joined",
         ]
-        read_only_fields = ["role", "is_verified", "is_locked", "date_joined"]
+        read_only_fields = ["role", "is_staff", "is_superuser", "is_verified", "is_locked", "date_joined"]
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -28,15 +29,10 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model  = User
         fields = [
-            "username", "first_name", "middle_name", "last_name",
-            "email", "contact_no", "password", "confirm_password",
+            "email", "first_name", "middle_initial", "last_name",
+            "password", "confirm_password",
             "role_name", "course_id", "college_id", "department_id",
         ]
-
-    def validate_username(self, value):
-        if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("This ID number is already registered.")
-        return value
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
