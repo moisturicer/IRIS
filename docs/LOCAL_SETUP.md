@@ -59,10 +59,10 @@ python manage.py createsuperuser
 
 ## Step 4 — Verify and assign admin role
 
-Replace `YOUR_USERNAME` with the username you chose in `createsuperuser`:
+Replace `YOUR_EMAIL` with the email you chose in `createsuperuser`:
 
 ```bash
-python manage.py shell -c "from apps.accounts.models import User; u = User.objects.get(username='YOUR_USERNAME'); u.is_verified = True; u.save(); print(u.username, u.is_verified)"
+python manage.py shell -c "from apps.accounts.models import User; u = User.objects.get(email='YOUR_EMAIL'); u.is_verified = True; u.save(); print(u.email, u.is_verified)"
 ```
 
 Then open the Django shell:
@@ -81,46 +81,26 @@ for name in roles:
     Role.objects.get_or_create(name=name)
 
 admin_role = Role.objects.get(name="System Administrator")
-u = User.objects.get(username="YOUR_USERNAME")
+u = User.objects.get(email="YOUR_EMAIL")
 u.role = admin_role
 u.is_verified = True
 u.save()
-print(u.username, u.role.name)
+print(u.email, u.role.name)
 ```
 
 ---
 
 ## Step 5 — Seed test accounts for all roles
 
-Still inside the shell, paste this:
+From `backend/` (with venv active), create verified test users with **@cit.edu** emails:
 
-```python
-from apps.accounts.models import User, Role
-
-test_users = [
-    ("test_student", "student@iris.dev", "Student"),
-    ("test_adviser", "adviser@iris.dev", "Adviser"),
-    ("test_ktto", "ktto@iris.dev", "KTTO"),
-    ("test_rdco", "rdco@iris.dev", "RDCO"),
-    ("test_itso", "itso@iris.dev", "ITSO"),
-    ("test_ierc", "ierc@iris.dev", "IERC"),
-]
-
-for username, email, role_name in test_users:
-    role = Role.objects.get(name=role_name)
-    user, created = User.objects.get_or_create(
-        username=username,
-        defaults={"email": email, "first_name": "Test", "last_name": role_name},
-    )
-    user.email = email
-    user.set_password("testpass123")
-    user.role = role
-    user.is_verified = True
-    user.save()
-    print(f"{'Created' if created else 'Updated'}: {username} → {role_name}")
-
-exit()
+```bash
+python manage.py seed_test_users --purge-iris-dev
 ```
+
+`--purge-iris-dev` removes legacy `@iris.dev` test accounts if you created them earlier.
+
+All test accounts use password **`testpass123`** unless you pass `--password`.
 
 ---
 
@@ -155,12 +135,12 @@ Go to **http://localhost:5173/login** and sign in with **email, not username**:
 | Account      | Email                    | Password      | Landing page       |
 |--------------|--------------------------|---------------|--------------------|
 | Your admin   | email from createsuperuser | your password | `/admin/users`     |
-| Test student | `student@iris.dev`       | `testpass123` | `/`                |
-| Test adviser | `adviser@iris.dev`       | `testpass123` | `/review/pending`  |
-| Test KTTO    | `ktto@iris.dev`          | `testpass123` | `/review/pending`  |
-| Test RDCO    | `rdco@iris.dev`          | `testpass123` | `/review/pending`  |
-| Test ITSO    | `itso@iris.dev`          | `testpass123` | `/records`         |
-| Test IERC    | `ierc@iris.dev`          | `testpass123` | `/review/pending`  |
+| Test student | `iris-student@cit.edu`   | `testpass123` | `/`                |
+| Test adviser | `iris-adviser@cit.edu`   | `testpass123` | `/review/pending`  |
+| Test KTTO    | `iris-ktto@cit.edu`      | `testpass123` | `/review/pending`  |
+| Test RDCO    | `iris-rdco@cit.edu`      | `testpass123` | `/review/pending`  |
+| Test ITSO    | `iris-itso@cit.edu`      | `testpass123` | `/records`         |
+| Test IERC    | `iris-ierc@cit.edu`      | `testpass123` | `/review/pending`  |
 
 ---
 
@@ -169,8 +149,11 @@ Go to **http://localhost:5173/login** and sign in with **email, not username**:
 | Problem | Fix |
 |---------|-----|
 | `SECRET_KEY not found` | Save `backend/.env` to disk |
-| `Email not verified` | Run Step 4 verify command |
-| 403 — Access Denied after login | Assign a role in Step 4 |
+| `Invalid credentials` for test accounts | Run `python manage.py seed_test_users`. Use full email, e.g. `iris-student@cit.edu`, password `testpass123` |
+| `column accounts_user.middle_initial does not exist` | Run `python manage.py migrate` |
+| `Email not verified` | Run Step 4 verify command, or set `is_verified=True` on the user in Django shell |
+| 403 — Access Denied after login | Assign a role in Step 4 / Step 5 |
+| Account locked after failed logins | `python manage.py shell -c "from axes.models import AccessAttempt; AccessAttempt.objects.all().delete()"` |
 | Database connection error | Confirm PostgreSQL is running and `DB_*` values match |
 | API errors in browser | Ensure backend (`:8000`) and frontend (`:5173`) are both running |
 
@@ -187,3 +170,5 @@ celery -A config worker -l info
 ```
 
 If you skip this step, sign-up emails will not be sent, but login and dashboard access work normally when accounts are marked verified manually.
+from axes.models import AccessAttempt
+AccessAttempt.objects.all().delete()

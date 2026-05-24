@@ -60,7 +60,7 @@ export function LoginForm({
                   id="login-identifier"
                   type="email"
                   autoComplete="email"
-                  placeholder="you@cit.edu"
+                  placeholder="iris-student@cit.edu"
                   disabled={disabled}
                   onChange={(e) => {
                     field.onChange(e);

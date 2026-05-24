@@ -17,6 +17,7 @@ export default function RoleRequestsPage() {
   const [requests,  setRequests]  = useState<RoleRequest[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
+  const [acting,    setActing]    = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -42,6 +43,7 @@ export default function RoleRequestsPage() {
     } catch {
       addToast({ type: "error", message: "Action failed. Please try again." });
     } finally {
+      setActing(false);
       setTarget(null);
     }
   };
@@ -135,7 +137,8 @@ export default function RoleRequestsPage() {
         confirmLabel={target?.action === "approve" ? "Approve" : "Decline"}
         danger={target?.action === "decline"}
         onConfirm={handleDecide}
-        onCancel={() => setTarget(null)}
+        onCancel={() => !acting && setTarget(null)}
+        confirming={acting}
       />
     </div>
   );
