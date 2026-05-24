@@ -4,12 +4,11 @@ import { useUIStore } from "@/store/ui.store";
 import { NotificationBell } from "./NotificationBell";
 
 export function Header() {
-  const { logout, user } = useAuth();
+  const { logout, user, refreshToken } = useAuth();
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   const handleLogout = async () => {
-    const refresh = localStorage.getItem("refresh_token") ?? "";
-    await authApi.logout(refresh).catch(() => {});
+    await authApi.logout(refreshToken ?? "").catch(() => {});
     logout();
   };
 

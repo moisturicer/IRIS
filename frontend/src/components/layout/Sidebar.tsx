@@ -1,61 +1,81 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { dashboardApi } from "@/api/dashboard";
+import { apiClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 import { useUIStore } from "@/store/ui.store";
 import { useNotifications } from "@/hooks/useNotifications";
-import { apiClient } from "@/api/client";
+import { ROLES, type RoleName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { STAFF_ROLES } from "@/lib/constants";
 import irisLogo from "@/assets/images/iris_logo.png";
 
-interface NavItem {
-  to:     string;
-  label:  string;
-  icon:   string;
-  badge?: number;
+interface NavItemDef {
+  to:      string;
+  label:   string;
+  icon:    string;
+  visible: (role: RoleName | null, isDjangoStaff: boolean) => boolean;
+  badge?:  number;
 }
 
-function NavSection({
-  title,
-  items,
-  onNavigate,
-}: {
-  title: string;
-  items: NavItem[];
-  onNavigate?: () => void;
-}) {
-  return (
-    <>
-      <div className="px-4 py-2 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
-        {title}
-      </div>
-      {items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.to === "/"}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-2.5 mx-2 px-4 py-2 rounded-md text-[13px] font-medium transition-colors relative",
-              isActive
-                ? "bg-red-50 text-[#6B0F12] font-semibold before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-[#6B0F12]"
-                : "text-gray-600 hover:bg-red-50/60 hover:text-[#6B0F12]"
-            )
-          }
-        >
-          <i className={cn("fas", item.icon, "w-4 text-center text-[13px]")} />
-          <span className="flex-1">{item.label}</span>
-          {item.badge != null && item.badge > 0 && (
-            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-              {item.badge > 9 ? "9+" : item.badge}
-            </span>
-          )}
-        </NavLink>
-      ))}
-    </>
-  );
-}
+const ALL: NavItemDef["visible"] = () => true;
+
+const ROLES_ONLY =
+  (...roles: RoleName[]): NavItemDef["visible"] =>
+  (role) =>
+    role !== null && roles.includes(role);
+
+const ADMIN_OR_STAFF: NavItemDef["visible"] = (role, isDjangoStaff) =>
+  isDjangoStaff || role === ROLES.ADMIN;
+
+const NAV_ITEMS: NavItemDef[] = [
+  { to: "/", label: "Discover", icon: "fa-compass", visible: ALL },
+  { to: "/ai", label: "Ask IRIS", icon: "fa-comments", visible: ALL },
+  {
+    to: "/ai/summarize",
+    label: "AI Summarizer",
+    icon: "fa-file-lines",
+    visible: ROLES_ONLY(ROLES.ADVISER, ROLES.KTTO, ROLES.TBI, ROLES.ITSO, ROLES.IERC, ROLES.RDCO),
+  },
+  { to: "/records", label: "Browse Collections", icon: "fa-book-open", visible: ALL },
+  { to: "/storage", label: "My Library", icon: "fa-bookmark", visible: ALL },
+  { to: "/records/add", label: "Submit Disclosure", icon: "fa-circle-plus", visible: ROLES_ONLY(ROLES.STUDENT) },
+  { to: "/records/mine", label: "My Workspace", icon: "fa-briefcase", visible: ROLES_ONLY(ROLES.STUDENT) },
+  {
+    to: "/review/pending",
+    label: "Review Submissions",
+    icon: "fa-clipboard-check",
+    visible: ROLES_ONLY(ROLES.ADVISER, ROLES.KTTO, ROLES.TBI, ROLES.IERC, ROLES.RDCO),
+  },
+  {
+    to: "/requests/access",
+    label: "Access Requests",
+    icon: "fa-download",
+    visible: ROLES_ONLY(ROLES.KTTO, ROLES.TBI, ROLES.RDCO),
+  },
+  {
+    to: "/requests/deletion",
+    label: "Deletion Requests",
+    icon: "fa-trash-can",
+    visible: ROLES_ONLY(ROLES.KTTO, ROLES.TBI, ROLES.RDCO),
+  },
+  {
+    to: "/notifications",
+    label: "Notifications",
+    icon: "fa-bell",
+    visible: ALL,
+  },
+  { to: "/admin/users", label: "User Management", icon: "fa-users-gear", visible: ADMIN_OR_STAFF },
+  { to: "/admin/role-requests", label: "Role Requests", icon: "fa-user-check", visible: ADMIN_OR_STAFF },
+  {
+    to: "/admin/audit",
+    label: "System Audit Logs",
+    icon: "fa-history",
+    visible: (role, isDjangoStaff) =>
+      isDjangoStaff || role === ROLES.ADMIN || role === ROLES.RDCO,
+  },
+  { to: "/help", label: "Settings & Profile", icon: "fa-gear", visible: ALL },
+];
 
 interface SidebarProps {
   className?: string;
@@ -63,61 +83,36 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
+  const { roleName, isStudent, isDjangoStaff } = useRole();
   const { unreadCount } = useNotifications();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
-  const [workspaceBadge,    setWorkspaceBadge]    = useState(0);
+  const [workspaceCount, setWorkspaceCount] = useState<number | undefined>();
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
 
-  const isStaff =
-    user?.is_staff === true ||
-    user?.is_superuser === true ||
-    (user?.role_name != null && STAFF_ROLES.includes(user.role_name as typeof STAFF_ROLES[number]));
+  useEffect(() => {
+    if (!isStudent) return;
+    dashboardApi.stats()
+      .then(({ data }) => setWorkspaceCount(data.total_mine > 0 ? data.total_mine : undefined))
+      .catch(() => setWorkspaceCount(undefined));
+  }, [isStudent]);
 
   useEffect(() => {
+    if (!isDjangoStaff && roleName !== ROLES.ADMIN) return;
     apiClient
-      .get<{ pending_mine: number }>("/dashboard/stats/")
-      .then(({ data }) => setWorkspaceBadge(data.pending_mine ?? 0))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!isStaff) return;
-    apiClient
-      .get<{ count: number; results: unknown[] }>("/users/role-requests/")
+      .get<{ count: number }>("/users/role-requests/")
       .then(({ data }) => setRoleRequestBadge(data.count ?? 0))
       .catch(() => {});
-  }, [isStaff]);
+  }, [isDjangoStaff, roleName]);
 
+  const visibleItems = NAV_ITEMS.filter((item) => item.visible(roleName, isDjangoStaff));
   const initials = `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.toUpperCase();
-  const onNavigate = () => closeSidebar();
 
-  const explorationNav: NavItem[] = [
-    { to: "/", label: "Discover", icon: "fa-compass" },
-    { to: "/ai", label: "Ask IRIS (AI Assistant)", icon: "fa-brain" },
-    { to: "/records", label: "Browse Collections", icon: "fa-layer-group" },
-    { to: "/records/mine", label: "My Library", icon: "fa-bookmark" },
-  ];
-
-  const ipNav: NavItem[] = [
-    { to: "/records/add", label: "Submit Disclosure", icon: "fa-file-signature" },
-    {
-      to: "/records/mine",
-      label: "My Workspace",
-      icon: "fa-briefcase",
-      badge: workspaceBadge,
-    },
-  ];
-
-  const toolsNav: NavItem[] = [
-    {
-      to: "/notifications",
-      label: "Notifications",
-      icon: "fa-bell",
-      badge: unreadCount,
-    },
-    { to: "/storage", label: "Storage", icon: "fa-folder-open" },
-    { to: "/help", label: "Settings & Profile", icon: "fa-cog" },
-  ];
+  const badgeFor = (to: string) => {
+    if (to === "/records/mine" && isStudent) return workspaceCount;
+    if (to === "/notifications") return unreadCount > 0 ? unreadCount : undefined;
+    if (to === "/admin/role-requests") return roleRequestBadge > 0 ? roleRequestBadge : undefined;
+    return undefined;
+  };
 
   return (
     <aside
@@ -129,9 +124,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className="px-4 py-4 border-b border-gray-100 flex items-start gap-3">
         <img src={irisLogo} alt="IRIS" className="w-10 h-10 object-contain flex-shrink-0" />
         <div className="min-w-0 pt-0.5 flex-1">
-          <div className="text-[22px] font-extrabold tracking-[4px] text-[#6B0F12] leading-none">
-            IRIS
-          </div>
+          <div className="text-[22px] font-extrabold tracking-[4px] text-[#6B0F12] leading-none">IRIS</div>
           <div className="text-[9px] font-bold tracking-[2px] text-gold uppercase mt-1 leading-snug">
             CIT-U Research Hub
           </div>
@@ -147,25 +140,38 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-        <NavSection title="Research Exploration" items={explorationNav} onNavigate={onNavigate} />
-        <NavSection title="IP Management" items={ipNav} onNavigate={onNavigate} />
-        <NavSection title="Tools" items={toolsNav} onNavigate={onNavigate} />
-        {isStaff && (
-          <NavSection
-            title="Administration"
-            onNavigate={onNavigate}
-            items={[
-              { to: "/admin/users",         label: "Manage Users",   icon: "fa-users" },
-              { to: "/admin/role-requests",  label: "Role Requests",  icon: "fa-user-check", badge: roleRequestBadge },
-              { to: "/admin/audit",          label: "Audit Log",      icon: "fa-clipboard-list" },
-            ]}
-          />
-        )}
+        {visibleItems.map((item) => {
+          const badge = badgeFor(item.to);
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              onClick={closeSidebar}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-2.5 mx-2 px-4 py-2 rounded-md text-[13px] font-medium transition-colors",
+                  isActive
+                    ? "bg-[#8B1A1A] text-white"
+                    : "text-gray-600 hover:bg-red-50 hover:text-[#8B1A1A]"
+                )
+              }
+            >
+              <i className={cn("fa-solid", item.icon, "w-4 shrink-0 text-[14px]")} aria-hidden />
+              <span className="flex-1">{item.label}</span>
+              {badge != null && badge > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#6B0F12] text-white text-[10px] font-bold flex items-center justify-center">
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="px-4 py-3 border-t border-gray-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-[34px] h-[34px] rounded-full bg-[#6B0F12] text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">
+          <div className="w-[34px] h-[34px] rounded-full bg-[#8B1A1A] text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">
             {initials || "?"}
           </div>
           <div className="min-w-0">
@@ -173,7 +179,7 @@ export function Sidebar({ className }: SidebarProps) {
               {user?.first_name} {user?.last_name}
             </div>
             <div className="text-[11px] text-gray-500 truncate">
-              {user?.role_name ?? user?.email}
+              {roleName ?? user?.email}
             </div>
           </div>
         </div>
