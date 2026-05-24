@@ -17,6 +17,7 @@ export interface Author {
 export interface RecordListItem {
   id:                    number;
   title:                 string;
+  abstract:              string;
   year_accomplished:     number | null;
   classification_name:   string | null;
   record_type_name:      string | null;

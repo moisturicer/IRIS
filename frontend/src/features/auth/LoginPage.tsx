@@ -35,8 +35,8 @@ export default function LoginPage() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutOpen, setLockoutOpen]   = useState(false);
   const [lockoutUntil, setLockoutUntilState] = useState<number | undefined>();
-  const [lockoutEmail, setLockoutEmail] = useState("");
-  const [email, setEmail] = useState("");
+  const [lockoutIdentifier, setLockoutIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const sessionExpiredFromState =
     (location.state as { reason?: string } | null)?.reason === "session_expired";
   const [sessionAlert, setSessionAlert] = useState(
@@ -53,15 +53,15 @@ export default function LoginPage() {
   }, [searchParams, location.state]);
 
   useEffect(() => {
-    if (!email) return;
-    const until = getLockoutUntil(email);
+    if (!identifier) return;
+    const until = getLockoutUntil(identifier);
     if (until) {
-      setLockoutEmail(email);
+      setLockoutIdentifier(identifier);
       setLockoutUntilState(until);
       setLockoutOpen(true);
     }
-    setFailedAttempts(getLoginAttempts(email));
-  }, [email]);
+    setFailedAttempts(getLoginAttempts(identifier));
+  }, [identifier]);
 
   const dismissSessionAlert = () => {
     setSessionAlert(false);
@@ -74,9 +74,9 @@ export default function LoginPage() {
     }
   };
 
-  const openLockout = (forEmail: string, untilMs: number) => {
-    setLockoutUntil(forEmail, untilMs);
-    setLockoutEmail(forEmail);
+  const openLockout = (forIdentifier: string, untilMs: number) => {
+    setLockoutUntil(forIdentifier, untilMs);
+    setLockoutIdentifier(forIdentifier);
     setLockoutUntilState(untilMs);
     setLockoutOpen(true);
     setLoginAlert(null);
@@ -84,8 +84,8 @@ export default function LoginPage() {
 
   const closeLockout = () => {
     setLockoutOpen(false);
-    if (lockoutEmail && lockoutUntil && lockoutUntil <= Date.now()) {
-      clearLockout(lockoutEmail);
+    if (lockoutIdentifier && lockoutUntil && lockoutUntil <= Date.now()) {
+      clearLockout(lockoutIdentifier);
     }
   };
 
@@ -95,21 +95,23 @@ export default function LoginPage() {
   ) => {
     setLoginAlert(null);
 
-    if (isAccountLocked(data.email)) {
-      openLockout(data.email, getLockoutUntil(data.email)!);
+    const loginId = data.identifier.trim();
+
+    if (isAccountLocked(loginId)) {
+      openLockout(loginId, getLockoutUntil(loginId)!);
       setSubmitting(false);
       return;
     }
 
     try {
-      const res = await authApi.login({ username: data.email, password: data.password });
-      resetLoginAttempts(data.email);
-      clearLockout(data.email);
+      const res = await authApi.login({ username: loginId, password: data.password });
+      resetLoginAttempts(loginId);
+      clearLockout(loginId);
       login(res.data.user, res.data.access, res.data.refresh);
       navigate(getRoleDashboardPath(res.data.user.role_name), { replace: true });
     } catch (err: unknown) {
       const res = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
-      const detail = res?.data?.detail ?? "Invalid email or password.";
+      const detail = res?.data?.detail ?? "Invalid username or password.";
       const status = res?.status;
       const detailLower = detail.toLowerCase();
 
@@ -118,7 +120,7 @@ export default function LoginPage() {
         (detailLower.includes("locked") || detailLower.includes("locked out"));
 
       if (locked) {
-        openLockout(data.email, Date.now() + LOCKOUT_MS);
+        openLockout(loginId, Date.now() + LOCKOUT_MS);
         setSubmitting(false);
         return;
       }
@@ -129,11 +131,11 @@ export default function LoginPage() {
         return;
       }
 
-      const attempts = incrementLoginAttempts(data.email);
+      const attempts = incrementLoginAttempts(loginId);
       setFailedAttempts(attempts);
 
       if (attempts >= LOGIN_FAILURE_LIMIT) {
-        openLockout(data.email, Date.now() + LOCKOUT_MS);
+        openLockout(loginId, Date.now() + LOCKOUT_MS);
         setSubmitting(false);
         return;
       }
@@ -228,7 +230,7 @@ export default function LoginPage() {
           </p>
 
           {loginAlert?.kind === "credentials" && (
-            <AuthAlert variant="error" title="Invalid email or password">
+            <AuthAlert variant="error" title="Invalid username or password">
               Please check your credentials and try again.
               {failedAttempts > 0 && failedAttempts < LOGIN_FAILURE_LIMIT && (
                 <>
@@ -256,7 +258,7 @@ export default function LoginPage() {
             onSubmit={handleLogin}
             disabled={lockoutOpen}
             showCredentialsError={showFieldError}
-            onEmailChange={setEmail}
+            onIdentifierChange={setIdentifier}
           />
 
         </div>

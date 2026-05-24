@@ -62,4 +62,4 @@ export const PIPELINE_STATUS = {
 
 export type PipelineStatus = (typeof PIPELINE_STATUS)[keyof typeof PIPELINE_STATUS];
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";

@@ -17,7 +17,7 @@ import EmailVerifyPage   from "@/features/auth/EmailVerifyPage";
 import { AppShell } from "@/components/layout/AppShell";
 
 // Feature pages
-import DashboardPage        from "@/features/dashboard/DashboardPage";
+import HomePage             from "@/features/dashboard/HomePage";
 import PublishedRecordsPage from "@/features/records/PublishedRecordsPage";
 import RecordDetailPage     from "@/features/records/RecordDetailPage";
 import AddRecordPage        from "@/features/records/AddRecordPage";
@@ -46,7 +46,7 @@ export const router = createBrowserRouter([
       {
         element: <AppShell />,
         children: [
-          { index: true,          element: <DashboardPage /> },
+          { index: true,          element: <HomePage /> },
           { path: "records",      element: <PublishedRecordsPage /> },
           { path: "records/:id",  element: <RecordDetailPage /> },
           { path: "records/:id/edit",  element: <EditRecordPage /> },

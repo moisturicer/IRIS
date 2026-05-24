@@ -12,7 +12,6 @@ function formatRoles(roles: RoleName[]): string {
   return roles.slice(0, -1).join(", ") + " or " + roles[roles.length - 1];
 }
 
-/** RBAC forbidden UI — SRS wireframe Figure 53. */
 export function ForbiddenScreen({ authenticatedRole, requiredRoles }: ForbiddenScreenProps) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">

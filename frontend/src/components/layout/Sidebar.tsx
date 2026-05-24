@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { dashboardApi } from "@/api/dashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { ROLES, type RoleName } from "@/lib/constants";
@@ -10,6 +12,7 @@ interface NavItemDef {
   icon:    string;
   /** Return true to include this link in the DOM for the given role. */
   visible: (role: RoleName | null) => boolean;
+  badge?:  (role: RoleName | null) => number | undefined;
 }
 
 const ALL: NavItemDef["visible"] = () => true;
@@ -25,13 +28,13 @@ const NAV_ITEMS: NavItemDef[] = [
   {
     to: "/ai/summarize",
     label: "AI Summarizer",
-    icon: "fa-file-alt",
+    icon: "fa-file-lines",
     visible: ROLES_ONLY(ROLES.ADVISER, ROLES.KTTO, ROLES.TBI, ROLES.ITSO, ROLES.IERC, ROLES.RDCO),
   },
-  { to: "/records",           label: "Browse Collections", icon: "fa-books",           visible: ALL },
+  { to: "/records",           label: "Browse Collections", icon: "fa-book-open",       visible: ALL },
   { to: "/storage",           label: "My Library",         icon: "fa-bookmark",        visible: ALL },
-  { to: "/records/add",       label: "Submit Disclosure",  icon: "fa-plus-circle",     visible: ROLES_ONLY(ROLES.STUDENT) },
-  { to: "/records/mine",      label: "My Workspace",       icon: "fa-briefcase",       visible: ROLES_ONLY(ROLES.STUDENT) },
+  { to: "/records/add",       label: "Submit Disclosure",  icon: "fa-circle-plus",     visible: ROLES_ONLY(ROLES.STUDENT) },
+  { to: "/records/mine",      label: "My Workspace",       icon: "fa-briefcase",       visible: ROLES_ONLY(ROLES.STUDENT), badge: () => undefined },
   {
     to: "/review/pending",
     label: "Review Submissions",
@@ -47,7 +50,7 @@ const NAV_ITEMS: NavItemDef[] = [
   {
     to: "/requests/deletion",
     label: "Deletion Requests",
-    icon: "fa-trash-alt",
+    icon: "fa-trash-can",
     visible: ROLES_ONLY(ROLES.KTTO, ROLES.TBI, ROLES.RDCO),
   },
   {
@@ -56,13 +59,21 @@ const NAV_ITEMS: NavItemDef[] = [
     icon: "fa-history",
     visible: ROLES_ONLY(ROLES.ADMIN, ROLES.RDCO),
   },
-  { to: "/admin/users",       label: "User Management",    icon: "fa-users-cog",       visible: ROLES_ONLY(ROLES.ADMIN) },
-  { to: "/settings",          label: "Settings & Profile",   icon: "fa-cog",             visible: ALL },
+  { to: "/admin/users",       label: "User Management",    icon: "fa-users-gear",      visible: ROLES_ONLY(ROLES.ADMIN) },
+  { to: "/settings",          label: "Settings & Profile",   icon: "fa-gear",            visible: ALL },
 ];
 
 export function Sidebar() {
   const { user }   = useAuth();
-  const { roleName } = useRole();
+  const { roleName, isStudent } = useRole();
+  const [workspaceCount, setWorkspaceCount] = useState<number | undefined>();
+
+  useEffect(() => {
+    if (!isStudent) return;
+    dashboardApi.stats()
+      .then(({ data }) => setWorkspaceCount(data.total_mine > 0 ? data.total_mine : undefined))
+      .catch(() => setWorkspaceCount(undefined));
+  }, [isStudent]);
 
   const visibleItems = NAV_ITEMS.filter((item) => item.visible(roleName));
   const initials     = `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.toUpperCase();
@@ -75,7 +86,10 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
-        {visibleItems.map((item) => (
+        {visibleItems.map((item) => {
+          const badge =
+            item.to === "/records/mine" && isStudent ? workspaceCount : item.badge?.(roleName);
+          return (
           <NavLink
             key={item.to}
             to={item.to}
@@ -89,10 +103,16 @@ export function Sidebar() {
               )
             }
           >
-            <i className={cn("fas", item.icon, "w-4 text-center text-[13px]")} />
-            {item.label}
+            <i className={cn("fa-solid", item.icon, "w-4 shrink-0 text-[14px]")} aria-hidden />
+            <span className="flex-1">{item.label}</span>
+            {badge != null && badge > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#6B0F12] text-white text-[10px] font-bold flex items-center justify-center">
+                {badge > 99 ? "99+" : badge}
+              </span>
+            )}
           </NavLink>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="px-4 py-4 border-t border-gray-100">

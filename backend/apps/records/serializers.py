@@ -30,7 +30,7 @@ class RecordListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Record
         fields = [
-            "id", "title", "year_accomplished", "classification_name",
+            "id", "title", "abstract", "year_accomplished", "classification_name",
             "record_type_name", "pipeline_status", "is_ip",
             "for_commercialization", "community_extension",
             "access_count", "created_at", "authors",

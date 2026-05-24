@@ -9,8 +9,8 @@
  * TODO: add citation links to referenced records in the answer.
  * TODO: surface EmbeddingJob status for admins so they can see indexing progress.
  */
-import { useState } from "react";
-import { Link }       from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { aiApi }      from "@/api/ai";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button }     from "@/components/ui/Button";
@@ -22,12 +22,18 @@ import type { SemanticSearchResult } from "@/types/ai";
 type Mode = "search" | "ask";
 
 export default function AIHubPage() {
+  const [searchParams]          = useSearchParams();
   const [mode, setMode]         = useState<Mode>("search");
-  const [query, setQuery]       = useState("");
+  const [query, setQuery]       = useState(() => searchParams.get("q") ?? "");
   const [loading, setLoading]   = useState(false);
   const [results, setResults]   = useState<SemanticSearchResult[]>([]);
   const [answer, setAnswer]     = useState<string | null>(null);
   const [error, setError]       = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) setQuery(q);
+  }, [searchParams]);
 
   const handleSubmit = async () => {
     if (!query.trim()) return;
@@ -39,7 +45,8 @@ export default function AIHubPage() {
     try {
       if (mode === "search") {
         const { data } = await aiApi.semanticSearch(query);
-        setResults(data.results ?? data);
+        const payload = data as { results?: SemanticSearchResult[]; sources?: SemanticSearchResult[] };
+        setResults(payload.results ?? payload.sources ?? []);
       } else {
         const { data } = await aiApi.ask(query);
         setAnswer(data.answer);

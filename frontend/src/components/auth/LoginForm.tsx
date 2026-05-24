@@ -4,15 +4,25 @@ import * as Yup from "yup";
 import { useUIStore } from "@/store/ui.store";
 
 export interface LoginFormValues {
-  email: string;
+  identifier: string;
   password: string;
 }
 
 const validationSchema = Yup.object({
-  email: Yup.string()
+  identifier: Yup.string()
     .trim()
-    .required("Email is required.")
-    .email("Enter a valid email address."),
+    .required("Username or email is required.")
+    .test(
+      "identifier",
+      "Enter a valid username or email address.",
+      (value) => {
+        if (!value) return false;
+        if (value.includes("@")) {
+          return Yup.string().email().isValidSync(value);
+        }
+        return value.length >= 2;
+      }
+    ),
   password: Yup.string().required("Password is required."),
 });
 
@@ -28,14 +38,14 @@ interface LoginFormProps {
   ) => Promise<void>;
   disabled?: boolean;
   showCredentialsError?: boolean;
-  onEmailChange?: (email: string) => void;
+  onIdentifierChange?: (identifier: string) => void;
 }
 
 export function LoginForm({
   onSubmit,
   disabled = false,
   showCredentialsError = false,
-  onEmailChange,
+  onIdentifierChange,
 }: LoginFormProps) {
   const { addToast } = useUIStore();
   const [showPassword, setShowPassword] = useState(false);
@@ -43,34 +53,34 @@ export function LoginForm({
 
   return (
     <Formik<LoginFormValues>
-      initialValues={{ email: "", password: "" }}
+      initialValues={{ identifier: "", password: "" }}
       validationSchema={validationSchema}
       onSubmit={onSubmit}
     >
       {({ isSubmitting, errors, touched }) => (
         <Form className="flex flex-col gap-5" noValidate>
           <div>
-            <label htmlFor="login-email" className="block text-[13px] font-semibold text-gray-900 mb-2">
-              Email Address
+            <label htmlFor="login-identifier" className="block text-[13px] font-semibold text-gray-900 mb-2">
+              Username or Email
             </label>
-            <Field name="email">
+            <Field name="identifier">
               {({ field }: FieldProps<string>) => (
                 <input
                   {...field}
-                  id="login-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="student@cit.edu"
+                  id="login-identifier"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="student ID or student@cit.edu"
                   disabled={disabled}
                   onChange={(e) => {
                     field.onChange(e);
-                    onEmailChange?.(e.target.value);
+                    onIdentifierChange?.(e.target.value);
                   }}
-                  className={`${inputBase} ${inputState} ${errors.email && touched.email ? inputErr : ""}`}
+                  className={`${inputBase} ${inputState} ${errors.identifier && touched.identifier ? inputErr : ""}`}
                 />
               )}
             </Field>
-            <ErrorMessage name="email" component="p" className="text-[12px] text-red-600 mt-1.5" />
+            <ErrorMessage name="identifier" component="p" className="text-[12px] text-red-600 mt-1.5" />
           </div>
 
           <div>
