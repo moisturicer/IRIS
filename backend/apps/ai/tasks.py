@@ -1,44 +1,6 @@
 from celery import shared_task
 from django.utils import timezone
 
-from apps.ai.extractor import extract_text_from_pdf
-
-
-@shared_task(bind=True, max_retries=3)
-def extract_pdf_text(self, upload_id: int) -> str:
-    """
-    Background task: extract and clean text from an uploaded PDF file.
-
-    Called automatically after a RecordUpload is saved.
-    Stores the extracted text back on the RecordUpload instance so it
-    can later be fed into the embedding pipeline.
-
-    Args:
-        upload_id: Primary key of the RecordUpload whose file should be parsed.
-
-    Returns:
-        The cleaned text string (also persisted to the DB).
-    """
-    from apps.documents.models import RecordUpload
-
-    upload = RecordUpload.objects.get(pk=upload_id)
-    file_path = upload.file.path  # absolute path on disk
-
-    try:
-        text = extract_text_from_pdf(file_path)
-
-        # Persist extracted text if the model has an extracted_text field,
-        # otherwise just return it for the caller / chained tasks to use.
-        if hasattr(upload, "extracted_text"):
-            upload.extracted_text = text
-            upload.save(update_fields=["extracted_text"])
-
-        return text
-
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=60)
-
-
 
 @shared_task(bind=True, max_retries=3)
 def embed_record(self, record_id: int):
