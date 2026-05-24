@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthStore } from "@/store/auth.store";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Spinner } from "@/components/ui/Spinner";
 import type { RecordListItem } from "@/types/records";
@@ -72,7 +73,7 @@ export default function DiscoverPage() {
   };
 
   const handleSignOut = async () => {
-    const refresh = localStorage.getItem("refresh_token") ?? "";
+    const refresh = useAuthStore.getState().refreshToken ?? "";
     await authApi.logout(refresh).catch(() => {});
     logout();
   };

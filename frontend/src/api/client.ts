@@ -30,11 +30,11 @@ apiClient.interceptors.response.use(
           original.headers!.Authorization = `Bearer ${data.access}`;
           return apiClient(original);
         } catch {
-          useAuthStore.getState().clearTokens();
+          useAuthStore.getState().logout();
           redirectToLoginSessionExpired();
         }
       } else {
-        useAuthStore.getState().clearTokens();
+        useAuthStore.getState().logout();
         redirectToLoginSessionExpired();
       }
     }
