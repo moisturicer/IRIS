@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
+from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile, PdfExtraction
 
 
 class UploadSlotSerializer(serializers.ModelSerializer):
@@ -69,3 +69,10 @@ class RecordFileSerializer(serializers.ModelSerializer):
         model  = RecordFile
         fields = ["id", "record", "file", "filename", "uploaded_by", "created_at"]
         read_only_fields = ["uploaded_by"]
+
+
+class PdfExtractionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = PdfExtraction
+        fields = ["id", "upload", "status", "celery_task_id", "error", "created_at", "completed_at"]
+        read_only_fields = fields

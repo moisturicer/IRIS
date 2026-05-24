@@ -4,9 +4,88 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from core.permissions import IsStaff
-from .models import RecordUpload, UploadSlot, UploadReview, RecordFile
-from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer
+from .models import RecordUpload, UploadSlot, UploadReview, RecordFile, PdfExtraction
+from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer
 from .services import create_upload
+
+MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+
+
+class SubmitDocumentView(APIView):
+    """
+    POST /api/v1/documents/submit/
+
+    Accepts a PDF file upload for a given record + slot.
+    Validates format (PDF only) and size (≤ 50 MB), saves the file,
+    then queues a background Celery task to extract the PDF text
+    without blocking the response.
+
+    Request (multipart/form-data):
+        record  — Record PK
+        slot    — UploadSlot PK
+        file    — PDF file
+
+    Response 201:
+        upload      — RecordUpload data
+        extraction  — PdfExtraction status record (status: "queued")
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from apps.records.models import Record
+        from .tasks import extract_pdf_text
+
+        record_id = request.data.get("record")
+        slot_id   = request.data.get("slot")
+        file      = request.FILES.get("file")
+
+        # --- Basic presence check ---
+        if not all([record_id, slot_id, file]):
+            return Response(
+                {"detail": "record, slot, and file are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- Format validation ---
+        file_name = file.name.lower()
+        content_type = getattr(file, "content_type", "")
+        if not file_name.endswith(".pdf") or "pdf" not in content_type:
+            return Response(
+                {"detail": "Only PDF files are accepted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- Size validation (50 MB) ---
+        if file.size > MAX_PDF_SIZE_BYTES:
+            mb = file.size / (1024 * 1024)
+            return Response(
+                {"detail": f"File size {mb:.1f} MB exceeds the 50 MB limit."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # --- Persist the upload ---
+        try:
+            record = Record.objects.get(pk=record_id)
+            slot   = UploadSlot.objects.get(pk=slot_id)
+        except (Record.DoesNotExist, UploadSlot.DoesNotExist):
+            return Response(
+                {"detail": "Record or slot not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        upload = create_upload(record, slot, file, uploaded_by=request.user)
+
+        # --- Create extraction tracker and queue the background task ---
+        extraction = PdfExtraction.objects.create(upload=upload)
+        extract_pdf_text.delay(upload.id)
+
+        return Response(
+            {
+                "upload":     RecordUploadSerializer(upload, context={"request": request}).data,
+                "extraction": PdfExtractionSerializer(extraction).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class UploadSlotListView(generics.ListAPIView):

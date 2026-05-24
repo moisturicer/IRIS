@@ -43,8 +43,11 @@ export default function DocumentsPage() {
     if (!recordId || !files[0]) return;
     setUploading((prev) => ({ ...prev, [slotId]: true }));
     try {
-      await documentsApi.upload(Number(recordId), slotId, files[0]);
-      addToast({ type: "success", message: "File uploaded successfully." });
+      const { data } = await documentsApi.upload(Number(recordId), slotId, files[0]);
+      addToast({
+        type: "success",
+        message: `File uploaded. Text extraction: ${data.extraction.status}.`,
+      });
       load();
     } catch {
       addToast({ type: "error", message: "Upload failed. Please try again." });
