@@ -9,7 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
-from core.permissions import IsOwnerOrStaff, IsReviewer, IsStaff
+from core.permissions import IsOwnerOrStaff, IsReviewer, IsStaff, IsAdmin
 from .download_tokens import make_download_token, verify_download_token
 from .download_service import file_response_for_record
 from .models import Record, DownloadRequest, DeleteRequest
@@ -98,15 +98,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         serializer = RecordListSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
     def import_excel(self, request):
-        """POST /records/import/ -- bulk import from .xls/.xlsx."""
+        """POST /records/import/ -- bulk import from .xls/.xlsx. Staff only."""
         # TODO: call parse_excel_import(request.FILES["file"])
         return Response({"detail": "TODO: implement Excel import"})
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsStaff])
     def download_template(self, request):
-        """GET /records/download_template/ -- return the import template file."""
+        """GET /records/download_template/ -- return the import template file. Staff only."""
         # TODO: return FileResponse of the template .xlsx
         return Response({"detail": "TODO: implement template download"})
 
@@ -124,9 +124,10 @@ class MyRecordsViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
 
 class DownloadRequestViewSet(viewsets.ModelViewSet):
     """
-    GET    /download-requests/         -- staff: list requests (?status=pending)
-    POST   /download-requests/         -- user requests download
-    PATCH  /download-requests/<id>/    -- staff: { "action": "approve"|"decline" }
+    GET    /download-requests/         -- staff only: view all pending requests
+    POST   /download-requests/         -- any authenticated user: request a download
+    PATCH  /download-requests/<id>/    -- staff only: approve or decline
+    DELETE /download-requests/<id>/    -- admin only
     """
     serializer_class = DownloadRequestSerializer
     queryset         = DownloadRequest.objects.select_related("record", "requested_by")
@@ -134,7 +135,12 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == "create":
+            # Any logged-in user may request a download
             return [IsAuthenticated()]
+        if self.action == "destroy":
+            # Only admins may delete a download request record
+            return [IsAuthenticated(), IsAdmin()]
+        # list, retrieve, update, partial_update → staff only
         return [IsAuthenticated(), IsStaff()]
 
     def get_queryset(self):
@@ -227,9 +233,10 @@ class DownloadRedeemView(APIView):
 
 class DeleteRequestViewSet(viewsets.ModelViewSet):
     """
-    GET    /delete-requests/
-    PATCH  /delete-requests/<id>/   -- admin approve triggers actual soft delete
-    TODO: on approve call soft_delete_record and update Record.pipeline_status
+    GET    /delete-requests/           -- admin only: all pending delete requests
+    PATCH  /delete-requests/<id>/      -- admin only: approve triggers soft delete
     """
     serializer_class = DeleteRequestSerializer
     queryset         = DeleteRequest.objects.select_related("record", "requested_by")
+    # All actions on delete requests are restricted to admins
+    permission_classes = [IsAuthenticated, IsAdmin]
