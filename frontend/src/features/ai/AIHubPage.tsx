@@ -1,19 +1,26 @@
 /**
  * Semantic search over the research corpus (companion to FR-M3-01 RAG chat at /ai).
  */
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { aiApi } from "@/api/ai";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { aiApi }      from "@/api/ai";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import type { SemanticSearchResult } from "@/types/ai";
 
 export default function AIHubPage() {
-  const [query, setQuery]       = useState("");
+  const [searchParams]          = useSearchParams();
+  const [mode, setMode]         = useState<Mode>("search");
+  const [query, setQuery]       = useState(() => searchParams.get("q") ?? "");
   const [loading, setLoading]   = useState(false);
   const [results, setResults]   = useState<SemanticSearchResult[]>([]);
   const [error, setError]       = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) setQuery(q);
+  }, [searchParams]);
 
   const handleSubmit = async () => {
     if (!query.trim()) return;
@@ -22,8 +29,14 @@ export default function AIHubPage() {
     setResults([]);
 
     try {
-      const { data } = await aiApi.semanticSearch(query);
-      setResults(data.results ?? data.sources ?? []);
+      if (mode === "search") {
+        const { data } = await aiApi.semanticSearch(query);
+        const payload = data as { results?: SemanticSearchResult[]; sources?: SemanticSearchResult[] };
+        setResults(payload.results ?? payload.sources ?? []);
+      } else {
+        const { data } = await aiApi.ask(query);
+        setAnswer(data.answer);
+      }
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

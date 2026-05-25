@@ -4,51 +4,54 @@ A web-based platform for Cebu Institute of Technology - University (CIT-U) that 
 
 **Documentation**
 
-| Guide | Description |
-|-------|-------------|
-| [Documentation hub](docs/README.md) | Index of all engineering, SDLC, security, and QA docs |
-| [Software engineering plan](docs/SOFTWARE_ENGINEERING_PLAN.md) | Scope, phases, milestones, RACI, open decisions (M5/M7) |
-| [SDLC process](docs/SDLC_PROCESS.md) | Lifecycle, branching, PR workflow, quality gates, release |
-| [Security overview](docs/SECURITY.md) | Threat model, controls, NFR-S mapping, deploy checklist |
-| [Security risk register](docs/SECURITY_RISK_REGISTER.md) | Threats, scores, mitigations, review log |
-| [Test plan](docs/TEST_PLAN.md) | Test levels, role matrix, UAT, automation roadmap |
-| [Traceability matrix](docs/TRACEABILITY_MATRIX.md) | SRS FR/NFR → code, UI, tests, status |
-| [Development guide](docs/DEVELOPMENT_GUIDE.md) | Step-by-step build order, phases, local setup |
-| [Frontend implementation plan](frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI tasks, wireframes, routes, design tokens |
-| [Changelog](CHANGELOG.md) | Version history |
-| SRS / SDD (repo root) | Official requirements and software design PDFs |
+| Guide                                                                    | Description                                               |
+| ------------------------------------------------------------------------ | --------------------------------------------------------- |
+| [Documentation hub](docs/README.md)                                      | Index of all engineering, SDLC, security, and QA docs     |
+| [Software engineering plan](docs/SOFTWARE_ENGINEERING_PLAN.md)           | Scope, phases, milestones, RACI, open decisions (M5/M7)   |
+| [SDLC process](docs/SDLC_PROCESS.md)                                     | Lifecycle, branching, PR workflow, quality gates, release |
+| [Security overview](docs/SECURITY.md)                                    | Threat model, controls, NFR-S mapping, deploy checklist   |
+| [Security risk register](docs/SECURITY_RISK_REGISTER.md)                 | Threats, scores, mitigations, review log                  |
+| [Test plan](docs/TEST_PLAN.md)                                           | Test levels, role matrix, UAT, automation roadmap         |
+| [Traceability matrix](docs/TRACEABILITY_MATRIX.md)                       | SRS FR/NFR → code, UI, tests, status                      |
+| [Development guide](docs/DEVELOPMENT_GUIDE.md)                           | Step-by-step build order, phases, local setup             |
+| [Frontend implementation plan](frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI tasks, wireframes, routes, design tokens               |
+| [Changelog](CHANGELOG.md)                                                | Version history                                           |
+| SRS / SDD (repo root)                                                    | Official requirements and software design PDFs            |
 
 ---
 
 ## Tech Stack
 
 ### Frontend
-| | |
-|---|---|
+
+|           |                              |
+| --------- | ---------------------------- |
 | Framework | React 18 + Vite + TypeScript |
-| Styling | Tailwind CSS v3 |
-| Routing | React Router v6 |
-| State | Zustand |
-| Forms | React Hook Form + Zod |
-| Tables | TanStack Table v8 |
-| Charts | Recharts |
-| HTTP | Axios |
+| Styling   | Tailwind CSS v3              |
+| Routing   | React Router v6              |
+| State     | Zustand                      |
+| Forms     | React Hook Form + Zod        |
+| Tables    | TanStack Table v8            |
+| Charts    | Recharts                     |
+| HTTP      | Axios                        |
 
 ### Backend
-| | |
-|---|---|
-| Framework | Django 5 + Django REST Framework |
-| Auth | SimpleJWT (access + refresh tokens) |
-| Database | PostgreSQL 18 |
-| Task Queue | Celery + Redis |
-| Email | SMTP (configurable, defaults to Gmail) |
-| Rate Limiting | django-axes |
+
+|               |                                        |
+| ------------- | -------------------------------------- |
+| Framework     | Django 5 + Django REST Framework       |
+| Auth          | SimpleJWT (access + refresh tokens)    |
+| Database      | PostgreSQL 18                          |
+| Task Queue    | Celery + Redis                         |
+| Email         | SMTP (configurable, defaults to Gmail) |
+| Rate Limiting | django-axes                            |
 
 ### Infrastructure
-| | |
-|---|---|
-| Containerisation | Docker + Docker Compose |
-| Web Server (prod) | Gunicorn + Nginx |
+
+|                   |                         |
+| ----------------- | ----------------------- |
+| Containerisation  | Docker + Docker Compose |
+| Web Server (prod) | Gunicorn + Nginx        |
 
 ---
 
@@ -89,6 +92,7 @@ IRIS/
 ## Running Locally
 
 ### Prerequisites
+
 - Python 3.11+
 - Node.js 18+
 - PostgreSQL 14+ (running locally)
@@ -155,13 +159,22 @@ python manage.py migrate
 # Create a superuser (use any username/email; password can be anything)
 python manage.py createsuperuser
 
-# Mark the superuser as email-verified so you can log in immediately
+# Mark the superuser as email-verified so you can log in immediately using username
 python manage.py shell -c "
 from apps.accounts.models import User
 u = User.objects.get(username='<your-superuser-username>')
 u.is_verified = True
 u.save()
 print('Done:', u.username, '| verified =', u.is_verified)
+"
+
+# Mark the superuser as email-verified so you can log in immediately using email
+python manage.py shell -c "
+from apps.accounts.models import User
+u = User.objects.get(email='<your-superuser-email>')
+u.is_verified = True
+u.save()
+print('Done:', u.email, '| verified =', u.is_verified)
 "
 
 # Start the dev server
@@ -203,22 +216,23 @@ celery -A config worker -l info
 
 ## Environment Variables Reference
 
-| Variable | Default | Description |
-|---|---|---|
-| `SECRET_KEY` | *(required)* | Django secret key |
-| `DEBUG` | `False` | Set `True` for local development |
-| `ALLOWED_HOSTS` | `localhost` | Comma-separated list of allowed hosts |
-| `DB_NAME` | `iris_db` | PostgreSQL database name |
-| `DB_USER` | `iris_user` | PostgreSQL user |
-| `DB_PASSWORD` | `iris_password` | PostgreSQL password |
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5432` | PostgreSQL port |
-| `FRONTEND_URL` | `http://localhost:5173` | Used to build email verification links |
-| `EMAIL_HOST` | `smtp.gmail.com` | SMTP server |
-| `EMAIL_PORT` | `587` | SMTP port |
-| `EMAIL_HOST_USER` | *(blank)* | SMTP username |
-| `EMAIL_HOST_PASSWORD` | *(blank)* | SMTP password / app password |
-| `CELERY_BROKER_URL` | `redis://localhost:6379/0` | Redis broker URL |
+| Variable              | Default                    | Description                            |
+| --------------------- | -------------------------- | -------------------------------------- |
+| `SECRET_KEY`          | _(required)_               | Django secret key                      |
+| `DEBUG`               | `False`                    | Set `True` for local development       |
+| `ALLOWED_HOSTS`       | `localhost`                | Comma-separated list of allowed hosts  |
+| `DB_NAME`             | `iris_db`                  | PostgreSQL database name               |
+| `DB_USER`             | `iris_user`                | PostgreSQL user                        |
+| `DB_PASSWORD`         | `iris_password`            | PostgreSQL password                    |
+| `DB_HOST`             | `localhost`                | PostgreSQL host                        |
+| `DB_PORT`             | `5432`                     | PostgreSQL port                        |
+| `FRONTEND_URL`        | `http://localhost:5173`    | Used to build email verification links |
+| `EMAIL_HOST`          | `smtp.gmail.com`           | SMTP server                            |
+| `EMAIL_PORT`          | `587`                      | SMTP port                              |
+| `EMAIL_HOST_USER`     | _(blank)_                  | SMTP username                          |
+| `EMAIL_HOST_PASSWORD` | _(blank)_                  | SMTP password / app password           |
+| `CELERY_BROKER_URL`   | `redis://localhost:6379/0` | Redis broker URL                       |
+
 ---
 
 ## Notes

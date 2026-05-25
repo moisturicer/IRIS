@@ -65,10 +65,20 @@ class RecordWriteSerializer(serializers.ModelSerializer):
 
 
 class DownloadRequestSerializer(serializers.ModelSerializer):
+    record_title        = serializers.CharField(source="record.title", read_only=True)
+    requested_by_name   = serializers.SerializerMethodField()
+    requested_by_email  = serializers.EmailField(source="requested_by.email", read_only=True)
+
     class Meta:
         model  = DownloadRequest
-        fields = "__all__"
-        read_only_fields = ["requested_by", "reviewed_by", "reviewed_at"]
+        fields = [
+            "id", "record", "record_title", "requested_by", "requested_by_name",
+            "requested_by_email", "status", "reviewed_by", "created_at", "reviewed_at",
+        ]
+        read_only_fields = ["requested_by", "reviewed_by", "reviewed_at", "status"]
+
+    def get_requested_by_name(self, obj):
+        return obj.requested_by.get_full_name() or obj.requested_by.email
 
 
 class DeleteRequestSerializer(serializers.ModelSerializer):

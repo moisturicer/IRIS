@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { DownloadRequestModal } from "@/components/records/DownloadRequestModal";
 import type { RecordDetail } from "@/types/records";
 import { formatDate } from "@/lib/utils";
 
@@ -10,6 +11,7 @@ export default function RecordDetailPage() {
   const { id }             = useParams<{ id: string }>();
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadOpen, setDownloadOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -66,8 +68,7 @@ export default function RecordDetailPage() {
           </div>
         </div>
 
-        {/* Documents link */}
-        <div className="pt-2 border-t border-gray-100 flex gap-2">
+        <div className="pt-2 border-t border-gray-100 flex flex-wrap gap-2">
           <Link
             to={`/records/${id}/documents`}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#6B0F12] text-white text-[13px] font-semibold hover:bg-[#7d1215] transition-colors"
@@ -75,7 +76,22 @@ export default function RecordDetailPage() {
             <i className="fas fa-folder-open text-[12px]" />
             View Documents
           </Link>
+          <button
+            type="button"
+            onClick={() => setDownloadOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#6B0F12] text-[#6B0F12] text-[13px] font-semibold hover:bg-[#6B0F12]/5 transition-colors"
+          >
+            <i className="fas fa-download text-[12px]" />
+            Request download
+          </button>
         </div>
+
+        <DownloadRequestModal
+          open={downloadOpen}
+          onClose={() => setDownloadOpen(false)}
+          recordId={record.id}
+          recordTitle={record.title}
+        />
 
         {/* TODO: add Review History section for staff/reviewer roles */}
       </div>
