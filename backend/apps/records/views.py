@@ -1,11 +1,17 @@
+from django.conf import settings
+from django.utils import timezone
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+import jwt
 
 from core.permissions import IsOwnerOrStaff, IsReviewer, IsStaff
+from .download_tokens import make_download_token, verify_download_token
+from .download_service import file_response_for_record
 from .models import Record, DownloadRequest, DeleteRequest
 from .serializers import (
     RecordListSerializer,
@@ -118,13 +124,105 @@ class MyRecordsViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
 
 class DownloadRequestViewSet(viewsets.ModelViewSet):
     """
-    GET    /download-requests/         -- admin: all pending
+    GET    /download-requests/         -- staff: list requests (?status=pending)
     POST   /download-requests/         -- user requests download
-    PATCH  /download-requests/<id>/    -- admin: approve/decline
-    TODO: restrict list to IsStaff, restrict create to IsAuthenticated
+    PATCH  /download-requests/<id>/    -- staff: { "action": "approve"|"decline" }
     """
     serializer_class = DownloadRequestSerializer
     queryset         = DownloadRequest.objects.select_related("record", "requested_by")
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_permissions(self):
+        if self.action == "create":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsStaff()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs.order_by("-created_at")
+
+    def perform_create(self, serializer):
+        record = serializer.validated_data["record"]
+        user   = self.request.user
+        if DownloadRequest.objects.filter(
+            record=record, requested_by=user, status="pending"
+        ).exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(
+                {"record": ["You already have a pending download request for this record."]}
+            )
+        serializer.save(requested_by=user)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        action = request.data.get("action")
+        if action not in ("approve", "decline"):
+            return Response(
+                {"detail": "Provide action: 'approve' or 'decline'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if instance.status != "pending":
+            return Response(
+                {"detail": "This request has already been reviewed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        instance.reviewed_by = request.user
+        instance.reviewed_at = timezone.now()
+        instance.status = "approved" if action == "approve" else "declined"
+        instance.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+
+        data = self.get_serializer(instance).data
+        if action == "approve":
+            token = make_download_token(
+                download_request_id=instance.id,
+                record_id=instance.record_id,
+                user_id=instance.requested_by_id,
+            )
+            data["download_url"] = f"{settings.FRONTEND_URL.rstrip('/')}/download?token={token}"
+        return Response(data)
+
+
+class DownloadRedeemView(APIView):
+    """
+    GET /records/download/?token=<jwt>
+    Redeem an approved download JWT and stream the record PDF.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        token = request.query_params.get("token")
+        if not token:
+            return Response({"detail": "token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            claims = verify_download_token(token)
+        except jwt.ExpiredSignatureError:
+            return Response({"detail": "Download link has expired."}, status=status.HTTP_403_FORBIDDEN)
+        except jwt.InvalidTokenError:
+            return Response({"detail": "Invalid download link."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            dl_request = DownloadRequest.objects.select_related("record").get(
+                pk=claims["drid"], status="approved"
+            )
+        except DownloadRequest.DoesNotExist:
+            return Response({"detail": "Download request not found or not approved."}, status=404)
+
+        if dl_request.record_id != claims["rid"] or dl_request.requested_by_id != claims["uid"]:
+            return Response({"detail": "Invalid download link."}, status=status.HTTP_403_FORBIDDEN)
+
+        response = file_response_for_record(dl_request.record)
+        if not response:
+            return Response(
+                {"detail": "No downloadable file is available for this record."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        # TODO(SRS): apply per-user watermark (email, date) before streaming when required
+        return response
 
 
 class DeleteRequestViewSet(viewsets.ModelViewSet):

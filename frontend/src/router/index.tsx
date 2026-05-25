@@ -36,11 +36,14 @@ import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
 import FolderBrowserPage    from "@/features/storage/FolderBrowserPage";
 import AIHubPage            from "@/features/ai/AIHubPage";
 import HelpPage             from "@/features/help/HelpPage";
+import DownloadTokenPage    from "@/features/download/DownloadTokenPage";
+import AccessRequestsPage   from "@/features/requests/AccessRequestsPage";
 
 export const router = createBrowserRouter([
   { path: "/login",  element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
   { path: "/activate/:uidb64/:token", element: <EmailVerifyPage /> },
+  { path: "/download", element: <DownloadTokenPage /> },
 
   {
     element: <ProtectedRoute allowedRoles={ALL_ROLES} />,
@@ -94,7 +97,7 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: "requests/access",
-                element: <div className="p-6 text-[13px] text-gray-500">Access requests — coming soon.</div>,
+                element: <AccessRequestsPage />,
                 handle: { crumb: "Access Requests" },
               },
               {
