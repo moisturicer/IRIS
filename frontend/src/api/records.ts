@@ -1,5 +1,15 @@
+import axios from "axios";
 import { apiClient } from "./client";
-import type { RecordListItem, RecordDetail, RecordFormData, Classification, PSCEDClassification, RecordType } from "@/types/records";
+import { API_BASE } from "@/lib/constants";
+import type {
+  DownloadRequest,
+  RecordListItem,
+  RecordDetail,
+  RecordFormData,
+  Classification,
+  PSCEDClassification,
+  RecordType,
+} from "@/types/records";
 
 interface PaginatedResponse<T> {
   count:    number;
@@ -38,7 +48,22 @@ export const recordsApi = {
   recordTypes:     () => apiClient.get<PaginatedResponse<RecordType>>("/records/record-types/"),
 
   // Download / delete requests
-  requestDownload: (recordId: number) => apiClient.post("/records/download-requests/", { record: recordId }),
+  listDownloadRequests: (params?: { status?: string }) =>
+    apiClient.get<PaginatedResponse<DownloadRequest>>("/records/download-requests/", { params }),
+
+  requestDownload: (recordId: number) =>
+    apiClient.post<DownloadRequest>("/records/download-requests/", { record: recordId }),
+
+  decideDownloadRequest: (id: number, action: "approve" | "decline") =>
+    apiClient.patch<DownloadRequest>(`/records/download-requests/${id}/`, { action }),
+
+  /** Redeem email/download link JWT — no session required. */
+  redeemDownloadToken: (token: string) =>
+    axios.get(`${API_BASE}/records/download/`, {
+      params: { token },
+      responseType: "blob",
+    }),
+
   requestDelete:   (recordId: number, reason?: string) => apiClient.post("/records/delete-requests/", { record: recordId, reason }),
   approveRequest:  (type: "download" | "delete", id: number, action: "approve" | "decline") =>
     apiClient.patch(`/records/${type}-requests/${id}/`, { action }),

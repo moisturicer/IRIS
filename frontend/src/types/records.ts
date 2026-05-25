@@ -73,11 +73,16 @@ export interface RecordType {
 }
 
 export interface DownloadRequest {
-  id:          number;
-  record:      number;
-  requested_by:number;
-  status:      "pending" | "approved" | "declined";
-  created_at:  string;
+  id:                 number;
+  record:             number;
+  record_title?:      string;
+  requested_by:       number;
+  requested_by_name?: string;
+  requested_by_email?:string;
+  status:             "pending" | "approved" | "declined";
+  created_at:         string;
+  reviewed_at?:       string | null;
+  download_url?:      string;
 }
 
 export interface DeleteRequest {
