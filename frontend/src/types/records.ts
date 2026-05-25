@@ -40,6 +40,7 @@ export interface RecordDetail extends RecordListItem {
   adviser:         number | null;
   added_by:        number | null;
   owners:          RecordOwner[];
+  keywords?:       string[];
   is_deleted:      boolean;
 }
 
@@ -55,6 +56,7 @@ export interface RecordFormData {
   is_ip?:                boolean;
   for_commercialization?: boolean;
   community_extension?:  boolean;
+  keywords?:             string[];
 }
 
 export interface Classification {

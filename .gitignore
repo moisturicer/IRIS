@@ -67,3 +67,10 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.gitignore
+.agent/
+
+SDD/
+SRS/
+.gitignore
+.agent/

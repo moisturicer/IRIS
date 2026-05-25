@@ -19,6 +19,7 @@ import { RecordDetailsStep } from "./steps/RecordDetailsStep";
 import { UploadsStep }       from "./steps/UploadsStep";
 import { DpaConsentGate, DpaConsentModal } from "@/components/compliance";
 import { recordFormSchema, type RecordFormValues } from "./recordFormSchema";
+import type { RecordFormData } from "@/types/records";
 
 const STEPS = ["Title & Abstract", "Details", "Documents"];
 
@@ -49,11 +50,11 @@ export default function EditRecordPage() {
       methods.reset({
         title:         data.title,
         abstract:      data.abstract ?? "",
-        year:          data.year_accomplished ?? new Date().getFullYear(),
+        year:          data.year_accomplished ?? data.year_completed ?? new Date().getFullYear(),
         record_type:   data.record_type?.toString() ?? "",
-        research_type: "",
+        research_type: data.classification?.toString() ?? "",
         authors:       data.authors?.map((a) => a.name) ?? [],
-        keywords:      [],
+        keywords:      data.keywords ?? [],
         owners:        data.owners?.map((o) => o.user) ?? [],
       });
     }).finally(() => setLoading(false));
@@ -62,12 +63,15 @@ export default function EditRecordPage() {
   const handleSave = methods.handleSubmit(async (values) => {
     setSaving(true);
     try {
-      await recordsApi.update(Number(id), {
-        title:             values.title,
-        abstract:          values.abstract,
-        year_accomplished: values.year,
-        record_type:       values.record_type ? Number(values.record_type) : undefined,
-      });
+      const payload: Partial<RecordFormData> = {
+        title:                 values.title,
+        abstract:              values.abstract,
+        year_accomplished:     values.year,
+        year_completed:        values.year,
+        record_type:           values.record_type ? Number(values.record_type) : undefined,
+        classification:        values.research_type ? Number(values.research_type) : undefined,
+      };
+      await recordsApi.update(Number(id), payload);
       addToast({ type: "success", message: "Record updated." });
       navigate(`/records/${id}`);
     } catch {

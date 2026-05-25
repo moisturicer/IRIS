@@ -1,0 +1,2 @@
+class VectorStoreService:
+    pass

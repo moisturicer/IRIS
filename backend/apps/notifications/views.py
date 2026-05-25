@@ -19,14 +19,20 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        from django.db.models import Exists, OuterRef
         user = self.request.user
+        read_notifications = NotificationRead.objects.filter(
+            notification=OuterRef("pk"),
+            user=user
+        )
         qs = Notification.objects.filter(
             Q(recipient=user) | Q(broadcast_to_role=user.role)
+        ).annotate(
+            is_read=Exists(read_notifications)
         ).select_related("notif_type", "record", "sender").order_by("-created_at")
 
         if self.request.query_params.get("unread") == "true":
-            read_ids = NotificationRead.objects.filter(user=user).values_list("notification_id", flat=True)
-            qs = qs.exclude(pk__in=read_ids)
+            qs = qs.filter(is_read=False)
 
         return qs
 
