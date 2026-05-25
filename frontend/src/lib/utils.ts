@@ -34,3 +34,12 @@ export function downloadBlob(data: Blob, filename: string) {
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+/** Parse filename from Content-Disposition (attachment; filename="…"). */
+export function filenameFromDisposition(header: string | undefined | null): string | null {
+  if (!header) return null;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (star) return decodeURIComponent(star[1].trim());
+  const plain = /filename="?([^";\n]+)"?/i.exec(header);
+  return plain ? plain[1].trim() : null;
+}

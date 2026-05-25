@@ -17,6 +17,7 @@ import { useUIStore }   from "@/store/ui.store";
 import { TitleAbstractStep } from "./steps/TitleAbstractStep";
 import { RecordDetailsStep } from "./steps/RecordDetailsStep";
 import { UploadsStep }       from "./steps/UploadsStep";
+import { DpaConsentGate, DpaConsentModal } from "@/components/compliance";
 import { recordFormSchema, type RecordFormValues } from "./recordFormSchema";
 import type { RecordFormData } from "@/types/records";
 
@@ -27,9 +28,11 @@ export default function EditRecordPage() {
   const navigate = useNavigate();
   const addToast = useUIStore((s) => s.addToast);
 
-  const [step, setStep]         = useState(0);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
+  const [step, setStep]             = useState(0);
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [dpaAccepted, setDpaAccepted] = useState(false);
+  const [dpaModalOpen, setDpaModalOpen] = useState(false);
 
   const methods = useForm<RecordFormValues>({
     resolver: zodResolver(recordFormSchema),
@@ -113,7 +116,16 @@ export default function EditRecordPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           {step === 0 && <TitleAbstractStep />}
           {step === 1 && <RecordDetailsStep />}
-          {step === 2 && <UploadsStep recordId={Number(id)} />}
+          {step === 2 && (
+            <>
+              <UploadsStep recordId={Number(id)} />
+              <DpaConsentGate
+                accepted={dpaAccepted}
+                onAcceptedChange={setDpaAccepted}
+                onViewTerms={() => setDpaModalOpen(true)}
+              />
+            </>
+          )}
         </div>
 
         {/* Navigation */}
@@ -138,9 +150,18 @@ export default function EditRecordPage() {
               Next
             </Button>
           ) : (
-            <Button loading={saving} onClick={handleSave}>Save Changes</Button>
+            <Button
+              loading={saving}
+              disabled={!dpaAccepted}
+              onClick={handleSave}
+              title={dpaAccepted ? undefined : "Accept the Data Privacy Act terms to save"}
+            >
+              Save Changes
+            </Button>
           )}
         </div>
+
+        <DpaConsentModal open={dpaModalOpen} onClose={() => setDpaModalOpen(false)} />
       </div>
     </FormProvider>
   );
