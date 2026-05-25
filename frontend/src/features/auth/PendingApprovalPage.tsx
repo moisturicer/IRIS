@@ -3,13 +3,11 @@
  * Replaces the full app shell — no sidebar, no navigation.
  */
 import { useAuth } from "@/hooks/useAuth";
-import { useUIStore } from "@/store/ui.store";
 import { authApi } from "@/api/auth";
 import irisLogo from "@/assets/images/iris_logo.png";
 
 export function PendingApprovalPage() {
   const { user, logout } = useAuth();
-  const { addToast }     = useUIStore();
 
   const handleLogout = async () => {
     try {

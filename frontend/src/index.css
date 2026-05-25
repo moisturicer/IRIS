@@ -25,6 +25,15 @@
   }
 }
 
+@layer components {
+  .chat-markdown pre {
+    @apply rounded-lg overflow-x-auto text-[12px] p-3;
+  }
+  .chat-markdown pre code {
+    @apply bg-transparent text-inherit p-0;
+  }
+}
+
 @layer utilities {
   /* Thin scrollbar for sidebar and panels */
   .scrollbar-thin {

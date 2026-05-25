@@ -30,6 +30,7 @@ import UserListPage         from "@/features/accounts/UserListPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
 import FolderBrowserPage    from "@/features/storage/FolderBrowserPage";
 import AIHubPage            from "@/features/ai/AIHubPage";
+import RAGChatPage          from "@/features/ai/RAGChatPage";
 import HelpPage             from "@/features/help/HelpPage";
 
 export const router = createBrowserRouter([
@@ -83,7 +84,8 @@ export const router = createBrowserRouter([
           { path: "notifications", element: <NotificationsPage />, handle: { crumb: "Notifications" } },
           { path: "storage", element: <FolderBrowserPage />, handle: { crumb: "Storage" } },
           { path: "storage/:folderId", element: <FolderBrowserPage />, handle: { crumb: "Storage" } },
-          { path: "ai", element: <AIHubPage />, handle: { crumb: "AI Research Hub" } },
+          { path: "ai", element: <RAGChatPage />, handle: { crumb: "Ask IRIS" } },
+          { path: "ai/search", element: <AIHubPage />, handle: { crumb: "Semantic Search" } },
           { path: "help", element: <HelpPage />, handle: { crumb: "Help" } },
         ],
       },

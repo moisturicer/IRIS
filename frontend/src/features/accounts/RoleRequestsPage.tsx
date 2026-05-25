@@ -138,6 +138,7 @@ export default function RoleRequestsPage() {
         danger={target?.action === "decline"}
         onConfirm={handleDecide}
         onCancel={() => setTarget(null)}
+        confirming={acting}
       />
     </div>
   );
