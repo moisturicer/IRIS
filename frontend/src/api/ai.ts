@@ -2,7 +2,10 @@ import { apiClient } from "./client";
 import type { SemanticSearchResult, AIAnswer, EmbeddingJobStatus } from "@/types/ai";
 
 interface SemanticSearchResponse {
-  results: SemanticSearchResult[];
+  answer?:  string;
+  sources?: SemanticSearchResult[];
+  /** Legacy shape if backend adds ranked results */
+  results?: SemanticSearchResult[];
 }
 
 export const aiApi = {
