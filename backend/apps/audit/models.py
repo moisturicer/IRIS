@@ -11,25 +11,27 @@ class AuditEvent(models.Model):
     (e.g. for RENAME: {"old_name": "...", "new_name": "..."}).
     Use the EVENT_TYPE constants below when creating events.
     """
-    LOGIN       = "LOGIN"
-    LOGOUT      = "LOGOUT"
-    ACCESS      = "ACCESS"
-    UPLOAD      = "UPLOAD"
-    DOWNLOAD    = "DOWNLOAD"
-    DELETE      = "DELETE"
-    RENAME      = "RENAME"
+    LOGIN                = "LOGIN"
+    LOGOUT               = "LOGOUT"
+    ACCESS               = "ACCESS"
+    UPLOAD               = "UPLOAD"
+    DOWNLOAD             = "DOWNLOAD"
+    DELETE               = "DELETE"
+    RENAME               = "RENAME"
+    UNAUTHORIZED_BYPASS  = "UNAUTHORIZED_BYPASS"
 
     EVENT_TYPE_CHOICES = [
-        (LOGIN,    "Login"),
-        (LOGOUT,   "Logout"),
-        (ACCESS,   "Record Access"),
-        (UPLOAD,   "File Upload"),
-        (DOWNLOAD, "File Download"),
-        (DELETE,   "File Delete"),
-        (RENAME,   "File Rename"),
+        (LOGIN,               "Login"),
+        (LOGOUT,              "Logout"),
+        (ACCESS,              "Record Access"),
+        (UPLOAD,              "File Upload"),
+        (DOWNLOAD,            "File Download"),
+        (DELETE,              "File Delete"),
+        (RENAME,              "File Rename"),
+        (UNAUTHORIZED_BYPASS, "Unauthorized Access Attempt"),
     ]
 
-    event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, db_index=True)
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES, db_index=True)
     user       = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="audit_events"
     )
