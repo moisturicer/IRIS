@@ -117,6 +117,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "EXCEPTION_HANDLER": "core.exceptions.rbac_exception_handler",
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
         "rest_framework.filters.SearchFilter",
@@ -137,6 +138,7 @@ REST_FRAMEWORK = {
 # ---- JWT ----------------------------------------------------------------
 
 SIMPLE_JWT = {
+    "ALGORITHM": "HS256",
     "ACCESS_TOKEN_LIFETIME": timedelta(
         minutes=config("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=30, cast=int)
     ),
