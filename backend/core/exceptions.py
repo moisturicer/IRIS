@@ -33,7 +33,7 @@ class PinInvalid(APIException):
 # 1. Return an enriched 403 with RBAC diagnostic info
 #    (authenticated role vs required role).
 # 2. Log the access violation to the AuditEvent table as
-#    UNAUTHORIZED_BYPASS — matching the SRS wireframe.
+#    UNAUTHORIZED_ACCESS — matching the SDD sequence diagram.
 
 import logging
 from rest_framework.views import exception_handler
@@ -48,7 +48,7 @@ def rbac_exception_handler(exc, context):
 
     When a PermissionDenied is raised, this handler:
     - Builds an RBAC diagnostic payload showing authenticated vs required role.
-    - Creates an UNAUTHORIZED_BYPASS AuditEvent for the immutable audit log.
+    - Creates an UNAUTHORIZED_ACCESS AuditEvent for the immutable audit log.
     - Returns a structured 403 JSON response matching the SRS wireframe.
 
     All other exceptions are delegated to DRF's default handler unchanged.
@@ -80,7 +80,7 @@ def rbac_exception_handler(exc, context):
         }
 
         # --- Log to the audit table ---
-        _log_unauthorized_bypass(request, view, authenticated_role, required_role)
+        _log_unauthorized_access(request, view, authenticated_role, required_role)
 
     return response
 
@@ -114,9 +114,9 @@ def _get_required_role(exc, view) -> str:
     return str(getattr(exc, "detail", "Unknown"))
 
 
-def _log_unauthorized_bypass(request, view, authenticated_role, required_role):
+def _log_unauthorized_access(request, view, authenticated_role, required_role):
     """
-    Create an UNAUTHORIZED_BYPASS AuditEvent.
+    Create an UNAUTHORIZED_ACCESS AuditEvent.
     Wrapped in try/except so a logging failure never blocks the 403 response.
     """
     try:
@@ -131,7 +131,7 @@ def _log_unauthorized_bypass(request, view, authenticated_role, required_role):
             view_name = f"{type(view).__name__}.{getattr(view, 'action', request.method)}"
 
         AuditEvent.objects.create(
-            event_type=AuditEvent.UNAUTHORIZED_BYPASS,
+            event_type=AuditEvent.UNAUTHORIZED_ACCESS,
             user=user,
             metadata={
                 "authenticated_role": authenticated_role,
@@ -143,7 +143,7 @@ def _log_unauthorized_bypass(request, view, authenticated_role, required_role):
         )
 
         _logger.warning(
-            "UNAUTHORIZED_BYPASS: user=%s role=%s required=%s path=%s",
+            "UNAUTHORIZED_ACCESS: user=%s role=%s required=%s path=%s",
             user,
             authenticated_role,
             required_role,
@@ -151,5 +151,5 @@ def _log_unauthorized_bypass(request, view, authenticated_role, required_role):
         )
     except Exception:
         # Never let audit logging break the API response
-        _logger.exception("Failed to log UNAUTHORIZED_BYPASS audit event")
+        _logger.exception("Failed to log UNAUTHORIZED_ACCESS audit event")
 

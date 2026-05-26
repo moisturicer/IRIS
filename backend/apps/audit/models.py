@@ -18,7 +18,7 @@ class AuditEvent(models.Model):
     DOWNLOAD             = "DOWNLOAD"
     DELETE               = "DELETE"
     RENAME               = "RENAME"
-    UNAUTHORIZED_BYPASS  = "UNAUTHORIZED_BYPASS"
+    UNAUTHORIZED_ACCESS   = "UNAUTHORIZED_ACCESS"
 
     EVENT_TYPE_CHOICES = [
         (LOGIN,               "Login"),
@@ -28,7 +28,7 @@ class AuditEvent(models.Model):
         (DOWNLOAD,            "File Download"),
         (DELETE,              "File Delete"),
         (RENAME,              "File Rename"),
-        (UNAUTHORIZED_BYPASS, "Unauthorized Access Attempt"),
+        (UNAUTHORIZED_ACCESS, "Unauthorized Access Attempt"),
     ]
 
     event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES, db_index=True)
