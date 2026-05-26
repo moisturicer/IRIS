@@ -138,6 +138,7 @@ REST_FRAMEWORK = {
 # ---- JWT ----------------------------------------------------------------
 
 SIMPLE_JWT = {
+    "ALGORITHM": "HS256",
     "ACCESS_TOKEN_LIFETIME": timedelta(
         minutes=config("JWT_ACCESS_TOKEN_LIFETIME_MINUTES", default=30, cast=int)
     ),
