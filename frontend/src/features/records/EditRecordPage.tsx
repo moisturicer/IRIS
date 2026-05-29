@@ -38,7 +38,7 @@ export default function EditRecordPage() {
     resolver: zodResolver(recordFormSchema),
     defaultValues: {
       title: "", abstract: "", year: new Date().getFullYear(),
-      record_type: "", research_type: "",
+      record_type: "",
       authors: [], keywords: [], owners: [],
     },
   });
@@ -52,7 +52,6 @@ export default function EditRecordPage() {
         abstract:      data.abstract ?? "",
         year:          data.year_accomplished ?? data.year_completed ?? new Date().getFullYear(),
         record_type:   data.record_type?.toString() ?? "",
-        research_type: data.classification?.toString() ?? "",
         authors:       data.authors?.map((a) => a.name) ?? [],
         keywords:      data.keywords ?? [],
         owners:        data.owners?.map((o) => o.user) ?? [],
@@ -141,7 +140,7 @@ export default function EditRecordPage() {
               onClick={async () => {
                 const fields: Record<number, (keyof RecordFormValues)[]> = {
                   0: ["title", "abstract"],
-                  1: ["record_type", "research_type", "year"],
+                  1: ["record_type", "year"],
                 };
                 const ok = await methods.trigger(fields[step] as (keyof RecordFormValues)[]);
                 if (ok) setStep(step + 1);

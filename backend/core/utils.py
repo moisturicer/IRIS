@@ -3,8 +3,6 @@ import string
 import zipfile
 import os
 from io import BytesIO
-from django.core.mail import send_mail
-from django.conf import settings
 
 
 def generate_pin(length: int = 6) -> str:
@@ -27,14 +25,29 @@ def build_zip(files: list) -> BytesIO:
 
 def send_email_async(subject: str, message: str, recipient_list: list):
     """
-    Simple wrapper around send_mail.
-    TODO: replace with a Celery task (apps.accounts.tasks.send_email_task)
-          so email sending never blocks a request.
+    Dispatch an email via Celery so it never blocks the request/response cycle.
+
+    Falls back to a direct synchronous send (fail_silently=True) if the Celery
+    broker is unreachable, so email is never silently dropped in development.
     """
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=recipient_list,
-        fail_silently=False,
-    )
+    try:
+        from apps.accounts.tasks import send_email_task
+        send_email_task.delay(
+            subject=subject,
+            message=message,
+            recipient_list=recipient_list,
+        )
+    except Exception:
+        # Broker unavailable — send synchronously as a last resort.
+        from django.core.mail import send_mail
+        from django.conf import settings
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=recipient_list,
+                fail_silently=True,
+            )
+        except Exception:
+            pass

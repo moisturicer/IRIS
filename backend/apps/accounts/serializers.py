@@ -11,14 +11,15 @@ class UserSerializer(serializers.ModelSerializer):
             "id", "email", "first_name", "middle_initial", "last_name",
             "role", "role_name",
             "is_staff", "is_superuser",
-            "is_verified", "is_locked", "date_joined",
+            "is_verified", "is_locked", "consent_given", "date_joined",
         ]
-        read_only_fields = ["role", "is_staff", "is_superuser", "is_verified", "is_locked", "date_joined"]
+        read_only_fields = ["role", "is_staff", "is_superuser", "is_verified", "is_locked", "consent_given", "date_joined"]
 
 
 class RegisterSerializer(serializers.ModelSerializer):
     password         = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True)
+    consent_given    = serializers.BooleanField(write_only=True)
 
     # Role-selection fields (not model fields — popped before user creation)
     role_name     = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -31,12 +32,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             "email", "first_name", "middle_initial", "last_name",
             "password", "confirm_password",
+            "consent_given",
             "role_name", "course_id", "college_id", "department_id",
         ]
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("This email address is already registered.")
+        return value
+
+    def validate_consent_given(self, value):
+        if not value:
+            raise serializers.ValidationError("You must agree to the Data Privacy Notice to register.")
         return value
 
     def validate(self, data):
@@ -46,7 +53,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         role_name = data.get("role_name")
         if role_name == "Student" and not data.get("course_id"):
             raise serializers.ValidationError({"course_id": "Course is required for students."})
-        if role_name == "Faculty Adviser":
+        if role_name == "Adviser":
             if not data.get("college_id"):
                 raise serializers.ValidationError({"college_id": "College is required for advisers."})
             if not data.get("department_id"):
@@ -62,7 +69,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         department_id = validated_data.pop("department_id", None)
 
         password = validated_data.pop("password")
-        user = User(**validated_data)
+        user = User(**validated_data)   # consent_given stays in validated_data → persisted to model
         user.set_password(password)
         user.save()
 
@@ -70,7 +77,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         if role_name == "Student" and course_id:
             from .models import StudentProfile
             StudentProfile.objects.create(user=user, course_id=course_id)
-        elif role_name == "Faculty Adviser":
+        elif role_name == "Adviser":
             from .models import AdviserProfile
             AdviserProfile.objects.create(
                 user=user,

@@ -56,19 +56,27 @@ class SlotWithUploadsSerializer(serializers.ModelSerializer):
 
     def get_uploads(self, slot):
         record_id = self.context.get("record_id")
+        request   = self.context.get("request")
         if not record_id:
             return []
         uploads = RecordUpload.objects.filter(
             slot=slot, record_id=record_id
         ).select_related("uploaded_by").order_by("-version")
-        return RecordUploadSerializer(uploads, many=True).data
+        return RecordUploadSerializer(uploads, many=True, context={"request": request}).data
 
 
 class RecordFileSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model  = RecordFile
-        fields = ["id", "record", "file", "filename", "uploaded_by", "created_at"]
-        read_only_fields = ["uploaded_by"]
+        fields = ["id", "record", "file", "filename", "uploaded_by", "uploaded_by_name", "created_at"]
+        read_only_fields = ["uploaded_by", "uploaded_by_name"]
+
+    def get_uploaded_by_name(self, obj):
+        if obj.uploaded_by:
+            return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}".strip() or obj.uploaded_by.email
+        return None
 
 
 class PdfExtractionSerializer(serializers.ModelSerializer):

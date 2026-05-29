@@ -93,7 +93,7 @@ Detailed scoring: [SECURITY_RISK_REGISTER.md](SECURITY_RISK_REGISTER.md).
 
 ### 4.1 Model
 
-- Each user has one **Role** (`Student`, `Adviser`, `KTTO`, `RDCO`, `ITSO`, `TBI`).  
+- Each user has one **Role** (`Student`, `Adviser`, `KTTO`, `RDCO`, `ITSO`, `IERC`).  
 - DRF default: `IsAuthenticated`; views add `IsStudent`, `IsReviewer`, `IsStaff`, etc.  
 - Frontend: `PrivateRoute`, `RoleRoute` — **UI only**; must mirror API checks (NFR-S4).
 

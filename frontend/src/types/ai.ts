@@ -8,17 +8,21 @@ export interface SemanticSearchResult {
 }
 
 export interface AIAnswer {
-  answer:      string;
-  /** Record IDs cited in the answer -- can be used to add reference links */
-  citations:   number[];
+  /** LLM-generated answer string, or null while RAG answer generation is not yet implemented. */
+  answer:    string | null;
+  /** Record IDs of the top-k most relevant records retrieved by semantic similarity. */
+  citations: number[];
+  /** Informational message returned by the backend (e.g. when the knowledge base is empty). */
+  message:   string | null;
 }
 
 export interface EmbeddingJobStatus {
-  id:             number;
-  record:         number;
-  record_title:   string;
-  status:         "queued" | "running" | "done" | "failed";
-  error:          string | null;
-  created_at:     string;
-  completed_at:   string | null;
+  id:               number;
+  record:           number;
+  record_title:     string;
+  status:           "queued" | "running" | "done" | "failed";
+  error:            string | null;
+  celery_task_id:   string | null;
+  created_at:       string;
+  completed_at:     string | null;
 }

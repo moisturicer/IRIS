@@ -8,8 +8,8 @@ from .models import User, RoleRequest
 
 def send_verification_email(user: User, request):
     """
-    Build and send an email verification link.
-    TODO: move send to a Celery task (apps.accounts.tasks.send_verification_email_task).
+    Build and send an email verification link via Celery (send_email_async dispatches
+    to the send_email_task Celery task so registration never blocks on mail delivery).
     """
     uid   = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)

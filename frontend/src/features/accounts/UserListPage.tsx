@@ -193,7 +193,7 @@ export default function UserListPage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] outline-none
                 focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12]"
             >
-              {["Student","Adviser","KTTO","RDCO","ITSO","TBI"].map((r) => (
+              {["Student","Adviser","KTTO","RDCO","ITSO","IERC"].map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>

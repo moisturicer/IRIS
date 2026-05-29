@@ -13,13 +13,18 @@ export function formatDate(value: string | Date | null | undefined, pattern = "M
 }
 
 const PIPELINE_LABELS: Record<PipelineStatus, string> = {
-  draft:          "Draft",
-  adviser_review: "Adviser Review",
-  ktto_review:    "KTTO / TBI Review",
-  rdco_review:    "RDCO Review",
-  published:      "Published",
-  declined:       "Declined",
-  pending_delete: "Pending Deletion",
+  draft:           "Draft",
+  adviser_review:  "Adviser Review",
+  approved:        "Approved — Ongoing",
+  completed:       "Completed",
+  rdco_intake:     "RDCO Intake Review",
+  itso_review:     "ITSO Review",
+  parallel_review: "Parallel Office Review",
+  rdco_review:     "RDCO Final Review",
+  published:       "Published",
+  declined:        "Revision Requested",
+  rejected:        "Rejected",
+  pending_delete:  "Pending Deletion",
 };
 
 export function pipelineLabel(status: PipelineStatus | string): string {

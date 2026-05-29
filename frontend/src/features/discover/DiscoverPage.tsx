@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
-import { useAuthStore } from "@/store/auth.store";
-import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Spinner } from "@/components/ui/Spinner";
 import type { RecordListItem } from "@/types/records";
 import {
@@ -16,7 +14,6 @@ import {
 import { RecentIndexedRow, SearchResultCard, SpotlightCard } from "./DiscoverRecordCard";
 
 export default function DiscoverPage() {
-  const navigate = useNavigate();
   const { logout } = useAuth();
 
   const [papers, setPapers] = useState<RecordListItem[]>([]);
@@ -68,10 +65,6 @@ export default function DiscoverPage() {
     setActiveResults(null);
   };
 
-  const handleSummarize = (recordId: number) => {
-    navigate(`/ai?record=${recordId}`);
-  };
-
   const handleSignOut = async () => {
     const refresh = useAuthStore.getState().refreshToken ?? "";
     await authApi.logout(refresh).catch(() => {});
@@ -93,7 +86,6 @@ export default function DiscoverPage() {
           <span className="text-slate-800 font-semibold">Discover</span>
         </div>
         <div className="flex items-center gap-3">
-          <NotificationBell />
           <button
             type="button"
             onClick={handleSignOut}
@@ -219,7 +211,6 @@ export default function DiscoverPage() {
                   <SearchResultCard
                     key={record.id}
                     record={record}
-                    onSummarize={handleSummarize}
                   />
                 ))}
               </div>
@@ -244,7 +235,6 @@ export default function DiscoverPage() {
                     key={record.id}
                     record={record}
                     index={index}
-                    onSummarize={handleSummarize}
                   />
                 ))}
               </div>
@@ -285,6 +275,56 @@ export default function DiscoverPage() {
                 </div>
               </aside>
             </div>
+            {/* Research Analytics — Coming Soon */}
+            <section>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-slate-800 tracking-tight">
+                  Research Analytics
+                </h2>
+                <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200 uppercase tracking-wider">
+                  Coming Soon
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Classification Distribution placeholder */}
+                <div className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-6 min-h-[180px] flex flex-col justify-between overflow-hidden">
+                  <p className="text-[12px] font-semibold text-slate-400 mb-3">
+                    Classification Distribution
+                  </p>
+                  <div className="flex items-end gap-1.5 h-20 opacity-20">
+                    {[55, 80, 40, 95, 65, 50, 75, 45].map((h, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 bg-slate-200 rounded-t"
+                        style={{ height: `${h}%` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 backdrop-blur-[1px]">
+                    <i className="fas fa-chart-bar text-2xl text-slate-200 mb-2" />
+                    <span className="text-[12px] text-slate-400 font-medium">In development</span>
+                  </div>
+                </div>
+
+                {/* PSCED Distribution placeholder */}
+                <div className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-6 min-h-[180px] flex flex-col justify-between overflow-hidden">
+                  <p className="text-[12px] font-semibold text-slate-400 mb-3">
+                    PSCED Field Distribution
+                  </p>
+                  <div className="space-y-2 opacity-20">
+                    {[75, 55, 90, 40, 65].map((w, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="h-3 bg-slate-200 rounded-full" style={{ width: `${w}%` }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 backdrop-blur-[1px]">
+                    <i className="fas fa-chart-pie text-2xl text-slate-200 mb-2" />
+                    <span className="text-[12px] text-slate-400 font-medium">In development</span>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </div>

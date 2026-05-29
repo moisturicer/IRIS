@@ -8,6 +8,8 @@ export const reviewsApi = {
   declined:   () => apiClient.get<RecordListItem[]>("/reviews/declined/"),
   submit:     (data: ReviewSubmitPayload) => apiClient.post<Review>("/reviews/submit/", data),
   resubmit:   (recordId: number)         => apiClient.post("/reviews/resubmit/", { record_id: recordId }),
-  generatePin:(recordId: number, email: string) => apiClient.post("/reviews/pin/generate/", { record: recordId, email }),
-  verifyPin:  (recordId: number, pin: string)   => apiClient.post("/reviews/pin/verify/", { record: recordId, pin }),
+  /** Request a one-time PIN emailed to the current user's account email. */
+  generatePin:(recordId: number) => apiClient.post("/reviews/pin/generate/", { record_id: recordId }),
+  /** Verify a PIN and confirm access. Returns { verified: true, record_id }. */
+  verifyPin:  (recordId: number, pin: string) => apiClient.post<{ verified: boolean; record_id: number }>("/reviews/pin/verify/", { record_id: recordId, pin }),
 };

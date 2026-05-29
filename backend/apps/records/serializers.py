@@ -31,7 +31,7 @@ class RecordListSerializer(serializers.ModelSerializer):
         model  = Record
         fields = [
             "id", "title", "abstract", "year_accomplished", "classification_name",
-            "record_type_name", "pipeline_status", "is_ip",
+            "record_type_name", "pipeline_status", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "access_count", "created_at", "authors",
         ]
@@ -39,53 +39,134 @@ class RecordListSerializer(serializers.ModelSerializer):
 
 class RecordDetailSerializer(serializers.ModelSerializer):
     """Full record detail including all related objects."""
-    owners        = RecordOwnerSerializer(many=True, read_only=True)
-    authors       = AuthorSerializer(many=True, read_only=True)
+    owners         = RecordOwnerSerializer(many=True, read_only=True)
+    authors        = AuthorSerializer(many=True, read_only=True)
     classification = serializers.StringRelatedField()
     psced          = serializers.StringRelatedField()
     record_type    = serializers.StringRelatedField()
+    reviews        = serializers.SerializerMethodField()
 
-    class Meta:
-        model  = Record
-        fields = "__all__"
+    def get_reviews(self, obj):
+        from apps.reviews.models import Review
+        qs = (
+            Review.objects
+            .filter(record=obj)
+            .select_related("reviewed_by")
+            .order_by("created_at")
+        )
+        return [
+            {
+                "id":               r.id,
+                "stage":            r.stage,
+                "status":           r.status,
+                "comment":          r.comment,
+                "reviewed_by_name": r.reviewed_by.get_full_name() if r.reviewed_by else None,
+                "created_at":       r.created_at.isoformat(),
+            }
+            for r in qs
+        ]
 
-
-class RecordWriteSerializer(serializers.ModelSerializer):
-    """Used for create and update operations."""
-    # TODO: add nested writable authors, budgets, conferences, collaborations
     class Meta:
         model  = Record
         fields = [
+            "id", "title", "abstract", "abstract_file",
+            "year_accomplished", "year_completed",
+            "classification", "psced", "record_type",
+            "adviser", "added_by", "is_ip", "ip_type",
+            "for_commercialization", "community_extension",
+            "access_count", "pipeline_status", "is_deleted",
+            "created_at", "updated_at",
+            "owners", "authors", "reviews",
+        ]
+
+
+class RecordWriteSerializer(serializers.ModelSerializer):
+    """
+    Used for create and update operations.
+    `authors` is a flat list of name strings — the serializer handles creating
+    and replacing Author rows so callers never touch the Author model directly.
+    """
+    authors = serializers.ListField(
+        child=serializers.CharField(max_length=200, allow_blank=False),
+        write_only=True,
+        required=False,
+        default=list,
+        help_text="List of author name strings. On update, replaces all existing authors.",
+    )
+
+    class Meta:
+        model  = Record
+        fields = [
+            "id",
             "title", "year_accomplished", "year_completed", "abstract",
             "classification", "psced", "record_type", "adviser",
             "is_ip", "for_commercialization", "community_extension",
             "abstract_file",
+            "authors",
         ]
-        read_only_fields = ["pipeline_status", "added_by"]
+        read_only_fields = ["id", "pipeline_status", "added_by"]
+
+    def _sync_authors(self, record, authors_data: list[str]):
+        """Replace all Author rows for a record with the provided name list."""
+        from .models import Author
+        record.authors.all().delete()
+        Author.objects.bulk_create(
+            [Author(record=record, name=name.strip()) for name in authors_data if name.strip()]
+        )
+
+    def create(self, validated_data):
+        authors_data = validated_data.pop("authors", [])
+        record = super().create(validated_data)
+        if authors_data:
+            self._sync_authors(record, authors_data)
+        return record
+
+    def update(self, instance, validated_data):
+        authors_data = validated_data.pop("authors", None)
+        record = super().update(instance, validated_data)
+        if authors_data is not None:           # only replace when field was explicitly sent
+            self._sync_authors(record, authors_data)
+        return record
 
 
 class DownloadRequestSerializer(serializers.ModelSerializer):
-    record_title        = serializers.CharField(source="record.title", read_only=True)
-    requested_by_name   = serializers.SerializerMethodField()
-    requested_by_email  = serializers.EmailField(source="requested_by.email", read_only=True)
+    record_title         = serializers.CharField(source="record.title",                    read_only=True)
+    requested_by_name    = serializers.SerializerMethodField()
+    requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
 
     class Meta:
         model  = DownloadRequest
         fields = [
-            "id", "record", "record_title", "requested_by", "requested_by_name",
-            "requested_by_email", "status", "reviewed_by", "created_at", "reviewed_at",
+            "id", "record", "record_title",
+            "requested_by", "requested_by_name", "requested_by_email",
+            "status", "reviewed_by", "reviewed_at", "created_at",
         ]
-        read_only_fields = ["requested_by", "reviewed_by", "reviewed_at", "status"]
+        read_only_fields = ["requested_by", "reviewed_by", "reviewed_at"]
 
     def get_requested_by_name(self, obj):
-        return obj.requested_by.get_full_name() or obj.requested_by.email
+        if obj.requested_by:
+            return obj.requested_by.get_full_name() or obj.requested_by.email
+        return None
 
 
 class DeleteRequestSerializer(serializers.ModelSerializer):
+    record_title         = serializers.CharField(source="record.title",                    read_only=True)
+    requested_by_name    = serializers.SerializerMethodField()
+    requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
+
     class Meta:
         model  = DeleteRequest
-        fields = "__all__"
+        fields = [
+            "id", "record", "record_title",
+            "requested_by", "requested_by_name", "requested_by_email",
+            "reason", "status", "reviewed_by", "reviewed_at", "created_at",
+        ]
         read_only_fields = ["requested_by", "reviewed_by", "reviewed_at"]
+
+    def get_requested_by_name(self, obj):
+        if obj.requested_by:
+            return obj.requested_by.get_full_name() or obj.requested_by.email
+        return None
 
 
 # ---- Reference data serializers -----------------------------------------

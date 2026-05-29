@@ -5,9 +5,7 @@ export const ROLES = {
   KTTO:    "KTTO",
   RDCO:    "RDCO",
   ITSO:    "ITSO",
-  TBI:     "TBI",
   IERC:    "IERC",
-  ADMIN:   "System Administrator",
 } as const;
 
 export type RoleName = (typeof ROLES)[keyof typeof ROLES];
@@ -19,23 +17,15 @@ export const REVIEWER_ROLES: RoleName[] = [
   ROLES.ADVISER,
   ROLES.KTTO,
   ROLES.RDCO,
-  ROLES.TBI,
+  ROLES.ITSO,
   ROLES.IERC,
-];
-
-export const APPROVAL_CHAIN_ROLES: RoleName[] = [
-  ROLES.ADVISER,
-  ROLES.KTTO,
-  ROLES.TBI,
-  ROLES.IERC,
-  ROLES.RDCO,
 ];
 
 export const STAFF_ROLES: RoleName[] = [
   ROLES.KTTO,
   ROLES.RDCO,
   ROLES.ITSO,
-  ROLES.TBI,
+  ROLES.IERC,
 ];
 
 export const REQUEST_QUEUE_ROLES: RoleName[] = [
@@ -52,12 +42,20 @@ export const AUDIT_LOG_ROLES: RoleName[] = [
 /** Record pipeline statuses — match `Record.PIPELINE_STATUS` in Django. */
 export const PIPELINE_STATUS = {
   DRAFT:          "draft",
+  // Proposal pipeline
   ADVISER_REVIEW: "adviser_review",
-  KTTO_REVIEW:    "ktto_review",
-  RDCO_REVIEW:    "rdco_review",
+  APPROVED:       "approved",       // Proposal approved by adviser — visible as ongoing
+  // Thesis/Research and Project pipeline
+  RDCO_INTAKE:      "rdco_intake",
+  ITSO_REVIEW:      "itso_review",
+  PARALLEL_REVIEW:  "parallel_review",
+  RDCO_REVIEW:      "rdco_review",
+  // Terminal / visible states
   PUBLISHED:      "published",
-  DECLINED:       "declined",
+  DECLINED:       "declined",       // sent back for revision; owner may resubmit
+  REJECTED:       "rejected",       // outright rejection; no resubmission
   PENDING_DELETE: "pending_delete",
+  COMPLETED:      "completed",      // Proposal research finished — toggled by RDCO
 } as const;
 
 export type PipelineStatus = (typeof PIPELINE_STATUS)[keyof typeof PIPELINE_STATUS];

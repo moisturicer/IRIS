@@ -1,7 +1,7 @@
 from django.db import migrations
 
 
-ROLES = ["Student", "Adviser", "KTTO", "RDCO", "ITSO", "TBI"]
+ROLES = ["Student", "Adviser", "KTTO", "RDCO", "ITSO", "IERC"]
 
 COLLEGES = [
     {"id": 1, "name": "College of Engineering and Architecture",   "code": "CEA"},

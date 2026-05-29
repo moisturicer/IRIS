@@ -17,7 +17,7 @@ export default function RoleRequestsPage() {
   const [requests,  setRequests]  = useState<RoleRequest[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
-  const [acting,    setActing]    = useState(false);
+  const [_acting,   setActing]    = useState(false);
 
   const load = () => {
     setLoading(true);

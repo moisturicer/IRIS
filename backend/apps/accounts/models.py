@@ -4,7 +4,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 
 class Role(models.Model):
     """
-    Roles: Student, Adviser, KTTO, RDCO, ITSO, TBI.
+    Roles: Student, Adviser, KTTO, RDCO, ITSO, IERC.
     Seed via a data migration -- do not let users create roles freely.
     """
     name = models.CharField(max_length=50, unique=True)
@@ -66,11 +66,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         Role, on_delete=models.SET_NULL, null=True, blank=True, related_name="users"
     )
 
-    is_verified = models.BooleanField(default=False)
-    is_locked   = models.BooleanField(default=False)   # manual lock, separate from axes
-    is_staff    = models.BooleanField(default=False)
-    is_active   = models.BooleanField(default=True)
-    date_joined = models.DateTimeField(auto_now_add=True)
+    is_verified    = models.BooleanField(default=False)
+    is_locked      = models.BooleanField(default=False)   # manual lock, separate from axes
+    is_staff       = models.BooleanField(default=False)
+    is_active      = models.BooleanField(default=True)
+    date_joined    = models.DateTimeField(auto_now_add=True)
+    consent_given  = models.BooleanField(default=False)   # FR-M6-06: Data Privacy Act (RA 10173) consent recorded at signup
 
     objects = UserManager()
 

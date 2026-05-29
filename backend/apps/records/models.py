@@ -60,11 +60,19 @@ class RecordManager(models.Manager):
 class Record(models.Model):
     PIPELINE_STATUS = [
         ("draft",          "Draft"),
-        ("adviser_review", "Adviser Review"),
-        ("ktto_review",    "KTTO / TBI Review"),
-        ("rdco_review",    "RDCO Review"),
+        # Proposal pipeline
+        ("adviser_review", "Adviser Review"),          # back-and-forth with adviser until approved
+        ("approved",       "Approved"),                # Proposal approved by adviser — visible as ongoing
+        ("completed",      "Completed"),               # Proposal research finished — toggled manually by RDCO
+        # Thesis/Research and Project pipeline
+        ("rdco_intake",    "RDCO Intake Review"),      # RDCO checks completeness; may reject outright
+        ("itso_review",     "ITSO Review"),              # Project only: ITSO sequential gate; KTTO also starts here in parallel
+        ("parallel_review", "Parallel Office Review"), # T/R: IERC+KTTO; Project: IERC+KTTO after ITSO clears — offices tracked via RecordClearance
+        ("rdco_review",     "RDCO Final Review"),      # RDCO consolidates all office clearances
+        # Terminal / visible states
         ("published",      "Published"),
-        ("declined",       "Declined"),
+        ("declined",       "Declined"),                # revision requested; owner may resubmit
+        ("rejected",       "Rejected"),                # terminal rejection; no resubmission
         ("pending_delete", "Pending Deletion"),
     ]
 
@@ -91,10 +99,26 @@ class Record(models.Model):
         related_name="created_records"
     )
 
-    # IP / tag flags -- kept as booleans since they are fixed and only 3
+    # IP / tag flags
     is_ip                   = models.BooleanField(default=False)
     for_commercialization   = models.BooleanField(default=False)
     community_extension     = models.BooleanField(default=False)
+
+    # Structured IP classification type (FR-M5-05)
+    IP_TYPE_CHOICES = [
+        ("patent",        "Patent"),
+        ("copyright",     "Copyright"),
+        ("trade_secret",  "Trade Secret"),
+        ("utility_model", "Utility Model"),
+    ]
+    ip_type = models.CharField(
+        max_length=20,
+        choices=IP_TYPE_CHOICES,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Specific IP classification set by RDCO/KTTO after final review.",
+    )
 
     # Denormalized pipeline status -- updated by reviews.services on every review action
     pipeline_status = models.CharField(
@@ -219,6 +243,7 @@ class DeleteRequest(models.Model):
     requested_by = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="delete_requests")
     reason       = models.TextField(blank=True)
     status       = models.CharField(max_length=10, choices=STATUS, default="pending")
+    previous_pipeline_status = models.CharField(max_length=20, blank=True, default="")
     reviewed_by  = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="reviewed_delete_requests"

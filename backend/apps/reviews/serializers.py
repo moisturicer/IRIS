@@ -13,7 +13,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class ReviewWriteSerializer(serializers.Serializer):
     record_id = serializers.IntegerField()
-    status    = serializers.ChoiceField(choices=["approved", "declined"])
+    status    = serializers.ChoiceField(choices=["approved", "declined", "rejected"])
     comment   = serializers.CharField(required=False, allow_blank=True)
 
 

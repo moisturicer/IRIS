@@ -7,7 +7,7 @@ const ROLE_DIAGNOSTIC: Record<RoleName | string, string> = {
   KTTO:    "KTTO",
   RDCO:    "RDCO_DIRECTOR",
   ITSO:    "ITSO",
-  TBI:     "TBI",
+  IERC:    "IERC",
 };
 
 export function roleToDiagnosticCode(role: string | null | undefined): string {

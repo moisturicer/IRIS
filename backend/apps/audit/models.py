@@ -11,22 +11,36 @@ class AuditEvent(models.Model):
     (e.g. for RENAME: {"old_name": "...", "new_name": "..."}).
     Use the EVENT_TYPE constants below when creating events.
     """
-    LOGIN       = "LOGIN"
-    LOGOUT      = "LOGOUT"
-    ACCESS      = "ACCESS"
-    UPLOAD      = "UPLOAD"
-    DOWNLOAD    = "DOWNLOAD"
-    DELETE      = "DELETE"
-    RENAME      = "RENAME"
+    LOGIN            = "LOGIN"
+    LOGOUT           = "LOGOUT"
+    FAILED_LOGIN     = "FAILED_LOGIN"
+    ACCESS           = "ACCESS"
+    UPLOAD           = "UPLOAD"
+    DOWNLOAD         = "DOWNLOAD"
+    DELETE           = "DELETE"
+    RENAME           = "RENAME"
+    PIN_GENERATED    = "PIN_GENERATED"
+    PIN_VERIFIED     = "PIN_VERIFIED"
+    ROLE_CHANGE      = "ROLE_CHANGE"
+    ACCOUNT_LOCKED   = "ACCOUNT_LOCKED"
+    ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
+    SESSION_REVOKE   = "SESSION_REVOKE"
 
     EVENT_TYPE_CHOICES = [
-        (LOGIN,    "Login"),
-        (LOGOUT,   "Logout"),
-        (ACCESS,   "Record Access"),
-        (UPLOAD,   "File Upload"),
-        (DOWNLOAD, "File Download"),
-        (DELETE,   "File Delete"),
-        (RENAME,   "File Rename"),
+        (LOGIN,            "Login"),
+        (LOGOUT,           "Logout"),
+        (FAILED_LOGIN,     "Failed Login"),
+        (ACCESS,           "Record Access"),
+        (UPLOAD,           "File Upload"),
+        (DOWNLOAD,         "File Download"),
+        (DELETE,           "File Delete"),
+        (RENAME,           "File Rename"),
+        (PIN_GENERATED,    "PIN Generated"),
+        (PIN_VERIFIED,     "PIN Verified"),
+        (ROLE_CHANGE,      "Role Change"),
+        (ACCOUNT_LOCKED,   "Account Locked"),
+        (ACCOUNT_UNLOCKED, "Account Unlocked"),
+        (SESSION_REVOKE,   "Session Revoked"),
     ]
 
     event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, db_index=True)

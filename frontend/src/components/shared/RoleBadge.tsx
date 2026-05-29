@@ -8,7 +8,7 @@ const ROLE_VARIANT: Record<string, BadgeVariantType> = {
   KTTO:     "warning",
   RDCO:     "warning",
   ITSO:     "neutral",
-  TBI:      "neutral",
+  IERC:     "neutral",
 };
 
 interface RoleBadgeProps {

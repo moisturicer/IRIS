@@ -214,7 +214,7 @@ Copy rows from SRS §3.2 functional requirements.
 
 Create a data migration or management command for:
 
-- **Roles:** Student, Adviser, KTTO, RDCO, ITSO, TBI (`accounts.Role`)
+- **Roles:** Student, Adviser, KTTO, RDCO, ITSO, IERC (`accounts.Role`)
 - **Colleges / departments / courses** (align with `frontend/src/lib/signupData.ts` IDs or load signup from API)
 - Classifications, record types (if used in forms)
 

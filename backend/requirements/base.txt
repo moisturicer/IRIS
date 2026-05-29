@@ -7,11 +7,26 @@ django-axes>=6.4
 psycopg2-binary>=2.9
 celery[redis]>=5.3
 redis>=5.0
+openai>=1.30                   # FR-M4-02: GPT-4.1-mini LLM inference + FR-M3-03: third-party embeddings (text-embedding-3-small)
+pgvector>=0.3                  # FR-M3-03: vector storage in PostgreSQL (VectorField + HNSW index)
+# TODO (AI engineer): add requests>=2.31 if not already transitive — needed for Docling-serve API calls
+# TODO (AI engineer): confirm DOCLING_API_URL setting in settings/base.py points to on-prem Docling-serve instance
+#
+# REMOVE when Docling + pgvector migration is complete:
+#   sentence-transformers>=3.0   ← replaced by third-party embedding API
+#   pymupdf>=1.24                ← replaced by Docling-serve
+#   unstructured[pdf]>=0.12      ← replaced by Docling-serve
+#   pytesseract>=0.3             ← replaced by Docling-serve
+#   Pillow>=10.3                 ← only needed by pytesseract; remove together
+sentence-transformers>=3.0     # TODO: remove after FR-M3-03 migration to third-party embedding API
 pyexcel-xls>=0.7
 pyexcel-xlsx>=0.6
+openpyxl>=3.1                  # FR-M2-04: styled .xlsx template download
 python-docx>=1.1
-Pillow>=10.3
-pymupdf>=1.24
+Pillow>=10.3                   # TODO: remove after FR-M3-01 migration to Docling-serve
+pymupdf>=1.24                  # TODO: remove after FR-M3-01 migration to Docling-serve
+unstructured[pdf]>=0.12        # TODO: remove after FR-M3-01 migration to Docling-serve
+pytesseract>=0.3               # TODO: remove after FR-M3-01 migration to Docling-serve
 python-decouple>=3.8
 django-storages[s3]>=1.14
 whitenoise>=6.6

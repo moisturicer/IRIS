@@ -33,7 +33,7 @@ export interface RegisterPayload {
   last_name:        string;
   password:         string;
   confirm_password: string;
-  /** "Student" or "Faculty Adviser" */
+  /** "Student" or "Adviser" */
   role_name?:       string;
   /** Student: course FK id */
   course_id?:       number;

@@ -36,10 +36,11 @@ export interface SlotWithUploads extends UploadSlot {
 }
 
 export interface RecordFile {
-  id:          number;
-  record:      number;
-  file:        string;
-  filename:    string;
-  uploaded_by: number | null;
-  created_at:  string;
+  id:               number;
+  record:           number;
+  file:             string;
+  filename:         string;
+  uploaded_by:      number | null;
+  uploaded_by_name: string | null;
+  created_at:       string;
 }

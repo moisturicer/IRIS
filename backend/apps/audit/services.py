@@ -21,8 +21,10 @@ def create_audit_event(
     Parameters
     ----------
     event_type : str
-        One of AuditEvent.LOGIN | LOGOUT | ACCESS | UPLOAD | DOWNLOAD |
-        DELETE | RENAME (see AuditEvent.EVENT_TYPE_CHOICES).
+        One of AuditEvent.LOGIN | LOGOUT | FAILED_LOGIN | ACCESS | UPLOAD |
+        DOWNLOAD | DELETE | RENAME | PIN_GENERATED | PIN_VERIFIED |
+        ROLE_CHANGE | ACCOUNT_LOCKED | ACCOUNT_UNLOCKED | SESSION_REVOKE
+        (see AuditEvent.EVENT_TYPE_CHOICES).
     user       : accounts.User or None
         The acting user.  Passing None is allowed (anonymous access).
     record     : records.Record or None
