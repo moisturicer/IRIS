@@ -8,21 +8,41 @@ interface SemanticSearchResponse {
   results?: SemanticSearchResult[];
 }
 
+interface ConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface RecordSummary {
+  objectives:   string;
+  methodology:  string;
+  findings:     string;
+  conclusion:   string;
+}
+
+interface SummarizeResponse {
+  summary: RecordSummary;
+}
+
 export const aiApi = {
   /** Semantic similarity search -- returns ranked record list */
   semanticSearch: (query: string, topK = 10) =>
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
-  /** Ask a free-form question -- backend does RAG and returns an answer string */
-  ask: (question: string) =>
-    apiClient.post<AIAnswer>("/ai/ask/", { question }),
+  /** Ask a free-form question with optional multi-turn history for conversational context. */
+  ask: (question: string, history?: ConversationTurn[]) =>
+    apiClient.post<AIAnswer>("/ai/ask/", { question, ...(history && { history }) }),
 
-  embedOne: (recordId: number) =>
+  /** Generate a four-part structured summary of a record's extracted PDF text via GPT-4.1-mini. */
+  summarize: (recordId: number) =>
+    apiClient.post<SummarizeResponse>(`/ai/summarize/${recordId}/`),
+
+  embedRecord: (recordId: number) =>
     apiClient.post<EmbeddingJobStatus>(`/ai/embed/${recordId}/`),
 
   embedAll: () =>
     apiClient.post("/ai/embed/all/"),
 
-  jobs: () =>
+  embeddingJobs: () =>
     apiClient.get<EmbeddingJobStatus[]>("/ai/embed/jobs/"),
 };

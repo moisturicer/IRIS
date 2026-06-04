@@ -17,27 +17,44 @@ import type { UploadSlot } from "@/types/documents";
 interface UploadsStepProps {
   /** If provided, uploads go straight to the API for this record. */
   recordId?: number;
+  /** Filter upload slots to only those configured for this record type. */
+  recordTypeId?: number;
+  /** Called whenever the local staged-file map changes (AddRecord flow). */
+  onStagedChange?: (staged: Record<number, StagedFile>) => void;
 }
 
-interface StagedFile {
+export interface StagedFile {
   slotId:   number;
   file:     File;
   uploaded: boolean;
   error?:   string;
 }
 
-export function UploadsStep({ recordId }: UploadsStepProps) {
+export function UploadsStep({ recordId, recordTypeId, onStagedChange }: UploadsStepProps) {
   const [slots, setSlots]         = useState<UploadSlot[]>([]);
   const [loading, setLoading]     = useState(true);
   const [staged, setStaged]       = useState<Record<number, StagedFile>>({});
   const [uploading, setUploading] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
+    setLoading(true);
     documentsApi
-      .slots()
-      .then(({ data }) => setSlots(data))
+      .slots(recordTypeId)          // filter by record type when available
+      .then(({ data }) => {
+        // The global paginator wraps list responses in { results: [...] }.
+        // Handle both the paginated envelope and a raw array defensively.
+        const list = Array.isArray(data)
+          ? data
+          : (data as unknown as { results: UploadSlot[] }).results ?? [];
+        setSlots(list);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [recordTypeId]);               // re-fetch when record type changes
+
+  // Notify parent (AddRecordPage) whenever the staged map changes
+  useEffect(() => {
+    onStagedChange?.(staged);
+  }, [staged, onStagedChange]);
 
   const stageFile = (slotId: number, files: File[]) => {
     if (!files[0]) return;
@@ -138,8 +155,8 @@ export function UploadsStep({ recordId }: UploadsStepProps) {
               ) : (
                 <FileUploadZone
                   onFiles={(files) => stageFile(slot.id, files)}
-                  accept=".pdf,.docx,.doc"
-                  hint="PDF or DOCX, up to 50 MB"
+                  accept=".pdf"
+                  hint="PDF only, up to 50 MB"
                 />
               )}
               {file?.error && (

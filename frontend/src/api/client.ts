@@ -26,7 +26,8 @@ apiClient.interceptors.response.use(
       if (refresh) {
         try {
           const { data } = await axios.post(`${API_BASE}/auth/token/refresh/`, { refresh });
-          useAuthStore.getState().setTokens(data.access);
+          localStorage.setItem("access_token", data.access);
+          localStorage.setItem("refresh_token", data.refresh); 
           original.headers!.Authorization = `Bearer ${data.access}`;
           return apiClient(original);
         } catch {

@@ -162,7 +162,7 @@ export default function SignupPage() {
         last_name:        form.last_name.trim(),
         password:         form.password,
         confirm_password: form.password2,
-        role_name:        role === "Adviser" ? "Faculty Adviser" : role,
+        role_name:        role,
         ...(role === "Student"
           ? { course_id: Number(form.course_id) }
           : { college_id: Number(form.college_id), department_id: Number(form.dept_id) }),

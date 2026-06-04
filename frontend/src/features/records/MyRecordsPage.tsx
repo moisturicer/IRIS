@@ -7,23 +7,41 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import type { RecordListItem } from "@/types/records";
 import { formatDate } from "@/lib/utils";
 
-export default function MyRecordsPage() {
+interface Props {
+  /** "library" shows only published records; "workspace" shows all statuses */
+  mode?: "library" | "workspace";
+}
+
+export default function MyRecordsPage({ mode = "workspace" }: Props) {
   const [records, setRecords] = useState<RecordListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isLibrary = mode === "library";
+
   useEffect(() => {
-    recordsApi.mine().then(({ data }) => setRecords(data.results)).finally(() => setLoading(false));
-  }, []);
+    const params = isLibrary ? { pipeline_status: "published,approved,completed" } : undefined;
+    recordsApi.mine(params)
+      .then(({ data }) => {
+        setRecords(Array.isArray(data) ? data : ((data as unknown as { results: RecordListItem[] }).results ?? []));
+      })
+      .finally(() => setLoading(false));
+  }, [isLibrary]);
 
   return (
     <div>
       <PageHeader
-        title="My Records"
-        description="Records you own or submitted."
+        title={isLibrary ? "My Library" : "My Workspace"}
+        description={
+          isLibrary
+            ? "Your published research records."
+            : "All your records — drafts, in review, and published."
+        }
         actions={
-          <Link to="/records/add" className="bg-[#6B0F12] text-white px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-[#7d1215]">
-            <i className="fas fa-plus mr-1.5" />Add Record
-          </Link>
+          !isLibrary && (
+            <Link to="/records/add" className="bg-[#6B0F12] text-white px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-[#7d1215]">
+              <i className="fas fa-plus mr-1.5" />Add Record
+            </Link>
+          )
         }
       />
 
@@ -31,7 +49,11 @@ export default function MyRecordsPage() {
         {loading ? (
           <div className="p-8 text-center text-gray-400 text-[13px]">Loading...</div>
         ) : records.length === 0 ? (
-          <EmptyState icon="fa-folder-open" title="No records yet" message="Start by adding your first record." />
+          <EmptyState
+            icon="fa-folder-open"
+            title={isLibrary ? "No published records yet" : "No records yet"}
+            message={isLibrary ? "Your published records will appear here." : "Start by adding your first record."}
+          />
         ) : (
           <table className="w-full text-[13px]">
             <thead className="bg-gray-50 border-b border-gray-200">

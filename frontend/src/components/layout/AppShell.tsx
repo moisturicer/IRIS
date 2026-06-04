@@ -24,7 +24,7 @@ export function AppShell() {
       {sidebarOpen && (
         <button
           type="button"
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
           aria-label="Close menu"
           onClick={closeSidebar}
         />
@@ -33,12 +33,12 @@ export function AppShell() {
       <Sidebar
         className={cn(
           "transition-transform duration-200 ease-out",
-          "lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       />
 
-      <div className="flex flex-col flex-1 min-w-0 lg:ml-[230px]">
+      <div className="flex flex-col flex-1 min-w-0 md:ml-[60px] xl:ml-[230px]">
         {!isDiscoverHome && <Header />}
         <main
           className={cn(

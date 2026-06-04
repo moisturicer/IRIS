@@ -19,10 +19,9 @@ const BADGE_STYLES: Record<SpotlightBadge["tone"], string> = {
 interface SpotlightCardProps {
   record: RecordListItem;
   index: number;
-  onSummarize: (id: number) => void;
 }
 
-export function SpotlightCard({ record, index, onSummarize }: SpotlightCardProps) {
+export function SpotlightCard({ record, index }: SpotlightCardProps) {
   const badges = spotlightBadges(record, index);
   const excerpt = record.abstract?.trim()
     ? `"${record.abstract.slice(0, 220)}${record.abstract.length > 220 ? "…" : ""}"`
@@ -63,14 +62,13 @@ export function SpotlightCard({ record, index, onSummarize }: SpotlightCardProps
         >
           Read Full Text
         </Link>
-        <button
-          type="button"
-          onClick={() => onSummarize(record.id)}
-          className="px-5 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold tracking-wide transition flex items-center gap-1.5"
-        >
-          <i className="fas fa-magic text-amber-500 text-[12px]" />
+        <span className="flex items-center gap-1.5 px-5 py-2.5 border border-slate-100 text-slate-400 rounded-xl text-xs font-bold tracking-wide cursor-default select-none">
+          <i className="fas fa-magic text-slate-300 text-[12px]" />
           Summarize with AI
-        </button>
+          <span className="px-1.5 py-0.5 bg-amber-50 text-amber-500 text-[9px] font-bold rounded-full border border-amber-100 uppercase tracking-wider leading-none">
+            soon
+          </span>
+        </span>
       </div>
     </div>
   );
@@ -114,10 +112,9 @@ export function RecentIndexedRow({ record }: RecentRowProps) {
 
 interface SearchResultCardProps {
   record: RecordListItem;
-  onSummarize: (id: number) => void;
 }
 
-export function SearchResultCard({ record, onSummarize }: SearchResultCardProps) {
+export function SearchResultCard({ record }: SearchResultCardProps) {
   const tags = listBadges(record);
   return (
     <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition flex flex-col justify-between">
@@ -151,14 +148,13 @@ export function SearchResultCard({ record, onSummarize }: SearchResultCardProps)
         </p>
       </div>
       <div className="mt-5 pt-4 border-t border-slate-50 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => onSummarize(record.id)}
-          className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-xs font-semibold transition flex items-center gap-1"
-        >
-          <i className="fas fa-magic text-amber-500 text-[11px]" />
+        <span className="flex items-center gap-1 px-3 py-1.5 border border-slate-100 text-slate-400 rounded-lg text-xs font-semibold cursor-default select-none">
+          <i className="fas fa-magic text-slate-300 text-[11px]" />
           Summarize
-        </button>
+          <span className="px-1.5 py-0.5 bg-amber-50 text-amber-500 text-[9px] font-bold rounded-full border border-amber-100 uppercase tracking-wider leading-none">
+            soon
+          </span>
+        </span>
         <Link
           to={`/records/${record.id}`}
           className="px-3.5 py-1.5 bg-[#721c1c] text-white rounded-lg hover:bg-[#5f1717] text-xs font-semibold transition"

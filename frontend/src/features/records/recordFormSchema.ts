@@ -22,11 +22,20 @@ export const recordFormSchema = z.object({
 
   record_type: z.string().min(1, "Record type is required."),
 
-  research_type: z.string().min(1, "Research type is required."),
+  /**
+   * Adviser is only required for Proposal records.
+   * Thesis/Research and Project records submit without an adviser.
+   * Server-side validation enforces the Proposal constraint; we make
+   * this field optional here so non-Proposal forms pass step-2 validation.
+   */
+  adviser: z.number().int().positive().optional(),
 
-  // TODO: validate minimum 1 author
-  authors: z.array(z.string()).default([]),
+  authors: z
+    .array(z.string().min(1))
+    .min(1, "At least one author is required.")
+    .default([]),
 
+  // Keywords are collected for future use but have no backend field yet.
   keywords: z.array(z.string()).default([]),
 
   // User IDs of co-owners

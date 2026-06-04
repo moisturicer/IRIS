@@ -6,11 +6,11 @@ ROLE_ADVISER = "Adviser"
 ROLE_KTTO    = "KTTO"
 ROLE_RDCO    = "RDCO"
 ROLE_ITSO    = "ITSO"
-ROLE_TBI     = "TBI"
+ROLE_IERC    = "IERC"
 
 # Convenience sets
-REVIEWER_ROLES = {ROLE_ADVISER, ROLE_KTTO, ROLE_RDCO, ROLE_TBI}
-STAFF_ROLES    = {ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_TBI}
+REVIEWER_ROLES = {ROLE_ADVISER, ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
+STAFF_ROLES    = {ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
 ADMIN_ROLES    = {ROLE_KTTO, ROLE_RDCO}
 
 
@@ -52,19 +52,19 @@ class IsITSO(BasePermission):
         return is_django_staff(request.user) or get_role_name(request.user) == ROLE_ITSO
 
 
-class IsTBI(BasePermission):
+class IsIERC(BasePermission):
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_TBI
+        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_IERC
 
 
 class IsReviewer(BasePermission):
-    """Adviser, KTTO, RDCO, or TBI — or any Django staff account."""
+    """Adviser, KTTO, RDCO, ITSO, or IERC — or any Django staff account."""
     def has_permission(self, request, view):
         return is_django_staff(request.user) or get_role_name(request.user) in REVIEWER_ROLES
 
 
 class IsStaff(BasePermission):
-    """KTTO, RDCO, ITSO, or TBI — or any Django staff account."""
+    """KTTO, RDCO, ITSO, or IERC — or any Django staff account."""
     def has_permission(self, request, view):
         return is_django_staff(request.user) or get_role_name(request.user) in STAFF_ROLES
 

@@ -29,11 +29,11 @@ IRIS is a web platform for managing research outputs and intellectual property: 
 
 | Module | SRS focus | Engineering priority | Spec stability |
 |--------|-----------|----------------------|----------------|
-| **M1** | Responsive UI, IP disclosure, login UX | **P0 — active** | Stable enough to implement |
-| **M2** | RAG indexing | P2 — after core workflow | Medium |
-| **M3** | Conversational chatbot | P2 | Medium |
-| **M4** | Summarizer | P2 | Medium |
-| **M5** | Hierarchical submission (Adviser → … → RDCO) | P1 — **API-first; UI generic** | **Draft / finalize with stakeholders** |
+| **M1** | Backend optimization, responsive UI, login UX | **P0 — active** | Stable enough to implement |
+| **M2** | Document lifecycle & CRUD operations | **P0 — active** | Stable |
+| **M3** | Semantic indexing (PDF extraction, FTS, embeddings) | P2 — after core workflow | Medium |
+| **M4** | RAG AI services (semantic search, conversational chatbot) | P2 | Medium |
+| **M5** | Hierarchical submission workflow (Adviser → … → RDCO) | P1 — **API-first; UI generic** | **Draft / finalize with stakeholders** |
 | **M6** | Security, JWT, DPA, RBAC, audit | **P0 — active** | Stable |
 | **M7** | KPI pipeline, RDCO dashboards | P3 — after M5 frozen | **Draft** |
 
@@ -131,9 +131,9 @@ Detailed ceremonies, gates, and artifacts: [SDLC_PROCESS.md](SDLC_PROCESS.md).
 
 | ID | Deliverable | SRS |
 |----|-------------|-----|
-| 4.1 | PDF indexing pipeline | FR-M2-* |
-| 4.2 | Chatbot UI | FR-M3-01 |
-| 4.3 | Summarizer | FR-M4-01 |
+| 4.1 | PDF text extraction pipeline | FR-M3-01 |
+| 4.2 | FTS indexing + semantic embeddings | FR-M3-02, FR-M3-03 |
+| 4.3 | RAG chatbot + semantic search UI | FR-M4-01 |
 
 ### Phase 5 — Admin & KPI (P3, spec-gated)
 

@@ -7,7 +7,8 @@ import { authApi } from "@/api/auth";
 import irisLogo from "@/assets/images/iris_logo.png";
 
 export function PendingApprovalPage() {
-  const { user, logout, refreshToken } = useAuth();
+  const { user, logout } = useAuth();
+  const { addToast: _addToast } = useUIStore();
 
   const handleLogout = async () => {
     try {

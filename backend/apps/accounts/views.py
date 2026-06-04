@@ -1,10 +1,11 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
+from apps.audit.services import create_audit_event
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, RegisterSerializer, ChangePasswordSerializer,
@@ -46,6 +47,7 @@ class LoginView(APIView):
         password = request.data.get("password")
         user = authenticate(request, username=email, password=password)
         if not user:
+            create_audit_event("FAILED_LOGIN", None, metadata={"email": email})
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if not user.is_verified:
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
@@ -53,7 +55,7 @@ class LoginView(APIView):
             return Response({"detail": "Account is locked."}, status=status.HTTP_403_FORBIDDEN)
 
         refresh = RefreshToken.for_user(user)
-        # TODO: create AuditEvent(LOGIN)
+        create_audit_event("LOGIN", user, metadata={"email": user.email})
         return Response({
             "access":  str(refresh.access_token),
             "refresh": str(refresh),
@@ -68,7 +70,7 @@ class LogoutView(APIView):
         try:
             token = RefreshToken(request.data["refresh"])
             token.blacklist()
-            # TODO: create AuditEvent(LOGOUT)
+            create_audit_event("LOGOUT", request.user, metadata={"email": request.user.email})
         except Exception:
             pass
         return Response({"detail": "Logged out."})
@@ -109,6 +111,26 @@ class UserListView(generics.ListAPIView):
     queryset           = User.objects.select_related("role").order_by("-date_joined")
 
 
+class AdviserListView(generics.ListAPIView):
+    """
+    GET /users/advisers/
+    Returns all active users whose role is "Adviser".
+    Used by the record creation form so students can pick their adviser.
+    Any authenticated user may call this endpoint.
+    """
+    serializer_class   = UserSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class   = LargeResultsPagination  # advisers list is small; return them all at once
+
+    def get_queryset(self):
+        return (
+            User.objects
+            .filter(role__name="Adviser", is_active=True)
+            .select_related("role")
+            .order_by("last_name", "first_name")
+        )
+
+
 class UserDetailView(generics.RetrieveUpdateAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
@@ -141,8 +163,26 @@ class ChangeUserRoleView(APIView):
 
         user.role = role
         user.save(update_fields=["role"])
-        # TODO: create Notification informing the user of their new role
-        # TODO: create AuditEvent for role change
+
+        create_audit_event(
+            "ROLE_CHANGE", request.user,
+            metadata={"target_user": user.email, "new_role": role.name},
+        )
+
+        from core.utils import send_email_async
+        from django.conf import settings
+        send_email_async(
+            subject="[IRIS] Your role has been updated",
+            message=(
+                f"Hello {user.first_name},\n\n"
+                f"An administrator has updated your IRIS role to: {role.name}.\n\n"
+                f"You may need to log out and back in for the change to take effect.\n\n"
+                f"Log in at: {settings.FRONTEND_URL}/login\n\n"
+                f"— The IRIS Team"
+            ),
+            recipient_list=[user.email],
+        )
+
         return Response(UserSerializer(user).data)
 
 
@@ -157,19 +197,38 @@ class LockUserView(APIView):
             return Response({"detail": "is_locked is required."}, status=400)
         user.is_locked = bool(is_locked)
         user.save(update_fields=["is_locked"])
-        action = "locked" if user.is_locked else "unlocked"
-        # TODO: create AuditEvent for account lock/unlock
+        action     = "locked" if user.is_locked else "unlocked"
+        event_type = "ACCOUNT_LOCKED" if user.is_locked else "ACCOUNT_UNLOCKED"
+
+        create_audit_event(
+            event_type, request.user,
+            metadata={"target_user": user.email},
+        )
+
         return Response({"detail": f"Account {action}.", "is_locked": user.is_locked})
 
 
 class LockedUsersView(generics.ListAPIView):
-    """Lists accounts locked by django-axes."""
+    """
+    Lists accounts that are locked.
+    Combines manually locked accounts (is_locked=True) with any accounts
+    that django-axes has flagged for repeated failed login attempts.
+    """
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get_queryset(self):
-        # TODO: query axes AccessAttempt to find locked usernames, return matching User objects
-        return User.objects.filter(is_locked=True)
+        from django.db.models import Q
+        q = Q(is_locked=True)
+
+        try:
+            from axes.models import AccessAttempt
+            axes_emails = AccessAttempt.objects.values_list("username", flat=True).distinct()
+            q |= Q(email__in=axes_emails)
+        except ImportError:
+            pass   # axes not installed — fall back to manual locks only
+
+        return User.objects.filter(q).select_related("role").distinct()
 
 
 class UnlockUserView(APIView):
@@ -179,18 +238,33 @@ class UnlockUserView(APIView):
         user = User.objects.get(pk=pk)
         user.is_locked = False
         user.save(update_fields=["is_locked"])
-        # TODO: reset axes AccessAttempt for this username
+
+        # Clear django-axes brute-force attempt records for this email
+        try:
+            from axes.models import AccessAttempt
+            AccessAttempt.objects.filter(username=user.email).delete()
+        except ImportError:
+            pass
+
+        create_audit_event(
+            "ACCOUNT_UNLOCKED", request.user,
+            metadata={"target_user": user.email},
+        )
         return Response({"detail": "Account unlocked."})
 
 
 class RoleRequestListView(generics.ListAPIView):
+    """
+    Student and Adviser role requests are reviewed by Django Admin only (is_staff=True).
+    Staff accounts (RDCO, KTTO, ITSO, IERC) are managed directly by Admin via the admin panel.
+    """
     serializer_class   = RoleRequestSerializer
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     queryset           = RoleRequest.objects.filter(status="pending").select_related("user", "requested_role")
 
 
 class RoleRequestDetailView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def patch(self, request, pk):
         role_request = RoleRequest.objects.get(pk=pk)
@@ -238,6 +312,67 @@ class CourseListView(generics.ListAPIView):
         if dept_id:
             qs = qs.filter(department_id=dept_id)
         return qs
+
+
+class ActiveSessionsView(APIView):
+    """
+    GET /users/sessions/
+    Returns all non-expired, non-blacklisted JWT tokens — i.e. every session
+    that could still be used to authenticate.  Admin only.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+        from django.utils import timezone
+
+        sessions = (
+            OutstandingToken.objects
+            .filter(
+                expires_at__gt=timezone.now(),
+                blacklistedtoken__isnull=True,       # not yet revoked
+            )
+            .select_related("user")
+            .order_by("-created_at")
+        )
+
+        data = [
+            {
+                "jti":        s.jti,
+                "user_id":    s.user_id,
+                "user_email": s.user.email           if s.user else None,
+                "user_name":  s.user.get_full_name() if s.user else None,
+                "created_at": s.created_at,
+                "expires_at": s.expires_at,
+            }
+            for s in sessions
+        ]
+        return Response(data)
+
+
+class RevokeSessionView(APIView):
+    """
+    DELETE /users/sessions/<jti>/
+    Blacklists a specific JWT by its JTI (JWT ID), forcing that session to
+    log out on the next request.  Admin only.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def delete(self, request, jti):
+        from rest_framework_simplejwt.token_blacklist.models import (
+            OutstandingToken, BlacklistedToken,
+        )
+        try:
+            token = OutstandingToken.objects.get(jti=jti)
+        except OutstandingToken.DoesNotExist:
+            return Response({"detail": "Session not found."}, status=404)
+
+        BlacklistedToken.objects.get_or_create(token=token)
+        create_audit_event(
+            "SESSION_REVOKE", request.user,
+            metadata={"revoked_jti": jti},
+        )
+        return Response({"detail": "Session revoked."})
 
 
 class SystemSettingView(APIView):

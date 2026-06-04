@@ -83,17 +83,17 @@ Define **what** is tested, **how**, and **when** tests are required so releases 
 
 Execute as **API** (preferred) and **UI** smoke. Expected: forbidden roles receive **403** (or 401 if unauthenticated).
 
-| Action | Student | Adviser | KTTO | RDCO | ITSO | TBI |
-|--------|:-------:|:-------:|:----:|:----:|:----:|:---:|
+| Action | Student | Adviser | KTTO | RDCO | ITSO | IERC |
+|--------|:-------:|:-------:|:----:|:----:|:----:|:----:|
 | Login / refresh token | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Submit IP disclosure | ✓ | — | — | — | — | — |
 | View own records | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | View published catalog | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Review pending queue | — | ✓ | ✓ | ✓ | — | ✓ |
 | Approve/decline evaluation | — | ✓* | ✓* | ✓* | — | ✓* |
-| Admin users list | — | — | ✓ | ✓ | ✓ | ✓ |
-| Audit log read | — | — | ✓ | ✓ | ✓ | ✓ |
-| Import records | — | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Admin users list | — | — | ✓ | ✓ | ✓ | — |
+| Audit log read | — | — | ✓ | ✓ | ✓ | — |
+| Import records | — | ✓ | ✓ | ✓ | ✓ | — |
 
 \*Only when record is in that role’s pipeline stage (after M5 FSM finalized).
 

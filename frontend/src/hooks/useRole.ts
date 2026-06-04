@@ -16,9 +16,7 @@ export function useRole() {
     isKTTO:     roleName === ROLES.KTTO,
     isRDCO:     roleName === ROLES.RDCO,
     isITSO:     roleName === ROLES.ITSO,
-    isTBI:      roleName === ROLES.TBI,
     isIERC:     roleName === ROLES.IERC,
-    isAdmin:    roleName === ROLES.ADMIN,
     isReviewer: isDjangoStaff || REVIEWER_ROLES.includes(roleName as RoleName),
     isStaff:    isDjangoStaff || STAFF_ROLES.includes(roleName as RoleName),
   };

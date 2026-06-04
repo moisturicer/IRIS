@@ -18,11 +18,11 @@ class DashboardStatsView(APIView):
         my_ids = Record.objects.filter(owners__user=user).values_list("pk", flat=True)
         return Response({
             "total_mine":       my_ids.count(),
-            "pending_mine":     Record.objects.filter(pk__in=my_ids, pipeline_status__in=["adviser_review","ktto_review","rdco_review"]).count(),
-            "approved_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status="published").count(),
+            "pending_mine":     Record.objects.filter(pk__in=my_ids, pipeline_status__in=["adviser_review","rdco_intake","itso_review","parallel_review","rdco_review"]).count(),
+            "approved_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status__in=("published", "approved", "completed")).count(),
             "declined_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status="declined").count(),
             # Staff-only totals -- return 0 for students
-            "total_published":  Record.objects.filter(pipeline_status="published").count() if request.user.role else 0,
+            "total_published":  Record.objects.filter(pipeline_status__in=("published", "approved", "completed")).count() if request.user.role else 0,
         })
 
 
@@ -31,7 +31,7 @@ class ClassificationChartView(APIView):
 
     def get(self, request):
         data = (
-            Record.objects.filter(pipeline_status="published")
+            Record.objects.filter(pipeline_status__in=("published", "approved", "completed"))
             .values("classification__name")
             .annotate(count=Count("id"))
             .order_by("-count")
@@ -44,9 +44,39 @@ class PSCEDChartView(APIView):
 
     def get(self, request):
         data = (
-            Record.objects.filter(pipeline_status="published")
+            Record.objects.filter(pipeline_status__in=("published", "approved", "completed"))
             .values("psced__name")
             .annotate(count=Count("id"))
             .order_by("-count")
         )
         return Response(list(data))
+
+
+# TODO (M07 — FR-M7-01 PipelineProgressView):
+#   GET /dashboard/pipeline/<record_pk>/
+#   Returns the per-office clearance breakdown for a single record.
+#
+#   Permission: [IsAuthenticated]; 403 if request.user is not an owner of the record AND not staff.
+#
+#   Response:
+#     {
+#       "pipeline_status": str,        # e.g. "parallel_review"
+#       "clearances": [
+#         { "office": "itso",  "status": "pending" | "cleared" | "declined" },
+#         { "office": "ierc",  "status": "pending" | "cleared" | "declined" },
+#         { "office": "ktto",  "status": "pending" | "cleared" | "declined" },
+#       ]
+#     }
+#
+#   Note: RDCO does not have a RecordClearance row — its review is reflected
+#   directly in pipeline_status (rdco_intake / rdco_review / published).
+#
+#   Implementation sketch:
+#     record = get_object_or_404(Record, pk=record_pk)
+#     if not (request.user.is_staff or record.owners.filter(user=request.user).exists()):
+#         return Response(status=403)
+#     clearances = RecordClearance.objects.filter(record=record)
+#     return Response({
+#         "pipeline_status": record.pipeline_status,
+#         "clearances": [{"office": c.office, "status": c.status} for c in clearances],
+#     })

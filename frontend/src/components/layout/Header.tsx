@@ -1,7 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/api/auth";
 import { useUIStore } from "@/store/ui.store";
-import { NotificationBell } from "./NotificationBell";
 
 export function Header() {
   const { logout, user, refreshToken } = useAuth();
@@ -13,11 +12,11 @@ export function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 lg:left-[230px] right-0 h-[58px] bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 gap-3 z-40">
+    <header className="fixed top-0 left-0 md:left-[60px] xl:left-[230px] right-0 h-[58px] bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 gap-3 z-40">
       <button
         type="button"
         onClick={toggleSidebar}
-        className="lg:hidden w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+        className="md:hidden w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50"
         aria-label="Open menu"
       >
         <i className="fas fa-bars text-[14px]" />
@@ -36,8 +35,6 @@ export function Header() {
         <span className="hidden sm:inline text-[12px] text-gray-500 truncate max-w-[120px]">
           {user?.first_name}
         </span>
-
-        <NotificationBell />
 
         <button
           type="button"

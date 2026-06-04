@@ -1,5 +1,14 @@
 import type { PipelineStatus } from "@/lib/constants";
 
+export type IpType = "patent" | "copyright" | "trade_secret" | "utility_model" | "";
+
+export const IP_TYPE_LABELS: Record<Exclude<IpType, "">, string> = {
+  patent:        "Patent",
+  copyright:     "Copyright",
+  trade_secret:  "Trade Secret",
+  utility_model: "Utility Model",
+};
+
 export interface RecordOwner {
   id:         number;
   user:       number;
@@ -23,11 +32,21 @@ export interface RecordListItem {
   record_type_name:      string | null;
   pipeline_status:       PipelineStatus;
   is_ip:                 boolean;
+  ip_type:               IpType;
   for_commercialization: boolean;
   community_extension:   boolean;
   access_count:          number;
   created_at:            string;
   authors:               Author[];
+}
+
+export interface RecordReview {
+  id:               number;
+  stage:            string;
+  status:           "approved" | "declined" | "rejected";
+  comment:          string;
+  reviewed_by_name: string | null;
+  created_at:       string;
 }
 
 export interface RecordDetail extends RecordListItem {
@@ -42,6 +61,7 @@ export interface RecordDetail extends RecordListItem {
   owners:          RecordOwner[];
   keywords?:       string[];
   is_deleted:      boolean;
+  reviews:         RecordReview[];
 }
 
 export interface RecordFormData {
@@ -56,7 +76,8 @@ export interface RecordFormData {
   is_ip?:                boolean;
   for_commercialization?: boolean;
   community_extension?:  boolean;
-  keywords?:             string[];
+  /** Flat list of author name strings — backend creates Author rows. */
+  authors?:              string[];
 }
 
 export interface Classification {
@@ -75,23 +96,28 @@ export interface RecordType {
 }
 
 export interface DownloadRequest {
-  id:                 number;
-  record:             number;
-  record_title?:      string;
-  requested_by:       number;
-  requested_by_name?: string;
-  requested_by_email?:string;
-  status:             "pending" | "approved" | "declined";
-  created_at:         string;
-  reviewed_at?:       string | null;
-  download_url?:      string;
+  id:                  number;
+  record:              number;
+  record_title:        string;
+  requested_by:        number;
+  requested_by_name:   string | null;
+  requested_by_email:  string | null;
+  status:              "pending" | "approved" | "declined";
+  reviewed_by:         number | null;
+  reviewed_at:         string | null;
+  created_at:          string;
 }
 
 export interface DeleteRequest {
-  id:          number;
-  record:      number;
-  requested_by:number;
-  reason:      string;
-  status:      "pending" | "approved" | "declined";
-  created_at:  string;
+  id:                  number;
+  record:              number;
+  record_title:        string;
+  requested_by:        number;
+  requested_by_name:   string | null;
+  requested_by_email:  string | null;
+  reason:              string;
+  status:              "pending" | "approved" | "declined";
+  reviewed_by:         number | null;
+  reviewed_at:         string | null;
+  created_at:          string;
 }

@@ -2,9 +2,10 @@ import { apiClient } from "./client";
 import type { RecordUpload, RecordFile, UploadSlot, SlotWithUploads } from "@/types/documents";
 
 export const documentsApi = {
-  // Fetch all UploadSlots for a record type
+  // Fetch all UploadSlots for a record type.
+  // The global paginator wraps this in { count, next, previous, results }.
   slots:          (recordTypeId?: number) =>
-    apiClient.get<UploadSlot[]>("/documents/slots/", {
+    apiClient.get<{ count: number; results: UploadSlot[] }>("/documents/slots/", {
       params: recordTypeId ? { record_type: recordTypeId } : {},
     }),
 
@@ -34,6 +35,15 @@ export const documentsApi = {
   downloadUpload: (uploadId: number) =>
     apiClient.get(`/documents/uploads/${uploadId}/download/`, { responseType: "blob" }),
 
+  viewUpload: (uploadId: number) =>
+    apiClient.get(`/documents/uploads/${uploadId}/download/?inline=true`, { responseType: "blob" }),
+
+  downloadFile: (fileId: number) =>
+    apiClient.get(`/documents/files/${fileId}/download/`, { responseType: "blob" }),
+
+  viewFile: (fileId: number) =>
+    apiClient.get(`/documents/files/${fileId}/download/?inline=true`, { responseType: "blob" }),
+
   files:          (recordId: number) =>
     apiClient.get<RecordFile[]>("/documents/files/", { params: { record: recordId } }),
 
@@ -48,4 +58,12 @@ export const documentsApi = {
 
   downloadAll:    (recordId: number) =>
     apiClient.get("/documents/files/download-all/", { params: { record: recordId }, responseType: "blob" }),
+
+  /** Delete a specific upload version. Staff may delete v1; owners may only delete v2+. */
+  deleteUpload:   (uploadId: number) =>
+    apiClient.delete(`/documents/uploads/${uploadId}/`),
+
+  /** Delete a miscellaneous RecordFile attachment. */
+  deleteFile:     (fileId: number) =>
+    apiClient.delete(`/documents/files/${fileId}/`),
 };
