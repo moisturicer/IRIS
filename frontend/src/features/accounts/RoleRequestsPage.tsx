@@ -137,8 +137,8 @@ export default function RoleRequestsPage() {
         confirmLabel={target?.action === "approve" ? "Approve" : "Decline"}
         danger={target?.action === "decline"}
         onConfirm={handleDecide}
-        onCancel={() => !acting && setTarget(null)}
-        confirming={acting}
+        onCancel={() => !_acting && setTarget(null)}
+        confirming={_acting}
       />
     </div>
   );

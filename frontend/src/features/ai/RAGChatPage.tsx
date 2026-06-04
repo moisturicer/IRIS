@@ -150,18 +150,18 @@ export default function RAGChatPage() {
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
 
-    const conv = getConversation(activeId);
+    const conv = getConversation(activeId!);
     const title =
       conv && conv.messages.length === 0 ? titleFromFirstMessage(text) : conv?.title ?? "New chat";
-    persist(activeId, nextMessages, title);
+    persist(activeId!, nextMessages, title);
 
     setLoading(true);
     try {
       const { data } = await aiApi.ask(buildRagQuestion(nextMessages));
-      const assistantMsg = newMessage("assistant", data.answer, data.citations);
+      const assistantMsg = newMessage("assistant", data.answer ?? "", data.citations);
       const withReply = [...nextMessages, assistantMsg];
       setMessages(withReply);
-      persist(activeId, withReply, title);
+      persist(activeId!, withReply, title);
       if (data.citations?.length) {
         setSourcesOpen(true);
       }

@@ -7,14 +7,11 @@ export function getRoleDashboardPath(roleName: RoleName | null | undefined): str
       return "/";
     case ROLES.ADVISER:
     case ROLES.KTTO:
-    case ROLES.TBI:
     case ROLES.RDCO:
     case ROLES.IERC:
       return "/review/pending";
     case ROLES.ITSO:
       return "/records";
-    case ROLES.ADMIN:
-      return "/admin/users";
     default:
       return "/";
   }

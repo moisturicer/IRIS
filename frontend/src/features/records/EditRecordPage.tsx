@@ -68,7 +68,7 @@ export default function EditRecordPage() {
         year_accomplished:     values.year,
         year_completed:        values.year,
         record_type:           values.record_type ? Number(values.record_type) : undefined,
-        classification:        values.research_type ? Number(values.research_type) : undefined,
+
       };
       await recordsApi.update(Number(id), payload);
       addToast({ type: "success", message: "Record updated." });

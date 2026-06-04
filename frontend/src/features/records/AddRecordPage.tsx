@@ -182,7 +182,6 @@ export default function AddRecordPage() {
         </div>
       </div>
 
-      <DpaConsentModal open={dpaModalOpen} onClose={() => setDpaModalOpen(false)} />
     </div>
     </FormProvider>
   );

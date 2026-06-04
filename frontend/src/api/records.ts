@@ -1,4 +1,3 @@
-import axios from "axios";
 import { apiClient } from "./client";
 import type {
   RecordListItem, RecordDetail, RecordFormData,
@@ -62,4 +61,14 @@ export const recordsApi = {
     apiClient.get<PaginatedResponse<DeleteRequest>>("/records/delete-requests/", { params }),
   approveDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/approve/`),
+  declineDeleteRequest:    (id: number) =>
+    apiClient.post(`/records/delete-requests/${id}/decline/`),
+
+  // Combined decide helper (approve or decline in one call)
+  decideDownloadRequest:   (id: number, action: "approve" | "decline") =>
+    apiClient.post<{ download_url?: string }>(`/records/download-requests/${id}/${action}/`),
+
+  // Redeem a one-time download token
+  redeemDownloadToken:     (token: string) =>
+    apiClient.get(`/records/download/${token}/`, { responseType: "blob" }),
 };

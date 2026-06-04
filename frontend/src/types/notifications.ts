@@ -3,8 +3,6 @@ export interface Notification {
   notif_type:        number;
   notif_type_name:   string;
   message:           string;
-  /** Set client-side after mark-read; optional from API when added. */
-  is_read?:          boolean;
   record:            number | null;
   record_title:      string | null;
   sender:            number | null;
