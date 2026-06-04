@@ -4,11 +4,12 @@
  */
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/api/auth";
+import { useAuthStore } from "@/store/auth.store";
 import irisLogo from "@/assets/images/iris_logo.png";
 
 export function PendingApprovalPage() {
   const { user, logout } = useAuth();
-  const { addToast: _addToast } = useUIStore();
+  const refreshToken = useAuthStore((s) => s.refreshToken);
 
   const handleLogout = async () => {
     try {

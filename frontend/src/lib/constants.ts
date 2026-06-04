@@ -30,12 +30,10 @@ export const STAFF_ROLES: RoleName[] = [
 
 export const REQUEST_QUEUE_ROLES: RoleName[] = [
   ROLES.KTTO,
-  ROLES.TBI,
   ROLES.RDCO,
 ];
 
 export const AUDIT_LOG_ROLES: RoleName[] = [
-  ROLES.ADMIN,
   ROLES.RDCO,
 ];
 

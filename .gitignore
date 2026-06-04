@@ -72,5 +72,7 @@ htmlcov/
 
 SDD/
 SRS/
+docs/software-design/
+docs/software-requirements/
 .gitignore
 .agent/

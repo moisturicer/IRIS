@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { dashboardApi } from "@/api/dashboard";
 import { apiClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { useUIStore } from "@/store/ui.store";
 import { useNotifications } from "@/hooks/useNotifications";
-import { ROLES, type RoleName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { STAFF_ROLES, REVIEWER_ROLES } from "@/lib/constants";
 import irisLogo from "@/assets/images/iris_logo.png";
@@ -79,10 +77,10 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
-  const { roleName, isStudent, isDjangoStaff } = useRole();
+  const { roleName, isDjangoStaff } = useRole();
   const { unreadCount } = useNotifications();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
-  const [workspaceCount, setWorkspaceCount] = useState<number | undefined>();
+  const [workspaceBadge, setWorkspaceBadge] = useState<number | undefined>();
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
 
   const isRDCO = user?.role_name === "RDCO" || user?.is_staff === true || user?.is_superuser === true;
@@ -100,7 +98,7 @@ export function Sidebar({ className }: SidebarProps) {
     REVIEWER_ROLES.includes(user.role_name as typeof REVIEWER_ROLES[number]);
 
   useEffect(() => {
-    if (!isDjangoStaff && roleName !== ROLES.ADMIN) return;
+    if (!isDjangoStaff) return;
     apiClient
       .get<{ pending_mine: number }>("/dashboard/stats/")
       .then(({ data }) => setWorkspaceBadge(data.pending_mine ?? 0))
@@ -115,7 +113,6 @@ export function Sidebar({ className }: SidebarProps) {
       .catch(() => {});
   }, [isDjangoAdmin]);
 
-  const visibleItems = NAV_ITEMS.filter((item) => item.visible(roleName, isDjangoStaff));
   const initials = `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.toUpperCase();
 
   const explorationNav: NavItem[] = [
@@ -189,16 +186,16 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* ── Navigation ──────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-        <NavSection title="Research Exploration" items={explorationNav} onNavigate={onNavigate} />
-        <NavSection title="IP Management" items={ipNav} onNavigate={onNavigate} />
+        <NavSection title="Research Exploration" items={explorationNav} onNavigate={closeSidebar} />
+        <NavSection title="IP Management" items={ipNav} onNavigate={closeSidebar} />
         {isReviewer && (
-          <NavSection title="Review Queue" items={reviewNav} onNavigate={onNavigate} />
+          <NavSection title="Review Queue" items={reviewNav} onNavigate={closeSidebar} />
         )}
-        <NavSection title="Tools" items={toolsNav} onNavigate={onNavigate} />
+        <NavSection title="Tools" items={toolsNav} onNavigate={closeSidebar} />
         {isStaff && (
           <NavSection
             title="Administration"
-            onNavigate={onNavigate}
+            onNavigate={closeSidebar}
             items={[
               { to: "/admin/users",             label: "Manage Users",      icon: "fa-users" },
               ...(isDjangoAdmin ? [{ to: "/admin/role-requests", label: "Role Requests", icon: "fa-user-check", badge: roleRequestBadge }] : []),

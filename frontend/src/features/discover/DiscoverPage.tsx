@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthStore } from "@/store/auth.store";
 import { Spinner } from "@/components/ui/Spinner";
 import type { RecordListItem } from "@/types/records";
 import {
