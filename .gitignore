@@ -75,4 +75,4 @@ SRS/
 docs/software-design/
 docs/software-requirements/
 .gitignore
-.agent/
+.agents/
