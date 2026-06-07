@@ -27,6 +27,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "django_filters",
     "axes",
+    "pgvector",
 ]
 
 LOCAL_APPS = [
@@ -184,9 +185,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # ---- AI -----------------------------------------------------------------
 
-AI_EMBEDDING_MODEL = config("AI_EMBEDDING_MODEL", default="TBD")  # Provider TBD: e.g. text-embedding-3-small (OpenAI), voyage-3-lite (Voyage AI), embed-v3.0 (Cohere)
-OPENAI_API_KEY     = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
-DOCLING_API_URL    = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction
+AI_EMBEDDING_PROVIDER  = config("AI_EMBEDDING_PROVIDER", default="openai")
+AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small") 
+AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
+OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
+DOCLING_API_URL        = config("DOCLING_API_URL", default="http://docling:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction
+AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:8001") # AI Gateway endpoint
 
 # ---- Axes (brute force protection) --------------------------------------
 
