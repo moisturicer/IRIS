@@ -4,37 +4,9 @@ from django.utils import timezone
 
 @shared_task(bind=True, max_retries=3)
 def embed_record(self, record_id: int):
-    """
-    Generate and store the vector embedding for one record.
-    Updates EmbeddingJob status throughout.
-
-    TODO (AI engineer — FR-M3-03 architecture change):
-      Replace SentenceTransformer + pickle with a third-party embedding API call.
-
-      Example using OpenAI (recommended — already a dependency):
-        import openai
-        client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-        response = client.embeddings.create(
-            model=settings.AI_EMBEDDING_MODEL,   # e.g. "text-embedding-3-small"
-            input=text,
-        )
-        vector = response.data[0].embedding      # list[float]
-
-      Then store using pgvector VectorField (after updating RecordEmbedding model):
-        RecordEmbedding.objects.update_or_create(
-            record=record,
-            defaults={"embedding": vector, "model_name": settings.AI_EMBEDDING_MODEL},
-        )
-
-      Remove when done:
-        - sentence_transformers import and SentenceTransformer usage
-        - pickle import and pickle.dumps()
-        - numpy import (used in views.py too — remove from there as well)
-    """
     from apps.ai.models import EmbeddingJob, RecordEmbedding
     from apps.records.models import Record
     from django.conf import settings
-    import pickle
 
     job = EmbeddingJob.objects.filter(record_id=record_id).order_by("-created_at").first()
     if job:
@@ -46,15 +18,18 @@ def embed_record(self, record_id: int):
         record = Record.objects.get(pk=record_id)
         text   = f"{record.title}. {record.abstract}"
 
-        # TODO: replace the block below with third-party embedding API call (see docstring above)
-        from sentence_transformers import SentenceTransformer
-        model     = SentenceTransformer(settings.AI_EMBEDDING_MODEL)
-        embedding = model.encode(text)
+        # Phase 5: celery-embedding -> ai-gateway internal API
+        import httpx
+        url = f"{settings.AI_GATEWAY_URL}/api/v1/ai/internal/embed/"
+        
+        response = httpx.post(url, json={"text": text}, timeout=60.0)
+        response.raise_for_status()
+        vector = response.json().get("embedding")
 
         RecordEmbedding.objects.update_or_create(
             record=record,
             defaults={
-                "embedding":  pickle.dumps(embedding),   # TODO: replace with vector after pgvector migration
+                "embedding": vector,
                 "model_name": settings.AI_EMBEDDING_MODEL,
             },
         )
