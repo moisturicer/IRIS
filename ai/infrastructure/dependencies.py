@@ -1,8 +1,8 @@
 from typing import Generator
-from ai.core.config import settings
-from ai.services.interfaces import LLMProvider, EmbeddingProvider
-from ai.services.openai_provider import OpenAILLMProvider, OpenAIEmbeddingProvider
-from ai.services.local_provider import LocalLLMProvider, LocalEmbeddingProvider
+from ai.infrastructure.settings import settings
+from ai.domain.ports import LLMProvider, EmbeddingProvider
+from ai.infrastructure.openai_adapter import OpenAILLMProvider, OpenAIEmbeddingProvider
+from ai.infrastructure.local_adapter import LocalLLMProvider, LocalEmbeddingProvider
 
 # Singleton instances so we don't recreate clients on every request
 _llm_provider = None

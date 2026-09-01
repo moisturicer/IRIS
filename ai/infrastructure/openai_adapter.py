@@ -1,7 +1,7 @@
 import openai
 from typing import List
-from .interfaces import LLMProvider, EmbeddingProvider
-from ai.core.config import settings
+from ai.domain.ports import LLMProvider, EmbeddingProvider
+from ai.infrastructure.settings import settings
 
 class OpenAILLMProvider(LLMProvider):
     def __init__(self):

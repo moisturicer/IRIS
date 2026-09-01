@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from ai.models.schemas import AskRequest, AskResponse, EmbedRequest, EmbedResponse
-from ai.services.interfaces import LLMProvider, EmbeddingProvider
-from ai.core.dependencies import get_llm_provider, get_embedding_provider
+from ai.api.schemas import AskRequest, AskResponse, EmbedRequest, EmbedResponse
+from ai.domain.ports import LLMProvider, EmbeddingProvider
+from ai.infrastructure.dependencies import get_llm_provider, get_embedding_provider
+from ai.services.chat_service import ChatService
+from ai.services.embedding_service import EmbeddingService
 
 router = APIRouter()
 
@@ -11,10 +13,8 @@ async def ask_question(
     llm: LLMProvider = Depends(get_llm_provider)
 ):
     try:
-        # Currently a placeholder context until we integrate with vector search
-        context = "The IRIS repository contains research papers."
-        
-        answer = await llm.generate_response(prompt=request.query, context=context)
+        chat_service = ChatService(llm)
+        answer = await chat_service.ask_question(request.query)
         
         return AskResponse(
             query=request.query,
@@ -30,7 +30,8 @@ async def create_embedding(
     embedder: EmbeddingProvider = Depends(get_embedding_provider)
 ):
     try:
-        vector = await embedder.generate_embedding(request.text)
+        embedding_service = EmbeddingService(embedder)
+        vector = await embedding_service.create_embedding(request.text)
         
         return EmbedResponse(
             record_id=request.record_id,
