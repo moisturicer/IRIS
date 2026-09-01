@@ -16,6 +16,10 @@ Central index for **software engineering**, **SDLC**, **security**, and **qualit
 | [Requirements Traceability Matrix](TRACEABILITY_MATRIX.md) | SRS FR/NFR → code, API, UI, tests | BA, QA, leads |
 | [Development Guide](DEVELOPMENT_GUIDE.md) | Local setup, build order, per-feature workflow | Developers |
 | [Frontend Implementation Plan](../frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI phases, wireframes, routes | Frontend |
+| [Architecture Review & AWS Roadmap](architecture_review_and_aws_roadmap.md) | Cleanup/removal plan, missing-functionality backlog, AWS production architecture + cost analysis, target RAG architecture | Leads, DevOps, AI engineer |
+| [Backend & Frontend Architecture Review](backend_frontend_architecture_review.md) | Confirmed defects, 15 deepening candidates with design patterns, ~2,400 lines of removals, low-cost hosting alternatives | Backend, frontend, leads |
+| [RAG Third-Party Services Architecture](rag_third_party_services_architecture.md) | Recommended vendor stack (Voyage, Groq, OpenRouter, pgvector), free-tier rollout plan, design patterns catalogue, nine prerequisites | AI engineer, leads |
+| [Chunker Architecture](chunker_architecture.md) | Chunk as a first-class entity, context-path chunking, idempotent re-chunking, design patterns, scaling to 1,000 concurrent users | AI engineer, backend |
 | [Changelog](../CHANGELOG.md) | Version history | Everyone |
 
 ---
