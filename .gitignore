@@ -76,3 +76,4 @@ docs/software-design/
 docs/software-requirements/
 .gitignore
 .agents/
+.codegraph/
