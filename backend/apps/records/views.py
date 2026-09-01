@@ -4,12 +4,17 @@ from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+from django.conf import settings
 from django.http import HttpResponse
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
 from core.permissions import IsOwnerOrStaff, IsReviewer, IsStaff, IsAdmin, IsRDCO
+from .download_service import file_response_for_record
+from .download_tokens import make_download_token, verify_download_token
 from .models import Record, DownloadRequest, DeleteRequest
 from .serializers import (
     RecordListSerializer,
@@ -515,7 +520,8 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"record": ["You already have a pending download request for this record."]}
             )
-        serializer.save(requested_by=user)
+        dr = serializer.save(requested_by=user)
+        notify_download_request(dr.record, requested_by=user)
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -545,6 +551,38 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
             )
             data["download_url"] = f"{settings.FRONTEND_URL.rstrip('/')}/download?token={token}"
         return Response(data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
+    def approve(self, request, pk=None):
+        """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
+        dr = self.get_object()
+        if dr.status != "pending":
+            return Response(
+                {"detail": f"Request is already '{dr.status}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        dr.status      = "approved"
+        dr.reviewed_by = request.user
+        dr.reviewed_at = timezone.now()
+        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+        notify_download_reviewed(dr, reviewed_by=request.user, approved=True)
+        return Response({"detail": "Download request approved. The requester has been notified."})
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
+    def decline(self, request, pk=None):
+        """POST /download-requests/<id>/decline/ — set declined, notify requester in-app."""
+        dr = self.get_object()
+        if dr.status != "pending":
+            return Response(
+                {"detail": f"Request is already '{dr.status}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        dr.status      = "declined"
+        dr.reviewed_by = request.user
+        dr.reviewed_at = timezone.now()
+        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+        notify_download_reviewed(dr, reviewed_by=request.user, approved=False)
+        return Response({"detail": "Download request declined. The requester has been notified."})
 
 
 class DownloadRedeemView(APIView):
@@ -584,49 +622,6 @@ class DownloadRedeemView(APIView):
             )
         # TODO(SRS): apply per-user watermark (email, date) before streaming when required
         return response
-
-    def get_permissions(self):
-        if self.action in ("list", "retrieve"):
-            return [IsAuthenticated(), IsStaff()]
-        return [IsAuthenticated()]
-
-    def perform_create(self, serializer):
-        dr = serializer.save(requested_by=self.request.user)
-        notify_download_request(dr.record, requested_by=self.request.user)
-
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
-    def approve(self, request, pk=None):
-        """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
-        from django.utils import timezone
-        dr = self.get_object()
-        if dr.status != "pending":
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = "approved"
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        notify_download_reviewed(dr, reviewed_by=request.user, approved=True)
-        return Response({"detail": "Download request approved. The requester has been notified."})
-
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
-    def decline(self, request, pk=None):
-        """POST /download-requests/<id>/decline/ — set declined, notify requester in-app."""
-        from django.utils import timezone
-        dr = self.get_object()
-        if dr.status != "pending":
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = "declined"
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        notify_download_reviewed(dr, reviewed_by=request.user, approved=False)
-        return Response({"detail": "Download request declined. The requester has been notified."})
 
 
 class DeleteRequestViewSet(viewsets.ModelViewSet):
