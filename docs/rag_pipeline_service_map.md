@@ -33,16 +33,17 @@ sequenceDiagram
     CX->>DB: PdfExtraction.extracted_text = cleaned
     CX->>DB: Record.search_vector rebuilt (FTS)
 
-    Note over FE,EXT: ── EMBEDDING PIPELINE (async, scheduled + on-demand) ──
+    Note over FE,EXT: ── EMBEDDING PIPELINE (async, on publish + on-demand) ──
 
-    CB->>RD: nightly: enqueue embed_all_records
-    FE->>BE: POST /ai/embed/<pk>/ or /ai/embed/all/
-    BE->>RD: enqueue embed_record
+    CX->>BE: extraction done & record published
+    BE->>RD: enqueue embed_record (auto)
+    FE->>BE: POST /ai/embed/<pk>/ or /ai/embed/all/ (manual)
     RD->>CE: pick up task
-    CE->>AI: POST /ai/internal/embed/ {text}
-    AI->>EXT: embed text → vector (async)
-    EXT-->>AI: float[] vector
-    AI-->>CE: {embedding: float[]}
+    CE->>CE: apply configured text chunking/formatting strategy
+    CE->>AI: POST /ai/internal/embed/ {text_chunks}
+    AI->>EXT: embed chunks → vectors (async)
+    EXT-->>AI: float[][] vectors
+    AI-->>CE: {embeddings: float[][]}
     CE->>DB: RecordEmbedding(pgvector VectorField)
 
     Note over FE,EXT: ── QUERY PIPELINE (async via AI Gateway) ──
@@ -129,11 +130,11 @@ sequenceDiagram
 | **Docker Service** | `celery-embedding` |
 | **Celery Queue** | `embedding` |
 | **Source** | [embed_record](file:///c:/Users/edlav/.antigravity/AntiProjects/IRIS/backend/apps/ai/tasks.py#L6) (ai/tasks.py) |
-| **What Happens** | Builds input text as `f"{record.title}. {record.abstract}"`, POSTs to internal AI Gateway, receives float vector |
+| **What Happens** | Retrieves record text, applies the currently configured text chunking/formatting strategy (e.g., chunking by paragraphs, or just title+abstract), POSTs to internal AI Gateway, receives vector embeddings |
 | **External Call** | `POST http://ai-gateway:8001/api/v1/ai/internal/embed/` (AI Gateway handles the external OpenAI call) |
 | **Retry** | 3 retries, 60s countdown |
 | **Stores To** | `db` — `ai_recordembedding.embedding` (pgvector `VectorField`) |
-| **Scheduled By** | `celery-beat` nightly at 2:00 AM via `embed_all_records`, or on-demand via `POST /ai/embed/all/` |
+| **Triggered By** | Automatically triggered when a record is published and its text extraction is complete, or on-demand via `POST /ai/embed/all/` |
 
 ---
 
@@ -206,9 +207,9 @@ sequenceDiagram
 |--------|--------|
 | **Docker Service** | **`ai-gateway`** (async, non-blocking) |
 | **Source** | `ai-gateway/routes/summarize.py` |
-| **What Happens** | Reads `PdfExtraction.extracted_text` via `asyncpg`, builds structured prompt ("Objectives, Methodology, Findings, Conclusion"), sends to GPT-4.1-mini async |
+| **What Happens** | Checks Redis cache first. If cache miss, reads `PdfExtraction.extracted_text` via `asyncpg`, builds structured prompt ("Objectives, Methodology, Findings, Conclusion"), sends to GPT-4.1-mini async |
 | **External Call** | OpenAI Chat Completions API |
-| **Stores To** | **Nothing** — generated on demand, never persisted |
+| **Stores To** | **`redis`** — summary is cached to prevent redundant LLM calls |
 
 ---
 
@@ -238,12 +239,11 @@ graph TD
     User --> AIroutes[/ai/* routes]
     
     NonAI --> BE[backend]
-    BE -->|enqueue| RD[redis]
+    BE -->|enqueue extraction| RD[redis]
+    BE -->|enqueue embedding on publish| RD
     
     RD --> CX[celery-extraction]
     RD --> CE[celery-embedding]
-    
-    CB[celery-beat] -->|cron| RD
     
     CX -->|internal| DK[docling]
     CE -->|internal| AI[ai-gateway]
