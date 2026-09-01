@@ -249,7 +249,7 @@ Writing the tests.
 Assemble from the two existing documents; do not invent a parallel strategy. The seam-first approach is defensible and honest — do not promise coverage the team cannot deliver.
 
 ## Dependencies
-`T-01`…`T-04`, `V-01`…`V-15`.
+`T-01`…`T-05`, `V-01`…`V-15`.
 
 ## Risks
 Low.

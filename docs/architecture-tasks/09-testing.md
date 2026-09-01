@@ -1,6 +1,6 @@
 # 09 — Testing
 
-Four tasks. **Test the seams, not coverage.** Broad coverage is not reachable in 27 dev-days and would not have caught any of the five current blockers. These are ordered by defects-caught-per-hour.
+Five tasks. **Test the seams, not coverage.** Broad coverage is not reachable in 27 dev-days and would not have caught any of the five current blockers. These are ordered by defects-caught-per-hour.
 
 > Of the five things that stop IRIS running today, an import-smoke test catches three, `makemigrations --check` catches a fourth, and `docker compose config` catches the fifth. Jira holds 51 issues and **not one** covers testing.
 
@@ -295,3 +295,94 @@ Frontend test approach in `DOC-04`.
 
 ## Definition of Done
 Merged; four assertions passing in CI.
+
+---
+
+# T-05 · Dependency and secret scanning in CI
+
+## Objective
+Automatically detect known-vulnerable dependencies and committed secrets, so neither reaches the deployed system unnoticed.
+
+## Problem
+There is no scanning of any kind — no dependency audit, no secret detection, no automated alerting. This matters more than usual here, because the codebase has already demonstrated both failure modes: credentials committed to version control, and a dependency list that drifted out of step with the code.
+
+## Evidence
+`grep -rlin "dependabot|SAST|dependency scan|trivy|snyk|bandit|pip-audit|npm audit|secret scan" docs/architecture-tasks/ docs/adr/ docs/mvp-validation/` returns **nothing**. No scanning is planned anywhere.
+
+Concrete instances the review already found:
+
+- `docker-compose.yml` and `docker-compose.prod.yml` both hardcode `POSTGRES_PASSWORD: iris_password`
+- `settings/base.py:79-82` defaults `DB_PASSWORD` to the same value
+- `.env.example` ships `SECRET_KEY=change-me-in-production`
+- `requirements/base.txt` lists `pgvector` **twice** with conflicting constraints (`>=0.3` line 11, `>=0.2.4` line 21)
+- Every requirement is pinned with `>=`, so the installed set is whatever resolved on the day — and nothing checks it
+
+`S-04` and `DEP-05` fix the *existing* credentials. Nothing prevents the next one.
+
+## Current State
+No automated check exists. Vulnerable dependencies and committed secrets would be found by accident or not at all.
+
+## Proposed State
+Three CI steps and two repository settings, running on every push.
+
+## Scope
+- `pip-audit` against the installed backend requirements
+- `npm audit --audit-level=high` for the frontend
+- Both wired into the `F-01` workflow, failing on **high and critical only**
+- Dependabot enabled for `pip` and `npm`, weekly
+- GitHub secret scanning and push protection enabled
+
+## Out of Scope
+SAST tooling (Bandit, Semgrep) — disproportionate at this budget, and noisy on a Django codebase without tuning. Container image scanning. Licence scanning. Penetration testing. These are Phase 2 if IRIS becomes a commercial product with paying institutional customers.
+
+## Technical Approach
+Fail the build on **high and critical only**. Failing on every advisory produces noise that gets ignored within a week, which is worse than no scanning at all.
+
+Where a transitive vulnerability has no available fix, record it as a documented exception with a date and a review trigger, rather than disabling the check.
+
+**Repository visibility caveat:** GitHub secret scanning and push protection are free on public repositories. Availability on private repositories depends on the plan — **check before assuming it is available**, and if it is not, use a pre-commit hook or a free alternative such as `gitleaks` in CI instead.
+
+## Dependencies
+`F-01` (the workflow exists). `S-04` and `DEP-05` fix the credentials that are already committed — this task stops the next ones.
+
+## Risks
+**Audit noise.** Starting at `high` avoids drowning the signal. **Unfixable transitive advisories** can block CI — hence the documented-exception process. **Historic secrets** already in git history will not be removed by push protection; if secret scanning flags anything historic, those credentials must be rotated regardless (they are, under `DEP-05`).
+
+## Security Impact
+Direct and preventive. Closes the mechanism by which the currently-committed credentials reached version control, and gives early warning on dependency advisories — relevant given that `pymupdf`, `pgvector` and the AI provider SDK are all being added this semester.
+
+## Performance Impact
+None on the application. Roughly 30–60 seconds of CI time.
+
+## SaaS Impact
+Institutional buyers routinely ask about dependency management and vulnerability response during procurement. A documented scanning process is a cheap answer to a question that will be asked.
+
+## Research/Thesis Impact
+None directly. Contributes to `DOC-05` (`SECURITY.md` and the risk register), which is an assessed artefact.
+
+## MVP Classification
+MVP REQUIRED
+
+## Priority
+P2
+
+## Complexity
+XS
+
+## Acceptance Criteria
+- [ ] `pip-audit` runs in CI and fails the build on a high or critical advisory.
+- [ ] `npm audit --audit-level=high` runs in CI and fails on high or critical.
+- [ ] A deliberately introduced vulnerable dependency fails the build (demonstrated, then reverted).
+- [ ] Dependabot is enabled for `pip` and `npm` and has opened at least one pull request or reported clean.
+- [ ] Secret scanning with push protection is enabled, **or** a documented alternative (`gitleaks`) runs in CI if unavailable on this repository's plan.
+- [ ] A committed test secret is blocked or flagged (demonstrated with a dummy value, then removed).
+- [ ] Any unfixable advisory is recorded as a dated exception with a review trigger.
+
+## Testing Requirements
+The two demonstrations above — a vulnerable dependency and a dummy secret — are the test. Record both in the pull request.
+
+## Documentation Requirements
+Scanning process, the failure threshold, and the exception procedure recorded in `DOC-05` (`SECURITY.md`). Exceptions listed in `SECURITY_RISK_REGISTER.md`.
+
+## Definition of Done
+Merged; both scans green in CI; Dependabot active; secret scanning enabled or its alternative running; both demonstrations recorded.

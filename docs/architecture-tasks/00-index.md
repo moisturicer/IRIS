@@ -33,13 +33,13 @@ Every classification below was made against that number. Where something is defe
 | [06-rag.md](06-rag.md) | Minimum pipeline, timeboxed | 6 |
 | [07-saas.md](07-saas.md) | Instance-per-tenant, configuration boundaries | 4 |
 | [08-deployment.md](08-deployment.md) | Five services, interim VPS, backups | 5 |
-| [09-testing.md](09-testing.md) | pytest, authorization matrix, transitions | 4 |
+| [09-testing.md](09-testing.md) | pytest, authorization matrix, transitions, dependency + secret scanning | 5 |
 | [10-mvp-validation.md](10-mvp-validation.md) | Three-phase validation, NFR evidence | 15 |
 | [11-documentation.md](11-documentation.md) | SRS refactor, traceability, security docs | 6 |
 | [12-scope-cuts.md](12-scope-cuts.md) | KEEP / REDUCE / REPLACE / DEFER / REMOVE / DO NOT BUILD YET | — |
 | [13-jira-reconciliation.md](13-jira-reconciliation.md) | 51 issues → ~18 active | — |
 
-**70 task specifications. ~30 are P0/P1 and fit the budget.** The remainder are P2/P3 or deferred, recorded so the cuts are visible rather than implied.
+**71 task specifications. ~30 are P0/P1 and fit the budget.** The remainder are P2/P3 or deferred, recorded so the cuts are visible rather than implied.
 
 ---
 

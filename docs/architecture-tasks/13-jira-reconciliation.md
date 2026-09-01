@@ -167,7 +167,7 @@ Checked against the live backlog: `citiris.atlassian.net`, project **IR**, 51 is
 |---|---|---|
 | **Boot blockers** | `B-01`, `B-02`, `D-01`, `D-02` | 4 MVP Blockers |
 | **Security** | `S-01`…`S-07`, `SC-01` | 4 MVP Blockers |
-| **Testing** | `T-01`…`T-04` | 1 MVP Blocker |
+| **Testing** | `T-01`…`T-05` | 1 MVP Blocker |
 | **CI/CD** | `F-01` | 1 MVP Blocker |
 | **Deployment** | `D-03`…`D-05` | Interim deployment, backups, observability |
 | **Workflow / thesis** | `W-01`…`W-06` | **The contribution** |
@@ -189,7 +189,7 @@ Checked against the live backlog: `citiris.atlassian.net`, project **IR**, 51 is
 | `IR-31` Epic 6: Compliance & Audit | `S-07`, `W-04` |
 | `IR-32` Epic 7: Analytics Dashboard | *(defer — Phase 2)* |
 | **NEW — Epic 8: Platform Stability & Security** | `B-01`, `B-02`, `S-01`…`S-05`, `SC-01` |
-| **NEW — Epic 9: Engineering Practice** | `F-01`, `T-01`…`T-04`, `FE-04`, `DOC-01`…`DOC-06` |
+| **NEW — Epic 9: Engineering Practice** | `F-01`, `T-01`…`T-05`, `FE-04`, `DOC-01`…`DOC-06` |
 | **NEW — Epic 10: Deployment & Operations** | `D-01`…`D-05`, `SA-01`…`SA-04` |
 | **NEW — Epic 11: MVP Validation & Research Evaluation** | `V-01`…`V-15` |
 

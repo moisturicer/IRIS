@@ -27,6 +27,8 @@ Backend job (Postgres service container): install deps → `makemigrations --che
 ## Out of Scope
 Deployment automation, container publishing, coverage gates, multi-version matrices.
 
+**Dependency and secret scanning is in scope but specified separately** as `T-05` — it plugs into this workflow rather than duplicating it. SAST, container image scanning and licence scanning remain out of scope.
+
 ## Technical Approach
 Pin action versions; cache pip and npm. Land the workflow early with `pytest` and `lint` steps commented, enabling each as `T-01` and `FE-04` arrive.
 
