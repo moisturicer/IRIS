@@ -21,7 +21,7 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 | Database | PostgreSQL. `Record.search_vector` (GIN, weighted) is maintained and **works** |
 | Async | Celery + Redis |
 | Deployment | Docker Compose, dev and prod |
-| **AI gateway** | **Does not exist.** Both Compose files reference `./ai`, which is not in the tree. ADR-010 rejects a separate gateway — AI stays inside Django |
+| **AI gateway** | `ai/` exists in the tree (FastAPI, added in `7f73e97`) but **is not deployed and does not run** — it imports `ai.services.chat_service`, which does not exist, and has no authentication. **[ADR-012](docs/adr/012-ai-provider-abstraction-not-a-service.md) settles this:** the provider abstraction is ported into Django as `apps/ai/providers/`; the service is not adopted. Compose still declares `ai-gateway`; IR-58 removes it. **Do not build on `ai/`** |
 | **pgvector** | **Not yet implemented.** ADR-007 selects it; the service classes are `pass` bodies |
 | **Docling** | **Not implemented.** SRS-specified, deferred by ADR-006 pending an SRS amendment |
 

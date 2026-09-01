@@ -21,6 +21,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [009](009-authorization-model.md) | Authorization model and `is_staff` semantics | Accepted | **Security** |
 | [010](010-deployment-topology.md) | Five-service topology and interim VPS deployment | Accepted | Deployment |
 | [011](011-evaluation-framework.md) | ISO 9241-11 as the evaluation spine | Accepted | Research |
+| [012](012-ai-provider-abstraction-not-a-service.md) | AI provider abstraction in Django, not a separate service | Accepted | Architecture · Security · Deployment |
 
 ---
 
