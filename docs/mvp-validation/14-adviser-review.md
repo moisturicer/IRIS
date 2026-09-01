@@ -36,15 +36,26 @@ Grouped by urgency. Items in Group A block Phase 1 work that starts this week.
 
 ---
 
-### A3 · What is "SBCVM"?
+### A3 · Which sense of "SBCVM", and is it required?
 
-**Question.** I could not reliably identify this acronym and **deliberately did not guess** — a wrong assumption would have propagated through the entire design.
+**Partially answered.** Three candidate meanings have been supplied: *Structured-Byte Code Real-Time Virtual Machine* (SBC-RVM), *Structure-Behavior Coalescence* (SBC), and *Startup Business Company Validation Methodology*.
 
-**Needed:** the full name · its source · whether it is **required** by the programme or offered as an option.
+**Assessment: none is a software-quality or usability evaluation framework**, so none competes with ISO 9241-11 for the primary role ([01](01-framework-selection.md)).
 
-**Consequence.** If it is mandatory it likely becomes the primary framework and the rest of the design adapts around it. That is a substantial change and is much cheaper now than in Week 10.
+- **SBC-RVM** — a runtime technology. Not an evaluation method; nothing in IRIS uses it
+- **Structure-Behavior Coalescence** — an architecture *description* approach. Could inform how the SDD documents the system; it does not evaluate anything
+- **Startup Business Company Validation Methodology** — validates a **business**, not a research contribution. Relevant to the commercial track, not to RQ1–RQ4
 
-**Status: NEEDS ADVISER CONFIRMATION — blocking**
+**Two questions remain:**
+
+1. **Which sense does the programme intend?** The definitions above are general, not a statement of programme intent.
+2. **Is it required, and for which deliverable?** If it is required for the **commercial defence** rather than the research evaluation, that is a different — and legitimate — obligation.
+
+**The gap this exposes.** Semester 2 contains two validation questions. This document set answers the research one thoroughly and the commercial one thinly — adoption intent (M21) and the decision-maker interview guide are the only coverage. If a structured commercial validation methodology is expected, it needs its own plan covering customer discovery, willingness to pay, pricing, Lean Canvas and the Business Model Canvas.
+
+**Recommendation.** Confirm the intended sense. If it is the startup-validation sense, treat it as a **commercial-track deliverable for Weeks 11–15**, separate from the research evaluation, and request a dedicated plan for it. Do **not** fold it into the research framework — validating a business and validating a workflow model are different questions with different evidence.
+
+**Status: NEEDS ADVISER CONFIRMATION — narrowed from "what is it?" to "which sense, for which deliverable?"**
 
 ---
 
@@ -201,7 +212,7 @@ Conflating them — reporting UAT passes as research findings — would be a def
 |---|---|---|---|---|
 | A1 | Ethics and consent | A | Adviser | Week 2 sessions |
 | A2 | Framework combination | A | Adviser | Everything downstream |
-| A3 | **What is SBCVM?** | A | Adviser | Framework selection |
+| A3 | **Which sense of SBCVM, for which deliverable?** | A | Adviser | Commercial-track plan |
 | A4 | Respondent count | A | Adviser | Recruitment |
 | A5 | **Baseline + pilot commitment** | A | CIT-U | **Highest risk** |
 | B1 | Census / descriptive analysis | B | Adviser | Analysis plan |
@@ -223,7 +234,7 @@ Conflating them — reporting UAT passes as research findings — would be a def
 
 1. Where the system actually is — it did not start; here is what was fixed and what remains
 2. Scope: the ~27 dev-day budget and the deferrals it forces ([ADR-001](../adr/001-mvp-scope-boundary.md))
-3. **Framework proposal and the SBCVM question** (A2, A3)
+3. **Framework proposal**, and which sense of SBCVM the programme intends (A2, A3)
 4. **Whether a null result is acceptable** (B2)
 5. Ethics process (A1)
 6. Respondent count interpretation (A4)

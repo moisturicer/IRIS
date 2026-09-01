@@ -146,7 +146,8 @@ Nothing below is assumed. Each is marked and tracked.
 | SUS use and instrument wording | **NEEDS ADVISER CONFIRMATION** |
 | Ethics / consent process for human participants | **NEEDS ADVISER CONFIRMATION** |
 | NFR-P3 amendment (3 s p95 chatbot) | **NEEDS ADVISER CONFIRMATION** |
-| Whether "SBCVM" refers to a specific required model | **NEEDS ADVISER CONFIRMATION** — see [01](01-framework-selection.md) |
+| Which sense of "SBCVM" the programme intends, and for which deliverable | **NEEDS ADVISER CONFIRMATION** — none of the three supplied senses is a research-evaluation framework; the startup-validation sense belongs to the **commercial** track. See [01](01-framework-selection.md) |
+| **A structured commercial validation plan** — customer discovery, willingness to pay, Lean Canvas, BMC | **Gap.** This document set covers research validation thoroughly and commercial validation only through adoption intent (M21). Needs its own plan if the programme expects one |
 | RDCO submission volume, decline rate, turnaround | **NEEDS RDCO DATA** |
 | Written pilot commitment, named participants | **NEEDS CIT-U CONFIRMATION** |
 | External AI transmission approval | **NEEDS CIT-U CONFIRMATION** |

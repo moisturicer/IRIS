@@ -155,15 +155,34 @@ Both are planned. UAT runs in Weeks 8–9 against the acceptance criteria in `do
 
 ---
 
-### ❓ SBCVM — **CANNOT EVALUATE — NEEDS ADVISER CONFIRMATION**
+### ❌ SBCVM — **REJECTED for the research evaluation; sense (3) belongs to the commercial track**
 
-I cannot reliably identify what "SBCVM" refers to in this context, and I will not evaluate a framework by guessing at its definition — a wrong assumption here would propagate through the entire evaluation design.
+Three candidate meanings were supplied. **None is a software-quality or usability evaluation framework**, so none competes with ISO 9241-11 for the primary role.
 
-**Please confirm with the adviser:** the full name, the source, and whether it is *required* by the programme or merely offered as an option.
+| Sense | What it is | Fit with this evaluation |
+|---|---|---|
+| **Structured-Byte Code Real-Time Virtual Machine** (SBC-RVM) | A runtime / virtual-machine technology | **None.** An implementation technology, not an evaluation method. Nothing in IRIS uses or resembles it |
+| **Structure-Behavior Coalescence** (SBC) | A systems-architecture description approach | **None for evaluation.** Conceivably relevant to *describing* architecture in the SDD, but it does not measure effectiveness, efficiency, satisfaction or the contribution |
+| **Startup Business Company Validation Methodology** | Business / market validation, tool-supported | **None for research validation** — but genuinely relevant to the **commercial** track |
 
-**Once clarified, assess it against:** whether it measures something ISO 9241-11 plus the controlled comparison does not; its instrument burden on a 6–12 person population; and whether it is mandatory. If it is a required programme framework, it becomes primary regardless of this analysis and the rest of the design adapts around it.
+**The third sense exposes a real gap**, and it is worth stating plainly rather than burying.
 
-Until then it is **excluded from the design and flagged as an open decision** ([14](14-adviser-review.md)).
+Semester 2 contains **two distinct validation questions**, and they require different methods:
+
+| | **Research validation** | **Commercial validation** |
+|---|---|---|
+| Question | Does the workflow contribution work? | Is this a viable business? |
+| Framework | ISO 9241-11 + controlled comparison | Customer discovery, willingness to pay, Lean Canvas, BMC |
+| Evidence | Effect sizes, SUS, SME themes | Paying customer, transaction evidence, market analysis |
+| Deliverable | Evaluation chapter | Commercial defence, pitch deck |
+| Weeks | 11–12 | 11–15 |
+| Covered here | **Thoroughly** | **Thinly** — adoption intent (M21) and the decision-maker guide only |
+
+**Conclusion.** SBCVM does not enter the research evaluation design in any of its three senses. If the programme intends sense (3), it belongs in the commercialisation track alongside Lean Canvas and the Business Model Canvas — and that track needs more structure than this document set currently gives it.
+
+**Still open:** which sense the programme intends, and whether it is *required*. The definitions above are general; they are not a statement of what this programme means by the acronym. **NEEDS ADVISER CONFIRMATION** ([14](14-adviser-review.md) A3).
+
+**If it turns out to be a required *research* framework** under a definition not listed above, this analysis is void and the design must be revisited — which is why the question is still tracked rather than closed.
 
 ---
 
@@ -182,7 +201,7 @@ Until then it is **excluded from the design and flagged as an open decision** ([
 | UEQ | ❌ Rejected | Redundant with SUS | — |
 | NPS | ❌ Rejected | Unstable at this N | — |
 | Cognitive Walkthrough | ❌ Rejected | HE gives more breadth per hour | — |
-| SBCVM | ❓ Unknown | **NEEDS ADVISER CONFIRMATION** | — |
+| SBCVM | ❌ Rejected | Not an evaluation framework in any supplied sense; the startup-validation sense belongs to the **commercial** track | — |
 
 **Plus, and separately from any of the above:** the **within-subjects controlled comparison** of clearance-aware against restart-all resubmission ([07](07-workflow-evaluation.md)). This is not a framework — it is the experimental design that tests the contribution, and it is the only element that can produce a negative result.
 

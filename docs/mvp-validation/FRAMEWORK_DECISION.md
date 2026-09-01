@@ -54,6 +54,7 @@ One framework, not a stack. Everything else below is either a method for derivin
 | **UEQ** | 26 items overlapping SUS on pragmatic dimensions, adding hedonic scales (novelty, stimulation) irrelevant to institutional compliance software. Nothing breaks if dropped |
 | **NPS** | Arithmetically unstable at N≈10 — one detractor moves it by tens of points. Compresses a rich judgement into a number supporting no analysis. May appear in the commercial deck, labelled indicative and reported with N; **must not** appear as research evidence |
 | **Cognitive Walkthrough** | Good theoretical fit for a multi-step workflow, but redundant with Heuristic Evaluation. HE gives more breadth per hour, and breadth is what Weeks 1–2 need. Reconsider as a focused method if Phase 1 shows the submission wizard specifically is where users fail |
+| **SBCVM** | Not a software-quality or usability evaluation framework in any of the three supplied senses. *Structured-Byte Code RT VM* is a runtime technology; *Structure-Behavior Coalescence* describes architecture rather than evaluating it; *Startup Business Company Validation Methodology* validates a **business**, not a research contribution. The third sense is relevant to the **commercial** track (Weeks 11–15) and is recorded there, not here. Which sense the programme intends remains **NEEDS ADVISER CONFIRMATION** |
 | **Preserved-clearance counting as primary evidence** | Given which office declined, the count is deterministically computable — no variance, no possible negative result. An arithmetic identity, not a finding. Retained as a *supporting* descriptive measure only |
 | **Manual-process comparison as primary evidence** | Confounded by digitisation — any software beats paper, so it measures the wrong variable. Retained as **context** for the problem statement |
 
@@ -91,7 +92,7 @@ Stated here so it is not claimed later.
 | # | Item | Why it matters |
 |---|---|---|
 | 1 | **The framework combination itself** | Everything downstream depends on it |
-| 2 | **Whether "SBCVM" is required** | I could not reliably identify this acronym and did not guess. If it is a mandatory programme framework it becomes primary and the design adapts around it |
+| 2 | **Which sense of "SBCVM" the programme intends, and whether it is required** | None of the three supplied senses is a research-evaluation framework. If sense (3) — Startup Business Company Validation Methodology — is intended, it belongs to the **commercial** track, which this document set covers only through qualitative adoption intent and needs strengthening |
 | 3 | **SUS wording and administration** | NFR-U1 cites SRS Appendix B; confirm that instrument is the one to use |
 | 4 | **Ethics and consent process** | Human participants, recorded sessions, timing data. RA 10173 applies |
 | 5 | **Acceptability of a census rather than a sample** | N is bounded by the population, not by choice |
