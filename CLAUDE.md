@@ -10,7 +10,41 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 
 ## Baseline branch
 
-**`refactor/docker-service`.** Not `main`. All work starts here.
+**`main` is the repository default and long-term trunk. `refactor/docker-service` is the current integration branch — cut new branches from it, and target it in PRs.** The two have diverged, including in `docs/`; reconciling them is separate work.
+
+## Jira and Git convention
+
+**Every development task corresponds to a Jira issue, and the issue key is the identifier that ties the whole lifecycle together.**
+
+**Branch** — `<type>/IR-XXX-short-description`, types `feature` `fix` `refactor` `test` `docs` `chore`:
+```
+feature/IR-124-rag-retrieval      fix/IR-131-pdf-validation
+test/IR-140-document-ingestion    docs/IR-150-rag-architecture
+```
+
+**Commit** — Conventional Commits with the key as scope:
+```
+feat(IR-124): implement RAG retrieval
+fix(IR-131): validate uploaded PDFs
+```
+
+**PR title** — `IR-124 Implement RAG retrieval`.
+
+### Rules
+
+1. **Identify the Jira issue before starting.** Read it and its acceptance criteria; confirm it is the right thing to work on.
+2. **Never invent a Jira issue key.** If no issue exists for substantive work, **create one first or flag it** — do not fabricate an identifier or work without one.
+3. Create the branch from the integration branch, named per the convention.
+4. Move the card to **In Progress** when you start.
+5. Implement, adding or updating tests where applicable.
+6. Run the relevant checks and record what you ran and what happened.
+7. Commit with the key in the scope. **No AI attribution** — no `Co-Authored-By`, no generated-with trailer.
+8. Push **and open the PR in the same step.** A pushed branch without a PR is incomplete work.
+9. Report CI and test status honestly, including failures and why.
+10. Update the Jira card, moving it to **In Review** only once the PR exists.
+11. **Never mark work Done because the implementation was written.** Done is defined in `docs/engineering/WORK_ITEM_LIFECYCLE.md` §9 and requires review, approval and evidence.
+
+Full specification: [`docs/engineering/SDLC.md`](docs/engineering/SDLC.md) §2-4a.
 
 ## Architecture — what actually exists
 
@@ -21,7 +55,7 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 | Database | PostgreSQL. `Record.search_vector` (GIN, weighted) is maintained and **works** |
 | Async | Celery + Redis |
 | Deployment | Docker Compose, dev and prod |
-| **AI gateway** | **Does not exist.** Both Compose files reference `./ai`, which is not in the tree. ADR-010 rejects a separate gateway — AI stays inside Django |
+| **AI gateway** | `ai/` **now exists** — a FastAPI service added in `7f73e97`. **This contradicts ADR-010**, which rejected a separate gateway because it duplicates authentication and visibility filtering. Unresolved: either ADR-010 is superseded by a new ADR, or the service is removed (IR-58). Compose still fails — there is no `ai/.env` or `ai/.env.example` |
 | **pgvector** | **Not yet implemented.** ADR-007 selects it; the service classes are `pass` bodies |
 | **Docling** | **Not implemented.** SRS-specified, deferred by ADR-006 pending an SRS amendment |
 
