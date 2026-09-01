@@ -1,8 +1,16 @@
-version: "3.9"
+# =============================================================================
+# IRIS — Development Docker Compose (10 Services)
+#
+# Architecture: Django API + FastAPI AI Gateway + Docling-serve + 3 Celery
+# queues + Celery Beat + PostgreSQL/pgvector + Redis + Vite Frontend
+#
+# See: docs/docker_compose_rag_services.md for full architecture rationale
+# See: docs/rag_pipeline_service_map.md for phase-to-service mapping
+# =============================================================================
 
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: iris_db
@@ -13,7 +21,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U iris_user -d iris_db"]
+      test: [ "CMD-SHELL", "pg_isready -U iris_user -d iris_db" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,7 +32,7 @@ services:
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -50,31 +58,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  celery:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      args:
-        REQUIREMENT_FILE: development.txt
-    restart: unless-stopped
-    command: celery -A config worker -l info
-    volumes:
-      - ./backend:/app
-      - media_files:/app/media
-    env_file:
-      - ./backend/.env
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.development
-      - DB_HOST=db
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DOCLING_API_URL=http://docling:5001
     depends_on:
       db:
         condition: service_healthy
@@ -93,6 +77,154 @@ services:
     command: sh -c "npm install && npm run dev -- --host"
     environment:
       - VITE_API_BASE_URL=http://localhost:8000/api/v1
+      - VITE_AI_API_BASE_URL=http://localhost:8001/api/v1
+
+  # AI services
+  docling:
+    image: quay.io/docling-project/docling-serve:latest
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=1
+      - DOCLING_SERVE_CONCURRENCY=4
+      - DOCLING_SERVE_MAX_NUM_PAGES=200
+      - DOCLING_SERVE_MAX_FILE_SIZE=52428800 # 50MB
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:5001/health || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+
+  ai-gateway:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./ai/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://iris_user:iris_password@db:5432/iris_db
+      - UVICORN_WORKERS=4
+      - MAX_CONCURRENT_LLM=80
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # Celery workers
+  celery-default:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: development.txt
+    restart: unless-stopped
+    command: celery -A config worker -l info -Q default -n default@%h
+    volumes:
+      - ./backend:/app
+      - media_files:/app/media
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-extraction:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: development.txt
+    restart: unless-stopped
+    command: celery -A config worker -l info -Q extraction -n extraction@%h --concurrency=2
+    volumes:
+      - ./backend:/app
+      - media_files:/app/media
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DOCLING_API_URL=http://docling:5001
+      - EXTRACTION_TIMEOUT=900
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      docling:
+        condition: service_healthy
+
+  celery-embedding:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: development.txt
+    restart: unless-stopped
+    command: celery -A config worker -l info -Q embedding -n embedding@%h --concurrency=4
+    volumes:
+      - ./backend:/app
+      - media_files:/app/media
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: development.txt
+    restart: unless-stopped
+    command: celery -A config beat -l info --schedule=/tmp/celerybeat-schedule
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

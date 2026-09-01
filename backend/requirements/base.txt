@@ -13,20 +13,13 @@ pgvector>=0.3                  # FR-M3-03: vector storage in PostgreSQL (VectorF
 # TODO (AI engineer): confirm DOCLING_API_URL setting in settings/base.py points to on-prem Docling-serve instance
 #
 # REMOVE when Docling + pgvector migration is complete:
-#   sentence-transformers>=3.0   ← replaced by third-party embedding API
-#   pymupdf>=1.24                ← replaced by Docling-serve
-#   unstructured[pdf]>=0.12      ← replaced by Docling-serve
-#   pytesseract>=0.3             ← replaced by Docling-serve
-#   Pillow>=10.3                 ← only needed by pytesseract; remove together
-sentence-transformers>=3.0     # TODO: remove after FR-M3-03 migration to third-party embedding API
+#   (Removed legacy ML dependencies)
 pyexcel-xls>=0.7
 pyexcel-xlsx>=0.6
 openpyxl>=3.1                  # FR-M2-04: styled .xlsx template download
 python-docx>=1.1
-Pillow>=10.3                   # TODO: remove after FR-M3-01 migration to Docling-serve
-pymupdf>=1.24                  # TODO: remove after FR-M3-01 migration to Docling-serve
-unstructured[pdf]>=0.12        # TODO: remove after FR-M3-01 migration to Docling-serve
-pytesseract>=0.3               # TODO: remove after FR-M3-01 migration to Docling-serve
+httpx>=0.27.0                  # For proxying requests to ai-gateway
+pgvector>=0.2.4                # For vector field handling in models
 python-decouple>=3.8
 django-storages[s3]>=1.14
 whitenoise>=6.6

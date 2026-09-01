@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: iris_db
@@ -53,6 +53,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DOCLING_API_URL=http://docling:5001
+      - AI_GATEWAY_URL=http://ai-gateway:8001
     depends_on:
       db:
         condition: service_healthy
@@ -69,14 +71,57 @@ services:
           cpus: '1.0'
           memory: 1G
 
-  celery:
+  docling:
+    image: quay.io/docling-project/docling-serve:latest
+    restart: unless-stopped
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=0
+      - DOCLING_SERVE_CONCURRENCY=4
+      - DOCLING_SERVE_MAX_NUM_PAGES=200
+      - DOCLING_SERVE_MAX_FILE_SIZE=52428800 # 50MB
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:5001/health || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+
+  ai-gateway:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./ai/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://iris_user:iris_password@db:5432/iris_db
+      - UVICORN_WORKERS=4
+      - MAX_CONCURRENT_LLM=80
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  celery-default:
     build:
       context: ./backend
       dockerfile: Dockerfile
       args:
         REQUIREMENT_FILE: production.txt
     restart: unless-stopped
-    command: celery -A config worker -l info
+    command: celery -A config worker -l info -Q default -n default@%h
     volumes:
       - media_files:/app/media
     env_file:
@@ -92,16 +137,78 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
+
+  celery-extraction:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: production.txt
+    restart: unless-stopped
+    command: celery -A config worker -l info -Q extraction -n extraction@%h --concurrency=2
+    volumes:
+      - media_files:/app/media
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DOCLING_API_URL=http://docling:5001
+      - EXTRACTION_TIMEOUT=900
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      docling:
+        condition: service_healthy
+
+  celery-embedding:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: production.txt
+    restart: unless-stopped
+    command: celery -A config worker -l info -Q embedding -n embedding@%h --concurrency=4
+    volumes:
+      - media_files:/app/media
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - AI_GATEWAY_URL=http://ai-gateway:8001
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: production.txt
+    restart: unless-stopped
+    command: celery -A config beat -l info --schedule=/tmp/celerybeat-schedule
+    volumes:
+      - media_files:/app/media
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -109,11 +216,12 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "80:8080"
+      - "80:80"
     volumes:
       - media_files:/usr/share/nginx/html/media:ro
     depends_on:
       - backend
+      - ai-gateway
     logging:
       driver: "json-file"
       options:

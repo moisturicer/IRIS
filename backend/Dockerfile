@@ -51,7 +51,7 @@ USER appuser
 
 # Collect static files (WhiteNoise will serve them)
 # TODO: run this during CI/CD, not at image build time in production
-RUN python manage.py collectstatic --noinput
+RUN SECRET_KEY=dummy python manage.py collectstatic --noinput
 
 EXPOSE 8000
 

@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [refactor/docker-service, main]
+  pull_request:
+    branches: [refactor/docker-service, main]
+
+# CI is evidence, not decoration.
+# It is expected to FAIL until IR-57 (application boot) and IR-58 (Docker stack) land.
+# Do not weaken a gate to make it green — fix the defect it is reporting.
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements/development.txt
+
+      - name: Static check for undefined names
+        # Catches the class of defect that currently stops the app importing.
+        run: |
+          pip install pyflakes
+          pyflakes apps/ config/ core/
+
+      - name: Django configuration check
+        # Fails while the URLconf cannot import — this is the point.
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.development
+          SECRET_KEY: ci-only-not-a-real-secret
+          DEBUG: 'False'
+        run: python manage.py check
+
+      - name: Migration consistency
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.development
+          SECRET_KEY: ci-only-not-a-real-secret
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Tests
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.development
+          SECRET_KEY: ci-only-not-a-real-secret
+        # No test harness exists yet. This step is deliberately visible rather
+        # than omitted, so the gap is reported on every run.
+        run: |
+          if [ -f pytest.ini ] || [ -f pyproject.toml ]; then
+            pip install pytest pytest-django
+            pytest
+          else
+            echo "::warning title=No backend tests::No pytest configuration found. Zero tests exist."
+          fi
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        # Runs `tsc && vite build`, so a type error fails the build. Intended.
+        run: npm run build
+
+  compose:
+    name: Docker Compose
+    runs-on: ubuntu-latest
+    # Verified 2026-09-01: this job FAILS on the current baseline with
+    #   "env file .../ai/.env not found"
+    # because both Compose files declare an `ai-gateway` service whose build
+    # context ./ai does not exist. ADR-010 rejects a separate AI gateway.
+    # IR-58 removes the service; this job goes green then. Do not silence it.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Provide env file
+        # backend/.env is gitignored. Compose interpolation needs it to exist,
+        # so seed it from the committed example. Values are placeholders.
+        run: cp backend/.env.example backend/.env
+
+      - name: Validate development stack
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Validate production stack
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dependency audit (Python)
+        run: |
+          pip install pip-audit
+          pip-audit -r backend/requirements/base.txt --desc || true
+
+      - name: Dependency audit (Node)
+        working-directory: frontend
+        run: npm audit --audit-level=high || true
