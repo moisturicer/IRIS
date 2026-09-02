@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — 2026-09-02
+**Superseded by [ADR-014](014-ai-gateway-as-a-service.md)** — 2026-09-02.
+
+Accepted earlier the same day. ADR-014 adopts the gateway as a deployed service. The objections recorded below were **not** answered by code — ADR-014 converts them into deployment preconditions. Read them before deploying the gateway; they are the reason the preconditions exist.
 
 **Reaffirms [ADR-010](010-deployment-topology.md).** It does not supersede it. ADR-010 remains accepted and unedited.
 
