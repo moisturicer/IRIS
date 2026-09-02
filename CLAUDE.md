@@ -1,107 +1,102 @@
-# CLAUDE.md
+# CLAUDE.md — IRIS
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI assistants working in this repository. Keep changes grounded in what the code actually does.
 
-## What this is
+## Repository
 
-IRIS is a research/IP management platform for Cebu Institute of Technology – University: submission, peer review, IP tagging, document storage, download requests, and AI-assisted discovery across colleges and departments. Three independently deployed services:
+IRIS is an institutional research and IP disclosure workflow system for CIT-U, built as a four-person capstone thesis with a commercial track.
 
-- **`backend/`** — Django 5 + DRF REST API (business logic, auth, records, workflow)
-- **`ai/`** — FastAPI async gateway (LLM/embeddings/vector search — the RAG pipeline)
-- **`frontend/`** — React 18 + Vite + TypeScript SPA
+**The thesis contribution is the workflow**, not the AI: type-differentiated routing, parallel multi-office clearance, and **clearance-aware resubmission** — when one office requires revisions, only that office's clearance resets and the others are preserved.
 
-They run together via `docker-compose.yml` (10 services: db, redis, backend, frontend, docling, ai-gateway, celery-default/extraction/embedding, celery-beat).
+## Baseline branch
 
-## Commands
+**`feat/rag-service`.** `main` carries the requirements, design and ADRs and is merged in; RAG and AI work continues here.
 
-### Backend (Django)
+## Architecture — what actually exists
+
+| Component | Reality |
+|---|---|
+| Backend | Django 5 + DRF, `backend/apps/{accounts,records,reviews,documents,notifications,audit,ai}` |
+| Frontend | React 18 + TypeScript + Vite + Tailwind + Zustand, `frontend/src/` |
+| Database | PostgreSQL. `Record.search_vector` (GIN, weighted) is maintained and **works** |
+| Async | Celery + Redis |
+| Deployment | Docker Compose, dev and prod |
+| **AI gateway** | `ai/` is FastAPI in ports-and-adapters shape: `domain/ports.py`, `infrastructure/{openai,local}_adapter.py`, `api/`. **[ADR-014](docs/adr/014-ai-gateway-as-a-service.md) adopts it as a sixth service, under five preconditions** — service-to-service auth, no public port, no CORS, **no direct DB access** (Django owns retrieval and visibility filtering), and it must boot. **It does not boot today**: `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist. Do not deploy it until all five hold |
+| **pgvector** | **Implemented on this branch.** `apps/ai/models/embedding.py` has a real `VectorField` + HNSW `vector_cosine_ops`, migrations `0001`/`0002`. ADR-007. **Migration `0002` hardcodes `dimensions=1536`** while the model reads a setting — [ADR-015](docs/adr/015-voyage-embedding-and-reranking.md) replaces this with `EmbeddingSpace` |
+| **Chunking** | **Not implemented; in scope.** [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) makes the chunk the retrievable unit. `PdfExtraction.extracted_text` is populated and read by nothing. Design: [`docs/chunker_architecture.md`](docs/chunker_architecture.md) |
+| **Embedding / rerank provider** | **Voyage**, both stages ([ADR-015](docs/adr/015-voyage-embedding-and-reranking.md)) — **conditional on written KTTO/IERC governance sign-off.** Synthetic and already-published data only until then |
+| **Docling** | **Not implemented.** SRS-specified, deferred by ADR-006 pending an SRS amendment. ADR-013 does not restore it |
+
+Always distinguish **CURRENT / PROPOSED / DEFERRED / LEGACY**. Do not describe a proposed component as if it exists.
+
+## Source-of-truth hierarchy
+
+1. **`docs/SRS.md`** — requirements authority
+2. **`docs/SDD.md`** — system and design authority
+3. **`docs/adr/`** — architectural decisions and rationale
+4. **`docs/engineering/`** — how the team builds, tests, reviews, releases
+5. **Code and tests** — actual behaviour
+6. **Jira** — planning and tracking, **never a requirements authority**
+
+When these conflict, the higher one wins **and the lower one is corrected**. Do not silently reconcile — record the contradiction.
+
+## Commands that actually work
+
 ```bash
-cd backend
-python -m venv venv && venv\Scripts\activate   # Windows
-pip install -r requirements/development.txt
-python manage.py migrate
-python manage.py runserver                     # http://localhost:8000
-python manage.py test apps.<app_name>           # run one app's tests (no tests written yet as of this writing)
-celery -A config worker -l info                 # background tasks (email, extraction, embedding)
-```
-Settings are split: `config/settings/{base,development,production}.py`, selected via `DJANGO_SETTINGS_MODULE`. Requires PostgreSQL (with `pgvector`) and Redis running locally, plus a `backend/.env` (see README for the minimum vars).
-
-### AI Gateway (FastAPI)
-```bash
-cd ai
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8001
-```
-Config comes from `ai/infrastructure/settings.py` (pydantic-settings, reads `ai/.env`). Key vars: `LLM_PROVIDER` / `EMBEDDING_PROVIDER` (`openai` or `local`), `OPENAI_API_KEY`, `LLM_MODEL`, `EMBEDDING_MODEL`.
-
-### Frontend
-```bash
-cd frontend
+# Frontend  (frontend/)
 npm install
-npm run dev       # http://localhost:5173
-npm run build      # tsc typecheck + vite build
-npm run lint        # eslint src --ext ts,tsx
+npm run dev          # vite
+npm run build        # tsc && vite build
+npm run lint         # eslint src --ext ts,tsx
+# NOTE: there is no `npm test` — no test runner is installed yet
+
+# Backend  (backend/)
+pip install -r requirements/development.txt
+python manage.py check
+python manage.py migrate
+python manage.py runserver
+# NOTE: there is no pytest config and no test files yet
+
+# Docker  (repo root)
+docker compose up --build          # currently FAILS: ai-gateway builds from ./ai which does not exist
+docker compose config              # validate without building
 ```
 
-### Full stack
-```bash
-docker-compose up      # all 10 services
-```
+**Do not document a command without verifying it runs.** Several obvious-looking commands currently fail.
 
-## Architecture
+## Known-broken — do not be surprised
 
-### Backend: Django apps under `backend/apps/`
-- `accounts` — users, `Role` (seeded via data migration, not user-creatable), `College → Department → Course` hierarchy, `StudentProfile`/`AdviserProfile`, `RoleRequest` (signup requests a role; an admin must approve before the user gets access — see `core/permissions.py` role constants: Student, Adviser, KTTO, RDCO, ITSO, IERC)
-- `records` — research records and the review/submission pipeline
-- `documents` — per-record file uploads, PDF text extraction (`PdfExtraction` model, Celery tasks)
-- `reviews` — review actions per record
-- `storage` — a general-purpose folder/file browser, unrelated to the record review pipeline
-- `notifications` — in-app notifications
-- `audit` — audit log
-- `ai` — models/routes for chat, summarization, and RAG exist as scaffolding here (`apps/ai/services/*` are currently stub files); the actual RAG/LLM logic lives in the standalone `ai/` FastAPI gateway, not this Django app
+- `backend/apps/records/views.py` has **six undefined names**; `config/urls.py:11` includes it, so the URLconf fails at import and **no endpoint responds**
+- `frontend/nginx.conf:52-56` serves `/media/` unauthenticated — every uploaded PDF is public
+- `RecordViewSet.get_queryset` filters only on `list`; `retrieve` returns any record to any authenticated user
+- Six `documents/` endpoints have no ownership check
+- `apps/ai` models are shadowed by field-less stubs; service classes are `pass`
+- `AuditEvent` has 14 event types, **none of them workflow events**
 
-Shared code lives in `backend/core/`: `permissions.py` (role-based `BasePermission` classes — prefer these over ad hoc role checks), `exceptions.py` (domain `APIException` subclasses), `pagination.py`, `utils.py`.
+## Rules
 
-Role/permission pattern to follow: define role constants and permission classes once in `core/permissions.py`, compose sets (`REVIEWER_ROLES`, `STAFF_ROLES`, `ADMIN_ROLES`) rather than hardcoding role name comparisons in views. `is_django_staff()` always grants access, on top of any role check.
+**Security.** Never commit secrets. Never widen CORS. Never add an endpoint without an object-level permission check. Never expose a file path that bypasses Django's permission layer. Treat visibility filtering as one predicate used everywhere — including RAG retrieval, so a citation can never point at an unreadable record.
 
-Document model is being redesigned — see `docs/document_requirements_architecture.md` for the target three-layer model (Department Templates → Office Checklists → Supplementary Attachments) that the current `UploadSlot`/`RecordFile` models will evolve toward. Read it before touching document requirement logic.
+**Migrations.** Every model change ships with a migration. Test it against a copy of a realistic database, not only an empty one. Never edit an applied migration.
 
-### AI Gateway (`ai/`): hexagonal/clean architecture, actively being restructured on this branch
-```
-ai/
-├── main.py                    # FastAPI app, CORS, router mounting
-├── api/                       # routes + pydantic request/response schemas (the "driving" adapters)
-├── domain/ports.py            # abstract interfaces: LLMProvider, EmbeddingProvider
-├── infrastructure/            # concrete adapters + config
-│   ├── settings.py            # pydantic-settings, reads ai/.env
-│   ├── dependencies.py        # provider factory / singleton wiring (FastAPI Depends)
-│   ├── openai_adapter.py      # OpenAILLMProvider, OpenAIEmbeddingProvider
-│   └── local_adapter.py       # Local/self-hosted equivalents (e.g. Ollama)
-└── services/                  # use-case orchestration, composed from domain ports
-```
-Provider selection is env-driven (`LLM_PROVIDER`/`EMBEDDING_PROVIDER` = `openai` or `local`) via `infrastructure/dependencies.py` — add a new provider by implementing the `LLMProvider`/`EmbeddingProvider` ABCs in `domain/ports.py`, not by branching in routes. This module was just reorganized from a flatter `core/models/routes/services` layout into this ports-and-adapters shape (see recent commits); some route handlers reference service classes that don't exist yet under `ai/services/` — check before assuming a route is wired end to end.
+**Environment and secrets.** Configuration comes from environment variables. `backend/.env.example` documents the keys and holds no real values. The app should fail to start on a missing required secret rather than defaulting silently.
 
-The full 11-phase pipeline (upload → Docling extraction → cleaning → FTS indexing → embedding → query encoding → pgvector retrieval → [reranking, not implemented] → prompt augmentation → LLM answer → summarization) and which Docker service/file executes each phase is documented in `docs/rag_pipeline_service_map.md` — read it before changing anything in the ingestion or Q&A flow. Note the gateway talks to Postgres directly via `asyncpg` for vector search, not through Django.
+**Tests.** Do not modify a test to make it pass. If a test is wrong, fix it deliberately and say so in the PR. **A requirement is not complete because code exists for it** — it is complete when a test demonstrates it and the evidence is recorded.
 
-### Frontend (`frontend/src/`)
-```
-api/         # Axios clients, one per domain (auth, storage, audit, notifications, ...)
-features/    # page-level components, grouped by domain (auth, records, review, ...)
-components/  # shared UI (components/ui) and layout components
-store/       # Zustand stores
-hooks/       # shared React hooks
-types/       # TypeScript interfaces (mirror backend serializer shapes)
-router/      # React Router config, PrivateRoute guard
-```
-Stack: Zustand for state, React Hook Form + Zod for forms, TanStack Table for data grids, Axios for HTTP, react-markdown for rendering AI responses.
+**Traceability.** A change that implements or alters a requirement updates `docs/testing/TRACEABILITY.md`.
 
-## Documentation map
+**Scope.** `thesis-critical` work is protected. If capacity is short, cut RAG and supporting frontend work first.
 
-`docs/README.md` is the index. Source-of-truth order: SRS/SDD PDFs (repo root) → `docs/` process docs (living) → code + `.env.example`. Notably:
-- `docs/SDLC_PROCESS.md` — branching/PR workflow, quality gates
-- `docs/SECURITY.md` + `docs/SECURITY_RISK_REGISTER.md` — read before touching auth/RBAC
-- `docs/TRACEABILITY_MATRIX.md` — SRS FR/NFR → code/UI/tests mapping; update in the same PR when an FR/NFR is touched
-- `docs/rag_pipeline_service_map.md`, `docs/docker_compose_rag_services.md` — AI/RAG infra
-- `docs/document_requirements_architecture.md` — target document model (see above)
+**Plan before substantial implementation.** For anything beyond a small fix, state the approach and the files you intend to touch before writing code. Say which acceptance criteria you are working to.
 
-Modules 5 (hierarchical submission workflow) and 7 (KPI dashboards) are marked draft/unstable in the SRS — don't hard-code assumptions about their final shape into the UI.
+## Definition of Done
+
+Authoritative definition: **`docs/engineering/WORK_ITEM_LIFECYCLE.md` §9.** Do not restate a different version anywhere.
+
+Required for every item: acceptance criteria satisfied · implementation complete · CI passing · reviewed by another person · reviewer approval recorded · no known blocking defect · merged.
+
+When applicable: tests added and **executed with evidence** · traceability updated · documentation updated · security addressed · migrations tested · deployment recorded.
+
+## What AI does not decide
+
+Human review remains the approval gate. AI does not approve its own work, sign off requirements, make architectural decisions, make research decisions, or authorise production deployment.
