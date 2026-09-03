@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { apiClient } from "@/api/client";
+import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { useUIStore } from "@/store/ui.store";
@@ -21,15 +22,23 @@ function NavSection({
   title,
   items,
   onNavigate,
+  collapsed,
 }: {
   title: string;
   items: NavItem[];
   onNavigate?: () => void;
+  collapsed: boolean;
 }) {
   return (
     <>
-      {/* Section title: visible only on desktop (≥1280px) */}
-      <div className="px-4 py-2 text-[10px] font-bold tracking-widest text-gray-400 uppercase hidden xl:block">
+      {/* Section title: hidden while the desktop rail is collapsed. The mobile
+          drawer is always full width, so it keeps its titles either way. */}
+      <div
+        className={cn(
+          "px-4 py-2 text-[10px] font-bold tracking-widest text-gray-400 uppercase",
+          collapsed ? "block md:hidden" : "block",
+        )}
+      >
         {title}
       </div>
       {items.map((item) => (
@@ -38,20 +47,25 @@ function NavSection({
           to={item.to}
           end
           onClick={onNavigate}
+          title={collapsed ? item.label : undefined}
           className={({ isActive }) =>
             cn(
-              // Base layout: centered icon on tablet, left-aligned with label on desktop
-              "flex items-center gap-2.5 mx-2 px-2 xl:px-4 py-2 rounded-md text-[13px] font-medium transition-colors relative",
-              "justify-center xl:justify-start",
+              "flex items-center gap-3 mx-2 py-2.5 rounded-md text-[13px] font-medium transition-colors relative",
+              collapsed ? "px-4 md:px-2 justify-start md:justify-center" : "px-4 justify-start",
               isActive
                 ? "bg-red-50 text-[#6B0F12] font-semibold before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-[#6B0F12]"
                 : "text-gray-600 hover:bg-red-50/60 hover:text-[#6B0F12]"
             )
           }
         >
-          <i className={cn("fas", item.icon, "w-4 text-center text-[13px] flex-shrink-0")} />
-          {/* Label + coming-soon badge stacked; hidden on tablet, shown on desktop */}
-          <div className="flex-1 hidden xl:flex flex-col gap-0.5 min-w-0">
+          <i className={cn("fas", item.icon, "w-5 text-center text-[16px] flex-shrink-0")} />
+          {/* Label + coming-soon badge stacked; hidden while collapsed */}
+          <div
+            className={cn(
+              "flex-1 flex-col gap-0.5 min-w-0",
+              collapsed ? "flex md:hidden" : "flex",
+            )}
+          >
             <span>{item.label}</span>
             {item.comingSoon && (
               <span className="self-start px-1.5 py-0.5 bg-amber-50 text-amber-600 text-[9px] font-bold rounded-full border border-amber-200 uppercase tracking-wider leading-none">
@@ -61,9 +75,18 @@ function NavSection({
           </div>
           {/* Numeric badge: hidden on tablet, shown on desktop */}
           {item.badge != null && item.badge > 0 && (
-            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold hidden xl:flex items-center justify-center">
+            <span
+              className={cn(
+                "min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center",
+                collapsed ? "flex md:hidden" : "flex",
+              )}
+            >
               {item.badge > 9 ? "9+" : item.badge}
             </span>
+          )}
+          {/* Collapsed: a dot keeps unread counts visible without the label */}
+          {collapsed && item.badge != null && item.badge > 0 && (
+            <span className="hidden md:block absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
           )}
         </NavLink>
       ))}
@@ -80,6 +103,14 @@ export function Sidebar({ className }: SidebarProps) {
   const { roleName, isDjangoStaff } = useRole();
   const { unreadCount } = useNotifications();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
+  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
+  const { logout, refreshToken } = useAuth();
+
+  const handleSignOut = async () => {
+    await authApi.logout(refreshToken ?? "").catch(() => {});
+    logout();
+  };
   const [workspaceBadge, setWorkspaceBadge] = useState<number | undefined>();
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
 
@@ -117,8 +148,7 @@ export function Sidebar({ className }: SidebarProps) {
 
   const explorationNav: NavItem[] = [
     { to: "/", label: "Discover", icon: "fa-compass" },
-    { to: "/ai", label: "Ask IRIS (AI Assistant)", icon: "fa-brain", comingSoon: true },
-    { to: "/records", label: "Browse Collections", icon: "fa-layer-group" },
+    { to: "/ai", label: "Ask IRIS", icon: "fa-brain" },
     { to: "/records/mine", label: "My Library", icon: "fa-bookmark" },
   ];
 
@@ -154,25 +184,79 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        // Mobile (<768px): full 230px drawer
-        // Tablet (768–1279px): narrow 60px icon-only rail, always visible
-        // Desktop (≥1280px): full 230px sidebar, always visible
-        "fixed top-0 left-0 w-[230px] md:w-[60px] xl:w-[230px] h-screen bg-white border-r border-gray-200 flex flex-col z-50",
+        // Mobile (<768px): always a full 230px drawer, overlaid.
+        // Desktop (≥768px): 230px, or a 60px icon rail when collapsed.
+        "fixed top-0 left-0 w-[230px] h-screen bg-white border-r border-gray-200 flex flex-col z-50",
+        "transition-[width] duration-200 ease-out",
+        collapsed ? "md:w-[60px]" : "md:w-[230px]",
         className
       )}
     >
       {/* ── Logo / Brand header ─────────────────────────────────────── */}
-      <div className="px-2 xl:px-4 py-4 border-b border-gray-100 flex items-center justify-center xl:items-start xl:justify-start gap-3">
-        <img src={irisLogo} alt="IRIS" className="w-10 h-10 object-contain flex-shrink-0" />
-        {/* Brand text: hidden on tablet, shown on desktop */}
-        <div className="hidden xl:block min-w-0 pt-0.5 flex-1">
+      <div
+        className={cn(
+          "py-4 border-b border-gray-100 flex items-center gap-3",
+          collapsed ? "px-4 md:px-2 md:justify-center" : "px-4",
+        )}
+      >
+        {/* Collapsed: the mark stands alone and only swaps to the toggle on
+            hover. Expanded: the mark is static and the toggle sits at the far
+            right of the brand block. */}
+        <div className={cn("relative w-10 h-10 flex-shrink-0 hidden md:block", collapsed && "group")}>
+          <img
+            src={irisLogo}
+            alt="IRIS"
+            className={cn(
+              "w-10 h-10 object-contain transition-opacity",
+              collapsed && "group-hover:opacity-0",
+            )}
+          />
+          {collapsed && (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Expand sidebar"
+              aria-expanded={false}
+              title="Expand sidebar"
+              className="absolute inset-0 w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-500 flex items-center justify-center opacity-0 transition-opacity hover:text-brand hover:border-brand-200 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+            >
+              <i className="fas fa-chevron-right text-[13px]" />
+            </button>
+          )}
+        </div>
+
+        {/* Mobile drawer keeps a plain, non-interactive mark */}
+        <img src={irisLogo} alt="IRIS" className="w-10 h-10 object-contain flex-shrink-0 md:hidden" />
+
+        {/* Brand text: hidden while the rail is collapsed */}
+        <div
+          className={cn(
+            "min-w-0 pt-0.5 flex-1",
+            collapsed ? "block md:hidden" : "block",
+          )}
+        >
           <div className="text-[22px] font-extrabold tracking-[4px] text-[#6B0F12] leading-none">
             IRIS
           </div>
           <div className="text-[9px] font-bold tracking-[2px] text-gold uppercase mt-1 leading-snug">
-            CIT-U Research Hub
+            Research-to-IP Platform
           </div>
         </div>
+
+        {/* Expanded: the collapse control sits at the right of the brand block. */}
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Collapse sidebar"
+            aria-expanded
+            title="Collapse sidebar"
+            className="hidden md:flex w-8 h-8 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:text-brand hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+          >
+            <i className="fas fa-chevron-left text-[13px]" />
+          </button>
+        )}
+
         {/* Close button: mobile-only drawer control, hidden on tablet+ */}
         <button
           type="button"
@@ -186,14 +270,14 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* ── Navigation ──────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-        <NavSection title="Research Exploration" items={explorationNav} onNavigate={closeSidebar} />
-        <NavSection title="IP Management" items={ipNav} onNavigate={closeSidebar} />
+        <NavSection collapsed={collapsed} title="Research Exploration" items={explorationNav} onNavigate={closeSidebar} />
+        <NavSection collapsed={collapsed} title="IP Management" items={ipNav} onNavigate={closeSidebar} />
         {isReviewer && (
-          <NavSection title="Review Queue" items={reviewNav} onNavigate={closeSidebar} />
+          <NavSection collapsed={collapsed} title="Review Queue" items={reviewNav} onNavigate={closeSidebar} />
         )}
-        <NavSection title="Tools" items={toolsNav} onNavigate={closeSidebar} />
+        <NavSection collapsed={collapsed} title="Tools" items={toolsNav} onNavigate={closeSidebar} />
         {isStaff && (
-          <NavSection
+          <NavSection collapsed={collapsed}
             title="Administration"
             onNavigate={closeSidebar}
             items={[
@@ -210,13 +294,23 @@ export function Sidebar({ className }: SidebarProps) {
       </nav>
 
       {/* ── User footer ─────────────────────────────────────────────── */}
-      <div className="px-2 xl:px-4 py-3 border-t border-gray-100">
-        <div className="flex items-center justify-center xl:justify-start gap-2.5">
+      <div
+        className={cn(
+          "py-3 border-t border-gray-100",
+          collapsed ? "px-4 md:px-2" : "px-4",
+        )}
+      >
+        <div
+          className={cn(
+            "flex items-center gap-2.5",
+            collapsed ? "justify-start md:justify-center" : "justify-start",
+          )}
+        >
           <div className="w-[34px] h-[34px] rounded-full bg-[#6B0F12] text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">
             {initials || "?"}
           </div>
-          {/* User info: hidden on tablet, shown on desktop */}
-          <div className="min-w-0 hidden xl:block">
+
+          <div className={cn("min-w-0 flex-1", collapsed ? "block md:hidden" : "block")}>
             <div className="text-[12px] font-semibold text-gray-900 truncate">
               {user?.first_name} {user?.last_name}
             </div>
@@ -224,7 +318,34 @@ export function Sidebar({ className }: SidebarProps) {
               {roleName ?? user?.email}
             </div>
           </div>
+
+          {/* Sign out lives here because AppShell hides its Header on "/" */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className={cn(
+              "p-1.5 rounded-md text-gray-400 hover:text-brand hover:bg-red-50 transition-colors flex-shrink-0",
+              collapsed ? "block md:hidden" : "block",
+            )}
+          >
+            <i className="fas fa-arrow-right-from-bracket text-[13px]" />
+          </button>
         </div>
+
+        {/* Collapsed rail: sign out gets its own row under the avatar */}
+        {collapsed && (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="hidden md:flex w-full mt-2 py-1.5 rounded-md text-gray-400 hover:text-brand hover:bg-red-50 transition-colors items-center justify-center"
+          >
+            <i className="fas fa-arrow-right-from-bracket text-[13px]" />
+          </button>
+        )}
       </div>
     </aside>
   );

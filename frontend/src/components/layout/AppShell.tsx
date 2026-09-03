@@ -9,9 +9,11 @@ import { cn } from "@/lib/utils";
 
 export function AppShell() {
   const sidebarOpen  = useUIStore((s) => s.sidebarOpen);
+  const collapsed    = useUIStore((s) => s.sidebarCollapsed);
   const closeSidebar = useUIStore((s) => s.closeSidebar);
   const { pathname } = useLocation();
-  const isDiscoverHome = pathname === "/";
+  // Routes that paint their own header and manage their own scrolling.
+  const isFullBleed = pathname === "/" || pathname === "/ai";
 
   const { user } = useAuth();
   // Block users who are logged in but whose role request hasn't been approved yet.
@@ -38,15 +40,20 @@ export function AppShell() {
         )}
       />
 
-      <div className="flex flex-col flex-1 min-w-0 md:ml-[60px] xl:ml-[230px]">
-        {!isDiscoverHome && <Header />}
+      <div
+        className={cn(
+          "flex flex-col flex-1 min-w-0 transition-[margin] duration-200 ease-out",
+          collapsed ? "md:ml-[60px]" : "md:ml-[230px]",
+        )}
+      >
+        {!isFullBleed && <Header />}
         <main
           className={cn(
             "flex-1 overflow-y-auto",
-            isDiscoverHome ? "pt-0 p-0" : "pt-[58px] p-4 sm:p-7"
+            isFullBleed ? "pt-0 p-0" : "pt-[58px] p-4 sm:p-7"
           )}
         >
-          {!isDiscoverHome && <Breadcrumbs />}
+          {!isFullBleed && <Breadcrumbs />}
           <Outlet />
         </main>
       </div>
