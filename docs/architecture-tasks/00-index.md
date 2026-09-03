@@ -103,6 +103,7 @@ Nothing else can be validated, demonstrated or safely deployed until these clear
 | `W-02` | Restart-all resubmission policy | The controlled comparison ([ADR-004](../adr/004-restart-all-comparison-mode.md)) |
 | `W-03` | Transaction boundaries on transitions | Office-specific clearance integrity |
 | `W-04` | Audit decisions + time-on-task instrumentation | Preserved clearances · turnaround · auditability |
+| `W-07` | Serialize clearance state (`clearances[]`, `route[]`, `resubmission{}`) | Makes the contribution observable to the UI and the evaluation |
 | `T-03` | Transition tests across both policies | Correctness of the model |
 | `V-03` | Manual-process baseline collection | Real-world comparator |
 | `V-04` | Scenario-based evaluation design | Controlled N when pilot volume is small |

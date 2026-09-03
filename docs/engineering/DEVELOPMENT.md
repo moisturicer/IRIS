@@ -16,7 +16,7 @@ Read this first — several obvious commands fail for reasons that are already u
 
 | Symptom | Cause | Item |
 |---|---|---|
-| `docker compose up` fails to build | Both Compose files build `ai-gateway` from `./ai`, which **does not exist** in the tree | IR-58 |
+| `docker compose up` fails | `ai-gateway` builds from `./ai`, which now exists, but Compose also requires `./ai/.env`, which does not. The service is not deployed under [ADR-010](../adr/010-deployment-topology.md) | IR-58 |
 | Every API request 500s / no route resolves | `apps/records/views.py` has six undefined names; `config/urls.py:11` imports it, so the URLconf fails at import | IR-57 |
 | Frontend unreachable in prod compose | Prod maps `80:80`; nginx-unprivileged listens on `8080` | IR-58 |
 | `pytest` does nothing | **No test files and no pytest config exist yet** | IR-73 *(pending)* |
@@ -118,7 +118,9 @@ docker compose down                # add -v to drop volumes
 
 **Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `worker` (Celery) · `frontend` (nginx).
 
-**`ai-gateway` is declared in both Compose files and has no source directory.** It is not a missing file to add — [ADR-010](../adr/010-deployment-topology.md) rejects a separate AI gateway; AI belongs inside Django. The service declaration is removed by IR-58.
+**`ai-gateway` is declared in both Compose files.** Commit `7f73e97` added an `ai/` FastAPI source tree, so the build context now exists — but the service still does not run: Compose requires `./ai/.env`, which is absent, and `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`, so the container would die at import even with the env file present.
+
+This is **not** a missing file to add. [ADR-010](../adr/010-deployment-topology.md) rejects a separate AI gateway; AI belongs inside Django. The service declaration is removed by IR-58. Do not build on `ai/`.
 
 ### Celery
 
@@ -176,7 +178,7 @@ Full process: [`SDLC.md`](SDLC.md). State definitions: [`WORK_ITEM_LIFECYCLE.md`
 | Problem | Check |
 |---|---|
 | Nothing responds | IR-57 — the URLconf fails at import. `python manage.py check` |
-| Compose will not build | IR-58 — `ai-gateway` has no build context |
+| Compose will not start | IR-58 — `ai-gateway` has no `ai/.env` and cannot import its own service package |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
 | Celery tasks never run | Queue routing mismatch — workers and publishers disagree |
 | Uploads not extracted | `documents/tasks.py` imports `unstructured`, `fitz`, `pytesseract` — **none are in any requirements file** |

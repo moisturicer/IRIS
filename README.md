@@ -4,19 +4,20 @@ A web-based platform for Cebu Institute of Technology - University (CIT-U) that 
 
 **Documentation**
 
-| Guide                                                                    | Description                                               |
-| ------------------------------------------------------------------------ | --------------------------------------------------------- |
-| [Documentation hub](docs/README.md)                                      | Index of all engineering, SDLC, security, and QA docs     |
-| [Software engineering plan](docs/SOFTWARE_ENGINEERING_PLAN.md)           | Scope, phases, milestones, RACI, open decisions (M5/M7)   |
-| [SDLC process](docs/SDLC_PROCESS.md)                                     | Lifecycle, branching, PR workflow, quality gates, release |
-| [Security overview](docs/SECURITY.md)                                    | Threat model, controls, NFR-S mapping, deploy checklist   |
-| [Security risk register](docs/SECURITY_RISK_REGISTER.md)                 | Threats, scores, mitigations, review log                  |
-| [Test plan](docs/TEST_PLAN.md)                                           | Test levels, role matrix, UAT, automation roadmap         |
-| [Traceability matrix](docs/TRACEABILITY_MATRIX.md)                       | SRS FR/NFR → code, UI, tests, status                      |
-| [Development guide](docs/DEVELOPMENT_GUIDE.md)                           | Step-by-step build order, phases, local setup             |
-| [Frontend implementation plan](frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI tasks, wireframes, routes, design tokens               |
-| [Changelog](CHANGELOG.md)                                                | Version history                                           |
-| SRS / SDD (repo root)                                                    | Official requirements and software design PDFs            |
+| Guide                                                                    | Description                                                   |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| [Documentation hub](docs/README.md)                                      | Governance index — what is authoritative and what is legacy   |
+| [SRS](docs/SRS.md)                                                       | **Requirements authority.** Functional and non-functional     |
+| [SDD](docs/SDD.md)                                                       | **Design authority.** Architecture, data model, interfaces    |
+| [Architecture decisions](docs/adr/README.md)                             | ADR index — every accepted decision and its rationale         |
+| [SDLC process](docs/engineering/SDLC.md)                                 | Branching, commits, PRs, review, release, traceability        |
+| [Work item lifecycle](docs/engineering/WORK_ITEM_LIFECYCLE.md)           | DoR, pull-based Kanban, and the **Definition of Done** (§9)   |
+| [Development guide](docs/engineering/DEVELOPMENT.md)                     | Local setup, known-broken commands, troubleshooting           |
+| [Security](docs/security/SECURITY.md)                                    | Threat model, controls, NFR-S mapping, open defects           |
+| [Test plan](docs/testing/TEST_PLAN.md)                                   | Test levels, evaluation design, evidence requirements         |
+| [Traceability](docs/testing/TRACEABILITY.md)                             | SRS FR/NFR → code → tests → evidence                          |
+| [Frontend implementation plan](frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI tasks, wireframes, routes, design tokens                   |
+| [Changelog](CHANGELOG.md)                                                | Version history                                               |
 
 ---
 
@@ -32,7 +33,6 @@ A web-based platform for Cebu Institute of Technology - University (CIT-U) that 
 | State     | Zustand                      |
 | Forms     | React Hook Form + Zod        |
 | Tables    | TanStack Table v8            |
-| Charts    | Recharts                     |
 | HTTP      | Axios                        |
 
 ### Backend
@@ -41,7 +41,7 @@ A web-based platform for Cebu Institute of Technology - University (CIT-U) that 
 | ------------- | -------------------------------------- |
 | Framework     | Django 5 + Django REST Framework       |
 | Auth          | SimpleJWT (access + refresh tokens)    |
-| Database      | PostgreSQL 18                          |
+| Database      | PostgreSQL 16 (`pgvector/pgvector:pg16`) |
 | Task Queue    | Celery + Redis                         |
 | Email         | SMTP (configurable, defaults to Gmail) |
 | Rate Limiting | django-axes                            |
@@ -62,7 +62,8 @@ IRIS/
 ├── backend/
 │   ├── apps/
 │   │   ├── accounts/      # Users, roles, colleges, departments, courses
-│   │   ├── records/       # Research records, review pipeline
+│   │   ├── records/       # Research records, workflow state
+│   │   ├── reviews/       # Review and multi-office clearance
 │   │   ├── documents/     # File uploads per record
 │   │   ├── notifications/ # In-app notifications
 │   │   ├── audit/         # Audit log
@@ -95,7 +96,7 @@ IRIS/
 
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL 14+ (running locally)
+- PostgreSQL 16 (running locally, to match the Compose image)
 - Redis (running locally — required for Celery/email tasks)
 
 ---

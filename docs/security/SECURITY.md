@@ -96,7 +96,7 @@ Correct path: files served only through `RecordUploadDownloadView` / `RecordFile
 
 Five services: `db`, `redis`, `backend`, `worker`, `frontend`. Only the frontend is published. PostgreSQL and Redis are not exposed outside the Compose network.
 
-**`ai-gateway` is declared in both Compose files with no source directory.** [ADR-010](../adr/010-deployment-topology.md) rejects a separate gateway — it would duplicate authentication and visibility filtering, creating a second place for every defect in §3 to recur.
+**`ai-gateway` is declared in both Compose files, and since `7f73e97` an `ai/` source tree exists for it.** It is not deployed and must not be: the service defines **no authentication** on either endpoint while holding the provider API key, and sets `allow_credentials=True` with `allow_methods=["*"]`. [ADR-010](../adr/010-deployment-topology.md) rejects a separate gateway — it would duplicate authentication and visibility filtering, creating a second place for every defect in §3 to recur. The code as written is that duplication, already exhibiting the defects.
 
 **Tenancy:** instance-per-tenant ([ADR-005](../adr/005-instance-per-tenant.md)). Each institution gets its own database and media volume, so cross-tenant leakage is *structurally impossible* rather than prevented by a filter. Given twelve live instances of "a query that forgot its filter", this was the decisive argument against pooled multi-tenancy.
 
