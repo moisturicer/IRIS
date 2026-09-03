@@ -36,6 +36,8 @@ export interface RecordListItem {
   for_commercialization: boolean;
   community_extension:   boolean;
   access_count:          number;
+  /** Attachments on the record (documents.RecordUpload). */
+  file_count:            number;
   created_at:            string;
   authors:               Author[];
 }
@@ -49,19 +51,44 @@ export interface RecordReview {
   created_at:       string;
 }
 
+export interface RecordClearance {
+  office:           "itso" | "ierc" | "ktto";
+  office_label:     string;
+  status:           "pending" | "cleared" | "declined" | "rejected";
+  comment:          string;
+  reviewed_by_name: string | null;
+  updated_at:       string;
+}
+
+export interface RecordFileItem {
+  id:         number;
+  filename:   string;
+  url:        string | null;
+  size_bytes: number;
+  created_at: string;
+}
+
 export interface RecordDetail extends RecordListItem {
   year_completed:  number | null;
   abstract:        string;
   abstract_file:   string | null;
-  classification:  number | null;
-  psced:           number | null;
-  record_type:     number | null;
+  /**
+   * These three are serialized with StringRelatedField, so the detail payload
+   * carries the related object's display name — not its id. Use
+   * `classification_name` / `record_type_name` for display.
+   */
+  classification:  string | null;
+  psced:           string | null;
+  record_type:     string | null;
   adviser:         number | null;
   added_by:        number | null;
   owners:          RecordOwner[];
   keywords?:       string[];
   is_deleted:      boolean;
   reviews:         RecordReview[];
+  /** Per-office clearance state — makes clearance-aware resubmission visible. */
+  clearances:      RecordClearance[];
+  files:           RecordFileItem[];
 }
 
 export interface RecordFormData {

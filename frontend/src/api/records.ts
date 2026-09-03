@@ -4,6 +4,7 @@ import type {
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest,
 } from "@/types/records";
+import type { SemanticSearchResult } from "@/types/ai";
 
 interface PaginatedResponse<T> {
   count:    number;
@@ -22,6 +23,13 @@ export const recordsApi = {
     apiClient.get<RecordListItem[]>("/records/mine/", { params }),
 
   detail:         (id: number) => apiClient.get<RecordDetail>(`/records/${id}/`),
+  /**
+   * Related institutional works. The backend reuses the Ask IRIS retrieval
+   * service, so this returns the retrieval shape (RetrievedSource.as_dict()),
+   * not a RecordListItem.
+   */
+  similar:        (id: number) =>
+    apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
   create:         (data: RecordFormData) => apiClient.post<RecordDetail>("/records/", data),
   update:         (id: number, data: Partial<RecordFormData>) => apiClient.patch<RecordDetail>(`/records/${id}/`, data),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
