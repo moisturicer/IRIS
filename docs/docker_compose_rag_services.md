@@ -4,7 +4,9 @@
 >
 > This document proposes an eight-service topology including a separate
 > `ai-gateway` container. [ADR-010](adr/010-deployment-topology.md) rejects that
-> gateway: AI belongs inside Django, and the deployed topology is five services.
+> gateway and [ADR-012](adr/012-ai-provider-abstraction-not-a-service.md)
+> reaffirms the rejection: AI belongs inside Django as `apps/ai/providers/`, and
+> the deployed topology is five services.
 > Under [ADR-005](adr/005-instance-per-tenant.md) every additional container is
 > one every institution runs.
 >

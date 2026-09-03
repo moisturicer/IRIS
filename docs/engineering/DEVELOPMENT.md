@@ -120,7 +120,7 @@ docker compose down                # add -v to drop volumes
 
 **`ai-gateway` is declared in both Compose files.** Commit `7f73e97` added an `ai/` FastAPI source tree, so the build context now exists — but the service still does not run: Compose requires `./ai/.env`, which is absent, and `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`, so the container would die at import even with the env file present.
 
-This is **not** a missing file to add. [ADR-010](../adr/010-deployment-topology.md) rejects a separate AI gateway; AI belongs inside Django. The service declaration is removed by IR-58. Do not build on `ai/`.
+This is **not** a missing file to add. [ADR-010](../adr/010-deployment-topology.md) rejects a separate AI gateway; AI belongs inside Django. [ADR-012](../adr/012-ai-provider-abstraction-not-a-service.md) settles the question: the provider abstraction is ported into Django as `apps/ai/providers/`, and the service is not adopted. The service declaration is removed by IR-58. Do not build on `ai/`.
 
 ### Celery
 

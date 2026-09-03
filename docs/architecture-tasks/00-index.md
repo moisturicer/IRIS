@@ -69,7 +69,7 @@ Nothing else can be validated, demonstrated or safely deployed until these clear
 
 | ID | Task | Cx |
 |---|---|---|
-| `D-01` | Both Compose files build `ai-gateway` from `./ai`, which does not exist | S |
+| `D-01` | Both Compose files build `ai-gateway` from `./ai`; since `7f73e97` the directory exists, but Compose also requires `./ai/.env`, which does not, and ADR-012 rejects deploying the service | S |
 | `D-02` | Prod maps `80:80`; nginx-unprivileged listens on 8080 — frontend unreachable | S |
 
 ### Public-deployment safety blockers
