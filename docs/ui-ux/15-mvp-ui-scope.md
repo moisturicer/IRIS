@@ -211,3 +211,32 @@ Recorded so the exclusions are decisions rather than omissions.
 ## 8 · The boundary in one line
 
 > **Build the sixteen screens that carry a submission from a student's draft to a published record, make the clearance state visible at every step, and instrument it well enough to measure. Everything else waits.**
+
+---
+
+## 9 · Recorded deviations
+
+Screens built outside the sixteen. Listed here so the boundary above stays true
+rather than quietly wrong — each one is either brought into scope by a decision,
+or unrouted before the pilot.
+
+| Screen | Route | Status | Note |
+|---|---|---|---|
+| `DiscoverPage` | `/` | Built, routed | Listed as **DEFER** in §2 ("overlaps `PublishedRecordsPage`"). It is now the landing surface, so the overlap resolves the other way — `PublishedRecordsPage` was deleted |
+| `PaperViewPage` | `/records/:id` | Built, routed | Replaces `RecordDetailPage` (**KEEP**), carrying the Clearance Track required by [06](06-record-detail.md). In scope; the component changed, not the disposition |
+| `MyLibraryPage` | `/records/mine` | Built, routed | **Not in the sixteen.** A reader-side saved-research surface: folders, likes, reading history. Took over the `My Library` route from `MyRecordsPage mode="library"`, which duplicated My Workspace behind a status filter |
+
+**`MyLibraryPage` carries no server state.** There is no bookmark, folder, like or
+reading-history model in `backend/apps/` — `apps.storage` stores uploaded files and is
+removed server-side by `P0-06`. Everything the page saves lives in the viewer's
+`localStorage` (`lib/recordLibrary`), and every surface on it says so. Saved ids resolve
+through the **list** endpoint (`?id=`), never `retrieve`, because `RecordViewSet.get_queryset`
+applies `publicly_visible()` only on `list`.
+
+**Open against [IR-86](https://citiris.atlassian.net/browse/IR-86)** (P1-18, *Reduce the pilot
+surface to 16 screens*). Its acceptance criteria include *"16 routes remain"* and *"Every
+remaining nav item leads somewhere real"*. The second is satisfied — no view here is a
+placeholder, and Reading History is written by `PaperViewPage` rather than mocked. The
+first is not, and **that is a team decision, not an implementation one**: either §2 gains a
+reader-side section covering Discover and My Library, or these routes come out before the
+pilot. Until it is decided, the count in §3 is understated by the rows above.
