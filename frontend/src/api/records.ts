@@ -32,6 +32,21 @@ export const recordsApi = {
     apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
   create:         (data: RecordFormData) => apiClient.post<RecordDetail>("/records/", data),
   update:         (id: number, data: Partial<RecordFormData>) => apiClient.patch<RecordDetail>(`/records/${id}/`, data),
+  /**
+   * The manuscript itself. `abstract_file` is a plain FileField on Record,
+   * separate from the per-type UploadSlot/RecordUpload system — no seeded
+   * slot is named "manuscript" for any record type, so this is the only way
+   * to attach it. AddRecordPage never called this before, which is why
+   * records could reach the paper view with zero files (see
+   * iris-paper-view-design memory).
+   */
+  uploadManuscript: (id: number, file: File) => {
+    const fd = new FormData();
+    fd.append("abstract_file", file);
+    return apiClient.patch<RecordDetail>(`/records/${id}/`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   submit:         (id: number) => apiClient.post<{ detail: string }>(`/records/${id}/submit/`),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),

@@ -82,6 +82,11 @@ export interface RecordDetail extends RecordListItem {
   record_type:     string | null;
   adviser:         number | null;
   added_by:        number | null;
+  /** ADR-016 (Proposed): what the submitter requested; RDCO confirms at intake. */
+  requires_ethics_review: boolean;
+  requested_itso:  boolean;
+  requested_ierc:  boolean;
+  requested_ktto:  boolean;
   owners:          RecordOwner[];
   keywords?:       string[];
   is_deleted:      boolean;
@@ -103,6 +108,11 @@ export interface RecordFormData {
   is_ip?:                boolean;
   for_commercialization?: boolean;
   community_extension?:  boolean;
+  /** ADR-016 (Proposed): conditional parallel-office routing. */
+  requires_ethics_review?: boolean;
+  requested_itso?:        boolean;
+  requested_ierc?:        boolean;
+  requested_ktto?:        boolean;
   /** Flat list of author name strings — backend creates Author rows. */
   authors?:              string[];
 }

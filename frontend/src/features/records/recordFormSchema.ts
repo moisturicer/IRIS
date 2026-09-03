@@ -40,6 +40,28 @@ export const recordFormSchema = z.object({
 
   // User IDs of co-owners
   owners: z.array(z.number()).default([]),
+
+  // Reference-data ids. Both optional: RecordWriteSerializer accepts either
+  // null or a valid pk, and neither field blocks submission on its own.
+  classification: z.number().int().positive().optional(),
+  psced:          z.number().int().positive().optional(),
+
+  // IP flags — submitter-settable. `ip_type` itself is deliberately absent:
+  // the model's help_text says it is "set by RDCO/KTTO after final review",
+  // and RecordViewSet.tags() (staff-only) is the only endpoint that writes it.
+  is_ip:                 z.boolean().default(false),
+  for_commercialization: z.boolean().default(false),
+  community_extension:   z.boolean().default(false),
+
+  // Ethics trigger + conditional office routing (ADR-016, Proposed).
+  // requires_ethics_review has no upstream flag to derive from -- it's its
+  // own question. requested_itso/ierc/ktto are the submitter's actual
+  // request; PaperDetailsStep pre-checks them from the flags above but the
+  // student can override before continuing.
+  requires_ethics_review: z.boolean().default(false),
+  requested_itso: z.boolean().default(false),
+  requested_ierc: z.boolean().default(false),
+  requested_ktto: z.boolean().default(false),
 });
 
 export type RecordFormValues = z.infer<typeof recordFormSchema>;
