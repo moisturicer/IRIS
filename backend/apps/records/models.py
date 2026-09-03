@@ -48,6 +48,12 @@ class CollaborationType(models.Model):
 
 # ---- Core record --------------------------------------------------------
 
+#: The single definition of "a record any authenticated user may read".
+#: Used by the public record list AND by AI retrieval, so a generated citation
+#: can never point at a record the reader is not allowed to open.
+PUBLICLY_VISIBLE_STATUSES = ("published", "approved", "completed")
+
+
 class RecordManager(models.Manager):
     """Default queryset excludes soft-deleted records."""
     def get_queryset(self):
@@ -55,6 +61,10 @@ class RecordManager(models.Manager):
 
     def with_deleted(self):
         return super().get_queryset()
+
+    def publicly_visible(self):
+        """Records readable by any authenticated user. Keep this the only predicate."""
+        return self.get_queryset().filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
 
 
 class Record(models.Model):
