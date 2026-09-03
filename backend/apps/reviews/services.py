@@ -1,25 +1,31 @@
 """
 Workflow routing services for the IRIS review pipeline.
 
-Pipeline routes (type-differentiated):
+Pipeline routes (type-differentiated bookends; ADR-002):
 
   Proposal
     draft → adviser_review → approved   (visible as ongoing; NOT published)
     Adviser may decline (revision) → owner resubmits → adviser_review
     Adviser may reject  (terminal) → rejected
 
-  Thesis / Research
+  Thesis / Research and Project
     draft → rdco_intake
-          → parallel_review   [IERC + KTTO run fully in parallel; tracked via RecordClearance]
+          → [ itso_review ]   Project only, and only if ITSO was requested
+          → [ parallel_review ]   IERC and/or KTTO, whichever were requested
           → rdco_review
           → published
 
-  Project
-    draft → rdco_intake
-          → itso_review   [ITSO sequential gate; KTTO starts in parallel here]
-          → parallel_review   [IERC starts after ITSO clears; KTTO may still be running]
-          → rdco_review
-          → published
+Which of ITSO/IERC/KTTO actually run is no longer fixed by record_type alone
+(ADR-016, Proposed — extends ADR-002's transition table rather than
+replacing it: pipeline_status transitions are still the same declarative
+table, only which offices get a RecordClearance row is now data on the
+record — record.requested_itso/ierc/ktto — rather than hardcoded here).
+ITSO remains structurally Project-only: Thesis/Research never enters
+itso_review regardless of what requested_itso says. A record requesting no
+offices at all skips straight from rdco_intake to rdco_review — see
+_enter_clearance_stage(). Project's ITSO-before-IERC sequencing (KTTO starts
+in parallel with ITSO; IERC only joins once ITSO clears, if requested) is
+unchanged in shape, just conditional in which offices actually populate it.
 
 At every stage, a reviewer may:
   approve / clear  -- advance to the next stage
@@ -153,6 +159,37 @@ def _first_status_for_type(record: Record) -> str:
     return "adviser_review" if _type_name(record) == "Proposal" else "rdco_intake"
 
 
+def _enter_clearance_stage(record: Record) -> str:
+    """
+    Create RecordClearance rows for whatever offices were requested, and
+    return the pipeline_status that follows rdco_intake.
+
+    ADR-016 (Proposed): the office set is no longer hardcoded by record_type.
+    requested_itso only takes effect for Project -- Thesis/Research has no
+    ITSO stage at all, matching the structural distinction the type already
+    encodes (see the module docstring's two route diagrams). A record
+    requesting nothing goes straight to rdco_review: a clearance stage with
+    no office attached would just auto-clear, which is worse than skipping it.
+    """
+    rt = _type_name(record)
+    offices: list[str] = []
+    if rt == "Project" and record.requested_itso:
+        offices.append("itso")
+    if record.requested_ierc:
+        offices.append("ierc")
+    if record.requested_ktto:
+        offices.append("ktto")
+
+    for office in offices:
+        RecordClearance.objects.get_or_create(record=record, office=office)
+
+    if "itso" in offices:
+        return "itso_review"
+    if offices:
+        return "parallel_review"
+    return "rdco_review"
+
+
 # ---------------------------------------------------------------------------
 # Sequential review actions: adviser_review, rdco_intake, rdco_review
 # ---------------------------------------------------------------------------
@@ -161,9 +198,8 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
     """
     Approve the record at its current sequential stage and advance the pipeline.
 
-    At rdco_intake the function also creates the appropriate RecordClearance rows:
-      Project        → ITSO(pending) + KTTO(pending);  pipeline → itso_review
-      Thesis/Research → IERC(pending) + KTTO(pending);  pipeline → parallel_review
+    At rdco_intake this also creates RecordClearance rows for whichever
+    offices were requested (ADR-016) — see _enter_clearance_stage().
     """
     if not _can_review(reviewed_by, record):
         raise InvalidPipelineTransition(
@@ -181,17 +217,7 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
     )
 
     if record.pipeline_status == "rdco_intake":
-        rt = _type_name(record)
-        if rt == "Project":
-            # ITSO is the sequential first; KTTO starts in parallel immediately
-            RecordClearance.objects.get_or_create(record=record, office="itso")
-            RecordClearance.objects.get_or_create(record=record, office="ktto")
-            next_status = "itso_review"
-        else:
-            # Thesis / Research: IERC + KTTO run fully in parallel
-            RecordClearance.objects.get_or_create(record=record, office="ierc")
-            RecordClearance.objects.get_or_create(record=record, office="ktto")
-            next_status = "parallel_review"
+        next_status = _enter_clearance_stage(record)
     elif record.pipeline_status == "adviser_review":
         # Proposals end at 'approved' (visible as ongoing); all other types published at rdco_review
         next_status = "approved" if _type_name(record) == "Proposal" else "published"
@@ -323,11 +349,21 @@ def submit_clearance(
 
     # ── ITSO approved at itso_review (Project only) ───────────────────────
     if office == "itso" and record.pipeline_status == "itso_review":
-        # IERC begins after ITSO clears; KTTO may have already cleared or be pending
-        RecordClearance.objects.get_or_create(record=record, office="ierc")
-        record.pipeline_status = "parallel_review"
-        record.save(update_fields=["pipeline_status", "updated_at"])
-        notify_clearance_result(record, review, office="itso", advanced=True)
+        # IERC begins after ITSO clears -- but only if it was actually
+        # requested (ADR-016). Unconditionally creating it here, as before,
+        # would force an ethics review nobody asked for.
+        if record.requested_ierc:
+            RecordClearance.objects.get_or_create(record=record, office="ierc")
+        # KTTO may have already cleared, be pending, or never have been
+        # requested at all -- _all_clearances_done reflects whichever is true.
+        if _all_clearances_done(record):
+            record.pipeline_status = "rdco_review"
+            record.save(update_fields=["pipeline_status", "updated_at"])
+            notify_clearance_result(record, review, office="itso", advanced=True, all_done=True)
+        else:
+            record.pipeline_status = "parallel_review"
+            record.save(update_fields=["pipeline_status", "updated_at"])
+            notify_clearance_result(record, review, office="itso", advanced=True)
         return review
 
     # ── All other approved clearances ─────────────────────────────────────

@@ -114,6 +114,21 @@ class Record(models.Model):
     for_commercialization   = models.BooleanField(default=False)
     community_extension     = models.BooleanField(default=False)
 
+    # Ethics trigger (ADR-016) -- IERC's SRS-defined scope is human/animal
+    # subjects and sensitive data, which none of the flags above cover.
+    requires_ethics_review  = models.BooleanField(default=False)
+
+    # Conditional parallel-office routing (ADR-016, Proposed -- extends
+    # ADR-002's transition table rather than replacing it). The submitter
+    # requests offices here; apps.reviews.services.approve_record() reads
+    # these at rdco_intake to decide which RecordClearance rows to create,
+    # instead of a hardcoded set per record_type. requested_itso only takes
+    # effect for Project -- Thesis/Research never routes through ITSO,
+    # matching the structural distinction the type already encodes.
+    requested_itso           = models.BooleanField(default=False)
+    requested_ierc           = models.BooleanField(default=False)
+    requested_ktto           = models.BooleanField(default=False)
+
     # Structured IP classification type (FR-M5-05)
     IP_TYPE_CHOICES = [
         ("patent",        "Patent"),

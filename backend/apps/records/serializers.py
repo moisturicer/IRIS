@@ -118,6 +118,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "classification_name", "record_type_name", "file_count",
             "adviser", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
+            "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "is_deleted",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "files",
@@ -145,6 +146,7 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             "title", "year_accomplished", "year_completed", "abstract",
             "classification", "psced", "record_type", "adviser",
             "is_ip", "for_commercialization", "community_extension",
+            "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "abstract_file",
             "authors",
         ]
