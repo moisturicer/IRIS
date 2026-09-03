@@ -76,10 +76,21 @@ class RecordViewSet(viewsets.ModelViewSet):
         return RecordDetailSerializer
 
     def get_permissions(self):
-        if self.action in ("update", "partial_update", "destroy"):
+        # "submit" belongs here too: it transitions someone's draft into the
+        # review pipeline, which is exactly the kind of object-level action
+        # update/partial_update/destroy are already gated on. It was missing --
+        # any authenticated user (not just the owner or staff) could submit
+        # another user's draft. Found while wiring the Submit Disclosure wizard
+        # (IR-88); see apps/records/tests.py::SubmitOwnershipTests.
+        if self.action in ("update", "partial_update", "destroy", "submit"):
             return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "complete":
             return [IsAuthenticated(), IsRDCO()]
+        if self.action == "tags":
+            # Staff-only per the action's own docstring -- ownership is not
+            # enough here. Same dead-permission_classes-kwarg bug as "submit"
+            # (see the comment above and apps/records/tests.py::TagsPermissionTests).
+            return [IsAuthenticated(), IsStaff()]
         return [IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -102,7 +113,11 @@ class RecordViewSet(viewsets.ModelViewSet):
         else:
             soft_delete_record(instance, deleted_by=self.request.user)
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsOwnerOrStaff])
+    # get_permissions() below is a full override with no super() fallback, so a
+    # permission_classes kwarg here would never actually run -- that's exactly
+    # how this action ended up unprotected despite looking otherwise. Real
+    # enforcement is the "submit" branch in get_permissions().
+    @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         """
         POST /records/<id>/submit/
@@ -182,7 +197,9 @@ class RecordViewSet(viewsets.ModelViewSet):
         create_audit_event("ACCESS", request.user, record=record)
         return Response({"access_count": record.access_count + 1})
 
-    @action(detail=True, methods=["patch"], permission_classes=[IsAuthenticated, IsStaff])
+    # See the comment on get_permissions() -- a decorator-level permission_classes
+    # kwarg here would be dead code; the "tags" branch there is what enforces this.
+    @action(detail=True, methods=["patch"])
     def tags(self, request, pk=None):
         """
         PATCH /records/<id>/tags/
