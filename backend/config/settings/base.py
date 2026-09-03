@@ -131,6 +131,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
         "user": "1000/day",
+        "ai_query": "60/hour",
     },
 }
 
@@ -186,6 +187,8 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 AI_EMBEDDING_MODEL = config("AI_EMBEDDING_MODEL", default="TBD")  # Provider TBD: e.g. text-embedding-3-small (OpenAI), voyage-3-lite (Voyage AI), embed-v3.0 (Cohere)
 OPENAI_API_KEY     = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
+ANTHROPIC_API_KEY  = config("ANTHROPIC_API_KEY", default="")       # Ask IRIS synthesis; unset -> retrieval-only mode
+AI_LLM_MODEL       = config("AI_LLM_MODEL", default="claude-sonnet-5")
 DOCLING_API_URL    = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction
 
 # ---- Axes (brute force protection) --------------------------------------
