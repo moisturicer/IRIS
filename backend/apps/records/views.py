@@ -14,6 +14,8 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
 from core.permissions import IsOwnerOrStaff, IsReviewer, IsStaff, IsAdmin, IsRDCO
+from .download_service import file_response_for_record
+from .download_tokens import make_download_token, verify_download_token
 from .models import Record, DownloadRequest, DeleteRequest
 from .serializers import (
     RecordListSerializer,
@@ -571,11 +573,9 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
             data["download_url"] = f"{settings.FRONTEND_URL.rstrip('/')}/download?token={token}"
         return Response(data)
 
-
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
     def approve(self, request, pk=None):
         """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
-        from django.utils import timezone
         dr = self.get_object()
         if dr.status != "pending":
             return Response(
@@ -592,7 +592,6 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
     def decline(self, request, pk=None):
         """POST /download-requests/<id>/decline/ — set declined, notify requester in-app."""
-        from django.utils import timezone
         dr = self.get_object()
         if dr.status != "pending":
             return Response(
@@ -605,6 +604,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
         notify_download_reviewed(dr, reviewed_by=request.user, approved=False)
         return Response({"detail": "Download request declined. The requester has been notified."})
+
 
 class DownloadRedeemView(APIView):
     """
@@ -643,6 +643,7 @@ class DownloadRedeemView(APIView):
             )
         # TODO(SRS): apply per-user watermark (email, date) before streaming when required
         return response
+
 
 class DeleteRequestViewSet(viewsets.ModelViewSet):
     """
