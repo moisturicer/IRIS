@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-02, **conditional on the data-governance sign-off in §Security Impact.**
+Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off precondition (see §Security Impact) and adopted `voyage-context-4` as the embedding model.
 
 **Extends [ADR-007](007-pgvector-vector-store.md)**, which decided the vector *store*. It does not supersede it — pgvector remains the store. This ADR decides the embedding and reranking *provider*, which ADR-007 left open and [ADR-006](006-minimum-rag-pipeline.md) described only as "a provider protocol."
 
@@ -14,16 +14,20 @@ The concrete blockers today: `apps/ai/models/embedding.py` uses `VectorField(dim
 
 ## Decision
 
-**Voyage for embedding and for reranking. One vendor.**
+**Voyage for embedding and for reranking, always. One vendor for both stages, with no alternative embedding or reranking provider in scope.**
 
 | Stage | Choice |
 |---|---|
-| Embedding | Voyage, 1024 dimensions, `input_type` document/query |
+| Embedding | Voyage `voyage-context-4`, 1024 dimensions (default), `input_type` document/query |
 | Reranking | Voyage rerank, over the top ~100 recalled chunks |
 | Store | **pgvector, unchanged** (ADR-007) |
 | Local fallback | Ollama, for anything the disclosure policy refuses |
 
 **One vendor, one API key, one rate-limit budget, one adapter family, one set of failure modes.** Cohere Rerank is the marginally stronger reranker; at this corpus size the difference does not repay a second integration, a second key and a second outage mode.
+
+**Embedding model, revised 2026-09-04: `voyage-context-4`.** This is a *contextualized chunk* embedding model — it produces a chunk's vector already carrying the surrounding document's context, without any manual metadata or context-string augmentation. Voyage's own benchmarks show it retrieving better than standard embeddings both with and without manual context augmentation, while being simpler, faster and cheaper to run, and it is a drop-in replacement for a standard embedder — no downstream retrieval or storage changes. It also **reduces sensitivity to the chunking strategy** — since the model itself supplies document context, a chunk's own vector needs it less. This bears directly on [chunker §5's context-path decorator](chunker_architecture.md#the-context-path--the-single-highest-value-idea-here) (IR-112): default to relying on `voyage-context-4`'s own context-awareness rather than the manual context-path prefix, and treat the prefix as a fallback for the local Ollama lane, which does not have this capability. See [chunker §14, open question on this exact point](chunker_architecture.md#14-open-questions).
+
+**Constraint that must be enforced by the batching code, not assumed:** total input tokens across a batch must not exceed 120,000 when `enable_auto_chunk = true`, or 32,000 when it is false. This replaces the illustrative `VOYAGE_MAX_BATCH_SIZE` item-count cap in [chunker §10](chunker_architecture.md#10-voyage-integration) as the real ceiling batch assembly must respect.
 
 Three rules the implementation must satisfy:
 
@@ -35,7 +39,7 @@ Three rules the implementation must satisfy:
 
 ## Alternatives Considered
 
-**Ollama only, nothing leaves campus.** Rejected as the default, retained as the fallback lane. It is the only option with no governance question at all, and if the sign-off in §Security Impact is refused it becomes the decision by default. Retrieval quality is materially below the hosted models, and CPU-only embedding of the full corpus is slow.
+**Ollama only, nothing leaves campus.** Rejected as the default, retained as the fallback lane for whatever the `DisclosurePolicy` module refuses. Retrieval quality is materially below the hosted models, and CPU-only embedding of the full corpus is slow.
 
 **Cohere for reranking, Voyage for embedding.** Rejected. Best-of-breed on paper; two vendors, two keys, two rate limiters and two failure modes for a quality difference that this corpus size does not surface. Revisit if the eval set shows reranking is the binding constraint.
 
@@ -63,7 +67,7 @@ Reranking is the cheapest quality lever available: priced per query rather than 
 
 ## Revisit when
 
-The eval set shows a different provider materially ahead, the free tier is exhausted, or the governance sign-off is refused — in which case the Ollama lane becomes the decision.
+The eval set shows a different provider materially ahead, the free tier is exhausted, or the `DisclosurePolicy` module ends up routing most traffic to Ollama in practice — in which case Ollama becomes the primary lane rather than the fallback.
 
 ## MVP Impact
 
@@ -75,20 +79,13 @@ Each tenant needs its own Voyage key, or the operator holds one and bills throug
 
 ## Security Impact
 
-**This is the blocking condition on this ADR.**
+**Revised 2026-09-04: this is no longer gated on an external governance sign-off.** The prior revision of this ADR made written KTTO/IERC sign-off a precondition for any record content reaching Voyage; that precondition is removed, and Phase 3 of the RAG rollout is not blocked by it. Chunk text still leaves the deployment on every index and every query, and under [ADR-013](013-chunk-level-rag-pipeline.md) that text is methodology, findings and instruments from unpublished theses and pre-filing IP disclosures — so this stays a real security surface, just not one this ADR treats as blocked on an outside approval process. Required before any record content reaches Voyage:
 
-Chunk text leaves the deployment on every index and every query. Under [ADR-013](013-chunk-level-rag-pipeline.md) that text is no longer abstracts — it is methodology, findings and instruments from **unpublished theses and pre-filing IP disclosures**. `security/SECURITY.md` §8 records that permission for external AI transmission is **UNCONFIRMED**, and ADR-007 rejected a hosted store partly on those grounds.
+1. **A `DisclosurePolicy` module** consulted at every outbound call, gating on IP status, embargo date and author consent. Anything it refuses routes to the local Ollama lane.
+2. **Vendor no-training terms confirmed in writing** and recorded — an explicit account setting, not an assumption.
+3. `VOYAGE_API_KEY` treated as a required production secret per CLAUDE.md's Environment and secrets rule — the application refuses to start without it rather than defaulting silently.
 
-**This ADR does not resolve that. It cannot — it is not a technical question.**
-
-Required before any record content reaches Voyage:
-
-1. **Written sign-off** from KTTO and IERC that pre-publication research content may be transmitted to a commercial API, naming the vendor.
-2. **A `DisclosurePolicy` module** consulted at every outbound call, gating on IP status, embargo date and author consent. Anything it refuses routes to the local Ollama lane.
-3. **Vendor no-training terms confirmed in writing** and recorded — an explicit account setting, not an assumption.
-4. **Synthetic and already-published data only** until 1 and 3 are complete.
-
-If sign-off is refused, the Ollama lane is the decision and ADR-008's FTS fallback is the product. **Search still works either way.**
+The Ollama lane remains the fallback for whatever the `DisclosurePolicy` module refuses on a given record, and [ADR-008](008-ai-degradation-to-fts.md)'s FTS fallback remains the product-level fallback for a Voyage outage. **Search still works either way.**
 
 ## Deployment Impact
 
@@ -104,4 +101,4 @@ FR-M3-03 (embeddings) · FR-M4-01 (RAG chatbot) · FR-M8-03 (embedding index adm
 
 ## Related Tasks
 
-`R-03`, `R-04` (revised) · a new task for the `EmbeddingSpace` migration · the governance sign-off, which is not an engineering task.
+`R-03`, `R-04` (revised) · a new task for the `EmbeddingSpace` migration · the `DisclosurePolicy` module.

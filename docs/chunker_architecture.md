@@ -2,10 +2,16 @@
 
 **Status:** design document — not yet implemented
 **Scope:** `ai/domain/` · `ai/services/` · `ai/infrastructure/` · `backend/apps/documents/` · `backend/apps/ai/`
-**Date:** 2026-08-31 · branch `feat/rag-service`
-**Decisions locked:** Voyage for both embedding and reranking · pgvector as the store · chunk as a first-class entity
-**Companions:** [RAG Third-Party Services](rag_third_party_services_architecture.md) · [RAG Pipeline Service Map](rag_pipeline_service_map.md)
+**Date:** 2026-09-02 · branch `feat/rag-service` · **revision 3**
+**Governed by:** [ADR-013](adr/013-chunk-level-rag-pipeline.md) chunk-level pipeline · [ADR-014](adr/014-ai-gateway-as-a-service.md) the gateway · [ADR-015](adr/015-voyage-embedding-and-reranking.md) Voyage for embedding and reranking, always — not gated on governance sign-off · [ADR-016](adr/016-docling-structured-extraction.md) Docling as the extraction path
+**Companions:** [RAG Architecture](rag_architecture.md) — the end-to-end view · [RAG Third-Party Services](rag_third_party_services_architecture.md)
 **Prior art reviewed:** `Docling-Studio/document-parser` · `teammind/packages/ai`
+
+> **Extraction status, corrected 2026-09-03.** This document assumes structured extraction output carrying `prov` page and bbox data. That input **does not exist in the tree yet**: the active path is a prototype PyMuPDF chain returning a flat string, and `PdfExtraction.extracted_text` is a plain `TextField`. The `docling` service and `DOCLING_API_URL` are already provisioned in both Compose files — only `_call_docling()` is missing. [ADR-016](adr/016-docling-structured-extraction.md) restores Docling as the extraction path per SRS §361; **IR-107 implements it and blocks the chunker.** Every stage below is written against the post-IR-107 state.
+
+> **Revision 2 — what changed and why.** Citation provenance became a requirement: the reader must be able to click a cited passage and see it highlighted in the source PDF. That is not a display feature bolted on at the end — it decides **what the chunker consumes**. Normalizing markdown-to-markdown destroys the coordinates a highlight anchors to, so stages 3 and 4 now operate on the structured `DoclingDocument` rather than on a markdown string. Sections 3, 4, 5, 6, 9 and the new section 11 carry the change.
+
+> **Revision 3 — 2026-09-04, two changes.** (1) [ADR-015](adr/015-voyage-embedding-and-reranking.md) dropped the written KTTO/IERC governance-sign-off precondition it originally carried — Phase 3 (Voyage embedding, the query path) is no longer gated on it. (2) The embedding model is now specified as `voyage-context-4`, a contextualized chunk embedding model, which resolves one of section 14's open questions: the context-path decorator (section 5, IR-112) is no longer assumed necessary for the vector Voyage computes, though it stays for display and for the local Ollama fallback. Sections 5, 10 and 14 carry the change, along with `CLAUDE.md` and `docs/rag_architecture.md`.
 
 ---
 
@@ -21,9 +27,10 @@
 8. [Scaling to a thousand concurrent users](#8-scaling-to-a-thousand-concurrent-users)
 9. [The data model](#9-the-data-model)
 10. [Voyage integration](#10-voyage-integration)
-11. [Testing strategy](#11-testing-strategy)
-12. [Rollout](#12-rollout)
-13. [Open questions](#13-open-questions)
+11. [Citation provenance](#11-citation-provenance)
+12. [Testing strategy](#12-testing-strategy)
+13. [Rollout](#13-rollout)
+14. [Open questions](#14-open-questions)
 
 ---
 
@@ -126,6 +133,13 @@ The central decision of this document: **the chunk, not the record, is what retr
 
 ```python
 @dataclass(frozen=True)
+class ChunkBbox:
+    """One highlightable region, TOPLEFT origin, in PDF points."""
+    page: int
+    rect: tuple[float, float, float, float]   # (left, top, right, bottom)
+
+
+@dataclass(frozen=True)
 class Chunk:
     """One retrievable unit of a document. Immutable."""
     text: str                      # context path + content, exactly as embedded
@@ -135,13 +149,17 @@ class Chunk:
     token_count: int
     source_page: int | None
     element_kinds: frozenset[str]  # {"text"} | {"table"} | {"heading", "text"}
+    bboxes: tuple[ChunkBbox, ...]  # one per source element — see section 11
 ```
 
-Three properties are load-bearing:
+Four properties are load-bearing:
 
 - **Frozen.** A chunk is a value, not an entity with a lifecycle. Re-chunking produces a new `ChunkSet`; it does not mutate chunks. This eliminates an entire category of "was this embedded before or after the edit?" bugs.
 - **`text` is stored, not derived.** It is the exact string handed to the embedding model. If the context-path format changes later, old chunks keep the string their vector was computed from. Deriving `text` from `content + context_path` at read time would silently invalidate every stored vector the day someone changes the separator.
 - **`sequence` is dense and ascending**, so neighbour expansion — "give me the chunk before and after this hit" — is an index lookup rather than a similarity search.
+- **`bboxes` is a tuple, not a single rectangle.** A chunk is assembled from several source elements — a heading, three paragraphs, a table row — and each carries its own region. Highlighting draws all of them, which marks the actual lines rather than one block that swallows the whitespace between them. A chunk spanning a page break has boxes on two pages.
+
+> **`element_kinds` earns its place in revision 1 and gets a job in revision 2.** It was defined and stored but read by nothing — the same defect this document opens by diagnosing elsewhere. It now has two consumers: the citation overlay styles a table region differently from prose, and retrieval can filter or boost by element kind (`WHERE 'table' = ANY(element_kinds)`). If neither consumer is built, **delete the field** rather than leave it stored and unread.
 
 ### `ChunkSet` — one chunking of one extraction
 
@@ -197,24 +215,46 @@ flowchart LR
   E --> I["6 index - pgvector"]
   classDef done fill:#ecfdf5,stroke:#059669,color:#065f46;
   classDef todo fill:#fef3c7,stroke:#d97706,color:#92400e;
-  class U,X done
-  class N,C,E,I todo
+  class U done
+  class X,N,C,E,I todo
 ```
 
 | Stage | Owner | Input | Output | Status |
 |---|---|---|---|---|
 | 1 · Upload | `backend/apps/documents` | file | `RecordUpload` | works |
-| 2 · Extract | `celery-extraction` → `docling` | PDF bytes | markdown + structure | works |
-| 3 · Normalize | `Normalizer` (pure) | raw markdown | cleaned markdown | **missing** |
-| 4 · Chunk | `Chunker` port | cleaned markdown | `ChunkSet` | **missing** |
+| 2 · Extract | `celery-extraction` → `docling` | PDF bytes | structure + markdown | **provisioned, not called** — IR-107 |
+| 3 · Normalize | `Normalizer` (pure) | `DoclingDocument` | `DoclingDocument` | **missing** |
+| 4 · Chunk | `Chunker` port | `DoclingDocument` | `ChunkSet` | **missing** |
 | 5 · Embed | `EmbeddingProvider` port | `ChunkSet` | vectors | partial — record-level only |
 | 6 · Index | `ChunkRepository` | vectors | pgvector rows | **missing** |
 
-### Stage 3 is not optional
+### Stage 3 is not optional, and it operates on structure
 
 Docling output from a Philippine university thesis carries artefacts that will otherwise be embedded as if they were content: running headers repeated on every page, page numbers stranded on their own line, hyphenated line-break splits (`method-\nology`), figure captions detached from figures, and reference lists that are pure citation noise.
 
-`Normalizer` is a **pure function** — markdown in, markdown out, no I/O — and therefore trivially testable with a table of before/after fixtures. It runs before chunking so that chunk boundaries are computed over clean text.
+`Normalizer` is a **pure function** — no I/O, no clock, no randomness — and therefore trivially testable with before/after fixtures.
+
+**Revision 2 changes what it operates on.** The obvious implementation is markdown in, markdown out. That is simpler, and it is why revision 1 specified it. It also makes citation provenance impossible:
+
+```mermaid
+flowchart LR
+  D["DoclingDocument - text plus prov"] --> N1["normalize as markdown"]
+  N1 --> M["a cleaned string - coordinates gone"]
+  M --> C1["chunker sees text only"]
+  C1 --> X["no highlight possible"]
+  D --> N2["normalize as structure"]
+  N2 --> D2["DoclingDocument - prov intact"]
+  D2 --> C2["chunker sees elements"]
+  C2 --> OK["each chunk carries its regions"]
+  classDef bad fill:#fef2f2,stroke:#dc2626,color:#991b1b;
+  classDef good fill:#ecfdf5,stroke:#059669,color:#065f46;
+  class M,C1,X bad
+  class D2,C2,OK good
+```
+
+Docling attaches `prov` — page number and bounding box — to every `DocItem`. Serializing to markdown discards it, and no later work recovers it: you would be matching chunk text back against the PDF, which fails on ligatures, hyphenation across line breaks and multi-column reading order.
+
+So `Normalizer` **drops and edits `DocItem`s** rather than rewriting a string — remove the running-header items, remove the stranded page-number items, merge a hyphenated span with its continuation. Every surviving item keeps its `prov`.
 
 One judgement call worth surfacing: **drop the references section from the embedded text.** A thesis bibliography is 10–20% of the token count and retrieves terribly — every chunk looks like every other chunk. Keep it in `extracted_text` for full-text search; exclude it from chunking. This is a policy, so it belongs in `ChunkingOptions`, not hardcoded.
 
@@ -228,16 +268,21 @@ flowchart TB
     GW1 --> VOY["Voyage API"]
   end
   subgraph R["query lane - latency bound"]
-    Q["user question"] --> GW2["ai-gateway ask route"]
-    GW2 --> VOY2["Voyage embed plus rerank"]
-    GW2 --> PG["pgvector"]
-    GW2 --> LLM["Groq or OpenRouter"]
+    Q["user question"] --> DJ["Django retrieval"]
+    DJ --> GW2["ai-gateway embed route"]
+    GW2 --> VOY2["Voyage embed"]
+    DJ --> PG["pgvector plus visible_to filter"]
+    DJ --> GW3["ai-gateway ask route"]
+    GW3 --> VOY3["Voyage rerank"]
+    GW3 --> LLM["Groq or OpenRouter"]
   end
   classDef w fill:#eef2ff,stroke:#6366f1,color:#3730a3;
   classDef r fill:#ecfdf5,stroke:#059669,color:#065f46;
   class CE,CB,DOC,GW1,VOY w
-  class Q,GW2,VOY2,PG,LLM r
+  class Q,DJ,GW2,VOY2,GW3,VOY3,PG,LLM r
 ```
+
+> **Corrected 2026-09-03.** Revision 2 of this diagram routed the gateway straight to pgvector. That violates [ADR-014](adr/014-ai-gateway-as-a-service.md) **precondition 4**, which the ADR states is *not negotiable*: *"Django performs retrieval, applies `visible_to(user)`, and passes the candidate chunks to the gateway as request payload. The gateway never decides what a user may see."* ADR-014 explicitly considered and rejected *"let the gateway own retrieval, with its own visibility filter"* — two implementations of the predicate in two runtimes will drift, and the drift is a confidentiality breach rather than a bug. **Django owns retrieval and visibility; the gateway is a stateless transformation over chunks it was handed.** Specified in IR-108.
 
 The two lanes share Postgres and share a Voyage rate-limit budget, and nothing else. **Keeping them from starving each other is the central scalability concern** — see [section 8](#8-scaling-to-a-thousand-concurrent-users).
 
@@ -254,8 +299,12 @@ class Chunker(Protocol):
     Pure with respect to I/O: no network, no database, no clock.
     Deterministic: the same document and options always produce the
     same ChunkSet, including its content_hash.
+
+    Takes the structured document, not markdown — the chunker needs
+    element kinds to split on structure, and prov to carry regions
+    through to the citation overlay.
     """
-    def chunk(self, document: NormalizedDocument, options: ChunkingOptions) -> ChunkSet: ...
+    def chunk(self, document: DoclingDocument, options: ChunkingOptions) -> ChunkSet: ...
 ```
 
 Two arguments, one return value, over an implementation of several hundred lines. That ratio is what makes it a **deep module**.
@@ -264,7 +313,9 @@ Note it is **synchronous and pure.** Docling-Studio's port is `async` because it
 
 **A pure, synchronous, deterministic interface means the entire chunker is testable with a string and an assertion.** No fixtures, no database, no event loop, no mocks.
 
-### The context path — the single highest-value idea here
+### The context path — the single highest-value idea here, until the embedding model started doing it too
+
+> **Amended 2026-09-04 — see [section 14](#14-open-questions).** `voyage-context-4`'s contextualized embeddings now do inside the model roughly what this decorator does by string concatenation, so the prefixed string this section describes is no longer what gets sent to Voyage. The decorator, and `Chunk.context_path`, are unchanged in shape and stay for two reasons: display (a citation's breadcrumb) and the local Ollama fallback lane, which has no equivalent capability and still needs the manual prefix.
 
 teammind prefixes every chunk with its heading trail before embedding:
 
@@ -366,7 +417,7 @@ def chunkset_hash(chunks: Iterable[Chunk]) -> str:
 
     Hashed:   text, sequence, context_path
     Excluded: token_count (unstable across tokenizer versions)
-              source_page, element_kinds (display metadata)
+              source_page, element_kinds, bboxes (display metadata)
 
     The exclusion list is pinned. Changing it re-flips every stored
     chunkset once — a deliberate release event, not a silent migration.
@@ -381,7 +432,7 @@ def chunkset_hash(chunks: Iterable[Chunk]) -> str:
     return h.hexdigest()
 ```
 
-The separator byte prevents a collision where two adjacent chunks concatenate to the same digest as one chunk containing the joined text. `token_count` is excluded because it changes when a tokenizer is upgraded, which would flip every document to stale for no semantic reason.
+The separator byte prevents a collision where two adjacent chunks concatenate to the same digest as one chunk containing the joined text. `token_count` is excluded because it changes when a tokenizer is upgraded, which would flip every document to stale for no semantic reason. **`bboxes` is excluded for the same class of reason** — a Docling upgrade that shifts a coordinate by a fraction of a point changes no meaning and must not trigger a corpus-wide re-embed.
 
 ### Per-chunk hashes make re-chunking incremental
 
@@ -599,6 +650,7 @@ CREATE TABLE chunk_sets (
     strategy_id      text NOT NULL,      -- "structural-markdown-v1"
     options          jsonb NOT NULL,     -- the ChunkingOptions used
     content_hash     text NOT NULL,      -- chunkset_hash over the chunks
+    page_sizes       jsonb NOT NULL DEFAULT '{}',  -- {"12": {"w": 612.0, "h": 792.0}}
     is_active        boolean NOT NULL DEFAULT false,
     created_at       timestamptz NOT NULL DEFAULT now(),
     UNIQUE (record_id, extraction_hash, strategy_id, content_hash)
@@ -622,6 +674,7 @@ CREATE TABLE document_chunks (
     token_count   int NOT NULL,
     source_page   int,
     element_kinds text[] NOT NULL DEFAULT '{}',
+    bboxes        jsonb NOT NULL DEFAULT '[]',   -- [{"page":12,"rect":[72.0,310.5,540.0,352.1]}]
     created_at    timestamptz NOT NULL DEFAULT now(),
     UNIQUE (chunk_set_id, sequence)
 );
@@ -654,11 +707,17 @@ Four design notes:
 
 **`text_hash` indexed.** Makes incremental re-chunking a join instead of a scan.
 
+**`bboxes` is `jsonb`, not a side table.** A chunk has a handful of regions, they are always read with the chunk and never queried independently, and they are immutable with the chunk. A `chunk_bboxes` table would add a join to every citation render and buy nothing. If regions ever need to be searched — *"which chunks are on page 12?"* — that is a GIN index on the column, not a new table.
+
+**`page_sizes` lives on the chunkset, not the chunk.** Converting a region to a percentage of the page needs the page dimensions, and those are a property of the extraction, not of any one chunk. Storing them per chunk would repeat the same two floats across every chunk on a page.
+
 ---
 
 ## 10 · Voyage integration
 
-**Decision: Voyage for embedding and reranking both.** One vendor, one API key, one rate-limit budget, one adapter family, one set of failure modes to learn. At IRIS's scale the marginal quality difference against a mixed best-of-breed stack does not repay the second integration.
+**Decision: Voyage for embedding and reranking, both, always** — no other embedding or reranking provider is in scope for IRIS. One vendor, one API key, one rate-limit budget, one adapter family, one set of failure modes to learn. At IRIS's scale the marginal quality difference against a mixed best-of-breed stack does not repay the second integration.
+
+**The embedding model is `voyage-context-4`, a contextualized chunk embedding model.** Per [ADR-015](adr/015-voyage-embedding-and-reranking.md), it embeds a chunk together with an awareness of the document it came from — without any manual context-string augmentation — which Voyage's benchmarks show outperforming both plain chunk embeddings and chunk embeddings manually augmented with context. It is a drop-in replacement for a standard embedder (no downstream retrieval or storage change) and it **reduces sensitivity to the chunking strategy itself**: because the model supplies document context to the vector, the choice of `max_tokens` or where exactly a boundary falls matters less than it would to a context-blind embedder. This is why [section 5's context-path decorator](#the-context-path--the-single-highest-value-idea-here) is no longer assumed to be needed for the embedded vector — see the resolved open question below.
 
 ### What the adapters look like
 
@@ -683,37 +742,40 @@ This is not a violation of the [one-space-one-model invariant](rag_third_party_s
 ```python
 class VoyageSettings(BaseSettings):
     VOYAGE_API_KEY: str
-    VOYAGE_EMBED_MODEL: str = "voyage-3.5-lite"
-    VOYAGE_EMBED_DIMENSIONS: int = 1024
+    VOYAGE_EMBED_MODEL: str = "voyage-context-4"
+    VOYAGE_EMBED_DIMENSIONS: int = 1024   # voyage-context-4's default
     VOYAGE_RERANK_MODEL: str = "rerank-2.5-lite"
-    VOYAGE_MAX_BATCH_SIZE: int = 128
+    VOYAGE_ENABLE_AUTO_CHUNK: bool = False
+    VOYAGE_MAX_BATCH_TOKENS: int = 32_000   # 120_000 if VOYAGE_ENABLE_AUTO_CHUNK
     VOYAGE_TPM_INGESTION: int = 200_000   # bulkhead: ingestion lane budget
     VOYAGE_TPM_QUERY: int = 100_000       # bulkhead: query lane budget, priority
 ```
 
-> Verify model names, dimension options, and rate limits against Voyage's current documentation before implementing. Model generations turn over quickly and the values above are illustrative defaults, not verified constants. What is stable is the *shape*: model id, dimensions, and per-lane budgets all belong in configuration, and dimensions must agree with the `EmbeddingSpace` record.
+**The batch ceiling is a hard vendor constraint, not a tuning knob like the rest of this table.** `voyage-context-4` caps total input tokens per call at 32,000, or 120,000 if `enable_auto_chunk` is turned on. Batch assembly (below) must respect whichever applies — this replaces the older illustrative `VOYAGE_MAX_BATCH_SIZE` item-count cap, which was never the real limit.
+
+> Verify the rerank model name and rate limits against Voyage's current documentation before implementing — those turn over quickly and the values above beyond the embedding model and its token ceiling are illustrative defaults, not verified constants. What is stable is the *shape*: model id, dimensions, and per-lane budgets all belong in configuration, and dimensions must agree with the `EmbeddingSpace` record.
 
 ### Batching
 
 ```mermaid
 flowchart LR
-  CS["ChunkSet - 400 chunks"] --> B["assemble batches under the token ceiling"]
-  B --> B1["batch 1 - 128 chunks"]
-  B --> B2["batch 2 - 128 chunks"]
-  B --> B3["batch 3 - 128 chunks"]
-  B --> B4["batch 4 - 16 chunks"]
+  CS["ChunkSet - 400 chunks, ~512 tokens each"] --> B["assemble batches under the 32K/120K token ceiling"]
+  B --> B1["batch 1 - ~60 chunks, ~31K tokens"]
+  B --> B2["batch 2 - ~60 chunks, ~31K tokens"]
+  B --> B3["batch 3 - ~60 chunks, ~31K tokens"]
+  B --> BN["... remaining batches"]
   B1 --> RL["shared token bucket - ingestion lane"]
   B2 --> RL
   B3 --> RL
-  B4 --> RL
+  BN --> RL
   RL --> API["Voyage embed"]
   classDef good fill:#ecfdf5,stroke:#059669,color:#065f46;
   class RL good
 ```
 
-Batch assembly respects **both** limits — item count and total tokens — because a batch of 128 long chunks can exceed the per-request token ceiling even when the item count is legal. teammind's `chunkWithinTokenLimit` gets this right; the `overlap` parameter it carries is not needed here, since document chunks are already contextually independent.
+Batch assembly is purely **token-driven** for `voyage-context-4`: total input tokens per call must stay under 32,000, or 120,000 with `enable_auto_chunk` turned on — there is no separate item-count cap to reconcile against it. teammind's `chunkWithinTokenLimit` is still the right shape for the assembly loop; the `overlap` parameter it carries is not needed here, since document chunks are already contextually independent.
 
-A 120,000-chunk backfill becomes roughly **1,000 batched calls** instead of 120,000 single-item ones. That is the difference between a multi-day rate-limit fight and an afternoon.
+At ~512 tokens per chunk, a batch holds roughly 60 chunks without auto-chunk, or roughly 230 with it on. A 120,000-chunk backfill becomes on the order of **500-2,000 batched calls**, depending on that setting, instead of 120,000 single-item ones — the difference between a multi-day rate-limit fight and an afternoon.
 
 ### Where reranking sits
 
@@ -725,7 +787,93 @@ Widen recall to feed it. Retrieving the top 8 and reranking 8 does nothing; retr
 
 ---
 
-## 11 · Testing strategy
+## 11 · Citation provenance
+
+The requirement: a reader sees an answer, clicks a cited passage, and the PDF pane scrolls to it and highlights the exact region. This is what makes an AI claim about unpublished IP **verifiable** rather than merely fluent — which for a system reviewed by KTTO and IERC is closer to a requirement than a nicety.
+
+### The chain
+
+```mermaid
+flowchart LR
+  DOC["DocItem - prov page and bbox"] --> CH["Chunk.bboxes"]
+  CH --> DB["document_chunks.bboxes jsonb"]
+  DB --> RET["retrieval returns chunk ids"]
+  RET --> LLM["answer cites [1] [2]"]
+  LLM --> UI["click a citation"]
+  UI --> VP["viewport.convertToViewportRectangle"]
+  VP --> HL["highlight layer over PDF.js"]
+  classDef k fill:#eef2ff,stroke:#6366f1,color:#3730a3;
+  class CH,DB,VP k
+```
+
+Every link is already load-bearing except the last two. The chain breaks at exactly one place if stage 3 flattens to markdown — which is why that decision moved.
+
+### Render the PDF, not page images
+
+The tempting shortcut is to render page images server-side and overlay percentage-positioned divs. Docling can produce them, and the coordinate maths is simpler.
+
+**Rejected.** It costs text selection, `Ctrl+F`, copy, screen-reader access, and sharpness at zoom — and it adds roughly 10–15 MB of derived assets per thesis, so tens of gigabytes at corpus scale. For a repository whose users *read theses and copy passages out of them*, those are not acceptable losses.
+
+**PDF.js renders a page as stacked layers in one coordinate space**, not a picture:
+
+| Layer | What it is | What it gives |
+|---|---|---|
+| Canvas | The page rasterized | The visual |
+| Text layer | Real HTML spans, transparent, positioned over each glyph run | Selection, find, copy, accessibility |
+| Highlight layer | Our own absolutely-positioned rects | Citation highlights |
+
+Put the highlight layer *below* the text layer (`z-index: 1` against `2`) so selection still works through a highlight.
+
+> **Docling-Studio made the opposite choice, correctly.** It renders page images because it is a *parser inspection tool* — the rendering is the subject, and showing Docling's own output is the point. IRIS's users read documents. Different purpose, different answer. Its coordinate code ports over unchanged regardless.
+
+### Highlights are coordinate-based, not text-based
+
+The highlight does **not** search the text layer for the passage. It uses the bbox the parser already produced.
+
+Text matching would be fragile in exactly the ways this corpus is hostile: ligatures, hyphenation across line breaks, multi-column reading order, and Docling's own whitespace normalization. Coordinates from `prov` are exact and cost nothing at query time.
+
+This also means **scanned theses degrade correctly**. A scan has no text layer, so selection and find do not work — unavoidably, the PDF contains no text. But OCR still produced coordinates, so **highlighting still works.**
+
+### What to port from Docling-Studio
+
+Working, tested code on this machine:
+
+| Concern | File | Note |
+|---|---|---|
+| Origin normalization | `document-parser/infra/bbox.py` | Docling emits BOTTOMLEFT *or* TOPLEFT; converts to TOPLEFT and returns a zero-area sentinel for degenerate rects instead of drawing a broken box |
+| Chunk region extraction | `infra/local_chunker.py:54-65` | Walks `chunk.meta.doc_items`, reads `prov.page_no` and `prov.bbox` |
+| Points to pixels | `frontend/src/features/document/bboxScaling.ts` | With divide-by-zero guards; has tests |
+| Points to percent | `frontend/src/features/document/bboxPercent.ts` | Resolution-independent rects; has tests |
+
+Store **TOPLEFT points**, convert at render. PDF.js viewports are top-left origin, so the stored form matches the consumer.
+
+### Citation markers
+
+Retrieval returns chunks; the answer must say which it used. Number the chunks in the prompt, instruct the model to cite inline as `[1]`, `[2]`, then parse `\[(\d+)\]` back to chunk ids. The response carries `{marker, chunk_id, record_id, page, bboxes}` per citation, and the UI needs no further lookup to draw a highlight.
+
+### The prerequisite that is not optional
+
+`frontend/nginx.conf:52-55` serves `/media/` unauthenticated — **every uploaded PDF is readable by anyone who guesses a filename.** This feature makes the browser fetch PDFs directly, so building it on that route ships a critical access-control defect into a user-facing feature.
+
+PDFs must stream through an endpoint applying the same `visible_to(user)` predicate as retrieval. **IR-59 is a hard blocker on this section**, not a backlog item.
+
+### Cost
+
+| Work | Estimate |
+|---|---|
+| Structure-preserving normalize, region plumbing through chunking | ~2 days |
+| Authenticated PDF streaming endpoint (IR-59) | ~0.5 day |
+| PDF.js viewer, virtualized, with highlight layer | ~2–3 days |
+| Citation markers, parsing, click wiring | ~1 day |
+| **Total** | **~5.5–6.5 dev-days** |
+
+[ADR-013](adr/013-chunk-level-rag-pipeline.md) budgets 7 dev-days for all of RAG. **This roughly doubles that**, and it is a scope decision rather than a detail — it needs an ADR of its own or an amendment to 013.
+
+If it does not fit, the degradation is graceful and worth stating now: cite at record level, link to the PDF, skip the highlight. Nothing else in this document changes — the regions are stored either way, because stage 3 already preserves them.
+
+---
+
+## 12 · Testing strategy
 
 The chunker is pure, synchronous, and deterministic, which makes it one of the most testable modules in IRIS — and worth exploiting, given that **zero test files currently exist under `backend/apps/`.**
 
@@ -771,7 +919,7 @@ Fifty labelled questions, as specified in the [third-party services document](ra
 
 ---
 
-## 12 · Rollout
+## 13 · Rollout
 
 ### Phase 0 — Prerequisites
 
@@ -808,7 +956,7 @@ PgBouncer in transaction mode · Redis-backed shared rate limiting across replic
 
 ---
 
-## 13 · Open questions
+## 14 · Open questions
 
 Genuinely undecided — each needs either a measurement or a decision that is not mine to make.
 
@@ -818,7 +966,11 @@ Genuinely undecided — each needs either a measurement or a decision that is no
 
 **Do we chunk the whole thesis, or only substantive sections?** A thesis contains an acknowledgements page, a table of contents, and a bibliography. Chunking all of it costs tokens and adds noise; excluding sections requires reliable section detection, which Docling's structure output may or may not provide for these specific documents. **Inspect real Docling output before deciding.**
 
-**Does `voyage-context-3` (or the current contextualized-embedding generation) replace the context-path prefix?** Voyage has offered models that embed a chunk together with its surrounding document context — addressing the same problem the prefix solves, but inside the model. If available on your account, it is worth a row in the eval table. Do not adopt it unmeasured: the prefix is transparent, debuggable, and free.
+**~~Does a contextualized-embedding model replace the context-path prefix?~~ Resolved 2026-09-04: yes, by decision, per ADR-015.** `voyage-context-4` embeds a chunk together with its document's context inside the model itself, and Voyage's own benchmarks show it beating both plain and manually-augmented chunk embeddings — so the manually-built context-path prefix (this section's decorator) is no longer needed for the vector Voyage computes. **What this changes and what it doesn't:** `Chunk.context_path` and the `ContextPathChunker` decorator (IR-112) stay in the domain model regardless — `context_path` is still useful for display (breadcrumbs on a citation) and it is still what the *local Ollama fallback* needs prefixed into its input, since Ollama has no contextualized-embedding capability. What changes is only which string gets sent to Voyage: the bare chunk content, not the prefixed one. This was adopted from the vendor's stated capability, not from IRIS's own eval set — the eval set (once it exists) should still confirm it holds for this specific thesis corpus rather than only trusting Voyage's general-purpose benchmark.
+
+**Does structure-preserving normalization survive scanned theses?** Docling's OCR produces `prov` for recognized text, but quality on a poor scan is unknown. **Run one real scanned submission through Docling and inspect the output before committing to section 11.** This is the single cheapest de-risking action available and it takes an hour.
+
+**How many regions does a typical chunk carry?** A chunk assembled from a heading plus four paragraphs has five boxes; one spanning a page break has boxes on two pages. If the median turns out to be twenty, the overlay needs merging logic for adjacent rects. Measure before building.
 
 **Is there a chunk-level access-control case?** Currently permissions are per-record. If an embargoed thesis ever needs "the abstract is public, the methodology is not," chunks need their own visibility field. Not a v1 requirement, but the `DisclosurePolicy` from the third-party services document is where it would live.
 

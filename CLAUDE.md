@@ -23,22 +23,24 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 | Deployment | Docker Compose, dev and prod |
 | **AI gateway** | `ai/` is FastAPI in ports-and-adapters shape: `domain/ports.py`, `infrastructure/{openai,local}_adapter.py`, `api/`. **[ADR-014](docs/adr/014-ai-gateway-as-a-service.md) adopts it as a sixth service, under five preconditions** — service-to-service auth, no public port, no CORS, **no direct DB access** (Django owns retrieval and visibility filtering), and it must boot. **It does not boot today**: `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist. Do not deploy it until all five hold |
 | **pgvector** | **Implemented on this branch.** `apps/ai/models/embedding.py` has a real `VectorField` + HNSW `vector_cosine_ops`, migrations `0001`/`0002`. ADR-007. **Migration `0002` hardcodes `dimensions=1536`** while the model reads a setting — [ADR-015](docs/adr/015-voyage-embedding-and-reranking.md) replaces this with `EmbeddingSpace` |
-| **Chunking** | **Not implemented; in scope.** [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) makes the chunk the retrievable unit. `PdfExtraction.extracted_text` is populated and read by nothing. Design: [`docs/chunker_architecture.md`](docs/chunker_architecture.md) |
-| **Embedding / rerank provider** | **Voyage**, both stages ([ADR-015](docs/adr/015-voyage-embedding-and-reranking.md)) — **conditional on written KTTO/IERC governance sign-off.** Synthetic and already-published data only until then |
-| **Docling** | **Not implemented.** SRS-specified, deferred by ADR-006 pending an SRS amendment. ADR-013 does not restore it |
+| **Chunking** | **Not implemented; in scope.** [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) makes the chunk the retrievable unit. `PdfExtraction.extracted_text` is populated and read by nothing. Consumes **structured** extraction output, so it is blocked on Docling ([ADR-016](docs/adr/016-docling-structured-extraction.md), IR-107). Design: [`docs/chunker_architecture.md`](docs/chunker_architecture.md) |
+| **Embedding / rerank provider** | **Voyage, always** — embedding (`voyage-context-4`, a contextualized chunk embedder, 1024 dims default) and reranking, both stages, no alternative provider in scope ([ADR-015](docs/adr/015-voyage-embedding-and-reranking.md)). **Not gated on governance sign-off** — that precondition was dropped 2026-09-04. Still gated on a `DisclosurePolicy` module (per-record IP status/embargo/consent) and confirmed vendor no-training terms |
+| **Docling** | **Restored, not yet implemented.** [ADR-016](docs/adr/016-docling-structured-extraction.md) amends ADR-006's deferral: the chunker needs structure, and flattening destroys the coordinates citations anchor to. The `docling` service is already in both Compose files and `DOCLING_API_URL` already exists — only the client call is missing. PyMuPDF stays as the unavailability fallback. Tracked as IR-107, blocking IR-89. **The live extractor chain does not work: none of its three libraries is declared** |
 
 Always distinguish **CURRENT / PROPOSED / DEFERRED / LEGACY**. Do not describe a proposed component as if it exists.
 
 ## Source-of-truth hierarchy
 
-1. **`docs/SRS.md`** — requirements authority
-2. **`docs/SDD.md`** — system and design authority
-3. **`docs/adr/`** — architectural decisions and rationale
-4. **`docs/engineering/`** — how the team builds, tests, reviews, releases
-5. **Code and tests** — actual behaviour
-6. **Jira** — planning and tracking, **never a requirements authority**
+1. **`docs/adr/`** — **requirements, design and decision authority**
+2. **`docs/engineering/`** — how the team builds, tests, reviews, releases
+3. **Code and tests** — actual behaviour
+4. **Jira** — planning and tracking, **never a requirements authority**
 
 When these conflict, the higher one wins **and the lower one is corrected**. Do not silently reconcile — record the contradiction.
+
+> **`docs/SRS.md` and `docs/SDD.md` are FROZEN (2026-09-03).** They are retained as **thesis deliverables** and are **not consulted, cited, or treated as authority** for any engineering work — not in code, tickets, ADRs, reviews or agent output. They are out of date and the team has decided not to maintain them. **Never cite an SRS or SDD section as justification.** Where a decision needs a written basis, that basis is an ADR — write one.
+>
+> `FR-`/`NFR-` ids survive as **stable labels only**, so existing ADRs and `docs/testing/TRACEABILITY.md` keep resolving. An id is a name, not a source: do not go to the SRS to read what it means.
 
 ## Commands that actually work
 
@@ -58,7 +60,7 @@ python manage.py runserver
 # NOTE: there is no pytest config and no test files yet
 
 # Docker  (repo root)
-docker compose up --build          # currently FAILS: ai-gateway builds from ./ai which does not exist
+docker compose up --build          # ai-gateway builds, then crashes: ai/services/chat_service.py is missing
 docker compose config              # validate without building
 ```
 
@@ -91,7 +93,7 @@ docker compose config              # validate without building
 
 ## Definition of Done
 
-Authoritative definition: **`docs/engineering/WORK_ITEM_LIFECYCLE.md` §9.** Do not restate a different version anywhere.
+Authoritative definition: **`docs/engineering/DEFINITION_OF_DONE.md` §4.** Do not restate a different version anywhere.
 
 Required for every item: acceptance criteria satisfied · implementation complete · CI passing · reviewed by another person · reviewer approval recorded · no known blocking defect · merged.
 
@@ -100,3 +102,19 @@ When applicable: tests added and **executed with evidence** · traceability upda
 ## What AI does not decide
 
 Human review remains the approval gate. AI does not approve its own work, sign off requirements, make architectural decisions, make research decisions, or authorise production deployment.
+
+**Jira status is bookkeeping, not sign-off — AI may transition it.** Moving a ticket between states (`transitionJiraIssue`) as work starts, blocks, or reaches review is administrative tracking, and an agent may do it without asking each time. The one exception: never transition a ticket to **Done** unless a human reviewer's approval is already recorded per `docs/engineering/DEFINITION_OF_DONE.md` §4 — that is the sign-off this section still reserves for a person. Attribute the change to **Jive Tyler Revalde** (`jivetyler.revalde@cit.edu`) — the Atlassian MCP session already authenticates and acts as him (see `docs/agents/issue-tracker.md`), so credit the status change or comment to him by name rather than leaving it looking like an unowned automated edit.
+
+## Agent skills
+
+### Issue tracker
+
+Jira (`citiris.atlassian.net`, project `IR`) via the Atlassian MCP server registered in `.mcp.json`. Holds the state mapping and label taxonomy. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles map onto the existing IRIS taxonomy, adding only `ready-for-agent` (`needs-info` maps onto `not-ready`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` (not yet created) and `docs/adr/`. See `docs/agents/domain.md`.
