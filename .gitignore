@@ -76,3 +76,5 @@ docs/software-design/
 docs/software-requirements/
 .gitignore
 .agents/
+# Local design captures and scratch screenshots — not part of the repo
+screenshots/
