@@ -1,19 +1,34 @@
 export interface SemanticSearchResult {
-  id:       number;
-  title:    string;
-  abstract: string | null;
-  authors:  string | null;    // comma-separated display string
-  year:     number | null;
-  score:    number;           // cosine similarity 0..1
+  id:             number;
+  title:          string;
+  abstract:       string;
+  authors:        string;          // comma-separated display string
+  year:           number | null;
+  classification: string | null;
+  /** PostgreSQL SearchRank. 0 when the substring fallback tier answered. */
+  score:          number;
+}
+
+/** Which synthesis path produced an answer — surfaced so the UI never implies more than ran. */
+export type AIAnswerMode = "generative" | "extractive" | "no_results" | "empty";
+
+export interface AIStatus {
+  retrieval:        string;
+  generative:       boolean;
+  mode:             "generative" | "extractive";
+  indexed_records:  number;
 }
 
 export interface AIAnswer {
-  /** LLM-generated answer string, or null while RAG answer generation is not yet implemented. */
+  /** Answer text, or null when nothing in the corpus matched. */
   answer:    string | null;
-  /** Record IDs of the top-k most relevant records retrieved by semantic similarity. */
+  /** Record IDs backing the answer. Always readable by the asker. */
   citations: number[];
-  /** Informational message returned by the backend (e.g. when the knowledge base is empty). */
+  /** The retrieved records themselves, so the UI need not re-fetch each one. */
+  sources:   SemanticSearchResult[];
+  /** Informational note (e.g. retrieval-only mode, or no matches). */
   message:   string | null;
+  mode:      AIAnswerMode;
 }
 
 export interface EmbeddingJobStatus {

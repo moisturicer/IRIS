@@ -15,6 +15,9 @@ import {
 } from "@/lib/chatStorage";
 import { useUIStore } from "@/store/ui.store";
 import type { ChatMessage, Conversation } from "@/types/chat";
+import type { AIStatus } from "@/types/ai";
+import { recordsApi } from "@/api/records";
+import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
 import { ChatInput } from "./components/ChatInput";
 import { ChatToolbar } from "./components/ChatToolbar";
@@ -51,6 +54,8 @@ export default function RAGChatPage() {
   const [loading, setLoading]               = useState(false);
   const [historyOpen, setHistoryOpen]       = useState(true);
   const [sourcesOpen, setSourcesOpen]       = useState(false);
+  const [status, setStatus]                 = useState<AIStatus | null>(null);
+  const [suggestions, setSuggestions]       = useState<string[]>([]);
 
   const citationIds = useMemo(() => latestCitationIds(messages), [messages]);
   const sourcesAvailable = citationIds.length > 0;
@@ -101,6 +106,32 @@ export default function RAGChatPage() {
       setMessages([]);
     }
   }, [searchParams, refreshList, loadConversation]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    aiApi
+      .status()
+      .then(({ data }) => !cancelled && setStatus(data))
+      .catch(() => {});
+
+    // Suggested prompts are built from classifications that actually exist,
+    // so a suggestion never leads to an empty answer.
+    recordsApi
+      .classifications()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const names = (data.results ?? []).map((c) => c.name).slice(0, 3);
+        setSuggestions(
+          names.length > 0
+            ? names.map((n) => `What research exists on ${n.toLowerCase()}?`)
+            : ["What research has been published at CIT-U?"],
+        );
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, []);
 
   const persist = (convId: string, nextMessages: ChatMessage[], title?: string) => {
     const existing = getConversation(convId);
@@ -158,7 +189,11 @@ export default function RAGChatPage() {
     setLoading(true);
     try {
       const { data } = await aiApi.ask(buildRagQuestion(nextMessages));
-      const assistantMsg = newMessage("assistant", data.answer ?? "", data.citations);
+      const body =
+        data.answer ??
+        data.message ??
+        "No published record matched that question.";
+      const assistantMsg = newMessage("assistant", body, data.citations);
       const withReply = [...nextMessages, assistantMsg];
       setMessages(withReply);
       persist(activeId!, withReply, title);
@@ -178,34 +213,18 @@ export default function RAGChatPage() {
   };
 
   return (
-    <div className="-m-6 flex flex-col h-[calc(100vh-3.5rem)] min-h-[480px] bg-[#FAFAF9]">
+    <div className="flex flex-col h-screen min-h-[480px] bg-[#FBFCFD]">
       <div className="flex flex-1 min-h-0 relative">
         <ConversationSidebar
           conversations={conversations}
           activeId={activeId}
           open={historyOpen}
-          onClose={() => setHistoryOpen(false)}
           onSelect={handleSelect}
-          onNew={handleNewChat}
           onDelete={handleDelete}
         />
 
         {/* Center: chat */}
         <div className="flex flex-col flex-1 min-w-0 relative">
-          {!historyOpen && (
-            <button
-              type="button"
-              onClick={() => setHistoryOpen(true)}
-              className="absolute left-3 top-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-                bg-white border border-stone-200 shadow-sm text-[11px] font-semibold text-stone-600
-                hover:border-[#6B0F12]/30 hover:text-[#6B0F12]"
-              aria-label="Show chat history"
-            >
-              <i className="fas fa-clock-rotate-left text-[11px]" />
-              History
-            </button>
-          )}
-
           <ChatToolbar
             sessionTitle={activeTitle}
             historyOpen={historyOpen}
@@ -216,10 +235,24 @@ export default function RAGChatPage() {
             onNewChat={handleNewChat}
           />
 
+          {status && !status.generative && (
+            <div className="shrink-0 flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-800">
+              <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
+              <p>
+                <strong>Retrieval-only mode.</strong> IRIS ranks and quotes real records but no
+                language model is configured, so answers are not written prose. Set{" "}
+                <code className="font-mono">ANTHROPIC_API_KEY</code> to enable synthesis.
+              </p>
+            </div>
+          )}
+
           <ChatMessageList
             messages={messages}
             isLoading={loading}
             showInlineSources={!sourcesOpen}
+            suggestions={suggestions}
+            onSuggestion={handleSend}
+            indexedRecords={status?.indexed_records ?? null}
           />
           <ChatInput
             onSend={handleSend}

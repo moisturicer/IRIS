@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom";
-
 interface ChatToolbarProps {
   sessionTitle:     string;
   historyOpen:      boolean;
@@ -30,10 +28,11 @@ export function ChatToolbar({
             : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
           }`}
         aria-pressed={historyOpen}
+        aria-expanded={historyOpen}
         aria-label={historyOpen ? "Hide chat history" : "Show chat history"}
         title={historyOpen ? "Hide history" : "Show history"}
       >
-        <i className="fas fa-bars-staggered" />
+        <i className={historyOpen ? "fas fa-angles-left" : "fas fa-bars-staggered"} />
       </button>
 
       <div className="min-w-0 flex-1 px-1">
@@ -70,14 +69,6 @@ export function ChatToolbar({
         <i className="fas fa-layer-group text-[11px]" />
         <span className="hidden sm:inline">Sources</span>
       </button>
-
-      <Link
-        to="/ai/search"
-        className="p-2 rounded-lg text-stone-500 hover:bg-stone-50 hover:text-[#6B0F12]"
-        title="Semantic search"
-      >
-        <i className="fas fa-search text-[12px]" />
-      </Link>
     </header>
   );
 }
