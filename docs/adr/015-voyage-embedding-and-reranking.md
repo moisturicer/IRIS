@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off precondition (see §Security Impact) and adopted `voyage-context-4` as the embedding model.
+Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off precondition (see §Security Impact); adopted `voyage-context-4` as the embedding model; removed the local Ollama fallback this ADR had introduced, which contradicted [ADR-008](008-ai-degradation-to-fts.md)'s already-accepted rejection of a local model. There is no local lane. A `DisclosurePolicy` refusal means that content is not sent to Voyage and is not AI-processed at all — it degrades to the same FTS path ADR-008 already specifies for a vendor outage.
 
 **Extends [ADR-007](007-pgvector-vector-store.md)**, which decided the vector *store*. It does not supersede it — pgvector remains the store. This ADR decides the embedding and reranking *provider*, which ADR-007 left open and [ADR-006](006-minimum-rag-pipeline.md) described only as "a provider protocol."
 
@@ -21,11 +21,11 @@ The concrete blockers today: `apps/ai/models/embedding.py` uses `VectorField(dim
 | Embedding | Voyage `voyage-context-4`, 1024 dimensions (default), `input_type` document/query |
 | Reranking | Voyage rerank, over the top ~100 recalled chunks |
 | Store | **pgvector, unchanged** (ADR-007) |
-| Local fallback | Ollama, for anything the disclosure policy refuses |
+| Content a `DisclosurePolicy` refuses | **Not sent to Voyage, not AI-processed.** Degrades to ADR-008's FTS path — the same behavior as a Voyage outage. No local model. |
 
 **One vendor, one API key, one rate-limit budget, one adapter family, one set of failure modes.** Cohere Rerank is the marginally stronger reranker; at this corpus size the difference does not repay a second integration, a second key and a second outage mode.
 
-**Embedding model, revised 2026-09-04: `voyage-context-4`.** This is a *contextualized chunk* embedding model — it produces a chunk's vector already carrying the surrounding document's context, without any manual metadata or context-string augmentation. Voyage's own benchmarks show it retrieving better than standard embeddings both with and without manual context augmentation, while being simpler, faster and cheaper to run, and it is a drop-in replacement for a standard embedder — no downstream retrieval or storage changes. It also **reduces sensitivity to the chunking strategy** — since the model itself supplies document context, a chunk's own vector needs it less. This bears directly on [chunker §5's context-path decorator](chunker_architecture.md#the-context-path--the-single-highest-value-idea-here) (IR-112): default to relying on `voyage-context-4`'s own context-awareness rather than the manual context-path prefix, and treat the prefix as a fallback for the local Ollama lane, which does not have this capability. See [chunker §14, open question on this exact point](chunker_architecture.md#14-open-questions).
+**Embedding model, revised 2026-09-04: `voyage-context-4`.** This is a *contextualized chunk* embedding model — it produces a chunk's vector already carrying the surrounding document's context, without any manual metadata or context-string augmentation. Voyage's own benchmarks show it retrieving better than standard embeddings both with and without manual context augmentation, while being simpler, faster and cheaper to run, and it is a drop-in replacement for a standard embedder — no downstream retrieval or storage changes. It also **reduces sensitivity to the chunking strategy** — since the model itself supplies document context, a chunk's own vector needs it less. This bears directly on [chunker §5's context-path decorator](chunker_architecture.md#the-context-path--the-single-highest-value-idea-here) (IR-112): default to relying on `voyage-context-4`'s own context-awareness rather than the manual context-path prefix. The prefix and `Chunk.context_path` are kept for one reason only now — display, a citation's breadcrumb — not as an embedding fallback, since there is no second embedding path for it to feed. See [chunker §14, open question on this exact point](chunker_architecture.md#14-open-questions).
 
 **Constraint that must be enforced by the batching code, not assumed:** total input tokens across a batch must not exceed 120,000 when `enable_auto_chunk = true`, or 32,000 when it is false. This replaces the illustrative `VOYAGE_MAX_BATCH_SIZE` item-count cap in [chunker §10](chunker_architecture.md#10-voyage-integration) as the real ceiling batch assembly must respect.
 
@@ -39,7 +39,7 @@ Three rules the implementation must satisfy:
 
 ## Alternatives Considered
 
-**Ollama only, nothing leaves campus.** Rejected as the default, retained as the fallback lane for whatever the `DisclosurePolicy` module refuses. Retrieval quality is materially below the hosted models, and CPU-only embedding of the full corpus is slow.
+**A local model (Ollama) as a fallback lane for content the `DisclosurePolicy` refuses.** Rejected outright, not deferred — [ADR-008](008-ai-degradation-to-fts.md) already rejected exactly this ("needs a GPU for usable latency; adds a service and several GB of weights... a second AI system to insure the first") and this ADR's original text contradicted that acceptance without ever revisiting it. There is no local model anywhere in this architecture. Content the `DisclosurePolicy` refuses is simply not AI-processed — it gets the same FTS degradation ADR-008 specifies for a Voyage outage, not a second, cheaper AI path.
 
 **Cohere for reranking, Voyage for embedding.** Rejected. Best-of-breed on paper; two vendors, two keys, two rate limiters and two failure modes for a quality difference that this corpus size does not surface. Revisit if the eval set shows reranking is the binding constraint.
 
@@ -67,7 +67,7 @@ Reranking is the cheapest quality lever available: priced per query rather than 
 
 ## Revisit when
 
-The eval set shows a different provider materially ahead, the free tier is exhausted, or the `DisclosurePolicy` module ends up routing most traffic to Ollama in practice — in which case Ollama becomes the primary lane rather than the fallback.
+The eval set shows a different provider materially ahead, or the free tier is exhausted. If `DisclosurePolicy` refusals turn out to affect a large share of the corpus in practice, that is a product gap worth its own decision — reduced AI coverage for that content, not a reason to reconsider a local model, which ADR-008 already settled.
 
 ## MVP Impact
 
@@ -81,11 +81,11 @@ Each tenant needs its own Voyage key, or the operator holds one and bills throug
 
 **Revised 2026-09-04: this is no longer gated on an external governance sign-off.** The prior revision of this ADR made written KTTO/IERC sign-off a precondition for any record content reaching Voyage; that precondition is removed, and Phase 3 of the RAG rollout is not blocked by it. Chunk text still leaves the deployment on every index and every query, and under [ADR-013](013-chunk-level-rag-pipeline.md) that text is methodology, findings and instruments from unpublished theses and pre-filing IP disclosures — so this stays a real security surface, just not one this ADR treats as blocked on an outside approval process. Required before any record content reaches Voyage:
 
-1. **A `DisclosurePolicy` module** consulted at every outbound call, gating on IP status, embargo date and author consent. Anything it refuses routes to the local Ollama lane.
+1. **A `DisclosurePolicy` module** consulted at every outbound call, gating on IP status, embargo date and author consent. Anything it refuses is not sent to Voyage and is not AI-processed by any provider — there is no local model to fall back to.
 2. **Vendor no-training terms confirmed in writing** and recorded — an explicit account setting, not an assumption.
 3. `VOYAGE_API_KEY` treated as a required production secret per CLAUDE.md's Environment and secrets rule — the application refuses to start without it rather than defaulting silently.
 
-The Ollama lane remains the fallback for whatever the `DisclosurePolicy` module refuses on a given record, and [ADR-008](008-ai-degradation-to-fts.md)'s FTS fallback remains the product-level fallback for a Voyage outage. **Search still works either way.**
+[ADR-008](008-ai-degradation-to-fts.md)'s FTS fallback is the *only* fallback, for both a Voyage outage and a `DisclosurePolicy` refusal — the same mechanism, not two. **Search still works either way.**
 
 ## Deployment Impact
 

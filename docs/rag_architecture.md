@@ -203,10 +203,10 @@ flowchart LR
   DOM --> LM["LLMProvider"]
   EX -.-> EXA["Docling · PyMuPDF"]
   CK -.-> CKA["structural-markdown · fixed-window · in-memory fake"]
-  EM -.-> EMA["Voyage · Ollama · deterministic fake"]
+  EM -.-> EMA["Voyage · deterministic fake"]
   VI -.-> VIA["pgvector · in-memory"]
   RK -.-> RKA["Voyage · NoOp"]
-  LM -.-> LMA["Groq · OpenRouter · Ollama · fake"]
+  LM -.-> LMA["Groq · OpenRouter · fake"]
   classDef port fill:#eef2ff,stroke:#6366f1,color:#3730a3;
   classDef adapter fill:#f8fafc,stroke:#94a3b8,color:#475569;
   class EX,NO,CK,EM,VI,RK,LM port
@@ -284,11 +284,11 @@ This blocks the citation viewer specifically, which makes the browser fetch PDFs
 
 [ADR-015](adr/015-voyage-embedding-and-reranking.md) was revised 2026-09-04 to drop the written-sign-off precondition it originally carried. Phase 3 (Voyage embedding and the query path) is **not blocked by KTTO/IERC review.** Under [ADR-013](adr/013-chunk-level-rag-pipeline.md) the text leaving the deployment is still methodology, findings and instruments from unpublished theses and pre-filing IP disclosures, so the following stay required as product-level controls, independent of any outside approval process:
 
-1. A `DisclosurePolicy` module gating every outbound call on IP status, embargo and consent — refusals route to the local Ollama lane
+1. A `DisclosurePolicy` module gating every outbound call on IP status, embargo and consent — refusals are not sent to Voyage and are not AI-processed at all; there is no local model
 2. Vendor no-training terms confirmed in writing
 3. `VOYAGE_API_KEY` as a required production secret, per CLAUDE.md
 
-Ollama remains the fallback for whatever the `DisclosurePolicy` module refuses, and FTS remains the product-level fallback for a Voyage outage. **Search works either way.**
+FTS is the fallback for both a `DisclosurePolicy` refusal and a Voyage outage — one mechanism, per [ADR-008](adr/008-ai-degradation-to-fts.md), which already rejected a local model on cost and complexity grounds. **Search works either way.**
 
 ---
 

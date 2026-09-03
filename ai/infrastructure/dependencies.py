@@ -2,7 +2,6 @@ from typing import Generator
 from ai.infrastructure.settings import settings
 from ai.domain.ports import LLMProvider, EmbeddingProvider
 from ai.infrastructure.openai_adapter import OpenAILLMProvider, OpenAIEmbeddingProvider
-from ai.infrastructure.local_adapter import LocalLLMProvider, LocalEmbeddingProvider
 
 # Singleton instances so we don't recreate clients on every request
 _llm_provider = None
@@ -14,7 +13,10 @@ def get_llm_provider() -> LLMProvider:
         if settings.LLM_PROVIDER == "openai":
             _llm_provider = OpenAILLMProvider()
         else:
-            _llm_provider = LocalLLMProvider()
+            # An unrecognized name must raise, not silently fall through to a
+            # mock adapter — that failure mode turns a typo into wrong
+            # output instead of an error.
+            raise ValueError(f"Unknown LLM_PROVIDER: {settings.LLM_PROVIDER!r}")
     return _llm_provider
 
 def get_embedding_provider() -> EmbeddingProvider:
@@ -23,5 +25,7 @@ def get_embedding_provider() -> EmbeddingProvider:
         if settings.EMBEDDING_PROVIDER == "openai":
             _embedding_provider = OpenAIEmbeddingProvider()
         else:
-            _embedding_provider = LocalEmbeddingProvider()
+            raise ValueError(
+                f"Unknown EMBEDDING_PROVIDER: {settings.EMBEDDING_PROVIDER!r}"
+            )
     return _embedding_provider

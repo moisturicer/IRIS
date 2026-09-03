@@ -3,7 +3,7 @@ from typing import List
 
 class LLMProvider(ABC):
     """
-    Abstract Base Class for LLM providers (e.g. OpenAI, Ollama).
+    Abstract Base Class for LLM providers (e.g. OpenAI).
     """
     @abstractmethod
     async def generate_response(self, prompt: str, context: str = "") -> str:
