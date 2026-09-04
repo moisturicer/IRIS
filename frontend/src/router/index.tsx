@@ -21,6 +21,7 @@ import HomePage             from "@/features/dashboard/HomePage";
 import PaperViewPage        from "@/features/records/paper-view/PaperViewPage";
 import AddRecordPage        from "@/features/records/AddRecordPage";
 import MyWorkspacePage      from "@/features/records/MyWorkspacePage";
+import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import EditRecordPage       from "@/features/records/EditRecordPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
           { path: "records/add",          element: <AddRecordPage />,                  handle: { crumb: "Add Record" } },
           { path: "records/mine",         element: <MyLibraryPage />,                  handle: { crumb: "My Library" } },
           { path: "workspace",            element: <MyWorkspacePage />,                 handle: { crumb: "My Workspace" } },
+          { path: "opportunities",        element: <CallsAndConferencesPage />,         handle: { crumb: "Calls & Conferences" } },
           { path: "records/:id/edit",     element: <EditRecordPage />,                 handle: { crumb: "Edit Record" } },
           { path: "records/:id/documents",element: <DocumentsPage />,                  handle: { crumb: "Documents" } },
           { path: "notifications",        element: <NotificationsPage />,              handle: { crumb: "Notifications" } },

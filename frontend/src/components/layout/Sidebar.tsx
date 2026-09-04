@@ -150,6 +150,7 @@ export function Sidebar({ className }: SidebarProps) {
     { to: "/", label: "Discover", icon: "fa-compass" },
     { to: "/ai", label: "Ask IRIS", icon: "fa-brain" },
     { to: "/records/mine", label: "My Library", icon: "fa-bookmark" },
+    { to: "/opportunities", label: "Calls & Conferences", icon: "fa-bullhorn" },
   ];
 
   const ipNav: NavItem[] = [
