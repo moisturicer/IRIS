@@ -1,4 +1,5 @@
 -r base.txt
 django-debug-toolbar>=4.3
 ipython>=8.0
-# TODO: add pytest-django and factory-boy when writing tests
+pytest>=8.0
+pytest-django>=4.8
