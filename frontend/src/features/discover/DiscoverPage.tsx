@@ -12,6 +12,7 @@ import { DiscoverFilterPanel, EMPTY_FILTERS, type DiscoverFilters } from "./Disc
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 import { PaperCiteModal } from "./PaperCiteModal";
 import { buildYearOptions } from "./discoverUtils";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
@@ -246,6 +247,15 @@ export default function DiscoverPage() {
           <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 leading-tight">
             Institutional Knowledge Base
           </p>
+        </div>
+
+        {/* AppShell hides the shared Header on "/" and "/ai" (isFullBleed), so
+            this page carries its own -- and has to carry the bell with it,
+            or Discover is the one screen where new notifications are
+            invisible. Same NotificationBell component; it reads the shared
+            store, so its count stays in step with the sidebar badge. */}
+        <div className="ml-auto shrink-0">
+          <NotificationBell />
         </div>
       </header>
 

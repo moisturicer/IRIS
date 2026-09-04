@@ -1,3 +1,5 @@
+import { NotificationBell } from "@/components/layout/NotificationBell";
+
 interface ChatToolbarProps {
   sessionTitle:     string;
   historyOpen:      boolean;
@@ -17,8 +19,11 @@ export function ChatToolbar({
   onToggleSources,
   onNewChat,
 }: ChatToolbarProps) {
+  // min-h-[56px] is shared with ConversationSidebar's header so both border-b
+  // rules land on the same line -- this toolbar's two-line title block made it
+  // naturally taller, and the divider visibly stepped down at the split.
   return (
-    <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-stone-200/80 bg-white">
+    <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 min-h-[56px] border-b border-stone-200/80 bg-white">
       <button
         type="button"
         onClick={onToggleHistory}
@@ -69,6 +74,11 @@ export function ChatToolbar({
         <i className="fas fa-layer-group text-[11px]" />
         <span className="hidden sm:inline">Sources</span>
       </button>
+
+      {/* Ask IRIS is the other page AppShell treats as full-bleed (isFullBleed
+          covers "/" and "/ai"), so the shared Header -- and its bell -- never
+          renders here. Same component, same shared store. */}
+      <NotificationBell />
     </header>
   );
 }

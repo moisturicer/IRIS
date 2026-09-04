@@ -32,14 +32,20 @@ export function ConversationSidebar({
     >
       <div className="w-[min(100vw,280px)] sm:w-[260px] flex flex-col h-full">
       {/* One collapse control only — it lives in ChatToolbar, beside the chat
-          title. A second copy here made the same action appear twice. */}
-      <div className="flex items-center gap-2 px-3 py-3 border-b border-stone-200/60">
+          title. A second copy here made the same action appear twice.
+
+          min-h-[56px] is shared with ChatToolbar so the two border-b rules meet
+          as one continuous line across the split. Without it this header was
+          41px against the toolbar's 55px (its title block is two lines) and the
+          rule visibly stepped down at the divider. px-5 lines the label up with
+          the conversation titles below, which sit at nav px-2 + button px-3. */}
+      <div className="flex items-center gap-2 px-5 py-2 min-h-[56px] border-b border-stone-200/80">
         <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex-1">
           Chat history
         </span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 pb-2 space-y-1">
+      <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2 space-y-1">
         {conversations.length === 0 ? (
           <p className="px-3 py-6 text-[11px] text-stone-500 text-center">
             Your past chats will appear here.
