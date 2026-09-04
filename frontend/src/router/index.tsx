@@ -33,7 +33,6 @@ import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import UserListPage         from "@/features/accounts/UserListPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
-import StoragePage          from "@/features/storage/StoragePage";
 import RAGChatPage          from "@/features/ai/RAGChatPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
 import HelpPage             from "@/features/help/HelpPage";
@@ -64,8 +63,9 @@ export const router = createBrowserRouter([
           { path: "records/:id/edit",     element: <EditRecordPage />,                 handle: { crumb: "Edit Record" } },
           { path: "records/:id/documents",element: <DocumentsPage />,                  handle: { crumb: "Documents" } },
           { path: "notifications",        element: <NotificationsPage />,              handle: { crumb: "Notifications" } },
-          { path: "storage",              element: <StoragePage />,                    handle: { crumb: "Storage" } },
-          { path: "storage/:folderId",    element: <StoragePage />,                    handle: { crumb: "Storage" } },
+          // Storage routes removed -- apps/storage is slated for deletion (SC-01/FE-03,
+          // IR-62) and overlapped DocumentsPage. StoragePage.tsx stays in the tree,
+          // unrouted, per IR-86's "no component is deleted from the repository".
           { path: "ai",                   element: <RAGChatPage />,                    handle: { crumb: "Ask IRIS" } },
           { path: "help",                 element: <HelpPage />,                       handle: { crumb: "Help" } },
           { path: "settings",             element: <SettingsPage />,                   handle: { crumb: "Settings & Profile" } },

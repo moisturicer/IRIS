@@ -1,5 +1,6 @@
 import { useUIStore } from "@/store/ui.store";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "./NotificationBell";
 
 export function Header() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
@@ -29,6 +30,10 @@ export function Header() {
           placeholder="Search records, authors, topics..."
           className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-[13px] bg-gray-50 focus:outline-none focus:border-[#6B0F12]"
         />
+      </div>
+
+      <div className="ml-auto">
+        <NotificationBell />
       </div>
     </header>
   );
