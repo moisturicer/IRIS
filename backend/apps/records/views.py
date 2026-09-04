@@ -91,7 +91,14 @@ class RecordViewSet(viewsets.ModelViewSet):
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
             # (see the comment above and apps/records/tests.py::TagsPermissionTests).
             return [IsAuthenticated(), IsStaff()]
-        return [IsAuthenticated()]
+        # super(), not a hardcoded [IsAuthenticated()], so that an @action's own
+        # permission_classes kwarg is actually honoured -- that's what consults
+        # it. Hardcoding the fallback silently killed the IsStaff on
+        # import_excel and download_template (any authenticated user could bulk-
+        # import straight-to-published records, bypassing review entirely).
+        # Identical behaviour for actions without a kwarg: DEFAULT_PERMISSION_CLASSES
+        # is exactly [IsAuthenticated]. See tests.py::DeadPermissionKwargSweepTests.
+        return super().get_permissions()
 
     def perform_create(self, serializer):
         from .models import RecordOwner
@@ -305,12 +312,20 @@ class RecordViewSet(viewsets.ModelViewSet):
     def mine(self, request):
         """GET /records/mine/ -- records the current user owns.
         Optional: ?pipeline_status=published,approved  (comma-separated)
+
+        Uses RecordDetailSerializer, not RecordListSerializer -- My Workspace
+        needs clearances[] to show per-office status, which the list
+        serializer doesn't carry. (There is a MyRecordsViewSet elsewhere in
+        this file with serializer_class = RecordDetailSerializer that looks
+        like it already does this -- it isn't registered in urls.py, so it
+        serves nothing. Found live: My Workspace read record.clearances
+        everywhere and always got undefined.)
         """
         qs = Record.objects.filter(owners__user=request.user).distinct()
         statuses = request.query_params.get("pipeline_status")
         if statuses:
             qs = qs.filter(pipeline_status__in=[s.strip() for s in statuses.split(",")])
-        serializer = RecordListSerializer(qs, many=True, context={"request": request})
+        serializer = RecordDetailSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
@@ -674,7 +689,17 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
             return [IsAuthenticated(), IsStaff()]
-        return [IsAuthenticated()]
+        if self.action in ("approve", "decline"):
+            # Must be explicit here. These two are wired manually in urls.py as
+            # as_view({"post": "approve"}) rather than through the router, and a
+            # manual as_view() never passes an @action's initkwargs (including
+            # permission_classes) to the view at all -- so unlike a router-
+            # registered action, even super().get_permissions() cannot recover
+            # the IsRDCO the decorator declares. Without this branch, any
+            # authenticated user could approve a delete request and soft-delete
+            # someone else's record. See tests.py::DeadPermissionKwargSweepTests.
+            return [IsAuthenticated(), IsRDCO()]
+        return super().get_permissions()
 
     def perform_create(self, serializer):
         serializer.save(requested_by=self.request.user)

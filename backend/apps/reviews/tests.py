@@ -13,10 +13,11 @@ rather than assumed from the type alone.
 """
 from django.test import TestCase
 
+from core.exceptions import InvalidPipelineTransition
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
 from .models import RecordClearance
-from .services import approve_record, submit_clearance
+from .services import approve_record, decline_record, submit_clearance
 
 
 def make_user(email, role_name):
@@ -103,3 +104,47 @@ class ApproveRecordConditionalOfficesTests(TestCase):
         self.assertEqual(self.offices(record), {"ierc", "ktto"})
         # itso_review would be a stage with nothing to review -- skip it.
         self.assertEqual(record.pipeline_status, "parallel_review")
+
+
+class SequentialReviewPermissionTests(TestCase):
+    """
+    _can_review() gates approve_record()/decline_record()/reject_record() at
+    every sequential stage (adviser_review, rdco_intake, rdco_review) --
+    Student is not in its role branches, so it always falls through to
+    `return False`. Written up after the user spotted a Student's name as the
+    reviewer on a seeded demo record's Review History and asked whether that
+    reflects real behaviour. It didn't: the seed script wrote
+    Review.objects.create(reviewed_by=student, ...) directly via the ORM,
+    which bypasses this check entirely -- raw ORM writes have no permission
+    layer to skip. This proves the real service function rejects exactly that
+    scenario, not just the seed data that looked wrong.
+    """
+
+    def setUp(self):
+        self.thesis = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        self.owner = make_user("perm_owner@cit.edu", "Student")
+        self.rdco = make_user("perm_rdco@cit.edu", "RDCO")
+        self.record = Record.objects.create(
+            title="A" * 10, abstract="B" * 40, record_type=self.thesis,
+            added_by=self.owner, pipeline_status="rdco_intake",
+        )
+        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+
+    def test_owner_cannot_decline_their_own_record_at_intake(self):
+        """Owning the record is not a review role -- being Student isn't either."""
+        with self.assertRaises(InvalidPipelineTransition):
+            decline_record(self.record, self.owner, comment="Missing manuscript.")
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, "rdco_intake")
+
+    def test_owner_cannot_approve_their_own_record_at_intake(self):
+        with self.assertRaises(InvalidPipelineTransition):
+            approve_record(self.record, self.owner)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, "rdco_intake")
+
+    def test_rdco_can_decline_at_intake(self):
+        review = decline_record(self.record, self.rdco, comment="Missing manuscript.")
+        self.assertEqual(review.reviewed_by, self.rdco)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, "declined")
