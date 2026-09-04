@@ -79,6 +79,17 @@ class FailingExtractor:
         raise self._error
 
 
+@pytest.fixture(autouse=True)
+def queued_chunkings(monkeypatch):
+    """Every upload id handed to the chunking task, in place of a real
+    ``delay`` — which blocks on a broker this test process has no reason to
+    need. Autouse, because a test that forgot it would hang rather than
+    fail."""
+    calls = []
+    monkeypatch.setattr(tasks, "_queue_chunking", calls.append)
+    return calls
+
+
 @pytest.fixture
 def upload(db):
     record_type = RecordType.objects.create(name="Thesis")
@@ -193,6 +204,16 @@ def test_a_re_extraction_clears_a_previous_error(monkeypatch, upload, extraction
     assert (extraction.status, extraction.error) == ("done", "")
 
 
+def test_a_successful_extraction_hands_the_document_to_the_chunker(
+    monkeypatch, upload, extraction, queued_chunkings
+):
+    """IR-116: an upload reaches an active chunk set with no manual step, and
+    the chunking runs in a worker of its own rather than on this one."""
+    _run(monkeypatch, FakeExtractor(), upload.id)
+
+    assert queued_chunkings == [upload.id]
+
+
 # ---------------------------------------------------------------------------
 # Failure
 # ---------------------------------------------------------------------------
@@ -222,6 +243,14 @@ def test_a_failure_leaves_no_half_written_structure(monkeypatch, upload, extract
     assert extraction.structure == {}
     assert extraction.extracted_text == ""
     assert extraction.as_normalized_document() is None
+
+
+def test_a_failed_extraction_hands_nothing_to_the_chunker(
+    monkeypatch, upload, extraction, queued_chunkings
+):
+    _run(monkeypatch, FailingExtractor(ExtractionError("boom")), upload.id)
+
+    assert queued_chunkings == []
 
 
 def test_the_task_retries_three_times_before_giving_up(monkeypatch, upload, extraction):

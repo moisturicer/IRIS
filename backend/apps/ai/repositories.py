@@ -43,6 +43,12 @@ class PersistedChunkSet:
     extraction_hash: str
     chunk_set: ChunkSet
 
+    @property
+    def chunk_count(self) -> int:
+        """How many chunks it holds, without the caller walking
+        ``.chunk_set.chunks`` — a chain that reads as a typo."""
+        return len(self.chunk_set.chunks)
+
 
 @dataclass(frozen=True)
 class RechunkOutcome:

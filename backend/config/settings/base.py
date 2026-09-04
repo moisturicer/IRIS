@@ -194,6 +194,39 @@ DOCLING_API_URL        = config("DOCLING_API_URL", default="http://docling:5001"
 DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)
 AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:8001") # AI Gateway endpoint
 
+# ---- Chunking (ADR-013) --------------------------------------------------
+#
+# The knobs the ingestion pipeline builds its ChunkingOptions from. They are
+# configuration rather than constants because IR-116's exit criterion is a
+# person reading fifty real chunks and choosing the ceiling from what they
+# see — so changing it must be a deployment decision, not a code change.
+#
+# Blank means the domain's own DEFAULT_STRATEGY, resolved in
+# apps.ai.ingestion.pipeline. Naming it here would put a third copy of the
+# strategy id in the tree -- and this is the copy that could silently drift
+# from the registry, because a settings module must not import an app
+# package to check itself against it.
+AI_CHUNK_STRATEGY      = config("AI_CHUNK_STRATEGY", default="")
+AI_CHUNK_MAX_TOKENS    = config("AI_CHUNK_MAX_TOKENS", default=512, cast=int)
+# Blank means "derive from max_tokens" — see ChunkingOptions.effective_min_tokens,
+# which explains why a fixed default would be a footgun.
+AI_CHUNK_MIN_TOKENS    = config(
+    "AI_CHUNK_MIN_TOKENS", default="", cast=lambda v: int(v) if str(v).strip() else None
+)
+AI_CHUNK_CONTEXT_PATH_MAX_TOKENS = config(
+    "AI_CHUNK_CONTEXT_PATH_MAX_TOKENS", default=48, cast=int
+)
+# A bibliography is 10-20% of a thesis by tokens and retrieves uniformly
+# badly, so it is excluded here and kept in extracted_text for full-text
+# search. Front matter (acknowledgements, table of contents) is deliberately
+# NOT excluded yet: whether the extractor detects those headings reliably on
+# real submissions is one of the questions IR-116's manual inspection answers.
+AI_CHUNK_EXCLUDE_SECTIONS = config(
+    "AI_CHUNK_EXCLUDE_SECTIONS",
+    default="References,Bibliography,Works Cited,Literature Cited",
+    cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
+)
+
 # ---- Axes (brute force protection) --------------------------------------
 
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)

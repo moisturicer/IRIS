@@ -41,6 +41,29 @@ def _build_extractor():
     )
 
 
+def _queue_chunking(upload_id: int) -> None:
+    """Hand the extracted document to the chunker, in another worker (IR-116).
+
+    A second seam, for the same reason as the one above: tests replace this
+    rather than standing up a broker. Queued rather than called, because
+    chunking is CPU work of its own and a failure to chunk must not mark a
+    perfectly good extraction failed or send the document back through
+    Docling.
+
+    ``on_commit`` rather than a bare ``delay``: the chunker reads the row this
+    task just wrote, and a worker that picked the message up inside an open
+    transaction would find the pre-save extraction and fail on a document that
+    is actually fine. Under autocommit -- how this task runs today -- the
+    callback fires immediately, so this costs nothing and stops being correct
+    only by accident later.
+    """
+    from django.db import transaction
+
+    from apps.ai.tasks import chunk_record_document
+
+    transaction.on_commit(lambda: chunk_record_document.delay(upload_id))
+
+
 @shared_task(bind=True, max_retries=3)
 def extract_pdf_text(self, upload_id: int):
     """Background task: extract an uploaded PDF and persist the result.
@@ -94,3 +117,6 @@ def extract_pdf_text(self, upload_id: int):
         extraction.error  = str(exc)
         extraction.save(update_fields=["status", "error"])
         raise self.retry(exc=exc, countdown=60)
+
+    # Reachable only on success -- the handler above always raises.
+    _queue_chunking(upload_id)
