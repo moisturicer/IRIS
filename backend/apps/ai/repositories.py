@@ -129,7 +129,19 @@ class DjangoChunkRepository:
     per record, inside one transaction, with any previous chunk set for
     that record deleted first (cascading to its chunks and their
     embeddings) — the same "replace, don't diff" model as the in-memory
-    one, at the schema level rather than in a dict."""
+    one, at the schema level rather than in a dict.
+
+    This is a deliberate departure from the chunker architecture doc's
+    section 9, which keeps a superseded chunk set around and flips
+    ``is_active`` instead of deleting it — that history is what lets a
+    later re-chunk diff per-chunk ``text_hash`` values and re-embed only
+    what changed. Retaining it now, with nothing yet reading it, would be
+    exactly the unread-field problem this codebase already calls out
+    elsewhere (see ``Chunk.element_kinds`` in the chunking package). IR-115
+    ("G", incremental re-chunking and idempotency) is where that history
+    starts being read, and is the right place to revisit whether ``save``
+    should stop deleting the old chunk set outright.
+    """
 
     def save(
         self, *, record_id: int, extraction_hash: str, chunk_set: ChunkSet
