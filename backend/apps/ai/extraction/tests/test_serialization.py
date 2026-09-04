@@ -32,7 +32,7 @@ def _document() -> NormalizedDocument:
                 kind=PARAGRAPH,
                 text="Samples were collected weekly from twelve ponds.",
                 page=12,
-                bbox=BoundingBox(page=12, left=72.0, top=310.5, right=540.0, bottom=352.1),
+                bboxes=(BoundingBox(page=12, left=72.0, top=310.5, right=540.0, bottom=352.1),),
             ),
             DocumentElement(kind=TABLE_ROW, text="| Tilapia | 412 g |"),
         ),
@@ -120,16 +120,15 @@ def test_a_moved_region_changes_the_extraction_hash():
                 text=e.text,
                 level=e.level,
                 page=e.page,
-                bbox=(
+                bboxes=tuple(
                     BoundingBox(
-                        page=e.bbox.page,
-                        left=e.bbox.left + 1.0,
-                        top=e.bbox.top,
-                        right=e.bbox.right,
-                        bottom=e.bbox.bottom,
+                        page=b.page,
+                        left=b.left + 1.0,
+                        top=b.top,
+                        right=b.right,
+                        bottom=b.bottom,
                     )
-                    if e.bbox
-                    else None
+                    for b in e.bboxes
                 ),
             )
             for e in original.elements

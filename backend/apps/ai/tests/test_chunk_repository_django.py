@@ -7,6 +7,7 @@ not reachable.
 """
 
 import pytest
+from django.conf import settings
 
 from apps.ai.chunking import Chunk, ChunkingOptions, ChunkSet, chunkset_hash
 from apps.ai.models import EmbeddingSpace, EmbeddingSpaceState
@@ -15,6 +16,14 @@ from apps.ai.repositories import DjangoChunkRepository
 from apps.records.models import Record
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
+
+
+@pytest.fixture(autouse=True)
+def _no_seeded_active_space():
+    """Migration 0003 seeds one active EmbeddingSpace on every fresh test
+    database; the tests below that create their own active row would
+    otherwise collide with it on the partial unique constraint."""
+    EmbeddingSpace.objects.all().delete()
 
 
 def _sample_chunk_set() -> ChunkSet:
@@ -48,10 +57,14 @@ def test_deleting_a_record_cascades_to_chunk_embeddings():
         record_id=record.id, extraction_hash="h", chunk_set=_sample_chunk_set()
     )
     space = EmbeddingSpace.objects.create(
-        model_id="voyage-context-4", dimensions=1024, state=EmbeddingSpaceState.ACTIVE
+        model_id="voyage-context-4",
+        dimensions=settings.AI_EMBEDDING_DIMENSIONS,
+        state=EmbeddingSpaceState.ACTIVE,
     )
     chunk = DocumentChunk.objects.get(chunk_set_id=persisted.id)
-    embedding = ChunkEmbedding.objects.create(chunk=chunk, space=space, embedding=[0.0] * 1024)
+    embedding = ChunkEmbedding.objects.create(
+        chunk=chunk, space=space, embedding=[0.0] * settings.AI_EMBEDDING_DIMENSIONS
+    )
 
     record.delete()
 
@@ -60,17 +73,19 @@ def test_deleting_a_record_cascades_to_chunk_embeddings():
 
 def test_replacing_a_chunk_set_also_removes_its_old_embeddings():
     """save() deletes the previous chunk set for a record before writing the
-    new one — confirms that deletion actually reaches embeddings two joins
+    new one â€” confirms that deletion actually reaches embeddings two joins
     away, not just the chunk_set/document_chunk tables directly."""
     record = Record.objects.create(title="Replacement test")
     repo = DjangoChunkRepository()
     first = repo.save(record_id=record.id, extraction_hash="h1", chunk_set=_sample_chunk_set())
 
     space = EmbeddingSpace.objects.create(
-        model_id="voyage-context-4", dimensions=1024, state=EmbeddingSpaceState.ACTIVE
+        model_id="voyage-context-4",
+        dimensions=settings.AI_EMBEDDING_DIMENSIONS,
+        state=EmbeddingSpaceState.ACTIVE,
     )
     old_chunk = DocumentChunk.objects.get(chunk_set_id=first.id)
-    old_embedding = ChunkEmbedding.objects.create(chunk=old_chunk, space=space, embedding=[0.0] * 1024)
+    old_embedding = ChunkEmbedding.objects.create(chunk=old_chunk, space=space, embedding=[0.0] * settings.AI_EMBEDDING_DIMENSIONS)
 
     repo.save(record_id=record.id, extraction_hash="h2", chunk_set=_sample_chunk_set())
 

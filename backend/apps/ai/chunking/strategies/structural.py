@@ -33,6 +33,7 @@ from ..document import (
 )
 from ..hashing import chunkset_hash
 from ..packing import Piece, pack_pieces
+from ..regions import dedupe_regions, regions_for
 from ..registry import register_chunker
 from ..text_splitting import (
     grapheme_safe_split,
@@ -84,6 +85,7 @@ class StructuralCascadeChunker:
             strategy_id=STRATEGY_ID,
             options=options,
             content_hash=chunkset_hash(chunks),
+            page_sizes=document.page_sizes,
         )
 
 
@@ -204,7 +206,7 @@ def _window_to_chunk(window: list[Piece]) -> Chunk:
     content = " ".join(text for text, _ in window)
     elements = [element for _, element in window]
     pages = [e.page for e in elements if e.page is not None]
-    bboxes = tuple(e.bbox for e in elements if e.bbox is not None)
+    bboxes = regions_for(elements)
     return Chunk(
         text=content,
         content=content,
@@ -371,7 +373,7 @@ def _merge_short_siblings(chunks: list[Chunk], options: ChunkingOptions) -> list
                     else nxt.source_page
                 ),
                 element_kinds=pending.element_kinds | nxt.element_kinds,
-                bboxes=pending.bboxes + nxt.bboxes,
+                bboxes=dedupe_regions(pending.bboxes + nxt.bboxes),
             )
         else:
             result.append(pending)

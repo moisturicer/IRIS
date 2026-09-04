@@ -14,6 +14,7 @@ lists; that is the whole point.
 from ..document import NormalizedDocument
 from ..hashing import chunkset_hash
 from ..packing import Piece, pack_pieces
+from ..regions import regions_for
 from ..registry import register_chunker
 from ..tokens import count_tokens
 from ..values import Chunk, ChunkingOptions, ChunkSet
@@ -37,6 +38,7 @@ class FixedWindowChunker:
             strategy_id=STRATEGY_ID,
             options=options,
             content_hash=chunkset_hash(chunks),
+            page_sizes=document.page_sizes,
         )
 
     # -- steps -------------------------------------------------------------
@@ -69,9 +71,7 @@ class FixedWindowChunker:
             content = " ".join(text for text, _ in window)
             elements = [element for _, element in window]
             pages = [e.page for e in elements if getattr(e, "page", None) is not None]
-            bboxes = tuple(
-                e.bbox for e in elements if getattr(e, "bbox", None) is not None
-            )
+            bboxes = regions_for(elements)
             chunks.append(
                 Chunk(
                     # The context path is applied by a decorator, not here, so

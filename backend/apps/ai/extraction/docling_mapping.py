@@ -20,8 +20,8 @@ nonsense and embeds as one.
 
 **A label outside the known set is carried through as its own kind**, per the
 promise in ``document.py``. It also does real work: it keeps ``page_header``
-and ``page_footer`` distinguishable, which is what the normalizer stage
-(still to be written) needs in order to drop running headers without
+and ``page_footer`` distinguishable, which is what
+``apps.ai.chunking.normalizer`` uses to drop running headers without
 guessing at them from the text.
 
 **Regions are stored top-left**, converted here rather than at render time.
@@ -179,9 +179,16 @@ def _elements_for(
             text=text,
             level=_level(item, label),
             page=page,
-            bbox=bbox,
+            bboxes=_regions(bbox),
         )
     ]
+
+
+def _regions(bbox: Optional[BoundingBox]) -> tuple[BoundingBox, ...]:
+    """One region, or none. An extractor emits at most one rect per element;
+    ``DocumentElement`` holds a tuple because *normalization* can later merge
+    two elements into one that spans a page break."""
+    return (bbox,) if bbox is not None else ()
 
 
 def _is_table(item: Mapping[str, Any]) -> bool:
@@ -249,7 +256,7 @@ def _table_elements(
                 kind=TABLE_HEADER if row_index in header_rows else TABLE_ROW,
                 text="| " + " | ".join(t for t in texts if t) + " |",
                 page=table_page if bbox is None else bbox.page,
-                bbox=bbox,
+                bboxes=_regions(bbox),
             )
         )
     return elements
@@ -347,6 +354,10 @@ def _bbox(
         height = page_sizes.get(page, (0.0, _DEFAULT_PAGE_HEIGHT))[1]
         top, bottom = height - top, height - bottom
 
-    if right <= left or bottom <= top:
-        return None
+    # A degenerate rect is kept, not discarded. Dropping it here would
+    # leave the element with no region at all, and a chunk assembled only
+    # from such elements would carry none — losing even the page the
+    # passage came from. It is stored flagged instead (see
+    # ``repositories.serialize_regions``) so the overlay skips drawing it,
+    # which is the one place that decision belongs.
     return BoundingBox(page=page, left=left, top=top, right=right, bottom=bottom)

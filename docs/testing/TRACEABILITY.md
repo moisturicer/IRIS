@@ -26,13 +26,16 @@
 
 ## Current position
 
-**Nothing in IRIS is currently VERIFIED.** There are no automated tests, so no requirement has test evidence. This table records the honest position; it is not a to-do list disguised as a status report.
+**Almost nothing in IRIS is VERIFIED.** A pytest harness landed with IR-82 and the `apps/ai` extraction and chunking work now carries tests, so the blanket "there are no automated tests" that stood here is no longer true. Everything outside `apps/ai` still has no test evidence. This table records the honest position; it is not a to-do list disguised as a status report.
+
+> **This document is itself out of date in places** and its header still names `../SRS.md` as the baseline, which [`../../CLAUDE.md`](../../CLAUDE.md) has since frozen in favour of `docs/adr/`. Recorded rather than silently reconciled, per the source-of-truth rule. Rows below are corrected as the work that touches them lands, not in one sweep.
 
 | Req | Requirement | Design | Implementation | Test | Evidence | Status |
 |---|---|---|---|---|---|---|
 | FR-M2-01 | Record submission | SDD M2 · [ui-ux/05](../ui-ux/05-submission.md) | `apps/records`, `AddRecordPage` | — | — | **IMPLEMENTED** |
-| FR-M3-01 | PDF text extraction | ADR-006 | `documents/tasks.py` — imports `unstructured`, `fitz`, `pytesseract`, **none in requirements** | — | — | **STUBBED** |
-| FR-M3-02 | Semantic indexing | ADR-006, ADR-007 | `apps/ai/services` — class bodies are `pass` | — | — | **STUBBED** |
+| FR-M3-01 | PDF text extraction | **ADR-016** (amends ADR-006) | `apps/ai/extraction/` — `StructuredExtractor` port, `DoclingExtractor` adapter; the prototype three-tier chain is deleted (IR-107) | `apps/ai/extraction/tests/` | `pytest apps/ai/extraction` green | **IMPLEMENTED** — no production run on a real thesis yet (IR-116) |
+| FR-M3-02 | Semantic indexing | ADR-013, ADR-007, ADR-015 | `apps/ai/chunking/` (domain, strategies, context path, normalizer, regions) · `apps/ai/repositories.py` (ChunkSet persistence) — IR-89 A–F | `apps/ai/chunking/tests/`, `apps/ai/tests/` | `pytest apps/ai` green | **PARTIAL** — chunker and persistence done; **no ingestion task calls them yet** (IR-115/IR-116), and no vectors are computed (IR-108) |
+| FR-M3-03 | Citation provenance — a retrieved passage carries the page and region it occupies in the source PDF | ADR-013 · `chunker_architecture.md` §region model | `chunking/document.py` (`BoundingBox`, per-element regions), `chunking/regions.py`, `chunking/normalizer.py`, `repositories.serialize_regions` — IR-89 E | `chunking/tests/test_regions.py`, `test_normalizer.py`, `apps/ai/tests/test_region_serialization.py` | `pytest apps/ai` green — regions asserted across every registered strategy | **IMPLEMENTED** — storage only; **the PDF.js highlight overlay is out of scope and blocked on IR-59** (`/media/` is unauthenticated) |
 | FR-M4-01 | RAG query and answer | ADR-006, ADR-008 | Service stubs; `AIHubPage` shows "Coming Soon" for both modes | — | — | **STUBBED** |
 | FR-M4-02 | Summarization | — | — | — | — | **DEFERRED** (ADR-001) |
 | **FR-M5-01** | **Hierarchical submission workflow** | **ADR-002, ADR-003** | `reviews/services.py` — 11 guarded transitions, `RecordClearance` | — | — | **PARTIAL** — routing works; **clearance state is never serialized** |

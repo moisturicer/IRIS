@@ -17,6 +17,8 @@ from .document import (
     CAPTION,
     HEADING,
     LIST_ITEM,
+    PAGE_FOOTER,
+    PAGE_HEADER,
     PARAGRAPH,
     TABLE_HEADER,
     TABLE_ROW,
@@ -25,6 +27,7 @@ from .document import (
     NormalizedDocument,
 )
 from .hashing import chunk_text_hash, chunkset_hash
+from .normalizer import normalize
 from .ports import Chunker, ChunkingError, UnknownChunkingStrategy
 from .registry import build_chunker, register_chunker, registered_strategies
 from .tokens import count_tokens
@@ -44,6 +47,8 @@ __all__ = [
     "TABLE_HEADER",
     "LIST_ITEM",
     "CAPTION",
+    "PAGE_HEADER",
+    "PAGE_FOOTER",
     # values
     "Chunk",
     "ChunkSet",
@@ -63,4 +68,5 @@ __all__ = [
     "chunkset_hash",
     "chunk_text_hash",
     "count_tokens",
+    "normalize",
 ]

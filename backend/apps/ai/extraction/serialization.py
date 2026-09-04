@@ -62,29 +62,44 @@ def _element_to_json(element: DocumentElement) -> dict[str, Any]:
         out["level"] = element.level
     if element.page is not None:
         out["page"] = element.page
-    if element.bbox is not None:
-        # {page, rect} rather than four keys: it is the shape the chunk's
-        # own stored regions use, so one reader understands both.
-        out["bbox"] = {
-            "page": element.bbox.page,
-            "rect": [
-                element.bbox.left,
-                element.bbox.top,
-                element.bbox.right,
-                element.bbox.bottom,
-            ],
-        }
+    # An extractor emits at most one region per element, so the single-box
+    # `bbox` key stays the wire format and every document written so far
+    # still reads back unchanged. `bboxes` appears only for an element that
+    # genuinely occupies several rectangles — which normalization can
+    # produce by rejoining a word hyphenated across a page break.
+    if len(element.bboxes) == 1:
+        out["bbox"] = _bbox_to_json(element.bboxes[0])
+    elif element.bboxes:
+        out["bboxes"] = [_bbox_to_json(b) for b in element.bboxes]
     return out
+
+
+def _bbox_to_json(bbox: BoundingBox) -> dict[str, Any]:
+    # {page, rect} — the extraction's own wire format. Note this is NOT the
+    # shape a chunk's stored regions use: ``repositories.serialize_regions``
+    # writes four flat keys plus a ``degenerate`` flag. Two formats for one
+    # value object is a wart, but they are written by different tickets into
+    # different columns and unifying them would rewrite stored rows, so it
+    # is recorded here rather than reconciled silently.
+    return {
+        "page": bbox.page,
+        "rect": [bbox.left, bbox.top, bbox.right, bbox.bottom],
+    }
 
 
 def _element_from_json(data: Mapping[str, Any]) -> DocumentElement:
     bbox = data.get("bbox")
+    bboxes = data.get("bboxes")
+    if bboxes:
+        regions = tuple(_bbox_from_json(b) for b in bboxes)
+    else:
+        regions = (_bbox_from_json(bbox),) if bbox else ()
     return DocumentElement(
         kind=data["kind"],
         text=data["text"],
         level=data.get("level"),
         page=data.get("page"),
-        bbox=_bbox_from_json(bbox) if bbox else None,
+        bboxes=regions,
     )
 
 

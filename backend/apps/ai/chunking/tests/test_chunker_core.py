@@ -102,6 +102,22 @@ def test_strategy_id_is_recorded_on_the_chunkset(strategy_id):
     assert result.strategy_id == strategy_id
 
 
+def test_page_sizes_are_carried_onto_the_chunkset(strategy_id):
+    """Page dimensions are stored once per chunk set, not repeated on every
+    chunk — a citation overlay needs them to convert a stored top-left
+    rectangle into screen coordinates."""
+    document = NormalizedDocument(
+        title="A Thesis",
+        elements=(DocumentElement(kind="paragraph", text="alpha beta"),),
+        page_sizes={1: (612.0, 792.0)},
+    )
+    options = ChunkingOptions(strategy=strategy_id, max_tokens=20)
+
+    result = build_chunker(options).chunk(document, options)
+
+    assert result.page_sizes == {1: (612.0, 792.0)}
+
+
 def test_the_port_performs_no_io(strategy_id):
     """A chunker that opens a socket or reads the clock is not a pure function.
 

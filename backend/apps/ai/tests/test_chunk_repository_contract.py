@@ -140,3 +140,61 @@ def test_context_path_and_element_kinds_round_trip(make_repository):
     assert isinstance(first.context_path, tuple)
     assert first.element_kinds == frozenset({"paragraph"})
     assert first.bboxes == (BoundingBox(page=1, left=0.0, top=0.0, right=10.0, bottom=10.0),)
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_page_sizes_round_trip_with_integer_keys(make_repository):
+    """JSON object keys are strings; the repository must hand back the same
+    int-keyed mapping the chunker produced, not the string-keyed one a naive
+    JSONField round-trip would leave behind."""
+    repo, record_id = make_repository()
+    chunks = (Chunk(text="X", content="X", context_path=(), sequence=0, token_count=1),)
+    original = ChunkSet(
+        chunks=chunks,
+        strategy_id="fixed-window",
+        options=ChunkingOptions(max_tokens=50),
+        content_hash=chunkset_hash(chunks),
+        page_sizes={1: (612.0, 792.0), 2: (612.0, 792.0)},
+    )
+
+    repo.save(record_id=record_id, extraction_hash="hash-1", chunk_set=original)
+    persisted = repo.get_active(record_id)
+
+    assert persisted.chunk_set.page_sizes == {1: (612.0, 792.0), 2: (612.0, 792.0)}
+    assert all(isinstance(k, int) for k in persisted.chunk_set.page_sizes)
+
+
+# --------------------------------------------------------------------------
+# Degenerate regions (IR-113)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_a_degenerate_region_still_round_trips_as_a_bounding_box(make_repository):
+    """The flag is a rendering hint written on the way out. It must not
+    change the value the domain reads back, or the chunk would stop
+    reporting the page it came from."""
+    repo, record_id = make_repository()
+    degenerate = BoundingBox(page=3, left=72.0, top=100.0, right=72.0, bottom=100.0)
+    chunk_set = ChunkSet(
+        chunks=(
+            Chunk(
+                text="A scanned line.",
+                content="A scanned line.",
+                context_path=(),
+                sequence=0,
+                token_count=3,
+                source_page=3,
+                bboxes=(degenerate,),
+            ),
+        ),
+        strategy_id="structural-markdown-v1",
+        options=ChunkingOptions(),
+        content_hash="",
+    )
+    object.__setattr__(chunk_set, "content_hash", chunkset_hash(chunk_set.chunks))
+
+    repo.save(record_id=record_id, extraction_hash="hash-1", chunk_set=chunk_set)
+    persisted = repo.get_active(record_id)
+
+    assert persisted.chunk_set.chunks[0].bboxes == (degenerate,)

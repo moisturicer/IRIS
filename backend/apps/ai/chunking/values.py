@@ -8,6 +8,7 @@ Pure: no Django, no I/O, no clock, no randomness.
 """
 
 from dataclasses import dataclass, field
+from typing import Mapping
 
 from .document import BoundingBox
 
@@ -93,6 +94,7 @@ class ChunkSet:
     strategy_id: str
     options: ChunkingOptions
     content_hash: str
+    page_sizes: Mapping[int, tuple[float, float]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.chunks, tuple):

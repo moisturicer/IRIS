@@ -46,7 +46,7 @@ DOCUMENT = NormalizedDocument(
             kind=PARAGRAPH,
             text="Samples were collected weekly from twelve ponds.",
             page=12,
-            bbox=BoundingBox(page=12, left=72.0, top=310.5, right=540.0, bottom=352.1),
+            bboxes=(BoundingBox(page=12, left=72.0, top=310.5, right=540.0, bottom=352.1),),
         ),
         DocumentElement(kind=TABLE_ROW, text="| Tilapia | 412 g |", page=13),
     ),

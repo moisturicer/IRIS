@@ -11,6 +11,7 @@ docling-serve returns under ``document.json_content``.
 
 from apps.ai.chunking.document import (
     CAPTION,
+    BoundingBox,
     HEADING,
     LIST_ITEM,
     PARAGRAPH,
@@ -291,9 +292,19 @@ def test_a_bottomleft_bbox_is_converted_to_topleft():
     assert (element.bbox.left, element.bbox.right) == (72.0, 540.0)
 
 
-def test_a_degenerate_bbox_is_dropped_rather_than_stored():
-    """A zero-area rect draws a broken highlight. Better no region than a
-    wrong one — the page number survives either way."""
+def test_a_degenerate_bbox_is_kept_for_the_storage_layer_to_flag():
+    """Reversed deliberately by IR-113, which owns the degenerate-rect
+    policy: *"A degenerate or zero-area rectangle is stored as a sentinel
+    rather than a drawable box."*
+
+    This test previously asserted the rect was dropped here, on the
+    reasoning that no region beats a broken one. That reasoning does not
+    survive the region acceptance criteria: a chunk assembled only from
+    elements with collapsed rects would carry no region at all, and would
+    lose even the page the passage came from — while IR-113 requires every
+    chunk to carry at least one. The rect is kept, and
+    ``repositories.serialize_regions`` writes it flagged so the citation
+    overlay skips drawing it. One decision, in one place."""
     doc = _doc(
         texts=[_text_item("#/texts/0", "text", "x", page=3, bbox=_topleft(72.0, 100.0, 72.0, 100.0))]
     )
@@ -301,7 +312,10 @@ def test_a_degenerate_bbox_is_dropped_rather_than_stored():
     (element,) = normalized_document_from_docling(doc).elements
 
     assert element.page == 3
-    assert element.bbox is None
+    assert element.bboxes == (
+        BoundingBox(page=3, left=72.0, top=100.0, right=72.0, bottom=100.0),
+    )
+    assert element.bboxes[0].is_degenerate
 
 
 def test_a_missing_prov_leaves_page_and_bbox_unset():

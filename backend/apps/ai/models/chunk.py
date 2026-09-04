@@ -37,6 +37,7 @@ class ChunkSet(models.Model):
     strategy_id = models.CharField(max_length=100)
     options = models.JSONField()
     content_hash = models.CharField(max_length=64)
+    page_sizes = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -81,7 +82,6 @@ class DocumentChunk(models.Model):
     element_kinds = ArrayField(models.CharField(max_length=30), default=list, blank=True)
     bboxes = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
     class Meta:
         constraints = [
             models.UniqueConstraint(

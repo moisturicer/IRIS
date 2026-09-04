@@ -21,6 +21,17 @@ from apps.ai.models import (
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 
+@pytest.fixture(autouse=True)
+def _no_seeded_active_space():
+    """Migration 0003 seeds one active row from settings on every fresh
+    database — correct for a real deployment bootstrapping itself, but every
+    test below is exercising the active/retired invariant from a genuinely
+    empty table. Clear it so the seed doesn't collide with a test's own
+    ``state=active`` row or make "none is active" untrue before the test
+    runs anything."""
+    EmbeddingSpace.objects.all().delete()
+
+
 def test_get_active_embedding_space_raises_when_none_is_active():
     with pytest.raises(ImproperlyConfigured):
         get_active_embedding_space()

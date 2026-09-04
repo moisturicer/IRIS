@@ -15,7 +15,7 @@ deliberately the seam, not an incidental one.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from django.db import transaction
 
@@ -87,15 +87,54 @@ def _deserialize_options(data: dict) -> ChunkingOptions:
     )
 
 
-def _serialize_bboxes(bboxes: tuple) -> list:
-    return [
-        {"page": b.page, "left": b.left, "top": b.top, "right": b.right, "bottom": b.bottom}
-        for b in bboxes
-    ]
+def serialize_regions(bboxes: tuple[BoundingBox, ...]) -> list[dict[str, Any]]:
+    """Regions as stored JSON.
+
+    A degenerate rect — zero-area, or inverted by a bad scan — is kept
+    rather than dropped, because it still says which page the passage came
+    from, and carries ``degenerate: true`` so the citation overlay skips
+    drawing it. Dropping it would lose the page; drawing it would paint an
+    invisible, unclickable box and tell the reader nothing.
+    """
+    rows: list[dict[str, Any]] = []
+    for b in bboxes:
+        row = {
+            "page": b.page,
+            "left": b.left,
+            "top": b.top,
+            "right": b.right,
+            "bottom": b.bottom,
+        }
+        if b.is_degenerate:
+            row["degenerate"] = True
+        rows.append(row)
+    return rows
 
 
-def _deserialize_bboxes(data: list) -> tuple:
-    return tuple(BoundingBox(**row) for row in data)
+def deserialize_regions(rows: list[dict[str, Any]]) -> tuple[BoundingBox, ...]:
+    """The inverse. ``degenerate`` is derived from the rect itself, so it is
+    dropped on the way in rather than stored on the value object — two
+    sources for one fact is how they come to disagree. Rows written before
+    the flag existed simply do not carry the key."""
+    return tuple(
+        BoundingBox(
+            page=row["page"],
+            left=row["left"],
+            top=row["top"],
+            right=row["right"],
+            bottom=row["bottom"],
+        )
+        for row in rows
+    )
+
+
+def _serialize_page_sizes(page_sizes) -> dict:
+    # JSON object keys are strings — mirrors apps.ai.extraction.serialization.
+    return {str(page): list(size) for page, size in page_sizes.items()}
+
+
+def _deserialize_page_sizes(data: dict) -> dict:
+    return {int(page): tuple(size) for page, size in data.items()}
 
 
 class InMemoryChunkRepository:
@@ -158,6 +197,7 @@ class DjangoChunkRepository:
                 strategy_id=chunk_set.strategy_id,
                 options=_serialize_options(chunk_set.options),
                 content_hash=chunk_set.content_hash,
+                page_sizes=_serialize_page_sizes(chunk_set.page_sizes),
                 is_active=True,
             )
 
@@ -175,7 +215,7 @@ class DjangoChunkRepository:
                     token_count=chunk.token_count,
                     source_page=chunk.source_page,
                     element_kinds=sorted(chunk.element_kinds),
-                    bboxes=_serialize_bboxes(chunk.bboxes),
+                    bboxes=serialize_regions(chunk.bboxes),
                 )
                 for chunk in chunk_set.chunks
             )
@@ -209,7 +249,7 @@ class DjangoChunkRepository:
                 token_count=row.token_count,
                 source_page=row.source_page,
                 element_kinds=frozenset(row.element_kinds),
-                bboxes=_deserialize_bboxes(row.bboxes),
+                bboxes=deserialize_regions(row.bboxes),
             )
             for row in rows
         )
@@ -218,6 +258,7 @@ class DjangoChunkRepository:
             strategy_id=db_chunk_set.strategy_id,
             options=_deserialize_options(db_chunk_set.options),
             content_hash=db_chunk_set.content_hash,
+            page_sizes=_deserialize_page_sizes(db_chunk_set.page_sizes),
         )
         return PersistedChunkSet(
             id=db_chunk_set.id,

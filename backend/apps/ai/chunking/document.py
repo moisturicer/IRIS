@@ -23,6 +23,13 @@ TABLE_HEADER = "table_header"
 LIST_ITEM = "list_item"
 CAPTION = "caption"
 
+# Not mapped by the Docling adapter (see docling_mapping.py's module
+# docstring) — these arrive as Docling's own labels, carried through
+# unchanged specifically so the normalizer can drop them without guessing
+# at running headers/footers from their text.
+PAGE_HEADER = "page_header"
+PAGE_FOOTER = "page_footer"
+
 
 @dataclass(frozen=True)
 class BoundingBox:
@@ -48,16 +55,38 @@ class BoundingBox:
 class DocumentElement:
     """One structural element of a document, with where it came from.
 
-    ``page`` and ``bbox`` are optional because the chunker core does not need
-    them; they are populated once structure-preserving extraction lands, and
-    carried through to chunks so a citation can be highlighted.
+    ``page`` and ``bboxes`` are populated by the extraction adapter (CURRENT
+    — ``apps.ai.extraction.docling_mapping``, IR-107) and carried through to
+    chunks so a citation can be highlighted. They stay optional because the
+    chunker core does not need them: a document assembled by hand in a test
+    chunks identically without them.
+
+    ``bboxes`` is a tuple rather than one rectangle because normalization can
+    assemble one element from several — a word hyphenated across a page break
+    becomes a single element occupying a rectangle on each page. Storing one
+    box there would truncate the highlight at the page boundary, which is the
+    evidence a reviewer most needs to see.
     """
 
     kind: str
     text: str
     level: Optional[int] = None
     page: Optional[int] = None
-    bbox: Optional[BoundingBox] = None
+    bboxes: tuple[BoundingBox, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.bboxes, tuple):
+            object.__setattr__(self, "bboxes", tuple(self.bboxes))
+
+    @property
+    def bbox(self) -> Optional[BoundingBox]:
+        """The first region — the one ``page`` refers to.
+
+        Read only by tests today. It stays because ``page`` names a single
+        page and this is the rectangle that goes with it; without it, a
+        reader has to know that ``bboxes[0]`` is the one that matches.
+        """
+        return self.bboxes[0] if self.bboxes else None
 
     @property
     def is_heading(self) -> bool:
