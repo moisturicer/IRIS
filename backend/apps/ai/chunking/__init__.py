@@ -12,6 +12,7 @@ assertion.
 Chunking runs in the Celery worker at ingestion, off the request path.
 """
 
+from .context_path import ContextPathChunker, build_context_path_chunker
 from .document import (
     CAPTION,
     HEADING,
@@ -55,6 +56,9 @@ __all__ = [
     "build_chunker",
     "register_chunker",
     "registered_strategies",
+    # context path (IR-112)
+    "ContextPathChunker",
+    "build_context_path_chunker",
     # helpers
     "chunkset_hash",
     "chunk_text_hash",
