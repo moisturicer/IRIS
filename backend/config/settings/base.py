@@ -189,6 +189,9 @@ AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-
 AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
 OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
 DOCLING_API_URL        = config("DOCLING_API_URL", default="http://docling:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction
+# A scanned thesis through OCR is minutes of work, not seconds. This bounds
+# one conversion, not the Celery retry that wraps it.
+DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)
 AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:8001") # AI Gateway endpoint
 
 # ---- Axes (brute force protection) --------------------------------------

@@ -7,7 +7,7 @@
 **Companions:** [RAG Architecture](rag_architecture.md) — the end-to-end view · [RAG Third-Party Services](rag_third_party_services_architecture.md)
 **Prior art reviewed:** `Docling-Studio/document-parser` · `teammind/packages/ai`
 
-> **Extraction status, corrected 2026-09-03.** This document assumes structured extraction output carrying `prov` page and bbox data. That input **does not exist in the tree yet**: the active path is a prototype PyMuPDF chain returning a flat string, and `PdfExtraction.extracted_text` is a plain `TextField`. The `docling` service and `DOCLING_API_URL` are already provisioned in both Compose files — only `_call_docling()` is missing. [ADR-016](adr/016-docling-structured-extraction.md) restores Docling as the extraction path per SRS §361; **IR-107 implements it and blocks the chunker.** Every stage below is written against the post-IR-107 state.
+> **Extraction status, updated 2026-09-04 — IR-107 has landed.** This document assumes structured extraction output carrying `prov` page and bbox data, and that input now exists. `backend/apps/ai/extraction/` is a `StructuredExtractor` port with Docling-serve as its only adapter; `PdfExtraction.structure` holds the serialized `NormalizedDocument`, and `PdfExtraction.as_normalized_document()` reads it back. [ADR-016](adr/016-docling-structured-extraction.md) governs it, **amended the same day to drop the PyMuPDF fallback**: a flat-text fallback produces chunks with no regions, which is the loss the ADR exists to prevent, so unavailability fails and retries instead. The chunker is no longer blocked; what is still missing is the ingestion task joining extraction to chunking.
 
 > **Revision 2 — what changed and why.** Citation provenance became a requirement: the reader must be able to click a cited passage and see it highlighted in the source PDF. That is not a display feature bolted on at the end — it decides **what the chunker consumes**. Normalizing markdown-to-markdown destroys the coordinates a highlight anchors to, so stages 3 and 4 now operate on the structured `DoclingDocument` rather than on a markdown string. Sections 3, 4, 5, 6, 9 and the new section 11 carry the change.
 
@@ -44,7 +44,7 @@ Three facts, each verified against the working tree:
 
 | Fact | Evidence |
 |---|---|
-| PDF text lands in one `TextField` per upload and stops there | [`backend/apps/documents/models.py:86`](../backend/apps/documents/models.py#L86) — `extracted_text = models.TextField(blank=True)` |
+| PDF text lands in one `TextField` per upload and stops there | [`backend/apps/documents/models.py:86`](../backend/apps/documents/models.py#L86) — `extracted_text = models.TextField(blank=True)`. **Half-fixed 2026-09-04 (IR-107):** extraction now also stores `structure`, the document the chunker consumes. It is still read by no retrieval path — the ingestion task joining extraction to chunking is what remains |
 | The only embedding in the system is over the abstract | [`backend/apps/ai/tasks.py:19`](../backend/apps/ai/tasks.py#L19) — `text = f"{record.title}. {record.abstract}"` |
 | The chunker is a stub | [`backend/apps/ai/services/text_chunker.py`](../backend/apps/ai/services/text_chunker.py) — `class TextChunkerService: pass` |
 
@@ -215,16 +215,16 @@ flowchart LR
   E --> I["6 index - pgvector"]
   classDef done fill:#ecfdf5,stroke:#059669,color:#065f46;
   classDef todo fill:#fef3c7,stroke:#d97706,color:#92400e;
-  class U done
-  class X,N,C,E,I todo
+  class U,X done
+  class N,C,E,I todo
 ```
 
 | Stage | Owner | Input | Output | Status |
 |---|---|---|---|---|
 | 1 · Upload | `backend/apps/documents` | file | `RecordUpload` | works |
-| 2 · Extract | `celery-extraction` → `docling` | PDF bytes | structure + markdown | **provisioned, not called** — IR-107 |
-| 3 · Normalize | `Normalizer` (pure) | `DoclingDocument` | `DoclingDocument` | **missing** |
-| 4 · Chunk | `Chunker` port | `DoclingDocument` | `ChunkSet` | **missing** |
+| 2 · Extract | `celery-extraction` → `docling` | PDF bytes | `NormalizedDocument` + FTS text | works — IR-107 |
+| 3 · Normalize | `Normalizer` (pure) | `NormalizedDocument` | `NormalizedDocument` | **missing** |
+| 4 · Chunk | `Chunker` port | `NormalizedDocument` | `ChunkSet` | works — IR-89 A/D, not yet called |
 | 5 · Embed | `EmbeddingProvider` port | `ChunkSet` | vectors | partial — record-level only |
 | 6 · Index | `ChunkRepository` | vectors | pgvector rows | **missing** |
 

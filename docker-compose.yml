@@ -173,7 +173,9 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DOCLING_API_URL=http://docling:5001
-      - EXTRACTION_TIMEOUT=900
+      # Read by config.settings.base.DOCLING_TIMEOUT_SECONDS. Replaces
+      # EXTRACTION_TIMEOUT, which was declared here and read by nothing.
+      - DOCLING_TIMEOUT_SECONDS=900
     depends_on:
       db:
         condition: service_healthy

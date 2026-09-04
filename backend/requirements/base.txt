@@ -9,11 +9,10 @@ celery[redis]>=5.3
 redis>=5.0
 openai>=1.30                   # FR-M4-02: GPT-4.1-mini LLM inference + FR-M3-03: third-party embeddings (text-embedding-3-small)
 pgvector>=0.3                  # FR-M3-03: vector storage in PostgreSQL (VectorField + HNSW index)
-# TODO (AI engineer): add requests>=2.31 if not already transitive — needed for Docling-serve API calls
-# TODO (AI engineer): confirm DOCLING_API_URL setting in settings/base.py points to on-prem Docling-serve instance
-#
-# REMOVE when Docling + pgvector migration is complete:
-#   (Removed legacy ML dependencies)
+# Docling-serve (FR-M3-01, ADR-016) is called over HTTP with httpx, declared
+# below and already used for the ai-gateway call. The extractor libraries the
+# prototype chain imported (unstructured, pymupdf, pytesseract) were never
+# declared here and are gone with it — extraction is one on-prem service now.
 pyexcel-xls>=0.7
 pyexcel-xlsx>=0.6
 openpyxl>=3.1                  # FR-M2-04: styled .xlsx template download
