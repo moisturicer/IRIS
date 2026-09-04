@@ -7,7 +7,11 @@ class Settings(BaseSettings):
 
     # AI Configuration
     LLM_PROVIDER: str = "openai"
-    EMBEDDING_PROVIDER: str = "openai"
+    # No EMBEDDING_PROVIDER switch: IRIS has exactly one embedding provider
+    # (ADR-015). A second switch here, independent of Django's, is how the
+    # two ends of the pipeline could silently disagree about what produced a
+    # vector — get_embedding_provider() below constructs the one adapter
+    # directly instead.
 
     # Provider-specific settings
     OPENAI_API_KEY: str = ""

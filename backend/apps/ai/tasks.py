@@ -4,7 +4,7 @@ from django.utils import timezone
 
 @shared_task(bind=True, max_retries=3)
 def embed_record(self, record_id: int):
-    from apps.ai.models import EmbeddingJob, RecordEmbedding
+    from apps.ai.models import EmbeddingJob, RecordEmbedding, assert_embedding_space_consistent
     from apps.records.models import Record
     from django.conf import settings
 
@@ -15,6 +15,12 @@ def embed_record(self, record_id: int):
         job.save(update_fields=["status", "celery_task_id"])
 
     try:
+        # Fail loudly, before spending a vendor call, if this path's own
+        # dimension has drifted from the active EmbeddingSpace (ADR-015).
+        assert_embedding_space_consistent(
+            settings.AI_EMBEDDING_DIMENSIONS, context="indexing"
+        )
+
         record = Record.objects.get(pk=record_id)
         text   = f"{record.title}. {record.abstract}"
 

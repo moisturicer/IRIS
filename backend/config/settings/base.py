@@ -185,8 +185,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # ---- AI -----------------------------------------------------------------
 
-AI_EMBEDDING_PROVIDER  = config("AI_EMBEDDING_PROVIDER", default="openai")
-AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small") 
+AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")
 AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
 OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
 DOCLING_API_URL        = config("DOCLING_API_URL", default="http://docling:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction

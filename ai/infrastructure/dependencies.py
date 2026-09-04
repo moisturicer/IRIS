@@ -20,12 +20,17 @@ def get_llm_provider() -> LLMProvider:
     return _llm_provider
 
 def get_embedding_provider() -> EmbeddingProvider:
+    """Construct the one embedding adapter directly.
+
+    No name-keyed branch here: IRIS has exactly one embedding provider
+    (ADR-015), so a switch would just be a second place, independent of
+    Django's ``EmbeddingSpace``, where the two ends of the pipeline could
+    silently disagree about what produced a vector. Swap the concrete class
+    here when the adapter changes; a test that needs a different one
+    constructs ``DeterministicFakeEmbeddingProvider`` directly rather than
+    routing through a setting.
+    """
     global _embedding_provider
     if _embedding_provider is None:
-        if settings.EMBEDDING_PROVIDER == "openai":
-            _embedding_provider = OpenAIEmbeddingProvider()
-        else:
-            raise ValueError(
-                f"Unknown EMBEDDING_PROVIDER: {settings.EMBEDDING_PROVIDER!r}"
-            )
+        _embedding_provider = OpenAIEmbeddingProvider()
     return _embedding_provider

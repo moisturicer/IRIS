@@ -14,11 +14,38 @@ class LLMProvider(ABC):
 
 class EmbeddingProvider(ABC):
     """
-    Abstract Base Class for Embedding providers.
+    Abstract Base Class for embedding providers.
+
+    Document and query embedding are separate methods, not one method with a
+    flag. Voyage-class models are asymmetric — a document and the query used
+    to retrieve it are embedded with different input types, and mixing them
+    degrades retrieval measurably (ADR-015). A boolean parameter makes the
+    wrong call possible; two methods make it impossible.
+
+    Document embedding is batched (one round trip for many chunks); query
+    embedding is single-text, because a query is embedded once per question,
+    on the request path.
     """
+
     @abstractmethod
-    async def generate_embedding(self, text: str) -> List[float]:
+    async def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
-        Generate a vector embedding for the given text.
+        Embed a batch of document texts, in order.
+
+        Returns one vector per input text, in the same order — callers rely
+        on positional correspondence to attach each vector back to its chunk.
         """
-        pass
+        raise NotImplementedError
+
+    @abstractmethod
+    async def embed_query(self, text: str) -> List[float]:
+        """
+        Embed a single query string for retrieval.
+
+        Kept distinct from ``embed_documents`` even for a provider whose
+        underlying model treats both the same way (see
+        ``OpenAIEmbeddingProvider``): the two-method shape is what prevents a
+        caller from silently mixing input types on a provider where it does
+        matter.
+        """
+        raise NotImplementedError
