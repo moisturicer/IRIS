@@ -164,6 +164,104 @@ def test_page_sizes_round_trip_with_integer_keys(make_repository):
     assert all(isinstance(k, int) for k in persisted.chunk_set.page_sizes)
 
 
+# --- incremental re-chunking (IR-115 G) ---------------------------------
+#
+# The counts below are the contract, not an implementation detail: a caller
+# decides how much of the token budget to spend from them, so the in-memory
+# repository has to report the same plan the Django one acts on.
+
+
+def _set_of(*texts: str) -> ChunkSet:
+    chunks = tuple(
+        Chunk(text=t, content=t, context_path=(), sequence=i, token_count=1)
+        for i, t in enumerate(texts)
+    )
+    return ChunkSet(
+        chunks=chunks,
+        strategy_id="fixed-window",
+        options=ChunkingOptions(),
+        content_hash=chunkset_hash(chunks),
+    )
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_a_first_rechunk_has_nothing_to_reuse(make_repository):
+    repo, record_id = make_repository()
+
+    outcome = repo.rechunk(
+        record_id=record_id, extraction_hash="h1", chunk_set=_set_of("a", "b")
+    )
+
+    assert outcome.unchanged is False
+    assert outcome.to_embed_count == 2
+    assert outcome.reused == 0
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_rechunking_identical_content_is_a_no_op(make_repository):
+    repo, record_id = make_repository()
+    repo.rechunk(record_id=record_id, extraction_hash="h1", chunk_set=_set_of("a", "b"))
+
+    outcome = repo.rechunk(
+        record_id=record_id, extraction_hash="h1", chunk_set=_set_of("a", "b")
+    )
+
+    assert outcome.unchanged is True
+    assert outcome.to_embed_count == 0
+    assert outcome.to_embed == ()
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_one_changed_chunk_is_the_only_one_to_embed(make_repository):
+    repo, record_id = make_repository()
+    repo.rechunk(record_id=record_id, extraction_hash="h1", chunk_set=_set_of("a", "b", "c"))
+
+    outcome = repo.rechunk(
+        record_id=record_id, extraction_hash="h2", chunk_set=_set_of("a", "B", "c")
+    )
+
+    assert outcome.to_embed_count == 1
+    assert outcome.reused == 2
+    assert [c.text for c in outcome.to_embed] == ["B"]
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_a_removed_chunk_is_reported(make_repository):
+    repo, record_id = make_repository()
+    repo.rechunk(record_id=record_id, extraction_hash="h1", chunk_set=_set_of("a", "b"))
+
+    outcome = repo.rechunk(
+        record_id=record_id, extraction_hash="h2", chunk_set=_set_of("a")
+    )
+
+    assert outcome.soft_deleted == 1
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_rechunk_makes_the_new_set_the_active_one(make_repository):
+    repo, record_id = make_repository()
+    repo.rechunk(record_id=record_id, extraction_hash="h1", chunk_set=_set_of("a"))
+
+    repo.rechunk(record_id=record_id, extraction_hash="h2", chunk_set=_set_of("b"))
+
+    active = repo.get_active(record_id)
+    assert [c.text for c in active.chunk_set.chunks] == ["b"]
+    assert active.extraction_hash == "h2"
+
+
+@pytest.mark.parametrize("make_repository", REPOSITORY_FACTORIES)
+def test_a_no_op_leaves_the_original_extraction_hash_in_place(make_repository):
+    """The content hash is meaning; the extraction hash is provenance. A
+    re-extraction that produces byte-identical chunks must cost nothing,
+    which means it does not get to rewrite the row either."""
+    repo, record_id = make_repository()
+    repo.rechunk(record_id=record_id, extraction_hash="h1", chunk_set=_set_of("a"))
+
+    repo.rechunk(record_id=record_id, extraction_hash="h2", chunk_set=_set_of("a"))
+
+    assert repo.get_active(record_id).extraction_hash == "h1"
+
+
 # --------------------------------------------------------------------------
 # Degenerate regions (IR-113)
 # --------------------------------------------------------------------------

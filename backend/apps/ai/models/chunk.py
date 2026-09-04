@@ -82,6 +82,13 @@ class DocumentChunk(models.Model):
     element_kinds = ArrayField(models.CharField(max_length=30), default=list, blank=True)
     bboxes = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Set when a re-chunk finds this chunk's text no longer anywhere in the
+    # document (IR-115). A tombstone, not a supersession marker: a chunk
+    # whose text carried into the new set stays null here even though its
+    # own set is no longer active. Hard-deleting instead would discard the
+    # vector that makes the *next* re-chunk cheap.
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(

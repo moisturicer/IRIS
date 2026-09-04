@@ -9,6 +9,7 @@ from .embedding_space import (
     get_active_embedding_space,
 )
 from .chunk import ChunkSet, DocumentChunk, ChunkEmbedding
+from .ingestion_job import IngestionJob
 
 __all__ = [
     "Conversation",
@@ -24,4 +25,5 @@ __all__ = [
     "ChunkSet",
     "DocumentChunk",
     "ChunkEmbedding",
+    "IngestionJob",
 ]

@@ -71,11 +71,14 @@ def test_deleting_a_record_cascades_to_chunk_embeddings():
     assert not ChunkEmbedding.objects.filter(pk=embedding.pk).exists()
 
 
-def test_replacing_a_chunk_set_also_removes_its_old_embeddings():
-    """save() deletes the previous chunk set for a record before writing the
-    new one â€” confirms that deletion actually reaches embeddings two joins
-    away, not just the chunk_set/document_chunk tables directly."""
-    record = Record.objects.create(title="Replacement test")
+def test_superseding_a_chunk_set_retains_it_and_its_embeddings():
+    """IR-89 F deleted the previous chunk set outright, and this test used
+    to assert that. IR-115 replaces the behaviour deliberately: those
+    vectors are exactly what makes the *next* re-chunk incremental, so a
+    swap deactivates the old set instead of dropping it. Cascade deletion
+    is still a real guarantee -- the two tests above are what cover it now.
+    """
+    record = Record.objects.create(title="Supersession test")
     repo = DjangoChunkRepository()
     first = repo.save(record_id=record.id, extraction_hash="h1", chunk_set=_sample_chunk_set())
 
@@ -85,9 +88,21 @@ def test_replacing_a_chunk_set_also_removes_its_old_embeddings():
         state=EmbeddingSpaceState.ACTIVE,
     )
     old_chunk = DocumentChunk.objects.get(chunk_set_id=first.id)
-    old_embedding = ChunkEmbedding.objects.create(chunk=old_chunk, space=space, embedding=[0.0] * settings.AI_EMBEDDING_DIMENSIONS)
+    old_embedding = ChunkEmbedding.objects.create(
+        chunk=old_chunk, space=space, embedding=[0.0] * settings.AI_EMBEDDING_DIMENSIONS
+    )
 
-    repo.save(record_id=record.id, extraction_hash="h2", chunk_set=_sample_chunk_set())
+    other_chunks = (Chunk(text="y", content="y", context_path=(), sequence=0, token_count=1),)
+    repo.save(
+        record_id=record.id,
+        extraction_hash="h2",
+        chunk_set=ChunkSet(
+            chunks=other_chunks,
+            strategy_id="fixed-window",
+            options=ChunkingOptions(),
+            content_hash=chunkset_hash(other_chunks),
+        ),
+    )
 
-    assert not ChunkSetModel.objects.filter(pk=first.id).exists()
-    assert not ChunkEmbedding.objects.filter(pk=old_embedding.pk).exists()
+    assert ChunkSetModel.objects.get(pk=first.id).is_active is False
+    assert ChunkEmbedding.objects.filter(pk=old_embedding.pk).exists()

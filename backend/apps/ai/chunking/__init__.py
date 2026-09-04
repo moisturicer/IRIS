@@ -13,6 +13,7 @@ Chunking runs in the Celery worker at ingestion, off the request path.
 """
 
 from .context_path import ContextPathChunker, build_context_path_chunker
+from .diff import ChunkSetDiff, diff_chunk_sets
 from .document import (
     CAPTION,
     HEADING,
@@ -41,6 +42,9 @@ __all__ = [
     "NormalizedDocument",
     "DocumentElement",
     "BoundingBox",
+    # diff (IR-115)
+    "ChunkSetDiff",
+    "diff_chunk_sets",
     "HEADING",
     "PARAGRAPH",
     "TABLE_ROW",
