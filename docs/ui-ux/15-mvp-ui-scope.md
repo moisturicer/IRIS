@@ -84,12 +84,36 @@ Four dispositions:
 | `DeclinedRecordsPage` | A filter on the queue |
 | `ApprovedProposalsPage` | A filter on the queue |
 | `UserListPage` | Django admin covers it at pilot scale |
-| `SettingsPage` | Nothing in it is per-user configurable in the MVP |
+| ~~`SettingsPage`~~ | **Reason was wrong — moved to KEEP.** See the correction below |
 | `SessionsPage` | Real, but an operator task at this scale |
 | `DownloadRequestsPage` | The download-token flow **fails at import** (`records/views.py:535–579`) |
 | `DownloadTokenPage` | Same broken flow |
 | `DeleteRequestsPage` | Not on the spine |
 | `HelpPage` | Content, not a feature. Revisit after NFR-U2 testing shows where users get stuck |
+
+**Correction — `SettingsPage` was deferred on a false premise.** Its stated reason,
+*"Nothing in it is per-user configurable in the MVP"*, was already untrue when written: the
+page changes the user's password, via `/auth/password/change/`, which is per-user
+configuration and the only way a user can do it. Three further things are per-user and real:
+name (`PATCH /users/me/`), the RA 10173 consent recorded against the account
+(`consent_given`, FR-M6-06), and the role that governs every permission check (FR-M6-02).
+Deferring the screen would have left a pilot with **no way to change a password**. It is
+therefore **KEEP**, and the count in §3 should include it.
+
+It is built to four tabs, not the six the mockup proposes. **Notification preferences** and
+**Active sessions** are deliberately absent:
+
+- *Notification preferences* — no preference, opt-in or opt-out model exists in
+  `backend/apps/`. It also cannot be a blanket switch: suppressing workflow notifications
+  would break the review loop, so the semantics need designing before any UI.
+- *Active sessions* — `/users/sessions/` is `IsAdmin` and returns **every** user's live
+  tokens. **FR-M6-05 scopes session monitoring to administrators**, so a student would get a
+  403, and widening the endpoint would expose the whole institution's sessions. Self-service
+  "your devices" is a different per-user endpoint that does not exist and is not in the SRS.
+
+Shipping either as a non-persisting panel would be exactly the dead end IR-86's acceptance
+criteria forbid, so both are filed instead.
+
 | `ImportRecordsPage` | Imported records distort turnaround metrics (`W-04`) |
 | `DocumentReviewsPage` | 13-line stub |
 | `ReviewAnalyticsPage` | 13-line stub; backend returns **501**; Module 7 is Phase 2 |

@@ -12,7 +12,18 @@ export interface User {
   is_superuser:   boolean;
   is_verified:    boolean;
   is_locked:      boolean;
+  /** RA 10173 consent, recorded at registration (FR-M6-06). Read-only. */
+  consent_given:  boolean;
   date_joined:    string;
+  /**
+   * Affiliation, read-only and derived server-side. A student's college comes
+   * through StudentProfile.course -> Department -> College; an adviser carries
+   * college and department directly. Empty string when the user has neither
+   * profile (staff roles), never null -- so the UI can render it unguarded.
+   */
+  college_name:    string;
+  department_name: string;
+  course_name:     string;
 }
 
 export interface LoginPayload {

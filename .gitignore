@@ -74,3 +74,5 @@ SDD/
 SRS/
 .gitignore
 .agents/
+# Local design mockups and captured screenshots -- never pushed.
+screenshots/
