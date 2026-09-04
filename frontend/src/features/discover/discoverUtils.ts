@@ -113,7 +113,7 @@ export function buildYearOptions(records: RecordListItem[]): string[] {
  * glance: what field it belongs to, what kind of work it is, whether it is
  * protected, and what programmes it is flagged for.
  */
-export type BadgeTone = "topic" | "type" | "ip" | "commercial" | "extension";
+export type BadgeTone = "topic" | "type" | "ip" | "commercial" | "extension" | "ongoing";
 
 /** Which icon component the card should render, if any. */
 export type BadgeIcon = "ip" | "commercial" | "extension";
@@ -133,6 +133,9 @@ export const BADGE_TONE_CLASS: Record<BadgeTone, string> = {
   ip:         "bg-blue-50 text-blue-700 border border-blue-200",
   commercial: "bg-amber-50 text-amber-800 border border-amber-200",
   extension:  "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  // Teal matches StatusBadge's own colour for `approved`, so the two never
+  // describe the same state in different colours.
+  ongoing:    "bg-teal-50 text-teal-700 border border-teal-200",
 };
 
 /** Human label for an IP type code, driven by the backend enum. */
@@ -154,6 +157,16 @@ export function metaBadges(record: RecordListItem): MetaBadge[] {
 
   if (record.record_type_name) {
     badges.push({ label: record.record_type_name, tone: "type" });
+  }
+
+  // A Proposal enters `approved` when its adviser signs off, and is publicly
+  // browsable from that moment while the research itself is still underway --
+  // SRS §Proposal flow: "approves → approved (visible as ongoing)". Without
+  // this badge nothing on the card distinguishes in-progress work from a
+  // finished, reviewed output, which is what "visible as ongoing" asks for.
+  // Only the ongoing case is marked; no badge means the work is finished.
+  if (record.pipeline_status === "approved") {
+    badges.push({ label: "Research Ongoing", tone: "ongoing" });
   }
 
   if (record.is_ip) {

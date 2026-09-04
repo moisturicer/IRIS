@@ -18,9 +18,15 @@ export const recordsApi = {
   list:           (params?: Record<string, unknown>) =>
     apiClient.get<PaginatedResponse<RecordListItem>>("/records/", { params }),
 
-  // My records — backend returns a plain array (not paginated)
+  // My records — backend returns a plain array (not paginated).
+  // RecordViewSet.mine() (the actual registered action -- MyRecordsViewSet
+  // elsewhere in views.py looks like it should serve this with
+  // RecordDetailSerializer already, but isn't wired into urls.py at all) now
+  // uses RecordDetailSerializer too, so clearances/ip_type/requested_itso
+  // etc. are really in this payload. Was mistyped as RecordListItem[] before
+  // the backend fix, matching what the endpoint used to actually return.
   mine:           (params?: Record<string, unknown>) =>
-    apiClient.get<RecordListItem[]>("/records/mine/", { params }),
+    apiClient.get<RecordDetail[]>("/records/mine/", { params }),
 
   detail:         (id: number) => apiClient.get<RecordDetail>(`/records/${id}/`),
   /**
