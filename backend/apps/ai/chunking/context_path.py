@@ -34,22 +34,17 @@ _TRUNCATION_MARKER = "..."
 _PATH_SEPARATOR = " > "
 
 
-def _heading_path_by_word(document: NormalizedDocument) -> list[tuple[str, ...]]:
-    """The heading trail active at each word of the document, in order.
+def _words_with_paths(document: NormalizedDocument) -> list[tuple[str, tuple[str, ...]]]:
+    """Every word of the document, in order, paired with the heading trail
+    active at that word.
 
     A stack keyed by heading level: a heading at level N replaces every
     entry already at level >= N, then pushes itself — the "3" then "3.2"
     nesting a numbered thesis outline produces. Every word up to the next
     heading inherits the path built so far, with the document title always
     first, so a word with no enclosing heading yet still gets a valid path.
-
-    Every registered strategy preserves word order exactly (IR-110's
-    no-content-loss property), so indexing this list by a running word count
-    over a strategy's *output* lands on the same word as this same index
-    into the *input* — which is what lets the decorator attribute a path to
-    a chunk without knowing anything about how that chunk was produced.
     """
-    path_by_word: list[tuple[str, ...]] = []
+    words_with_paths: list[tuple[str, tuple[str, ...]]] = []
     stack: list[tuple[int, str]] = []
 
     for element in document.elements:
@@ -61,9 +56,37 @@ def _heading_path_by_word(document: NormalizedDocument) -> list[tuple[str, ...]]
             stack = [(lv, text) for lv, text in stack if lv < level]
             stack.append((level, element.text.strip()))
         path = (document.title,) + tuple(text for _, text in stack)
-        path_by_word.extend([path] * len(words))
+        words_with_paths.extend((word, path) for word in words)
 
-    return path_by_word
+    return words_with_paths
+
+
+def _advance_cursor(
+    document_words: list[str], cursor: int, chunk_words: list[str]
+) -> int:
+    """How far a chunk's content actually moves the cursor through the
+    document's word list.
+
+    Not always ``len(chunk_words)``: a strategy is free to repeat content
+    verbatim — the structural cascade repeats a table's header row in every
+    fragment it splits that table into (IR-111), so a chunk's word count can
+    exceed how much *new* document content it actually contains. Repeated
+    content is always a prefix of the chunk reproducing words that appeared
+    earlier in the document, never a reordering or new material, so the
+    genuinely new portion is the chunk's longest *trailing* run of words
+    that lines up with the document's next unconsumed words — the greedy
+    longest match is what excludes a repeated leading header rather than
+    miscounting it as new content.
+
+    For a chunk with no repetition (the common case), the longest such run
+    is the whole chunk, so this returns exactly ``len(chunk_words)`` — the
+    same as the naive count would have.
+    """
+    max_length = min(len(chunk_words), len(document_words) - cursor)
+    for length in range(max_length, 0, -1):
+        if chunk_words[len(chunk_words) - length :] == document_words[cursor : cursor + length]:
+            return cursor + length
+    return cursor
 
 
 def _truncate_middle(path: tuple[str, ...], max_tokens: int) -> tuple[str, ...]:
@@ -113,15 +136,16 @@ class ContextPathChunker:
         if not inner_set.chunks:
             return inner_set
 
-        path_by_word = _heading_path_by_word(document)
+        words_with_paths = _words_with_paths(document)
+        document_words = [word for word, _ in words_with_paths]
         last_path = (document.title,)
         cursor = 0
         decorated: list[Chunk] = []
 
         for chunk in inner_set.chunks:
-            path = path_by_word[cursor] if cursor < len(path_by_word) else last_path
+            path = words_with_paths[cursor][1] if cursor < len(words_with_paths) else last_path
             last_path = path
-            cursor += count_tokens(chunk.content)
+            cursor = _advance_cursor(document_words, cursor, chunk.content.split())
 
             path = _truncate_middle(path, options.context_path_max_tokens)
             prefix = _PATH_SEPARATOR.join(path)

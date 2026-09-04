@@ -15,7 +15,7 @@ from apps.ai.chunking import (
     registered_strategies,
 )
 from apps.ai.chunking.context_path import ContextPathChunker, _truncate_middle
-from apps.ai.chunking.document import HEADING, PARAGRAPH
+from apps.ai.chunking.document import HEADING, PARAGRAPH, TABLE_HEADER, TABLE_ROW
 from apps.ai.chunking.tokens import count_tokens
 
 ALL_STRATEGIES = sorted(registered_strategies())
@@ -86,6 +86,40 @@ def test_embedded_text_begins_with_the_context_path_but_content_does_not():
     )
     assert "Optimization of Tilapia Feed Conversion" not in chunk.content
     assert "Samples were collected weekly" in chunk.content
+
+
+def test_a_repeated_table_header_does_not_desync_the_cursor():
+    """The structural cascade repeats a table's header row in every fragment
+    it splits that table into (IR-111). A cursor that naively advances by a
+    chunk's full word count over-counts on every fragment after the first,
+    racing ahead of the true document position — regression test for that.
+    """
+    document = doc(
+        DocumentElement(kind=HEADING, text="1 Results", level=1),
+        DocumentElement(kind=TABLE_HEADER, text="Col1 Col2 Col3 Col4"),
+        *[
+            DocumentElement(kind=TABLE_ROW, text=f"r{i} a b c")
+            for i in range(20)
+        ],
+        DocumentElement(kind=HEADING, text="2 Discussion", level=1),
+        DocumentElement(kind=PARAGRAPH, text="This is the discussion section text."),
+    )
+    options = ChunkingOptions(
+        strategy="structural-markdown-v1", max_tokens=15, merge_short_siblings=False
+    )
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    table_chunks = [c for c in result.chunks if TABLE_ROW in c.element_kinds]
+    assert table_chunks, "the table must have actually been split into fragments"
+    for chunk in table_chunks:
+        assert chunk.context_path[-1] == "1 Results", (
+            "a table fragment drifted into the next section's heading path: "
+            f"{chunk.context_path!r} for {chunk.content!r}"
+        )
+
+    last_chunk = result.chunks[-1]
+    assert last_chunk.context_path[-1] == "2 Discussion"
+    assert "discussion section" in last_chunk.content
 
 
 def test_a_chunk_with_no_enclosing_heading_still_gets_a_valid_path():
