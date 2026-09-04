@@ -1,6 +1,6 @@
 from .conversation import Conversation, ChatMessage
 from .summary import DocumentSummary
-from .metadata import DocumentMetadata, DocumentChunk
+from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, EmbeddingJob
 from .embedding_space import (
     EmbeddingSpace,
@@ -8,17 +8,20 @@ from .embedding_space import (
     assert_embedding_space_consistent,
     get_active_embedding_space,
 )
+from .chunk import ChunkSet, DocumentChunk, ChunkEmbedding
 
 __all__ = [
     "Conversation",
     "ChatMessage",
     "DocumentSummary",
     "DocumentMetadata",
-    "DocumentChunk",
     "RecordEmbedding",
     "EmbeddingJob",
     "EmbeddingSpace",
     "EmbeddingSpaceState",
     "get_active_embedding_space",
     "assert_embedding_space_consistent",
+    "ChunkSet",
+    "DocumentChunk",
+    "ChunkEmbedding",
 ]
