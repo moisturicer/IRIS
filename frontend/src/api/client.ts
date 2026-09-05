@@ -49,11 +49,22 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Captured before the refresh starts so a logout that lands while it is in
+    // flight can be detected once it settles -- see auth.store.ts's sessionEpoch.
+    const epochAtRefreshStart = useAuthStore.getState().sessionEpoch;
+
     try {
       // Every request that 401s during the same window joins this one promise, so
       // the refresh token -- which the server rotates and blacklists on use -- is
       // spent exactly once. See lib/tokenRefresh.ts.
       const tokens = await refreshOnce(() => requestNewTokens(refreshToken));
+
+      if (useAuthStore.getState().sessionEpoch !== epochAtRefreshStart) {
+        // The session that asked for this refresh was logged out while it was in
+        // flight. Applying the result now would silently re-authenticate a
+        // browser the user already signed out of -- discard it instead.
+        return Promise.reject(error);
+      }
 
       // Write through the store, which is the single token store: it updates
       // sessionStorage via authStorage and re-renders anything reading auth
