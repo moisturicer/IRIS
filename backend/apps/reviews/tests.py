@@ -4,7 +4,7 @@ Tests for apps.reviews.services — the sequential/clearance state machine.
 Run with (see apps/records/tests.py docstring for why the dotted path matters):
     docker compose exec -T backend python manage.py test apps.reviews.tests
 
-Covers ADR-016 (Proposed): conditional parallel-office routing. Before this,
+Covers ADR-018 (Proposed): conditional parallel-office routing. Before this,
 approve_record() created a hardcoded clearance set per record_type
 (Project -> ITSO+KTTO, Thesis/Research -> IERC+KTTO). These tests lock in the
 new behaviour: the office set comes from what the submitter (and, eventually,

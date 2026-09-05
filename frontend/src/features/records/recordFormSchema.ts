@@ -53,7 +53,7 @@ export const recordFormSchema = z.object({
   for_commercialization: z.boolean().default(false),
   community_extension:   z.boolean().default(false),
 
-  // Ethics trigger + conditional office routing (ADR-016, Proposed).
+  // Ethics trigger + conditional office routing (ADR-018, Proposed).
   // requires_ethics_review has no upstream flag to derive from -- it's its
   // own question. requested_itso/ierc/ktto are the submitter's actual
   // request; PaperDetailsStep pre-checks them from the flags above but the

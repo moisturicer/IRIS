@@ -8,7 +8,7 @@
  * Only the fixed bookends are shown here — real `<input type="radio">`
  * elements (native arrow-key roving, not reimplemented) plus
  * `lib/submissionRoutes.ts`'s bookend map. Two things this step deliberately
- * does NOT show, per the grilled redesign (ADR-016, Proposed):
+ * does NOT show, per the grilled redesign (ADR-018, Proposed):
  *
  *  - A full route pill-chain with fixed offices (e.g. "IERC + KTTO" for every
  *    Thesis/Research). Which offices review a disclosure is no longer type-

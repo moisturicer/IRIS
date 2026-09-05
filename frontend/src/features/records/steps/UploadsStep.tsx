@@ -43,7 +43,7 @@ interface UploadsStepProps {
   onManuscriptChange?: (file: File | null) => void;
   /**
    * Manuscript only, no per-type UploadSlot list. Used by the Submit
-   * Disclosure wizard (ADR-016, Proposed): only the manuscript is required at
+   * Disclosure wizard (ADR-018, Proposed): only the manuscript is required at
    * submission — the real UploadSlot list is large (13 required items for
    * Thesis/Research) and unconditional, which works against NFR-U2 rather
    * than for it (IR-118). Everything else is attached later from the

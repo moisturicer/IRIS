@@ -1,7 +1,7 @@
 /**
  * Route bookends per record type, for the Submit Disclosure wizard.
  *
- * Only the parts of the route that are actually fixed by type. Under ADR-016
+ * Only the parts of the route that are actually fixed by type. Under ADR-018
  * (Proposed), which of ITSO/IERC/KTTO review a Thesis/Research or Project
  * disclosure is no longer determined by type alone — the submitter requests
  * offices in step 2 based on what the disclosure actually involves, and RDCO

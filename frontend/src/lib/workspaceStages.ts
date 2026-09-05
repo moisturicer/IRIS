@@ -3,7 +3,7 @@
  *
  * Grilled with the user before building this (see iris-my-workspace-design
  * memory): the mockup's "stage N of 7" bar doesn't hold up once a record's
- * office involvement is conditional (ADR-016) — a record can legitimately
+ * office involvement is conditional (ADR-018) — a record can legitimately
  * skip stages, so there is no fixed N. IP Assessment (ITSO/IERC) and
  * Commercialization (KTTO) are also genuinely *parallel*, not sequential
  * positions on one bar; a case can be in both at once. This derives a
@@ -100,7 +100,7 @@ export function inCommercialization(record: RecordDetail): boolean {
 
 /**
  * The office(s) actually holding a case up right now, for the card's "Office"
- * line. Not the ADR-016 request -- what's genuinely pending. Falls back to
+ * line. Not the ADR-018 request -- what's genuinely pending. Falls back to
  * who owns the *current sequential* stage when there's no clearance yet.
  */
 export function currentOfficeLabel(record: RecordDetail): string {

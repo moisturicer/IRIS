@@ -14,7 +14,7 @@
  * undecided (D-4). See iris-submit-disclosure-design memory for the search
  * that confirmed this. This step stays manual entry — real, not fabricated.
  *
- * Also collects the ADR-016 (Proposed) office-routing questions: an ethics
+ * Also collects the ADR-018 (Proposed) office-routing questions: an ethics
  * trigger with no upstream flag to derive from, and the actual office
  * request (ITSO/IERC/KTTO), pre-checked from the IP/ethics answers above but
  * independently overridable — the student decides, the system suggests.
@@ -335,7 +335,7 @@ export function PaperDetailsStep() {
         </label>
       </fieldset>
 
-      {/* Office routing (ADR-016, Proposed) — Proposal has no parallel
+      {/* Office routing (ADR-018, Proposed) — Proposal has no parallel
           offices at all; ITSO only applies to Project (see submissionRoutes). */}
       {hasOfficeRouting && (
         <fieldset className="border border-gray-200 rounded-xl p-4">
