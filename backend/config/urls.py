@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.conf.urls.static import static
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -20,4 +19,9 @@ urlpatterns = [
 if settings.DEBUG:
     import debug_toolbar
     urlpatterns = [path("__debug__/", include(debug_toolbar.urls))] + urlpatterns
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# MEDIA_URL is deliberately not routed, in DEBUG or anywhere else (IR-152 / S-01).
+# Django's static() helper would serve every upload with no permission check, and
+# "only in development" is not much comfort when development is where real theses
+# get loaded to try the workflow out. Uploads go through
+# RecordUploadDownloadView / RecordFileDownloadView, which check ownership.
