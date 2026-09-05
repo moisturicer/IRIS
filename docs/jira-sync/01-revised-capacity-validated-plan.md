@@ -12,7 +12,7 @@
 | v1 | v2 |
 |---|---|
 | Reorganised the 51 existing issues into the new backlog | **The 51 are frozen as legacy.** New Kanban built fresh; old issues linked, not reused |
-| 56 cards, no effort estimates | **41 cards, every one estimated**, summed against capacity |
+| 56 cards, no effort estimates | **48 cards, every one estimated**, summed against capacity |
 | Commercialization deferred pending confirmation | **Committed workstream** — 6 cards, W11–W15 |
 | No capacity check | **Full capacity validation. The plan does not fit — see §5** |
 
@@ -51,7 +51,17 @@ The 51 issues are **not** the foundation of Semester 2. They are Semester 1 hist
 
 ---
 
-## 4 · New Semester 2 Active Kanban — 41 cards
+## 4 · New Semester 2 Active Kanban — 48 cards
+
+> **Card count corrected.** Earlier revisions of this document said "41 cards".
+> The tables below have always contained **48**, and the 61.5 dev-day total is
+> the correct sum of those 48 rows — only the label was wrong.
+>
+> **Two cards were added after this plan was written** and are *not* in the 61.5
+> total: **IR-105** (Jira/Git traceability convention) and **IR-106** (resolve the
+> AI gateway architecture contradiction). The active board therefore holds **50
+> cards**. Both are documentation-only and were absorbed within the W1-W2
+> allocation; neither changes the 102% finding, which was already over capacity.
 
 Five new epics. Legacy epics stay untouched.
 
@@ -251,7 +261,7 @@ SEMESTER 2 ACTIVE KANBAN  ◄─────────────────
    P2 MVP Supporting    10 cards   12.5 d
    Commercialization     6 cards    9.5 d
                         ─────────────────
-                        41 cards   61.5 d
+                        48 cards   61.5 d
    P3 Post-MVP          no cards — docs/architecture-tasks/12-scope-cuts.md
 ```
 
@@ -280,7 +290,7 @@ Priority: P0 → `Highest`, P1 → `High`, P2 → `Medium`. **No assignees — t
 | 3 | **Is out-of-band payment evidence acceptable?** (§3) | `C-01` | If payment must be *inside* IRIS: 8–15 dev-days that do not exist |
 | 4 | **Will the SRS amendment for Docling-serve deferral be accepted?** | `P0-12` | SRS-specified in four places |
 | 5 | **Is CIT-U infrastructure confirmed, or is the interim VPS final?** | `P0-07` | Migration stays documented, not built |
-| 6 | **Jira issue-type scheme** | All 41 cards | Proposed as Story under Epic; will map to Task/Subtask if the scheme requires |
+| 6 | **Jira issue-type scheme** | All 48 cards | Proposed as Story under Epic; will map to Task/Subtask if the scheme requires |
 
 ---
 

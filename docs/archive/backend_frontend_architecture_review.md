@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-31
 **Scope:** `backend/` (6,371 lines of non-migration Python) and `frontend/src/` (11,181 lines across 128 files)
-**Companion document:** [Architecture Review & AWS Roadmap](architecture_review_and_aws_roadmap.md) — covers the `ai/` gateway, the RAG pipeline, and the production AWS path. This document covers everything else, and revises the hosting recommendation for capstone scale.
+**Companion document:** Architecture Review & AWS Roadmap (a companion working document, not committed to this repository) — covers the `ai/` gateway, the RAG pipeline, and the production AWS path. This document covers everything else, and revises the hosting recommendation for capstone scale.
 
 Churn over the last 80 commits: `frontend/src` accounts for 281 file-touches, all backend apps combined roughly 200. `features/records`, `features/auth` and `components/layout` are the hot spots, so the frontend candidates are weighted accordingly.
 
@@ -599,7 +599,7 @@ Everything below passes the deletion test: removing it concentrates the codebase
 | Budget VPS | Hetzner, Contabo or similar — 8 GB shared-vCPU box, Docker Compose, Caddy for TLS | ~$6–15 | The pragmatic default. Predictable, boring, one machine to reason about. Hetzner is the usual price leader; Contabo is cheaper per GB but slower disks. |
 | Managed free tiers, stitched | Neon or Supabase for Postgres (both ship pgvector), Upstash for Redis, Fly.io or Render for containers, Cloudflare Pages or Netlify for the SPA | $0–20 | No server to patch, and the SPA gets a CDN for free. But four vendors, four dashboards, and free tiers that sleep on idle — a cold start in front of a panel is a bad demo. Celery workers are the awkward part; most free tiers assume a web process. |
 | Student credits | GitHub Student Developer Pack bundles DigitalOcean and other credits; Azure for Students and AWS Educate grant credit without a card | $0 until credit runs out | Fine for the defence window, dangerous as a plan — the bill arrives after the credit does. Use it to buy a comfortable VPS for a year, not to build habits around managed services you cannot afford later. |
-| The AWS plan | ECS Fargate, RDS, ElastiCache, ALB, NAT Gateway — see the [AWS roadmap](architecture_review_and_aws_roadmap.md) | ~$350–450 | Right for a production university deployment with an ops owner, wrong for a capstone. The NAT Gateway and ALB alone cost more per month than a VPS that runs the entire stack. Keep that document as the "if this gets adopted" path. |
+| The AWS plan | ECS Fargate, RDS, ElastiCache, ALB, NAT Gateway — see the AWS roadmap (not committed to this repository) | ~$350–450 | Right for a production university deployment with an ops owner, wrong for a capstone. The NAT Gateway and ALB alone cost more per month than a VPS that runs the entire stack. Keep that document as the "if this gets adopted" path. |
 
 > All figures are order-of-magnitude and change frequently — verify current pricing before committing. Free-tier terms in particular change without notice.
 

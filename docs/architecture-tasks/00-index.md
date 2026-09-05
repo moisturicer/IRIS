@@ -28,7 +28,7 @@ Every classification below was made against that number. Where something is defe
 | [01-foundation.md](01-foundation.md) | CI, enums, requirements refactor | 3 |
 | [02-backend.md](02-backend.md) | Boot blockers, Celery, `apps/ai`, querysets | 9 |
 | [03-frontend.md](03-frontend.md) | Tokens, pilot surface, dead code | 5 |
-| [04-workflow.md](04-workflow.md) | **Thesis-critical** — transition table, policies, instrumentation | 6 |
+| [04-workflow.md](04-workflow.md) | **Thesis-critical** — transition table, policies, instrumentation | 7 |
 | [05-security.md](05-security.md) | Media, authorization, `is_staff`, config | 7 |
 | [06-rag.md](06-rag.md) | Minimum pipeline, timeboxed | 6 |
 | [07-saas.md](07-saas.md) | Instance-per-tenant, configuration boundaries | 4 |
@@ -69,7 +69,7 @@ Nothing else can be validated, demonstrated or safely deployed until these clear
 
 | ID | Task | Cx |
 |---|---|---|
-| `D-01` | Both Compose files build `ai-gateway` from `./ai`, which does not exist | S |
+| `D-01` | Both Compose files build `ai-gateway` from `./ai`; since `7f73e97` the directory exists, but Compose also requires `./ai/.env`, which does not, and ADR-012 rejects deploying the service | S |
 | `D-02` | Prod maps `80:80`; nginx-unprivileged listens on 8080 — frontend unreachable | S |
 
 ### Public-deployment safety blockers
@@ -103,6 +103,7 @@ Nothing else can be validated, demonstrated or safely deployed until these clear
 | `W-02` | Restart-all resubmission policy | The controlled comparison ([ADR-004](../adr/004-restart-all-comparison-mode.md)) |
 | `W-03` | Transaction boundaries on transitions | Office-specific clearance integrity |
 | `W-04` | Audit decisions + time-on-task instrumentation | Preserved clearances · turnaround · auditability |
+| `W-07` | Serialize clearance state (`clearances[]`, `route[]`, `resubmission{}`) | Makes the contribution observable to the UI and the evaluation |
 | `T-03` | Transition tests across both policies | Correctness of the model |
 | `V-03` | Manual-process baseline collection | Real-world comparator |
 | `V-04` | Scenario-based evaluation design | Controlled N when pilot volume is small |

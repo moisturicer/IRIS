@@ -92,7 +92,7 @@ python manage.py runserver
 # NOTE: there is no pytest config and no test files yet
 
 # Docker  (repo root)
-docker compose up --build          # currently FAILS: ai-gateway builds from ./ai which does not exist
+docker compose up --build          # currently FAILS: ai-gateway requires ./ai/.env, which does not exist
 docker compose config              # validate without building
 ```
 
