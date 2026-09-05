@@ -257,20 +257,27 @@ Celery does not currently consume its own queue ([IR-83](https://citiris.atlassi
 and a scheduled reminder would silently never fire. Bookmarks are `localStorage`, with
 the same no-server-state caveat as My Library.
 
-**Resolved.** This was open against IR-86 (now **[IR-160](https://citiris.atlassian.net/browse/IR-160)** —
-*Reduce the pilot surface to 16 screens*), whose acceptance criteria were *"16 routes remain"* and
-*"Every remaining nav item leads somewhere real"*.
+**One criterion met, one recommended for a human to close out.** This was open against IR-86 (now
+**[IR-160](https://citiris.atlassian.net/browse/IR-160)** — *Reduce the pilot surface to 16
+screens*), whose acceptance criteria were *"16 routes remain"* and *"Every remaining nav item leads
+somewhere real"*. IR-160 itself is explicit that its scope question — is the target still 16, or is
+this document amended — **"is a human scope decision, not one to settle in a commit."** Nothing
+below settles it; the second criterion is closed, the first is a recommendation for whoever owns
+that decision.
 
 The second is **met**: no nav item is a placeholder. The last two `comingSoon` entries — Review
 Analytics and Document Reviews, both already **DEFER** in §2 as 13-line stubs, one of them backed by
 an endpoint that returns 501 — were removed from the nav and the router, along with the Storage
 entry before them. A badge promising a screen that is not coming is worse than the screen's absence.
 
-The first is **deliberately not met, and is withdrawn as a criterion.** The count is not 16 and will
-not be; see the note at the top of this document and [§10](#10--the-surface-by-role). The reader-side
-section IR-160 anticipated ("either §2 gains a reader-side section... or these routes come out") is
-what §10 became — it covers Discover, My Library and Calls & Conferences by naming the role that
-sees them, rather than by arguing them past a number.
+The first is **deliberately not met.** The count is not 16 today, and this document's
+recommendation — pending the human sign-off IR-160 reserves — is to withdraw it as a criterion
+rather than delete working screens to reach it; see the note at the top of this document and
+[§10](#10--the-surface-by-role). The reader-side section IR-160 anticipated ("either §2 gains a
+reader-side section... or these routes come out") is what §10 became — it covers Discover, My
+Library and Calls & Conferences by naming the role that sees them, rather than by arguing them past
+a number. **IR-160 should stay open, not be closed as Resolved, until that recommendation is
+ratified or rejected.**
 
 ---
 
