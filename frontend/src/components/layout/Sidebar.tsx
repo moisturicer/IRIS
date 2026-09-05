@@ -177,12 +177,6 @@ export function Sidebar({ className }: SidebarProps) {
       icon: "fa-bell",
       badge: unreadCount,
     },
-    // Storage removed from the nav: apps/storage is slated for deletion
-    // (scope-cuts SC-01/FE-03, Jira IR-62) and overlaps DocumentsPage, so a
-    // "coming soon" entry pointed at something that is never coming. IR-86's
-    // acceptance criteria rule out exactly this ("no route renders a
-    // coming-soon placeholder"; "every remaining nav item leads somewhere
-    // real"). The backend app and its known auth holes stay IR-62's job.
     { to: "/settings", label: "Settings & Profile", icon: "fa-cog" },
   ];
 

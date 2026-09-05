@@ -53,20 +53,31 @@ Governed by [ADR-009](../adr/009-authorization-model.md). **This is the weakest 
 
 ## 4 · File and document access
 
-**The highest-severity finding.** `frontend/nginx.conf:52-56` serves the media volume directly:
+**Was the highest-severity finding. Closed by [IR-152](https://citiris.atlassian.net/browse/IR-152) (`S-01`), PR #26.**
+
+`frontend/nginx.conf` used to serve the media volume directly:
 
 ```nginx
-location /media/ {
+location /media/ {              # removed
     alias /usr/share/nginx/html/media/;
     expires 30d;
 }
 ```
 
-`RecordUpload.file` uses `upload_to="documents/"`, so filenames derive from the uploaded name and are guessable. **Every uploaded document is readable at `https://host/media/documents/<filename>` with no authentication.**
+`RecordUpload.file` uses `upload_to="documents/"`, so filenames derive from the uploaded name and are guessable — every uploaded document was readable at `https://host/media/documents/<filename>` with no authentication. Demonstrated on a real upload before the fix:
 
-This is currently masked only by the production port mismatch. **Fixing the port without removing this route exposes every document in the system.**
+```
+before: GET /media/abstracts/thesis-manuscript.pdf  ->  200
+after :                                             ->  404
+```
 
-Correct path: files served only through `RecordUploadDownloadView` / `RecordFileDownloadView`, which already check permissions.
+It was masked only by the production port mismatch, so fixing the port first would have exposed every document in the system. That ordering constraint is now discharged.
+
+**Three routes served those files, and all three are gone:** the nginx `location` block, the `media_files` mount into the prod web container, and Django's `static(MEDIA_URL)` route under `DEBUG` — the last of which meant uploads were unauthenticated in every developer environment, not just production.
+
+Files are served only through `RecordUploadDownloadView` / `RecordFileDownloadView`, which check record ownership and write an audit event. Regression guards live in `apps/documents/tests.py`; note that the two asserting on `nginx.conf` and `docker-compose.prod.yml` **skip inside the backend container**, which mounts only `backend/`, so they run only on a full checkout.
+
+If download throughput ever matters, the answer is `X-Accel-Redirect` — nginx serves the bytes, Django still authorises — never a public alias.
 
 ---
 
@@ -137,7 +148,7 @@ Two consequences: the audit log cannot answer any question about the workflow, a
 
 | # | Risk | Severity | Status | Item |
 |---|---|---|---|---|
-| 1 | Every uploaded document publicly readable via `/media/` | **Critical** | Open | IR-59 |
+| 1 | ~~Every uploaded document publicly readable via `/media/`~~ | **Critical** | **Closed** — route removed, 200 → 404 verified | IR-152 (PR #26) |
 | 2 | Any authenticated user can read any record via `retrieve` | **Critical** | Open | IR-60 |
 | 3 | Six `documents/` endpoints without ownership checks | **Critical** | Open | IR-60 |
 | 4 | Six `storage` endpoints without authorization | **High** | Open — closed by deletion | IR-62 |
