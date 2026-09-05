@@ -81,9 +81,29 @@ class IsAdmin(BasePermission):
 
 
 class IsOpportunityPoster(BasePermission):
-    """RDCO, KTTO or Adviser — or any Django staff account. See IR-121."""
+    """
+    Who may post a call, and who may then edit or delete one. See IR-121.
+
+    `has_permission` gates *posting* by role: RDCO, KTTO or Adviser (or Django
+    staff). `has_object_permission` gates *editing an existing posting*, and the
+    two are deliberately different — without the second, every Adviser in the
+    university could rewrite or delete RDCO's grant announcements, because they
+    share a role bucket. Role membership answers "may you post?", never "is this
+    yours?".
+
+    The rule mirrors `IsOwnerOrStaff` below: the person who posted it, or an
+    admin (RDCO/KTTO/Django staff) acting as a moderator. An Adviser can edit
+    only their own call; RDCO and KTTO can correct anyone's, which is what an
+    institutional noticeboard needs when a deadline changes and the poster is
+    unavailable. Narrow that to poster-only if the team prefers.
+    """
     def has_permission(self, request, view):
         return is_django_staff(request.user) or get_role_name(request.user) in OPPORTUNITY_POSTER_ROLES
+
+    def has_object_permission(self, request, view, obj):
+        if is_django_staff(request.user) or get_role_name(request.user) in ADMIN_ROLES:
+            return True
+        return obj.posted_by_id == request.user.pk
 
 
 class IsOwnerOrStaff(BasePermission):

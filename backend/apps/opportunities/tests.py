@@ -116,6 +116,53 @@ class OpportunityPermissionTests(APITestCase):
         self.opportunity.refresh_from_db()
         self.assertEqual(self.opportunity.title, "CIT-U Seed Grant")
 
+    def test_a_poster_cannot_edit_another_posters_call(self):
+        """
+        Role membership answers "may you post?", never "is this yours?".
+
+        Every Adviser shares a role bucket with every other Adviser, so a
+        role-only check would let any of them rewrite or delete a colleague's
+        call. Caught by review: the first version of `IsOpportunityPoster` had
+        no `has_object_permission` at all.
+        """
+        theirs = make_opportunity(title="Adviser's Own Call", posted_by=self.adviser)
+        url = reverse("opportunity-detail", args=[theirs.pk])
+
+        other_adviser = make_user("adviser2@cit.edu", "Adviser")
+        self.client.force_authenticate(other_adviser)
+
+        self.assertEqual(
+            self.client.patch(url, {"title": "Hijacked"}, format="json").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN)
+
+        theirs.refresh_from_db()
+        self.assertEqual(theirs.title, "Adviser's Own Call")
+
+    def test_a_poster_can_edit_their_own_call(self):
+        mine = make_opportunity(title="My Own Call", posted_by=self.adviser)
+        url = reverse("opportunity-detail", args=[mine.pk])
+
+        self.client.force_authenticate(self.adviser)
+        response = self.client.patch(url, {"title": "Corrected"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        mine.refresh_from_db()
+        self.assertEqual(mine.title, "Corrected")
+
+    def test_an_admin_can_moderate_another_posters_call(self):
+        """RDCO/KTTO can correct anyone's posting — a deadline outlives its poster."""
+        theirs = make_opportunity(title="Adviser's Own Call", posted_by=self.adviser)
+        url = reverse("opportunity-detail", args=[theirs.pk])
+
+        self.client.force_authenticate(self.rdco)
+        response = self.client.patch(url, {"title": "Deadline Corrected"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        theirs.refresh_from_db()
+        self.assertEqual(theirs.title, "Deadline Corrected")
+
     def test_posted_by_is_the_request_user_not_client_supplied(self):
         """A poster must not be able to attribute a call to somebody else."""
         self.client.force_authenticate(self.rdco)
