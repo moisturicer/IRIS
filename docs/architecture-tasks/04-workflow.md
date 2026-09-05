@@ -452,3 +452,91 @@ The bypass documented as a deliberate, audited capability in the SDD.
 
 ## Definition of Done
 Merged; tests green; the status decision recorded in `F-03`.
+
+---
+
+# W-07 · Serialize clearance state so the contribution is observable
+
+## Objective
+Expose each record's per-office clearance rows, its computed route, and its resubmission history through the API, so the thesis contribution is visible to the interface and measurable by the evaluation.
+
+## Problem
+**The thesis contribution has no API representation.** `RecordClearance` (`reviews/models.py:43`) is the model that carries type-differentiated routing, parallel multi-office clearance and clearance-aware resubmission — the entire claimed contribution. Its own docstring states the behaviour: *"only that office's row is reset to `pending`; other offices' clearance progress is preserved."*
+
+It appears in **no serializer**. `records/serializers.py` and `reviews/serializers.py` never reference it.
+
+Consequently a client can read a record's `pipeline_status` but cannot learn which offices must clear it, which have cleared, which declined, or which clearances were preserved across a resubmission. The UI/UX review found five of the eight required workflow communications absent for exactly this reason — office clearance status, pending offices, approved offices, the declining office, and preserved clearances.
+
+This is not a presentation gap. **A contribution that no API exposes cannot be demonstrated in a defence or measured in an evaluation.**
+
+## Evidence
+- `backend/apps/reviews/models.py:43` — `RecordClearance`, with `related_name="clearances"` on `Record`
+- `grep -rn "RecordClearance" backend/apps/records/serializers.py backend/apps/reviews/serializers.py` — no matches
+- Fields available and unexposed: `office`, `status`, `reviewed_by`, `comment`, `created_at`, `updated_at`
+- `unique_together = ("record", "office")` — the per-office row is already the right shape to serialize
+
+## Current State
+Clearance state is written correctly by the workflow and readable only from the database or the Django admin.
+
+## Proposed State
+`GET /api/records/<id>/` returns:
+
+- `clearances[]` — one entry per office row: `office`, `status`, `reviewed_by`, `comment`, `updated_at`
+- `route[]` — the offices this record type requires, in the order the type demands, including offices not yet instantiated as rows
+- `resubmission{}` — which office declined, which clearances were preserved, and the resubmission count
+
+`route[]` matters as much as `clearances[]`: for a Project the IERC row does not exist until ITSO clears, so a client reading only `clearances[]` cannot render "IERC — not yet started" and the parallel structure stays invisible.
+
+## Scope
+A `RecordClearanceSerializer`; a nested read-only `clearances` field on the record detail serializer; a `route` computed from the record type via the transition table; a `resubmission` summary object. Read-only throughout — clearance is mutated by the workflow, never by a client write to this field.
+
+## Out of Scope
+The UI components that consume this (`P1-07`, `P1-08`). Write endpoints for clearance. Workflow event history — that is `W-04`.
+
+## Technical Approach
+Serializer-layer only; no model change and no migration. Prefetch `clearances` on the record detail queryset to avoid an N+1. `route` derives from `W-01`'s transition table rather than a second hard-coded copy of the routing rules — if it is duplicated here it will drift from the workflow it describes.
+
+## Dependencies
+`W-01` for the route derivation. Independent of `W-04`.
+
+## Risks
+Low technically. The real risk is sequencing: every clearance-related UI task and the evaluation's observability both sit behind this, so scheduling it late blocks work that cannot start without it.
+
+## Security Impact
+Clearance rows carry reviewer identity and comments. The serializer must respect the same visibility predicate as the parent record — a client that cannot read the record must not read its clearances, and reviewer comments should follow the record's existing disclosure rules rather than being exposed more broadly than the record itself.
+
+## Performance Impact
+Neutral with `prefetch_related("clearances")`. Without it, one query per record on list endpoints.
+
+## SaaS Impact
+None. Clearance offices are per-institution configuration already carried by the record type.
+
+## Research/Thesis Impact
+**Direct.** Without this, clearance-aware resubmission cannot be shown in the interface, demonstrated in the defence, or measured by the evaluation instrument. `W-04` supplies the event history; this supplies the current state. The contribution needs both.
+
+## MVP Classification
+MVP BLOCKER — the contribution is unobservable without it
+
+## Priority
+P1
+
+## Complexity
+S
+
+## Acceptance Criteria
+- [ ] `GET /api/records/<id>/` includes `clearances[]` with office, status, reviewer and timestamp per row.
+- [ ] `route[]` lists every office the record's type requires, including those with no row yet, in the required order.
+- [ ] `resubmission{}` names the declining office and the clearances preserved across the reset.
+- [ ] A Project and a Thesis of equivalent state return different `route[]` values.
+- [ ] After a clearance-office decline and resubmit, the response shows the declining office `pending` and the others still `cleared`.
+- [ ] A user who cannot retrieve the record cannot retrieve its clearances.
+- [ ] Record detail issues a constant number of queries regardless of clearance count.
+
+## Testing Requirements
+Serializer tests over both record types; a resubmission test asserting preservation is visible in the response; an authorization test; a query-count assertion.
+
+## Documentation Requirements
+The three fields documented in the SDD's API section as the observable form of the contribution.
+
+## Definition of Done
+Per `docs/engineering/WORK_ITEM_LIFECYCLE.md` §9. Tests green with recorded evidence; `docs/testing/TRACEABILITY.md` updated.

@@ -1,5 +1,6 @@
 from django.apps import AppConfig
 
-class StorageConfig(AppConfig):
+
+class OpportunitiesConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "apps.storage"
+    name = "apps.opportunities"

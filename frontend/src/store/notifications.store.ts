@@ -22,5 +22,8 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
       unreadCount: Math.max(0, s.unreadCount - 1),
     })),
 
-  markAllRead: () => set({ unreadCount: 0 }),
+  // Clears items too, not just the count. `items` holds only unread rows (see
+  // setItems), so leaving them behind would render a populated list against a
+  // zeroed badge -- visible in the header bell, which lists from `items`.
+  markAllRead: () => set({ items: [], unreadCount: 0 }),
 }));

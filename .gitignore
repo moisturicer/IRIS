@@ -75,4 +75,5 @@ SRS/
 .gitignore
 .agents/
 # Local design mockups and captured screenshots -- never pushed.
+# Local design captures and scratch screenshots — not part of the repo
 screenshots/

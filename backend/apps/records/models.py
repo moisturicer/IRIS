@@ -48,6 +48,12 @@ class CollaborationType(models.Model):
 
 # ---- Core record --------------------------------------------------------
 
+#: The single definition of "a record any authenticated user may read".
+#: Used by the public record list AND by AI retrieval, so a generated citation
+#: can never point at a record the reader is not allowed to open.
+PUBLICLY_VISIBLE_STATUSES = ("published", "approved", "completed")
+
+
 class RecordManager(models.Manager):
     """Default queryset excludes soft-deleted records."""
     def get_queryset(self):
@@ -55,6 +61,10 @@ class RecordManager(models.Manager):
 
     def with_deleted(self):
         return super().get_queryset()
+
+    def publicly_visible(self):
+        """Records readable by any authenticated user. Keep this the only predicate."""
+        return self.get_queryset().filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
 
 
 class Record(models.Model):
@@ -103,6 +113,21 @@ class Record(models.Model):
     is_ip                   = models.BooleanField(default=False)
     for_commercialization   = models.BooleanField(default=False)
     community_extension     = models.BooleanField(default=False)
+
+    # Ethics trigger (ADR-018) -- IERC's SRS-defined scope is human/animal
+    # subjects and sensitive data, which none of the flags above cover.
+    requires_ethics_review  = models.BooleanField(default=False)
+
+    # Conditional parallel-office routing (ADR-018, Proposed -- extends
+    # ADR-002's transition table rather than replacing it). The submitter
+    # requests offices here; apps.reviews.services.approve_record() reads
+    # these at rdco_intake to decide which RecordClearance rows to create,
+    # instead of a hardcoded set per record_type. requested_itso only takes
+    # effect for Project -- Thesis/Research never routes through ITSO,
+    # matching the structural distinction the type already encodes.
+    requested_itso           = models.BooleanField(default=False)
+    requested_ierc           = models.BooleanField(default=False)
+    requested_ktto           = models.BooleanField(default=False)
 
     # Structured IP classification type (FR-M5-05)
     IP_TYPE_CHOICES = [

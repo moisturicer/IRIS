@@ -1,334 +1,413 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { recordsApi } from "@/api/records";
-import { authApi } from "@/api/auth";
-import { useAuth } from "@/hooks/useAuth";
-import { useAuthStore } from "@/store/auth.store";
+import { accountsApi } from "@/api/accounts";
+import { useUIStore } from "@/store/ui.store";
 import { Spinner } from "@/components/ui/Spinner";
+import { IP_TYPE_LABELS } from "@/types/records";
 import type { RecordListItem } from "@/types/records";
-import {
-  DISCOVER_QUICK_CHIPS,
-  buildTrendingTopics,
-  chipToSearchTerm,
-  pickSpotlightAndRecent,
-} from "@/lib/discoverUtils";
-import { RecentIndexedRow, SearchResultCard, SpotlightCard } from "./DiscoverRecordCard";
+import { DiscoverRecordCard } from "./DiscoverRecordCard";
+import { ALL_VALUE, type FilterOption } from "./DiscoverFilterDropdown";
+import { DiscoverFilterPanel, EMPTY_FILTERS, type DiscoverFilters } from "./DiscoverFilterPanel";
+import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
+import { PaperCiteModal } from "./PaperCiteModal";
+import { buildYearOptions } from "./discoverUtils";
+import { NotificationBell } from "@/components/layout/NotificationBell";
+import { cn } from "@/lib/utils";
+
+const PAGE_SIZE = 12;
+
+/**
+ * Saved views. Each maps to a real query.
+ *
+ * "For you" has no personalisation signal available — `User` carries no college
+ * or interest data — so it is the default recency feed. Kept because the agreed
+ * design shows it; revisit once the profile exposes something to rank on.
+ */
+const VIEWS = [
+  { id: "for-you", label: "For you", params: { ordering: "-created_at" } },
+  { id: "latest", label: "Latest", params: { ordering: "-created_at" } },
+  { id: "viewed", label: "Most Viewed", params: { ordering: "-access_count" } },
+  { id: "ip", label: "IP & Patents", params: { ordering: "-created_at", is_ip: true } },
+] as const;
+
+type ViewId = (typeof VIEWS)[number]["id"] | "theses";
 
 export default function DiscoverPage() {
-  const { logout } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
-  const [papers, setPapers] = useState<RecordListItem[]>([]);
+  const [records, setRecords] = useState<RecordListItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeResults, setActiveResults] = useState<RecordListItem[] | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
+  const [activeQuery, setActiveQuery] = useState(searchParams.get("q") ?? "");
 
-  const loadPublished = useCallback(async (search?: string) => {
-    setLoadError(null);
-    const params: Record<string, unknown> = { ordering: "-created_at", page_size: 24 };
-    if (search?.trim()) params.search = search.trim();
-    const { data } = await recordsApi.list(params);
-    return data.results ?? [];
+  const [view, setView] = useState<ViewId>("for-you");
+  const [filters, setFilters] = useState<DiscoverFilters>(EMPTY_FILTERS);
+  const [filterSignal, setFilterSignal] = useState(0);
+
+  const [classifications, setClassifications] = useState<FilterOption[]>([]);
+  const [colleges, setColleges] = useState<FilterOption[]>([]);
+  const [recordTypes, setRecordTypes] = useState<FilterOption[]>([]);
+  const [refLoading, setRefLoading] = useState(true);
+
+  const [citeRecord, setCiteRecord] = useState<RecordListItem | null>(null);
+  const [yearPool, setYearPool] = useState<RecordListItem[]>([]);
+
+  /* ── Reference data drives every filter list ────────────────────────── */
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.allSettled([
+      recordsApi.classifications(),
+      accountsApi.colleges(),
+      recordsApi.recordTypes(),
+    ])
+      .then(([classRes, collegeRes, typeRes]) => {
+        if (cancelled) return;
+        if (classRes.status === "fulfilled") {
+          setClassifications(
+            (classRes.value.data.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+          );
+        }
+        if (collegeRes.status === "fulfilled") {
+          setColleges(
+            (collegeRes.value.data.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+          );
+        }
+        if (typeRes.status === "fulfilled") {
+          setRecordTypes(
+            (typeRes.value.data.results ?? []).map((t) => ({ value: String(t.id), label: t.name })),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRefLoading(false);
+      });
+
+    return () => { cancelled = true; };
   }, []);
 
+  /* "Theses" is a real record type, so the tab resolves to its id at runtime. */
+  const thesesTypeId = useMemo(
+    () => recordTypes.find((t) => /thesis|research/i.test(t.label))?.value ?? null,
+    [recordTypes],
+  );
+
+  /* ── Debounce the search box into the query + the URL ───────────────── */
   useEffect(() => {
-    loadPublished()
-      .then(setPapers)
-      .catch(() => setLoadError("Could not load published records. Is the backend running?"))
-      .finally(() => setLoading(false));
-  }, [loadPublished]);
+    const handle = setTimeout(() => {
+      setActiveQuery(searchInput.trim());
+      const next = new URLSearchParams(searchParams);
+      if (searchInput.trim()) next.set("q", searchInput.trim());
+      else next.delete("q");
+      setSearchParams(next, { replace: true });
+    }, 300);
 
-  const handleSearch = async (queryStr: string) => {
-    setSearchQuery(queryStr);
-    if (!queryStr.trim()) {
-      setActiveResults(null);
-      return;
+    return () => clearTimeout(handle);
+    // `searchParams`/`setSearchParams` are intentionally excluded — including
+    // them would re-fire this effect on every URL write and loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
+  /* ── The query the API actually understands ─────────────────────────── */
+  const queryParams = useMemo(() => {
+    const preset =
+      view === "theses"
+        ? { ordering: "-created_at", ...(thesesTypeId ? { record_type: thesesTypeId } : {}) }
+        : VIEWS.find((v) => v.id === view)!.params;
+
+    const params: Record<string, unknown> = { page_size: PAGE_SIZE, ...preset };
+
+    if (activeQuery) params.search = activeQuery;
+    if (filters.topics.length > 0) params.classification = filters.topics.join(",");
+    if (filters.colleges.length > 0) params.college = filters.colleges.join(",");
+    if (filters.year !== ALL_VALUE) {
+      params.year_from = filters.year;
+      params.year_to = filters.year;
     }
-    setSearching(true);
-    try {
-      const results = await loadPublished(queryStr);
-      setActiveResults(results);
-    } catch {
-      setActiveResults([]);
-    } finally {
-      setSearching(false);
-    }
+    if (filters.ipType !== ALL_VALUE) params.ip_type = filters.ipType;
+    if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;
+
+    return params;
+  }, [view, thesesTypeId, activeQuery, filters]);
+
+  /* Guard against a slow early request overwriting a newer one. */
+  const requestSeq = useRef(0);
+
+  useEffect(() => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
+    setError(null);
+
+    recordsApi
+      .list({ ...queryParams, page: 1 })
+      .then(({ data }) => {
+        if (seq !== requestSeq.current) return;
+        const results = data.results ?? [];
+        setRecords(results);
+        setTotalCount(data.count ?? results.length);
+        setPage(1);
+        setYearPool((prev) => {
+          const seen = new Set(prev.map((r) => r.id));
+          const added = results.filter((r) => !seen.has(r.id));
+          return added.length > 0 ? [...prev, ...added] : prev;
+        });
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return;
+        setRecords([]);
+        setTotalCount(0);
+        setError("Could not load records. Is the backend running?");
+      })
+      .finally(() => {
+        if (seq === requestSeq.current) setLoading(false);
+      });
+  }, [queryParams]);
+
+  const loadMore = useCallback(() => {
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    recordsApi
+      .list({ ...queryParams, page: nextPage })
+      .then(({ data }) => {
+        setRecords((prev) => [...prev, ...(data.results ?? [])]);
+        setPage(nextPage);
+      })
+      .catch(() => setError("Could not load more records."))
+      .finally(() => setLoadingMore(false));
+  }, [page, queryParams]);
+
+  const yearOptions = useMemo<FilterOption[]>(
+    () => [
+      { value: ALL_VALUE, label: "Any year" },
+      ...buildYearOptions(yearPool).map((y) => ({ value: y, label: y })),
+    ],
+    [yearPool],
+  );
+
+  const ipTypeOptions = useMemo<FilterOption[]>(
+    () => [
+      { value: ALL_VALUE, label: "Any IP type" },
+      ...Object.entries(IP_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+    ],
+    [],
+  );
+
+  const recordTypeOptions = useMemo<FilterOption[]>(
+    () => [{ value: ALL_VALUE, label: "Any record type" }, ...recordTypes],
+    [recordTypes],
+  );
+
+  const activeFilterCount =
+    filters.topics.length +
+    filters.colleges.length +
+    (filters.year !== ALL_VALUE ? 1 : 0) +
+    (filters.ipType !== ALL_VALUE ? 1 : 0) +
+    (filters.recordType !== ALL_VALUE ? 1 : 0);
+
+  const resetAll = () => {
+    setSearchInput("");
+    setFilters(EMPTY_FILTERS);
+    setView("for-you");
   };
 
-  const handleChipClick = (chip: string) => {
-    handleSearch(chipToSearchTerm(chip));
-  };
+  const tabs: { id: ViewId; label: string }[] = [
+    ...VIEWS.map((v) => ({ id: v.id as ViewId, label: v.label })),
+    { id: "theses", label: "Theses" },
+  ];
 
-  const handleClearSearch = () => {
-    setSearchQuery("");
-    setActiveResults(null);
-  };
-
-  const handleSignOut = async () => {
-    const refresh = useAuthStore.getState().refreshToken ?? "";
-    await authApi.logout(refresh).catch(() => {});
-    logout();
-  };
-
-  const { spotlight, recent } = pickSpotlightAndRecent(papers);
-  const trendingTags = buildTrendingTopics(papers);
+  const hasMore = records.length < totalCount;
 
   return (
-    <div className="-mx-4 sm:-mx-7 -mt-4 sm:-mt-7 flex flex-col min-h-[calc(100vh-58px)] bg-slate-50/50">
-      {/* Discover sub-header (wireframe) */}
-      <header className="px-6 sm:px-8 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0 sticky top-0 z-30">
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-          <Link to="/" className="hover:text-brand transition-colors">
-            Home
-          </Link>
-          <span className="text-slate-300">/</span>
-          <span className="text-slate-800 font-semibold">Discover</span>
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+      {/* ── Top bar. Spans the full width, unlike the centred record column. ── */}
+      <header className="bg-white border-b border-stone-200 px-4 sm:px-7 py-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-stone-200 flex items-center justify-center text-stone-600"
+          aria-label="Toggle navigation"
+        >
+          <i className="fas fa-bars text-sm" />
+        </button>
+
+        <span className="w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
+          <i className="fas fa-compass text-[12px]" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-[16px] font-bold text-stone-900 leading-tight truncate">
+            IRIS Discovery
+          </h1>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 leading-tight">
+            Institutional Knowledge Base
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-slate-800 text-xs font-semibold transition"
-          >
-            <i className="fas fa-sign-out-alt text-[13px]" />
-            <span className="hidden sm:inline">Sign Out</span>
-          </button>
+
+        {/* AppShell hides the shared Header on "/" and "/ai" (isFullBleed), so
+            this page carries its own -- and has to carry the bell with it,
+            or Discover is the one screen where new notifications are
+            invisible. Same NotificationBell component; it reads the shared
+            store, so its count stays in step with the sidebar badge. */}
+        <div className="ml-auto shrink-0">
+          <NotificationBell />
         </div>
       </header>
 
-      <div className="p-6 sm:p-8 max-w-7xl mx-auto w-full space-y-8 flex-1">
-        {/* Hero */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-[#611616] via-[#751d1d] to-[#942727] text-white px-6 sm:px-8 py-12 md:py-16 shadow-lg border border-[#802222]">
-          <div
-            className="absolute inset-0 opacity-10 pointer-events-none"
-            style={{
-              backgroundImage:
-                "linear-gradient(to right, #808080 1px, transparent 1px), linear-gradient(to bottom, #808080 1px, transparent 1px)",
-              backgroundSize: "14px 24px",
-            }}
+      <div className="w-full max-w-5xl mx-auto px-4 sm:px-7 py-5 flex-1 flex flex-col">
+
+        <DiscoverSearchComposer
+          value={searchInput}
+          onChange={setSearchInput}
+          onAddFilter={() => setFilterSignal((n) => n + 1)}
+        />
+
+        {/* ── Filter + saved views + result count ───────────────────────── */}
+        <div className="flex flex-wrap items-center gap-3 mt-5 mb-4">
+          <DiscoverFilterPanel
+            filters={filters}
+            onChange={setFilters}
+            onClear={() => setFilters(EMPTY_FILTERS)}
+            activeCount={activeFilterCount}
+            topicOptions={classifications}
+            collegeOptions={colleges}
+            yearOptions={yearOptions}
+            ipTypeOptions={ipTypeOptions}
+            recordTypeOptions={recordTypeOptions}
+            loading={refLoading}
+            openSignal={filterSignal}
           />
-          <div className="absolute right-0 top-0 w-96 h-96 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative max-w-3xl mx-auto text-center flex flex-col items-center">
-            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white leading-tight">
-              Explore CIT-U&apos;s Institutional Knowledge Base
-            </h1>
-            <p className="mt-2 text-xs sm:text-sm text-red-200/90 font-medium tracking-wide uppercase">
-              Powered by Retrieval-Augmented Generation (RAG)
-            </p>
-
-            <div className="mt-8 w-full max-w-2xl relative flex items-center bg-white rounded-full shadow-md p-1.5 border border-red-950/20 focus-within:ring-2 focus-within:ring-red-200 transition">
-              <i className="fas fa-search text-slate-400 text-[14px] ml-3 shrink-0" />
-              <input
-                type="text"
-                placeholder="Ask a research question, or search by keyword, author, or abstract..."
-                value={searchQuery}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSearchQuery(v);
-                  if (!v.trim()) setActiveResults(null);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch(searchQuery)}
-                className="w-full pl-3 pr-24 py-2.5 text-sm text-slate-800 outline-none placeholder-slate-400 bg-transparent"
-              />
+          <div
+            role="tablist"
+            aria-label="Saved views"
+            className="flex items-center gap-1 p-1 bg-stone-100/80 rounded-full overflow-x-auto"
+          >
+            {tabs.map((tab) => (
               <button
+                key={tab.id}
+                role="tab"
+                aria-selected={view === tab.id}
                 type="button"
-                onClick={() => handleSearch(searchQuery)}
-                disabled={searching}
-                className="absolute right-1.5 px-5 py-2 bg-[#721c1c] text-white hover:bg-[#5b1616] disabled:opacity-70 rounded-full text-xs font-semibold tracking-wide shadow-sm transition-colors"
+                onClick={() => setView(tab.id)}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-colors",
+                  view === tab.id
+                    ? "bg-white text-stone-900 shadow-card"
+                    : "text-stone-500 hover:text-stone-900",
+                )}
               >
-                {searching ? "…" : "Search"}
+                {tab.label}
               </button>
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <span className="text-[11px] text-red-200/80 uppercase font-mono tracking-wider font-semibold mr-1">
-                Suggested:
-              </span>
-              {DISCOVER_QUICK_CHIPS.map((chip) => (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => handleChipClick(chip)}
-                  className="px-3.5 py-1 text-xs font-medium rounded-full bg-red-900/40 text-red-100 hover:bg-white/10 hover:text-white transition-colors border border-red-100/10"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
+
+          <span className="ml-auto text-[12px] text-stone-400 font-medium whitespace-nowrap">
+            {loading ? "Loading…" : `${totalCount} record${totalCount === 1 ? "" : "s"}`}
+          </span>
         </div>
 
+        {/* ── Feed ──────────────────────────────────────────────────────── */}
         {loading ? (
-          <div className="flex justify-center py-20">
+          <div className="py-24 flex flex-col items-center justify-center gap-3">
             <Spinner />
+            <span className="text-xs text-stone-400 font-medium">Searching the repository…</span>
           </div>
-        ) : loadError ? (
-          <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
-            <p className="text-sm text-red-600 font-medium">{loadError}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setLoading(true);
-                loadPublished().then(setPapers).finally(() => setLoading(false));
-              }}
-              className="mt-4 text-xs font-semibold text-brand hover:underline"
-            >
-              Retry
-            </button>
-          </div>
-        ) : activeResults !== null ? (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Search Results</h2>
-                <p className="text-xs text-slate-400 mt-1 font-mono">
-                  Found {activeResults.length} matching records for &quot;{searchQuery}&quot;
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                className="flex items-center gap-1 text-xs text-[#721c1c] font-semibold hover:underline"
-              >
-                <i className="fas fa-arrow-left text-[12px]" />
-                Return to Discover
-              </button>
+        ) : error ? (
+          <EmptyState icon="fa-triangle-exclamation" tone="error" title="Something went wrong" body={error} />
+        ) : records.length === 0 ? (
+          <EmptyState
+            icon="fa-book-open"
+            title="No research papers found"
+            body={
+              activeFilterCount > 0 || activeQuery
+                ? "No records match your current search and filters."
+                : "Nothing has been published yet. Records appear here once they clear review."
+            }
+            action={
+              activeFilterCount > 0 || activeQuery
+                ? { label: "Reset all filters", onClick: resetAll }
+                : undefined
+            }
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4">
+              {records.map((record) => (
+                <DiscoverRecordCard
+                  key={record.id}
+                  record={record}
+                  searchHighlight={activeQuery}
+                  onCite={() => setCiteRecord(record)}
+                />
+              ))}
             </div>
 
-            {activeResults.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                <i className="fas fa-search text-4xl text-slate-300 mb-3" />
-                <h3 className="font-medium text-slate-700 text-base">No matches found</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-                  Try different keywords, an author name, or a classification chip above.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {activeResults.map((record) => (
-                  <SearchResultCard
-                    key={record.id}
-                    record={record}
-                  />
-                ))}
+            {hasMore && (
+              <div className="flex justify-center mt-6">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="px-5 py-2.5 rounded-full border border-stone-200 bg-white text-stone-700 hover:border-brand hover:text-brand text-xs font-bold transition disabled:opacity-60 flex items-center gap-2"
+                >
+                  {loadingMore ? <Spinner size="sm" /> : <i className="fas fa-arrow-down text-[10px]" />}
+                  <span>{loadingMore ? "Loading…" : `Load more (${totalCount - records.length} left)`}</span>
+                </button>
               </div>
             )}
-          </div>
-        ) : papers.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
-            <p className="text-sm text-slate-600">No published records yet.</p>
-            <Link to="/records/add" className="mt-3 inline-block text-xs font-semibold text-brand hover:underline">
-              Submit a disclosure
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-10">
-            <section>
-              <h2 className="text-lg font-bold text-slate-800 tracking-tight mb-4">
-                Spotlight Research
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {spotlight.map((record, index) => (
-                  <SpotlightCard
-                    key={record.id}
-                    record={record}
-                    index={index}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <section className="lg:col-span-2 space-y-4">
-                <h2 className="text-lg font-bold text-slate-800 tracking-tight">
-                  Recently Indexed
-                </h2>
-                <div className="space-y-4">
-                  {recent.length === 0 ? (
-                    <p className="text-xs text-slate-400">No additional records to show.</p>
-                  ) : (
-                    recent.map((record) => (
-                      <RecentIndexedRow key={record.id} record={record} />
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <aside className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm h-fit space-y-4">
-                <h2 className="text-sm font-bold text-slate-800 tracking-wider uppercase">
-                  Trending Topics at CIT-U
-                </h2>
-                <div className="flex flex-col gap-2">
-                  {trendingTags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => handleSearch(tag)}
-                      className="w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 border border-slate-100 bg-slate-50/50 hover:bg-red-50 hover:text-[#721c1c] hover:border-red-100 transition flex items-center gap-1.5"
-                    >
-                      <span className="text-[#721c1c] font-bold">#</span>
-                      <span className="truncate">{tag}</span>
-                    </button>
-                  ))}
-                </div>
-              </aside>
-            </div>
-            {/* Research Analytics — Coming Soon */}
-            <section>
-              <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-lg font-bold text-slate-800 tracking-tight">
-                  Research Analytics
-                </h2>
-                <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200 uppercase tracking-wider">
-                  Coming Soon
-                </span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Classification Distribution placeholder */}
-                <div className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-6 min-h-[180px] flex flex-col justify-between overflow-hidden">
-                  <p className="text-[12px] font-semibold text-slate-400 mb-3">
-                    Classification Distribution
-                  </p>
-                  <div className="flex items-end gap-1.5 h-20 opacity-20">
-                    {[55, 80, 40, 95, 65, 50, 75, 45].map((h, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 bg-slate-200 rounded-t"
-                        style={{ height: `${h}%` }}
-                      />
-                    ))}
-                  </div>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 backdrop-blur-[1px]">
-                    <i className="fas fa-chart-bar text-2xl text-slate-200 mb-2" />
-                    <span className="text-[12px] text-slate-400 font-medium">In development</span>
-                  </div>
-                </div>
-
-                {/* PSCED Distribution placeholder */}
-                <div className="relative bg-white rounded-2xl border border-slate-100 shadow-sm p-6 min-h-[180px] flex flex-col justify-between overflow-hidden">
-                  <p className="text-[12px] font-semibold text-slate-400 mb-3">
-                    PSCED Field Distribution
-                  </p>
-                  <div className="space-y-2 opacity-20">
-                    {[75, 55, 90, 40, 65].map((w, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div className="h-3 bg-slate-200 rounded-full" style={{ width: `${w}%` }} />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/75 backdrop-blur-[1px]">
-                    <i className="fas fa-chart-pie text-2xl text-slate-200 mb-2" />
-                    <span className="text-[12px] text-slate-400 font-medium">In development</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
+          </>
         )}
       </div>
+
+      <PaperCiteModal
+        record={citeRecord}
+        isOpen={Boolean(citeRecord)}
+        onClose={() => setCiteRecord(null)}
+      />
+    </div>
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  body,
+  action,
+  tone = "neutral",
+}: {
+  icon: string;
+  title: string;
+  body: string;
+  action?: { label: string; onClick: () => void };
+  tone?: "neutral" | "error";
+}) {
+  return (
+    <div className="py-16 flex flex-col items-center justify-center text-center bg-white rounded-2xl border border-stone-200 px-6">
+      <div
+        className={cn(
+          "w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-[18px]",
+          tone === "error" ? "bg-red-50 text-red-400" : "bg-stone-100 text-stone-400",
+        )}
+      >
+        <i className={cn("fas", icon)} />
+      </div>
+      <h3 className="text-[15px] font-bold text-stone-900">{title}</h3>
+      <p className="text-[13px] text-stone-500 mt-1 max-w-sm">{body}</p>
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          className="mt-4 px-4 py-2 bg-brand hover:bg-brand-light text-white text-[12px] font-bold rounded-lg transition"
+        >
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }

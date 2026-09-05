@@ -10,7 +10,43 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 
 ## Baseline branch
 
-**`refactor/docker-service`.** Not `main`. All work starts here.
+**`main`.** Cut every branch from it and target it in PRs.
+
+`refactor/docker-service` is **retired** — it is fully contained in `main` (`git merge-base --is-ancestor` confirms it), so cutting from it now would branch from a dead ref. Earlier guidance naming it as the baseline, or as an "integration branch" alongside `main`, is superseded by this line.
+
+## Jira and Git convention
+
+**Every development task corresponds to a Jira issue, and the issue key is the identifier that ties the whole lifecycle together.**
+
+**Branch** — `<type>/IR-XXX-short-description`, types `feature` `fix` `refactor` `test` `docs` `chore`:
+```
+feature/IR-124-rag-retrieval      fix/IR-131-pdf-validation
+test/IR-140-document-ingestion    docs/IR-150-rag-architecture
+```
+
+**Commit** — Conventional Commits with the key as scope:
+```
+feat(IR-124): implement RAG retrieval
+fix(IR-131): validate uploaded PDFs
+```
+
+**PR title** — `IR-124 Implement RAG retrieval`.
+
+### Rules
+
+1. **Identify the Jira issue before starting.** Read it and its acceptance criteria; confirm it is the right thing to work on.
+2. **Never invent a Jira issue key.** If no issue exists for substantive work, **create one first or flag it** — do not fabricate an identifier or work without one.
+3. Create the branch from the integration branch, named per the convention.
+4. Move the card to **In Progress** when you start.
+5. Implement, adding or updating tests where applicable.
+6. Run the relevant checks and record what you ran and what happened.
+7. Commit with the key in the scope. **No AI attribution** — no `Co-Authored-By`, no generated-with trailer.
+8. Push **and open the PR in the same step.** A pushed branch without a PR is incomplete work.
+9. Report CI and test status honestly, including failures and why.
+10. Update the Jira card, moving it to **In Review** only once the PR exists.
+11. **Never mark work Done because the implementation was written.** Done is defined in `docs/engineering/WORK_ITEM_LIFECYCLE.md` §9 and requires review, approval and evidence.
+
+Full specification: [`docs/engineering/SDLC.md`](docs/engineering/SDLC.md) §2-4a.
 
 ## Architecture — what actually exists
 
@@ -21,9 +57,9 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 | Database | PostgreSQL. `Record.search_vector` (GIN, weighted) is maintained and **works** |
 | Async | Celery + Redis |
 | Deployment | Docker Compose, dev and prod |
-| **AI gateway** | `ai/` exists in the tree (FastAPI, added in `7f73e97`) but **is not deployed and does not run** — it imports `ai.services.chat_service`, which does not exist, and has no authentication. **[ADR-012](docs/adr/012-ai-provider-abstraction-not-a-service.md) settles this:** the provider abstraction is ported into Django as `apps/ai/providers/`; the service is not adopted. Compose still declares `ai-gateway`; IR-58 removes it. **Do not build on `ai/`** |
+| **AI gateway** | **Adopted, not yet working.** [ADR-014](docs/adr/014-ai-gateway-as-a-service.md) (2026-09-02) **supersedes ADR-012** and accepts `ai/` as a service. It still does not boot — the package flattens under `COPY . .` so `import ai.*` fails, `ai.services.chat_service` does not exist, and `ai/api/schemas.py` imports Django, which is absent from its requirements. **IR-156** is the ticket to make it boot. Build on it only through that ticket |
 | **pgvector** | **Not yet implemented.** ADR-007 selects it; the service classes are `pass` bodies |
-| **Docling** | **Not implemented.** SRS-specified, deferred by ADR-006 pending an SRS amendment |
+| **Docling** | **Adopted, not implemented.** ADR-006 deferred it, but [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) (Accepted, 2026-09-02) **supersedes ADR-006** and brings structured extraction back in. No parsing pipeline runs yet; IR-107 |
 
 Always distinguish **CURRENT / PROPOSED / DEFERRED / LEGACY**. Do not describe a proposed component as if it exists.
 
@@ -56,7 +92,7 @@ python manage.py runserver
 # NOTE: there is no pytest config and no test files yet
 
 # Docker  (repo root)
-docker compose up --build          # currently FAILS: ai-gateway builds from ./ai which does not exist
+docker compose up --build          # currently FAILS: ai-gateway requires ./ai/.env, which does not exist
 docker compose config              # validate without building
 ```
 

@@ -3,11 +3,12 @@ from io import BytesIO
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
+from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
@@ -25,6 +26,8 @@ from .serializers import (
 )
 from .filters import RecordFilter
 from .services import soft_delete_record, parse_excel_import
+from .download_tokens import make_download_token, verify_download_token
+from .download_service import file_response_for_record
 from apps.notifications.services import (
     notify_new_record,
     notify_download_request,
@@ -55,7 +58,10 @@ class RecordViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Public list shows published research, approved (ongoing) and completed proposals
         if self.action == "list":
-            return Record.objects.filter(pipeline_status__in=("published", "approved", "completed")).select_related(
+            # distinct=True: the college/department filters join through owners.
+            return Record.objects.publicly_visible().annotate(
+                file_count=Count("files", distinct=True)
+            ).select_related(
                 "classification", "psced", "record_type", "adviser"
             ).prefetch_related("owners__user", "authors")
         return Record.objects.select_related(
@@ -70,11 +76,29 @@ class RecordViewSet(viewsets.ModelViewSet):
         return RecordDetailSerializer
 
     def get_permissions(self):
-        if self.action in ("update", "partial_update", "destroy"):
+        # "submit" belongs here too: it transitions someone's draft into the
+        # review pipeline, which is exactly the kind of object-level action
+        # update/partial_update/destroy are already gated on. It was missing --
+        # any authenticated user (not just the owner or staff) could submit
+        # another user's draft. Found while wiring the Submit Disclosure wizard
+        # (IR-88); see apps/records/tests.py::SubmitOwnershipTests.
+        if self.action in ("update", "partial_update", "destroy", "submit"):
             return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "complete":
             return [IsAuthenticated(), IsRDCO()]
-        return [IsAuthenticated()]
+        if self.action == "tags":
+            # Staff-only per the action's own docstring -- ownership is not
+            # enough here. Same dead-permission_classes-kwarg bug as "submit"
+            # (see the comment above and apps/records/tests.py::TagsPermissionTests).
+            return [IsAuthenticated(), IsStaff()]
+        # super(), not a hardcoded [IsAuthenticated()], so that an @action's own
+        # permission_classes kwarg is actually honoured -- that's what consults
+        # it. Hardcoding the fallback silently killed the IsStaff on
+        # import_excel and download_template (any authenticated user could bulk-
+        # import straight-to-published records, bypassing review entirely).
+        # Identical behaviour for actions without a kwarg: DEFAULT_PERMISSION_CLASSES
+        # is exactly [IsAuthenticated]. See tests.py::DeadPermissionKwargSweepTests.
+        return super().get_permissions()
 
     def perform_create(self, serializer):
         from .models import RecordOwner
@@ -96,7 +120,11 @@ class RecordViewSet(viewsets.ModelViewSet):
         else:
             soft_delete_record(instance, deleted_by=self.request.user)
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsOwnerOrStaff])
+    # get_permissions() below is a full override with no super() fallback, so a
+    # permission_classes kwarg here would never actually run -- that's exactly
+    # how this action ended up unprotected despite looking otherwise. Real
+    # enforcement is the "submit" branch in get_permissions().
+    @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         """
         POST /records/<id>/submit/
@@ -153,6 +181,21 @@ class RecordViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["get"])
+    def similar(self, request, pk=None):
+        """
+        GET /records/<id>/similar/ — related institutional works.
+
+        Reuses the Ask IRIS retrieval service, so "similar" means the same
+        ranking users get from search, over the same visibility predicate.
+        """
+        from apps.ai.services.retrieval import search_records
+
+        record = self.get_object()
+        seed = f"{record.title} {record.abstract or ''}".strip()
+        matches = search_records(seed, top_k=3, exclude_id=record.id)
+        return Response({"results": [s.as_dict() for s in matches]})
+
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):
         """POST /records/<id>/increment_access/"""
@@ -161,7 +204,9 @@ class RecordViewSet(viewsets.ModelViewSet):
         create_audit_event("ACCESS", request.user, record=record)
         return Response({"access_count": record.access_count + 1})
 
-    @action(detail=True, methods=["patch"], permission_classes=[IsAuthenticated, IsStaff])
+    # See the comment on get_permissions() -- a decorator-level permission_classes
+    # kwarg here would be dead code; the "tags" branch there is what enforces this.
+    @action(detail=True, methods=["patch"])
     def tags(self, request, pk=None):
         """
         PATCH /records/<id>/tags/
@@ -267,12 +312,20 @@ class RecordViewSet(viewsets.ModelViewSet):
     def mine(self, request):
         """GET /records/mine/ -- records the current user owns.
         Optional: ?pipeline_status=published,approved  (comma-separated)
+
+        Uses RecordDetailSerializer, not RecordListSerializer -- My Workspace
+        needs clearances[] to show per-office status, which the list
+        serializer doesn't carry. (There is a MyRecordsViewSet elsewhere in
+        this file with serializer_class = RecordDetailSerializer that looks
+        like it already does this -- it isn't registered in urls.py, so it
+        serves nothing. Found live: My Workspace read record.clearances
+        everywhere and always got undefined.)
         """
         qs = Record.objects.filter(owners__user=request.user).distinct()
         statuses = request.query_params.get("pipeline_status")
         if statuses:
             qs = qs.filter(pipeline_status__in=[s.strip() for s in statuses.split(",")])
-        serializer = RecordListSerializer(qs, many=True, context={"request": request})
+        serializer = RecordDetailSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
@@ -636,7 +689,17 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
             return [IsAuthenticated(), IsStaff()]
-        return [IsAuthenticated()]
+        if self.action in ("approve", "decline"):
+            # Must be explicit here. These two are wired manually in urls.py as
+            # as_view({"post": "approve"}) rather than through the router, and a
+            # manual as_view() never passes an @action's initkwargs (including
+            # permission_classes) to the view at all -- so unlike a router-
+            # registered action, even super().get_permissions() cannot recover
+            # the IsRDCO the decorator declares. Without this branch, any
+            # authenticated user could approve a delete request and soft-delete
+            # someone else's record. See tests.py::DeadPermissionKwargSweepTests.
+            return [IsAuthenticated(), IsRDCO()]
+        return super().get_permissions()
 
     def perform_create(self, serializer):
         serializer.save(requested_by=self.request.user)
