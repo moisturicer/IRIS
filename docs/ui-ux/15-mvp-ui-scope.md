@@ -1,8 +1,16 @@
 # 15 — MVP UI Scope
 
-**37 page components. 32 routes. 16 MVP screens.**
+**The pilot surface is defined per role, not as a single number — see [§10](#10--the-surface-by-role).**
 
 The scope boundary in [ADR-001](../adr/001-mvp-scope-boundary.md), applied to the interface.
+
+> **The "16 screens" target is retired.** It was set before Discover, My Library, My Workspace
+> and Calls & Conferences existed, and a single global cap cannot survive a four-role system —
+> every argument about it turns into an argument about whether an administration screen counts.
+> §2's four dispositions still bind, and §1's spine test is still the test. What changed is the
+> unit: **each role has a named surface**, and a screen is in scope when it appears on one of
+> them. §10 is that list, and it is the answer to "what does this role see?" — the question
+> this document previously could not answer.
 
 ---
 
@@ -55,7 +63,7 @@ Four dispositions:
 | `DocumentsPage` | **KEEP** | Genuinely a separate task |
 | `PendingRecordsPage` | **REDUCE** | [07](07-review-clearance.md) — becomes the one queue |
 | `EvaluationPage` | **KEEP** | [07](07-review-clearance.md) — made self-sufficient |
-| `PublishedRecordsPage` | **KEEP** | Public value of the corpus |
+| ~~`PublishedRecordsPage`~~ | **REMOVED** | Was **KEEP** (*"public value of the corpus"*). `DiscoverPage` took the browse role and the component was deleted — the corpus is still public, through Discover. See the reversal note under `DiscoverPage` in DEFER below |
 
 ### Supporting — 3 screens
 
@@ -72,14 +80,16 @@ Four dispositions:
 | `AuditLogPage` | **KEEP** | [10](10-audit-history.md) — needs `W-04`'s events |
 | `RoleRequestsPage` | **KEEP** | [11](11-saas-admin.md) — the only administration in the pilot |
 
-**That is 18 components producing 16 MVP screens** — `ForbiddenPage` and `PendingApprovalPage` are states rather than destinations.
+**That is 18 components producing 16 destinations** — `ForbiddenPage` and `PendingApprovalPage` are
+states rather than destinations. This was the original sixteen; [§10](#10--the-surface-by-role)
+supersedes it as the definition of scope, and the two differ — §10 is what is actually built.
 
 ### DEFER — 11
 
 | Page | Reason |
 |---|---|
 | `DashboardPage` | Unrouted already. `HomePage` is the landing |
-| `DiscoverPage` | Overlaps `PublishedRecordsPage`. Two browse surfaces, one corpus |
+| `DiscoverPage` | **Reversed — now KEEP, and it is the landing route.** The reasoning stands ("two browse surfaces, one corpus") but resolved the other way: Discover won and `PublishedRecordsPage` was deleted. Recorded here rather than edited away, because the original call was reversed by a decision, not by a mistake |
 | `ApprovedRecordsPage` | A filter on the queue ([07](07-review-clearance.md)) |
 | `DeclinedRecordsPage` | A filter on the queue |
 | `ApprovedProposalsPage` | A filter on the queue |
@@ -247,10 +257,81 @@ Celery does not currently consume its own queue ([IR-83](https://citiris.atlassi
 and a scheduled reminder would silently never fire. Bookmarks are `localStorage`, with
 the same no-server-state caveat as My Library.
 
-**Open against [IR-86](https://citiris.atlassian.net/browse/IR-86)** (P1-18, *Reduce the pilot
-surface to 16 screens*). Its acceptance criteria include *"16 routes remain"* and *"Every
-remaining nav item leads somewhere real"*. The second is satisfied — no view here is a
-placeholder, and Reading History is written by `PaperViewPage` rather than mocked. The
-first is not, and **that is a team decision, not an implementation one**: either §2 gains a
-reader-side section covering Discover, My Library and Calls & Conferences, or these routes
-come out before the pilot. Until it is decided, the count in §3 is understated by the rows above.
+**Resolved.** This was open against IR-86 (now **[IR-160](https://citiris.atlassian.net/browse/IR-160)** —
+*Reduce the pilot surface to 16 screens*), whose acceptance criteria were *"16 routes remain"* and
+*"Every remaining nav item leads somewhere real"*.
+
+The second is **met**: no nav item is a placeholder. The last two `comingSoon` entries — Review
+Analytics and Document Reviews, both already **DEFER** in §2 as 13-line stubs, one of them backed by
+an endpoint that returns 501 — were removed from the nav and the router, along with the Storage
+entry before them. A badge promising a screen that is not coming is worse than the screen's absence.
+
+The first is **deliberately not met, and is withdrawn as a criterion.** The count is not 16 and will
+not be; see the note at the top of this document and [§10](#10--the-surface-by-role). The reader-side
+section IR-160 anticipated ("either §2 gains a reader-side section... or these routes come out") is
+what §10 became — it covers Discover, My Library and Calls & Conferences by naming the role that
+sees them, rather than by arguing them past a number.
+
+---
+
+## 10 · The surface, by role
+
+Read off `frontend/src/router/index.tsx` and `components/layout/Sidebar.tsx` as built, not aspirational.
+**This section is the scope boundary.** A screen is in the MVP when it appears below.
+
+Roles come from `backend/core/permissions.py`: `REVIEWER_ROLES` = Adviser, KTTO, RDCO, ITSO, IERC ·
+`STAFF_ROLES` = KTTO, RDCO, ITSO, IERC · Django admin is `is_staff`/`is_superuser`.
+
+### Every signed-in user — 8
+
+| Screen | Route | Group |
+|---|---|---|
+| Discover | `/` | Research Exploration |
+| Ask IRIS | `/ai` | Research Exploration |
+| My Library | `/records/mine` | Research Exploration |
+| Calls & Conferences | `/opportunities` | Research Exploration |
+| Submit Disclosure | `/records/add` | IP Management |
+| My Workspace | `/workspace` | IP Management |
+| Notifications | `/notifications` | Tools |
+| Settings & Profile | `/settings` | Tools |
+
+**This is the student surface** — a student sees these eight and nothing else. Every other role sees
+these eight *plus* the sections below, because every role also submits and browses.
+
+### + Reviewer — 3, or 4 for RDCO
+
+`REVIEWER_ROLES`. Rendered behind `isReviewer`.
+
+| Screen | Route |
+|---|---|
+| Pending Records | `/review/pending` |
+| Approved | `/review/approved` |
+| Declined | `/review/declined` |
+| Approved Proposals *(RDCO only)* | `/review/approved-proposals` |
+
+### + Staff — 4, or 6 for a Django admin
+
+`STAFF_ROLES`. Rendered behind `isStaff`.
+
+| Screen | Route | Gate |
+|---|---|---|
+| Manage Users | `/admin/users` | `isStaff` |
+| Download Requests | `/admin/download-requests` | `isStaff` |
+| Delete Requests | `/admin/delete-requests` | `isStaff` |
+| Active Sessions | `/admin/sessions` | `isStaff` |
+| Role Requests | `/admin/role-requests` | Django admin |
+| Audit Log | `/admin/audit` | Django admin |
+
+### Reached from a screen, not from nav
+
+Not counted above, because nobody navigates to them directly: `/records/:id` (paper view),
+`/records/:id/edit`, `/records/:id/documents`, `/review/:id/evaluate`, `/records/import`, `/help`,
+and the entry screens (`/login`, `/signup`, `/activate/...`, `/download`).
+
+### What this replaces
+
+The per-role lists answer the question the global count could not: **what does this role see?**
+The count was a proxy for "is the pilot small enough". The lists are the thing itself — and they make
+the next gap obvious, which is that the reviewer surface is three queue screens and a decision screen
+while the student surface is eight built-out ones. That asymmetry is the work
+[IR-143](https://citiris.atlassian.net/browse/IR-143) covers, not a scope question.

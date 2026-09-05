@@ -40,8 +40,6 @@ import HelpPage             from "@/features/help/HelpPage";
 import SessionsPage          from "@/features/admin/SessionsPage";
 import DownloadRequestsPage  from "@/features/admin/DownloadRequestsPage";
 import DeleteRequestsPage    from "@/features/admin/DeleteRequestsPage";
-import DocumentReviewsPage   from "@/features/admin/DocumentReviewsPage";
-import ReviewAnalyticsPage   from "@/features/review/ReviewAnalyticsPage";
 import ApprovedProposalsPage from "@/features/review/ApprovedProposalsPage";
 
 export const router = createBrowserRouter([
@@ -87,7 +85,6 @@ export const router = createBrowserRouter([
               { path: "review/declined",           element: <DeclinedRecordsPage />,    handle: { crumb: "Declined" } },
               { path: "review/approved-proposals", element: <ApprovedProposalsPage />,  handle: { crumb: "Approved Proposals" } },
               { path: "review/:id/evaluate",       element: <EvaluationPage />,         handle: { crumb: "Evaluate" } },
-              { path: "review/analytics",          element: <ReviewAnalyticsPage />,    handle: { crumb: "Review Analytics" } },
             ],
           },
 
@@ -100,7 +97,6 @@ export const router = createBrowserRouter([
               { path: "admin/sessions",          element: <SessionsPage />,         handle: { crumb: "Sessions" } },
               { path: "admin/download-requests", element: <DownloadRequestsPage />, handle: { crumb: "Download Requests" } },
               { path: "admin/delete-requests",   element: <DeleteRequestsPage />,   handle: { crumb: "Delete Requests" } },
-              { path: "admin/document-reviews",  element: <DocumentReviewsPage />,  handle: { crumb: "Document Reviews" } },
             ],
           },
         ],

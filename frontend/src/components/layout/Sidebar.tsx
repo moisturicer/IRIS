@@ -15,6 +15,12 @@ interface NavItem {
   label:       string;
   icon:        string;
   badge?:      number;
+  /**
+   * Renders a COMING SOON badge. **No nav item uses this any more**, and none
+   * should: IR-160's acceptance criteria require that every remaining nav item
+   * leads somewhere real. Kept only so the badge markup below stays typed --
+   * if you find yourself setting it, the screen belongs out of the nav instead.
+   */
   comingSoon?: boolean;
 }
 
@@ -168,7 +174,6 @@ export function Sidebar({ className }: SidebarProps) {
     { to: "/review/approved",           label: "Approved",            icon: "fa-check-circle"   },
     { to: "/review/declined",           label: "Declined",            icon: "fa-times-circle"   },
     ...(isRDCO ? [{ to: "/review/approved-proposals", label: "Approved Proposals", icon: "fa-flag-checkered" }] : []),
-    { to: "/review/analytics",          label: "Review Analytics",    icon: "fa-chart-line", comingSoon: true },
   ];
 
   const toolsNav: NavItem[] = [
@@ -293,7 +298,6 @@ export function Sidebar({ className }: SidebarProps) {
               { to: "/admin/delete-requests",   label: "Delete Requests",   icon: "fa-trash-alt" },
               ...(isDjangoAdmin ? [{ to: "/admin/audit", label: "Audit Log", icon: "fa-clipboard-list" }] : []),
               { to: "/admin/sessions",          label: "Active Sessions",    icon: "fa-shield-alt" },
-              { to: "/admin/document-reviews",  label: "Document Reviews",   icon: "fa-file-check", comingSoon: true },
             ]}
           />
         )}
