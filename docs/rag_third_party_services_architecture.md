@@ -1,5 +1,7 @@
 # RAG Third-Party Services — Architecture, Cost, and a Free-Tier-First Rollout
 
+> **Correction, 2026-09-04 — the local Ollama lane described throughout this document is rejected.** This document (2026-08-31) predates [ADR-008](adr/008-ai-degradation-to-fts.md) and [ADR-015](adr/015-voyage-embedding-and-reranking.md)'s current text, both of which now explicitly reject a local model: it needs a GPU for usable latency, adds a service and several GB of weights, and is "a second AI system to insure the first." **There is no local lane in the accepted architecture.** Every reference below to Ollama as the `DisclosurePolicy` refusal destination, as a cost-free baseline, or as an `LLMProvider`/`EmbeddingProvider` adapter target is superseded: a `DisclosurePolicy` refusal degrades to the same PostgreSQL FTS path as a vendor outage (ADR-008), not to a second, cheaper AI system. This was not reconciled line-by-line through this document — it is recorded once, here, per this repo's rule against silently reconciling a contradiction. Everything else in this document (the Voyage-for-embedding-and-reranking decision, the cost tables, the free-tier analysis) is unaffected.
+
 **Status:** living design document
 **Scope:** `ai/` (FastAPI gateway) · `backend/apps/ai/` · `backend/apps/records/`
 **Date:** 2026-08-31 · branch `feat/rag-service`

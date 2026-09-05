@@ -6,14 +6,16 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # AI Configuration
-    # 'openai' or 'local'
     LLM_PROVIDER: str = "openai"
-    EMBEDDING_PROVIDER: str = "openai"
-    
+    # No EMBEDDING_PROVIDER switch: IRIS has exactly one embedding provider
+    # (ADR-015). A second switch here, independent of Django's, is how the
+    # two ends of the pipeline could silently disagree about what produced a
+    # vector — get_embedding_provider() below constructs the one adapter
+    # directly instead.
+
     # Provider-specific settings
     OPENAI_API_KEY: str = ""
-    LOCAL_LLM_URL: str = "http://localhost:11434" # Example for Ollama
-    
+
     # Models
     LLM_MODEL: str = "gpt-4o-mini"
     EMBEDDING_MODEL: str = "text-embedding-3-small"

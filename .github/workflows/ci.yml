@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [refactor/docker-service, main]
+    branches: [feat/rag-service, main]
   pull_request:
-    branches: [refactor/docker-service, main]
+    branches: [feat/rag-service, main]
 
 # CI is evidence, not decoration.
 # It is expected to FAIL until IR-57 (application boot) and IR-58 (Docker stack) land.
@@ -31,9 +31,12 @@ jobs:
 
       - name: Static check for undefined names
         # Catches the class of defect that currently stops the app importing.
-        run: |
-          pip install pyflakes
-          pyflakes apps/ config/ core/
+        # flake8 (in requirements/development.txt), not bare pyflakes, so the
+        # codebase's existing `# noqa` markers (deliberate side-effect imports)
+        # are honored; backend/.flake8 selects only the F-codes (pyflakes' own
+        # checks) and excludes migrations, where apps.get_model() locals read
+        # as undefined names to static analysis.
+        run: flake8 apps/ config/ core/
 
       - name: Django configuration check
         # Fails while the URLconf cannot import — this is the point.
@@ -53,15 +56,11 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
-        # No test harness exists yet. This step is deliberately visible rather
-        # than omitted, so the gap is reported on every run.
-        run: |
-          if [ -f pytest.ini ] || [ -f pyproject.toml ]; then
-            pip install pytest pytest-django
-            pytest
-          else
-            echo "::warning title=No backend tests::No pytest configuration found. Zero tests exist."
-          fi
+        # pytest and pytest-django are pinned in requirements/development.txt
+        # (IR-82), already installed above. The import smoke test in
+        # apps/tests/test_boot.py is what actually fails when the URLconf
+        # cannot import — this step just has to run it.
+        run: pytest
 
   frontend:
     name: Frontend
@@ -92,10 +91,12 @@ jobs:
   compose:
     name: Docker Compose
     runs-on: ubuntu-latest
-    # Verified 2026-09-01: this job FAILS on the current baseline with
+    # Verified 2026-09-02: this job FAILS on the current baseline with
     #   "env file .../ai/.env not found"
-    # because both Compose files declare an `ai-gateway` service whose build
-    # context ./ai does not exist. ADR-010 rejects a separate AI gateway.
+    # because both Compose files declare an `ai-gateway` service whose env file
+    # ai/.env is gitignored and absent in CI. The ./ai build context now exists;
+    # the missing env file is what breaks it. ADR-014 adopts the gateway as a
+    # sixth service under five preconditions, one of which is that it boots.
     # IR-58 removes the service; this job goes green then. Do not silence it.
     steps:
       - uses: actions/checkout@v4

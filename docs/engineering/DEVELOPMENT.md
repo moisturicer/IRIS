@@ -2,27 +2,29 @@
 
 **Purpose.** How to run, build and work on IRIS locally.
 **Owns.** Prerequisites, setup, commands, environment variables, troubleshooting.
-**Does not own.** Process (`SDLC.md`) · state definitions (`WORK_ITEM_LIFECYCLE.md`) · architecture (SDD).
+**Does not own.** Process (`SDLC.md`) · the Ready/Review/Done gates (`DEFINITION_OF_DONE.md`) · Jira states (`../agents/issue-tracker.md`) · architecture and decisions (`../adr/`).
 **Authority.** Authoritative for commands. **Every command here has been checked against this branch.**
 **Update when.** A command, script, dependency or service changes.
 
-> **Baseline branch: `refactor/docker-service`.** Not `main`. The two branches have diverged substantially, including in `docs/`.
+> **Baseline branch: `feat/rag-service`.** `main` carries the requirements, design and ADRs and is merged in; RAG and AI work continues here.
 
 ---
 
 ## 1 · Known-broken on this branch
 
-Read this first — several obvious commands fail for reasons that are already understood and ticketed.
+Read this first — several obvious commands fail for reasons that are already understood and ticketed. See `CLAUDE.md`'s "Known-broken" section for the authoritative, currently-maintained list; this table exists so setup failures aren't mistaken for a local mistake.
 
 | Symptom | Cause | Item |
 |---|---|---|
-| `docker compose up` fails | `ai-gateway` builds from `./ai`, which now exists, but Compose also requires `./ai/.env`, which does not. The service is not deployed under [ADR-010](../adr/010-deployment-topology.md) | IR-58 |
-| Every API request 500s / no route resolves | `apps/records/views.py` has six undefined names; `config/urls.py:11` imports it, so the URLconf fails at import | IR-57 |
+| `docker compose up --build` fails | `ai-gateway` builds from `./ai`, which now exists, but Compose also requires `./ai/.env`, which does not; even with that supplied, `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist. [ADR-014](../adr/014-ai-gateway-as-a-service.md) adopts the gateway under five preconditions — none met yet, so it stays undeployed, not rejected | IR-58 |
+| Every API request 500s / no route resolves | `apps/records/views.py` has undefined names; `config/urls.py:11` imports it, so the URLconf fails at import | IR-57 |
+| No Celery task is ever processed | Workers consume `default`/`extraction`/`embedding` queues, but nothing sets `CELERY_TASK_ROUTES` — every `.delay()` call still publishes to Celery's implicit default queue (`celery`), which no worker consumes | — |
 | Frontend unreachable in prod compose | Prod maps `80:80`; nginx-unprivileged listens on `8080` | IR-58 |
-| `pytest` does nothing | **No test files and no pytest config exist yet** | IR-73 *(pending)* |
+| `npm run lint` / `npm run build` fail | Not currently known-broken — both pass on this branch (verified 2026-09-06) | — |
 | `npm test` not found | No test runner is installed in `frontend/package.json` | deferred (P3) |
+| `/media/` serves any uploaded PDF unauthenticated | `frontend/nginx.conf:52-56` | IR-59 |
 
-**Until IR-57 and IR-58 land, the stack does not start.** That is expected, not a setup mistake on your part.
+**Until IR-57 and IR-58 land, the stack does not start end to end.** Backend and frontend each build, lint and test independently of that — see §4/§5/§8 below.
 
 ---
 
@@ -39,11 +41,14 @@ Read this first — several obvious commands fail for reasons that are already u
 ```
 backend/          Django + DRF
   apps/           accounts · records · reviews · documents
-                  notifications · audit · ai · storage
+                  notifications · audit · ai
+                  (apps/storage removed — IR-62)
   config/         settings, urls, celery
   core/           permissions, shared utilities
   requirements/   base.txt · development.txt · production.txt
   manage.py · Dockerfile · entrypoint.sh · .env.example
+
+ai/               FastAPI AI gateway, ports-and-adapters (`domain/`, `infrastructure/`, `api/`) — ADR-014
 
 frontend/         React 18 + TypeScript + Vite
   src/
@@ -68,10 +73,12 @@ pip install -r requirements/development.txt
 
 cp .env.example .env          # then fill in real values
 
-python manage.py check        # validates configuration; currently FAILS until IR-57
+python manage.py check        # passes (one deprecation warning: AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP)
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
+python -m pytest -q           # pytest.ini + conftest.py (IR-82); tests skip cleanly with no Postgres reachable
+python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 ```
 
 **Requirements are split three ways.** `base.txt` holds what both environments need; `development.txt` and `production.txt` each include base. Add a runtime dependency to `base.txt`, not to one of the leaves.
@@ -116,15 +123,13 @@ docker compose logs -f backend
 docker compose down                # add -v to drop volumes
 ```
 
-**Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `worker` (Celery) · `frontend` (nginx).
+**Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `frontend` (nginx) · `docling` (docling-serve, structured extraction — ADR-016) · `ai-gateway` (FastAPI, ADR-014) · `celery-default` / `celery-extraction` / `celery-embedding` / `celery-beat` (Celery workers, routed by queue).
 
-**`ai-gateway` is declared in both Compose files.** Commit `7f73e97` added an `ai/` FastAPI source tree, so the build context now exists — but the service still does not run: Compose requires `./ai/.env`, which is absent, and `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`, so the container would die at import even with the env file present.
-
-This is **not** a missing file to add. [ADR-010](../adr/010-deployment-topology.md) rejects a separate AI gateway; AI belongs inside Django. [ADR-012](../adr/012-ai-provider-abstraction-not-a-service.md) settles the question: the provider abstraction is ported into Django as `apps/ai/providers/`, and the service is not adopted. The service declaration is removed by IR-58. Do not build on `ai/`.
+**`ai-gateway` now has a real build context (`./ai`)** and builds, given `./ai/.env` (gitignored, absent in CI and on a fresh checkout) — but it crashes at runtime: `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`. [ADR-014](../adr/014-ai-gateway-as-a-service.md) supersedes ADR-010/012's earlier rejection and adopts the gateway as a service under five preconditions, none yet met — this is what's tracked in IR-58, not a missing file to bolt on. Do not deploy it.
 
 ### Celery
 
-Workers consume `default`, `extraction` and `embedding`; tasks currently publish to `celery`. **No worker consumes the queue that tasks publish to**, so no task is ever processed. Fixed by the Celery routing work in Epic C.
+Workers consume the `default`, `extraction` and `embedding` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding` services) — but nothing sets `CELERY_TASK_ROUTES`, so every task still publishes to Celery's implicit default queue (`celery`), which no worker consumes. **No Celery task in this system is currently processed**, chunking/ingestion and embedding included, regardless of how the workers are named. This predates and is unrelated to the RAG pipeline work; still open.
 
 ---
 
@@ -143,17 +148,15 @@ Workers consume `default`, `extraction` and `embedding`; tasks currently publish
 
 ## 8 · Tests
 
-**There are currently no tests.** This is the single largest engineering gap, and the first thing CI will enforce once the harness lands.
-
-Intended:
+**The backend harness exists (IR-82)**: `pytest.ini` + `conftest.py`, DB-required tests skip cleanly when no Postgres is reachable. Coverage is concentrated in `apps/ai` (chunking, extraction, ingestion) and `apps/documents`, built out through IR-89 and IR-107.
 
 ```bash
-# backend  (once the harness exists)
-cd backend && pytest
-cd backend && pytest apps/reviews -v
+cd backend && python -m pytest -q
+cd backend && python -m pytest apps/reviews -v
+cd backend && python -m pytest apps/ai apps/documents   # the RAG pipeline suites
 ```
 
-The first test to write is an **import smoke test** — it catches three of the five current blockers on its own.
+**Frontend still has no test runner** — `npm test` is not wired up, deliberately deferred (P3). `npm run lint` and `npm run build` (`tsc && vite build`) are the only automated frontend checks.
 
 Rules: **never modify a test to make it pass**; if the test is wrong, fix it deliberately and say so in the PR. A requirement is not satisfied because code exists — only when a test demonstrates it and the evidence is recorded.
 
@@ -161,15 +164,15 @@ Rules: **never modify a test to make it pass**; if the test is wrong, fix it del
 
 ## 9 · Contributing
 
-1. Pull a `ready-to-pull` item from the board and assign yourself
-2. Branch from `refactor/docker-service` — `feat/IR-69-transition-table`
+1. Pull a `ready-for-agent` / `ready-to-pull` item from the board and assign yourself
+2. Branch from `feat/rag-service` — `feat/IR-69-transition-table`
 3. Implement, with tests where applicable
 4. Verify each acceptance criterion yourself and note how
 5. Open a PR referencing the Jira key, with evidence
-6. Move the item to **In Review** only when the conditions in `WORK_ITEM_LIFECYCLE.md` §7 hold
+6. Move the item to **In Review** only when the conditions in `DEFINITION_OF_DONE.md` §2 hold
 7. Address review; merge on approval
 
-Full process: [`SDLC.md`](SDLC.md). State definitions: [`WORK_ITEM_LIFECYCLE.md`](WORK_ITEM_LIFECYCLE.md).
+Full process: [`SDLC.md`](SDLC.md). Done gates: [`DEFINITION_OF_DONE.md`](DEFINITION_OF_DONE.md). Jira states and labels: [`../agents/issue-tracker.md`](../agents/issue-tracker.md).
 
 ---
 
@@ -178,9 +181,10 @@ Full process: [`SDLC.md`](SDLC.md). State definitions: [`WORK_ITEM_LIFECYCLE.md`
 | Problem | Check |
 |---|---|
 | Nothing responds | IR-57 — the URLconf fails at import. `python manage.py check` |
-| Compose will not start | IR-58 — `ai-gateway` has no `ai/.env` and cannot import its own service package |
+| Compose will not start / `ai-gateway` container exits | IR-58 — `ai-gateway` has no `ai/.env`, and even with one, its service package is missing (`ai.services.chat_service`, `ai.services.embedding_service`); do not deploy it |
+| Celery task never runs | Queue routing gap — see §6 Celery above; unrelated to whether the task itself is correct |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
-| Celery tasks never run | Queue routing mismatch — workers and publishers disagree |
-| Uploads not extracted | `documents/tasks.py` imports `unstructured`, `fitz`, `pytesseract` — **none are in any requirements file** |
+| Uploads not extracted | `DoclingExtractor` calls `POST {DOCLING_API_URL}/v1/convert/file` — check the `docling` service is up and reachable; there is no fallback extractor (ADR-016) |
 | Migrations conflict | `showmigrations`, then resolve deliberately; never edit an applied migration |
 | Type error on build | Intended — `npm run build` runs `tsc` first. Fix the type |
+| `npm run lint` can't find a config | Shouldn't happen — `eslint.config.js` is committed. If it does, check it wasn't accidentally removed |

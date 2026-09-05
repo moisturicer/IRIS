@@ -27,6 +27,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "django_filters",
     "axes",
+    "pgvector",
 ]
 
 LOCAL_APPS = [
@@ -185,11 +186,49 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # ---- AI -----------------------------------------------------------------
 
-AI_EMBEDDING_MODEL = config("AI_EMBEDDING_MODEL", default="TBD")  # Provider TBD: e.g. text-embedding-3-small (OpenAI), voyage-3-lite (Voyage AI), embed-v3.0 (Cohere)
-OPENAI_API_KEY     = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
-ANTHROPIC_API_KEY  = config("ANTHROPIC_API_KEY", default="")       # Ask IRIS synthesis; unset -> retrieval-only mode
-AI_LLM_MODEL       = config("AI_LLM_MODEL", default="claude-sonnet-5")
-DOCLING_API_URL    = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction
+AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")
+AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
+OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
+ANTHROPIC_API_KEY      = config("ANTHROPIC_API_KEY", default="")       # Ask IRIS synthesis; unset -> retrieval-only mode
+AI_LLM_MODEL           = config("AI_LLM_MODEL", default="claude-sonnet-5")
+DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
+# A scanned thesis through OCR is minutes of work, not seconds. This bounds
+# one conversion, not the Celery retry that wraps it.
+DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)
+AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:8001") # AI Gateway endpoint
+
+# ---- Chunking (ADR-013) --------------------------------------------------
+#
+# The knobs the ingestion pipeline builds its ChunkingOptions from. They are
+# configuration rather than constants because IR-116's exit criterion is a
+# person reading fifty real chunks and choosing the ceiling from what they
+# see — so changing it must be a deployment decision, not a code change.
+#
+# Blank means the domain's own DEFAULT_STRATEGY, resolved in
+# apps.ai.ingestion.pipeline. Naming it here would put a third copy of the
+# strategy id in the tree -- and this is the copy that could silently drift
+# from the registry, because a settings module must not import an app
+# package to check itself against it.
+AI_CHUNK_STRATEGY      = config("AI_CHUNK_STRATEGY", default="")
+AI_CHUNK_MAX_TOKENS    = config("AI_CHUNK_MAX_TOKENS", default=512, cast=int)
+# Blank means "derive from max_tokens" — see ChunkingOptions.effective_min_tokens,
+# which explains why a fixed default would be a footgun.
+AI_CHUNK_MIN_TOKENS    = config(
+    "AI_CHUNK_MIN_TOKENS", default="", cast=lambda v: int(v) if str(v).strip() else None
+)
+AI_CHUNK_CONTEXT_PATH_MAX_TOKENS = config(
+    "AI_CHUNK_CONTEXT_PATH_MAX_TOKENS", default=48, cast=int
+)
+# A bibliography is 10-20% of a thesis by tokens and retrieves uniformly
+# badly, so it is excluded here and kept in extracted_text for full-text
+# search. Front matter (acknowledgements, table of contents) is deliberately
+# NOT excluded yet: whether the extractor detects those headings reliably on
+# real submissions is one of the questions IR-116's manual inspection answers.
+AI_CHUNK_EXCLUDE_SECTIONS = config(
+    "AI_CHUNK_EXCLUDE_SECTIONS",
+    default="References,Bibliography,Works Cited,Literature Cited",
+    cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
+)
 
 # ---- Axes (brute force protection) --------------------------------------
 

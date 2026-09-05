@@ -1,193 +1,83 @@
+"""PDF extraction: Docling-serve in, structure out (IR-107, ADR-016).
+
+What this module used to be is worth recording, because it explains the shape
+it has now. It held a three-tier extractor chain — ``unstructured``, PyMuPDF,
+Tesseract — tried in order, each catching ``ImportError`` and falling through
+to the next. None of the three libraries was declared in any requirements
+file, so on a clean install all three fell through and extraction raised. It
+was scaffolding, and its own module docstring said so.
+
+It is replaced by one call to the Docling-serve container that both Compose
+files have declared all along. **There is no fallback extractor.** ADR-016
+retained PyMuPDF for Docling-serve unavailability; that clause is dropped —
+see the divergence note in the ADR. A second extractor produces documents
+without the structure this pipeline exists to consume, which means the
+fallback path silently yields chunks with no regions and citations that
+cannot be highlighted. Failing and retrying is the honest behaviour: the
+Celery retry below is what covers a container that is briefly down.
+
+The task stays thin on purpose. Reading bytes, persisting a row and moving a
+status through its states is all it does; every judgement — reading order,
+table shape, coordinate origin, what counts as a failure — lives in
+``apps.ai.extraction``, where it is pure and tested without a container.
 """
-PDF text extraction task.
 
-TODO (AI engineer — FR-M3-01 architecture change):
-  Replace the three-tier extractor chain below with a single Docling-serve API call.
+import os
 
-  Target architecture:
-    1. Read PDF bytes from storage.
-    2. POST bytes to Docling-serve: POST <settings.DOCLING_API_URL>/convert
-       - Docling handles text-layer PDFs, complex layouts, and OCR internally.
-       - Returns extracted text as Markdown.
-    3. Apply _clean_text() to the response.
-    4. Store in PdfExtraction.extracted_text.
-
-  Required settings:
-    DOCLING_API_URL = "http://<docling-host>:<port>"  (add to settings/base.py)
-
-  Required packages:
-    requests (already available via django-storages transitive dep, verify)
-
-  Remove when done:
-    - _run_extraction_chain(), _extract_with_opendataloader(),
-      _extract_with_pymupdf(), _extract_with_tesseract()
-    - requirements: unstructured[pdf], pymupdf, pytesseract, Pillow
-
-  The _clean_text() helper below is still needed — keep it.
-"""
-import io
-import re
 from celery import shared_task
 from django.utils import timezone
 
 
-# ---------------------------------------------------------------------------
-# Text cleaning helper
-# ---------------------------------------------------------------------------
+def _build_extractor():
+    """The seam. Tests replace this function rather than patching a client
+    into the middle of the task."""
+    from django.conf import settings
 
-def _clean_text(raw: str) -> str:
-    """
-    Normalise raw extracted text for storage and FTS indexing.
+    from apps.ai.extraction import DoclingExtractor
 
-    Steps:
-      1. Drop lines shorter than 3 chars (page numbers, decorators).
-      2. Drop lines that are purely digits (page-number lines).
-      3. Strip non-printable / control characters.
-      4. Collapse excessive whitespace.
-    """
-    lines = raw.splitlines()
-    cleaned_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if len(stripped) < 3:
-            continue
-        if re.fullmatch(r"\d+", stripped):
-            continue
-        cleaned_lines.append(stripped)
-
-    text = " ".join(cleaned_lines)
-    text = re.sub(r"[^\w\s.,;:!?()\-\'\"/]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
-
-# ---------------------------------------------------------------------------
-# Extractor implementations
-# ---------------------------------------------------------------------------
-
-def _extract_with_opendataloader(pdf_bytes: bytes) -> str:
-    """
-    Primary extractor: unstructured library (OpenDataLoader).
-
-    Install: pip install "unstructured[pdf]"
-
-    unstructured.partition.auto.partition() detects the document type and
-    applies the best available strategy (pdfminer → OCR as its own fallback).
-    This aligns with the SRS requirement for OpenDataLoader as the primary
-    extraction method.
-    """
-    from unstructured.partition.auto import partition  # type: ignore[import]
-
-    elements = partition(
-        file=io.BytesIO(pdf_bytes),
-        content_type="application/pdf",
-        strategy="fast",       # avoids spawning heavyweight OCR on the task worker
-    )
-    return "\n".join(str(e) for e in elements if str(e).strip())
-
-
-def _extract_with_pymupdf(pdf_bytes: bytes) -> str:
-    """
-    Fallback extractor: PyMuPDF (fitz).
-
-    Install: pip install pymupdf
-    """
-    import fitz  # type: ignore[import]
-
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    raw = ""
-    for page in doc:
-        raw += page.get_text()
-    doc.close()
-    return raw
-
-
-def _extract_with_tesseract(pdf_bytes: bytes) -> str:
-    """
-    Tertiary extractor: Tesseract OCR via pytesseract.
-
-    Uses PyMuPDF to render each PDF page to a bitmap at 2× zoom, then runs
-    Tesseract on each rendered image.  This covers fully image-based / scanned
-    PDFs that text-based extractors cannot handle.
-
-    Requires:
-      pip install pytesseract pillow pymupdf
-      System: tesseract-ocr ≥ 4 must be on PATH.
-    """
-    import fitz          # type: ignore[import]
-    import pytesseract   # type: ignore[import]
-    from PIL import Image  # type: ignore[import]
-
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    page_texts: list[str] = []
-    zoom_matrix = fitz.Matrix(2, 2)   # 2× for reasonable OCR resolution
-
-    for page in doc:
-        pix = page.get_pixmap(matrix=zoom_matrix, alpha=False)
-        img = Image.open(io.BytesIO(pix.tobytes("png")))
-        page_texts.append(pytesseract.image_to_string(img))
-
-    doc.close()
-    return "\n".join(page_texts)
-
-
-# ---------------------------------------------------------------------------
-# Extraction chain
-# ---------------------------------------------------------------------------
-
-_EXTRACTORS = [
-    ("opendataloader", _extract_with_opendataloader),
-    ("pymupdf",        _extract_with_pymupdf),
-    ("tesseract",      _extract_with_tesseract),
-]
-
-
-def _run_extraction_chain(pdf_bytes: bytes) -> tuple[str, str]:
-    """
-    Try each extractor in priority order.
-
-    Returns (raw_text, method_name) for the first extractor that yields
-    non-empty text.  Raises RuntimeError if all extractors fail or are
-    unavailable.
-    """
-    errors: list[str] = []
-
-    for name, fn in _EXTRACTORS:
-        try:
-            raw = fn(pdf_bytes)
-            if raw and raw.strip():
-                return raw, name
-            # Extractor ran but returned empty — try next
-            errors.append(f"{name}: returned empty text")
-        except ImportError:
-            errors.append(f"{name}: library not installed")
-        except Exception as exc:
-            errors.append(f"{name}: {exc}")
-
-    raise RuntimeError(
-        "All PDF extractors failed or produced empty text. "
-        "Details: " + " | ".join(errors)
+    return DoclingExtractor(
+        settings.DOCLING_API_URL,
+        timeout=settings.DOCLING_TIMEOUT_SECONDS,
     )
 
 
-# ---------------------------------------------------------------------------
-# Celery task
-# ---------------------------------------------------------------------------
+def _queue_chunking(upload_id: int) -> None:
+    """Hand the extracted document to the chunker, in another worker (IR-116).
+
+    A second seam, for the same reason as the one above: tests replace this
+    rather than standing up a broker. Queued rather than called, because
+    chunking is CPU work of its own and a failure to chunk must not mark a
+    perfectly good extraction failed or send the document back through
+    Docling.
+
+    ``on_commit`` rather than a bare ``delay``: the chunker reads the row this
+    task just wrote, and a worker that picked the message up inside an open
+    transaction would find the pre-save extraction and fail on a document that
+    is actually fine. Under autocommit -- how this task runs today -- the
+    callback fires immediately, so this costs nothing and stops being correct
+    only by accident later.
+    """
+    from django.db import transaction
+
+    from apps.ai.tasks import chunk_record_document
+
+    transaction.on_commit(lambda: chunk_record_document.delay(upload_id))
+
 
 @shared_task(bind=True, max_retries=3)
 def extract_pdf_text(self, upload_id: int):
-    """
-    Background task: extract text from an uploaded PDF and persist the result.
+    """Background task: extract an uploaded PDF and persist the result.
 
-    Triggered by SubmitDocumentView immediately after saving the file so the
-    API response is never blocked.  Retries up to 3 times (60-second delay)
-    on extraction failure.
+    Triggered by ``SubmitDocumentView`` immediately after the file is saved,
+    so the API response is never blocked on a conversion that can take
+    minutes on a scanned thesis. Retries three times, sixty seconds apart.
     """
-    from apps.documents.models import RecordUpload, PdfExtraction
+    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
+    from apps.documents.models import PdfExtraction, RecordUpload
 
     extraction = PdfExtraction.objects.filter(upload_id=upload_id).first()
     if not extraction:
-        return  # record deleted before task ran
+        return  # record deleted before the task ran
 
     extraction.status         = "running"
     extraction.celery_task_id = self.request.id
@@ -199,17 +89,34 @@ def extract_pdf_text(self, upload_id: int):
         with upload.file.open("rb") as f:
             pdf_bytes = f.read()
 
-        raw_text, method = _run_extraction_chain(pdf_bytes)
-        cleaned = _clean_text(raw_text)
+        extracted = _build_extractor().extract(
+            pdf_bytes, filename=os.path.basename(upload.file.name)
+        )
 
-        extraction.extracted_text = cleaned
+        extraction.extracted_text = flatten_for_search(extracted.document)
+        extraction.structure      = document_to_json(extracted.document)
+        extraction.content_hash   = extraction_hash(extracted.document)
+        extraction.extractor      = extracted.extractor
+        extraction.error          = ""
         extraction.status         = "done"
         extraction.completed_at   = timezone.now()
-        # Store which extractor succeeded so it's observable in the admin
-        extraction.save(update_fields=["extracted_text", "status", "completed_at"])
+        extraction.save(
+            update_fields=[
+                "extracted_text",
+                "structure",
+                "content_hash",
+                "extractor",
+                "error",
+                "status",
+                "completed_at",
+            ]
+        )
 
     except Exception as exc:
         extraction.status = "failed"
         extraction.error  = str(exc)
         extraction.save(update_fields=["status", "error"])
         raise self.retry(exc=exc, countdown=60)
+
+    # Reachable only on success -- the handler above always raises.
+    _queue_chunking(upload_id)

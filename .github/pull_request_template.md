@@ -33,7 +33,7 @@
 **Required**
 - [ ] Acceptance criteria satisfied and self-verified
 - [ ] CI passing, or the failure is explained above and understood
-- [ ] Branch is up to date with `refactor/docker-service`
+- [ ] Branch is up to date with `feat/rag-service`
 - [ ] No secret, credential or real institutional data committed
 - [ ] No test was modified to make it pass
 
@@ -47,5 +47,5 @@
 
 ---
 
-Definition of Done: [`docs/engineering/WORK_ITEM_LIFECYCLE.md`](../docs/engineering/WORK_ITEM_LIFECYCLE.md) §9.
+Definition of Done: [`docs/engineering/DEFINITION_OF_DONE.md`](../docs/engineering/DEFINITION_OF_DONE.md) §4.
 Human approval is the gate — AI review may assist but does not approve.

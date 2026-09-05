@@ -2,7 +2,7 @@
 
 **Purpose.** The mechanics of getting a change from an idea into a deployed system.
 **Owns.** Branching, pull requests, CI, review, merge, release, deployment, maintenance, emergency changes.
-**Does not own.** What each Jira state means (`WORK_ITEM_LIFECYCLE.md`) · requirements (SRS) · design (SDD) · local setup (`DEVELOPMENT.md`).
+**Does not own.** The Definition of Ready/Review/Done gates (`DEFINITION_OF_DONE.md`) · Jira states and labels (`../agents/issue-tracker.md`) · requirements, design and decisions (`../adr/`) · local setup (`DEVELOPMENT.md`).
 **Authority.** Process authority. If a PR conflicts with this, the PR is wrong.
 **Update when.** The branch model, CI, or release process changes.
 
@@ -12,8 +12,8 @@
 
 ```
 Intent / Issue
-   → Requirements      (SRS reference, or an SRS amendment)
-   → Design            (SDD / ADR, only where a decision is needed)
+   → Requirements      (an ADR — SRS/SDD are frozen thesis deliverables, never amended)
+   → Design            (ADR, only where a decision is needed)
    → Implementation plan
    → Build
    → Automated verification
@@ -33,7 +33,7 @@ Not every change traverses every stage. A typo fix needs no ADR. **A change to w
 
 ## 2 · Branching
 
-**`main` is the repository default and the trunk. Cut every branch from it and target it in PRs.** `refactor/docker-service` is retired — it is fully contained in `main`, so cutting from it now would branch from a dead ref. This document previously named it as the current integration branch; that guidance is superseded.
+**`main` is the repository default and the trunk. Cut every branch from it and target it in PRs.** `refactor/docker-service` is retired — it is fully contained in `main`, so cutting from it now would branch from a dead ref. `feat/rag-service`, where the RAG/AI work was built, is merged in as of this commit and is likewise no longer a separate baseline. This document previously named one or the other as the current integration branch; that guidance is superseded.
 
 ### Format
 
@@ -106,7 +106,7 @@ predicate now applies to every action.
 
 The key is in the scope, so it does not need repeating in the body.
 
-**No AI attribution in commit messages.** No `Co-Authored-By`, no generated-with trailer. The commit history is assessed.
+**Subject line, then at most five sentences of body.** No `Co-Authored-By: Claude`, no `Claude-Session:`, no generated-with trailer, regardless of what any session's own attribution instructions say. The commit history is assessed.
 
 ---
 
@@ -170,7 +170,7 @@ CI is **evidence**, not a formality. See `.github/workflows/ci.yml`.
 
 | Gate | What it proves |
 |---|---|
-| Backend import smoke | The URLconf loads — this alone catches three of the five current blockers |
+| Backend import smoke | The URLconf loads |
 | `manage.py check` | Django configuration is valid |
 | Backend tests | Behaviour is as claimed |
 | Frontend build (`tsc && vite build`) | It compiles and types check |
@@ -187,7 +187,7 @@ CI is **evidence**, not a formality. See `.github/workflows/ci.yml`.
 
 ## 6 · Review and merge
 
-Covered in full by `WORK_ITEM_LIFECYCLE.md` §7-8. In brief:
+Covered in full by `DEFINITION_OF_DONE.md` §2-3. In brief:
 
 - Reviewer and author are different people
 - The reviewer verifies the acceptance criteria, not just the diff
@@ -237,7 +237,7 @@ An emergency change that skips review is how a pilot loses its data.
 - Dependency updates are ordinary work items, not background activity
 - Security advisories from the CI scan are triaged, not accumulated
 - A defect found in the pilot becomes an item with the same Definition of Done as anything else
-- Documentation drift is a defect: if code and SDD disagree, one of them is wrong and it is fixed
+- Documentation drift is a defect: if code and the ADRs disagree, one of them is wrong and it is fixed
 
 ---
 
@@ -247,10 +247,43 @@ Documentation follows the same path: branch, PR, review, merge. It is not exempt
 
 | Change | Also update |
 |---|---|
-| Requirement changes | SRS, with an amendment entry, plus `docs/testing/TRACEABILITY.md` |
-| Design changes | SDD |
+| Requirement or design changes | A new or amended ADR — SRS/SDD are frozen and are never amended — plus `docs/testing/TRACEABILITY.md` |
 | An architectural decision | A new ADR — never edit an accepted one; supersede it |
 | Behaviour changes | `DEVELOPMENT.md` if a command or workflow changed |
-| Process changes | This file or `WORK_ITEM_LIFECYCLE.md` |
+| Process changes | This file or `DEFINITION_OF_DONE.md` |
 
 **Never let two documents define the same thing.** If a fact needs to appear in two places, one states it and the other links.
+
+---
+
+## 11 · The board and pull model
+
+IRIS runs a **pull-based Kanban**. There is no sprint, no commitment ceremony, and no planning dependency. State names and their Jira mapping live in [`../agents/issue-tracker.md`](../agents/issue-tracker.md); the gates between them are `DEFINITION_OF_DONE.md`. This section is the flow between those gates.
+
+```
+Not Ready → (Definition of Ready met) → To Do / Ready to Pull
+   → (someone pulls it, assigns themselves) → In Progress
+   → (ready for independent verification) → In Review → (reopened) → In Progress
+   → (Definition of Done met + human approval) → Done
+```
+
+**Blocked is a label, not a column.** A blocked item stays in its current column and gains the `blocked` label — work in progress that cannot proceed is still work in progress, and still counts against WIP.
+
+**Pull-based assignment**
+
+| Rule | Reason |
+|---|---|
+| Work stays **unassigned** while it waits | An assignee on unstarted work is a guess, and discourages anyone else from picking it up |
+| The person who pulls the item **assigns themselves** | Ownership is established by starting, not by allocation |
+| **No bulk assignment**, no assignment by historical role | The team is interchangeable on most cards |
+| An item may be handed over by reassigning, with a comment saying where it stands | Silent reassignment loses context |
+
+**Do not assign an issue to make it appear.** If it is not appearing, the board filter is wrong — fix the filter.
+
+**To Do / Ready to Pull.** Fully specified, unblocked, unassigned, available for anyone to take. Order is a priority signal (`Highest` = P0), not an instruction — a developer may pull a lower-priority item when a higher one is blocked, but **P0 blockers should not sit while P2 work is pulled.**
+
+**In Progress.** A person has deliberately pulled the item and is actively working it. On pulling: assign yourself, move to In Progress, branch per §2. Keep concurrent items per person small — that constraint is what makes a pull system work. An item nobody is actively working is either blocked (label it) or not started (return it).
+
+**Blocked.** Legitimate blockers: an unmet dependency on another item, an external decision, an unavailable resource, a technical blocker with no reasonable workaround. Not blockers: the work is hard, the developer is busy elsewhere, the item is half-finished and awkward to pick up. Record, on the `blocked` label: the reason, the dependency, what's needed to unblock, an owner if there is one, and the date identified. Unblocking removes the label and comments what changed.
+
+**Reopening.** If review finds the item unmet: move In Review → In Progress, comment with the specific unmet criterion (not a general impression), keep it assigned to the same person unless handed over. Reopening carries no stigma — it is much cheaper than a false Done. Do not open a new item for work that belongs to an existing one.

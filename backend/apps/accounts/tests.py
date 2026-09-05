@@ -11,7 +11,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import (
-    AdviserProfile, College, Course, Department, Role, StudentProfile, User,
+    AdviserProfile, Course, Role, StudentProfile, User,
 )
 
 

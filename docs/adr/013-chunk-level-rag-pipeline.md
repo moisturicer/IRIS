@@ -2,9 +2,11 @@
 
 ## Status
 
-Accepted — 2026-09-02
+Accepted — 2026-09-02 · **amended 2026-09-04, §Research Impact**
 
 **Supersedes [ADR-006](006-minimum-rag-pipeline.md).** ADR-006's exclusions of full-text chunking, reranking and multiple providers are reversed. Its retrieval-visibility requirement and its timebox-with-fallback discipline are **retained** and restated below.
+
+> **Amendment, 2026-09-04 — RAG is reclassified as thesis-critical.** §Research Impact below originally read "RAG remains a supporting capability, not the thesis contribution." That framing is reversed, on the instruction of the project lead: RAG is thesis-critical work, alongside the clearance-aware resubmission workflow [ADR-003](003-clearance-aware-resubmission.md) describes, not subordinate to it. `CLAUDE.md`'s Scope rule — "cut RAG first if capacity is short" — is corrected to match. This does **not** change what ADR-003/ADR-004's controlled comparison measures: that evaluation is still of the workflow mechanism, unaffected by chunking. What changes is priority and protection, not the evaluation design.
 
 ## Context
 
@@ -93,7 +95,7 @@ No new services beyond those in [ADR-014](014-ai-gateway-as-a-service.md). Chunk
 
 ## Research Impact
 
-Minimal by design. RAG remains a supporting capability, not the thesis contribution ([ADR-003](003-clearance-aware-resubmission.md)). Chunking does not change what the controlled comparison measures.
+~~Minimal by design. RAG remains a supporting capability, not the thesis contribution ([ADR-003](003-clearance-aware-resubmission.md)).~~ **Superseded by the 2026-09-04 amendment above: RAG is thesis-critical, not merely supporting.** What still holds: chunking does not change what the controlled comparison in [ADR-003](003-clearance-aware-resubmission.md)/[ADR-004](004-restart-all-comparison-mode.md) measures — that experiment is of the workflow mechanism, and RAG's priority status doesn't fold it into that measurement.
 
 ## Related Requirements
 

@@ -80,7 +80,19 @@ class RecordFileSerializer(serializers.ModelSerializer):
 
 
 class PdfExtractionSerializer(serializers.ModelSerializer):
+    """Extraction status, not extraction output.
+
+    `structure` is deliberately absent: it is the chunker's input and can run
+    to megabytes on a thesis, which is not something to attach to every
+    upload response. `content_hash` is absent too — it is an internal
+    idempotency key with no client that needs it. `extractor` is present
+    because "what produced this?" is the question an operator asks about a
+    bad extraction, and the ticket asks for it to be observable.
+    """
     class Meta:
         model  = PdfExtraction
-        fields = ["id", "upload", "status", "celery_task_id", "error", "created_at", "completed_at"]
+        fields = [
+            "id", "upload", "status", "extractor",
+            "celery_task_id", "error", "created_at", "completed_at",
+        ]
         read_only_fields = fields

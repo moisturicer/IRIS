@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from core.permissions import IsReviewer, IsStaff
 from core.exceptions import InvalidPipelineTransition
 from .models import Review, RecordAuthPin, RecordClearance
-from .serializers import ReviewSerializer, ReviewWriteSerializer, RecordAuthPinSerializer
+from .serializers import ReviewSerializer, ReviewWriteSerializer
 from .services import (
     approve_record, decline_record, reject_record,
     resubmit_record, submit_clearance,

@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    Record, RecordOwner, Author, Publication, Conference,
-    Budget, Collaboration, ResearchLink, DownloadRequest, DeleteRequest,
+    Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
     Classification, PSCEDClassification, RecordType,
 )
 
