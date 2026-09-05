@@ -1,10 +1,13 @@
-# <!-- IR-nn: what changed -->
+<!-- PR title format: IR-XXX Description     e.g. "IR-124 Implement RAG retrieval" -->
 
 ## What and why
 
 <!-- What changed, and why. Not a restatement of the diff. -->
 
 **Jira:** IR-
+
+<!-- Branch: <type>/IR-XXX-short-description   Commits: type(IR-XXX): description
+     Convention: docs/engineering/SDLC.md §2-4a -->
 
 ## Acceptance criteria
 

@@ -25,6 +25,8 @@ class RecordListSerializer(serializers.ModelSerializer):
     classification_name = serializers.CharField(source="classification.name", read_only=True)
     record_type_name    = serializers.CharField(source="record_type.name", read_only=True)
     authors             = AuthorSerializer(many=True, read_only=True)
+    # Annotated by RecordViewSet.get_queryset; 0 when the queryset omits it.
+    file_count          = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model  = Record
@@ -32,7 +34,7 @@ class RecordListSerializer(serializers.ModelSerializer):
             "id", "title", "abstract", "year_accomplished", "classification_name",
             "record_type_name", "pipeline_status", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
-            "access_count", "created_at", "authors",
+            "access_count", "file_count", "created_at", "authors",
         ]
 
 
@@ -43,7 +45,15 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     classification = serializers.StringRelatedField()
     psced          = serializers.StringRelatedField()
     record_type    = serializers.StringRelatedField()
+    # Mirrored from RecordListSerializer so the detail payload is a strict
+    # superset of the list payload — the frontend types RecordDetail as an
+    # extension of RecordListItem and reads these on the paper view.
+    classification_name = serializers.CharField(source="classification.name", read_only=True)
+    record_type_name    = serializers.CharField(source="record_type.name", read_only=True)
+    file_count          = serializers.SerializerMethodField()
     reviews        = serializers.SerializerMethodField()
+    clearances     = serializers.SerializerMethodField()
+    files          = serializers.SerializerMethodField()
 
     def get_reviews(self, obj):
         from apps.reviews.models import Review
@@ -65,17 +75,52 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             for r in qs
         ]
 
+    def get_clearances(self, obj):
+        """
+        Per-office clearance state. This is what makes clearance-aware
+        resubmission visible: a preserved clearance shows as cleared with a
+        decision date earlier than the current submission.
+        """
+        return [
+            {
+                "office":           c.office,
+                "office_label":     c.get_office_display(),
+                "status":           c.status,
+                "comment":          c.comment,
+                "reviewed_by_name": c.reviewed_by.get_full_name() if c.reviewed_by else None,
+                "updated_at":       c.updated_at.isoformat(),
+            }
+            for c in obj.clearances.select_related("reviewed_by").order_by("office")
+        ]
+
+    def get_file_count(self, obj):
+        return obj.files.count()
+
+    def get_files(self, obj):
+        return [
+            {
+                "id":          f.id,
+                "filename":    f.filename,
+                "url":         f.file.url if f.file else None,
+                "size_bytes":  f.file.size if f.file else 0,
+                "created_at":  f.created_at.isoformat(),
+            }
+            for f in obj.files.all().order_by("-created_at")
+        ]
+
     class Meta:
         model  = Record
         fields = [
             "id", "title", "abstract", "abstract_file",
             "year_accomplished", "year_completed",
             "classification", "psced", "record_type",
+            "classification_name", "record_type_name", "file_count",
             "adviser", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
+            "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "is_deleted",
             "created_at", "updated_at",
-            "owners", "authors", "reviews",
+            "owners", "authors", "reviews", "clearances", "files",
         ]
 
 
@@ -100,6 +145,7 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             "title", "year_accomplished", "year_completed", "abstract",
             "classification", "psced", "record_type", "adviser",
             "is_ip", "for_commercialization", "community_extension",
+            "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "abstract_file",
             "authors",
         ]

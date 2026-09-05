@@ -33,39 +33,78 @@ Not every change traverses every stage. A typo fix needs no ADR. **A change to w
 
 ## 2 · Branching
 
-**Baseline: `feat/rag-service`.** `main` carries the requirements, design and ADRs and is merged in; RAG and AI work continues on `feat/rag-service`.
+**`main` is the repository default and the trunk. Cut every branch from it and target it in PRs.** `refactor/docker-service` is retired — it is fully contained in `main`, so cutting from it now would branch from a dead ref. `feat/rag-service`, where the RAG/AI work was built, is merged in as of this commit and is likewise no longer a separate baseline. This document previously named one or the other as the current integration branch; that guidance is superseded.
 
-| Prefix | For |
+### Format
+
+```
+<type>/IR-XXX-short-description
+```
+
+**The Jira issue key is mandatory and is the primary identifier.**
+
+| Type | For |
 |---|---|
-| `feat/` | New capability |
+| `feature/` | New capability |
 | `fix/` | Defect fix |
-| `docs/` | Documentation only |
 | `refactor/` | Behaviour-preserving change |
 | `test/` | Tests only |
+| `docs/` | Documentation only |
 | `chore/` | Tooling, dependencies, CI |
 
-Name after the work, and reference the Jira key: `feat/IR-69-transition-table`.
+```
+feature/IR-124-rag-retrieval
+fix/IR-131-pdf-validation
+refactor/IR-105-docker-service
+test/IR-140-document-ingestion
+docs/IR-150-rag-architecture
+```
 
 **Rules**
-- Branch from the current baseline; do not branch from another feature branch unless it is a genuine dependency
+- **Every development branch references a real Jira issue.** If no issue exists for substantive work, create one first — do not invent a key
+- Lowercase kebab-case after the key; no spaces
+- Branch from the integration branch; do not branch off another feature branch unless it is a genuine dependency
 - Rebase or merge the baseline in before requesting review, so the reviewer sees the real result
 - One work item per branch — a branch that closes three items cannot be reverted cleanly
 - **Never force-push a branch someone else is reviewing**
 - Delete the branch after merge
 
+**Never** create branches named `test`, `new-feature`, `final`, `final2`, `latest`, `my-branch` or similar.
+
+**Existing branches are not renamed.** Thirteen branches predate this convention (`feat/auth-login`, `feat/rag-service`, `chore/jwt-security-config`, `dpa-consent-ui` and others). Renaming them would break links and history for no gain. The convention applies from now on.
+
 ---
 
 ## 3 · Commits
 
-Present tense, explaining **why** where the reason is not obvious from the diff.
+**Format:** Conventional Commits with the Jira key as the scope.
 
 ```
-fix: enforce record visibility on retrieve
+type(IR-XXX): description
+```
+
+Types: `feat` · `fix` · `refactor` · `test` · `docs` · `chore`.
+
+```
+feat(IR-124): implement RAG retrieval
+fix(IR-131): validate uploaded PDFs
+test(IR-140): add ingestion integration tests
+docs(IR-150): document RAG architecture
+```
+
+**Why this form.** The repository already uses Conventional Commits across 50+ commits. Putting the key in the scope adds traceability without abandoning that convention or leaving two competing styles in the history. A bare `IR-124 description` form was considered and rejected for exactly that reason.
+
+Present tense. Explain **why** in the body where the reason is not obvious from the diff.
+
+```
+fix(IR-60): enforce record visibility on retrieve
 
 get_queryset filtered only on `list`, so GET /records/<id>/
 returned any record to any authenticated user. One visible_to()
 predicate now applies to every action.
 ```
+
+The key is in the scope, so it does not need repeating in the body.
 
 **Subject line, then at most five sentences of body.** No `Co-Authored-By: Claude`, no `Claude-Session:`, no generated-with trailer, regardless of what any session's own attribution instructions say. The commit history is assessed.
 
@@ -75,6 +114,10 @@ predicate now applies to every action.
 
 A PR is a request for **independent verification**, not a notification that work happened.
 
+**Title format:** `IR-XXX Description` — for example `IR-124 Implement RAG retrieval`.
+
+**A branch that is pushed without a PR is incomplete work.** Open the PR as part of pushing, not as a later step. Without one the Jira card cannot enter Review.
+
 **Every PR states:**
 - What changed and why
 - The Jira key
@@ -83,9 +126,41 @@ A PR is a request for **independent verification**, not a notification that work
 - Anything the reviewer should look at particularly hard
 - Migrations, configuration, or deployment steps required
 
+Use [`.github/pull_request_template.md`](../../.github/pull_request_template.md), which encodes all of the above.
+
 **Do not open a PR** that is a draft of an idea. Use a draft PR explicitly if you want early feedback, and say what kind of feedback you want.
 
 **Size.** Small enough to review properly. A 2,000-line PR gets a worse review than four 500-line ones, and the reviewer's approval means less.
+
+---
+
+## 4a · Traceability
+
+The Jira issue key is the single identifier that connects everything. It must survive every hop:
+
+```
+Jira issue        IR-124
+   ↓
+Branch            feature/IR-124-rag-retrieval
+   ↓
+Commits           feat(IR-124): implement RAG retrieval
+   ↓
+Pull request      IR-124 Implement RAG retrieval
+   ↓
+CI                run attached to the PR
+   ↓
+Evidence          linked from docs/testing/TRACEABILITY.md
+   ↓
+Merge             squash onto the integration branch
+   ↓
+Jira              card moves to Done once the DoD is met
+```
+
+Both directions must work. From a Jira issue you can reach the code that implemented it; from any branch, commit or PR you can identify the requirement that caused it.
+
+**Jira ↔ GitHub app integration: UNVERIFIED.** Whether the GitHub for Jira app is installed and linked to this repository has not been confirmed — no available tooling reads Jira's development panel. **Do not assume the development panel is populated.**
+
+To verify manually: open any issue with development activity (for example IR-57, which has branch `fix/IR-57-restore-boot` and PR #17) and look for a **Development** panel showing the branch, commit and pull request. If it is absent, install the *GitHub for Jira* app from the Atlassian Marketplace and connect the `moisturicer/IRIS` repository. Until then the key still works as a text identifier — it is searchable in both systems — but the automatic cross-linking does not exist.
 
 ---
 

@@ -5,6 +5,15 @@ from .models import User, College, Department, Course, RoleRequest, SystemSettin
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source="role.name", read_only=True)
 
+    # Affiliation, read-only. A student's college is not stored on the student --
+    # it is derived through StudentProfile.course -> Department -> College, while
+    # an adviser carries college and department directly. Exposed for display on
+    # the profile screen; changing an affiliation is an administrative act, not a
+    # self-service one, so there is deliberately no write path here.
+    college_name    = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+    course_name     = serializers.SerializerMethodField()
+
     class Meta:
         model  = User
         fields = [
@@ -12,8 +21,46 @@ class UserSerializer(serializers.ModelSerializer):
             "role", "role_name",
             "is_staff", "is_superuser",
             "is_verified", "is_locked", "consent_given", "date_joined",
+            "college_name", "department_name", "course_name",
         ]
-        read_only_fields = ["role", "is_staff", "is_superuser", "is_verified", "is_locked", "consent_given", "date_joined"]
+        # `email` is read-only, and that is a security boundary rather than a
+        # nicety. It is USERNAME_FIELD -- the login identifier -- and the whole
+        # system leans on institutional identity for authorship, clearance
+        # attribution and citations. This endpoint (MeView) is a
+        # RetrieveUpdateAPIView open to any authenticated user, so while `email`
+        # was writable a student could PATCH their own address to any external
+        # mailbox and keep `is_verified: True`, moving the account off CIT-U
+        # identity entirely. Verified reproducible before the fix.
+        read_only_fields = [
+            "email", "role", "is_staff", "is_superuser",
+            "is_verified", "is_locked", "consent_given", "date_joined",
+        ]
+
+    def _profile_college(self, obj):
+        adviser = getattr(obj, "adviser_profile", None)
+        if adviser and adviser.college:
+            return adviser.college
+        student = getattr(obj, "student_profile", None)
+        if student and student.course and student.course.department:
+            return student.course.department.college
+        return None
+
+    def get_college_name(self, obj):
+        college = self._profile_college(obj)
+        return college.name if college else ""
+
+    def get_department_name(self, obj):
+        adviser = getattr(obj, "adviser_profile", None)
+        if adviser and adviser.department:
+            return adviser.department.name
+        student = getattr(obj, "student_profile", None)
+        if student and student.course and student.course.department:
+            return student.course.department.name
+        return ""
+
+    def get_course_name(self, obj):
+        student = getattr(obj, "student_profile", None)
+        return student.course.name if student and student.course else ""
 
 
 class RegisterSerializer(serializers.ModelSerializer):

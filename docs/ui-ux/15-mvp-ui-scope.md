@@ -1,8 +1,16 @@
 # 15 — MVP UI Scope
 
-**37 page components. 32 routes. 16 MVP screens.**
+**The pilot surface is defined per role, not as a single number — see [§10](#10--the-surface-by-role).**
 
 The scope boundary in [ADR-001](../adr/001-mvp-scope-boundary.md), applied to the interface.
+
+> **The "16 screens" target is retired.** It was set before Discover, My Library, My Workspace
+> and Calls & Conferences existed, and a single global cap cannot survive a four-role system —
+> every argument about it turns into an argument about whether an administration screen counts.
+> §2's four dispositions still bind, and §1's spine test is still the test. What changed is the
+> unit: **each role has a named surface**, and a screen is in scope when it appears on one of
+> them. §10 is that list, and it is the answer to "what does this role see?" — the question
+> this document previously could not answer.
 
 ---
 
@@ -55,7 +63,7 @@ Four dispositions:
 | `DocumentsPage` | **KEEP** | Genuinely a separate task |
 | `PendingRecordsPage` | **REDUCE** | [07](07-review-clearance.md) — becomes the one queue |
 | `EvaluationPage` | **KEEP** | [07](07-review-clearance.md) — made self-sufficient |
-| `PublishedRecordsPage` | **KEEP** | Public value of the corpus |
+| ~~`PublishedRecordsPage`~~ | **REMOVED** | Was **KEEP** (*"public value of the corpus"*). `DiscoverPage` took the browse role and the component was deleted — the corpus is still public, through Discover. See the reversal note under `DiscoverPage` in DEFER below |
 
 ### Supporting — 3 screens
 
@@ -72,19 +80,21 @@ Four dispositions:
 | `AuditLogPage` | **KEEP** | [10](10-audit-history.md) — needs `W-04`'s events |
 | `RoleRequestsPage` | **KEEP** | [11](11-saas-admin.md) — the only administration in the pilot |
 
-**That is 18 components producing 16 MVP screens** — `ForbiddenPage` and `PendingApprovalPage` are states rather than destinations.
+**That is 18 components producing 16 destinations** — `ForbiddenPage` and `PendingApprovalPage` are
+states rather than destinations. This was the original sixteen; [§10](#10--the-surface-by-role)
+supersedes it as the definition of scope, and the two differ — §10 is what is actually built.
 
 ### DEFER — 11
 
 | Page | Reason |
 |---|---|
 | `DashboardPage` | Unrouted already. `HomePage` is the landing |
-| `DiscoverPage` | Overlaps `PublishedRecordsPage`. Two browse surfaces, one corpus |
+| `DiscoverPage` | **Reversed — now KEEP, and it is the landing route.** The reasoning stands ("two browse surfaces, one corpus") but resolved the other way: Discover won and `PublishedRecordsPage` was deleted. Recorded here rather than edited away, because the original call was reversed by a decision, not by a mistake |
 | `ApprovedRecordsPage` | A filter on the queue ([07](07-review-clearance.md)) |
 | `DeclinedRecordsPage` | A filter on the queue |
 | `ApprovedProposalsPage` | A filter on the queue |
 | `UserListPage` | Django admin covers it at pilot scale |
-| `SettingsPage` | Nothing in it is per-user configurable in the MVP |
+| ~~`SettingsPage`~~ | **Reason was wrong — recommended for KEEP.** See the correction below |
 | `SessionsPage` | Real, but an operator task at this scale |
 | `DownloadRequestsPage` | The download-token flow **fails at import** (`records/views.py:535–579`) |
 | `DownloadTokenPage` | Same broken flow |
@@ -93,6 +103,34 @@ Four dispositions:
 | `ImportRecordsPage` | Imported records distort turnaround metrics (`W-04`) |
 | `DocumentReviewsPage` | 13-line stub |
 | `ReviewAnalyticsPage` | 13-line stub; backend returns **501**; Module 7 is Phase 2 |
+
+**Correction — `SettingsPage` was deferred on a false premise.** Its stated reason,
+*"Nothing in it is per-user configurable in the MVP"*, was already untrue when written: the
+page changes the user's password, via `/auth/password/change/`, which is per-user
+configuration and the only way a user can do it. Three further things are per-user and real:
+name (`PATCH /users/me/`), the RA 10173 consent recorded against the account
+(`consent_given`, FR-M6-06), and the role that governs every permission check (FR-M6-02).
+Deferring the screen would leave a pilot with **no way to change a password.**
+
+Whether this moves `SettingsPage` to **KEEP** is bundled with IR-160's broader question — "is the
+target still 16 routes, or is this document amended" — which IR-160 itself reserves as **"a human
+scope decision, not one to settle in a commit."** This document recommends KEEP on the evidence
+above; it is not settling the question. IR-160 should stay open against that recommendation until
+someone with scope authority rules on it, at which point the count in §3 follows from that ruling.
+
+It is built to four tabs, not the six the mockup proposes. **Notification preferences** and
+**Active sessions** are deliberately absent:
+
+- *Notification preferences* — no preference, opt-in or opt-out model exists in
+  `backend/apps/`. It also cannot be a blanket switch: suppressing workflow notifications
+  would break the review loop, so the semantics need designing before any UI.
+- *Active sessions* — `/users/sessions/` is `IsAdmin` and returns **every** user's live
+  tokens. **FR-M6-05 scopes session monitoring to administrators**, so a student would get a
+  403, and widening the endpoint would expose the whole institution's sessions. Self-service
+  "your devices" is a different per-user endpoint that does not exist and is not in the SRS.
+
+Shipping either as a non-persisting panel would be exactly the dead end IR-86's acceptance
+criteria forbid, so both are filed instead.
 
 ### REMOVE — 4
 
@@ -211,3 +249,124 @@ Recorded so the exclusions are decisions rather than omissions.
 ## 8 · The boundary in one line
 
 > **Build the sixteen screens that carry a submission from a student's draft to a published record, make the clearance state visible at every step, and instrument it well enough to measure. Everything else waits.**
+
+---
+
+## 9 · Recorded deviations
+
+Screens built outside the sixteen. Listed here so the boundary above stays true
+rather than quietly wrong — each one is either brought into scope by a decision,
+or unrouted before the pilot.
+
+| Screen | Route | Status | Note |
+|---|---|---|---|
+| `DiscoverPage` | `/` | Built, routed | Listed as **DEFER** in §2 ("overlaps `PublishedRecordsPage`"). It is now the landing surface, so the overlap resolves the other way — `PublishedRecordsPage` was deleted |
+| `PaperViewPage` | `/records/:id` | Built, routed | Replaces `RecordDetailPage` (**KEEP**), carrying the Clearance Track required by [06](06-record-detail.md). In scope; the component changed, not the disposition |
+| `MyLibraryPage` | `/records/mine` | Built, routed | **Not in the sixteen.** A reader-side saved-research surface: folders, likes, reading history. Took over the `My Library` route from `MyRecordsPage mode="library"`, which duplicated My Workspace behind a status filter |
+| `CallsAndConferencesPage` | `/opportunities` | Built, routed | **Not in the sixteen, and not in any requirement.** A deadline board for internal calls, conference deadlines, funding windows and institutional grants, backed by a new `apps.opportunities`. Requested directly by the team; see [IR-121](https://citiris.atlassian.net/browse/IR-121) |
+
+**`MyLibraryPage` carries no server state.** There is no bookmark, folder, like or
+reading-history model in `backend/apps/` — `apps.storage` stores uploaded files and is
+removed server-side by `P0-06`. Everything the page saves lives in the viewer's
+`localStorage` (`lib/recordLibrary`), and every surface on it says so. Saved ids resolve
+through the **list** endpoint (`?id=`), never `retrieve`, because `RecordViewSet.get_queryset`
+applies `publicly_visible()` only on `list`.
+
+**`CallsAndConferencesPage` has no SRS backing at all**, and that is worth stating
+plainly rather than leaving for a reader to discover. `docs/SRS.md` contains no
+requirement for announcements, calls for proposals, funding windows or institutional
+grants; there is no ADR and there was no prior Jira card. It is a product addition the
+team asked for, not a requirement being implemented, so **nothing in `TRACEABILITY.md`
+changes** — there is no requirement for it to trace to. Two limits were chosen
+deliberately and are recorded in IR-121: nothing scrapes external sources (a staff
+member types every entry, with a `source` field attributing external ones), and the
+calendar action emits an `.ics` file rather than scheduling an in-app reminder, because
+Celery does not currently consume its own queue ([IR-83](https://citiris.atlassian.net/browse/IR-83))
+and a scheduled reminder would silently never fire. Bookmarks are `localStorage`, with
+the same no-server-state caveat as My Library.
+
+**One criterion met, one recommended for a human to close out.** This was open against IR-86 (now
+**[IR-160](https://citiris.atlassian.net/browse/IR-160)** — *Reduce the pilot surface to 16
+screens*), whose acceptance criteria were *"16 routes remain"* and *"Every remaining nav item leads
+somewhere real"*. IR-160 itself is explicit that its scope question — is the target still 16, or is
+this document amended — **"is a human scope decision, not one to settle in a commit."** Nothing
+below settles it; the second criterion is closed, the first is a recommendation for whoever owns
+that decision.
+
+The second is **met**: no nav item is a placeholder. The last two `comingSoon` entries — Review
+Analytics and Document Reviews, both already **DEFER** in §2 as 13-line stubs, one of them backed by
+an endpoint that returns 501 — were removed from the nav and the router, along with the Storage
+entry before them. A badge promising a screen that is not coming is worse than the screen's absence.
+
+The first is **deliberately not met.** The count is not 16 today, and this document's
+recommendation — pending the human sign-off IR-160 reserves — is to withdraw it as a criterion
+rather than delete working screens to reach it; see the note at the top of this document and
+[§10](#10--the-surface-by-role). The reader-side section IR-160 anticipated ("either §2 gains a
+reader-side section... or these routes come out") is what §10 became — it covers Discover, My
+Library and Calls & Conferences by naming the role that sees them, rather than by arguing them past
+a number. **IR-160 should stay open, not be closed as Resolved, until that recommendation is
+ratified or rejected.**
+
+---
+
+## 10 · The surface, by role
+
+Read off `frontend/src/router/index.tsx` and `components/layout/Sidebar.tsx` as built, not aspirational.
+**This section is the scope boundary.** A screen is in the MVP when it appears below.
+
+Roles come from `backend/core/permissions.py`: `REVIEWER_ROLES` = Adviser, KTTO, RDCO, ITSO, IERC ·
+`STAFF_ROLES` = KTTO, RDCO, ITSO, IERC · Django admin is `is_staff`/`is_superuser`.
+
+### Every signed-in user — 8
+
+| Screen | Route | Group |
+|---|---|---|
+| Discover | `/` | Research Exploration |
+| Ask IRIS | `/ai` | Research Exploration |
+| My Library | `/records/mine` | Research Exploration |
+| Calls & Conferences | `/opportunities` | Research Exploration |
+| Submit Disclosure | `/records/add` | IP Management |
+| My Workspace | `/workspace` | IP Management |
+| Notifications | `/notifications` | Tools |
+| Settings & Profile | `/settings` | Tools |
+
+**This is the student surface** — a student sees these eight and nothing else. Every other role sees
+these eight *plus* the sections below, because every role also submits and browses.
+
+### + Reviewer — 3, or 4 for RDCO
+
+`REVIEWER_ROLES`. Rendered behind `isReviewer`.
+
+| Screen | Route |
+|---|---|
+| Pending Records | `/review/pending` |
+| Approved | `/review/approved` |
+| Declined | `/review/declined` |
+| Approved Proposals *(RDCO only)* | `/review/approved-proposals` |
+
+### + Staff — 4, or 6 for a Django admin
+
+`STAFF_ROLES`. Rendered behind `isStaff`.
+
+| Screen | Route | Gate |
+|---|---|---|
+| Manage Users | `/admin/users` | `isStaff` |
+| Download Requests | `/admin/download-requests` | `isStaff` |
+| Delete Requests | `/admin/delete-requests` | `isStaff` |
+| Active Sessions | `/admin/sessions` | `isStaff` |
+| Role Requests | `/admin/role-requests` | Django admin |
+| Audit Log | `/admin/audit` | Django admin |
+
+### Reached from a screen, not from nav
+
+Not counted above, because nobody navigates to them directly: `/records/:id` (paper view),
+`/records/:id/edit`, `/records/:id/documents`, `/review/:id/evaluate`, `/records/import`, `/help`,
+and the entry screens (`/login`, `/signup`, `/activate/...`, `/download`).
+
+### What this replaces
+
+The per-role lists answer the question the global count could not: **what does this role see?**
+The count was a proxy for "is the pilot small enough". The lists are the thing itself — and they make
+the next gap obvious, which is that the reviewer surface is three queue screens and a decision screen
+while the student surface is eight built-out ones. That asymmetry is the work
+[IR-143](https://citiris.atlassian.net/browse/IR-143) covers, not a scope question.

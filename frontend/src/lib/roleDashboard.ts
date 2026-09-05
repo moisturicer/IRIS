@@ -11,7 +11,7 @@ export function getRoleDashboardPath(roleName: RoleName | null | undefined): str
     case ROLES.IERC:
       return "/review/pending";
     case ROLES.ITSO:
-      return "/records";
+      return "/";
     default:
       return "/";
   }

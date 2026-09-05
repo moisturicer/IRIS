@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { ChatMessage } from "@/types/chat";
+import { AskIrisMark, GroundedCitationIcon } from "./AskIrisIcons";
 import "highlight.js/styles/github.min.css";
 
 interface ChatMessageBubbleProps {
@@ -17,16 +18,16 @@ export function ChatMessageBubble({ message, showSources = true }: ChatMessageBu
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
       <div
         className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[12px]
-          ${isUser ? "bg-gray-200 text-gray-600" : "bg-[#6B0F12]/10 text-[#6B0F12]"}`}
+          ${isUser ? "bg-stone-100 text-stone-500" : "bg-brand/10 text-brand"}`}
         aria-hidden
       >
-        <i className={`fas ${isUser ? "fa-user" : "fa-robot"}`} />
+        {isUser ? <i className="fas fa-user" /> : <AskIrisMark className="w-[18px] h-[18px]" />}
       </div>
 
       <div
         className={`max-w-[min(88%,40rem)] rounded-2xl px-4 py-3 text-[13px] leading-relaxed
           ${isUser
-            ? "bg-stone-800 text-white rounded-br-sm"
+            ? "bg-brand text-white rounded-br-sm"
             : "bg-white border border-stone-200/90 text-stone-800 rounded-bl-sm shadow-sm"
           }`}
       >
@@ -42,8 +43,10 @@ export function ChatMessageBubble({ message, showSources = true }: ChatMessageBu
 
         {!isUser && showSources && message.citations && message.citations.length > 0 && (
           <div className="mt-3 pt-2 border-t border-gray-100 flex flex-wrap gap-1.5">
-            <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide w-full">
-              Cited records
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-stone-400 uppercase tracking-wide w-full">
+              <GroundedCitationIcon className="w-3.5 h-3.5" />
+              Grounded in {message.citations.length} record
+              {message.citations.length === 1 ? "" : "s"}
             </span>
             {message.citations.map((id) => (
               <Link

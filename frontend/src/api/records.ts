@@ -4,6 +4,7 @@ import type {
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest,
 } from "@/types/records";
+import type { SemanticSearchResult } from "@/types/ai";
 
 interface PaginatedResponse<T> {
   count:    number;
@@ -17,13 +18,41 @@ export const recordsApi = {
   list:           (params?: Record<string, unknown>) =>
     apiClient.get<PaginatedResponse<RecordListItem>>("/records/", { params }),
 
-  // My records — backend returns a plain array (not paginated)
+  // My records — backend returns a plain array (not paginated).
+  // RecordViewSet.mine() (the actual registered action -- MyRecordsViewSet
+  // elsewhere in views.py looks like it should serve this with
+  // RecordDetailSerializer already, but isn't wired into urls.py at all) now
+  // uses RecordDetailSerializer too, so clearances/ip_type/requested_itso
+  // etc. are really in this payload. Was mistyped as RecordListItem[] before
+  // the backend fix, matching what the endpoint used to actually return.
   mine:           (params?: Record<string, unknown>) =>
-    apiClient.get<RecordListItem[]>("/records/mine/", { params }),
+    apiClient.get<RecordDetail[]>("/records/mine/", { params }),
 
   detail:         (id: number) => apiClient.get<RecordDetail>(`/records/${id}/`),
+  /**
+   * Related institutional works. The backend reuses the Ask IRIS retrieval
+   * service, so this returns the retrieval shape (RetrievedSource.as_dict()),
+   * not a RecordListItem.
+   */
+  similar:        (id: number) =>
+    apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
   create:         (data: RecordFormData) => apiClient.post<RecordDetail>("/records/", data),
   update:         (id: number, data: Partial<RecordFormData>) => apiClient.patch<RecordDetail>(`/records/${id}/`, data),
+  /**
+   * The manuscript itself. `abstract_file` is a plain FileField on Record,
+   * separate from the per-type UploadSlot/RecordUpload system — no seeded
+   * slot is named "manuscript" for any record type, so this is the only way
+   * to attach it. AddRecordPage never called this before, which is why
+   * records could reach the paper view with zero files (see
+   * iris-paper-view-design memory).
+   */
+  uploadManuscript: (id: number, file: File) => {
+    const fd = new FormData();
+    fd.append("abstract_file", file);
+    return apiClient.patch<RecordDetail>(`/records/${id}/`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   submit:         (id: number) => apiClient.post<{ detail: string }>(`/records/${id}/submit/`),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),

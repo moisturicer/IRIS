@@ -16,8 +16,9 @@ Read this first — several obvious commands fail for reasons that are already u
 
 | Symptom | Cause | Item |
 |---|---|---|
-| `docker compose up --build` builds `ai-gateway`, then it crashes | `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist | IR-58 |
+| `docker compose up --build` fails | `ai-gateway` builds from `./ai`, which now exists, but Compose also requires `./ai/.env`, which does not; even with that supplied, `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist. [ADR-014](../adr/014-ai-gateway-as-a-service.md) adopts the gateway under five preconditions — none met yet, so it stays undeployed, not rejected | IR-58 |
 | Every API request 500s / no route resolves | `apps/records/views.py` has undefined names; `config/urls.py:11` imports it, so the URLconf fails at import | IR-57 |
+| No Celery task is ever processed | Workers consume `default`/`extraction`/`embedding` queues, but nothing sets `CELERY_TASK_ROUTES` — every `.delay()` call still publishes to Celery's implicit default queue (`celery`), which no worker consumes | — |
 | Frontend unreachable in prod compose | Prod maps `80:80`; nginx-unprivileged listens on `8080` | IR-58 |
 | `npm run lint` / `npm run build` fail | Not currently known-broken — both pass on this branch (verified 2026-09-06) | — |
 | `npm test` not found | No test runner is installed in `frontend/package.json` | deferred (P3) |
@@ -40,7 +41,8 @@ Read this first — several obvious commands fail for reasons that are already u
 ```
 backend/          Django + DRF
   apps/           accounts · records · reviews · documents
-                  notifications · audit · ai · storage
+                  notifications · audit · ai
+                  (apps/storage removed — IR-62)
   config/         settings, urls, celery
   core/           permissions, shared utilities
   requirements/   base.txt · development.txt · production.txt
@@ -123,7 +125,11 @@ docker compose down                # add -v to drop volumes
 
 **Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `frontend` (nginx) · `docling` (docling-serve, structured extraction — ADR-016) · `ai-gateway` (FastAPI, ADR-014) · `celery-default` / `celery-extraction` / `celery-embedding` / `celery-beat` (Celery workers, routed by queue).
 
-**`ai-gateway` now has a real build context (`./ai`)** and builds, but crashes at runtime: `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist. [ADR-014](../adr/014-ai-gateway-as-a-service.md) adopts it as a service under five preconditions, none yet met. Do not deploy it. Tracked in IR-58.
+**`ai-gateway` now has a real build context (`./ai`)** and builds, given `./ai/.env` (gitignored, absent in CI and on a fresh checkout) — but it crashes at runtime: `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`. [ADR-014](../adr/014-ai-gateway-as-a-service.md) supersedes ADR-010/012's earlier rejection and adopts the gateway as a service under five preconditions, none yet met — this is what's tracked in IR-58, not a missing file to bolt on. Do not deploy it.
+
+### Celery
+
+Workers consume the `default`, `extraction` and `embedding` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding` services) — but nothing sets `CELERY_TASK_ROUTES`, so every task still publishes to Celery's implicit default queue (`celery`), which no worker consumes. **No Celery task in this system is currently processed**, chunking/ingestion and embedding included, regardless of how the workers are named. This predates and is unrelated to the RAG pipeline work; still open.
 
 ---
 
@@ -175,7 +181,8 @@ Full process: [`SDLC.md`](SDLC.md). Done gates: [`DEFINITION_OF_DONE.md`](DEFINI
 | Problem | Check |
 |---|---|
 | Nothing responds | IR-57 — the URLconf fails at import. `python manage.py check` |
-| `ai-gateway` container exits | IR-58 — `ai/services/chat_service.py` is missing; do not deploy it |
+| Compose will not start / `ai-gateway` container exits | IR-58 — `ai-gateway` has no `ai/.env`, and even with one, its service package is missing (`ai.services.chat_service`, `ai.services.embedding_service`); do not deploy it |
+| Celery task never runs | Queue routing gap — see §6 Celery above; unrelated to whether the task itself is correct |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
 | Uploads not extracted | `DoclingExtractor` calls `POST {DOCLING_API_URL}/v1/convert/file` — check the `docling` service is up and reachable; there is no fallback extractor (ADR-016) |
 | Migrations conflict | `showmigrations`, then resolve deliberately; never edit an applied migration |

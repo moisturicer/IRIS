@@ -37,8 +37,8 @@ LOCAL_APPS = [
     "apps.documents",
     "apps.notifications",
     "apps.audit",
-    "apps.storage",
     "apps.ai",
+    "apps.opportunities",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -132,6 +132,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
         "user": "1000/day",
+        "ai_query": "60/hour",
     },
 }
 
@@ -188,7 +189,9 @@ MEDIA_ROOT = BASE_DIR / "media"
 AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")
 AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
 OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
-DOCLING_API_URL        = config("DOCLING_API_URL", default="http://docling:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction
+ANTHROPIC_API_KEY      = config("ANTHROPIC_API_KEY", default="")       # Ask IRIS synthesis; unset -> retrieval-only mode
+AI_LLM_MODEL           = config("AI_LLM_MODEL", default="claude-sonnet-5")
+DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.
 DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)

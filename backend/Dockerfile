@@ -43,8 +43,16 @@ COPY --from=builder /install /usr/local
 # Copy application code
 COPY . .
 
-# Create a non-root user and change ownership of the app directory
-RUN useradd -m appuser && chown -R appuser:appuser /app
+# Create a non-root user and change ownership of the app directory.
+# media/ is explicitly created (not just left to Django's first FileField
+# save) because docker-compose.yml mounts it as a *named volume*
+# (media_files:/app/media) — Docker initializes a named volume empty and
+# root-owned, then populates it by copying the image's directory at that
+# path on first mount. Without a media/ directory existing here, owned by
+# appuser, that first mount stays root-owned and every upload gets
+# "PermissionError: [Errno 13] Permission denied" the first time anything
+# writes to it (found via the Submit Disclosure manuscript upload, IR-88).
+RUN useradd -m appuser && mkdir -p /app/media && chown -R appuser:appuser /app
 
 # Switch to the non-root user
 USER appuser

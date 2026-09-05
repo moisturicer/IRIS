@@ -43,7 +43,7 @@
 | FR-M6-02 | DPA consent | SDD M6 | `DpaConsentGate`, `DpaConsentModal` | — | — | **IMPLEMENTED** |
 | FR-M6-03 | Role-based access control | **ADR-009** | `core/permissions.py` — 11 classes, **5 referenced nowhere**. Two `RecordViewSet` actions (`submit`, `tags`) fixed — a `get_permissions()` override was silently discarding decorator-level `permission_classes` (`IR-120`) | `apps/records/tests.py::SubmitOwnershipTests`, `::TagsPermissionTests` | `pytest apps/records` green | **PARTIAL** — 2 of the affected endpoints closed and tested; **the remaining object-level checks are still open** — tracked as `IR-147` subtask B (`IR-153`) |
 | FR-M7-01 | KPI dashboard | — | `recharts` installed, **zero importers** | — | — | **DEFERRED** — Phase 2 in SRS §31 |
-| FR-M2-06/07 | Institutional / personal storage | — | `apps/storage` — **6 unauthorized endpoints** | — | — | **DEFERRED** — removed by IR-62, needs SRS amendment |
+| FR-M2-06/07 | Institutional / personal storage | — | **none — `apps/storage` deleted (IR-62)** | `config/tests.py::StorageAppRemovedTests` | 3 passing — routes 404, app absent | **WITHDRAWN in code, PENDING in the SRS** — the six unauthorized endpoints are gone; the requirements they served are still written down and **need a formal descope (P0-12)** |
 
 ### Non-functional
 
@@ -52,7 +52,7 @@
 | NFR-S1 | Transport security | Not yet deployed | — | **NOT STARTED** |
 | NFR-S2 | 30-minute inactivity expiry | Absent | — | **NOT STARTED** |
 | NFR-S3 | Secure configuration | `CORS_ALLOW_ALL_ORIGINS` with credentials; hardcoded DB credentials; `ALLOWED_HOSTS` unset | — | **NOT STARTED** |
-| NFR-S4 | Server-side authorization | Originally 12 endpoints unprotected; 2 `RecordViewSet` actions (`submit`, `tags`) since fixed and tested (`IR-120`) | `apps/records/tests.py::SubmitOwnershipTests`, `::TagsPermissionTests` | **PARTIAL** — remainder tracked as `IR-147` subtask B (`IR-153`) |
+| NFR-S4 | Server-side authorization | Originally 12 endpoints unprotected. 2 `RecordViewSet` actions (`submit`, `tags`) fixed and tested (`IR-120`). Separately, **the public `/media/` route that bypassed all of them is gone (IR-152)** — nginx alias, the prod web-container mount, and Django's `DEBUG` `static()` route all removed | `apps/records/tests.py::SubmitOwnershipTests`, `::TagsPermissionTests`; `apps/documents/tests.py` — 4 executed (owner 200, non-owner 403, anonymous 401, URLconf), **2 skipped** inside the backend container, which cannot see `nginx.conf` or the compose file. Plus a **manual, unautomated** probe: `/media/abstracts/thesis-manuscript.pdf` 200 → 404 | **PARTIAL** — the `/media/` bypass is closed and the download path is proven, and 2 of the 12 endpoint-level gaps are closed and tested. The nginx guard runs only on a full checkout, and **the deployment smoke test S-01 asks for does not exist** (belongs with IR-157). The remaining endpoint-level gaps are tracked as `IR-147` subtask B (`IR-153`) |
 | NFR-S5 | Audit immutability | No DB-level guard | — | **NOT STARTED** |
 | NFR-S6 | Account protection | Lockout events defined in the audit model | — | **PARTIAL** |
 | NFR-P1 | 100 concurrent sessions | Untested | — | **NOT STARTED** |

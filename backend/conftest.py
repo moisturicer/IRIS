@@ -44,6 +44,20 @@ def _database_reachable() -> bool:
         sock.close()
 
 
+def _needs_a_real_database(item) -> bool:
+    """True for Django TestCase/APITestCase-style tests, which hit the DB in
+    setUp regardless of markers. SimpleTestCase (and plain functions) do not.
+    """
+    cls = getattr(item, "cls", None)
+    if cls is None:
+        return False
+    try:
+        from django.test import TransactionTestCase
+    except ImportError:
+        return False
+    return issubclass(cls, TransactionTestCase)
+
+
 def pytest_collection_modifyitems(config, items):
     deps = _backend_deps_installed()
     db = _database_reachable() if deps else False
@@ -56,7 +70,14 @@ def pytest_collection_modifyitems(config, items):
     )
 
     for item in items:
-        if "db_required" in item.keywords and not db:
+        if not deps:
+            if "django_required" in item.keywords:
+                item.add_marker(skip_django)
+            continue
+        if db:
+            continue
+        # Explicit db_required marker (apps/ai's own convention), or a bare
+        # Django TestCase/APITestCase subclass (everyone else's convention —
+        # these hit the database in setUp with no marker to opt in with).
+        if "db_required" in item.keywords or _needs_a_real_database(item):
             item.add_marker(skip_db)
-        elif "django_required" in item.keywords and not deps:
-            item.add_marker(skip_django)
