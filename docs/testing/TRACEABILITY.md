@@ -40,7 +40,7 @@
 | FR-M6-02 | DPA consent | SDD M6 | `DpaConsentGate`, `DpaConsentModal` | — | — | **IMPLEMENTED** |
 | FR-M6-03 | Role-based access control | **ADR-009** | `core/permissions.py` — 11 classes, **5 referenced nowhere** | — | — | **PARTIAL** — **12 endpoints have no object-level check** |
 | FR-M7-01 | KPI dashboard | — | `recharts` installed, **zero importers** | — | — | **DEFERRED** — Phase 2 in SRS §31 |
-| FR-M2-06/07 | Institutional / personal storage | — | `apps/storage` — **6 unauthorized endpoints** | — | — | **DEFERRED** — removed by IR-62, needs SRS amendment |
+| FR-M2-06/07 | Institutional / personal storage | — | **none — `apps/storage` deleted (IR-62)** | `config/tests.py::StorageAppRemovedTests` | 3 passing — routes 404, app absent | **WITHDRAWN in code, PENDING in the SRS** — the six unauthorized endpoints are gone; the requirements they served are still written down and **need a formal descope (P0-12)** |
 
 ### Non-functional
 

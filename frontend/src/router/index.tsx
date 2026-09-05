@@ -33,7 +33,6 @@ import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import UserListPage         from "@/features/accounts/UserListPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
-import StoragePage          from "@/features/storage/StoragePage";
 import AIHubPage            from "@/features/ai/AIHubPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
 import HelpPage             from "@/features/help/HelpPage";
@@ -65,8 +64,6 @@ export const router = createBrowserRouter([
           { path: "records/:id/edit",     element: <EditRecordPage />,                 handle: { crumb: "Edit Record" } },
           { path: "records/:id/documents",element: <DocumentsPage />,                  handle: { crumb: "Documents" } },
           { path: "notifications",        element: <NotificationsPage />,              handle: { crumb: "Notifications" } },
-          { path: "storage",              element: <StoragePage />,                    handle: { crumb: "Storage" } },
-          { path: "storage/:folderId",    element: <StoragePage />,                    handle: { crumb: "Storage" } },
           { path: "ai",                   element: <AIHubPage />,                      handle: { crumb: "AI Research Hub" } },
           { path: "ai/summarize",         element: <AIHubPage />,                      handle: { crumb: "AI Summarizer" } },
           { path: "help",                 element: <HelpPage />,                       handle: { crumb: "Help" } },

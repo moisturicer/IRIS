@@ -147,7 +147,6 @@ export function Sidebar({ className }: SidebarProps) {
       icon: "fa-bell",
       badge: unreadCount,
     },
-    { to: "/storage", label: "Storage", icon: "fa-folder-open", comingSoon: true },
     { to: "/settings", label: "Settings & Profile", icon: "fa-cog" },
   ];
 
