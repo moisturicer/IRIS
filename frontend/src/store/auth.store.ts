@@ -6,6 +6,7 @@ import {
   getStoredRefreshToken,
   setStoredRefreshToken,
 } from "@/lib/authStorage";
+import { __resetRefreshState } from "@/lib/tokenRefresh";
 import { REVIEWER_ROLES, STAFF_ROLES, type RoleName } from "@/lib/constants";
 
 interface AuthState {
@@ -15,6 +16,16 @@ interface AuthState {
   isAuthenticated: boolean;
   /** False until we have checked sessionStorage for a refresh token on load. */
   authReady:       boolean;
+  /**
+   * Bumped by `logout`/`clearTokens`. `client.ts` captures this before starting a
+   * refresh and checks it again after the refresh resolves: if it moved, the
+   * session that requested the refresh no longer exists, so the result is
+   * discarded instead of reviving a session the user already signed out of.
+   * `__resetRefreshState` alone doesn't cover this -- it only stops a *future*
+   * caller from joining a stale in-flight promise; it can't reach into the one a
+   * request is already `await`ing.
+   */
+  sessionEpoch: number;
 
   login:      (user: User, access: string, refresh: string) => void;
   logout:     () => void;
@@ -30,6 +41,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   refreshToken:    null,
   isAuthenticated: false,
   authReady:       false,
+  sessionEpoch:    0,
 
   login: (user, access, refresh) => {
     setStoredRefreshToken(refresh);
@@ -42,13 +54,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: () => {
+    // Drop any refresh already in flight so a *future* caller doesn't join it.
+    // This alone is not enough: a request already `await`ing the old promise in
+    // client.ts still resolves and would otherwise call setTokens after logout,
+    // quietly re-authenticating the browser the user just signed out of. Bumping
+    // sessionEpoch is what lets that caller notice and discard its result.
+    __resetRefreshState();
     clearAuthSession();
-    set({
+    set((s) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
-    });
+      sessionEpoch: s.sessionEpoch + 1,
+    }));
   },
 
   updateUser: (user) => set({ user }),
@@ -63,8 +82,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   clearTokens: () => {
+    __resetRefreshState();
     clearAuthSession();
-    set({ accessToken: null, refreshToken: null, isAuthenticated: false });
+    set((s) => ({
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      sessionEpoch: s.sessionEpoch + 1,
+    }));
   },
 
   hydrateAuth: async () => {
