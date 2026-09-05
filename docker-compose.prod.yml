@@ -217,8 +217,9 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-    volumes:
-      - media_files:/usr/share/nginx/html/media:ro
+    # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
+    # longer serves /media/, so the web container has no reason to be able to
+    # read uploaded documents at all.
     depends_on:
       - backend
       - ai-gateway

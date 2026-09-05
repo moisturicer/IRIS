@@ -36,7 +36,6 @@ LOCAL_APPS = [
     "apps.documents",
     "apps.notifications",
     "apps.audit",
-    "apps.storage",
     "apps.ai",
     "apps.opportunities",
 ]

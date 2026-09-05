@@ -63,9 +63,6 @@ export const router = createBrowserRouter([
           { path: "records/:id/edit",     element: <EditRecordPage />,                 handle: { crumb: "Edit Record" } },
           { path: "records/:id/documents",element: <DocumentsPage />,                  handle: { crumb: "Documents" } },
           { path: "notifications",        element: <NotificationsPage />,              handle: { crumb: "Notifications" } },
-          // Storage routes removed -- apps/storage is slated for deletion (SC-01/FE-03,
-          // IR-62) and overlapped DocumentsPage. StoragePage.tsx stays in the tree,
-          // unrouted, per IR-86's "no component is deleted from the repository".
           { path: "ai",                   element: <RAGChatPage />,                    handle: { crumb: "Ask IRIS" } },
           { path: "help",                 element: <HelpPage />,                       handle: { crumb: "Help" } },
           { path: "settings",             element: <SettingsPage />,                   handle: { crumb: "Settings & Profile" } },
