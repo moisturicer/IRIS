@@ -49,7 +49,7 @@
 | NFR-S1 | Transport security | Not yet deployed | — | **NOT STARTED** |
 | NFR-S2 | 30-minute inactivity expiry | Absent | — | **NOT STARTED** |
 | NFR-S3 | Secure configuration | `CORS_ALLOW_ALL_ORIGINS` with credentials; hardcoded DB credentials; `ALLOWED_HOSTS` unset | — | **NOT STARTED** |
-| NFR-S4 | Server-side authorization | 12 endpoints unprotected | — | **PARTIAL** |
+| NFR-S4 | Server-side authorization | 12 endpoints unprotected. **The public `/media/` route that bypassed all of them is gone (IR-152)** — nginx alias, the prod web-container mount, and Django's `DEBUG` `static()` route all removed | `apps/documents/tests.py` — 4 executed, 2 skipped outside a full checkout. Live: `/media/abstracts/thesis-manuscript.pdf` **200 → 404**; owner downloads 200, non-owner 403, anonymous 401 | **PARTIAL** — the bypass is closed and the download path is proven; the 12 endpoint-level gaps remain |
 | NFR-S5 | Audit immutability | No DB-level guard | — | **NOT STARTED** |
 | NFR-S6 | Account protection | Lockout events defined in the audit model | — | **PARTIAL** |
 | NFR-P1 | 100 concurrent sessions | Untested | — | **NOT STARTED** |
