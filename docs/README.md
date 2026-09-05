@@ -5,7 +5,7 @@
 **Does not own.** Any subject matter itself — every fact lives in exactly one document, and this file points at it.
 **Update when.** A document is added, removed, or changes responsibility.
 
-> **Baseline branch: `refactor/docker-service`.** `main` has diverged and carries a different, older documentation set. Do not use `main` as the reference.
+> **Baseline branch: `main`.** `refactor/docker-service` was merged in (PR #20) and `main` now carries this documentation set. The divergent per-module `software-requirements/` and `software-design/` trees have been removed — `SRS.md` and `SDD.md` are the consolidated baseline.
 
 ---
 
@@ -33,11 +33,13 @@ A requirement is not satisfied because code exists for it. It is satisfied when 
 |---|---|
 | [`SRS.md`](SRS.md) | Functional and non-functional requirements |
 | [`SDD.md`](SDD.md) | System and component design |
+| [`chunker_architecture.md`](chunker_architecture.md) | Chunk as the retrievable unit, context-path prefixing, idempotent re-chunking. The design [ADR-013](adr/013-chunk-level-rag-pipeline.md) adopts |
+| [`rag_third_party_services_architecture.md`](rag_third_party_services_architecture.md) | Provider survey and the prerequisites behind [ADR-015](adr/015-voyage-embedding-and-reranking.md) |
 
 ### Decisions
 | Document | Owns |
 |---|---|
-| [`adr/`](adr/README.md) | 11 accepted ADRs — MVP scope, transition table, clearance-aware resubmission, restart-all comparison, instance-per-tenant, minimum RAG, pgvector, FTS degradation, authorization model, deployment topology, evaluation framework |
+| [`adr/`](adr/README.md) | 15 ADRs, 13 in force — MVP scope, transition table, clearance-aware resubmission, restart-all comparison, instance-per-tenant, pgvector, FTS degradation, authorization model, deployment topology, evaluation framework, chunk-level RAG, AI gateway as a service, Voyage provider. **006 and 012 are superseded by 013 and 014** |
 
 ADRs are immutable once accepted. A changed decision gets a **new** ADR that supersedes the old one.
 
@@ -74,6 +76,11 @@ ADRs are immutable once accepted. A changed decision gets a **new** ADR that sup
 | [`jira-sync/`](jira-sync/01-revised-capacity-validated-plan.md) | The Semester 2 Kanban plan and its capacity validation |
 | [`architecture-review/`](architecture-review/) | The verified architecture audit that produced the ADRs |
 
+### Archive
+| Document | Owns |
+|---|---|
+| [`archive/`](archive/README.md) | **Nothing.** Superseded documents retained only because active documents and ADR-006 cite them as evidence |
+
 ---
 
 ## Known contradictions
@@ -82,11 +89,15 @@ Recorded rather than silently reconciled. Each needs a decision.
 
 | # | Contradiction | Status |
 |---|---|---|
-| 1 | **Docling-serve** is SRS-specified in four places; ADR-006 defers it | Needs an SRS amendment — **NEEDS ADVISER CONFIRMATION** |
-| 2 | `docker_compose_rag_services.md` and `rag_pipeline_service_map.md` describe an **eleven-phase RAG pipeline**; two phases exist | To be rewritten as target-state plans, clearly marked PROPOSED |
-| 3 | Both Compose files declare an **`ai-gateway`** service; no `./ai` directory exists and ADR-010 rejects it | Removed by IR-58 |
-| 4 | `backend_frontend_architecture_review.md` predates the verified review | Superseded by `architecture-review/`; retained for history |
-| 5 | **`main` and `refactor/docker-service` carry different documentation sets** — main has per-module `software-requirements/` and `software-design/` plus 8 engineering docs; the baseline consolidated these into `SRS.md`/`SDD.md` and dropped the engineering set | Engineering set rebuilt here under `engineering/`. The module docs on `main` are **legacy** |
+| 1 | **Docling-serve** is SRS-specified in four places; ADR-006 defers it | Open — needs an SRS amendment, **NEEDS ADVISER CONFIRMATION** |
+| 2 | `docker_compose_rag_services.md` and `rag_pipeline_service_map.md` describe an **eleven-phase RAG pipeline**; two phases exist | **Resolved 2026-09-02** — both moved to [`archive/`](archive/README.md). ADR-006 owns the pipeline scope |
+| 3 | Both Compose files declare an **`ai-gateway`** service; ADR-010 and ADR-012 reject it | Open — removed by IR-58 |
+| 4 | `backend_frontend_architecture_review.md` predates the verified review | **Resolved 2026-09-02** — moved to [`archive/`](archive/README.md); [`architecture-review/`](architecture-review/) supersedes it |
+| 5 | `main` and `refactor/docker-service` carried different documentation sets | **Resolved 2026-09-02** — merged. The legacy per-module `software-requirements/M01-M08`, and the byte-identical `SRS (2).md` / `SDD (2).md` copies, were removed |
+| 6 | **ADR-011**, [`mvp-validation/FRAMEWORK_DECISION.md`](mvp-validation/FRAMEWORK_DECISION.md) and [`mvp-validation/01-framework-selection.md`](mvp-validation/01-framework-selection.md) each state the evaluation-framework decision | Open — three statements of one decision. ADR-011 is authoritative; the other two should be reduced to the evaluation detail the ADR does not carry |
+| 7 | The **SRS service table** (§393-405) lists no FastAPI gateway; [ADR-014](adr/014-ai-gateway-as-a-service.md) deploys one | Open — needs an SRS amendment, alongside the Docling one in row 1 |
+| 8 | [`security/SECURITY.md`](security/SECURITY.md) §8 records external AI transmission as **UNCONFIRMED**; [ADR-015](adr/015-voyage-embedding-and-reranking.md) sends chunk text to Voyage | **Blocking** — ADR-015 is conditional on written KTTO/IERC sign-off. Synthetic and published data only until then |
+| 9 | [`architecture-review/04-ai-rag-architecture.md`](architecture-review/04-ai-rag-architecture.md) and [`security/SECURITY.md`](security/SECURITY.md) §7 state `ai/` has no source directory | Stale — `ai/` exists. Both predate ADR-014 |
 
 ---
 
@@ -96,4 +107,6 @@ Every engineering document states, at the top: its purpose · what it owns · wh
 
 **No fact appears in two documents.** If it is needed in two places, one states it and the other links.
 
-*Baseline: `refactor/docker-service`. Last reviewed: 2026-09-01.*
+**File naming.** `SCREAMING_SNAKE.md` for a standalone named document (`SRS.md`, `TEST_PLAN.md`, `WORK_ITEM_LIFECYCLE.md`). `NN-kebab-case.md` for an ordered series (`architecture-review/`, `architecture-tasks/`, `mvp-validation/`, `ui-ux/`, `jira-sync/`, `adr/`). `kebab-case` for directories. No spaces, parentheses, or version suffixes in filenames.
+
+*Baseline: `main`. Last reviewed: 2026-09-02.*

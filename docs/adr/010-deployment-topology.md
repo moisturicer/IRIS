@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-01
+Accepted — 2026-09-01. **Amended by [ADR-014](014-ai-gateway-as-a-service.md)** — 2026-09-02: the topology is six services, adding `ai-gateway`. Every other reduction below stands.
 
 ## Context
 

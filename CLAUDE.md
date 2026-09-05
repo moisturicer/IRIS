@@ -10,7 +10,9 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 
 ## Baseline branch
 
-**`main` is the repository default and long-term trunk. `refactor/docker-service` is the current integration branch — cut new branches from it, and target it in PRs.** The two have diverged, including in `docs/`; reconciling them is separate work.
+**`main`.** Cut every branch from it and target it in PRs.
+
+`refactor/docker-service` is **retired** — it is fully contained in `main` (`git merge-base --is-ancestor` confirms it), so cutting from it now would branch from a dead ref. Earlier guidance naming it as the baseline, or as an "integration branch" alongside `main`, is superseded by this line.
 
 ## Jira and Git convention
 
@@ -55,9 +57,9 @@ Full specification: [`docs/engineering/SDLC.md`](docs/engineering/SDLC.md) §2-4
 | Database | PostgreSQL. `Record.search_vector` (GIN, weighted) is maintained and **works** |
 | Async | Celery + Redis |
 | Deployment | Docker Compose, dev and prod |
-| **AI gateway** | `ai/` **now exists** — a FastAPI service added in `7f73e97`. **This contradicts ADR-010**, which rejected a separate gateway because it duplicates authentication and visibility filtering. Unresolved: either ADR-010 is superseded by a new ADR, or the service is removed (IR-58). Compose still fails — there is no `ai/.env` or `ai/.env.example` |
+| **AI gateway** | **Adopted, not yet working.** [ADR-014](docs/adr/014-ai-gateway-as-a-service.md) (2026-09-02) **supersedes ADR-012** and accepts `ai/` as a service. It still does not boot — the package flattens under `COPY . .` so `import ai.*` fails, `ai.services.chat_service` does not exist, and `ai/api/schemas.py` imports Django, which is absent from its requirements. **IR-156** is the ticket to make it boot. Build on it only through that ticket |
 | **pgvector** | **Not yet implemented.** ADR-007 selects it; the service classes are `pass` bodies |
-| **Docling** | **Not implemented.** SRS-specified, deferred by ADR-006 pending an SRS amendment |
+| **Docling** | **Adopted, not implemented.** ADR-006 deferred it, but [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) (Accepted, 2026-09-02) **supersedes ADR-006** and brings structured extraction back in. No parsing pipeline runs yet; IR-107 |
 
 Always distinguish **CURRENT / PROPOSED / DEFERRED / LEGACY**. Do not describe a proposed component as if it exists.
 
