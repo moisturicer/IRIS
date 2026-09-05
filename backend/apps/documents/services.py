@@ -1,3 +1,5 @@
+from io import BytesIO
+
 from .models import RecordUpload, UploadSlot
 
 

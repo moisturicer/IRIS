@@ -31,9 +31,12 @@ jobs:
 
       - name: Static check for undefined names
         # Catches the class of defect that currently stops the app importing.
-        run: |
-          pip install pyflakes
-          pyflakes apps/ config/ core/
+        # flake8 (in requirements/development.txt), not bare pyflakes, so the
+        # codebase's existing `# noqa` markers (deliberate side-effect imports)
+        # are honored; backend/.flake8 selects only the F-codes (pyflakes' own
+        # checks) and excludes migrations, where apps.get_model() locals read
+        # as undefined names to static analysis.
+        run: flake8 apps/ config/ core/
 
       - name: Django configuration check
         # Fails while the URLconf cannot import — this is the point.

@@ -12,7 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
-from core.permissions import IsOwnerOrStaff, IsReviewer, IsStaff, IsAdmin, IsRDCO
+from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
 from .models import Record, DownloadRequest, DeleteRequest
@@ -176,8 +176,6 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         Passing ip_type="" clears the classification.
         """
-        from .models import Record as RecordModel
-
         record = self.get_object()
 
         BOOL_FIELDS   = {"is_ip", "for_commercialization", "community_extension"}

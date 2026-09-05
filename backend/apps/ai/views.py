@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from core.permissions import IsStaff
 from .models import RecordEmbedding, EmbeddingJob
-from .serializers import SemanticSearchResultSerializer, EmbeddingJobSerializer
-from .tasks import embed_record, embed_all_records
+from .serializers import EmbeddingJobSerializer
+from .tasks import embed_record
 
 class EmbedRecordView(APIView):
     """POST /ai/embed/<id>/ -- queue embedding for one record."""

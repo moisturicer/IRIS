@@ -1,4 +1,3 @@
-from django.db.models import Value
 from django.contrib.postgres.search import SearchVector
 from .models import Record, RecordOwner
 
