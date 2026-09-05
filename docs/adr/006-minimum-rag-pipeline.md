@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — 2026-09-01
+**Superseded by [ADR-013](013-chunk-level-rag-pipeline.md)** — 2026-09-02.
+
+Accepted 2026-09-01. Its exclusions of full-text chunking, reranking and multiple providers are reversed by ADR-013. Its retrieval-visibility requirement and its timebox-with-fallback discipline are retained there. The reasoning below is preserved unedited — the cost argument still holds and ADR-013's fallback is this pipeline.
 
 ## Context
 
