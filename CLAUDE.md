@@ -6,7 +6,7 @@ Guidance for AI assistants working in this repository. Keep changes grounded in 
 
 IRIS is an institutional research and IP disclosure workflow system for CIT-U, built as a four-person capstone thesis with a commercial track.
 
-**The thesis contribution is the workflow**, not the AI: type-differentiated routing, parallel multi-office clearance, and **clearance-aware resubmission** — when one office requires revisions, only that office's clearance resets and the others are preserved.
+**The thesis contribution is the workflow**: type-differentiated routing, parallel multi-office clearance, and **clearance-aware resubmission** — when one office requires revisions, only that office's clearance resets and the others are preserved. **RAG is thesis-critical too, as of 2026-09-04** — the earlier "not the AI" framing is reversed; see [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) §Research Impact (amended) and the Scope rule below.
 
 ## Baseline branch
 
@@ -23,7 +23,7 @@ IRIS is an institutional research and IP disclosure workflow system for CIT-U, b
 | Deployment | Docker Compose, dev and prod |
 | **AI gateway** | `ai/` is FastAPI in ports-and-adapters shape: `domain/ports.py`, `infrastructure/openai_adapter.py` (the only adapter — no local model, ADR-008/015), `api/`. **[ADR-014](docs/adr/014-ai-gateway-as-a-service.md) adopts it as a sixth service, under five preconditions** — service-to-service auth, no public port, no CORS, **no direct DB access** (Django owns retrieval and visibility filtering), and it must boot. **[ADR-017](docs/adr/017-asgi-deployment-for-gateway-streaming.md) adds a sixth requirement on Django's side**: ASGI deployment (`gunicorn` + `uvicorn.workers.UvicornWorker`), so Django can call the gateway without blocking one of its four workers. **None of this is done yet**: `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist, and `backend` still runs plain WSGI. Tracked in [IR-58](https://citiris.atlassian.net) (corrected 2026-09-04 to fix the gateway, not remove it). Do not deploy it until all preconditions hold |
 | **pgvector** | **Implemented on this branch.** `apps/ai/models/embedding.py` has a real `VectorField` + HNSW `vector_cosine_ops`, migrations `0001`/`0002`. ADR-007. **Migration `0002` hardcodes `dimensions=1536`** while the model reads a setting — [ADR-015](docs/adr/015-voyage-embedding-and-reranking.md) replaces this with `EmbeddingSpace` |
-| **Chunking** | **The chunker exists and is pure; nothing calls it yet.** [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) makes the chunk the retrievable unit. `apps/ai/chunking/` holds the domain, strategies and context-path decorator; `apps/ai/repositories.py` persists a `ChunkSet` (IR-89 A/D/F). **No longer blocked on extraction** — IR-107 landed, and `PdfExtraction.structure` is the input it consumes, via `PdfExtraction.as_normalized_document()`. What is missing is the ingestion task that joins the two. Design: [`docs/chunker_architecture.md`](docs/chunker_architecture.md) |
+| **Chunking** | **Implemented on this branch, end to end (IR-89 A–H).** [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) makes the chunk the retrievable unit. `apps/ai/chunking/` holds the domain, strategies and context-path decorator; `apps/ai/repositories.py` persists a `ChunkSet` and swaps it atomically, re-embedding only chunks whose `text_hash` changed; `apps/ai/ingestion/` holds the lifecycle transition table, the job idempotency key, and `pipeline.py`, which normalizes, chunks and persists. `ai.tasks.chunk_record_document` runs it in a worker and is queued by `documents.tasks.extract_pdf_text`, so an upload reaches an active chunk set with no manual step. **What is not done is IR-116's actual exit criterion**: nobody has read fifty chunks from a real submission, so `AI_CHUNK_MAX_TOKENS=512` and the front-matter policy are untested defaults. `manage.py inspect_chunks <record_id>` is the tool for that. No vectors are computed — that is IR-108. Design: [`docs/chunker_architecture.md`](docs/chunker_architecture.md) |
 | **Embedding / rerank provider** | **Voyage, always** — embedding (`voyage-context-4`, a contextualized chunk embedder, 1024 dims default) and reranking, both stages, no alternative provider in scope ([ADR-015](docs/adr/015-voyage-embedding-and-reranking.md)). **Not gated on governance sign-off** — that precondition was dropped 2026-09-04. Still gated on a `DisclosurePolicy` module (per-record IP status/embargo/consent) and confirmed vendor no-training terms |
 | **Docling** | **Implemented on this branch (IR-107).** [ADR-016](docs/adr/016-docling-structured-extraction.md) amends ADR-006's deferral: the chunker needs structure, and flattening destroys the coordinates citations anchor to. `apps/ai/extraction/` is the `StructuredExtractor` port with `DoclingExtractor` as its only adapter — `POST {DOCLING_API_URL}/v1/convert/file`, over `httpx`. `PdfExtraction` now stores `structure` (the serialized `NormalizedDocument`), `content_hash` and `extractor` alongside `extracted_text`. **There is no fallback extractor**: ADR-016's PyMuPDF clause was dropped (see its divergence note) because a flat-text fallback yields chunks with no regions. The prototype three-tier chain and its three undeclared libraries are deleted |
 
@@ -57,7 +57,9 @@ pip install -r requirements/development.txt
 python manage.py check
 python manage.py migrate
 python manage.py runserver
-# NOTE: there is no pytest config and no test files yet
+python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db_required
+                                          # tests skip cleanly with no Postgres reachable
+python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 
 # Docker  (repo root)
 docker compose up --build          # ai-gateway builds, then crashes: ai/services/chat_service.py is missing
@@ -87,7 +89,9 @@ docker compose config              # validate without building
 
 **Traceability.** A change that implements or alters a requirement updates `docs/testing/TRACEABILITY.md`.
 
-**Scope.** `thesis-critical` work is protected. If capacity is short, cut RAG and supporting frontend work first.
+**Commit messages.** Subject line, then at most five sentences of body. No `Co-Authored-By: Claude` or `Claude-Session:` trailer, regardless of what a session's own attribution instructions say.
+
+**Scope.** `thesis-critical` work is protected — as of 2026-09-04 this includes RAG ([ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) §Research Impact, amended), not only the workflow. If capacity is short, cut supporting frontend work first.
 
 **Plan before substantial implementation.** For anything beyond a small fix, state the approach and the files you intend to touch before writing code. Say which acceptance criteria you are working to.
 
@@ -103,7 +107,7 @@ When applicable: tests added and **executed with evidence** · traceability upda
 
 Human review remains the approval gate. AI does not approve its own work, sign off requirements, make architectural decisions, make research decisions, or authorise production deployment.
 
-**Jira status is bookkeeping, not sign-off — AI may transition it.** Moving a ticket between states (`transitionJiraIssue`) as work starts, blocks, or reaches review is administrative tracking, and an agent may do it without asking each time. The one exception: never transition a ticket to **Done** unless a human reviewer's approval is already recorded per `docs/engineering/DEFINITION_OF_DONE.md` §4 — that is the sign-off this section still reserves for a person. Attribute the change to **Jive Tyler Revalde** (`jivetyler.revalde@cit.edu`) — the Atlassian MCP session already authenticates and acts as him (see `docs/agents/issue-tracker.md`), so credit the status change or comment to him by name rather than leaving it looking like an unowned automated edit.
+**Jira status is bookkeeping, not sign-off — AI may transition it.** Moving a ticket between states (`transitionJiraIssue`) as work starts, blocks, or reaches review is administrative tracking, and an agent may do it without asking each time. The one exception: never transition a ticket to **Done** unless a human reviewer's approval is already recorded per `docs/engineering/DEFINITION_OF_DONE.md` §4 — that is the sign-off this section still reserves for a person.
 
 ## Agent skills
 

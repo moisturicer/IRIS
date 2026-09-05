@@ -22,10 +22,10 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [009](009-authorization-model.md) | Authorization model and `is_staff` semantics | Accepted | **Security** |
 | [010](010-deployment-topology.md) | Five-service topology and interim VPS deployment | Accepted · **amended by 014** | Deployment |
 | [011](011-evaluation-framework.md) | ISO 9241-11 as the evaluation spine | Accepted | Research |
-| [013](013-chunk-level-rag-pipeline.md) | Chunk-level RAG pipeline with reranking | Accepted | Scope · Cost · Security |
+| [013](013-chunk-level-rag-pipeline.md) | Chunk-level RAG pipeline with reranking | Accepted · **amended 2026-09-04** | Scope · Cost · Security · **Research** |
 | [014](014-ai-gateway-as-a-service.md) | The AI gateway is adopted as a deployed service, subject to five preconditions | Accepted · **completed by 017** | Architecture · Security · Deployment |
 | [015](015-voyage-embedding-and-reranking.md) | Voyage for embedding and reranking, always — `voyage-context-4` | Accepted | Architecture · Security · Cost |
-| [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Accepted | Architecture · Scope |
+| [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Accepted · **amended 2026-09-04 (twice)** | Architecture · Scope · **Research** |
 | [017](017-asgi-deployment-for-gateway-streaming.md) | ASGI deployment so Django can call the gateway asynchronously | Accepted | Architecture · Deployment · Performance |
 
 **Two superseded decisions, kept for the record — not for "what does IRIS do today."** This project's rule is to supersede an ADR rather than edit or delete it (see *Writing a new ADR* below), so these stay, but neither describes current behavior:
@@ -44,6 +44,8 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 **ADRs 013–016 reverse the AI/RAG decisions in 006 and 012.** ADR-016 (2026-09-03) closes the one point 013 left standing: ADR-006's incidental avoidance of Docling outlived its stated reason once 014 adopted the gateway. It was **amended 2026-09-04**, during IR-107, to drop the PyMuPDF fallback it originally retained — a flat-text fallback yields chunks with no regions, which is the loss the decision exists to prevent, so Docling-serve unavailability now fails and retries instead of degrading silently.
 
 **ADRs 013–015 (2026-09-02) reverse the AI/RAG decisions in 006 and 012.** The review that produced 001–012 audited `refactor/docker-service`, where no part of the AI pipeline functioned. `feat/rag-service` implements pgvector, the extraction service and the gateway restructure, and the chunker is designed in [`../chunker_architecture.md`](../chunker_architecture.md). The superseded records are kept unedited: their cost and security arguments still hold, and 013's fallback *is* 006's pipeline.
+
+**013 and 016 were amended again 2026-09-04, on the instruction of the project lead: RAG is reclassified as thesis-critical**, reversing both ADRs' §Research Impact claim that RAG was "a supporting capability, not the thesis contribution." `CLAUDE.md`'s Scope rule is corrected to match. Unaffected: what ADR-003/ADR-004's controlled comparison measures — that experiment is still of the clearance-aware resubmission workflow mechanism, not RAG.
 
 ADRs 001–012 record the conclusions of a structured architecture review conducted 31 August – 1 September 2026, in three passes:
 

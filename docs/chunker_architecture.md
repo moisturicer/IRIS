@@ -44,7 +44,7 @@ Three facts, each verified against the working tree:
 
 | Fact | Evidence |
 |---|---|
-| PDF text lands in one `TextField` per upload and stops there | [`backend/apps/documents/models.py:86`](../backend/apps/documents/models.py#L86) — `extracted_text = models.TextField(blank=True)`. **Half-fixed 2026-09-04 (IR-107):** extraction now also stores `structure`, the document the chunker consumes. It is still read by no retrieval path — the ingestion task joining extraction to chunking is what remains |
+| PDF text lands in one `TextField` per upload and stops there | [`backend/apps/documents/models.py:86`](../backend/apps/documents/models.py#L86) — `extracted_text = models.TextField(blank=True)`. **Fixed 2026-09-04 (IR-107, then IR-116):** extraction stores `structure`, and `ai.tasks.chunk_record_document` now reads it into an active chunk set. Retrieval over those chunks is IR-108 |
 | The only embedding in the system is over the abstract | [`backend/apps/ai/tasks.py:19`](../backend/apps/ai/tasks.py#L19) — `text = f"{record.title}. {record.abstract}"` |
 | The chunker is a stub | [`backend/apps/ai/services/text_chunker.py`](../backend/apps/ai/services/text_chunker.py) — `class TextChunkerService: pass` |
 
@@ -215,18 +215,20 @@ flowchart LR
   E --> I["6 index - pgvector"]
   classDef done fill:#ecfdf5,stroke:#059669,color:#065f46;
   classDef todo fill:#fef3c7,stroke:#d97706,color:#92400e;
-  class U,X done
-  class N,C,E,I todo
+  class U,X,N,C,I done
+  class E todo
 ```
 
 | Stage | Owner | Input | Output | Status |
 |---|---|---|---|---|
 | 1 · Upload | `backend/apps/documents` | file | `RecordUpload` | works |
 | 2 · Extract | `celery-extraction` → `docling` | PDF bytes | `NormalizedDocument` + FTS text | works — IR-107 |
-| 3 · Normalize | `Normalizer` (pure) | `NormalizedDocument` | `NormalizedDocument` | **missing** |
-| 4 · Chunk | `Chunker` port | `NormalizedDocument` | `ChunkSet` | works — IR-89 A/D, not yet called |
-| 5 · Embed | `EmbeddingProvider` port | `ChunkSet` | vectors | partial — record-level only |
-| 6 · Index | `ChunkRepository` | vectors | pgvector rows | **missing** |
+| 3 · Normalize | `Normalizer` (pure) | `NormalizedDocument` | `NormalizedDocument` | works — IR-89 E |
+| 4 · Chunk | `Chunker` port | `NormalizedDocument` | `ChunkSet` | works — IR-89 A–D, called by `ingestion/pipeline.py` (IR-116) |
+| 5 · Embed | `EmbeddingProvider` port | `ChunkSet` | vectors | partial — record-level only; chunk vectors are IR-108 |
+| 6 · Index | `ChunkRepository` | `ChunkSet` | chunk rows | works — IR-89 F/G, driven by the pipeline (IR-116) |
+
+Stages 1, 2, 3, 4 and 6 now run as one chain: `documents.tasks.extract_pdf_text` queues `ai.tasks.chunk_record_document`, which normalizes, chunks and swaps in the active chunk set. Stage 5 is the gap — the rows persist without vectors until IR-108.
 
 ### Stage 3 is not optional, and it operates on structure
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-03 · **amended 2026-09-04, decision point 4**
+Accepted — 2026-09-03 · **amended 2026-09-04, decision point 4 and §Research Impact**
 
 > **Amendment, 2026-09-04 — the PyMuPDF fallback is dropped.** Decision point 4
 > below retained PyMuPDF for Docling-serve unavailability. On the instruction
@@ -108,7 +108,7 @@ None beyond what is already declared. The `docling` service exists in both Compo
 
 ## Research Impact
 
-None. Extraction quality does not affect what the controlled comparison in [ADR-004](004-restart-all-comparison-mode.md) measures. RAG remains a supporting capability, not the thesis contribution.
+Extraction quality does not affect what the controlled comparison in [ADR-004](004-restart-all-comparison-mode.md) measures — that experiment is of the workflow mechanism. ~~RAG remains a supporting capability, not the thesis contribution.~~ **Superseded 2026-09-04, matching the amendment on [ADR-013](013-chunk-level-rag-pipeline.md#research-impact): RAG is thesis-critical, not merely supporting.**
 
 ## Related Requirements
 

@@ -2,7 +2,7 @@
 
 **Purpose.** How IRIS is tested, and what counts as evidence.
 **Owns.** Test strategy, levels, execution, evidence rules.
-**Does not own.** Requirement→test mapping ([`TRACEABILITY.md`](TRACEABILITY.md)) · research evaluation ([`../mvp-validation/`](../mvp-validation/)) · Definition of Done ([`../engineering/WORK_ITEM_LIFECYCLE.md`](../engineering/WORK_ITEM_LIFECYCLE.md)).
+**Does not own.** Requirement→test mapping ([`TRACEABILITY.md`](TRACEABILITY.md)) · research evaluation ([`../mvp-validation/`](../mvp-validation/)) · Definition of Done ([`../engineering/DEFINITION_OF_DONE.md`](../engineering/DEFINITION_OF_DONE.md)).
 **Authority.** Authoritative for engineering testing.
 **Update when.** Test tooling, levels or evidence rules change.
 
@@ -10,9 +10,11 @@
 
 ## 1 · Current state — stated plainly
 
-**There are zero automated tests in this repository.** No test files, no pytest configuration, no frontend test runner.
+**The backend harness exists (IR-82):** `pytest.ini` + `conftest.py`, with DB-required tests skipping cleanly when no Postgres is reachable. Coverage is concentrated where the RAG pipeline was built out — `apps/ai` (chunking, extraction, ingestion, repositories) and `apps/documents` — plus an import smoke test (`apps/tests/test_boot.py`) and targeted authorization tests in `apps/records`.
 
-Every claim of "working" in IRIS today rests on manual observation. That is the starting position this plan addresses, and it is why the first test written is worth more than the next twenty.
+**The frontend still has zero automated tests.** No test runner is installed; `npm run lint` and `npm run build` are the only automated frontend checks.
+
+Backend and frontend workflow-layer coverage (clearance transitions, resubmission policy, remaining authorization gaps) is thinner than the RAG-side coverage — see `docs/testing/TRACEABILITY.md` for what is and isn't demonstrated per requirement. **A requirement is not satisfied because code exists for it; it is satisfied when a test demonstrates it and the evidence is recorded.**
 
 ---
 
@@ -51,7 +53,7 @@ A passing test suite says nothing about whether the contribution is better than 
 
 Not everything is worth testing equally. In order:
 
-1. **Import smoke.** One test. Catches three of the five current blockers.
+1. **Import smoke.** One test (`apps/tests/test_boot.py`), already in place.
 2. **Authorization matrix.** Role × action × ownership. This is where twelve live defects are, and where a regression is a confidentiality breach rather than a bug.
 3. **Workflow transitions across both resubmission policies.** The thesis contribution. Must be correct under `PRESERVE` **and** `RESTART_ALL`, or the comparison is invalid.
 4. **Clearance state serialization.** That `preserved` is true only after a genuine resubmission.
@@ -84,16 +86,17 @@ Not everything is worth testing equally. In order:
 ## 6 · Execution
 
 ```bash
-# backend — once the harness lands
-cd backend && pytest
-cd backend && pytest apps/reviews -v
+# backend
+cd backend && python -m pytest -q
+cd backend && python -m pytest apps/reviews -v
+cd backend && python -m pytest apps/ai apps/documents   # RAG pipeline suites
 
 # frontend
 cd frontend && npm run lint
 cd frontend && npm run build
 ```
 
-CI runs on every push and pull request to `refactor/docker-service` — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). It currently reports the absence of a backend test harness as a warning on every run, deliberately, so the gap stays visible.
+CI runs on every push and pull request to `feat/rag-service` and `main` — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). `ci.yml`'s own comment records that it is expected to stay red until IR-57 (application boot) and IR-58 (Docker stack) land — do not weaken a gate to make it green.
 
 ---
 
@@ -101,7 +104,7 @@ CI runs on every push and pull request to `refactor/docker-service` — see [`.g
 
 **A change may enter Review when** implementation is complete, acceptance criteria are self-verified, applicable tests are added and executed, and CI is green or the failure is explained.
 
-**A change may exit to Done when** the Definition of Done in [`../engineering/WORK_ITEM_LIFECYCLE.md`](../engineering/WORK_ITEM_LIFECYCLE.md) §9 is met. There is no separate testing sign-off — that document is the single gate.
+**A change may exit to Done when** the Review → Done gate in [`../engineering/DEFINITION_OF_DONE.md`](../engineering/DEFINITION_OF_DONE.md) §3 is met. There is no separate testing sign-off — that document is the single gate.
 
 ---
 
