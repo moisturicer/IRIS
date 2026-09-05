@@ -75,3 +75,16 @@ SRS/
 .gitignore
 .agents/
 .codegraph/
+
+# Personal teaching workspace (/teach)
+MISSION.md
+RESOURCES.md
+NOTES.md
+lessons/
+reference/
+learning-records/
+assets/
+
+# Local tooling config — not shared via git
+.mcp.json
+skills-lock.json
