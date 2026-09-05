@@ -155,6 +155,11 @@ def seed_data(apps, schema_editor):
 
 
 def unseed_data(apps, schema_editor):
+    Role       = apps.get_model("accounts", "Role")
+    College    = apps.get_model("accounts", "College")
+    Department = apps.get_model("accounts", "Department")
+    Course     = apps.get_model("accounts", "Course")
+
     Course.objects.filter(id__in=[c["id"] for c in COURSES]).delete()
     Department.objects.filter(id__in=[d["id"] for d in DEPARTMENTS]).delete()
     College.objects.filter(id__in=[c["id"] for c in COLLEGES]).delete()

@@ -1,18 +1,19 @@
-import { useAuth } from "@/hooks/useAuth";
-import { authApi } from "@/api/auth";
 import { useUIStore } from "@/store/ui.store";
+import { cn } from "@/lib/utils";
+import { NotificationBell } from "./NotificationBell";
 
 export function Header() {
-  const { logout, user, refreshToken } = useAuth();
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-
-  const handleLogout = async () => {
-    await authApi.logout(refreshToken ?? "").catch(() => {});
-    logout();
-  };
+  const collapsed = useUIStore((s) => s.sidebarCollapsed);
 
   return (
-    <header className="fixed top-0 left-0 md:left-[60px] xl:left-[230px] right-0 h-[58px] bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 gap-3 z-40">
+    <header
+      className={cn(
+        "fixed top-0 left-0 right-0 h-[58px] bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 gap-3 z-40",
+        "transition-[left] duration-200 ease-out",
+        collapsed ? "md:left-[60px]" : "md:left-[230px]",
+      )}
+    >
       <button
         type="button"
         onClick={toggleSidebar}
@@ -31,19 +32,8 @@ export function Header() {
         />
       </div>
 
-      <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-        <span className="hidden sm:inline text-[12px] text-gray-500 truncate max-w-[120px]">
-          {user?.first_name}
-        </span>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-[12px] font-semibold transition-colors whitespace-nowrap"
-        >
-          <i className="fas fa-sign-out-alt text-[13px]" />
-          <span className="hidden sm:inline">Sign Out</span>
-        </button>
+      <div className="ml-auto">
+        <NotificationBell />
       </div>
     </header>
   );

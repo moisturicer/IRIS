@@ -18,10 +18,11 @@ import { AppShell } from "@/components/layout/AppShell";
 
 // Feature pages
 import HomePage             from "@/features/dashboard/HomePage";
-import PublishedRecordsPage from "@/features/records/PublishedRecordsPage";
-import RecordDetailPage     from "@/features/records/RecordDetailPage";
+import PaperViewPage        from "@/features/records/paper-view/PaperViewPage";
 import AddRecordPage        from "@/features/records/AddRecordPage";
-import MyRecordsPage        from "@/features/records/MyRecordsPage";
+import MyWorkspacePage      from "@/features/records/MyWorkspacePage";
+import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
+import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import EditRecordPage       from "@/features/records/EditRecordPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
 import PendingRecordsPage   from "@/features/review/PendingRecordsPage";
@@ -33,14 +34,12 @@ import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import UserListPage         from "@/features/accounts/UserListPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
-import AIHubPage            from "@/features/ai/AIHubPage";
+import RAGChatPage          from "@/features/ai/RAGChatPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
 import HelpPage             from "@/features/help/HelpPage";
 import SessionsPage          from "@/features/admin/SessionsPage";
 import DownloadRequestsPage  from "@/features/admin/DownloadRequestsPage";
 import DeleteRequestsPage    from "@/features/admin/DeleteRequestsPage";
-import DocumentReviewsPage   from "@/features/admin/DocumentReviewsPage";
-import ReviewAnalyticsPage   from "@/features/review/ReviewAnalyticsPage";
 import ApprovedProposalsPage from "@/features/review/ApprovedProposalsPage";
 
 export const router = createBrowserRouter([
@@ -56,16 +55,15 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage />, handle: { crumb: "Discover" } },
-          { path: "records",              element: <PublishedRecordsPage />,           handle: { crumb: "Published Records" } },
-          { path: "records/:id",          element: <RecordDetailPage />,               handle: { crumb: "Record Detail" } },
+          { path: "records/:id",          element: <PaperViewPage />,                  handle: { crumb: "Paper" } },
           { path: "records/add",          element: <AddRecordPage />,                  handle: { crumb: "Add Record" } },
-          { path: "records/mine",         element: <MyRecordsPage mode="library" />,   handle: { crumb: "My Library" } },
-          { path: "workspace",            element: <MyRecordsPage mode="workspace" />, handle: { crumb: "My Workspace" } },
+          { path: "records/mine",         element: <MyLibraryPage />,                  handle: { crumb: "My Library" } },
+          { path: "workspace",            element: <MyWorkspacePage />,                 handle: { crumb: "My Workspace" } },
+          { path: "opportunities",        element: <CallsAndConferencesPage />,         handle: { crumb: "Calls & Conferences" } },
           { path: "records/:id/edit",     element: <EditRecordPage />,                 handle: { crumb: "Edit Record" } },
           { path: "records/:id/documents",element: <DocumentsPage />,                  handle: { crumb: "Documents" } },
           { path: "notifications",        element: <NotificationsPage />,              handle: { crumb: "Notifications" } },
-          { path: "ai",                   element: <AIHubPage />,                      handle: { crumb: "AI Research Hub" } },
-          { path: "ai/summarize",         element: <AIHubPage />,                      handle: { crumb: "AI Summarizer" } },
+          { path: "ai",                   element: <RAGChatPage />,                    handle: { crumb: "Ask IRIS" } },
           { path: "help",                 element: <HelpPage />,                       handle: { crumb: "Help" } },
           { path: "settings",             element: <SettingsPage />,                   handle: { crumb: "Settings & Profile" } },
 
@@ -84,7 +82,6 @@ export const router = createBrowserRouter([
               { path: "review/declined",           element: <DeclinedRecordsPage />,    handle: { crumb: "Declined" } },
               { path: "review/approved-proposals", element: <ApprovedProposalsPage />,  handle: { crumb: "Approved Proposals" } },
               { path: "review/:id/evaluate",       element: <EvaluationPage />,         handle: { crumb: "Evaluate" } },
-              { path: "review/analytics",          element: <ReviewAnalyticsPage />,    handle: { crumb: "Review Analytics" } },
             ],
           },
 
@@ -97,7 +94,6 @@ export const router = createBrowserRouter([
               { path: "admin/sessions",          element: <SessionsPage />,         handle: { crumb: "Sessions" } },
               { path: "admin/download-requests", element: <DownloadRequestsPage />, handle: { crumb: "Download Requests" } },
               { path: "admin/delete-requests",   element: <DeleteRequestsPage />,   handle: { crumb: "Delete Requests" } },
-              { path: "admin/document-reviews",  element: <DocumentReviewsPage />,  handle: { crumb: "Document Reviews" } },
             ],
           },
         ],

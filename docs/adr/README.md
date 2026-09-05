@@ -25,6 +25,9 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [013](013-chunk-level-rag-pipeline.md) | Chunk-level RAG pipeline with reranking | Accepted | Scope · Cost · Security |
 | [014](014-ai-gateway-as-a-service.md) | The AI gateway is adopted as a deployed service | Accepted | Architecture · Security · Deployment |
 | [015](015-voyage-embedding-and-reranking.md) | Voyage for embedding and reranking | Accepted, **conditional on governance sign-off** | Architecture · Security · Cost |
+| [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Proposed** — not accepted | Architecture · Research |
+
+**Numbering note:** this branch is cut from `main`, which does not yet carry `feat/rag-service`'s ADR-016 (`docling-structured-extraction`) or ADR-017 (`asgi-deployment-for-gateway-streaming`). 018 was chosen to avoid colliding with those once the branches reconcile, rather than reusing 016 as originally drafted.
 
 ---
 

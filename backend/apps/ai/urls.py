@@ -1,11 +1,12 @@
 from django.urls import path
-from .views import SemanticSearchView, AskView, SummarizeView, EmbedRecordView, EmbedAllView, EmbeddingJobListView
 
+from .views import AIStatusView, ChatQueryView, SemanticSearchView
+
+# Only routes backed by an implemented view are registered here. Summarisation
+# and embedding endpoints stay out until their services exist — a 404 is more
+# honest than a 500 from a `pass` body.
 urlpatterns = [
-    path("search/",            SemanticSearchView.as_view(),  name="ai-search"),
-    path("ask/",               AskView.as_view(),             name="ai-ask"),
-    path("summarize/<int:pk>/",SummarizeView.as_view(),       name="ai-summarize"),
-    path("embed/<int:pk>/",    EmbedRecordView.as_view(),     name="ai-embed-record"),
-    path("embed/all/",         EmbedAllView.as_view(),        name="ai-embed-all"),
-    path("embed/jobs/",        EmbeddingJobListView.as_view(),name="ai-embed-jobs"),
+    path("ask/",    ChatQueryView.as_view(),      name="ai-ask"),
+    path("search/", SemanticSearchView.as_view(), name="ai-search"),
+    path("status/", AIStatusView.as_view(),       name="ai-status"),
 ]

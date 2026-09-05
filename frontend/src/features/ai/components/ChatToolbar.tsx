@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 interface ChatToolbarProps {
   sessionTitle:     string;
@@ -19,8 +19,11 @@ export function ChatToolbar({
   onToggleSources,
   onNewChat,
 }: ChatToolbarProps) {
+  // min-h-[56px] is shared with ConversationSidebar's header so both border-b
+  // rules land on the same line -- this toolbar's two-line title block made it
+  // naturally taller, and the divider visibly stepped down at the split.
   return (
-    <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-stone-200/80 bg-white">
+    <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 min-h-[56px] border-b border-stone-200/80 bg-white">
       <button
         type="button"
         onClick={onToggleHistory}
@@ -30,10 +33,11 @@ export function ChatToolbar({
             : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
           }`}
         aria-pressed={historyOpen}
+        aria-expanded={historyOpen}
         aria-label={historyOpen ? "Hide chat history" : "Show chat history"}
         title={historyOpen ? "Hide history" : "Show history"}
       >
-        <i className="fas fa-bars-staggered" />
+        <i className={historyOpen ? "fas fa-angles-left" : "fas fa-bars-staggered"} />
       </button>
 
       <div className="min-w-0 flex-1 px-1">
@@ -71,13 +75,10 @@ export function ChatToolbar({
         <span className="hidden sm:inline">Sources</span>
       </button>
 
-      <Link
-        to="/ai/search"
-        className="p-2 rounded-lg text-stone-500 hover:bg-stone-50 hover:text-[#6B0F12]"
-        title="Semantic search"
-      >
-        <i className="fas fa-search text-[12px]" />
-      </Link>
+      {/* Ask IRIS is the other page AppShell treats as full-bleed (isFullBleed
+          covers "/" and "/ai"), so the shared Header -- and its bell -- never
+          renders here. Same component, same shared store. */}
+      <NotificationBell />
     </header>
   );
 }
