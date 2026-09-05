@@ -116,13 +116,25 @@ class PublicMediaRouteRemovedTests(SimpleTestCase):
         )
 
 
-@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="iris-test-media-"))
 class DocumentDownloadPermissionTests(APITestCase):
     """The authenticated download path must let owners through and turn others away."""
 
     @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Created here rather than as a decorator argument: `@override_settings(
+        # MEDIA_ROOT=tempfile.mkdtemp(...))` evaluates mkdtemp at import time, so
+        # merely importing this module leaves a directory behind whether or not
+        # any test runs. Creating and removing it in the same lifecycle pair keeps
+        # the two ends together.
+        cls._media_root = tempfile.mkdtemp(prefix="iris-test-media-")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._media_override.enable()
+
+    @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
         super().tearDownClass()
 
     @classmethod
