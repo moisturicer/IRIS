@@ -6,6 +6,7 @@ import {
   getStoredRefreshToken,
   setStoredRefreshToken,
 } from "@/lib/authStorage";
+import { __resetRefreshState } from "@/lib/tokenRefresh";
 import { REVIEWER_ROLES, STAFF_ROLES, type RoleName } from "@/lib/constants";
 
 interface AuthState {
@@ -42,6 +43,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: () => {
+    // Drop any refresh already in flight. Without this, a refresh started by the
+    // outgoing session can resolve after logout and call setTokens, quietly
+    // re-authenticating the browser the user just signed out of.
+    __resetRefreshState();
     clearAuthSession();
     set({
       user: null,
@@ -63,6 +68,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   clearTokens: () => {
+    __resetRefreshState();
     clearAuthSession();
     set({ accessToken: null, refreshToken: null, isAuthenticated: false });
   },
