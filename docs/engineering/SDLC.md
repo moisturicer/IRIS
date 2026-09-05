@@ -33,7 +33,7 @@ Not every change traverses every stage. A typo fix needs no ADR. **A change to w
 
 ## 2 · Branching
 
-**`main` is the repository default and the long-term trunk. `refactor/docker-service` is the current integration branch — cut new branches from it and target it in PRs.** The two have diverged; reconciling them is its own piece of work, not part of any feature branch.
+**`main` is the repository default and the trunk. Cut every branch from it and target it in PRs.** `refactor/docker-service` is retired — it is fully contained in `main`, so cutting from it now would branch from a dead ref. This document previously named it as the current integration branch; that guidance is superseded.
 
 ### Format
 
