@@ -28,7 +28,7 @@ Every classification below was made against that number. Where something is defe
 | [01-foundation.md](01-foundation.md) | CI, enums, requirements refactor | 3 |
 | [02-backend.md](02-backend.md) | Boot blockers, Celery, `apps/ai`, querysets | 9 |
 | [03-frontend.md](03-frontend.md) | Tokens, pilot surface, dead code | 5 |
-| [04-workflow.md](04-workflow.md) | **Thesis-critical** — transition table, policies, instrumentation | 6 |
+| [04-workflow.md](04-workflow.md) | **Thesis-critical** — transition table, policies, instrumentation | 7 |
 | [05-security.md](05-security.md) | Media, authorization, `is_staff`, config | 7 |
 | [06-rag.md](06-rag.md) | Minimum pipeline, timeboxed | 6 |
 | [07-saas.md](07-saas.md) | Instance-per-tenant, configuration boundaries | 4 |

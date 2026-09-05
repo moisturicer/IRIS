@@ -3,28 +3,28 @@
 > **Status: LEGACY — superseded, retained for reference.**
 >
 > This document proposes an eight-service topology including a separate
-> `ai-gateway` container. [ADR-010](adr/010-deployment-topology.md) rejects that
-> gateway and [ADR-012](adr/012-ai-provider-abstraction-not-a-service.md)
+> `ai-gateway` container. [ADR-010](../adr/010-deployment-topology.md) rejects that
+> gateway and [ADR-012](../adr/012-ai-provider-abstraction-not-a-service.md)
 > reaffirms the rejection: AI belongs inside Django as `apps/ai/providers/`, and
 > the deployed topology is five services.
-> Under [ADR-005](adr/005-instance-per-tenant.md) every additional container is
+> Under [ADR-005](../adr/005-instance-per-tenant.md) every additional container is
 > one every institution runs.
 >
 > Treat the scaling analysis below as background research, **not** as the
-> architecture to build. Requirements authority is [SRS.md](SRS.md); design
-> authority is [SDD.md](SDD.md).
+> architecture to build. Requirements authority is [SRS.md](../SRS.md); design
+> authority is [SDD.md](../SDD.md).
 
 
 ---
 
 ## Current State
 
-Your existing [docker-compose.yml](../docker-compose.yml) has **5 services**: `db`, `redis`, `backend`, `celery`, `frontend`. The RAG/extraction concerns are currently baked into the monolithic `celery` worker — extraction tasks, embedding tasks, and general app tasks all share a single queue and a single worker pool.
+Your existing [docker-compose.yml](../../docker-compose.yml) has **5 services**: `db`, `redis`, `backend`, `celery`, `frontend`. The RAG/extraction concerns are currently baked into the monolithic `celery` worker — extraction tasks, embedding tasks, and general app tasks all share a single queue and a single worker pool.
 
 This **does not scale** because:
 - A heavy PDF extraction (via Docling OCR) blocks embedding tasks and vice versa
 - You can't scale extraction workers independently of embedding workers
-- Docling-serve (the planned extraction backend per [tasks.py TODO](../backend/apps/documents/tasks.py#L4-L27)) is not yet a Docker service
+- Docling-serve (the planned extraction backend per [tasks.py TODO](../../backend/apps/documents/tasks.py#L4-L27)) is not yet a Docker service
 - pgvector is not enabled on the PostgreSQL container
 - All AI query phases (embedding, retrieval, LLM calls) run synchronously inside Django, tying up Gunicorn workers for 3–10 seconds per request — at 100 concurrent RAG users, this would require ~15 GB of RAM in synchronous workers
 
@@ -32,7 +32,7 @@ This **does not scale** because:
 
 ## Target Architecture (100 Concurrent RAG Users)
 
-Based on your [SRS M03](../docs/SRS.md), [SRS M04](../docs/SRS.md), [SDD M03](../docs/SDD.md), [SDD M04](../docs/SDD.md), the past RAG architecture study (an external working note, not in this repository), and the Docling-Studio compose (a separate project, not in this repository):
+Based on your [SRS M03](../SRS.md), [SRS M04](../SRS.md), [SDD M03](../SDD.md), [SDD M04](../SDD.md), the past RAG architecture study (an external working note, not in this repository), and the Docling-Studio compose (a separate project, not in this repository):
 
 ```mermaid
 graph TD
@@ -360,7 +360,7 @@ volumes:
 
 ## Required Backend Changes
 
-### 1. Celery Queue Routing ([settings/base.py](../backend/config/settings/base.py))
+### 1. Celery Queue Routing ([settings/base.py](../../backend/config/settings/base.py))
 
 ```python
 # settings/base.py — add after existing Celery config

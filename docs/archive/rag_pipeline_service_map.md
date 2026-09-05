@@ -2,17 +2,21 @@
 
 > **Status: LEGACY — superseded, retained for reference.**
 >
-> This document proposes an eight-service topology including a separate
-> `ai-gateway` container. [ADR-010](adr/010-deployment-topology.md) rejects that
-> gateway and [ADR-012](adr/012-ai-provider-abstraction-not-a-service.md)
-> reaffirms the rejection: AI belongs inside Django as `apps/ai/providers/`, and
-> the deployed topology is five services.
-> Under [ADR-005](adr/005-instance-per-tenant.md) every additional container is
-> one every institution runs.
+> This document maps an eleven-phase pipeline to individual Docker services.
+> **Two of those eleven phases exist.** [ADR-006](../adr/006-minimum-rag-pipeline.md)
+> is the superseding decision — see `docs/archive/README.md`'s table, which also
+> cites `architecture-review/04-ai-rag-architecture.md`.
+>
+> The separate `ai-gateway` container this map also proposes is independently
+> rejected by [ADR-010](../adr/010-deployment-topology.md) and
+> [ADR-012](../adr/012-ai-provider-abstraction-not-a-service.md): AI belongs
+> inside Django as `apps/ai/providers/`, and the deployed topology is five
+> services. Under [ADR-005](../adr/005-instance-per-tenant.md) every additional
+> container is one every institution runs.
 >
 > Treat the scaling analysis below as background research, **not** as the
-> architecture to build. Requirements authority is [SRS.md](SRS.md); design
-> authority is [SDD.md](SDD.md).
+> architecture to build. Requirements authority is [SRS.md](../SRS.md); design
+> authority is [SDD.md](../SDD.md).
 
 
 Every phase of the IRIS RAG pipeline, mapped to the exact Docker service, source file, and external dependency that executes it.
@@ -88,7 +92,7 @@ sequenceDiagram
 | Aspect | Detail |
 |--------|--------|
 | **Docker Service** | `backend` |
-| **Source** | [SubmitDocumentView](../backend/apps/documents) (documents/views.py) |
+| **Source** | [SubmitDocumentView](../../backend/apps/documents) (documents/views.py) |
 | **What Happens** | Validates PDF format + ≤50MB size, saves file to storage, creates `RecordUpload` + `PdfExtraction(status="queued")`, enqueues Celery task |
 | **Stores To** | `db` — tables `documents_recordupload`, `documents_pdfextraction` |
 | **Blocking?** | No — returns HTTP 201 immediately |
@@ -101,14 +105,14 @@ sequenceDiagram
 |--------|--------|
 | **Docker Service** | `celery-extraction` → `docling` |
 | **Celery Queue** | `extraction` |
-| **Source** | [extract_pdf_text](../backend/apps/documents/tasks.py#L177-L216) (documents/tasks.py) |
+| **Source** | [extract_pdf_text](../../backend/apps/documents/tasks.py#L177-L216) (documents/tasks.py) |
 | **What Happens** | Worker reads PDF bytes from storage, POSTs to Docling-serve `/convert` endpoint. Docling handles text-layer PDFs, complex layouts (tables, multi-column), and scanned/image PDFs via its own OCR pipeline. Returns Markdown. |
 | **External Call** | `POST http://docling:5001/convert` (internal Docker network) |
 | **Retry** | 3 retries, 60s countdown |
 | **Stores To** | `db` — `PdfExtraction.extracted_text`, `status = "done"` |
 
 > [!NOTE]
-> Currently this phase uses the [3-tier extraction chain](../backend/apps/documents/tasks.py#L138-L170) (OpenDataLoader → PyMuPDF → Tesseract). The [TODO at the top of tasks.py](../backend/apps/documents/tasks.py#L4-L27) documents the migration to Docling-serve.
+> Currently this phase uses the [3-tier extraction chain](../../backend/apps/documents/tasks.py#L138-L170) (OpenDataLoader → PyMuPDF → Tesseract). The [TODO at the top of tasks.py](../../backend/apps/documents/tasks.py#L4-L27) documents the migration to Docling-serve.
 
 ---
 
@@ -117,7 +121,7 @@ sequenceDiagram
 | Aspect | Detail |
 |--------|--------|
 | **Docker Service** | `celery-extraction` (same task, same worker) |
-| **Source** | [_clean_text()](../backend/apps/documents/tasks.py#L38-L61) (documents/tasks.py) |
+| **Source** | [_clean_text()](../../backend/apps/documents/tasks.py#L38-L61) (documents/tasks.py) |
 | **What Happens** | (1) Drop lines < 3 chars, (2) drop pure-digit lines (page numbers), (3) strip non-printable/control chars, (4) collapse whitespace |
 | **Stores To** | Cleaned text is written to `PdfExtraction.extracted_text` in `db` |
 
@@ -128,7 +132,7 @@ sequenceDiagram
 | Aspect | Detail |
 |--------|--------|
 | **Docker Service** | `backend` (triggered by Django signal) |
-| **Source** | [on_record_saved](../backend/apps/records) (records/signals.py) → [update_search_vector](../backend/apps/records) (records/services.py) |
+| **Source** | [on_record_saved](../../backend/apps/records) (records/signals.py) → [update_search_vector](../../backend/apps/records) (records/services.py) |
 | **What Happens** | `post_save` signal fires on `Record` model. Rebuilds `SearchVector(title, weight="A") + SearchVector(abstract, weight="B")`. PostgreSQL GIN index auto-updates. |
 | **Stores To** | `db` — `records_record.search_vector` column (GIN-indexed) |
 
@@ -143,7 +147,7 @@ sequenceDiagram
 |--------|--------|
 | **Docker Service** | `celery-embedding` |
 | **Celery Queue** | `embedding` |
-| **Source** | [embed_record](../backend/apps/ai/tasks.py#L6) (ai/tasks.py) |
+| **Source** | [embed_record](../../backend/apps/ai/tasks.py#L6) (ai/tasks.py) |
 | **What Happens** | Builds input text as `f"{record.title}. {record.abstract}"`, POSTs to internal AI Gateway, receives float vector |
 | **External Call** | `POST http://ai-gateway:8001/api/v1/ai/internal/embed/` (AI Gateway handles the external OpenAI call) |
 | **Retry** | 3 retries, 60s countdown |
@@ -183,7 +187,7 @@ sequenceDiagram
 |--------|--------|
 | **Docker Service** | **Not implemented** — would execute in `ai-gateway` if added |
 | **Documented In** | Agile notes (not in this repository) mention "Integrate Cohere reranking to extract the top 5 most relevant chunks" |
-| **SDD Status** | The [SDD M04](../docs/SDD.md) does **not** include a reranking step — the top-K from pgvector are used directly |
+| **SDD Status** | The [SDD M04](../SDD.md) does **not** include a reranking step — the top-K from pgvector are used directly |
 | **If Added** | Would be an async call in `ai-gateway` between retrieval (Phase 7) and prompt construction (Phase 9). External call to Cohere Rerank API via `httpx.AsyncClient`. |
 
 > [!WARNING]
