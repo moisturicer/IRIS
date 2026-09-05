@@ -16,7 +16,7 @@ Pipeline routes (type-differentiated bookends; ADR-002):
           → published
 
 Which of ITSO/IERC/KTTO actually run is no longer fixed by record_type alone
-(ADR-016, Proposed — extends ADR-002's transition table rather than
+(ADR-018, Proposed — extends ADR-002's transition table rather than
 replacing it: pipeline_status transitions are still the same declarative
 table, only which offices get a RecordClearance row is now data on the
 record — record.requested_itso/ierc/ktto — rather than hardcoded here).
@@ -164,7 +164,7 @@ def _enter_clearance_stage(record: Record) -> str:
     Create RecordClearance rows for whatever offices were requested, and
     return the pipeline_status that follows rdco_intake.
 
-    ADR-016 (Proposed): the office set is no longer hardcoded by record_type.
+    ADR-018 (Proposed): the office set is no longer hardcoded by record_type.
     requested_itso only takes effect for Project -- Thesis/Research has no
     ITSO stage at all, matching the structural distinction the type already
     encodes (see the module docstring's two route diagrams). A record
@@ -199,7 +199,7 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
     Approve the record at its current sequential stage and advance the pipeline.
 
     At rdco_intake this also creates RecordClearance rows for whichever
-    offices were requested (ADR-016) — see _enter_clearance_stage().
+    offices were requested (ADR-018) — see _enter_clearance_stage().
     """
     if not _can_review(reviewed_by, record):
         raise InvalidPipelineTransition(
@@ -350,7 +350,7 @@ def submit_clearance(
     # ── ITSO approved at itso_review (Project only) ───────────────────────
     if office == "itso" and record.pipeline_status == "itso_review":
         # IERC begins after ITSO clears -- but only if it was actually
-        # requested (ADR-016). Unconditionally creating it here, as before,
+        # requested (ADR-018). Unconditionally creating it here, as before,
         # would force an ethics review nobody asked for.
         if record.requested_ierc:
             RecordClearance.objects.get_or_create(record=record, office="ierc")
