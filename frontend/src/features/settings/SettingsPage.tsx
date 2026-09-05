@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { DPA_SECTIONS } from "@/lib/dpaTerms";
