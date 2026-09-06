@@ -25,6 +25,8 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
+from apps.records.models import Record, RecordOwner, RecordType
+from apps.reviews.services import _can_review, _can_submit_clearance
 
 # Every application role. The matrix is only honest if it enumerates all of
 # them -- a suite that tests "RDCO can, Student cannot" and stops would have
@@ -160,3 +162,95 @@ class AuthorizationMatrixTests(APITestCase):
             reverse("opportunity-list"),
             {"title": "A call", "kind": "conference"},
         )
+
+
+class OwnershipMatrixTests(APITestCase):
+    """
+    The ownership half of "role x action x ownership".
+
+    Role alone is not the whole authorization question: `IsOwnerOrStaff` and the
+    review gates turn on *which* record, not only *who* is asking. A suite that
+    varied role and nothing else would have passed throughout the bug this
+    ticket closes, because the bypass was invisible until you asked whether the
+    right office was acting on the right record.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Reference rows are seeded by migration; create() would collide.
+        cls.record_type = RecordType.objects.first() or RecordType.objects.create(name="Thesis / Research")
+        cls.owner     = make_user("owner@cit.edu", "Student")
+        cls.stranger  = make_user("stranger@cit.edu", "Student")
+        cls.adviser   = make_user("named-adviser@cit.edu", "Adviser")
+        cls.other_adv = make_user("other-adviser@cit.edu", "Adviser")
+        cls.rdco      = make_user("rdco-own@cit.edu", "RDCO")
+        cls.itso      = make_user("itso-own@cit.edu", "ITSO")
+        cls.ierc      = make_user("ierc-own@cit.edu", "IERC")
+
+        cls.record = Record.objects.create(
+            title="A" * 10, abstract="B" * 40, record_type=cls.record_type,
+            added_by=cls.owner, pipeline_status="draft", adviser=cls.adviser,
+        )
+        RecordOwner.objects.create(record=cls.record, user=cls.owner, is_primary=True)
+
+    # --- submit: owner vs non-owner, same role ----------------------------
+
+    def test_a_student_cannot_submit_another_students_draft(self):
+        url = reverse("record-submit", args=[self.record.pk])
+
+        self.client.force_authenticate(self.stranger)
+        self.assertEqual(
+            self.client.post(url, {}, format="json").status_code, 403,
+            "a non-owning Student must not submit someone else's draft",
+        )
+
+        self.client.force_authenticate(self.owner)
+        self.assertNotEqual(
+            self.client.post(url, {}, format="json").status_code, 403,
+            "the owner must be able to submit their own draft",
+        )
+
+    # --- _can_review: the sequential gates --------------------------------
+
+    def test_only_the_named_adviser_may_review_at_adviser_review(self):
+        """
+        The card's AC: "_can_review no longer short-circuits on a staff flag."
+        Before, every office role was is_staff and so returned True here
+        regardless of stage or assignment.
+        """
+        self.record.pipeline_status = "adviser_review"
+        self.assertTrue(_can_review(self.adviser, self.record),
+                        "the named adviser may review at adviser_review")
+        self.assertFalse(_can_review(self.other_adv, self.record),
+                         "an unrelated Adviser must not review someone else's record")
+        for user, who in ((self.itso, "ITSO"), (self.ierc, "IERC"), (self.owner, "the owner")):
+            self.assertFalse(_can_review(user, self.record),
+                             f"{who} has no standing at the adviser gate")
+
+    def test_rdco_reviews_only_at_its_own_stages(self):
+        for stage in ("rdco_intake", "rdco_review"):
+            self.record.pipeline_status = stage
+            self.assertTrue(_can_review(self.rdco, self.record), f"RDCO at {stage}")
+        self.record.pipeline_status = "parallel_review"
+        self.assertFalse(_can_review(self.rdco, self.record),
+                         "RDCO must not review at a clearance stage")
+
+    # --- clearance: one office must not sign for another ------------------
+
+    def test_an_office_cannot_record_another_offices_clearance(self):
+        """
+        The consequence the ticket did not name. `_can_submit_clearance` let any
+        is_staff account act on *whichever* clearance was pending, so an ITSO
+        officer could sign IERC's ethics clearance -- collapsing the office
+        separation the whole workflow rests on.
+        """
+        self.record.pipeline_status = "itso_review"
+        can_itso, office = _can_submit_clearance(self.itso, self.record)
+        self.assertEqual(office, "itso", "ITSO's role maps to the itso office")
+
+        can_ierc, _ = _can_submit_clearance(self.ierc, self.record)
+        self.assertFalse(can_ierc,
+                         "IERC must not record a clearance at the ITSO stage")
+
+        can_owner, _ = _can_submit_clearance(self.owner, self.record)
+        self.assertFalse(can_owner, "a Student holds no clearance office at all")
