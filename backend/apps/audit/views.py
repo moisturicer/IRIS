@@ -1,5 +1,7 @@
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
+
+from core.permissions import IsAdmin
 from .models import AuditEvent
 from .serializers import AuditEventSerializer
 
@@ -7,7 +9,8 @@ from .serializers import AuditEventSerializer
 class AuditEventListView(generics.ListAPIView):
     """
     GET /audit/
-    Django Admin only (is_staff=True). Supports filtering via query params:
+    RDCO only -- SRS FR-M6-06. Was DRF IsAdminUser, which reads Django's
+    is_staff flag and therefore admitted all four offices (IR-165). Supports filtering via query params:
       ?event_type=LOGIN
       ?record=<id>
       ?user=<id>
@@ -15,7 +18,7 @@ class AuditEventListView(generics.ListAPIView):
       ?to=YYYY-MM-DD     (inclusive)
     """
     serializer_class   = AuditEventSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get_queryset(self):
         qs = AuditEvent.objects.select_related("user", "record").order_by("-created_at")

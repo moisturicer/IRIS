@@ -85,11 +85,12 @@ def _can_review(user, record: Record) -> bool:
 
     Adviser : only the assigned adviser, at adviser_review.
     RDCO    : any RDCO user, at rdco_intake or rdco_review.
-    Django staff / superuser: always allowed.
+
+    There is no Django-staff bypass. There was one, and because migration
+    accounts/0005 set is_staff=True on every office role it meant ITSO, IERC and
+    KTTO could approve or reject at the sequential adviser/RDCO gates their
+    office has no standing at (IR-165).
     """
-    from core.permissions import is_django_staff
-    if is_django_staff(user):
-        return True
     role_name = user.role.name if user.role else ""
     status    = record.pipeline_status
     if role_name == "Adviser":
@@ -111,40 +112,32 @@ def _can_submit_clearance(user, record: Record) -> tuple[bool, str]:
            itso_review → 'itso' or 'ktto'
            parallel_review → 'ierc' or 'ktto'
 
-    Django staff bypass all checks except (1).
+    There is no Django-staff bypass. The previous one let any is_staff account
+    record *whichever clearance happened to be pending*, regardless of office --
+    so with accounts/0005 seeding is_staff=True across the offices, an ITSO
+    officer could sign IERC's ethics clearance. That is precisely the office
+    separation the thesis contribution rests on (IR-165).
     """
-    from core.permissions import is_django_staff
-    staff = is_django_staff(user)
-
     role_name = user.role.name if user.role else ""
     office    = ROLE_TO_OFFICE.get(role_name, "")
 
     if not office:
-        if staff:
-            # Allow staff to act on whichever clearance is pending
-            pending = RecordClearance.objects.filter(
-                record=record, status="pending"
-            ).first()
-            if pending:
-                return True, pending.office
         return False, ""
 
-    if record.pipeline_status not in CLEARANCE_STATUSES and not staff:
+    if record.pipeline_status not in CLEARANCE_STATUSES:
         return False, office
 
     has_pending = RecordClearance.objects.filter(
         record=record, office=office, status="pending"
     ).exists()
 
-    if not has_pending and not staff:
+    if not has_pending:
         return False, office
 
     status = record.pipeline_status
     if status == "itso_review" and office in ("itso", "ktto"):
         return True, office
     if status == "parallel_review" and office in ("ierc", "ktto"):
-        return True, office
-    if staff:
         return True, office
     return False, office
 

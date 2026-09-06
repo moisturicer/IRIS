@@ -223,7 +223,7 @@ class RecordUploadDownloadView(APIView):
         except RecordUpload.DoesNotExist:
             return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES or request.user.is_staff
+        is_staff_user = get_role_name(request.user) in STAFF_ROLES
         is_owner      = upload.record.owners.filter(user=request.user).exists()
 
         if not (is_owner or is_staff_user):
@@ -299,7 +299,7 @@ class RecordUploadDeleteView(APIView):
 
         # Permission: owner or staff
         from core.permissions import STAFF_ROLES, get_role_name
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES or request.user.is_staff
+        is_staff_user = get_role_name(request.user) in STAFF_ROLES
         is_owner = upload.record.owners.filter(user=request.user).exists()
 
         if not (is_owner or is_staff_user):
@@ -333,7 +333,7 @@ class RecordFileDownloadView(APIView):
         except RecordFile.DoesNotExist:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES or request.user.is_staff
+        is_staff_user = get_role_name(request.user) in STAFF_ROLES
         is_owner      = record_file.record.owners.filter(user=request.user).exists()
 
         if not (is_owner or is_staff_user):
@@ -375,7 +375,7 @@ class RecordFileDeleteView(APIView):
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
         from core.permissions import STAFF_ROLES, get_role_name
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES or request.user.is_staff
+        is_staff_user = get_role_name(request.user) in STAFF_ROLES
         is_owner = record_file.record.owners.filter(user=request.user).exists()
 
         if not (is_owner or is_staff_user):
