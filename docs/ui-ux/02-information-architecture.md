@@ -98,21 +98,39 @@ L3  Record detail · Submission wizard · Decision screen · Documents
 Client-side gating is **UX only**; enforcement is server-side (`S-02`…`S-05`). See [03](03-navigation.md).
 
 | Screen | Student | Adviser | RDCO | ITSO | IERC | KTTO |
-|---|---|---|---|---|---|---|
-| Home | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Published records | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Submission wizard | ✅ | ✅ | ✅ | — | — | — |
-| My submissions | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Record detail | ✅ own/visible | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Documents | ✅ own | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Review queue | — | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Decision screen | — | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Notifications | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Search / AI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|
+| Discover | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Paper view | ◐ | ◐ | ✅ | ◐ | ◐ | ◐ |
+| Ask IRIS | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| My Library *(reader)* | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Calls & Conferences | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Notifications · Settings · Help | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Submit Disclosure** | ✅ | ✅ | — | — | — | — |
+| **My Workspace** *(author)* | ✅ | ✅ | — | — | — | — |
+| Edit record | ◐ | ◐ | — | — | — | — |
+| Documents | ◐ | ◐ | ✅ | ◐ | ◐ | ◐ |
+| **Review queue** *(+ Approved / Declined filters)* | — | ◐ | ✅ | ◐ | ◐ | ◐ |
+| **Decision screen** | — | ◐ | ✅ | ◐ | ◐ | ◐ |
+| Approved Proposals | — | — | ✅ | — | — | — |
+| Import Records *(file on behalf of)* | — | — | ✅ | — | — | — |
+| Download Requests | — | — | ✅ | — | — | — |
+| Delete Requests | — | — | ✅ | — | — | — |
 | Audit log | — | — | ✅ | — | — | — |
 | Role approvals | — | — | ✅ | — | — | — |
 
-**Audit is RDCO-only.** `AUDIT_LOG_ROLES` in `lib/constants.ts` already says `[RDCO]`; the backend currently uses `IsAdminUser`, which under the `is_staff` seeding admits all four offices. `S-05`/`S-07` narrow it. **The frontend constant is already correct — the backend is not.**
+**✅** full · **◐** scoped to your own or assigned records — the server decides which, not the client (`IR-153`) · **—** hidden in nav *and* 403 on direct URL.
+
+**The gating rule.** *Permission* → hidden in the nav and refused on the URL. *State* → visible but **disabled, with the reason stated**. So ITSO never sees Delete Requests (never their role), but ITSO does see its clearance action greyed out with "waiting on RDCO intake" (their role, wrong moment). Disabling for permission teaches people to want what they can never have; hiding for state makes the workflow look broken.
+
+**Named surfaces** ([15](15-mvp-ui-scope.md)'s unit of scope): Student → My Workspace · Adviser → My Workspace and the review queue for records they advise · ITSO / IERC / KTTO → the review queue for their office's clearances · RDCO → the review queue plus the coordination screens.
+
+**~~Audit is RDCO-only~~ — done.** `AUDIT_LOG_ROLES = [RDCO]` was correct and referenced nowhere; `IR-160` wires it, and `IR-165` narrowed the backend from DRF's `IsAdminUser` (which reads `is_staff`, and therefore admitted all four offices under the `accounts/0005` seeding) to `IsAdmin` with `ADMIN_ROLES = {RDCO}`.
+
+**Amended 2026-09-06, and one row is narrower than it was.** Submission was listed as Student / Adviser / **RDCO**. SRS Use Cases M2-2.1 and M2-2.2 both name the actor *"Record Owner (Student or Adviser)"*, and the SRS outranks this document — so RDCO is removed. The reasoning matters as much as the source: RDCO performs **both** intake and final review, so authoring would mean reviewing its own record at two of the three gates. That is a sharper conflict than the one that (correctly) keeps ITSO, IERC and KTTO out. RDCO's genuine need to file for others is served by **Import Records** instead. Recorded rather than silently reconciled.
+
+**Manage Users and Active Sessions left this table**, and the React app with them: account administration is the Django admin site's job. The SRS names seven user classes; the role enum has six, and the missing one is *System Administrators* — `is_staff` had been standing in for it, which is what produced the defect above. Self-service session management ("your devices") is a different, per-user screen and is tracked as `IR-124`.
+
+**Enforced, not just documented.** `frontend/src/lib/access.ts` is this table in code; the router and the sidebar both read it, so a nav item cannot exist without a matching gate. `frontend/src/lib/access.test.ts` asserts every role against every screen in both directions.
 
 ---
 

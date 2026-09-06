@@ -7,7 +7,7 @@ import { useRole } from "@/hooks/useRole";
 import { useUIStore } from "@/store/ui.store";
 import { useNotifications } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
-import { STAFF_ROLES, REVIEWER_ROLES } from "@/lib/constants";
+import { navFor, canAccess, NAV_SECTION_ORDER, type NavEntry } from "@/lib/access";
 import irisLogo from "@/assets/images/iris_logo.png";
 
 interface NavItem {
@@ -15,14 +15,12 @@ interface NavItem {
   label:       string;
   icon:        string;
   badge?:      number;
-  /**
-   * Renders a COMING SOON badge. **No nav item uses this any more**, and none
-   * should: IR-160's acceptance criteria require that every remaining nav item
-   * leads somewhere real. Kept only so the badge markup below stays typed --
-   * if you find yourself setting it, the screen belongs out of the nav instead.
-   */
-  comingSoon?: boolean;
 }
+
+// There is no `comingSoon` flag any more. Nav items are derived from
+// `lib/access.ts`, which maps a role to screens that exist and are routed --
+// so a dead-end entry is no longer something you have to remember not to add.
+// IR-160: "a dead end is worse than an absence."
 
 function NavSection({
   title,
@@ -81,11 +79,6 @@ function NavSection({
             )}
           >
             <span>{item.label}</span>
-            {item.comingSoon && (
-              <span className="self-start px-1.5 py-0.5 bg-amber-50 text-amber-600 text-[9px] font-bold rounded-full border border-amber-200 uppercase tracking-wider leading-none">
-                coming soon
-              </span>
-            )}
           </div>
           {/* Numeric badge: hidden on tablet, shown on desktop */}
           {item.badge != null && item.badge > 0 && (
@@ -114,7 +107,7 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
-  const { roleName, isDjangoStaff } = useRole();
+  const { roleName } = useRole();
   const { unreadCount } = useNotifications();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
@@ -128,22 +121,15 @@ export function Sidebar({ className }: SidebarProps) {
   const [workspaceBadge, setWorkspaceBadge] = useState<number | undefined>();
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
 
-  const isRDCO = user?.role_name === "RDCO" || user?.is_staff === true || user?.is_superuser === true;
-
-  const isStaff =
-    user?.is_staff === true ||
-    user?.is_superuser === true ||
-    (user?.role_name != null && STAFF_ROLES.includes(user.role_name as typeof STAFF_ROLES[number]));
-
-  // Django admin only (is_staff=True) — gates role requests, audit log
-  const isDjangoAdmin = user?.is_staff === true || user?.is_superuser === true;
-
-  const isReviewer =
-    user?.role_name != null &&
-    REVIEWER_ROLES.includes(user.role_name as typeof REVIEWER_ROLES[number]);
+  // Every nav decision comes from lib/access.ts, the same map the router gates
+  // on. This block used to hold four separate re-derivations of "staff" -- one
+  // reading `is_staff`, one `is_superuser`, one a role list -- which is how the
+  // sidebar came to offer ITSO and IERC screens the router then refused. There
+  // is nothing to keep in sync now because there is only one definition.
+  const nav = navFor(roleName as Parameters<typeof navFor>[0]);
 
   useEffect(() => {
-    if (!isDjangoStaff) return;
+    if (!canAccess(roleName as never, "workspace")) return;
     apiClient
       .get<{ pending_mine: number }>("/dashboard/stats/")
       .then(({ data }) => setWorkspaceBadge(data.pending_mine ?? 0))
@@ -151,48 +137,39 @@ export function Sidebar({ className }: SidebarProps) {
   }, []);
 
   useEffect(() => {
-    if (!isDjangoAdmin) return;
+    if (!canAccess(roleName as never, "roleRequests")) return;
     apiClient
       .get<{ count: number; results: unknown[] }>("/users/role-requests/")
       .then(({ data }) => setRoleRequestBadge(data.count ?? 0))
       .catch(() => {});
-  }, [isDjangoAdmin]);
+  }, [roleName]);
 
   const initials = `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}`.toUpperCase();
 
-  const explorationNav: NavItem[] = [
-    { to: "/", label: "Discover", icon: "fa-compass" },
-    { to: "/ai", label: "Ask IRIS", icon: "fa-brain" },
-    { to: "/records/mine", label: "My Library", icon: "fa-bookmark" },
-    { to: "/opportunities", label: "Calls & Conferences", icon: "fa-bullhorn" },
-  ];
+  // Badges are the only per-item state the map does not carry, so they are
+  // attached here rather than baked into lib/access.ts -- the map answers "may
+  // this role open it", never "how many are waiting".
+  const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
+    workspace:     workspaceBadge,
+    notifications: unreadCount,
+    roleRequests:  roleRequestBadge,
+  };
 
-  const ipNav: NavItem[] = [
-    { to: "/records/add", label: "Submit Disclosure", icon: "fa-file-signature" },
-    {
-      to: "/workspace",
-      label: "My Workspace",
-      icon: "fa-briefcase",
-      badge: workspaceBadge,
-    },
-  ];
-
-  const reviewNav: NavItem[] = [
-    { to: "/review/pending",            label: "Pending Records",     icon: "fa-hourglass-half" },
-    { to: "/review/approved",           label: "Approved",            icon: "fa-check-circle"   },
-    { to: "/review/declined",           label: "Declined",            icon: "fa-times-circle"   },
-    ...(isRDCO ? [{ to: "/review/approved-proposals", label: "Approved Proposals", icon: "fa-flag-checkered" }] : []),
-  ];
-
-  const toolsNav: NavItem[] = [
-    {
-      to: "/notifications",
-      label: "Notifications",
-      icon: "fa-bell",
-      badge: unreadCount,
-    },
-    { to: "/settings", label: "Settings & Profile", icon: "fa-cog" },
-  ];
+  const sections = NAV_SECTION_ORDER
+    .map((section) => ({
+      section,
+      items: nav
+        .filter((entry) => entry.section === section)
+        .map((entry): NavItem => ({
+          to: entry.to,
+          label: entry.label,
+          icon: entry.icon,
+          badge: BADGES[entry.key],
+        })),
+    }))
+    // A section with nothing in it for this role is not rendered at all, which
+    // is what keeps an empty "Administration" heading off a student's sidebar.
+    .filter((s) => s.items.length > 0);
 
   return (
     <aside
@@ -282,27 +259,16 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* ── Navigation ──────────────────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-        <NavSection collapsed={collapsed} title="Research Exploration" items={explorationNav} onNavigate={closeSidebar} />
-        <NavSection collapsed={collapsed} title="IP Management" items={ipNav} onNavigate={closeSidebar} />
-        {isReviewer && (
-          <NavSection collapsed={collapsed} title="Review Queue" items={reviewNav} onNavigate={closeSidebar} />
-        )}
-        <NavSection collapsed={collapsed} title="Tools" items={toolsNav} onNavigate={closeSidebar} />
-        {isStaff && (
-          <NavSection collapsed={collapsed}
-            title="Administration"
+      <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin" aria-label="Main">
+        {sections.map(({ section, items }) => (
+          <NavSection
+            key={section}
+            collapsed={collapsed}
+            title={section}
+            items={items}
             onNavigate={closeSidebar}
-            items={[
-              { to: "/admin/users",             label: "Manage Users",      icon: "fa-users" },
-              ...(isDjangoAdmin ? [{ to: "/admin/role-requests", label: "Role Requests", icon: "fa-user-check", badge: roleRequestBadge }] : []),
-              { to: "/admin/download-requests", label: "Download Requests", icon: "fa-download" },
-              { to: "/admin/delete-requests",   label: "Delete Requests",   icon: "fa-trash-alt" },
-              ...(isDjangoAdmin ? [{ to: "/admin/audit", label: "Audit Log", icon: "fa-clipboard-list" }] : []),
-              { to: "/admin/sessions",          label: "Active Sessions",    icon: "fa-shield-alt" },
-            ]}
           />
-        )}
+        ))}
       </nav>
 
       {/* ── User footer ─────────────────────────────────────────────── */}

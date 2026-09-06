@@ -12,7 +12,7 @@
 | 768–1279 px | 60 px icon rail | Icons only, section titles hidden |
 | ≥ 1280 px | 230 px full | Icons + labels + section titles |
 
-`Sidebar` builds `NavItem[]` per section, gated by `useRole()`, with an unread-notification badge and a "coming soon" pill for stubs. Active state is a brand-tinted background plus a left rail.
+`Sidebar` builds its sections from `navFor(role)` in [`lib/access.ts`](../../frontend/src/lib/access.ts), with badges attached per item. Active state is a brand-tinted background plus a left rail. There is no longer a "coming soon" pill — see §3.
 
 **This is good and needs no structural change.** The work is reduction and correctness.
 
@@ -24,7 +24,7 @@
 |---|---|---|
 | 1 | **Too many destinations for the pilot** | ~37 page components; 16 serve the pilot workflow |
 | 2 | **"Coming soon" items are navigational dead ends** | Sidebar renders a `comingSoon` pill; a user clicks and gets a stub |
-| 3 | **Inline role derivation** | `Sidebar` calls `useRole()` then re-derives staff status inline — a fourth definition of "staff" (`FE-05`) |
+| 3 | ~~**Inline role derivation**~~ | **Closed (`IR-160`).** `Sidebar` held four separate re-derivations of "staff" — one on `is_staff`, one on `is_superuser`, one on a role list — and disagreed with the router, so ITSO and IERC were shown Role Requests and Audit Log and then refused by it. Both now read one map |
 | 4 | **`dashboardApi` bypassed** | `Sidebar` calls `apiClient.get` directly for stats instead of the API module (`FE-03`) |
 | 5 | **Icon-only rail has no accessible names** | At 768–1279 px labels are visually hidden but not exposed to assistive tech ([12](12-accessibility.md)) |
 | 6 | **Discover home is special-cased** | `AppShell` suppresses Header and padding for `/` — inconsistent with every other route |
@@ -33,50 +33,65 @@
 
 ## 3 · MVP sidebar
 
-Three sections. Everything else removed from the router (`FE-02`).
+Five sections, each rendered only when the signed-in role has at least one item in it. Built from `frontend/src/lib/access.ts` — the same map the router gates on — so this listing describes code rather than intent.
 
 ```
-WORK
-  Home                    /
-  My Submissions          /records/mine
-  New Submission          /records/add          (Student, Adviser, RDCO)
-  Review Queue            /review/pending       (reviewers)  ·  badge = pending count
+RESEARCH EXPLORATION                                  (every role)
+  Discover                /
+  Ask IRIS                /ai
+  My Library              /records/mine
+  Calls & Conferences     /opportunities
 
-DISCOVER
-  Published Records       /records
-  Search                  /ai
+IP MANAGEMENT
+  Submit Disclosure       /records/add          (Student, Adviser)
+  My Workspace            /workspace            (Student, Adviser)  · badge = pending
+  Import Records          /records/import       (RDCO)
 
-ADMIN                                            (RDCO only)
-  Role Approvals          /users/role-requests
-  Audit Log               /audit
+REVIEW QUEUE                                          (reviewers)
+  Pending Records         /review/pending
+  Approved                /review/approved
+  Declined                /review/declined
+  Approved Proposals      /review/approved-proposals  (RDCO)
+
+TOOLS                                                 (every role)
+  Notifications           /notifications        · badge = unread
+  Settings & Profile      /settings
+
+ADMINISTRATION                                        (RDCO)
+  Role Requests           /admin/role-requests  · badge = pending
+  Download Requests       /admin/download-requests
+  Delete Requests         /admin/delete-requests
+  Audit Log               /admin/audit
 ```
 
-Plus **Notifications** in the Header, not the sidebar — it is a transient index, not a place.
+**Amended 2026-09-06.** This section described three sections, `Published Records` (deleted — Discover took the browse role) and `Notifications` in the header rather than the sidebar. It now matches what ships. **Manage Users and Active Sessions are gone from the app entirely**: account administration belongs to the Django admin site, and per-user session management is a separate screen tracked as `IR-124`.
 
 ### Rules
 
 | Rule | Reason |
 |---|---|
-| **No "coming soon" items.** If it is not in the pilot, it is not in the nav | A dead end is worse than an absence. It also invites evaluation participants to comment on things that do not exist |
-| Sections appear only if they contain a permitted item | An empty "ADMIN" heading for a student is noise |
-| Badge counts only where actionable | Review Queue and Notifications. Not on "Published Records" |
+| **No "coming soon" items.** If it is not in the pilot, it is not in the nav | A dead end is worse than an absence, and it invites evaluation participants to comment on things that do not exist. The `comingSoon` flag has been **removed from `NavItem`** — nav entries now come from a map of screens that exist and are routed, so a dead end is no longer something to remember not to add |
+| Sections appear only if they contain a permitted item | An empty "ADMINISTRATION" heading for a student is noise. Falls out of the map rather than being a second rule |
+| Badge counts only where actionable | My Workspace, Review Queue, Notifications, Role Requests |
 | Labels come from configuration post-MVP | "Review Queue" may be "Clearance Queue" elsewhere ([11](11-saas-admin.md)) |
-| One source of role truth — `useRole()` | `FE-05`; no inline re-derivation |
+| **One source of role truth — `lib/access.ts`** | Was `useRole()`, but `Sidebar` re-derived staff status inline anyway — four definitions of "staff" in one component. Now the router and the sidebar read one map, so a link cannot exist without a matching gate (`IR-160`) |
 
 ---
 
 ## 4 · Role-dependent navigation
 
-| Section | Student | Adviser | RDCO | ITSO / IERC / KTTO |
-|---|---|---|---|---|
-| Home | ✅ | ✅ | ✅ | ✅ |
-| My Submissions | ✅ | ✅ | ✅ | ✅ |
-| New Submission | ✅ | ✅ | ✅ | — |
-| Review Queue | — | ✅ | ✅ | ✅ |
-| Published Records | ✅ | ✅ | ✅ | ✅ |
-| Search | ✅ | ✅ | ✅ | ✅ |
-| Role Approvals | — | — | ✅ | — |
-| Audit Log | — | — | ✅ | — |
+| Section | Student | Adviser | RDCO | ITSO | IERC | KTTO |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|
+| Research Exploration | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Submit Disclosure | ✅ | ✅ | — | — | — | — |
+| My Workspace | ✅ | ✅ | — | — | — | — |
+| Import Records | — | — | ✅ | — | — | — |
+| Review Queue | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Approved Proposals | — | — | ✅ | — | — | — |
+| Tools | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Administration | — | — | ✅ | — | — | — |
+
+**The three offices are separate columns, deliberately.** Collapsing ITSO, IERC and KTTO into one "office reviewer" column would erase the distinction the thesis contribution rests on — parallel multi-office clearance, where one office requiring revision resets only its own clearance. They share a *screen*; they are not one role.
 
 **Client-side gating is UX only.** `ProtectedRoute`'s docstring is already correct: *"client-side RBAC (UX only). Real enforcement is on the Django API (NFR-S4)."* Hiding a nav item is a courtesy; `S-02`…`S-05` are the control.
 
@@ -136,9 +151,9 @@ Reachable from six places. Every one must carry enough context that the destinat
 
 **Secondary actions.** Toggle sidebar (mobile) · open notifications · sign out.
 
-**Required data.** `user.role_name`, `user.is_staff`, unread notification count, pending review count.
+**Required data.** `user.role_name`, unread notification count, pending review count. **Not `user.is_staff`** — it is a Django admin-site flag, and using it for authorization was the defect `IR-165` closed.
 
-**Permissions.** Items filtered by `useRole()`. **UX only** — server enforces.
+**Permissions.** Items come from `navFor(role)` — one map, shared with the router, so a nav item cannot exist without a matching gate. Still **UX only**: the Django API enforces (`core/permissions.py`, `IR-165`).
 
 **States.** Drawer open/closed (mobile) · rail/full (desktop) · item active · badge present/absent · section empty and therefore hidden.
 
