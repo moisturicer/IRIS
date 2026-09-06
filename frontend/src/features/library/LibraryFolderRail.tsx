@@ -118,8 +118,7 @@ export function LibraryFolderRail({
           )}
         >
           <i
-            className={cn("fas", icon, "text-[13px] shrink-0", active ? "text-brand" : "text-stone-400")}
-          />
+            className={cn("fas", icon, "text-[13px] shrink-0", active ? "text-brand" : "text-stone-400")} aria-hidden />
           <span className="truncate flex-1">{collection.name}</span>
           <span
             className={cn(
@@ -145,7 +144,7 @@ export function LibraryFolderRail({
               title="Rename"
               className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-white"
             >
-              <i className="fas fa-pen text-[10px]" />
+              <i className="fas fa-pen text-[10px]" aria-hidden />
             </button>
             <button
               type="button"
@@ -154,7 +153,7 @@ export function LibraryFolderRail({
               title="Delete folder"
               className="p-1 rounded text-stone-400 hover:text-brand hover:bg-white"
             >
-              <i className="fas fa-trash text-[10px]" />
+              <i className="fas fa-trash text-[10px]" aria-hidden />
             </button>
           </span>
         )}
@@ -172,7 +171,7 @@ export function LibraryFolderRail({
   ) => {
     const inner = (
       <>
-        <i className={cn("fas", icon, "text-[13px] shrink-0", active ? "text-brand" : "text-stone-400")} />
+        <i className={cn("fas", icon, "text-[13px] shrink-0", active ? "text-brand" : "text-stone-400")} aria-hidden />
         <span className="flex-1 truncate">{label}</span>
         {count !== null && (
           <span
@@ -217,7 +216,7 @@ export function LibraryFolderRail({
           title="Hide folders"
           className="p-1.5 rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700"
         >
-          <i className="fas fa-angles-left text-[12px]" />
+          <i className="fas fa-angles-left text-[12px]" aria-hidden />
         </button>
       </div>
 
@@ -245,7 +244,7 @@ export function LibraryFolderRail({
             onClick={() => setCreating(true)}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-brand-200 text-brand text-[13px] font-semibold hover:bg-brand-50 transition-colors"
           >
-            <i className="fas fa-folder-plus text-[12px]" />
+            <i className="fas fa-folder-plus text-[12px]" aria-hidden />
             New Folder
           </button>
         )}

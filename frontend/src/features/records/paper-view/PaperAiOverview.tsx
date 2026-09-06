@@ -83,7 +83,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
 
       {!loading && failed && (
         <div className="flex items-start gap-3">
-          <i className="fas fa-plug-circle-xmark text-[13px] text-stone-300 mt-0.5" />
+          <i className="fas fa-plug-circle-xmark text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-stone-700">AI overview unavailable</p>
             <p className="text-[12px] text-stone-500 mt-0.5">
@@ -103,7 +103,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
 
       {!loading && !failed && !hasOverview && mode === "extractive" && (
         <div className="flex items-start gap-3">
-          <i className="fas fa-microchip text-[13px] text-stone-300 mt-0.5" />
+          <i className="fas fa-microchip text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-stone-700">
               AI summary unavailable
@@ -119,7 +119,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
 
       {!loading && !failed && !hasOverview && mode !== "extractive" && (
         <div className="flex items-start gap-3">
-          <i className="fas fa-circle-info text-[13px] text-stone-300 mt-0.5" />
+          <i className="fas fa-circle-info text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-stone-700">Nothing indexed to summarise</p>
             <p className="text-[12px] text-stone-500 mt-0.5">
@@ -148,7 +148,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
                     to={`/records/${s.id}`}
                     className="max-w-full inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200 text-[11px] font-semibold text-stone-700 hover:border-brand/30 transition-colors"
                   >
-                    <i className="fas fa-file-lines text-[9px] text-stone-400" />
+                    <i className="fas fa-file-lines text-[9px] text-stone-400" aria-hidden />
                     <span className="truncate">{s.title}</span>
                   </Link>
                 ))}

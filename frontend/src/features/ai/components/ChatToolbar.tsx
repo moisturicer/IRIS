@@ -37,7 +37,7 @@ export function ChatToolbar({
         aria-label={historyOpen ? "Hide chat history" : "Show chat history"}
         title={historyOpen ? "Hide history" : "Show history"}
       >
-        <i className={historyOpen ? "fas fa-angles-left" : "fas fa-bars-staggered"} />
+        <i className={historyOpen ? "fas fa-angles-left" : "fas fa-bars-staggered"} aria-hidden />
       </button>
 
       <div className="min-w-0 flex-1 px-1">
@@ -53,7 +53,7 @@ export function ChatToolbar({
         className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold
           text-stone-600 hover:bg-stone-50 border border-stone-200"
       >
-        <i className="fas fa-plus text-[10px]" />
+        <i className="fas fa-plus text-[10px]" aria-hidden />
         New chat
       </button>
 
@@ -71,7 +71,7 @@ export function ChatToolbar({
         aria-label={sourcesOpen ? "Hide sources" : "Show sources"}
         title={sourcesAvailable ? (sourcesOpen ? "Hide sources" : "Show sources") : "Sources appear after IRIS responds"}
       >
-        <i className="fas fa-layer-group text-[11px]" />
+        <i className="fas fa-layer-group text-[11px]" aria-hidden />
         <span className="hidden sm:inline">Sources</span>
       </button>
 

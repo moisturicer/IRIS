@@ -219,7 +219,7 @@ export default function AddRecordPage() {
                     step === i + 1 ? "bg-white text-brand" : step > i + 1 ? "bg-emerald-100" : "bg-stone-100",
                   )}
                 >
-                  {step > i + 1 ? <i className="fa fa-check text-[9px]" /> : i + 1}
+                  {step > i + 1 ? <i className="fa fa-check text-[9px]" aria-hidden /> : i + 1}
                 </span>
                 {s.title}
               </div>

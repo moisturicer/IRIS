@@ -89,7 +89,7 @@ export function RecordDetailsStep() {
           {...register("record_type")}
           disabled={loadingData}
           className={`w-full border rounded-lg px-3 py-2 text-[13px] outline-none transition-colors
-            disabled:bg-gray-50 disabled:text-gray-400
+            disabled:bg-gray-50 disabled:text-gray-500
             ${errors.record_type
               ? "border-red-400 focus:border-red-500"
               : "border-gray-300 focus:border-[#6B0F12]"
@@ -112,7 +112,7 @@ export function RecordDetailsStep() {
           {isProposal ? (
             <span className="text-red-500">*</span>
           ) : (
-            <span className="text-gray-400 font-normal text-[12px]">
+            <span className="text-gray-500 font-normal text-[12px]">
               {selectedTypeName ? "(optional for this record type)" : "(select record type first)"}
             </span>
           )}
@@ -121,7 +121,7 @@ export function RecordDetailsStep() {
           {...register("adviser", { valueAsNumber: true })}
           disabled={loadingData}
           className={`w-full border rounded-lg px-3 py-2 text-[13px] outline-none transition-colors
-            disabled:bg-gray-50 disabled:text-gray-400
+            disabled:bg-gray-50 disabled:text-gray-500
             ${errors.adviser
               ? "border-red-400 focus:border-red-500"
               : "border-gray-300 focus:border-[#6B0F12]"
@@ -138,7 +138,7 @@ export function RecordDetailsStep() {
           <p className="text-[12px] text-red-500 mt-1">{errors.adviser.message}</p>
         )}
         {isProposal && (
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <p className="text-[11px] text-gray-500 mt-0.5">
             Proposal records must have an assigned adviser before submission.
           </p>
         )}
@@ -179,9 +179,9 @@ export function RecordDetailsStep() {
                 <button
                   type="button"
                   onClick={() => removeAuthor(i)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-500 hover:text-gray-600"
                 >
-                  <i className="fa fa-times text-[10px]" />
+                  <i className="fa fa-times text-[10px]" aria-hidden />
                 </button>
               </span>
             ))}

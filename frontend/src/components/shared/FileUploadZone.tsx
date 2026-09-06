@@ -55,11 +55,11 @@ export function FileUploadZone({
         ${disabled ? "opacity-50 cursor-not-allowed" : ""}
       `}
     >
-      <i className="fa fa-cloud-upload-alt text-3xl text-gray-400" />
+      <i className="fa fa-cloud-upload-alt text-3xl text-gray-500" aria-hidden />
       <p className="text-[13px] text-gray-600 font-medium">
         Drag and drop here, or <span className="text-[#6B0F12]">browse</span>
       </p>
-      {hint && <p className="text-[12px] text-gray-400">{hint}</p>}
+      {hint && <p className="text-[12px] text-gray-500">{hint}</p>}
       <input
         ref={inputRef}
         type="file"

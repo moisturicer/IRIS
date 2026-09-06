@@ -21,7 +21,7 @@ export function ChatMessageBubble({ message, showSources = true }: ChatMessageBu
           ${isUser ? "bg-stone-100 text-stone-500" : "bg-brand/10 text-brand"}`}
         aria-hidden
       >
-        {isUser ? <i className="fas fa-user" /> : <AskIrisMark className="w-[18px] h-[18px]" />}
+        {isUser ? <i className="fas fa-user" aria-hidden /> : <AskIrisMark className="w-[18px] h-[18px]" />}
       </div>
 
       <div

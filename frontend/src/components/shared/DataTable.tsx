@@ -75,7 +75,7 @@ export function DataTable<T>({
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="py-12 text-center text-gray-400 text-[13px]">
+                <td colSpan={columns.length} className="py-12 text-center text-gray-500 text-[13px]">
                   No records found.
                 </td>
               </tr>
@@ -105,7 +105,7 @@ export function DataTable<T>({
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
-              <i className="fa fa-chevron-left text-[11px]" />
+              <i className="fa fa-chevron-left text-[11px]" aria-hidden />
             </Button>
             <span className="px-2 py-1 font-medium text-gray-700">{page} / {totalPages}</span>
             <Button
@@ -114,7 +114,7 @@ export function DataTable<T>({
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >
-              <i className="fa fa-chevron-right text-[11px]" />
+              <i className="fa fa-chevron-right text-[11px]" aria-hidden />
             </Button>
           </div>
         </div>

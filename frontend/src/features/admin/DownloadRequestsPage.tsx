@@ -97,7 +97,7 @@ export default function DownloadRequestsPage() {
           disabled={loading}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-gray-500 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50"
         >
-          <i className={`fas fa-sync-alt text-[11px] ${loading ? "animate-spin" : ""}`} />
+          <i className={`fas fa-sync-alt text-[11px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </button>
       </div>
@@ -148,7 +148,7 @@ export default function DownloadRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800">{req.requested_by_name ?? "—"}</p>
-                      <p className="text-[11px] text-gray-400">{req.requested_by_email}</p>
+                      <p className="text-[11px] text-gray-500">{req.requested_by_email}</p>
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                       {formatDate(req.created_at)}
@@ -171,7 +171,7 @@ export default function DownloadRequestsPage() {
                           >
                             {acting[req.id] === "approve"
                               ? <><Spinner size="sm" /> Approving…</>
-                              : <><i className="fas fa-check" /> Approve</>}
+                              : <><i className="fas fa-check" aria-hidden /> Approve</>}
                           </button>
                           <button
                             type="button"
@@ -183,11 +183,11 @@ export default function DownloadRequestsPage() {
                           >
                             {acting[req.id] === "decline"
                               ? <><Spinner size="sm" /> Declining…</>
-                              : <><i className="fas fa-times" /> Decline</>}
+                              : <><i className="fas fa-times" aria-hidden /> Decline</>}
                           </button>
                         </div>
                       ) : (
-                        <span className="text-[12px] text-gray-400 italic">
+                        <span className="text-[12px] text-gray-500 italic">
                           {req.reviewed_at ? formatDate(req.reviewed_at) : "Reviewed"}
                         </span>
                       )}

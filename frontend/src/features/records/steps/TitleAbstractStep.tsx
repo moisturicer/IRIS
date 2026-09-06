@@ -39,7 +39,7 @@ export function TitleAbstractStep() {
           <label className="text-[13px] font-medium text-gray-700">
             Abstract <span className="text-red-500">*</span>
           </label>
-          <span className="text-[11px] text-gray-400">{abstract.length} / 5000</span>
+          <span className="text-[11px] text-gray-500">{abstract.length} / 5000</span>
         </div>
         <textarea
           {...register("abstract")}

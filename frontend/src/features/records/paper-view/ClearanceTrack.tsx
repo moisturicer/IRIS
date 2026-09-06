@@ -75,7 +75,7 @@ export function ClearanceTrack({ clearances, preservedBefore }: ClearanceTrackPr
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[13px] font-bold text-stone-900">{c.office_label}</span>
                   <span className={cn("text-[11px] font-semibold flex items-center gap-1", meta.text)}>
-                    <i className={cn("fas", meta.icon, "text-[9px]")} />
+                    <i className={cn("fas", meta.icon, "text-[9px]")} aria-hidden />
                     {meta.label}
                   </span>
                   {preserved && (
@@ -83,7 +83,7 @@ export function ClearanceTrack({ clearances, preservedBefore }: ClearanceTrackPr
                       className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1"
                       title="Cleared before the current submission and carried over — this office will not review again"
                     >
-                      <i className="fas fa-shield-halved text-[8px]" />
+                      <i className="fas fa-shield-halved text-[8px]" aria-hidden />
                       Preserved
                     </span>
                   )}

@@ -213,7 +213,7 @@ export default function MyLibraryPage() {
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
           <h1 className="text-[20px] font-bold text-stone-900 flex items-center gap-2">
-            <i className="fas fa-bookmark text-[15px] text-brand" />
+            <i className="fas fa-bookmark text-[15px] text-brand" aria-hidden />
             My Library
           </h1>
           <p className="text-[13px] text-stone-500 mt-1">
@@ -248,7 +248,7 @@ export default function MyLibraryPage() {
             onClick={() => setRailOpen(true)}
             className="mb-4 lg:mb-0 lg:shrink-0 flex items-center gap-2 px-3 py-2 bg-white border border-stone-200 rounded-xl text-[13px] font-semibold text-stone-600 hover:border-stone-300"
           >
-            <i className="fas fa-angles-right text-[12px] text-stone-400" />
+            <i className="fas fa-angles-right text-[12px] text-stone-400" aria-hidden />
             Folders
             <span className="text-stone-400 font-medium truncate max-w-[10rem]">{viewTitle}</span>
           </button>
@@ -258,7 +258,7 @@ export default function MyLibraryPage() {
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <div className="relative flex-1 min-w-[12rem]">
-              <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-stone-400" />
+              <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-stone-400" aria-hidden />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -296,7 +296,7 @@ export default function MyLibraryPage() {
                     layout === mode ? "bg-brand-50 text-brand" : "text-stone-400 hover:text-stone-600",
                   )}
                 >
-                  <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-[12px]")} />
+                  <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-[12px]")} aria-hidden />
                 </button>
               ))}
             </div>
@@ -350,7 +350,7 @@ export default function MyLibraryPage() {
 
           {unavailable > 0 && !loading && !failed && (
             <p className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-800">
-              <i className="fas fa-eye-slash mr-1.5" />
+              <i className="fas fa-eye-slash mr-1.5" aria-hidden />
               {unavailable} saved {unavailable === 1 ? "record is" : "records are"} no longer
               available to you — {unavailable === 1 ? "it may have" : "they may have"} been
               unpublished or withdrawn.
@@ -371,7 +371,7 @@ export default function MyLibraryPage() {
             </div>
           ) : failed ? (
             <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center">
-              <i className="fas fa-plug-circle-xmark text-[22px] text-stone-300 mb-3" />
+              <i className="fas fa-plug-circle-xmark text-[22px] text-stone-300 mb-3" aria-hidden />
               <p className="text-[14px] font-semibold text-stone-700">Could not load your library</p>
               <p className="text-[12px] text-stone-500 mt-1">
                 Your saved records are still stored in this browser — only fetching them failed.
@@ -390,8 +390,7 @@ export default function MyLibraryPage() {
                 className={cn(
                   "fas text-[22px] text-stone-300 mb-3",
                   query ? "fa-magnifying-glass" : "fa-folder-open",
-                )}
-              />
+                )} aria-hidden />
               <p className="text-[14px] font-semibold text-stone-700">
                 {query ? "No matches in this folder" : emptyCopy().title}
               </p>

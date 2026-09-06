@@ -172,7 +172,7 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
 
       <p
         className={cn(
-          "relative z-10 text-[11px] text-gray-400 mt-8 lg:mt-6",
+          "relative z-10 text-[11px] text-gray-500 mt-8 lg:mt-6",
           isSignup && "text-center"
         )}
       >

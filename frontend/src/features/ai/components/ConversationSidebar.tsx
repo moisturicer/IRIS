@@ -76,7 +76,7 @@ export function ConversationSidebar({
                     text-stone-400 hover:text-red-600 hover:bg-red-50/80"
                   aria-label={`Delete ${c.title}`}
                 >
-                  <i className="fas fa-trash text-[10px]" />
+                  <i className="fas fa-trash text-[10px]" aria-hidden />
                 </button>
               </div>
             );

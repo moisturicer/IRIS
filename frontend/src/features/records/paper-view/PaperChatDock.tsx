@@ -158,7 +158,7 @@ export function PaperChatPanel({
             title="Panel position"
             className="p-1.5 rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700"
           >
-            <i className="fas fa-ellipsis text-[13px]" />
+            <i className="fas fa-ellipsis text-[13px]" aria-hidden />
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-card-md border border-stone-200 py-1 z-50">
@@ -179,10 +179,10 @@ export function PaperChatPanel({
                   className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] text-stone-700 hover:bg-stone-50"
                 >
                   <span className="flex items-center gap-2">
-                    <i className={cn("fas", opt.icon, "text-[10px] text-stone-400")} />
+                    <i className={cn("fas", opt.icon, "text-[10px] text-stone-400")} aria-hidden />
                     {opt.label}
                   </span>
-                  {dock === opt.id && <i className="fas fa-check text-brand text-[10px]" />}
+                  {dock === opt.id && <i className="fas fa-check text-brand text-[10px]" aria-hidden />}
                 </button>
               ))}
             </div>
@@ -195,7 +195,7 @@ export function PaperChatPanel({
           aria-label="Close Paper Chat"
           className="p-1.5 rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700"
         >
-          <i className="fas fa-xmark text-[13px]" />
+          <i className="fas fa-xmark text-[13px]" aria-hidden />
         </button>
       </div>
 
@@ -278,7 +278,7 @@ export function PaperChatPanel({
         />
         <div className="flex items-center justify-between mt-2">
           <span className="flex items-center gap-1.5 text-[10px] text-stone-400">
-            <i className="fas fa-file-lines text-[9px]" />
+            <i className="fas fa-file-lines text-[9px]" aria-hidden />
             Referencing this paper
           </span>
           <button
@@ -288,7 +288,7 @@ export function PaperChatPanel({
             aria-label="Send"
             className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors"
           >
-            <i className="fas fa-arrow-up text-[11px]" />
+            <i className="fas fa-arrow-up text-[11px]" aria-hidden />
           </button>
         </div>
       </div>

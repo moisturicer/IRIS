@@ -90,14 +90,14 @@ export function DiscoverFilterPanel({
             : "bg-white border-stone-200 text-stone-700 hover:border-stone-300",
         )}
       >
-        <i className="fas fa-sliders text-[12px]" />
+        <i className="fas fa-sliders text-[12px]" aria-hidden />
         <span>Filter</span>
         {activeCount > 0 && (
           <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
             {activeCount}
           </span>
         )}
-        <i className={cn("fas fa-chevron-down text-[9px] opacity-60 transition-transform", open && "rotate-180")} />
+        <i className={cn("fas fa-chevron-down text-[9px] opacity-60 transition-transform", open && "rotate-180")} aria-hidden />
       </button>
 
       {open && (
@@ -110,7 +110,7 @@ export function DiscoverFilterPanel({
               className="p-1 rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100"
               aria-label="Close filters"
             >
-              <i className="fas fa-times text-[13px]" />
+              <i className="fas fa-times text-[13px]" aria-hidden />
             </button>
           </div>
 

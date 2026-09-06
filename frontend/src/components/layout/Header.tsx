@@ -20,11 +20,11 @@ export function Header() {
         className="md:hidden w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50"
         aria-label="Open menu"
       >
-        <i className="fas fa-bars text-[14px]" />
+        <i className="fas fa-bars text-[14px]" aria-hidden />
       </button>
 
       <div className="relative flex-1 max-w-md min-w-0 hidden md:block">
-        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[12px]" />
+        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[12px]" aria-hidden />
         <input
           type="text"
           placeholder="Search records, authors, topics..."

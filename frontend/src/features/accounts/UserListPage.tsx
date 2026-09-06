@@ -142,7 +142,7 @@ export default function UserListPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          leading={<i className="fa fa-search text-[13px]" />}
+          leading={<i className="fa fa-search text-[13px]" aria-hidden />}
           className="max-w-xs"
         />
         <Button variant="secondary" size="sm" onClick={handleSearch}>Filter</Button>

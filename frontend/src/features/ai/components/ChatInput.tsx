@@ -52,7 +52,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
             hover:bg-[#7d1215] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
           aria-label="Send message"
         >
-          <i className="fas fa-arrow-up text-[14px]" />
+          <i className="fas fa-arrow-up text-[14px]" aria-hidden />
         </button>
       </div>
       <p className="text-[10px] text-stone-400 text-center mt-2 max-w-3xl mx-auto">
