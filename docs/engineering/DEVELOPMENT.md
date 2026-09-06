@@ -18,7 +18,7 @@ Read this first — several obvious commands fail for reasons that are already u
 |---|---|---|
 | `docker compose up --build` fails | `ai-gateway` builds from `./ai`, which now exists, but Compose also requires `./ai/.env`, which does not; even with that supplied, `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist. [ADR-014](../adr/014-ai-gateway-as-a-service.md) adopts the gateway under five preconditions — none met yet, so it stays undeployed, not rejected | IR-58 |
 | Every API request 500s / no route resolves | `apps/records/views.py` has undefined names; `config/urls.py:11` imports it, so the URLconf fails at import | IR-57 |
-| No Celery task is ever processed | Workers consume `default`/`extraction`/`embedding` queues, but nothing sets `CELERY_TASK_ROUTES` — every `.delay()` call still publishes to Celery's implicit default queue (`celery`), which no worker consumes | — |
+| Celery tasks never ran | Fixed (IR-164) — `CELERY_TASK_ROUTES`/`CELERY_TASK_DEFAULT_QUEUE` now match the workers' queues, verified against the real stack. Not currently known-broken | — |
 | Frontend unreachable in prod compose | Prod maps `80:80`; nginx-unprivileged listens on `8080` | IR-58 |
 | `npm run lint` / `npm run build` fail | Not currently known-broken — both pass on this branch (verified 2026-09-06) | — |
 | `npm test` not found | No test runner is installed in `frontend/package.json` | deferred (P3) |
@@ -129,7 +129,7 @@ docker compose down                # add -v to drop volumes
 
 ### Celery
 
-Workers consume the `default`, `extraction` and `embedding` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding` services) — but nothing sets `CELERY_TASK_ROUTES`, so every task still publishes to Celery's implicit default queue (`celery`), which no worker consumes. **No Celery task in this system is currently processed**, chunking/ingestion and embedding included, regardless of how the workers are named. This predates and is unrelated to the RAG pipeline work; still open.
+Workers consume the `default`, `extraction` and `embedding` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding` services). `config/settings/base.py` sets `CELERY_TASK_ROUTES` (`extract_pdf_text` → `extraction`, `embed_record` → `embedding`) and `CELERY_TASK_DEFAULT_QUEUE = "default"` for everything else, including `chunk_record_document` (IR-164) — so publishers and consumers agree on queue names. Verified against the real docker-compose stack, not just the config: a task dispatched over the real Redis broker was consumed and completed by the real `celery-default` and `celery-extraction` containers.
 
 ---
 
@@ -182,7 +182,7 @@ Full process: [`SDLC.md`](SDLC.md). Done gates: [`DEFINITION_OF_DONE.md`](DEFINI
 |---|---|
 | Nothing responds | IR-57 — the URLconf fails at import. `python manage.py check` |
 | Compose will not start / `ai-gateway` container exits | IR-58 — `ai-gateway` has no `ai/.env`, and even with one, its service package is missing (`ai.services.chat_service`, `ai.services.embedding_service`); do not deploy it |
-| Celery task never runs | Queue routing gap — see §6 Celery above; unrelated to whether the task itself is correct |
+| Celery task never runs | Routing was the gap and is fixed (IR-164, see §6 Celery above) — if a task still doesn't run, look at the task itself, not queue names |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
 | Uploads not extracted | `DoclingExtractor` calls `POST {DOCLING_API_URL}/v1/convert/file` — check the `docling` service is up and reachable; there is no fallback extractor (ADR-016) |
 | Migrations conflict | `showmigrations`, then resolve deliberately; never edit an applied migration |
