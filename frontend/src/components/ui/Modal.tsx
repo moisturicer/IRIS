@@ -33,8 +33,12 @@ export function Modal({ open, onClose, title, children, size = "max-w-lg" }: Mod
   useEffect(() => {
     if (!open) return;
 
+    const active = document.activeElement;
+    // A modal opened programmatically (a route effect, a toast action) leaves
+    // <body> as the active element. Recording it would make the restore a
+    // silent no-op -- body.focus() does nothing -- while looking like it worked.
     triggerRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      active instanceof HTMLElement && active !== document.body ? active : null;
 
     const panel = panelRef.current;
     if (panel) {

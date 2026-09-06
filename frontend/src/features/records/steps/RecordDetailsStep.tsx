@@ -180,6 +180,7 @@ export function RecordDetailsStep() {
                   type="button"
                   onClick={() => removeAuthor(i)}
                   className="text-gray-500 hover:text-gray-600"
+                  aria-label={`Remove author ${a}`}
                 >
                   <i className="fa fa-times text-[10px]" aria-hidden />
                 </button>

@@ -37,14 +37,14 @@ function PdfViewer({ blobUrl, filename, onClose }: PdfViewerProps) {
           <a
             href={blobUrl}
             download={filename}
-            className="text-gray-500 hover:text-white text-[12px] flex items-center gap-1.5"
+            className="text-gray-300 hover:text-white text-[12px] flex items-center gap-1.5"
           >
             <i className="fas fa-download" aria-hidden /> Download
           </a>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-white text-[18px] leading-none"
+            className="text-gray-300 hover:text-white text-[18px] leading-none"
             aria-label="Close viewer"
           >
             <i className="fas fa-times" aria-hidden />
@@ -132,6 +132,7 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
             type="button"
             onClick={onClose}
             className="text-gray-500 hover:text-gray-600 text-[18px] leading-none ml-2 mt-0.5"
+            aria-label="Close"
           >
             <i className="fas fa-times" aria-hidden />
           </button>

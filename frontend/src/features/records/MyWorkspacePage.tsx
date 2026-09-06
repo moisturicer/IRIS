@@ -137,7 +137,7 @@ export default function MyWorkspacePage() {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{s.label}</span>
-              <i className={cn("fas", s.icon, "text-[13px]", s.danger && s.value > 0 ? "text-red-500" : "text-stone-300")} />
+              <i className={cn("fas", s.icon, "text-[13px]", s.danger && s.value > 0 ? "text-red-500" : "text-stone-300")} aria-hidden />
             </div>
             <p className={cn("text-[26px] font-bold leading-none", s.danger && s.value > 0 ? "text-red-600" : "text-stone-900")}>
               {s.value}

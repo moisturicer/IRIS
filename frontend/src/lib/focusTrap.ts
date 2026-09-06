@@ -25,18 +25,32 @@ const TABBABLE = [
   "input:not([disabled])",
   "select:not([disabled])",
   "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
+  "iframe",
+  "summary",
+  "audio[controls]",
+  "video[controls]",
+  "[contenteditable]:not([contenteditable=\"false\"])",
+  "[tabindex]",
+]
+  // Every selector above still has to clear this: `tabindex="-1"` means
+  // "focusable by script, not by Tab", and a `<button tabindex="-1">` matches
+  // `button:not([disabled])` no matter what the last selector says.
+  .map((sel) => `${sel}:not([tabindex="-1"])`)
+  .join(",");
 
 /** The tabbable elements inside `root`, in document order. */
 export function tabbableWithin(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(TABBABLE)).filter(
+  return Array.from(root.querySelectorAll<HTMLElement>(TABBABLE)).filter((el) => {
     // `offsetParent` is null for anything `display: none`, which keeps hidden
     // panels (a collapsed section, a closed dropdown) out of the tab ring.
     // `position: fixed` elements report null too, so they are let through on
     // the strength of having a client rect instead.
-    (el) => el.offsetParent !== null || el.getClientRects().length > 0,
-  );
+    if (el.offsetParent === null && el.getClientRects().length === 0) return false;
+    // `visibility: hidden` keeps both its offsetParent and its client rects, so
+    // it survives the check above -- but browsers do not Tab to it, and neither
+    // should we. `getComputedStyle` is the only honest way to see this.
+    return getComputedStyle(el).visibility !== "hidden";
+  });
 }
 
 /**
