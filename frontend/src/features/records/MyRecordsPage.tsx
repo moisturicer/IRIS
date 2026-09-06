@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import type { RecordListItem } from "@/types/records";
 import { formatDate } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface Props {
   /** "library" shows only published records; "workspace" shows all statuses */
@@ -39,7 +40,7 @@ export default function MyRecordsPage({ mode = "workspace" }: Props) {
         actions={
           !isLibrary && (
             <Link to="/records/add" className="bg-[#6B0F12] text-white px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-[#7d1215]">
-              <i className="fas fa-plus mr-1.5" />Add Record
+              <i className="fas fa-plus mr-1.5" aria-hidden />Add Record
             </Link>
           )
         }
@@ -47,7 +48,7 @@ export default function MyRecordsPage({ mode = "workspace" }: Props) {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-[13px]">Loading...</div>
+          <Skeleton />
         ) : records.length === 0 ? (
           <EmptyState
             icon="fa-folder-open"

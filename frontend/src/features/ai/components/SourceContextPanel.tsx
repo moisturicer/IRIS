@@ -57,7 +57,7 @@ export function SourceContextPanel({ open, citationIds, onClose }: SourceContext
           className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
           aria-label="Hide sources panel"
         >
-          <i className="fas fa-xmark text-[13px]" />
+          <i className="fas fa-xmark text-[13px]" aria-hidden />
         </button>
       </div>
 
@@ -113,7 +113,7 @@ export function SourceContextPanel({ open, citationIds, onClose }: SourceContext
               className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#6B0F12] hover:underline"
             >
               View record
-              <i className="fas fa-arrow-right text-[9px]" />
+              <i className="fas fa-arrow-right text-[9px]" aria-hidden />
             </Link>
           </article>
         ))}

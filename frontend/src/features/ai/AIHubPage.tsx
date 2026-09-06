@@ -24,7 +24,7 @@ export default function AIHubPage() {
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
         >
-          <i className="fa fa-search" />
+          <i className="fa fa-search" aria-hidden />
           Semantic Search
           <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded-full border border-amber-200 uppercase tracking-wider leading-none">
             soon
@@ -39,7 +39,7 @@ export default function AIHubPage() {
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
         >
-          <i className="fa fa-robot" />
+          <i className="fa fa-robot" aria-hidden />
           Ask a Question
           <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-bold rounded-full border border-amber-200 uppercase tracking-wider leading-none">
             soon
@@ -51,7 +51,7 @@ export default function AIHubPage() {
       {mode === "ask" && (
         <div className="flex flex-col items-center text-center py-16 px-6 bg-white rounded-xl border border-gray-200">
           <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
-            <i className="fas fa-robot text-2xl text-slate-300" />
+            <i className="fas fa-robot text-2xl text-slate-300" aria-hidden />
           </div>
           <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[11px] font-bold rounded-full border border-amber-200 uppercase tracking-wider mb-4">
             Coming Soon
@@ -67,7 +67,7 @@ export default function AIHubPage() {
       {mode === "search" && (
         <div className="flex flex-col items-center text-center py-16 px-6 bg-white rounded-xl border border-gray-200">
           <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
-            <i className="fas fa-search text-2xl text-slate-300" />
+            <i className="fas fa-search text-2xl text-slate-300" aria-hidden />
           </div>
           <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[11px] font-bold rounded-full border border-amber-200 uppercase tracking-wider mb-4">
             Coming Soon

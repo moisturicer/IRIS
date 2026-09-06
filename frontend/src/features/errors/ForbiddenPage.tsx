@@ -41,8 +41,8 @@ export function ForbiddenPage({ requiredRoles }: ForbiddenPageProps) {
         className="relative w-[88px] h-[88px] rounded-full bg-red-50 flex items-center justify-center mb-6"
         aria-hidden
       >
-        <i className="fas fa-shield-alt text-[40px] text-red-300" />
-        <i className="fas fa-lock text-[18px] text-red-500 absolute bottom-[22px]" />
+        <i className="fas fa-shield-alt text-[40px] text-red-300" aria-hidden />
+        <i className="fas fa-lock text-[18px] text-red-500 absolute bottom-[22px]" aria-hidden />
         <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="block w-[70px] h-[3px] bg-red-500 rounded-full rotate-45" />
         </span>

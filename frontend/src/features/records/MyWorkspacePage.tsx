@@ -111,7 +111,7 @@ export default function MyWorkspacePage() {
             to="/records/add"
             className="inline-flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-brand-light transition-colors"
           >
-            <i className="fas fa-file-signature text-[12px]" />
+            <i className="fas fa-file-signature text-[12px]" aria-hidden />
             Submit Disclosure
           </Link>
         }
@@ -137,7 +137,7 @@ export default function MyWorkspacePage() {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{s.label}</span>
-              <i className={cn("fas", s.icon, "text-[13px]", s.danger && s.value > 0 ? "text-red-500" : "text-stone-300")} />
+              <i className={cn("fas", s.icon, "text-[13px]", s.danger && s.value > 0 ? "text-red-500" : "text-stone-300")} aria-hidden />
             </div>
             <p className={cn("text-[26px] font-bold leading-none", s.danger && s.value > 0 ? "text-red-600" : "text-stone-900")}>
               {s.value}
@@ -165,7 +165,7 @@ export default function MyWorkspacePage() {
           ))}
         </div>
         <div className="relative flex-1 min-w-[12rem]">
-          <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-stone-400" />
+          <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-stone-400" aria-hidden />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -224,7 +224,7 @@ export default function MyWorkspacePage() {
                       ))}
                       {flagged && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">
-                          <i className="fas fa-circle-exclamation mr-1" />Action Required
+                          <i className="fas fa-circle-exclamation mr-1" aria-hidden />Action Required
                         </span>
                       )}
                     </div>
@@ -269,7 +269,7 @@ export default function MyWorkspacePage() {
                         to={`/records/${record.id}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 text-[12px] font-semibold text-stone-600 hover:border-brand/40 hover:text-brand transition-colors"
                       >
-                        Inspect Dossier <i className="fas fa-chevron-right text-[9px]" />
+                        Inspect Dossier <i className="fas fa-chevron-right text-[9px]" aria-hidden />
                       </Link>
                     </div>
                   </div>

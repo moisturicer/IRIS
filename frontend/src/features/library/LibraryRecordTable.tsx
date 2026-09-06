@@ -77,8 +77,7 @@ export function LibraryRecordTable({
           className={cn(
             "fa-star text-[13px] transition-colors",
             isOn ? "fas text-gold" : "far text-stone-300 hover:text-gold",
-          )}
-        />
+          )} aria-hidden />
       </button>
     );
   };
@@ -92,7 +91,7 @@ export function LibraryRecordTable({
         title="Cite"
         className="p-1.5 rounded-md text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
       >
-        <i className="fas fa-quote-right text-[11px]" />
+        <i className="fas fa-quote-right text-[11px]" aria-hidden />
       </button>
       <button
         type="button"
@@ -101,7 +100,7 @@ export function LibraryRecordTable({
         title="Remove from library"
         className="p-1.5 rounded-md text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
       >
-        <i className="fas fa-bookmark text-[11px]" />
+        <i className="fas fa-bookmark text-[11px]" aria-hidden />
       </button>
     </div>
   );

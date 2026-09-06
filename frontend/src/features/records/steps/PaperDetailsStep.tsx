@@ -139,7 +139,7 @@ export function PaperDetailsStep() {
           <label htmlFor="abstract" className="text-[13px] font-medium text-gray-700">
             Abstract <span className="text-red-500">*</span>
           </label>
-          <span className="text-[11px] text-gray-400">{abstract.length} / 5000</span>
+          <span className="text-[11px] text-gray-500">{abstract.length} / 5000</span>
         </div>
         <textarea
           id="abstract"
@@ -172,7 +172,7 @@ export function PaperDetailsStep() {
             {isProposal ? (
               <span className="text-red-500">*</span>
             ) : (
-              <span className="text-gray-400 font-normal text-[12px]">(optional for this type)</span>
+              <span className="text-gray-500 font-normal text-[12px]">(optional for this type)</span>
             )}
           </label>
           <select
@@ -188,7 +188,7 @@ export function PaperDetailsStep() {
             disabled={loadingData}
             aria-invalid={Boolean(errors.adviser)}
             className={`w-full border rounded-lg px-3 py-2 text-[13px] outline-none transition-colors
-              disabled:bg-gray-50 disabled:text-gray-400
+              disabled:bg-gray-50 disabled:text-gray-500
               ${errors.adviser ? "border-red-400 focus:border-red-500" : "border-gray-300 focus:border-brand"} focus:ring-1`}
           >
             <option value="">
@@ -204,7 +204,7 @@ export function PaperDetailsStep() {
             <p className="text-[12px] text-red-500 mt-1">{errors.adviser.message}</p>
           )}
           {isProposal && !errors.adviser && (
-            <p className="text-[11px] text-gray-400 mt-0.5">Required before this Proposal can be submitted.</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Required before this Proposal can be submitted.</p>
           )}
         </div>
 
@@ -218,7 +218,7 @@ export function PaperDetailsStep() {
             {...register("classification", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })}
             disabled={loadingData}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] outline-none
-              focus:border-brand focus:ring-1 disabled:bg-gray-50 disabled:text-gray-400"
+              focus:border-brand focus:ring-1 disabled:bg-gray-50 disabled:text-gray-500"
           >
             <option value="">{loadingData ? "Loading…" : "Select a field"}</option>
             {classifications.map((c) => (
@@ -237,7 +237,7 @@ export function PaperDetailsStep() {
             {...register("psced", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })}
             disabled={loadingData}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] outline-none
-              focus:border-brand focus:ring-1 disabled:bg-gray-50 disabled:text-gray-400"
+              focus:border-brand focus:ring-1 disabled:bg-gray-50 disabled:text-gray-500"
           >
             <option value="">{loadingData ? "Loading…" : "Select a classification"}</option>
             {psceds.map((p) => (
@@ -283,9 +283,9 @@ export function PaperDetailsStep() {
                   type="button"
                   onClick={() => removeAuthor(i)}
                   aria-label={`Remove ${a}`}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-500 hover:text-gray-600"
                 >
-                  <i className="fa fa-times text-[10px]" />
+                  <i className="fa fa-times text-[10px]" aria-hidden />
                 </button>
               </span>
             ))}
@@ -316,7 +316,7 @@ export function PaperDetailsStep() {
             This is a community extension project
           </label>
         </div>
-        <p className="text-[11px] text-gray-400 mt-2.5">
+        <p className="text-[11px] text-gray-500 mt-2.5">
           RDCO/KTTO set the specific IP classification (patent, copyright, etc.) after review.
         </p>
       </fieldset>
@@ -342,7 +342,7 @@ export function PaperDetailsStep() {
           <legend className="px-1 text-[13px] font-medium text-gray-700">
             Which offices should review this?
           </legend>
-          <p className="text-[11px] text-gray-400 mb-2.5">
+          <p className="text-[11px] text-gray-500 mb-2.5">
             Suggested from your answers above — uncheck anything that doesn't apply. RDCO
             confirms this once your disclosure reaches intake.
           </p>
@@ -368,7 +368,7 @@ export function PaperDetailsStep() {
               </span>
             </label>
           </div>
-          <p className="text-[11px] text-gray-400 mt-2.5">
+          <p className="text-[11px] text-gray-500 mt-2.5">
             Not sure? Leave everything unchecked — RDCO can still route it to the right office
             at intake.
           </p>

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import type { RecordListItem } from "@/types/records";
 import { formatDate } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function DeclinedRecordsPage() {
   const [records, setRecords] = useState<RecordListItem[]>([]);
@@ -25,7 +26,7 @@ export default function DeclinedRecordsPage() {
       />
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-[13px]">Loading...</div>
+          <Skeleton />
         ) : records.length === 0 ? (
           <EmptyState icon="fa-times-circle" title="No declined records." />
         ) : (

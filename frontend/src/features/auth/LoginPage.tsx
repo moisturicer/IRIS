@@ -204,7 +204,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="relative z-10 text-[11px] text-gray-400 mt-8 lg:mt-0 text-center lg:text-left">
+        <p className="relative z-10 text-[11px] text-gray-500 mt-8 lg:mt-0 text-center lg:text-left">
           © 2026 Cebu Institute of Technology - University
         </p>
       </div>

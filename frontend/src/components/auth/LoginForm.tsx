@@ -17,7 +17,7 @@ const validationSchema = Yup.object({
 });
 
 const inputBase =
-  "w-full rounded-lg px-4 py-3 text-[14px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-400 text-gray-900 border focus:bg-white";
+  "w-full rounded-lg px-4 py-3 text-[14px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-500 text-gray-900 border focus:bg-white";
 const inputOk = "border-transparent focus:border-brand";
 const inputErr = "border-brand bg-red-50/50 focus:border-brand";
 

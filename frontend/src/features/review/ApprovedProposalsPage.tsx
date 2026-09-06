@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { useAuth } from "@/hooks/useAuth";
 import type { RecordListItem } from "@/types/records";
 import { formatDate } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function ApprovedProposalsPage() {
   const { user } = useAuth();
@@ -51,7 +52,7 @@ export default function ApprovedProposalsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-[13px]">Loading...</div>
+          <Skeleton />
         ) : records.length === 0 ? (
           <EmptyState
             icon="fa-check-double"
@@ -96,7 +97,7 @@ export default function ApprovedProposalsPage() {
                           disabled={completing === r.id}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-[12px] font-semibold hover:bg-emerald-800 transition-colors disabled:opacity-60 whitespace-nowrap"
                         >
-                          <i className="fas fa-check-circle text-[11px]" />
+                          <i className="fas fa-check-circle text-[11px]" aria-hidden />
                           {completing === r.id ? "Marking..." : "Mark as Completed"}
                         </button>
                         {errors[r.id] && (

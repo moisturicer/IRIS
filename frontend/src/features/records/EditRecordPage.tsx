@@ -20,6 +20,7 @@ import { UploadsStep }       from "./steps/UploadsStep";
 import { DpaConsentGate, DpaConsentModal } from "@/components/compliance";
 import { recordFormSchema, type RecordFormValues } from "./recordFormSchema";
 import type { RecordFormData } from "@/types/records";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const STEPS = ["Title & Abstract", "Details", "Documents"];
 
@@ -80,7 +81,7 @@ export default function EditRecordPage() {
     }
   });
 
-  if (loading) return <div className="p-8 text-center text-gray-400 text-[13px]">Loading record...</div>;
+  if (loading) return <Skeleton label="Loading record…" />;
 
   return (
     <FormProvider {...methods}>
@@ -95,17 +96,17 @@ export default function EditRecordPage() {
                 type="button"
                 onClick={() => i < step && setStep(i)}
                 className={`flex items-center gap-2 text-[13px] font-medium
-                  ${i === step ? "text-[#6B0F12]" : i < step ? "text-green-600 cursor-pointer" : "text-gray-400"}`}
+                  ${i === step ? "text-[#6B0F12]" : i < step ? "text-green-600 cursor-pointer" : "text-gray-500"}`}
               >
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold
                   ${i === step ? "bg-[#6B0F12] text-white" : i < step ? "bg-green-600 text-white" : "bg-gray-200 text-gray-500"}`}
                 >
-                  {i < step ? <i className="fa fa-check text-[10px]" /> : i + 1}
+                  {i < step ? <i className="fa fa-check text-[10px]" aria-hidden /> : i + 1}
                 </span>
                 {label}
               </button>
               {i < STEPS.length - 1 && (
-                <span className="mx-3 text-gray-300 text-[11px]"><i className="fa fa-chevron-right" /></span>
+                <span className="mx-3 text-gray-300 text-[11px]"><i className="fa fa-chevron-right" aria-hidden /></span>
               )}
             </div>
           ))}

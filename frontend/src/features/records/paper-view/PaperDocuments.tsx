@@ -50,7 +50,7 @@ export function PaperDocuments({ recordId, files }: PaperDocumentsProps) {
             const inner = (
               <>
                 <span className="w-8 h-8 rounded-lg bg-brand-50 text-brand flex items-center justify-center shrink-0">
-                  <i className="fas fa-file-lines text-[12px]" />
+                  <i className="fas fa-file-lines text-[12px]" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12px] font-semibold text-stone-800 truncate">
@@ -61,12 +61,11 @@ export function PaperDocuments({ recordId, files }: PaperDocumentsProps) {
                   </span>
                 </span>
                 {file.url ? (
-                  <i className="fas fa-download text-[11px] text-stone-400 shrink-0" />
+                  <i className="fas fa-download text-[11px] text-stone-400 shrink-0" aria-hidden />
                 ) : (
                   <i
                     className="fas fa-lock text-[11px] text-stone-300 shrink-0"
-                    title="You do not have access to download this file"
-                  />
+                    title="You do not have access to download this file" aria-hidden />
                 )}
               </>
             );
@@ -98,7 +97,7 @@ export function PaperDocuments({ recordId, files }: PaperDocumentsProps) {
         className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:underline"
       >
         Manage documents
-        <i className="fas fa-arrow-right text-[9px]" />
+        <i className="fas fa-arrow-right text-[9px]" aria-hidden />
       </Link>
     </section>
   );

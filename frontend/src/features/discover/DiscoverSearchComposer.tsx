@@ -74,7 +74,7 @@ export function DiscoverSearchComposer({
             aria-label="Clear search"
             className="p-1 text-stone-300 hover:text-stone-500"
           >
-            <i className="fas fa-times-circle text-[13px]" />
+            <i className="fas fa-times-circle text-[13px]" aria-hidden />
           </button>
         )}
       </div>
@@ -87,7 +87,7 @@ export function DiscoverSearchComposer({
           title="Add a filter"
           className="w-7 h-7 shrink-0 rounded-full border border-stone-200 text-stone-500 flex items-center justify-center hover:border-brand-200 hover:text-brand transition-colors"
         >
-          <i className="fas fa-plus text-[11px]" />
+          <i className="fas fa-plus text-[11px]" aria-hidden />
         </button>
 
         <div className="relative" ref={menuRef}>
@@ -103,7 +103,7 @@ export function DiscoverSearchComposer({
             )}
           >
             <span>{mode === "smart" ? "Smart AI Search" : "Keyword Search"}</span>
-            <i className={cn("fas fa-chevron-down text-[8px] opacity-60 transition-transform", menuOpen && "rotate-180")} />
+            <i className={cn("fas fa-chevron-down text-[8px] opacity-60 transition-transform", menuOpen && "rotate-180")} aria-hidden />
           </button>
 
           {menuOpen && (
@@ -136,7 +136,7 @@ export function DiscoverSearchComposer({
             title={mode === "smart" ? "Ask IRIS" : "Switch to Smart AI Search to ask"}
             className="w-8 h-8 shrink-0 rounded-full bg-brand text-white flex items-center justify-center transition-colors hover:bg-brand-light disabled:opacity-30"
           >
-            <i className="fas fa-arrow-up text-[12px]" />
+            <i className="fas fa-arrow-up text-[12px]" aria-hidden />
           </button>
         </div>
       </div>
@@ -163,7 +163,7 @@ function ModeOption({
     >
       <span className="flex items-center justify-between gap-2">
         <span className="text-[12px] font-semibold text-stone-800">{title}</span>
-        {active && <i className="fas fa-check text-brand text-[11px]" />}
+        {active && <i className="fas fa-check text-brand text-[11px]" aria-hidden />}
       </span>
       <span className="block text-[11px] text-stone-500 mt-0.5">{detail}</span>
     </button>

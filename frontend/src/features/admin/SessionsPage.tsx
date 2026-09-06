@@ -53,7 +53,7 @@ export default function SessionsPage() {
           className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-gray-600
             bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
-          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} />
+          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </button>
       </div>
@@ -74,8 +74,8 @@ export default function SessionsPage() {
 
       {/* Empty state */}
       {!loading && !error && sessions.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-          <i className="fas fa-shield-alt text-4xl mb-3" />
+        <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+          <i className="fas fa-shield-alt text-4xl mb-3" aria-hidden />
           <p className="text-[13px] font-medium">No active sessions</p>
           <p className="text-[12px] mt-1">All users are currently logged out.</p>
         </div>
@@ -106,7 +106,7 @@ export default function SessionsPage() {
                 {sessions.map(s => (
                   <tr key={s.jti} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-800">
-                      {s.user_name || <span className="text-gray-400 italic">Unknown</span>}
+                      {s.user_name || <span className="text-gray-500 italic">Unknown</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-500">{s.user_email ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-500">
@@ -126,7 +126,7 @@ export default function SessionsPage() {
                         {revoking === s.jti ? (
                           <><Spinner size="sm" /> Revoking…</>
                         ) : (
-                          <><i className="fas fa-sign-out-alt" /> Revoke</>
+                          <><i className="fas fa-sign-out-alt" aria-hidden /> Revoke</>
                         )}
                       </button>
                     </td>

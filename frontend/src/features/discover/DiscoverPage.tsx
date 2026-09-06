@@ -234,11 +234,11 @@ export default function DiscoverPage() {
           className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-stone-200 flex items-center justify-center text-stone-600"
           aria-label="Toggle navigation"
         >
-          <i className="fas fa-bars text-sm" />
+          <i className="fas fa-bars text-sm" aria-hidden />
         </button>
 
         <span className="w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
-          <i className="fas fa-compass text-[12px]" />
+          <i className="fas fa-compass text-[12px]" aria-hidden />
         </span>
         <div className="min-w-0">
           <h1 className="text-[16px] font-bold text-stone-900 leading-tight truncate">
@@ -356,7 +356,7 @@ export default function DiscoverPage() {
                   disabled={loadingMore}
                   className="px-5 py-2.5 rounded-full border border-stone-200 bg-white text-stone-700 hover:border-brand hover:text-brand text-xs font-bold transition disabled:opacity-60 flex items-center gap-2"
                 >
-                  {loadingMore ? <Spinner size="sm" /> : <i className="fas fa-arrow-down text-[10px]" />}
+                  {loadingMore ? <Spinner size="sm" /> : <i className="fas fa-arrow-down text-[10px]" aria-hidden />}
                   <span>{loadingMore ? "Loading…" : `Load more (${totalCount - records.length} left)`}</span>
                 </button>
               </div>
@@ -395,7 +395,7 @@ function EmptyState({
           tone === "error" ? "bg-red-50 text-red-400" : "bg-stone-100 text-stone-400",
         )}
       >
-        <i className={cn("fas", icon)} />
+        <i className={cn("fas", icon)} aria-hidden />
       </div>
       <h3 className="text-[15px] font-bold text-stone-900">{title}</h3>
       <p className="text-[13px] text-stone-500 mt-1 max-w-sm">{body}</p>

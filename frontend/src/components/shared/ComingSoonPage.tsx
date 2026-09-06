@@ -21,7 +21,7 @@ export function ComingSoonPage({
       <PageHeader title={title} />
       <div className="mt-6 flex flex-col items-center text-center py-16 px-6 bg-white rounded-xl border border-gray-200 max-w-lg mx-auto">
         <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
-          <i className={`fas ${icon} text-2xl text-slate-300`} />
+          <i className={`fas ${icon} text-2xl text-slate-300`} aria-hidden />
         </div>
         <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[11px] font-bold rounded-full border border-amber-200 uppercase tracking-wider mb-4">
           Coming Soon

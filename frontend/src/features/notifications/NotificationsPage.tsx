@@ -11,6 +11,7 @@ import { EmptyState }   from "@/components/shared/EmptyState";
 import { Button }       from "@/components/ui/Button";
 import { formatDate }   from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function NotificationsPage() {
   const { markRead, markAllRead } = useNotificationsStore();
@@ -58,7 +59,7 @@ export default function NotificationsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-[13px]">Loading...</div>
+          <Skeleton />
         ) : notifications.length === 0 ? (
           <EmptyState icon="fa-bell-slash" title="No notifications yet." />
         ) : (
@@ -80,7 +81,7 @@ export default function NotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] text-gray-800">{n.message}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[12px] text-gray-400">{formatDate(n.created_at)}</span>
+                    <span className="text-[12px] text-gray-500">{formatDate(n.created_at)}</span>
                     {n.record != null && (
                       <Link
                         to={`/records/${n.record}`}
@@ -95,7 +96,7 @@ export default function NotificationsPage() {
                 {!n.is_read && (
                   <button
                     onClick={() => handleMarkRead(n.id)}
-                    className="shrink-0 text-[12px] text-gray-400 hover:text-gray-600"
+                    className="shrink-0 text-[12px] text-gray-500 hover:text-gray-600"
                   >
                     Dismiss
                   </button>
