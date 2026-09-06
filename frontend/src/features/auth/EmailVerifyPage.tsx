@@ -120,7 +120,7 @@ export default function EmailVerifyPage() {
           </blockquote>
         </div>
 
-        <p className="relative z-10 text-[11px] text-gray-400 mt-10 lg:mt-0">
+        <p className="relative z-10 text-[11px] text-gray-500 mt-10 lg:mt-0">
           © 2026 Cebu Institute of Technology - University
         </p>
       </div>
@@ -139,7 +139,7 @@ export default function EmailVerifyPage() {
           </p>
 
           {status === "loading" && (
-            <p className="text-[13px] text-gray-400">
+            <p className="text-[13px] text-gray-500">
               This usually takes only a moment…
             </p>
           )}

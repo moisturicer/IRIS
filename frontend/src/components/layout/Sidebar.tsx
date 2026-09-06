@@ -39,7 +39,7 @@ function NavSection({
           drawer is always full width, so it keeps its titles either way. */}
       <div
         className={cn(
-          "px-4 py-2 text-[10px] font-bold tracking-widest text-gray-400 uppercase",
+          "px-4 py-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase",
           collapsed ? "block md:hidden" : "block",
         )}
       >
@@ -62,7 +62,15 @@ function NavSection({
             )
           }
         >
-          <i className={cn("fas", item.icon, "w-5 text-center text-[16px] flex-shrink-0")} />
+          <i className={cn("fas", item.icon, "w-5 text-center text-[16px] flex-shrink-0")} aria-hidden />
+          {/* The visible label below is `md:hidden` while the rail is collapsed,
+              which leaves the link with no accessible name on tablet and up --
+              `title` is a tooltip, not a reliable name. This carries the name at
+              exactly those widths: `hidden` keeps it out of the mobile drawer
+              (where the real label is already showing, and announcing both would
+              double up), `md:inline` brings it back, and `sr-only` keeps it
+              visually absent. */}
+          {collapsed && <span className="sr-only hidden md:inline">{item.label}</span>}
           {/* Label + coming-soon badge stacked; hidden while collapsed */}
           <div
             className={cn(
@@ -202,7 +210,7 @@ export function Sidebar({ className }: SidebarProps) {
               title="Expand sidebar"
               className="absolute inset-0 w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-500 flex items-center justify-center opacity-0 transition-opacity hover:text-brand hover:border-brand-200 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
             >
-              <i className="fas fa-chevron-right text-[13px]" />
+              <i className="fas fa-chevron-right text-[13px]" aria-hidden />
             </button>
           )}
         </div>
@@ -235,7 +243,7 @@ export function Sidebar({ className }: SidebarProps) {
             title="Collapse sidebar"
             className="hidden md:flex w-8 h-8 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:text-brand hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
           >
-            <i className="fas fa-chevron-left text-[13px]" />
+            <i className="fas fa-chevron-left text-[13px]" aria-hidden />
           </button>
         )}
 
@@ -243,10 +251,10 @@ export function Sidebar({ className }: SidebarProps) {
         <button
           type="button"
           onClick={closeSidebar}
-          className="md:hidden p-1.5 text-gray-400 hover:text-brand rounded-md"
+          className="md:hidden p-1.5 text-gray-500 hover:text-brand rounded-md"
           aria-label="Close menu"
         >
-          <i className="fas fa-times text-[14px]" />
+          <i className="fas fa-times text-[14px]" aria-hidden />
         </button>
       </div>
 
@@ -296,11 +304,11 @@ export function Sidebar({ className }: SidebarProps) {
             aria-label="Sign out"
             title="Sign out"
             className={cn(
-              "p-1.5 rounded-md text-gray-400 hover:text-brand hover:bg-red-50 transition-colors flex-shrink-0",
+              "p-1.5 rounded-md text-gray-500 hover:text-brand hover:bg-red-50 transition-colors flex-shrink-0",
               collapsed ? "block md:hidden" : "block",
             )}
           >
-            <i className="fas fa-arrow-right-from-bracket text-[13px]" />
+            <i className="fas fa-arrow-right-from-bracket text-[13px]" aria-hidden />
           </button>
         </div>
 
@@ -311,9 +319,9 @@ export function Sidebar({ className }: SidebarProps) {
             onClick={handleSignOut}
             aria-label="Sign out"
             title="Sign out"
-            className="hidden md:flex w-full mt-2 py-1.5 rounded-md text-gray-400 hover:text-brand hover:bg-red-50 transition-colors items-center justify-center"
+            className="hidden md:flex w-full mt-2 py-1.5 rounded-md text-gray-500 hover:text-brand hover:bg-red-50 transition-colors items-center justify-center"
           >
-            <i className="fas fa-arrow-right-from-bracket text-[13px]" />
+            <i className="fas fa-arrow-right-from-bracket text-[13px]" aria-hidden />
           </button>
         )}
       </div>

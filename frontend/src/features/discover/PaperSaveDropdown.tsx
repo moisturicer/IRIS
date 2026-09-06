@@ -76,7 +76,7 @@ export function PaperSaveDropdown({ record }: PaperSaveDropdownProps) {
             : "border-slate-200 text-slate-400 hover:text-brand hover:border-brand-200",
         )}
       >
-        <i className={cn(isSaved ? "fas" : "far", "fa-bookmark text-[12px]")} />
+        <i className={cn(isSaved ? "fas" : "far", "fa-bookmark text-[12px]")} aria-hidden />
       </button>
 
       {open && (
@@ -108,11 +108,10 @@ export function PaperSaveDropdown({ record }: PaperSaveDropdownProps) {
                       className={cn(
                         "fa-folder text-[11px] shrink-0",
                         checked ? "fas text-brand" : "far text-slate-300",
-                      )}
-                    />
+                      )} aria-hidden />
                     <span className="truncate">{collection.name}</span>
                   </span>
-                  {checked && <i className="fas fa-check text-brand text-xs shrink-0" />}
+                  {checked && <i className="fas fa-check text-brand text-xs shrink-0" aria-hidden />}
                 </button>
               );
             })}
@@ -141,7 +140,7 @@ export function PaperSaveDropdown({ record }: PaperSaveDropdownProps) {
                 className="w-7 h-7 shrink-0 rounded-lg bg-brand text-white disabled:opacity-30 flex items-center justify-center transition"
                 aria-label="Create collection"
               >
-                <i className="fas fa-plus text-[10px]" />
+                <i className="fas fa-plus text-[10px]" aria-hidden />
               </button>
             </div>
             <p className="mt-2 mb-1 text-[10px] text-slate-400 leading-snug">

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { formatDate } from "@/lib/utils";
 import type { DownloadRequest } from "@/types/records";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function AccessRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
@@ -77,7 +78,7 @@ export default function AccessRequestsPage() {
       )}
 
       {loading ? (
-        <div className="text-[13px] text-gray-400 py-10 text-center">Loading…</div>
+        <Skeleton />
       ) : requests.length === 0 ? (
         <div className="text-[13px] text-gray-500 py-10 text-center bg-white rounded-xl border border-gray-200">
           No pending download requests.
@@ -100,7 +101,7 @@ export default function AccessRequestsPage() {
                   <td className="px-4 py-3 text-gray-600">
                     {req.requested_by_name ?? "—"}
                     {req.requested_by_email && (
-                      <span className="block text-[11px] text-gray-400">{req.requested_by_email}</span>
+                      <span className="block text-[11px] text-gray-500">{req.requested_by_email}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{formatDate(req.created_at)}</td>

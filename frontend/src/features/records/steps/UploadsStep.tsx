@@ -170,10 +170,10 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
           <div className="flex justify-center py-6"><Spinner /></div>
         ) : manuscript && !manuscript.error ? (
           <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg border border-stone-200">
-            <i className="fa fa-file-pdf text-stone-400" />
+            <i className="fa fa-file-pdf text-stone-400" aria-hidden />
             <span className="text-[13px] text-stone-700 flex-1 truncate">{manuscript.file.name}</span>
             <button type="button" onClick={removeManuscript} className="text-stone-400 hover:text-red-500 text-[12px]" aria-label="Remove manuscript">
-              <i className="fa fa-times" />
+              <i className="fa fa-times" aria-hidden />
             </button>
           </div>
         ) : (
@@ -196,7 +196,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
     <div className="flex flex-col gap-5">
       {!recordId && (
         <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-[13px] text-amber-700">
-          <i className="fa fa-info-circle mr-2" />
+          <i className="fa fa-info-circle mr-2" aria-hidden />
           {hideSlots
             ? "Your manuscript is uploaded once the record is saved."
             : "Files will be uploaded after the record is saved."}
@@ -242,7 +242,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                   </div>
                 ) : file && !file.error ? (
                   <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <i className="fa fa-file text-gray-400" />
+                    <i className="fa fa-file text-gray-500" aria-hidden />
                     <span className="text-[13px] text-gray-700 flex-1 truncate">{file.file.name}</span>
                     <button
                       type="button"
@@ -252,9 +252,9 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                         return next;
                       })}
                       aria-label={`Remove ${slot.name}`}
-                      className="text-gray-400 hover:text-red-500 text-[12px]"
+                      className="text-gray-500 hover:text-red-500 text-[12px]"
                     >
-                      <i className="fa fa-times" />
+                      <i className="fa fa-times" aria-hidden />
                     </button>
                   </div>
                 ) : (

@@ -64,7 +64,7 @@ const COLUMNS: ColumnDef<AuditEvent, unknown>[] = [
     accessorKey: "metadata",
     cell: ({ getValue }) => {
       const meta = getValue<Record<string, unknown>>();
-      if (!meta || Object.keys(meta).length === 0) return <span className="text-gray-400">-</span>;
+      if (!meta || Object.keys(meta).length === 0) return <span className="text-gray-500">-</span>;
       return (
         <span className="text-[12px] text-gray-500 font-mono truncate max-w-[180px] block">
           {JSON.stringify(meta)}
@@ -112,7 +112,7 @@ export default function AuditLogPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          leading={<i className="fa fa-search text-[13px]" />}
+          leading={<i className="fa fa-search text-[13px]" aria-hidden />}
           className="max-w-xs"
         />
         <select

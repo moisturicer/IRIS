@@ -76,7 +76,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
             onClick={handleCopy}
             className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-light text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0"
           >
-            <i className={cn("fas text-[10px]", copied ? "fa-check" : "fa-copy")} />
+            <i className={cn("fas text-[10px]", copied ? "fa-check" : "fa-copy")} aria-hidden />
             <span>{copied ? "Copied" : "Copy citation"}</span>
           </button>
         </div>

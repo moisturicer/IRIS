@@ -25,6 +25,13 @@ AUTHOR_ROLES   = {ROLE_STUDENT, ROLE_ADVISER}
 # reason to post calls, and excludes Adviser, who is exactly the "teacher
 # posting a departmental call" the feature was asked for. Students never post.
 OPPORTUNITY_POSTER_ROLES = {ROLE_RDCO, ROLE_KTTO, ROLE_ADVISER}
+# Who may correct or remove *someone else's* posting. Deliberately its own set
+# rather than a reference to ADMIN_ROLES: when IR-165 narrowed ADMIN_ROLES to
+# {RDCO}, borrowing it here would have silently stripped KTTO of the moderation
+# its own docstring promises -- a change to IR-121's behaviour with no ticket
+# behind it. An institutional noticeboard needs two people who can fix a
+# deadline when the poster is unavailable.
+OPPORTUNITY_MODERATOR_ROLES = {ROLE_RDCO, ROLE_KTTO}
 
 
 def get_role_name(user) -> str:
@@ -35,23 +42,22 @@ def get_role_name(user) -> str:
         return ""
 
 
-def is_django_admin_site_user(user) -> bool:
-    """
-    True for accounts that may open the Django admin site at /admin.
-
-    **Not an authorization signal for this API.** It was one, and that was the
-    defect IR-165 closed: `is_staff` answers "may you open the Django admin
-    site", never "may you approve an IP disclosure". Migration `accounts/0005`
-    set `is_staff = True` on every office role, so every permission class that
-    began `is_django_staff(user) or ...` short-circuited to True for RDCO, KTTO,
-    ITSO and IERC alike -- `ADMIN_ROLES` constrained nobody and the audit log,
-    intended for RDCO, admitted all four offices.
-
-    Nothing in `core.permissions` calls this. It exists so the distinction has a
-    name, and so `apps/tests/test_authorization_matrix.py` can assert that a
-    role-less superuser is refused by the API.
-    """
-    return bool(getattr(user, "is_superuser", False) or getattr(user, "is_staff", False))
+# --- a note on Django's is_staff, deliberately not a function -------------
+#
+# `is_staff` answers "may you open the Django admin site". It is not an
+# authorization signal for this API, and there is no helper here that treats it
+# as one -- not even an unused one, because an unused helper is an invitation.
+#
+# It was one. Every class below began `is_django_staff(user) or <role check>`,
+# and migration `accounts/0005` set `is_staff = True` on RDCO, KTTO, ITSO and
+# IERC so those accounts could reach /admin. The left operand was therefore
+# always true for all four offices and the role check never ran: `ADMIN_ROLES`
+# constrained nobody, the audit log admitted every office, and an ITSO officer
+# could record IERC's ethics clearance. Migration `accounts/0009` reverses the
+# seeding for role-holders; superusers keep the flag, and with it /admin.
+#
+# If you need "may this account open /admin", read `user.is_staff` at the point
+# of use and say why. Do not reintroduce a shared predicate (IR-165).
 
 
 class IsStudent(BasePermission):
@@ -91,19 +97,19 @@ class IsAuthor(BasePermission):
 
 
 class IsReviewer(BasePermission):
-    """Adviser, KTTO, RDCO, ITSO, or IERC — or any Django staff account."""
+    """Adviser, KTTO, RDCO, ITSO or IERC. Role only -- see the module note on is_staff."""
     def has_permission(self, request, view):
         return get_role_name(request.user) in REVIEWER_ROLES
 
 
 class IsStaff(BasePermission):
-    """KTTO, RDCO, ITSO, or IERC — or any Django staff account."""
+    """KTTO, RDCO, ITSO or IERC. Role only -- see the module note on is_staff."""
     def has_permission(self, request, view):
         return get_role_name(request.user) in STAFF_ROLES
 
 
 class IsAdmin(BasePermission):
-    """KTTO, RDCO, or any Django staff/superuser (account management, delete approvals)."""
+    """RDCO alone: account administration, the audit log, and the request queues."""
     def has_permission(self, request, view):
         return get_role_name(request.user) in ADMIN_ROLES
 
@@ -129,7 +135,7 @@ class IsOpportunityPoster(BasePermission):
         return get_role_name(request.user) in OPPORTUNITY_POSTER_ROLES
 
     def has_object_permission(self, request, view, obj):
-        if get_role_name(request.user) in ADMIN_ROLES:
+        if get_role_name(request.user) in OPPORTUNITY_MODERATOR_ROLES:
             return True
         return obj.posted_by_id == request.user.pk
 

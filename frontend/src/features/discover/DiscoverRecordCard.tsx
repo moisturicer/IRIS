@@ -28,7 +28,7 @@ interface DiscoverRecordCardProps {
 const BADGE_ICONS: Record<BadgeIcon, (p: { className?: string }) => JSX.Element> = {
   ip:         IpProtectedIcon,
   commercial: CommercialReadyIcon,
-  extension:  ({ className }) => <i className={cn("fas fa-people-group", className)} />,
+  extension:  ({ className }) => <i className={cn("fas fa-people-group", className)} aria-hidden />,
 };
 
 export function DiscoverRecordCard({
@@ -106,7 +106,7 @@ export function DiscoverRecordCard({
 
         {/* Byline */}
         <p className={cn("flex items-start gap-1.5 text-[12px] text-brand font-medium mb-2.5", !expanded && "truncate")}>
-          <i className="fas fa-user-group text-[10px] text-slate-300 mt-1 shrink-0" />
+          <i className="fas fa-user-group text-[10px] text-slate-300 mt-1 shrink-0" aria-hidden />
           <span className={cn(!expanded && "truncate")}>
             {highlightMatch(formatAuthorList(record.authors), searchHighlight)}
           </span>
@@ -130,7 +130,7 @@ export function DiscoverRecordCard({
             }}
             className="mt-2 text-[12px] font-bold text-brand hover:underline flex items-center gap-1.5"
           >
-            <i className={cn("fas text-[9px]", expanded ? "fa-chevron-up" : "fa-chevron-down")} />
+            <i className={cn("fas text-[9px]", expanded ? "fa-chevron-up" : "fa-chevron-down")} aria-hidden />
             <span>{expanded ? "Show less" : "Quick read"}</span>
           </button>
         )}
@@ -140,17 +140,17 @@ export function DiscoverRecordCard({
       <div className="px-5 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4 text-[12px] text-slate-400 font-medium">
           <span className="flex items-center gap-1.5" title="Times this record has been opened">
-            <i className="fas fa-eye text-[11px]" />
+            <i className="fas fa-eye text-[11px]" aria-hidden />
             <span>{record.access_count} views</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <i className="fas fa-file-lines text-[11px]" />
+            <i className="fas fa-file-lines text-[11px]" aria-hidden />
             <span>
               {record.file_count} file{record.file_count === 1 ? "" : "s"}
             </span>
           </span>
           <span className="hidden sm:flex items-center gap-1.5">
-            <i className="fas fa-calendar text-[11px]" />
+            <i className="fas fa-calendar text-[11px]" aria-hidden />
             <span>{recordYearLabel(record)}</span>
           </span>
         </div>
@@ -215,7 +215,7 @@ function IconButton({
           : "border-slate-200 text-slate-400 hover:text-brand hover:border-brand-200",
       )}
     >
-      <i className={cn(icon, "text-[12px]")} />
+      <i className={cn(icon, "text-[12px]")} aria-hidden />
     </button>
   );
 }

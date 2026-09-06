@@ -19,12 +19,24 @@ wherever one is not reachable, same as the rest of the ``EmbeddingSpace``
 suite. ``transaction=True`` is required here specifically: the migration
 executor manages its own transactions, which do not compose with
 pytest-django's default per-test wrapping transaction.
+
+Note on ``Record``: this test rewinds **only the ``ai`` app**, so the
+``records_record`` table stays at its latest schema throughout. The historical
+``records.Record`` class from ``project_state`` therefore does *not* match that
+table -- it predates ``records/0009``, whose ``requested_itso/ierc/ktto`` columns
+are ``NOT NULL`` with the database default dropped after backfill, so an INSERT
+through the historical class omits them and Postgres rejects the row. The
+current model is the one that matches the live table, so unrelated fixture data
+is created through it. This was latent from 2026-09-03 until IR-165 gave CI a
+database and the suite actually ran.
 """
 
 import pytest
 from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+
+from apps.records.models import Record
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -38,12 +50,11 @@ def test_migration_0003_seeds_one_active_space_and_leaves_existing_record_embedd
     executor.migrate(_MIGRATE_FROM)
 
     try:
-        OldRecord = old_apps.get_model("records", "Record")
         OldRecordEmbedding = old_apps.get_model("ai", "RecordEmbedding")
 
-        record = OldRecord.objects.create(title="A pre-existing thesis")
+        record = Record.objects.create(title="A pre-existing thesis")
         OldRecordEmbedding.objects.create(
-            record=record,
+            record_id=record.pk,
             embedding=[0.0] * 1536,
             model_name="text-embedding-3-small",
         )

@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { RecordDetail } from "@/types/records";
 import type { ReviewStatus } from "@/types/reviews";
 import { pipelineLabel } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface FormData {
   status:  ReviewStatus;
@@ -91,7 +92,7 @@ export default function EvaluationPage() {
     }
   };
 
-  if (!record) return <div className="p-8 text-gray-400 text-[13px]">Loading...</div>;
+  if (!record) return <Skeleton />;
 
   return (
     <div>
@@ -140,14 +141,14 @@ export default function EvaluationPage() {
               to={`/records/${id}/documents`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#6B0F12] text-white text-[12px] font-semibold hover:bg-[#7d1215] transition-colors"
             >
-              <i className="fas fa-folder-open text-[11px]" />
+              <i className="fas fa-folder-open text-[11px]" aria-hidden />
               View &amp; Attach Documents
             </Link>
             <Link
               to={`/records/${id}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              <i className="fas fa-external-link-alt text-[11px]" />
+              <i className="fas fa-external-link-alt text-[11px]" aria-hidden />
               Record Detail
             </Link>
           </div>
@@ -186,7 +187,7 @@ export default function EvaluationPage() {
           <div>
             <label className="block text-[12px] font-semibold text-gray-700 mb-1">
               Comment{" "}
-              <span className={commentRequired ? "text-red-500" : "text-gray-400"}>
+              <span className={commentRequired ? "text-red-500" : "text-gray-500"}>
                 {commentRequired ? "(required)" : "(optional)"}
               </span>
             </label>

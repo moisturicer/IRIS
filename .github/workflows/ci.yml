@@ -18,6 +18,27 @@ jobs:
       run:
         working-directory: backend
 
+    # Without this, `conftest.py::_needs_a_real_database` skips every
+    # TransactionTestCase subclass -- which APITestCase is -- and the whole
+    # authorization suite is collected, skipped, and reported GREEN without
+    # running. A gate that cannot fail is not a gate (IR-165).
+    # pgvector/pgvector rather than plain postgres: apps/ai migrations create a
+    # VectorField and need the extension available.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: iris
+          POSTGRES_USER: iris
+          POSTGRES_PASSWORD: iris
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -47,20 +68,40 @@ jobs:
         run: python manage.py check
 
       - name: Migration consistency
+        # The DB_* vars matter: without them this step reached for the settings
+        # default (`iris_user`) and logged `password authentication failed`,
+        # then passed anyway. `makemigrations --check` degrades to a
+        # model-vs-migration diff when it cannot connect, silently skipping the
+        # applied-history consistency check it is here to perform.
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
+          DB_NAME: iris
+          DB_USER: iris
+          DB_PASSWORD: iris
+          DB_HOST: localhost
+          DB_PORT: '5432'
         run: python manage.py makemigrations --check --dry-run
 
       - name: Tests
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
+          DB_NAME: iris
+          DB_USER: iris
+          DB_PASSWORD: iris
+          DB_HOST: localhost
+          DB_PORT: '5432'
         # pytest and pytest-django are pinned in requirements/development.txt
         # (IR-82), already installed above. The import smoke test in
         # apps/tests/test_boot.py is what actually fails when the URLconf
         # cannot import — this step just has to run it.
-        run: pytest
+        #
+        # `-p no:randomly --strict-markers` is inherited from pytest.ini.
+        # `-ra` surfaces the skip reasons, which is how you notice the database
+        # went away again: a skipped authorization suite must be visible in the
+        # log, not silently green.
+        run: pytest -ra
 
   frontend:
     name: Frontend

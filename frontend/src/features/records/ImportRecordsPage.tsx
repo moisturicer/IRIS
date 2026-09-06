@@ -35,7 +35,7 @@ export default function ImportRecordsPage() {
         {/* Instructions */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <p className="text-[13px] font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <i className="fas fa-info-circle text-[#6B0F12]" /> Instructions
+            <i className="fas fa-info-circle text-[#6B0F12]" aria-hidden /> Instructions
           </p>
           <ol className="list-decimal pl-4 space-y-2 text-[13px] text-gray-600">
             <li>Follow the data entry format -- <button onClick={handleDownloadTemplate} className="text-[#6B0F12] font-semibold hover:underline">download template here</button>.</li>
@@ -48,16 +48,16 @@ export default function ImportRecordsPage() {
         {/* Upload */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <p className="text-[13px] font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <i className="fas fa-file-upload text-[#6B0F12]" /> Upload Spreadsheet
+            <i className="fas fa-file-upload text-[#6B0F12]" aria-hidden /> Upload Spreadsheet
           </p>
           <label
             className="block border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-[#6B0F12] transition-colors"
           >
-            <i className="fas fa-cloud-upload-alt text-3xl text-gray-300 mb-2" />
+            <i className="fas fa-cloud-upload-alt text-3xl text-gray-300 mb-2" aria-hidden />
             <p className="text-[13px] font-semibold text-gray-600">
               {file ? file.name : "Click to choose a file"}
             </p>
-            <p className="text-[11px] text-gray-400 mt-1">Supports .xls and .xlsx</p>
+            <p className="text-[11px] text-gray-500 mt-1">Supports .xls and .xlsx</p>
             <input
               type="file"
               accept=".xls,.xlsx"
@@ -71,7 +71,7 @@ export default function ImportRecordsPage() {
             disabled={!file || loading}
             className="mt-4 w-full bg-[#6B0F12] text-white py-2.5 rounded-lg text-[13px] font-semibold hover:bg-[#7d1215] disabled:opacity-50"
           >
-            <i className="fas fa-cogs mr-1.5" />
+            <i className="fas fa-cogs mr-1.5" aria-hidden />
             {loading ? "Importing..." : "Generate"}
           </button>
         </div>
@@ -80,7 +80,7 @@ export default function ImportRecordsPage() {
       {/* Log */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <p className="text-[13px] font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <i className="fas fa-terminal text-[#6B0F12]" /> Import Log
+          <i className="fas fa-terminal text-[#6B0F12]" aria-hidden /> Import Log
         </p>
         <textarea
           readOnly

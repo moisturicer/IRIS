@@ -85,7 +85,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
             : "bg-white text-stone-700 border-stone-200 hover:border-stone-300",
         )}
       >
-        {icon && <i className={cn("fas", icon, "text-[10px] shrink-0")} />}
+        {icon && <i className={cn("fas", icon, "text-[10px] shrink-0")} aria-hidden />}
         <span className="truncate">{isActive && activeLabel ? activeLabel : label}</span>
 
         {props.multi && props.selected.length > 0 && (
@@ -93,7 +93,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
             {props.selected.length}
           </span>
         )}
-        <i className={cn("fas fa-chevron-down text-[8px] opacity-60 ml-0.5 shrink-0 transition-transform", open && "rotate-180")} />
+        <i className={cn("fas fa-chevron-down text-[8px] opacity-60 ml-0.5 shrink-0 transition-transform", open && "rotate-180")} aria-hidden />
       </button>
 
       {open && (
@@ -134,7 +134,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
                   className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] text-slate-700 hover:bg-slate-50 transition text-left"
                 >
                   <span className="truncate">{option.label}</span>
-                  {selected && <i className="fas fa-check text-brand text-[11px] shrink-0" />}
+                  {selected && <i className="fas fa-check text-brand text-[11px] shrink-0" aria-hidden />}
                 </button>
               );
             })

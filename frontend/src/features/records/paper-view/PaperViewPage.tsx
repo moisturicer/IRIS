@@ -375,7 +375,7 @@ export default function PaperViewPage() {
   if (!record) {
     return (
       <div className="max-w-md mx-auto text-center py-20">
-        <i className="fas fa-file-circle-question text-[28px] text-stone-300 mb-3" />
+        <i className="fas fa-file-circle-question text-[28px] text-stone-300 mb-3" aria-hidden />
         <p className="text-[15px] font-bold text-stone-800">Record not available</p>
         <p className="text-[13px] text-stone-500 mt-1">
           It may have been withdrawn, or you may not have access to it.
@@ -427,16 +427,16 @@ export default function PaperViewPage() {
             onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 text-[13px] font-semibold text-stone-600 hover:text-brand transition-colors"
           >
-            <i className="fas fa-arrow-left text-[11px]" />
+            <i className="fas fa-arrow-left text-[11px]" aria-hidden />
             Back
           </button>
           <div className="flex items-center gap-4 text-[12px] text-stone-400">
             <span className="flex items-center gap-1.5">
-              <i className="fas fa-calendar text-[11px]" />
+              <i className="fas fa-calendar text-[11px]" aria-hidden />
               Added {formatDate(record.created_at)}
             </span>
             <span className="flex items-center gap-1.5">
-              <i className="fas fa-eye text-[11px]" />
+              <i className="fas fa-eye text-[11px]" aria-hidden />
               {record.access_count} view{record.access_count === 1 ? "" : "s"}
             </span>
           </div>
@@ -452,7 +452,7 @@ export default function PaperViewPage() {
               <StatusBadge status={record.pipeline_status} />
               {record.is_ip && (
                 <span className="px-2 py-0.5 rounded-full bg-brand text-white text-[11px] font-semibold flex items-center gap-1.5">
-                  <i className="fas fa-shield-halved text-[9px]" />
+                  <i className="fas fa-shield-halved text-[9px]" aria-hidden />
                   Intellectual Property
                 </span>
               )}
@@ -509,7 +509,7 @@ export default function PaperViewPage() {
             {canBeResubmitted && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                 <p className="text-[13px] font-bold text-amber-900 flex items-center gap-2">
-                  <i className="fas fa-arrow-rotate-left text-[12px]" />
+                  <i className="fas fa-arrow-rotate-left text-[12px]" aria-hidden />
                   Revision requested
                 </p>
                 <p className="text-[13px] text-amber-800 leading-relaxed mt-1">
@@ -523,7 +523,7 @@ export default function PaperViewPage() {
                   disabled={resubmitting}
                   className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-[13px] font-bold hover:bg-amber-700 disabled:opacity-60 transition-colors"
                 >
-                  <i className="fas fa-paper-plane text-[11px]" />
+                  <i className="fas fa-paper-plane text-[11px]" aria-hidden />
                   {resubmitting ? "Resubmitting…" : "Resubmit for review"}
                 </button>
                 {resubmitError && <p className="text-[12px] text-red-700 mt-2">{resubmitError}</p>}
@@ -533,7 +533,7 @@ export default function PaperViewPage() {
             {record.pipeline_status === "rejected" && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
                 <p className="text-[13px] font-bold text-red-900 flex items-center gap-2">
-                  <i className="fas fa-circle-xmark text-[12px]" />
+                  <i className="fas fa-circle-xmark text-[12px]" aria-hidden />
                   This record was rejected
                 </p>
                 <p className="text-[13px] text-red-800 leading-relaxed mt-1">
@@ -567,7 +567,7 @@ export default function PaperViewPage() {
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-light transition-colors"
                 >
-                  <i className="fas fa-book-open text-[12px]" />
+                  <i className="fas fa-book-open text-[12px]" aria-hidden />
                   View Paper
                 </a>
               ) : (
@@ -575,7 +575,7 @@ export default function PaperViewPage() {
                   title="No paper file has been uploaded for this record yet."
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-100 text-stone-400 text-[13px] font-bold cursor-not-allowed"
                 >
-                  <i className="fas fa-book-open text-[12px]" />
+                  <i className="fas fa-book-open text-[12px]" aria-hidden />
                   View Paper
                 </span>
               )}
@@ -585,7 +585,7 @@ export default function PaperViewPage() {
                   to={`/review/${record.id}/evaluate`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 text-white text-[13px] font-bold hover:bg-emerald-800 transition-colors"
                 >
-                  <i className="fas fa-clipboard-check text-[12px]" />
+                  <i className="fas fa-clipboard-check text-[12px]" aria-hidden />
                   Review this record
                 </Link>
               )}
@@ -597,7 +597,7 @@ export default function PaperViewPage() {
                   disabled={completing}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 text-white text-[13px] font-bold hover:bg-emerald-800 disabled:opacity-60 transition-colors"
                 >
-                  <i className="fas fa-circle-check text-[12px]" />
+                  <i className="fas fa-circle-check text-[12px]" aria-hidden />
                   {completing ? "Marking…" : "Mark as completed"}
                 </button>
               )}
@@ -609,7 +609,7 @@ export default function PaperViewPage() {
                 onClick={() => setCiteOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-stone-200 bg-white text-stone-700 text-[13px] font-bold hover:border-brand/40 transition-colors"
               >
-                <i className="fas fa-quote-right text-[11px]" />
+                <i className="fas fa-quote-right text-[11px]" aria-hidden />
                 Cite
               </button>
             </div>

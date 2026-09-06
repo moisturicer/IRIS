@@ -23,14 +23,14 @@ export function ToastContainer() {
           className={`pointer-events-auto flex items-start gap-3 w-80 rounded-xl border px-4 py-3 shadow-lg
             text-[13px] text-gray-800 ${BG[t.type]}`}
         >
-          <i className={`fa ${ICON[t.type]} mt-0.5 shrink-0`} />
+          <i className={`fa ${ICON[t.type]} mt-0.5 shrink-0`} aria-hidden />
           <p className="flex-1">{t.message}</p>
           <button
             onClick={() => removeToast(t.id)}
-            className="text-gray-400 hover:text-gray-600 shrink-0"
+            className="text-gray-500 hover:text-gray-600 shrink-0"
             aria-label="Dismiss"
           >
-            <i className="fa fa-times text-[12px]" />
+            <i className="fa fa-times text-[12px]" aria-hidden />
           </button>
         </div>
       ))}

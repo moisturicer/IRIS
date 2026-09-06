@@ -34,7 +34,7 @@ const EMPTY: FormState = {
 };
 
 const INPUT_BASE =
-  "w-full rounded-lg px-4 py-3 text-[14px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-400 text-gray-900 border font-[inherit]";
+  "w-full rounded-lg px-4 py-3 text-[14px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-500 text-gray-900 border font-[inherit]";
 
 // ── Validation ─────────────────────────────────────────────────────────────
 function validateAll(f: FormState, role: Role): FieldErrors {

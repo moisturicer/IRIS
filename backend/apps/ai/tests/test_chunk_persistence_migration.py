@@ -15,12 +15,24 @@ wherever one is not reachable, same as the rest of this app's migration
 tests. ``transaction=True`` is required: the migration executor manages its
 own transactions, which do not compose with pytest-django's default
 per-test wrapping transaction.
+
+Note on ``Record``: this test rewinds **only the ``ai`` app**, so the
+``records_record`` table stays at its latest schema throughout. The historical
+``records.Record`` class from ``project_state`` therefore does *not* match that
+table -- it predates ``records/0009``, whose ``requested_itso/ierc/ktto`` columns
+are ``NOT NULL`` with the database default dropped after backfill, so an INSERT
+through the historical class omits them and Postgres rejects the row. The
+current model is the one that matches the live table, so unrelated fixture data
+is created through it. This was latent from 2026-09-03 until IR-165 gave CI a
+database and the suite actually ran.
 """
 
 import pytest
 from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+
+from apps.records.models import Record
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -34,13 +46,12 @@ def test_migration_0004_replaces_the_placeholder_without_disturbing_other_data()
     executor.migrate(_MIGRATE_FROM)
 
     try:
-        OldRecord = old_apps.get_model("records", "Record")
         OldRecordEmbedding = old_apps.get_model("ai", "RecordEmbedding")
         OldDocumentChunk = old_apps.get_model("ai", "DocumentChunk")
 
-        record = OldRecord.objects.create(title="Pre-existing thesis")
+        record = Record.objects.create(title="Pre-existing thesis")
         OldRecordEmbedding.objects.create(
-            record=record, embedding=[0.0] * 1536, model_name="text-embedding-3-small"
+            record_id=record.pk, embedding=[0.0] * 1536, model_name="text-embedding-3-small"
         )
         # The placeholder has no fields beyond its id — this is the only
         # thing a pre-migration deployment could possibly have put in it.

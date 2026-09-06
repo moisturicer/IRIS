@@ -45,10 +45,10 @@ export function DpaConsentModal({ open, onClose }: DpaConsentModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 shrink-0"
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-600 shrink-0"
               aria-label="Close"
             >
-              <i className="fa fa-times text-[14px]" />
+              <i className="fa fa-times text-[14px]" aria-hidden />
             </button>
           </div>
           <button
@@ -58,7 +58,7 @@ export function DpaConsentModal({ open, onClose }: DpaConsentModalProps) {
             className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200
               text-[12px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
-            <i className="fas fa-copy text-[11px]" />
+            <i className="fas fa-copy text-[11px]" aria-hidden />
             {copying ? "Copying…" : "Copy content"}
           </button>
         </div>
