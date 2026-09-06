@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
@@ -255,16 +255,18 @@ class UnlockUserView(APIView):
 
 class RoleRequestListView(generics.ListAPIView):
     """
-    Student and Adviser role requests are reviewed by Django Admin only (is_staff=True).
+    Student and Adviser role requests are reviewed by RDCO. This said "Django
+    Admin only (is_staff=True)", which under the accounts/0005 seeding meant all
+    four offices -- the comment described an intent the code did not have (IR-165).
     Staff accounts (RDCO, KTTO, ITSO, IERC) are managed directly by Admin via the admin panel.
     """
     serializer_class   = RoleRequestSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsAdmin]
     queryset           = RoleRequest.objects.filter(status="pending").select_related("user", "requested_role")
 
 
 class RoleRequestDetailView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def patch(self, request, pk):
         role_request = RoleRequest.objects.get(pk=pk)

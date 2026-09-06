@@ -41,8 +41,9 @@ Governed by [ADR-009](../adr/009-authorization-model.md). **This is the weakest 
 |---|---|
 | **Record visibility** | `RecordViewSet.get_queryset` filters **only on `list`**. `retrieve` returns any record to any authenticated user, including unpublished drafts and their review comments |
 | **Document endpoints** | Six `documents/` endpoints have **no object-level check** — any user can upload into any record |
-| **`is_staff` bypass** | `is_django_staff()` returns true for `is_staff` or `is_superuser`. Migration `accounts/0005` sets `is_staff=True` for RDCO, KTTO, ITSO and IERC — so `IsAdmin`'s `ADMIN_ROLES` **constrains nobody**, and `_can_review` short-circuits |
-| **Audit access** | Backend uses `IsAdminUser`, which under that seeding admits **all four offices**. The frontend constant `AUDIT_LOG_ROLES = [RDCO]` is correct; the backend is not |
+| ~~**`is_staff` bypass**~~ | **Closed (IR-165).** Every `is_django_staff(user) or <role check>` is gone; authorization reads the application role only. Migration `accounts/0009` reverses `0005`'s seeding for role-holders, leaving superusers their Django admin access. `ADMIN_ROLES` narrowed to `{RDCO}` — KTTO is a technology-transfer office and has no reason to administer accounts. `_can_review` and `_can_submit_clearance` no longer short-circuit: an ITSO officer could previously sign IERC's ethics clearance, which is exactly the office separation the thesis rests on |
+| ~~**Audit access**~~ | **Closed (IR-165).** `apps/audit/views.py` used DRF's `IsAdminUser`, which reads `is_staff`; it now uses `IsAdmin`, and with `ADMIN_ROLES = {RDCO}` the log is RDCO-only as SRS FR-M6-06 requires. The frontend constant was already correct |
+| **Record authoring** | ~~`RecordViewSet` had **no role gate on creation**~~ — **closed (IR-165).** Now `IsAuthor` (Student or Adviser), per SRS Use Cases M2-2.1/M2-2.2 |
 | **Storage app** | Six further endpoints with no authorization |
 
 **Twelve endpoints in total have no object-level check.**
@@ -152,12 +153,12 @@ Two consequences: the audit log cannot answer any question about the workflow, a
 | 2 | Any authenticated user can read any record via `retrieve` | **Critical** | Open | IR-60 |
 | 3 | Six `documents/` endpoints without ownership checks | **Critical** | Open | IR-60 |
 | 4 | Six `storage` endpoints without authorization | **High** | Open — closed by deletion | IR-62 |
-| 5 | `is_staff` seeding voids role-based restriction | **High** | Open | Epic C |
+| 5 | ~~`is_staff` seeding voids role-based restriction~~ | **High** | **Closed** — bypass removed, `accounts/0009` reverses the seeding, verified by `apps/tests/test_authorization_matrix.py` | IR-165 |
 | 6 | Hardcoded credentials, permissive CORS, unset `ALLOWED_HOSTS` | **High** | Open | IR-61 |
-| 7 | Audit readable by all four offices, not only RDCO | **Medium** | Open | Epic C |
+| 7 | ~~Audit readable by all four offices, not only RDCO~~ | **Medium** | **Closed** — `IsAdmin` with `ADMIN_ROLES = {RDCO}`, asserted per-role | IR-165 |
 | 8 | No session inactivity expiry (NFR-S2) | **Medium** | Open | Epic C |
 | 9 | Audit log not immutable (NFR-S5) | **Medium** | Open | Epic C |
-| 10 | No automated tests — no regression detection on any control | **High** | Open | Epic C |
+| 10 | No automated tests — no regression detection on any control | **High** | **Partially closed** — a pytest harness exists and `apps/tests/test_authorization_matrix.py` now regression-tests role × action authorization in both directions. Other controls remain uncovered | IR-163, IR-165 |
 | 11 | External AI transmission permission unconfirmed | **Medium** | **Decision required** | — |
 | 12 | No backups, no rehearsed restore before the pilot | **High** | Open | Epic D |
 

@@ -11,7 +11,15 @@ ROLE_IERC    = "IERC"
 # Convenience sets
 REVIEWER_ROLES = {ROLE_ADVISER, ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
 STAFF_ROLES    = {ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
-ADMIN_ROLES    = {ROLE_KTTO, ROLE_RDCO}
+ADMIN_ROLES    = {ROLE_RDCO}
+# Who may author a disclosure. SRS Use Cases M2-2.1 (Create IP Disclosure Draft)
+# and M2-2.2 (Submit Record for Review) both name the actor "Record Owner
+# (Student or Adviser)". Deliberately excludes the clearing offices -- ITSO,
+# IERC and KTTO must not author records they may later clear -- and RDCO, which
+# performs both intake and final review, so authoring would mean reviewing its
+# own record at two of the three gates. RDCO files on behalf of others through
+# the bulk import path instead.
+AUTHOR_ROLES   = {ROLE_STUDENT, ROLE_ADVISER}
 # Who may publish a Calls & Conferences opportunity (IR-121). Deliberately not
 # STAFF_ROLES: that set includes ITSO/IERC, who review clearances and have no
 # reason to post calls, and excludes Adviser, who is exactly the "teacher
@@ -27,8 +35,22 @@ def get_role_name(user) -> str:
         return ""
 
 
-def is_django_staff(user) -> bool:
-    """True for Django superusers and staff accounts (no role required)."""
+def is_django_admin_site_user(user) -> bool:
+    """
+    True for accounts that may open the Django admin site at /admin.
+
+    **Not an authorization signal for this API.** It was one, and that was the
+    defect IR-165 closed: `is_staff` answers "may you open the Django admin
+    site", never "may you approve an IP disclosure". Migration `accounts/0005`
+    set `is_staff = True` on every office role, so every permission class that
+    began `is_django_staff(user) or ...` short-circuited to True for RDCO, KTTO,
+    ITSO and IERC alike -- `ADMIN_ROLES` constrained nobody and the audit log,
+    intended for RDCO, admitted all four offices.
+
+    Nothing in `core.permissions` calls this. It exists so the distinction has a
+    name, and so `apps/tests/test_authorization_matrix.py` can assert that a
+    role-less superuser is refused by the API.
+    """
     return bool(getattr(user, "is_superuser", False) or getattr(user, "is_staff", False))
 
 
@@ -44,40 +66,46 @@ class IsAdviser(BasePermission):
 
 class IsKTTO(BasePermission):
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_KTTO
+        return get_role_name(request.user) == ROLE_KTTO
 
 
 class IsRDCO(BasePermission):
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_RDCO
+        return get_role_name(request.user) == ROLE_RDCO
 
 
 class IsITSO(BasePermission):
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_ITSO
+        return get_role_name(request.user) == ROLE_ITSO
 
 
 class IsIERC(BasePermission):
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) == ROLE_IERC
+        return get_role_name(request.user) == ROLE_IERC
+
+
+class IsAuthor(BasePermission):
+    """Student or Adviser -- the roles the SRS names as a Record Owner."""
+    def has_permission(self, request, view):
+        return get_role_name(request.user) in AUTHOR_ROLES
 
 
 class IsReviewer(BasePermission):
     """Adviser, KTTO, RDCO, ITSO, or IERC — or any Django staff account."""
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) in REVIEWER_ROLES
+        return get_role_name(request.user) in REVIEWER_ROLES
 
 
 class IsStaff(BasePermission):
     """KTTO, RDCO, ITSO, or IERC — or any Django staff account."""
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) in STAFF_ROLES
+        return get_role_name(request.user) in STAFF_ROLES
 
 
 class IsAdmin(BasePermission):
     """KTTO, RDCO, or any Django staff/superuser (account management, delete approvals)."""
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) in ADMIN_ROLES
+        return get_role_name(request.user) in ADMIN_ROLES
 
 
 class IsOpportunityPoster(BasePermission):
@@ -98,10 +126,10 @@ class IsOpportunityPoster(BasePermission):
     unavailable. Narrow that to poster-only if the team prefers.
     """
     def has_permission(self, request, view):
-        return is_django_staff(request.user) or get_role_name(request.user) in OPPORTUNITY_POSTER_ROLES
+        return get_role_name(request.user) in OPPORTUNITY_POSTER_ROLES
 
     def has_object_permission(self, request, view, obj):
-        if is_django_staff(request.user) or get_role_name(request.user) in ADMIN_ROLES:
+        if get_role_name(request.user) in ADMIN_ROLES:
             return True
         return obj.posted_by_id == request.user.pk
 
@@ -112,6 +140,6 @@ class IsOwnerOrStaff(BasePermission):
     The view must attach `obj.owners` as a queryset or list of users.
     """
     def has_object_permission(self, request, view, obj):
-        if is_django_staff(request.user) or get_role_name(request.user) in STAFF_ROLES:
+        if get_role_name(request.user) in STAFF_ROLES:
             return True
         return obj.owners.filter(user=request.user).exists()

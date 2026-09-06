@@ -13,7 +13,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
-from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO
+from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO, IsAdmin, IsAuthor
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
 from .models import Record, DownloadRequest, DeleteRequest
@@ -80,6 +80,12 @@ class RecordViewSet(viewsets.ModelViewSet):
         # any authenticated user (not just the owner or staff) could submit
         # another user's draft. Found while wiring the Submit Disclosure wizard
         # (IR-88); see apps/records/tests.py::SubmitOwnershipTests.
+        # Creation is role-gated: the SRS names the actor of "Create IP
+        # Disclosure Draft" as "Record Owner (Student or Adviser)". There was no
+        # gate at all here -- any authenticated user, including the offices that
+        # later clear the record, could author one (IR-165).
+        if self.action == "create":
+            return [IsAuthenticated(), IsAuthor()]
         if self.action in ("update", "partial_update", "destroy", "submit"):
             return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "complete":
@@ -548,9 +554,12 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_permissions(self):
+        # Anyone may *request* a download; only RDCO acts on the queue. This was
+        # IsStaff, which is all four offices -- so ITSO or IERC could approve
+        # release of a document from a record routed to neither of them (IR-165).
         if self.action == "create":
             return [IsAuthenticated()]
-        return [IsAuthenticated(), IsStaff()]
+        return [IsAuthenticated(), IsAdmin()]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -684,7 +693,10 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
-            return [IsAuthenticated(), IsStaff()]
+            # The Delete Requests queue is RDCO's, matching approve/decline
+            # below. IsStaff would have shown the queue to all four offices
+            # while only RDCO could act on it (IR-165).
+            return [IsAuthenticated(), IsAdmin()]
         if self.action in ("approve", "decline"):
             # Must be explicit here. These two are wired manually in urls.py as
             # as_view({"post": "approve"}) rather than through the router, and a
