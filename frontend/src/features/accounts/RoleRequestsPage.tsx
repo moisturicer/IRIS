@@ -10,6 +10,7 @@ import { Badge }         from "@/components/ui/Badge";
 import { Button }        from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { RoleRequest } from "@/types/auth";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function RoleRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
@@ -56,12 +57,12 @@ export default function RoleRequestsPage() {
       />
 
       {loading ? (
-        <div className="text-[13px] text-gray-400 py-10 text-center">Loading…</div>
+        <Skeleton />
       ) : requests.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
-          <i className="fas fa-check-circle text-[32px] text-green-400 mb-3 block" />
+          <i className="fas fa-check-circle text-[32px] text-green-400 mb-3 block" aria-hidden />
           <p className="text-[14px] font-medium text-gray-700">All caught up!</p>
-          <p className="text-[12px] text-gray-400 mt-1">No pending role requests.</p>
+          <p className="text-[12px] text-gray-500 mt-1">No pending role requests.</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

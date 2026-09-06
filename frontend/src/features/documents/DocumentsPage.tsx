@@ -13,6 +13,7 @@ import { useUIStore }   from "@/store/ui.store";
 import { formatDate }   from "@/lib/utils";
 import type { RecordUpload, UploadSlot, RecordFile } from "@/types/documents";
 import type { RecordDetail } from "@/types/records";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 // ---------------------------------------------------------------------------
 // PDF viewer modal
@@ -36,17 +37,17 @@ function PdfViewer({ blobUrl, filename, onClose }: PdfViewerProps) {
           <a
             href={blobUrl}
             download={filename}
-            className="text-gray-400 hover:text-white text-[12px] flex items-center gap-1.5"
+            className="text-gray-500 hover:text-white text-[12px] flex items-center gap-1.5"
           >
-            <i className="fas fa-download" /> Download
+            <i className="fas fa-download" aria-hidden /> Download
           </a>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-[18px] leading-none"
+            className="text-gray-500 hover:text-white text-[18px] leading-none"
             aria-label="Close viewer"
           >
-            <i className="fas fa-times" />
+            <i className="fas fa-times" aria-hidden />
           </button>
         </div>
       </div>
@@ -130,9 +131,9 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-[18px] leading-none ml-2 mt-0.5"
+            className="text-gray-500 hover:text-gray-600 text-[18px] leading-none ml-2 mt-0.5"
           >
-            <i className="fas fa-times" />
+            <i className="fas fa-times" aria-hidden />
           </button>
         </div>
 
@@ -170,7 +171,7 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
         {step === "enter" && (
           <div className="space-y-4">
             <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-[13px] text-green-700">
-              <i className="fas fa-check-circle mr-1.5" />
+              <i className="fas fa-check-circle mr-1.5" aria-hidden />
               PIN sent to <strong>{userEmail}</strong>. Check your inbox.
             </div>
             <div>
@@ -216,7 +217,7 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
           <div className="space-y-4 text-center">
             <div className="flex justify-center">
               <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
-                <i className="fas fa-check-circle text-green-500 text-2xl" />
+                <i className="fas fa-check-circle text-green-500 text-2xl" aria-hidden />
               </div>
             </div>
             <div>
@@ -465,7 +466,7 @@ export default function DocumentsPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-400 text-[13px]">Loading...</div>;
+  if (loading) return <Skeleton />;
 
   return (
     <div>
@@ -477,7 +478,7 @@ export default function DocumentsPage() {
             to={`/records/${recordId}`}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            <i className="fas fa-arrow-left text-[11px]" />
+            <i className="fas fa-arrow-left text-[11px]" aria-hidden />
             Back to Record
           </Link>
         }
@@ -488,7 +489,7 @@ export default function DocumentsPage() {
         <div className="mb-4 px-5 py-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-4">
           <div>
             <p className="text-[13px] font-semibold text-blue-800">
-              <i className="fas fa-lock mr-1.5" />
+              <i className="fas fa-lock mr-1.5" aria-hidden />
               Verified access
             </p>
             <p className="text-[12px] text-blue-600 mt-0.5">
@@ -573,7 +574,7 @@ export default function DocumentsPage() {
                                   className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                                   title="View in browser"
                                 >
-                                  {busyUploadId === upload.id ? <Spinner size="sm" /> : <i className="fas fa-eye" />}
+                                  {busyUploadId === upload.id ? <Spinner size="sm" /> : <i className="fas fa-eye" aria-hidden />}
                                   View
                                 </button>
                                 <button
@@ -583,7 +584,7 @@ export default function DocumentsPage() {
                                   className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                                   title="Download file"
                                 >
-                                  {busyUploadId === upload.id ? <Spinner size="sm" /> : <i className="fas fa-download" />}
+                                  {busyUploadId === upload.id ? <Spinner size="sm" /> : <i className="fas fa-download" aria-hidden />}
                                   Download
                                 </button>
                                 {canUpload && (
@@ -591,12 +592,12 @@ export default function DocumentsPage() {
                                     type="button"
                                     disabled={deletingUpload === upload.id}
                                     onClick={() => handleDeleteUpload(upload.id)}
-                                    className="text-gray-400 hover:text-red-500 text-[12px] disabled:opacity-40 transition-colors"
+                                    className="text-gray-500 hover:text-red-500 text-[12px] disabled:opacity-40 transition-colors"
                                     title="Remove this version"
                                   >
                                     {deletingUpload === upload.id
                                       ? <Spinner size="sm" />
-                                      : <i className="fas fa-trash-alt" />
+                                      : <i className="fas fa-trash-alt" aria-hidden />
                                     }
                                   </button>
                                 )}
@@ -609,7 +610,7 @@ export default function DocumentsPage() {
                   </div>
                 ) : (
                   !canUpload && (
-                    <p className="text-[13px] text-gray-400 text-center py-4">
+                    <p className="text-[13px] text-gray-500 text-center py-4">
                       No files uploaded yet.
                     </p>
                   )
@@ -627,7 +628,7 @@ export default function DocumentsPage() {
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <p className="text-[14px] font-semibold text-gray-900">
-              <i className="fas fa-paperclip mr-1.5 text-gray-400" />
+              <i className="fas fa-paperclip mr-1.5 text-gray-500" aria-hidden />
               Supplementary Attachments
             </p>
             <p className="text-[12px] text-gray-500 mt-0.5">
@@ -652,7 +653,7 @@ export default function DocumentsPage() {
               >
                 {miscUploading
                   ? <><Spinner size="sm" /> Uploading…</>
-                  : <><i className="fas fa-plus" /> Attach File</>
+                  : <><i className="fas fa-plus" aria-hidden /> Attach File</>
                 }
               </button>
             </div>
@@ -661,7 +662,7 @@ export default function DocumentsPage() {
 
         <div className="p-5">
           {miscFiles.length === 0 ? (
-            <p className="text-[13px] text-gray-400 text-center py-4">
+            <p className="text-[13px] text-gray-500 text-center py-4">
               {isStaff
                 ? "No supplementary files yet. Use the button above to attach one."
                 : "No supplementary attachments have been added."}
@@ -685,7 +686,7 @@ export default function DocumentsPage() {
                     <tr key={f.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-2 pr-3">
                         <div className="flex items-center gap-2">
-                          <i className="fas fa-file text-gray-400 text-[12px]" />
+                          <i className="fas fa-file text-gray-500 text-[12px]" aria-hidden />
                           <span className="truncate max-w-[240px] text-[13px] text-gray-700">{f.filename}</span>
                         </div>
                       </td>
@@ -705,7 +706,7 @@ export default function DocumentsPage() {
                               className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                               title="View in browser"
                             >
-                              {busy ? <Spinner size="sm" /> : <i className="fas fa-eye" />}
+                              {busy ? <Spinner size="sm" /> : <i className="fas fa-eye" aria-hidden />}
                               View
                             </button>
                           )}
@@ -716,7 +717,7 @@ export default function DocumentsPage() {
                             className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                             title="Download file"
                           >
-                            {busy ? <Spinner size="sm" /> : <i className="fas fa-download" />}
+                            {busy ? <Spinner size="sm" /> : <i className="fas fa-download" aria-hidden />}
                             Download
                           </button>
                           {canDelete && (
@@ -724,12 +725,12 @@ export default function DocumentsPage() {
                               type="button"
                               disabled={deletingFile === f.id}
                               onClick={() => handleDeleteFile(f)}
-                              className="text-gray-400 hover:text-red-500 text-[12px] disabled:opacity-40 transition-colors"
+                              className="text-gray-500 hover:text-red-500 text-[12px] disabled:opacity-40 transition-colors"
                               title="Remove attachment"
                             >
                               {deletingFile === f.id
                                 ? <Spinner size="sm" />
-                                : <i className="fas fa-trash-alt" />
+                                : <i className="fas fa-trash-alt" aria-hidden />
                               }
                             </button>
                           )}
@@ -749,7 +750,7 @@ export default function DocumentsPage() {
         <div className="mt-6 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-4">
           <div>
             <p className="text-[13px] font-semibold text-amber-800">
-              <i className="fas fa-redo mr-1.5" />
+              <i className="fas fa-redo mr-1.5" aria-hidden />
               Ready to resubmit?
             </p>
             <p className="text-[12px] text-amber-700 mt-0.5">
@@ -765,7 +766,7 @@ export default function DocumentsPage() {
             disabled={resubmitting}
             className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-[12px] font-semibold hover:bg-amber-700 transition-colors disabled:opacity-60"
           >
-            <i className="fas fa-redo text-[11px]" />
+            <i className="fas fa-redo text-[11px]" aria-hidden />
             {resubmitting ? "Resubmitting..." : "Resubmit for Review"}
           </button>
         </div>

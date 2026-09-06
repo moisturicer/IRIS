@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import type { RecordListItem } from "@/types/records";
 import { formatDate } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function ApprovedRecordsPage() {
   const [records, setRecords] = useState<RecordListItem[]>([]);
@@ -22,7 +23,7 @@ export default function ApprovedRecordsPage() {
     <div>
       <PageHeader title="Approved Records" description="Records you have approved." />
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {loading ? <div className="p-8 text-center text-gray-400 text-[13px]">Loading...</div>
+        {loading ? <Skeleton />
           : records.length === 0 ? <EmptyState icon="fa-check-circle" title="No approved records yet." />
           : (
             <table className="w-full text-[13px]">
