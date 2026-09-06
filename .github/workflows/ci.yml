@@ -68,9 +68,19 @@ jobs:
         run: python manage.py check
 
       - name: Migration consistency
+        # The DB_* vars matter: without them this step reached for the settings
+        # default (`iris_user`) and logged `password authentication failed`,
+        # then passed anyway. `makemigrations --check` degrades to a
+        # model-vs-migration diff when it cannot connect, silently skipping the
+        # applied-history consistency check it is here to perform.
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
+          DB_NAME: iris
+          DB_USER: iris
+          DB_PASSWORD: iris
+          DB_HOST: localhost
+          DB_PORT: '5432'
         run: python manage.py makemigrations --check --dry-run
 
       - name: Tests
