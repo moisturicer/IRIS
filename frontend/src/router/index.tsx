@@ -1,11 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import {
-  ROLES,
-  ALL_ROLES,
-  REVIEWER_ROLES,
-  REQUEST_QUEUE_ROLES,
-} from "@/lib/constants";
+import { rolesFor } from "@/lib/access";
 
 // Auth pages
 import LoginPage         from "@/features/auth/LoginPage";
@@ -32,12 +27,10 @@ import EvaluationPage       from "@/features/review/EvaluationPage";
 import DocumentsPage        from "@/features/documents/DocumentsPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
-import UserListPage         from "@/features/accounts/UserListPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
 import RAGChatPage          from "@/features/ai/RAGChatPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
 import HelpPage             from "@/features/help/HelpPage";
-import SessionsPage          from "@/features/admin/SessionsPage";
 import DownloadRequestsPage  from "@/features/admin/DownloadRequestsPage";
 import DeleteRequestsPage    from "@/features/admin/DeleteRequestsPage";
 import ApprovedProposalsPage from "@/features/review/ApprovedProposalsPage";
@@ -49,51 +42,57 @@ export const router = createBrowserRouter([
   { path: "/download", element: <DownloadTokenPage /> },
 
   {
-    element: <ProtectedRoute allowedRoles={ALL_ROLES} />,
+    // Every gate below comes from `lib/access.ts`, which the sidebar reads too.
+    // Client-side gating is UX only -- the Django API is the boundary. See
+    // access.ts and ProtectedRoute for why that distinction matters.
+    element: <ProtectedRoute allowedRoles={rolesFor("discover")} />,
     children: [
       {
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage />, handle: { crumb: "Discover" } },
-          { path: "records/:id",          element: <PaperViewPage />,                  handle: { crumb: "Paper" } },
-          { path: "records/add",          element: <AddRecordPage />,                  handle: { crumb: "Add Record" } },
-          { path: "records/mine",         element: <MyLibraryPage />,                  handle: { crumb: "My Library" } },
-          { path: "workspace",            element: <MyWorkspacePage />,                 handle: { crumb: "My Workspace" } },
-          { path: "opportunities",        element: <CallsAndConferencesPage />,         handle: { crumb: "Calls & Conferences" } },
-          { path: "records/:id/edit",     element: <EditRecordPage />,                 handle: { crumb: "Edit Record" } },
-          { path: "records/:id/documents",element: <DocumentsPage />,                  handle: { crumb: "Documents" } },
-          { path: "notifications",        element: <NotificationsPage />,              handle: { crumb: "Notifications" } },
-          { path: "ai",                   element: <RAGChatPage />,                    handle: { crumb: "Ask IRIS" } },
-          { path: "help",                 element: <HelpPage />,                       handle: { crumb: "Help" } },
-          { path: "settings",             element: <SettingsPage />,                   handle: { crumb: "Settings & Profile" } },
+          { path: "records/:id",           element: <PaperViewPage />,   handle: { crumb: "Paper" } },
+          { path: "records/:id/documents", element: <DocumentsPage />,   handle: { crumb: "Documents" } },
+          { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
+          { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
+          { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
+          { path: "ai",                    element: <RAGChatPage />,     handle: { crumb: "Ask IRIS" } },
+          { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
+          { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings & Profile" } },
 
           {
-            element: <ProtectedRoute allowedRoles={[ROLES.ADVISER, ROLES.KTTO, ROLES.RDCO, ROLES.ITSO, ROLES.IERC]} />,
+            // Authoring. SRS M2-2.1/M2-2.2 name the actor "Record Owner
+            // (Student or Adviser)"; the clearing offices must not author what
+            // they later clear.
+            element: <ProtectedRoute allowedRoles={rolesFor("submit")} />,
             children: [
-              { path: "records/import", element: <ImportRecordsPage />, handle: { crumb: "Import Records" } },
+              { path: "records/add",      element: <AddRecordPage />,   handle: { crumb: "Submit Disclosure" } },
+              { path: "workspace",        element: <MyWorkspacePage />, handle: { crumb: "My Workspace" } },
+              { path: "records/:id/edit", element: <EditRecordPage />,  handle: { crumb: "Edit Record" } },
             ],
           },
 
           {
-            element: <ProtectedRoute allowedRoles={REVIEWER_ROLES} />,
+            element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
             children: [
-              { path: "review/pending",            element: <PendingRecordsPage />,     handle: { crumb: "Pending Review" } },
-              { path: "review/approved",           element: <ApprovedRecordsPage />,    handle: { crumb: "Approved" } },
-              { path: "review/declined",           element: <DeclinedRecordsPage />,    handle: { crumb: "Declined" } },
-              { path: "review/approved-proposals", element: <ApprovedProposalsPage />,  handle: { crumb: "Approved Proposals" } },
-              { path: "review/:id/evaluate",       element: <EvaluationPage />,         handle: { crumb: "Evaluate" } },
+              { path: "review/pending",      element: <PendingRecordsPage />,  handle: { crumb: "Pending Review" } },
+              { path: "review/approved",     element: <ApprovedRecordsPage />, handle: { crumb: "Approved" } },
+              { path: "review/declined",     element: <DeclinedRecordsPage />, handle: { crumb: "Declined" } },
+              { path: "review/:id/evaluate", element: <EvaluationPage />,      handle: { crumb: "Evaluate" } },
             ],
           },
 
           {
-            element: <ProtectedRoute allowedRoles={REQUEST_QUEUE_ROLES} />,
+            // RDCO coordination. `Import Records` is the "file on behalf of"
+            // path -- which is why RDCO does not also get the submission wizard.
+            element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
             children: [
-              { path: "admin/users",             element: <UserListPage />,         handle: { crumb: "Manage Users" } },
-              { path: "admin/role-requests",     element: <RoleRequestsPage />,     handle: { crumb: "Role Requests" } },
-              { path: "admin/audit",             element: <AuditLogPage />,         handle: { crumb: "Audit Log" } },
-              { path: "admin/sessions",          element: <SessionsPage />,         handle: { crumb: "Sessions" } },
-              { path: "admin/download-requests", element: <DownloadRequestsPage />, handle: { crumb: "Download Requests" } },
-              { path: "admin/delete-requests",   element: <DeleteRequestsPage />,   handle: { crumb: "Delete Requests" } },
+              { path: "review/approved-proposals", element: <ApprovedProposalsPage />, handle: { crumb: "Approved Proposals" } },
+              { path: "records/import",            element: <ImportRecordsPage />,     handle: { crumb: "Import Records" } },
+              { path: "admin/role-requests",       element: <RoleRequestsPage />,      handle: { crumb: "Role Requests" } },
+              { path: "admin/download-requests",   element: <DownloadRequestsPage />,  handle: { crumb: "Download Requests" } },
+              { path: "admin/delete-requests",     element: <DeleteRequestsPage />,    handle: { crumb: "Delete Requests" } },
+              { path: "admin/audit",               element: <AuditLogPage />,          handle: { crumb: "Audit Log" } },
             ],
           },
         ],
