@@ -16,7 +16,7 @@ Pipeline routes (type-differentiated bookends; ADR-002):
           → published
 
 Which of ITSO/IERC/KTTO actually run is no longer fixed by record_type alone
-(ADR-018, Proposed — extends ADR-002's transition table rather than
+(ADR-018 — extends ADR-002's transition table rather than
 replacing it: pipeline_status transitions are still the same declarative
 table, only which offices get a RecordClearance row is now data on the
 record — record.requested_itso/ierc/ktto — rather than hardcoded here).
@@ -159,7 +159,7 @@ def _enter_clearance_stage(record: Record) -> str:
     Create RecordClearance rows for whatever offices were requested, and
     return the pipeline_status that follows rdco_intake.
 
-    ADR-018 (Proposed): the office set is no longer hardcoded by record_type.
+    ADR-018: the office set is no longer hardcoded by record_type.
     requested_itso only takes effect for Project -- Thesis/Research has no
     ITSO stage at all, matching the structural distinction the type already
     encodes (see the module docstring's two route diagrams). A record

@@ -43,7 +43,7 @@ interface UploadsStepProps {
   onManuscriptChange?: (file: File | null) => void;
   /**
    * Manuscript only, no per-type UploadSlot list. Used by the Submit
-   * Disclosure wizard (ADR-018, Proposed): only the manuscript is required at
+   * Disclosure wizard (ADR-018): only the manuscript is required at
    * submission — the real UploadSlot list is large (13 required items for
    * Thesis/Research) and unconditional, which works against NFR-U2 rather
    * than for it (IR-118). Everything else is attached later from the
@@ -224,9 +224,15 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] font-semibold text-gray-800">{slot.name}</span>
-                  <Badge variant={slot.is_required ? "danger" : "neutral"}>
-                    {slot.is_required ? "Required" : "Optional"}
-                  </Badge>
+                  {/* Only mark what is genuinely required. Every slot used to
+                      carry a badge, so an "Optional" one said nothing and a
+                      "Required" one was false -- 37 of 41 slots claimed to be
+                      required, nothing enforced it, and several (Patent Draft,
+                      Patent Search Report) are outputs of KTTO's work that a
+                      submitter cannot possibly attach. IR-118 dropped the claim;
+                      this stops the UI making it. When an office states its real
+                      list, set is_required and the badge returns by itself. */}
+                  {slot.is_required && <Badge variant="danger">Required</Badge>}
                 </div>
                 {file && (
                   <Badge variant={file.uploaded ? "success" : file.error ? "danger" : "neutral"}>

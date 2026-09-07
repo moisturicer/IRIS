@@ -99,7 +99,7 @@ export interface RecordDetail extends RecordListItem {
   record_type:     string | null;
   adviser:         number | null;
   added_by:        number | null;
-  /** ADR-018 (Proposed): what the submitter requested; RDCO confirms at intake. */
+  /** ADR-018: what the submitter requested; RDCO confirms at intake. */
   requires_ethics_review: boolean;
   requested_itso:  boolean;
   requested_ierc:  boolean;
@@ -126,7 +126,7 @@ export interface RecordFormData {
   is_ip?:                boolean;
   for_commercialization?: boolean;
   community_extension?:  boolean;
-  /** ADR-018 (Proposed): conditional parallel-office routing. */
+  /** ADR-018: conditional parallel-office routing. */
   requires_ethics_review?: boolean;
   requested_itso?:        boolean;
   requested_ierc?:        boolean;

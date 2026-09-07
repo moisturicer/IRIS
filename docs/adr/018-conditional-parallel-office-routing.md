@@ -2,9 +2,22 @@
 
 ## Status
 
-**Proposed** — 2026-09-04. Not accepted. Implemented behind this ADR so the change has a paper
-trail before the team formally decides; do not treat the code as settling the question this
-document raises. AI does not approve its own architectural decisions — a human reviewer does.
+**Accepted** — 2026-09-07, by **Lee Jasmin Adolfo**. Proposed 2026-09-04 and implemented behind
+this ADR so the change had a paper trail before the team decided; the decision has now been
+taken, so the code and this document agree on their own status again.
+
+What settled it was practice rather than argument: submitter-requested routing, confirmed by
+RDCO at intake, is how the team has been describing the workflow for several days. The gap was
+a signature, not an open question.
+
+**One consequence is accepted but not built.** This ADR states below that documents are
+"requested later, by the office that actually needs it," and that this "required no new document
+infrastructure." That is true only in the sense that an office can ask in a decline comment and
+the owner uploads through `DocumentsPage` — there is **no `request_document` mechanism in the
+system**, and the request is therefore invisible to the record. That is deliberate for now
+(clearance-aware resubmission already resets only the asking office, which is exactly the
+behaviour a missing form needs), but it means nothing distinguishes "you forgot a form" from a
+substantive revision — which matters to IR-144's audit events. Tracked on IR-118.
 
 ## Context
 
