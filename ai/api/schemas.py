@@ -1,20 +1,67 @@
-from django.db.models.enums import StrEnum
-from pydantic import BaseModel, ConfigDict, Field, field_validator, AliasChoices
-from typing import List, Dict, Any, Optional, Union
-from datetime import datetime
-from django.db.models import TextChoices
+"""Wire shapes for the AI gateway.
 
-class DOCUMENT_STATUS(TextChoices):
+**No Django here.** This is a standalone FastAPI service with its own
+`requirements.txt`, and Django is not in it -- these three lines
+
+    from django.db.models.enums import StrEnum
+    from django.db.models import TextChoices
+
+made the module unimportable, which is one of the reasons `ai-gateway` never
+booted (IR-156). A gateway that imports Django would also quietly re-open
+ADR-014's precondition 4, since the next step from `TextChoices` is a model,
+and a model is a second path to the database that Django is supposed to own.
+"""
+
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union  # noqa: F401  (used by schemas below)
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+
+
+class DOCUMENT_STATUS(str, Enum):
+    """Plain enum, not django TextChoices -- see the module docstring."""
+
     PENDING = "pending"
     UPLOADED = "uploaded"
     PROCESSING = "processing"
     FAILED = "failed"
 
 
+# --- the chat/embed contract -------------------------------------------------
+# `api/chat.py` has always imported these four; they were never defined, so the
+# router failed at import even once the service layer existed (IR-156).
+
+class AskRequest(BaseModel):
+    """A question put to the gateway by Django -- never by a browser."""
+
+    query: str = Field(min_length=1)
+
+
+class AskResponse(BaseModel):
+    query: str
+    answer: str
+    #: Empty until retrieval moves behind the gateway. It stays in the shape
+    #: because an answer without its sources is the thing ADR-008 forbids, and
+    #: a caller should never have to guess whether the field will appear.
+    sources: List[str] = []
+
+
+class EmbedRequest(BaseModel):
+    record_id: str
+    text: str = Field(min_length=1)
+
+
+class EmbedResponse(BaseModel):
+    record_id: str
+    dimensions: int
+    success: bool
+
+
 class DocumentResponse(BaseModel):
     id: str
     filename: str
-    status: str = DOCUMENT_STATUS.PENDING
+    status: str = DOCUMENT_STATUS.PENDING.value
     content_type: str 
     file_size: int = 0
     page_count: int = 0

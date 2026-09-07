@@ -7,7 +7,10 @@ on:
     branches: [feat/rag-service, main]
 
 # CI is evidence, not decoration.
-# It is expected to FAIL until IR-57 (application boot) and IR-58 (Docker stack) land.
+# Application boot was restored by IR-155 (not IR-57, which no longer
+# exists) and the Docker stack by IR-156 (not IR-58). Both original keys
+# were superseded during the 2026-09-05 renumbering; this line named them
+# for two days after they stopped resolving.
 # Do not weaken a gate to make it green — fix the defect it is reporting.
 
 jobs:
@@ -150,20 +153,27 @@ jobs:
   compose:
     name: Docker Compose
     runs-on: ubuntu-latest
-    # Verified 2026-09-02: this job FAILS on the current baseline with
-    #   "env file .../ai/.env not found"
-    # because both Compose files declare an `ai-gateway` service whose env file
-    # ai/.env is gitignored and absent in CI. The ./ai build context now exists;
-    # the missing env file is what breaks it. ADR-014 adopts the gateway as a
-    # sixth service under five preconditions, one of which is that it boots.
-    # IR-58 removes the service; this job goes green then. Do not silence it.
+    # Was red from 2026-09-02 until IR-156: both Compose files declare an
+    # `ai-gateway` whose env file ai/.env is gitignored and absent in CI, so
+    # `docker compose config` failed before validating anything.
+    #
+    # The previous note here said "IR-58 removes the service; this job goes
+    # green then." Both halves were wrong. IR-58 does not exist -- it was
+    # superseded by IR-156 -- and the decision went the other way: ADR-014
+    # ADOPTS the gateway as a sixth service under five preconditions, and
+    # ADR-018-era work fixes it rather than deleting it. A reader following
+    # that comment would have removed a service the team decided to keep.
     steps:
       - uses: actions/checkout@v4
 
-      - name: Provide env file
-        # backend/.env is gitignored. Compose interpolation needs it to exist,
-        # so seed it from the committed example. Values are placeholders.
-        run: cp backend/.env.example backend/.env
+      - name: Provide env files
+        # backend/.env and ai/.env are both gitignored. Compose interpolation
+        # and the ai-gateway `env_file:` need them to exist, so seed both from
+        # their committed examples. Values are placeholders; ai/.env.example
+        # was added by IR-156 and is what unblocks this job.
+        run: |
+          cp backend/.env.example backend/.env
+          cp ai/.env.example ai/.env
 
       - name: Validate development stack
         run: docker compose -f docker-compose.yml config --quiet

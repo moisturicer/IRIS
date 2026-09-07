@@ -42,7 +42,11 @@ services:
       args:
         REQUIREMENT_FILE: production.txt
     restart: unless-stopped
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    # ASGI, per ADR-017 (IR-156). This `command:` overrides the image's
+    # CMD, so changing the Dockerfile alone left production on sync WSGI
+    # workers -- where one call to the AI gateway blocks one of only four
+    # workers for a whole model round trip.
+    command: gunicorn config.asgi:application --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --workers 4 --timeout 120
     volumes:
       - media_files:/app/media
     env_file:
@@ -218,7 +222,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "80:80"
+      # 8080, not 80: the runtime image is nginx-unprivileged, which
+      # listens on 8080 because it does not run as root. Mapping 80:80
+      # made the frontend unreachable even when it started (IR-156).
+      - "80:8080"
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.
