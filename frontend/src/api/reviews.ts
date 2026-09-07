@@ -1,11 +1,16 @@
 import { apiClient } from "./client";
-import type { Review, ReviewSubmitPayload } from "@/types/reviews";
-import type { RecordListItem } from "@/types/records";
+import type { Review, ReviewSubmitPayload, ReviewQueueRow } from "@/types/reviews";
+
+/** The three queue filters. One screen, three server-side views (IR-143). */
+export type QueueFilter = "pending" | "approved" | "declined";
 
 export const reviewsApi = {
-  pending:    () => apiClient.get<RecordListItem[]>("/reviews/pending/"),
-  approved:   () => apiClient.get<RecordListItem[]>("/reviews/approved/"),
-  declined:   () => apiClient.get<RecordListItem[]>("/reviews/declined/"),
+  /**
+   * One queue, three filters. Each is a distinct server-side question -- what
+   * awaits me, what I cleared, what I sent back -- so the filter is a request,
+   * not a client-side slice of one list. That also keeps the row count honest.
+   */
+  queue: (filter: QueueFilter) => apiClient.get<ReviewQueueRow[]>(`/reviews/${filter}/`),
   submit:     (data: ReviewSubmitPayload) => apiClient.post<Review>("/reviews/submit/", data),
   resubmit:   (recordId: number)         => apiClient.post("/reviews/resubmit/", { record_id: recordId }),
   /** Request a one-time PIN emailed to the current user's account email. */

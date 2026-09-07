@@ -57,6 +57,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     reviews        = serializers.SerializerMethodField()
     clearances     = serializers.SerializerMethodField()
     resubmission   = serializers.SerializerMethodField()
+    stage_label    = serializers.CharField(source="get_pipeline_status_display", read_only=True)
+    your_office    = serializers.SerializerMethodField()
+    your_office_label = serializers.SerializerMethodField()
     files          = serializers.SerializerMethodField()
 
     def get_reviews(self, obj):
@@ -108,6 +111,31 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             latest_decline_stage=latest_decline.stage if latest_decline else None,
         )
 
+    def _viewer_office(self, obj):
+        """Which office's clearance the requesting user would be recording.
+
+        Server-derived for the same reason `preserved` is (IR-139): the client
+        would otherwise need its own role->office table, and a second table is a
+        second thing to get wrong. None for Adviser and RDCO, who decide the
+        record at a sequential stage rather than clearing for an office.
+        """
+        from apps.reviews.services import ROLE_TO_OFFICE
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        role = getattr(getattr(user, "role", None), "name", "")
+        return ROLE_TO_OFFICE.get(role) or None
+
+    def get_your_office(self, obj):
+        return self._viewer_office(obj)
+
+    def get_your_office_label(self, obj):
+        office = self._viewer_office(obj)
+        if not office:
+            return None
+        match = next((c for c in self._ordered_clearances(obj) if c.office == office), None)
+        return match.get_office_display() if match else office.upper()
+
     def get_file_count(self, obj):
         return obj.files.count()
 
@@ -133,7 +161,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "adviser", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
-            "access_count", "pipeline_status", "is_deleted",
+            "access_count", "pipeline_status", "stage_label", "is_deleted",
+            "your_office", "your_office_label",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
         ]

@@ -95,12 +95,12 @@ export const SCREEN_ACCESS = {
   editRecord: { path: "/records/:id/edit",  roles: AUTHORS },
 
   // --- review ------------------------------------------------------------
-  reviewQueue: { path: "/review/pending",  roles: REVIEWERS,
-                 nav: { label: "Pending Records", icon: "fa-hourglass-half", section: "Review Queue" } },
-  reviewApproved: { path: "/review/approved", roles: REVIEWERS,
-                 nav: { label: "Approved", icon: "fa-check-circle", section: "Review Queue" } },
-  reviewDeclined: { path: "/review/declined", roles: REVIEWERS,
-                 nav: { label: "Declined", icon: "fa-times-circle", section: "Review Queue" } },
+  // One queue, three filters (IR-143). Approved and Declined were separate nav
+  // entries and separate pages differing only by endpoint; they are now
+  // `?status=` on this screen, so the sidebar stops implying three destinations
+  // for one job.
+  reviewQueue: { path: "/review",  roles: REVIEWERS,
+                 nav: { label: "Review Queue", icon: "fa-hourglass-half", section: "Review Queue" } },
   evaluate:    { path: "/review/:id/evaluate", roles: REVIEWERS },
 
   // --- RDCO coordination -------------------------------------------------

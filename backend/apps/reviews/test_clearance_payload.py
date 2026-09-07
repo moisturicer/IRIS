@@ -177,3 +177,50 @@ class QueueRowContextTests(APITestCase):
         falling back to 'now' would report every fresh queue as instant."""
         row = queue_rows([self.record], viewer_office="ierc")[0]
         self.assertEqual(row["waiting_since"], self.record.created_at.isoformat())
+
+
+class ViewerOfficeTests(APITestCase):
+    """Who the record detail says *you* are (IR-139/IR-143).
+
+    The decision screen must state which office's clearance it records. That
+    label is server-derived for the same reason `preserved` is: a client-side
+    role->office table would be a second definition to keep in step with
+    `ROLE_TO_OFFICE`, and it would drift.
+    """
+
+    def setUp(self):
+        self.owner = make_user("owner-vo@cit.edu", "Student")
+        self.itso = make_user("itso-vo@cit.edu", "ITSO")
+        self.rdco = make_user("rdco-vo@cit.edu", "RDCO")
+        self.record = Record.objects.create(
+            title="Viewer office record",
+            record_type=RecordType.objects.first(),
+            added_by=self.owner,
+            pipeline_status="parallel_review",
+        )
+        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+        RecordClearance.objects.create(record=self.record, office="itso", status="pending")
+
+    def _detail_as(self, user):
+        self.client.force_authenticate(user)
+        return self.client.get(f"/api/v1/records/{self.record.id}/").data
+
+    def test_a_clearance_officer_is_told_which_office_they_clear_for(self):
+        data = self._detail_as(self.itso)
+        self.assertEqual(data["your_office"], "itso")
+        self.assertEqual(data["your_office_label"], "ITSO")
+
+    def test_a_sequential_reviewer_clears_for_no_office(self):
+        """RDCO decides the record at its own stages; it holds no clearance row,
+        so claiming an office would be false."""
+        data = self._detail_as(self.rdco)
+        self.assertIsNone(data["your_office"])
+        self.assertIsNone(data["your_office_label"])
+
+    def test_an_author_clears_for_no_office(self):
+        data = self._detail_as(self.owner)
+        self.assertIsNone(data["your_office"])
+
+    def test_the_stage_label_comes_from_the_server(self):
+        """AC: no client-side pipeline-key -> English mapping."""
+        self.assertEqual(self._detail_as(self.owner)["stage_label"], "Parallel Office Review")
