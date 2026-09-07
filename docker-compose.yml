@@ -109,8 +109,10 @@ services:
       context: ./ai
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "8001:8001"
+    # No published port (ADR-014 precondition 2, IR-156). The gateway
+    # holds a provider API key and is reached only over the Compose
+    # network by backend and celery. It used to publish 8001:8001,
+    # which put it on the host for anything that could reach it.
     env_file:
       - ./ai/.env
     environment:

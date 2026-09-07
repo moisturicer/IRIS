@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     # vector — get_embedding_provider() below constructs the one adapter
     # directly instead.
 
+    # Service-to-service authentication (ADR-014 precondition 1, IR-156).
+    # Shared with Django, which sends it as the x-iris-service-secret
+    # header. Empty by default, and the gateway then refuses every request
+    # with 503: a service holding a vendor API key must not serve anyone
+    # who can reach the port, and shipping a default value would make an
+    # unconfigured deployment look configured.
+    SERVICE_SECRET: str = ""
+
     # Provider-specific settings
     OPENAI_API_KEY: str = ""
 
