@@ -57,7 +57,16 @@ jobs:
         # are honored; backend/.flake8 selects only the F-codes (pyflakes' own
         # checks) and excludes migrations, where apps.get_model() locals read
         # as undefined names to static analysis.
-        run: flake8 apps/ config/ core/
+        #
+        # This step is what closes the "pyflakes installed" criterion carried
+        # open by both IR-155 and IR-163 — flake8>=7.0 bundles pyflakes, and
+        # `select = F` runs pyflakes' checks and nothing else. Verified 2026-09-07
+        # rather than assumed: clean on apps/records/views.py (the file IR-155
+        # named) and on the whole set above, and demonstrated to FAIL — a
+        # temporary `return deliberately_undefined_name` produced
+        # `F821 undefined name` and exit 1. A check nobody has watched fail is
+        # not yet evidence.
+        run: flake8 apps/ config/ core/ testing/
 
       - name: Django configuration check
         # Fails while the URLconf cannot import — this is the point.
@@ -99,7 +108,7 @@ jobs:
           # which is exactly how the authorization suite shipped green without
           # ever executing. `-ra` below makes a skip visible; this makes it
           # fatal, and visible-but-not-fatal is what let it go unnoticed for a
-          # day. See backend/core/harness.py (IR-163).
+          # day. See backend/testing/harness.py (IR-163).
           IRIS_REQUIRE_DB: '1'
         # pytest and pytest-django are pinned in requirements/development.txt
         # (IR-82), already installed above. The import smoke test in

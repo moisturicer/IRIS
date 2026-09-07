@@ -7,7 +7,7 @@ it inherits the very failure it exists to catch (IR-163).
 
 import pytest
 
-from core.harness import (
+from testing.harness import (
     STRICT_ENV_VAR,
     HarnessMode,
     harness_decision,

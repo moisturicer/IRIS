@@ -6,7 +6,7 @@ reason when the backend dependencies or the database are unavailable, instead
 of erroring at collection or, worse, appearing to pass.
 
 Skipping is the right answer on a laptop with no Postgres running and the wrong
-one in CI, so the choice is not made here — `core.harness` decides, and CI sets
+one in CI, so the choice is not made here — `testing.harness` decides, and CI sets
 ``IRIS_REQUIRE_DB`` to turn a skip into a failed run (IR-163).
 """
 
@@ -15,7 +15,7 @@ import socket
 
 import pytest
 
-from core.harness import (
+from testing.harness import (
     HarnessMode,
     harness_decision,
     strict_mode_requested,
@@ -81,7 +81,7 @@ def pytest_collection_modifyitems(config, items):
 
     # Strict mode: an environment that would have skipped stops the run
     # instead. This is what makes the suite a gate in CI rather than a
-    # formality — see core/harness.py for the incident that motivated it.
+    # formality — see testing/harness.py for the incident that motivated it.
     if decision.mode is HarnessMode.FAIL:
         pytest.exit(decision.reason, returncode=1)
 
