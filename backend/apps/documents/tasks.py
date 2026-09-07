@@ -41,36 +41,20 @@ def _build_extractor():
     )
 
 
-def _queue_chunking(upload_id: int) -> None:
-    """Hand the extracted document to the chunker, in another worker (IR-116).
-
-    A second seam, for the same reason as the one above: tests replace this
-    rather than standing up a broker. Queued rather than called, because
-    chunking is CPU work of its own and a failure to chunk must not mark a
-    perfectly good extraction failed or send the document back through
-    Docling.
-
-    ``on_commit`` rather than a bare ``delay``: the chunker reads the row this
-    task just wrote, and a worker that picked the message up inside an open
-    transaction would find the pre-save extraction and fail on a document that
-    is actually fine. Under autocommit -- how this task runs today -- the
-    callback fires immediately, so this costs nothing and stops being correct
-    only by accident later.
-    """
-    from django.db import transaction
-
-    from apps.ai.tasks import chunk_record_document
-
-    transaction.on_commit(lambda: chunk_record_document.delay(upload_id))
-
-
 @shared_task(bind=True, max_retries=3)
 def extract_pdf_text(self, upload_id: int):
-    """Background task: extract an uploaded PDF and persist the result.
+    """Background task: extract a supplementary upload's PDF and persist the
+    result.
 
     Triggered by ``SubmitDocumentView`` immediately after the file is saved,
     so the API response is never blocked on a conversion that can take
     minutes on a scanned thesis. Retries three times, sixty seconds apart.
+
+    Deliberately does not queue chunking (IR-195, ADR-013's 2026-09-08
+    amendment): every ``UploadSlot`` a real record uses is supplementary --
+    an Ethics Clearance form, a Patent Draft, and so on -- never the
+    manuscript, so nothing extracted here belongs in the RAG corpus. See
+    ``extract_manuscript_text`` below for the path that does chunk.
     """
     from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
     from apps.documents.models import PdfExtraction, RecordUpload
@@ -118,5 +102,83 @@ def extract_pdf_text(self, upload_id: int):
         extraction.save(update_fields=["status", "error"])
         raise self.retry(exc=exc, countdown=60)
 
+
+@shared_task(bind=True, max_retries=3)
+def extract_manuscript_text(self, record_id: int):
+    """Background task: extract a record's manuscript and persist the result.
+
+    The manuscript-side counterpart to ``extract_pdf_text`` above: same
+    Docling call, same status lifecycle, but reading ``Record.abstract_file``
+    and writing a ``PdfExtraction`` keyed by ``record`` rather than
+    ``upload`` -- the manuscript has no ``UploadSlot`` to hang one off.
+    Queued by ``RecordViewSet.perform_update`` whenever a PATCH changes
+    ``abstract_file`` (IR-195).
+
+    Unlike ``extract_pdf_text``, a successful run here does queue chunking
+    (``chunk_manuscript``): the manuscript is the one document ADR-013's
+    2026-09-08 amendment says belongs in the RAG corpus.
+    """
+    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
+    from apps.documents.models import PdfExtraction
+    from apps.records.models import Record
+
+    extraction = PdfExtraction.objects.filter(record_id=record_id).first()
+    if not extraction:
+        return  # record deleted, or its manuscript removed, before the task ran
+
+    extraction.status         = "running"
+    extraction.celery_task_id = self.request.id
+    extraction.save(update_fields=["status", "celery_task_id"])
+
+    try:
+        record = Record.objects.get(pk=record_id)
+
+        with record.abstract_file.open("rb") as f:
+            pdf_bytes = f.read()
+
+        extracted = _build_extractor().extract(
+            pdf_bytes, filename=os.path.basename(record.abstract_file.name)
+        )
+
+        extraction.extracted_text = flatten_for_search(extracted.document)
+        extraction.structure      = document_to_json(extracted.document)
+        extraction.content_hash   = extraction_hash(extracted.document)
+        extraction.extractor      = extracted.extractor
+        extraction.error          = ""
+        extraction.status         = "done"
+        extraction.completed_at   = timezone.now()
+        extraction.save(
+            update_fields=[
+                "extracted_text",
+                "structure",
+                "content_hash",
+                "extractor",
+                "error",
+                "status",
+                "completed_at",
+            ]
+        )
+
+    except Exception as exc:
+        extraction.status = "failed"
+        extraction.error  = str(exc)
+        extraction.save(update_fields=["status", "error"])
+        raise self.retry(exc=exc, countdown=60)
+
     # Reachable only on success -- the handler above always raises.
-    _queue_chunking(upload_id)
+    _queue_manuscript_chunking(record_id)
+
+
+def _queue_manuscript_chunking(record_id: int) -> None:
+    """Hand the extracted manuscript to the chunker, in another worker.
+
+    ``on_commit`` rather than a bare ``delay``, for the same reason IR-116's
+    original ``_queue_chunking`` used it: the chunker reads the row this task
+    just wrote, and a worker that picked the message up inside an open
+    transaction would find the pre-save extraction.
+    """
+    from django.db import transaction
+
+    from apps.ai.tasks import chunk_manuscript
+
+    transaction.on_commit(lambda: chunk_manuscript.delay(record_id))

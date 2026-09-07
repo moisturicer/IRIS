@@ -230,3 +230,70 @@ class DeadPermissionKwargSweepTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()
         self.assertTrue(self.record.is_deleted)
+
+
+class ManuscriptExtractionTriggerTests(APITestCase):
+    """PATCHing abstract_file must reach the chunker (IR-195, ADR-013's
+    2026-09-08 amendment) -- the manuscript is the one document that belongs
+    in the RAG corpus, and it has no UploadSlot to trigger extraction the
+    way a supplementary document does through SubmitDocumentView."""
+
+    def setUp(self):
+        self.record_type = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        self.owner = make_user("owner@cit.edu", "Student")
+        self.record = Record.objects.create(
+            title="A" * 10, abstract="B" * 40, record_type=self.record_type,
+            added_by=self.owner, pipeline_status="draft",
+        )
+        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+        self.client.force_authenticate(self.owner)
+
+    def _patch_manuscript(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        file = SimpleUploadedFile("thesis.pdf", b"%PDF-1.7 fake bytes", content_type="application/pdf")
+        return self.client.patch(
+            reverse("record-detail", args=[self.record.id]),
+            {"abstract_file": file},
+            format="multipart",
+        )
+
+    def test_patching_abstract_file_queues_extraction(self):
+        # perform_update queues the task via transaction.on_commit, which
+        # APITestCase's wrapping transaction never actually commits -- this
+        # is Django's own documented way to make on_commit callbacks fire in
+        # a test that would otherwise silently never run them.
+        from unittest.mock import patch
+
+        with patch("apps.documents.tasks.extract_manuscript_text.delay") as mock_delay:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self._patch_manuscript()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        mock_delay.assert_called_once_with(self.record.id)
+
+    def test_patching_abstract_file_creates_a_pdf_extraction_row(self):
+        from unittest.mock import patch
+
+        from apps.documents.models import PdfExtraction
+
+        with patch("apps.documents.tasks.extract_manuscript_text.delay"):
+            with self.captureOnCommitCallbacks(execute=True):
+                self._patch_manuscript()
+
+        extraction = PdfExtraction.objects.get(record=self.record)
+        self.assertEqual(extraction.status, "queued")
+
+    def test_patching_an_unrelated_field_does_not_queue_extraction(self):
+        from unittest.mock import patch
+
+        with patch("apps.documents.tasks.extract_manuscript_text.delay") as mock_delay:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.patch(
+                    reverse("record-detail", args=[self.record.id]),
+                    {"title": "A new title"},
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        mock_delay.assert_not_called()

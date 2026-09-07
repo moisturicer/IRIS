@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -110,6 +111,27 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Add the creator as the primary owner automatically
         RecordOwner.objects.create(record=record, user=self.request.user, is_primary=True)
         # Record starts as draft — notification fires only when the owner calls /submit/
+
+    def perform_update(self, serializer):
+        # abstract_file is the manuscript (see RecordWriteSerializer). A PATCH
+        # that changes it must reach the chunker -- IR-195 / ADR-013's
+        # 2026-09-08 amendment -- so re-extract every time it's part of the
+        # payload, the same way SubmitDocumentView does for a supplementary
+        # upload. "in validated_data" rather than diffing old vs. new: a
+        # client re-sending an unchanged file is rare enough that re-running
+        # extraction on it costs nothing, and the alternative (comparing file
+        # contents) costs a read on every save just to skip the common case.
+        queue_extraction = "abstract_file" in serializer.validated_data
+        record = serializer.save()
+        if queue_extraction and record.abstract_file:
+            from apps.documents.models import PdfExtraction
+            from apps.documents.tasks import extract_manuscript_text
+
+            extraction, _ = PdfExtraction.objects.update_or_create(
+                record=record,
+                defaults={"status": "queued", "error": ""},
+            )
+            transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
 
     def perform_destroy(self, instance):
         # Publicly visible records go through delete request flow
