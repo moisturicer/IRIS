@@ -41,6 +41,56 @@ def _build_extractor():
     )
 
 
+_EXTRACTION_RESULT_FIELDS = [
+    "extracted_text",
+    "structure",
+    "content_hash",
+    "extractor",
+    "error",
+    "status",
+    "completed_at",
+]
+
+
+def _run_extraction(self, extraction, *, file_field) -> None:
+    """Shared body of ``extract_pdf_text``/``extract_manuscript_text``
+    (IR-195): both differ only in which file field they read and how they
+    looked up ``extraction`` -- the Docling call, status lifecycle and
+    retry policy are identical either way.
+
+    ``self`` is the bound Celery task (for ``self.request.id``/``self.retry``);
+    passed through rather than looked up, since a plain function has neither.
+    """
+    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
+
+    extraction.status         = "running"
+    extraction.celery_task_id = self.request.id
+    extraction.save(update_fields=["status", "celery_task_id"])
+
+    try:
+        with file_field.open("rb") as f:
+            pdf_bytes = f.read()
+
+        extracted = _build_extractor().extract(
+            pdf_bytes, filename=os.path.basename(file_field.name)
+        )
+
+        extraction.extracted_text = flatten_for_search(extracted.document)
+        extraction.structure      = document_to_json(extracted.document)
+        extraction.content_hash   = extraction_hash(extracted.document)
+        extraction.extractor      = extracted.extractor
+        extraction.error          = ""
+        extraction.status         = "done"
+        extraction.completed_at   = timezone.now()
+        extraction.save(update_fields=_EXTRACTION_RESULT_FIELDS)
+
+    except Exception as exc:
+        extraction.status = "failed"
+        extraction.error  = str(exc)
+        extraction.save(update_fields=["status", "error"])
+        raise self.retry(exc=exc, countdown=60)
+
+
 @shared_task(bind=True, max_retries=3)
 def extract_pdf_text(self, upload_id: int):
     """Background task: extract a supplementary upload's PDF and persist the
@@ -56,51 +106,14 @@ def extract_pdf_text(self, upload_id: int):
     manuscript, so nothing extracted here belongs in the RAG corpus. See
     ``extract_manuscript_text`` below for the path that does chunk.
     """
-    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
     from apps.documents.models import PdfExtraction, RecordUpload
 
     extraction = PdfExtraction.objects.filter(upload_id=upload_id).first()
     if not extraction:
         return  # record deleted before the task ran
 
-    extraction.status         = "running"
-    extraction.celery_task_id = self.request.id
-    extraction.save(update_fields=["status", "celery_task_id"])
-
-    try:
-        upload = RecordUpload.objects.get(pk=upload_id)
-
-        with upload.file.open("rb") as f:
-            pdf_bytes = f.read()
-
-        extracted = _build_extractor().extract(
-            pdf_bytes, filename=os.path.basename(upload.file.name)
-        )
-
-        extraction.extracted_text = flatten_for_search(extracted.document)
-        extraction.structure      = document_to_json(extracted.document)
-        extraction.content_hash   = extraction_hash(extracted.document)
-        extraction.extractor      = extracted.extractor
-        extraction.error          = ""
-        extraction.status         = "done"
-        extraction.completed_at   = timezone.now()
-        extraction.save(
-            update_fields=[
-                "extracted_text",
-                "structure",
-                "content_hash",
-                "extractor",
-                "error",
-                "status",
-                "completed_at",
-            ]
-        )
-
-    except Exception as exc:
-        extraction.status = "failed"
-        extraction.error  = str(exc)
-        extraction.save(update_fields=["status", "error"])
-        raise self.retry(exc=exc, countdown=60)
+    upload = RecordUpload.objects.get(pk=upload_id)
+    _run_extraction(self, extraction, file_field=upload.file)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -116,9 +129,14 @@ def extract_manuscript_text(self, record_id: int):
 
     Unlike ``extract_pdf_text``, a successful run here does queue chunking
     (``chunk_manuscript``): the manuscript is the one document ADR-013's
-    2026-09-08 amendment says belongs in the RAG corpus.
+    2026-09-08 amendment says belongs in the RAG corpus. That distinction is
+    still drawn by *which task ran*, not by an inspectable field on the
+    document itself -- sound today only because ``abstract_file`` structurally
+    can never hold a supplementary document and no ``UploadSlot`` is seeded as
+    "Manuscript". If a manuscript ``UploadSlot`` is ever introduced (the
+    alternative IR-195 considered and did not take), this exclusion needs a
+    real document-type marker instead of relying on which endpoint was hit.
     """
-    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
     from apps.documents.models import PdfExtraction
     from apps.records.models import Record
 
@@ -126,46 +144,10 @@ def extract_manuscript_text(self, record_id: int):
     if not extraction:
         return  # record deleted, or its manuscript removed, before the task ran
 
-    extraction.status         = "running"
-    extraction.celery_task_id = self.request.id
-    extraction.save(update_fields=["status", "celery_task_id"])
+    record = Record.objects.get(pk=record_id)
+    _run_extraction(self, extraction, file_field=record.abstract_file)
 
-    try:
-        record = Record.objects.get(pk=record_id)
-
-        with record.abstract_file.open("rb") as f:
-            pdf_bytes = f.read()
-
-        extracted = _build_extractor().extract(
-            pdf_bytes, filename=os.path.basename(record.abstract_file.name)
-        )
-
-        extraction.extracted_text = flatten_for_search(extracted.document)
-        extraction.structure      = document_to_json(extracted.document)
-        extraction.content_hash   = extraction_hash(extracted.document)
-        extraction.extractor      = extracted.extractor
-        extraction.error          = ""
-        extraction.status         = "done"
-        extraction.completed_at   = timezone.now()
-        extraction.save(
-            update_fields=[
-                "extracted_text",
-                "structure",
-                "content_hash",
-                "extractor",
-                "error",
-                "status",
-                "completed_at",
-            ]
-        )
-
-    except Exception as exc:
-        extraction.status = "failed"
-        extraction.error  = str(exc)
-        extraction.save(update_fields=["status", "error"])
-        raise self.retry(exc=exc, countdown=60)
-
-    # Reachable only on success -- the handler above always raises.
+    # Reachable only on success -- _run_extraction's handler always raises.
     _queue_manuscript_chunking(record_id)
 
 

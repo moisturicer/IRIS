@@ -284,6 +284,27 @@ class ManuscriptExtractionTriggerTests(APITestCase):
         extraction = PdfExtraction.objects.get(record=self.record)
         self.assertEqual(extraction.status, "queued")
 
+    def test_posting_a_new_record_with_abstract_file_also_queues_extraction(self):
+        """The spec review on IR-195 caught this gap: RecordWriteSerializer
+        includes abstract_file on create too, and only perform_update queued
+        extraction. A caller that sets the manuscript at creation time, not
+        just via a later PATCH, must reach the chunker exactly the same way."""
+        from unittest.mock import patch
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        file = SimpleUploadedFile("thesis.pdf", b"%PDF-1.7 fake bytes", content_type="application/pdf")
+        with patch("apps.documents.tasks.extract_manuscript_text.delay") as mock_delay:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse("record-list"),
+                    {"title": "A new disclosure", "abstract_file": file},
+                    format="multipart",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        mock_delay.assert_called_once_with(response.data["id"])
+
     def test_patching_an_unrelated_field_does_not_queue_extraction(self):
         from unittest.mock import patch
 
