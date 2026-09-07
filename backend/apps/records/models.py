@@ -118,7 +118,7 @@ class Record(models.Model):
     # subjects and sensitive data, which none of the flags above cover.
     requires_ethics_review  = models.BooleanField(default=False)
 
-    # Conditional parallel-office routing (ADR-018, Proposed -- extends
+    # Conditional parallel-office routing (ADR-018 -- extends
     # ADR-002's transition table rather than replacing it). The submitter
     # requests offices here; apps.reviews.services.approve_record() reads
     # these at rdco_intake to decide which RecordClearance rows to create,
