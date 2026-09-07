@@ -38,6 +38,8 @@ decline_record / reject_record.
 Clearance stages (itso_review, parallel_review) use submit_clearance;
 individual office statuses are tracked in RecordClearance rows.
 """
+from django.utils import timezone
+
 from core.exceptions import InvalidPipelineTransition
 from .models import Review, RecordClearance
 from apps.records.models import Record
@@ -430,7 +432,20 @@ def resubmit_record(record: Record, submitted_by) -> Record:
         RecordClearance.objects.filter(record=record).delete()
         new_status = _first_status_for_type(record)
 
+    # Record the resubmission itself, not just its effect (IR-139). `preserved`
+    # is defined against this timestamp: a clearance decided before it survived
+    # a resubmission, one decided after it was granted fresh. Without this the
+    # distinction that carries the contribution cannot be recovered afterwards.
     record.pipeline_status = new_status
-    record.save(update_fields=["pipeline_status", "updated_at"])
+    record.resubmission_count = (record.resubmission_count or 0) + 1
+    record.last_resubmitted_at = timezone.now()
+    record.save(
+        update_fields=[
+            "pipeline_status",
+            "resubmission_count",
+            "last_resubmitted_at",
+            "updated_at",
+        ]
+    )
     notify_resubmit(record, submitted_by, new_status=new_status)
     return record

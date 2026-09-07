@@ -86,10 +86,12 @@ class ReviewViewSet(viewsets.GenericViewSet):
             ).values_list("record_id", flat=True)
             records = records.filter(pk__in=pending_ids)
 
-        from apps.records.serializers import RecordListSerializer
-        return Response(
-            RecordListSerializer(records, many=True, context={"request": request}).data
-        )
+        # The queryset above is already scoped to what this office may act on.
+        # queue_rows adds the context that says so -- stage, the office this
+        # viewer would be clearing for, peer decisions and waiting time (IR-139).
+        from .serializers import queue_rows
+        records = records.prefetch_related("clearances", "reviews")
+        return Response(queue_rows(records, viewer_office=office, request=request))
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsStaff])
     def analytics(self, request):
@@ -198,23 +200,31 @@ class ReviewViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["get"])
     def approved(self, request):
-        reviews = Review.objects.filter(reviewed_by=request.user, status="approved")
-        from apps.records.serializers import RecordListSerializer
-        records = [r.record for r in reviews]
+        reviews = (
+            Review.objects.filter(reviewed_by=request.user, status="approved")
+            .select_related("record")
+            .prefetch_related("record__clearances", "record__reviews")
+        )
+        from .serializers import queue_rows
+        office = ROLE_TO_OFFICE.get(request.user.role.name if request.user.role else "")
         return Response(
-            RecordListSerializer(records, many=True, context={"request": request}).data
+            queue_rows([r.record for r in reviews], viewer_office=office, request=request)
         )
 
     @action(detail=False, methods=["get"])
     def declined(self, request):
         """Returns records this user declined or rejected."""
-        reviews = Review.objects.filter(
-            reviewed_by=request.user, status__in=["declined", "rejected"]
+        reviews = (
+            Review.objects.filter(
+                reviewed_by=request.user, status__in=["declined", "rejected"]
+            )
+            .select_related("record")
+            .prefetch_related("record__clearances", "record__reviews")
         )
-        from apps.records.serializers import RecordListSerializer
-        records = [r.record for r in reviews]
+        from .serializers import queue_rows
+        office = ROLE_TO_OFFICE.get(request.user.role.name if request.user.role else "")
         return Response(
-            RecordListSerializer(records, many=True, context={"request": request}).data
+            queue_rows([r.record for r in reviews], viewer_office=office, request=request)
         )
 
 
