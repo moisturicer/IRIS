@@ -175,6 +175,20 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
+# IR-164: without this, every task publishes to Celery's own implicit
+# "celery" queue, which none of docker-compose.yml's three workers consume
+# (they run `-Q default` / `-Q extraction` / `-Q embedding`) -- so nothing
+# dispatched is ever picked up. CELERY_TASK_DEFAULT_QUEUE catches any task
+# with no explicit route below, present or future, and lands it on the
+# worker with no special dependencies. The two tasks with a real dependency
+# (a Docling container, the embedding vendor) are routed to the workers
+# built for them.
+CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_TASK_ROUTES = {
+    "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
+    "apps.ai.tasks.embed_record": {"queue": "embedding"},
+}
+
 # ---- Static / Media -----------------------------------------------------
 
 STATIC_URL = "/static/"

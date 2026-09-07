@@ -8,7 +8,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 
 ## Index
 
-**Fifteen active decisions.** Read these for "what does IRIS do today and why."
+**Seventeen active decisions.** Read these for "what does IRIS do today and why."
 
 | ADR | Title | Status | Impact |
 |---|---|---|---|
@@ -28,6 +28,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Accepted · **amended 2026-09-04 (twice)** | Architecture · Scope · **Research** |
 | [017](017-asgi-deployment-for-gateway-streaming.md) | ASGI deployment so Django can call the gateway asynchronously | Accepted | Architecture · Deployment · Performance |
 | [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Accepted** — 2026-09-07 | Architecture · Research |
+| [019](019-persisted-unified-conversation-history.md) | Persisted conversation history, unified across Ask IRIS and Paper Chat | Accepted | Architecture · **Research** |
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 
