@@ -26,7 +26,9 @@
 
 ## Current position
 
-**Almost nothing in IRIS is VERIFIED.** A pytest harness landed with IR-82 and the `apps/ai` extraction and chunking work now carries tests, so the blanket "there are no automated tests" that stood here is no longer true. Everything outside `apps/ai` still has no test evidence. This table records the honest position; it is not a to-do list disguised as a status report.
+**Almost nothing in IRIS is VERIFIED.** A pytest harness landed with IR-82 and the `apps/ai` extraction and chunking work now carries tests, so the blanket "there are no automated tests" that stood here is no longer true. Tests now also exist outside `apps/ai` — `apps/accounts`, `apps/documents`, `apps/opportunities`, `apps/records`, `config`, and the authorization matrix in `apps/tests` — so the "everything outside `apps/ai` has no test evidence" that stood here is corrected. This table records the honest position; it is not a to-do list disguised as a status report.
+
+> **CI evidence dated before 2026-09-06 does not mean the test ran.** The workflow executed `pytest` with no database service, and `conftest.py` skips every `TransactionTestCase` — which DRF's `APITestCase` is — when Postgres is unreachable. Every database-backed test in the repo was collected, skipped, and reported green. IR-165 added the service; IR-163 made a wholesale skip fail the run rather than pass it. **Treat any "CI green" evidence in the rows below that predates those two as unverified**, and re-establish it from a run that provably executed. This is recorded rather than swept, per the source-of-truth rule.
 
 > **This document is itself out of date in places** and its header still names `../SRS.md` as the baseline, which [`../../CLAUDE.md`](../../CLAUDE.md) has since frozen in favour of `docs/adr/`. Recorded rather than silently reconciled, per the source-of-truth rule. Rows below are corrected as the work that touches them lands, not in one sweep.
 
