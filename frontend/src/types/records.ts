@@ -111,6 +111,15 @@ export interface RecordDetail extends RecordListItem {
   /** Per-office clearance state — makes clearance-aware resubmission visible. */
   clearances:      RecordClearance[];
   resubmission:    RecordResubmission;
+  /** Server-worded stage. Never map a pipeline key to English on the client. */
+  stage_label:     string;
+  /**
+   * The office whose clearance the *requesting user* would be recording, or
+   * null for Adviser and RDCO, who decide the record at a sequential stage.
+   * Server-derived so the client needs no role->office table of its own.
+   */
+  your_office:       "itso" | "ierc" | "ktto" | null;
+  your_office_label: string | null;
   files:           RecordFileItem[];
 }
 

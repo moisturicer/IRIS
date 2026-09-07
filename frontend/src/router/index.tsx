@@ -20,9 +20,7 @@ import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConfer
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import EditRecordPage       from "@/features/records/EditRecordPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
-import PendingRecordsPage   from "@/features/review/PendingRecordsPage";
-import ApprovedRecordsPage  from "@/features/review/ApprovedRecordsPage";
-import DeclinedRecordsPage  from "@/features/review/DeclinedRecordsPage";
+import ReviewQueuePage      from "@/features/review/ReviewQueuePage";
 import EvaluationPage       from "@/features/review/EvaluationPage";
 import DocumentsPage        from "@/features/documents/DocumentsPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
@@ -75,9 +73,7 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
             children: [
-              { path: "review/pending",      element: <PendingRecordsPage />,  handle: { crumb: "Pending Review" } },
-              { path: "review/approved",     element: <ApprovedRecordsPage />, handle: { crumb: "Approved" } },
-              { path: "review/declined",     element: <DeclinedRecordsPage />, handle: { crumb: "Declined" } },
+              { path: "review",              element: <ReviewQueuePage />,     handle: { crumb: "Review Queue" } },
               { path: "review/:id/evaluate", element: <EvaluationPage />,      handle: { crumb: "Evaluate" } },
             ],
           },
