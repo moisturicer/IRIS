@@ -55,9 +55,26 @@ export interface RecordClearance {
   office:           "itso" | "ierc" | "ktto";
   office_label:     string;
   status:           "pending" | "cleared" | "declined" | "rejected";
+  /** Server-supplied wording, so a status can be renamed without a release. */
+  status_label:     string;
   comment:          string;
   reviewed_by_name: string | null;
   updated_at:       string;
+  /**
+   * True when this clearance survived a resubmission rather than being granted
+   * again. Derived by the server (IR-139) -- the client used to compute it from
+   * the last decline, which is a different rule than `resubmit_record` applies.
+   */
+  preserved:        boolean;
+}
+
+/** What happened across resubmissions, and which offices survived them. */
+export interface RecordResubmission {
+  count:               number;
+  last_resubmitted_at: string | null;
+  /** Null when a sequential stage declined -- that path preserves nothing. */
+  declining_office:    "itso" | "ierc" | "ktto" | null;
+  offices_preserved:   Array<"itso" | "ierc" | "ktto">;
 }
 
 export interface RecordFileItem {
@@ -93,6 +110,7 @@ export interface RecordDetail extends RecordListItem {
   reviews:         RecordReview[];
   /** Per-office clearance state — makes clearance-aware resubmission visible. */
   clearances:      RecordClearance[];
+  resubmission:    RecordResubmission;
   files:           RecordFileItem[];
 }
 

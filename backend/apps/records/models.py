@@ -150,6 +150,16 @@ class Record(models.Model):
         max_length=20, choices=PIPELINE_STATUS, default="draft", db_index=True
     )
 
+    # Resubmission history (IR-139). Both are maintained by
+    # reviews.services.resubmit_record and exist because neither can be derived
+    # after the fact: a decline's timestamp is when the reviewer decided, not
+    # when the owner resubmitted, and the gap between them is exactly the window
+    # in which a clearance is either preserved or re-granted. Serializing
+    # `preserved` from a decline timestamp would call a re-granted clearance
+    # preserved whenever an office happened to clear before the decline landed.
+    resubmission_count   = models.PositiveIntegerField(default=0)
+    last_resubmitted_at  = models.DateTimeField(null=True, blank=True)
+
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)
     deleted_at  = models.DateTimeField(null=True, blank=True)
