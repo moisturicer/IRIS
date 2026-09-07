@@ -7,7 +7,10 @@ on:
     branches: [feat/rag-service, main]
 
 # CI is evidence, not decoration.
-# It is expected to FAIL until IR-57 (application boot) and IR-58 (Docker stack) land.
+# Application boot was restored by IR-155 (not IR-57, which no longer
+# exists) and the Docker stack by IR-156 (not IR-58). Both original keys
+# were superseded during the 2026-09-05 renumbering; this line named them
+# for two days after they stopped resolving.
 # Do not weaken a gate to make it green — fix the defect it is reporting.
 
 jobs:
@@ -57,7 +60,16 @@ jobs:
         # are honored; backend/.flake8 selects only the F-codes (pyflakes' own
         # checks) and excludes migrations, where apps.get_model() locals read
         # as undefined names to static analysis.
-        run: flake8 apps/ config/ core/
+        #
+        # This step is what closes the "pyflakes installed" criterion carried
+        # open by both IR-155 and IR-163 — flake8>=7.0 bundles pyflakes, and
+        # `select = F` runs pyflakes' checks and nothing else. Verified 2026-09-07
+        # rather than assumed: clean on apps/records/views.py (the file IR-155
+        # named) and on the whole set above, and demonstrated to FAIL — a
+        # temporary `return deliberately_undefined_name` produced
+        # `F821 undefined name` and exit 1. A check nobody has watched fail is
+        # not yet evidence.
+        run: flake8 apps/ config/ core/ testing/
 
       - name: Django configuration check
         # Fails while the URLconf cannot import — this is the point.
@@ -92,15 +104,24 @@ jobs:
           DB_PASSWORD: iris
           DB_HOST: localhost
           DB_PORT: '5432'
+          # The other half of the IR-165 fix. The postgres service above makes
+          # the database-backed tests *able* to run; this makes them *have* to.
+          # Without it, if the service fails to come up, conftest.py skips every
+          # TransactionTestCase and the job passes having verified nothing —
+          # which is exactly how the authorization suite shipped green without
+          # ever executing. `-ra` below makes a skip visible; this makes it
+          # fatal, and visible-but-not-fatal is what let it go unnoticed for a
+          # day. See backend/testing/harness.py (IR-163).
+          IRIS_REQUIRE_DB: '1'
         # pytest and pytest-django are pinned in requirements/development.txt
         # (IR-82), already installed above. The import smoke test in
         # apps/tests/test_boot.py is what actually fails when the URLconf
         # cannot import — this step just has to run it.
         #
         # `-p no:randomly --strict-markers` is inherited from pytest.ini.
-        # `-ra` surfaces the skip reasons, which is how you notice the database
-        # went away again: a skipped authorization suite must be visible in the
-        # log, not silently green.
+        # `-ra` surfaces the skip reasons for the skips that remain legitimate
+        # (an individual test opting out), not for a wholesale environment
+        # failure — IRIS_REQUIRE_DB above stops the run outright for that.
         run: pytest -ra
 
   frontend:
@@ -132,20 +153,27 @@ jobs:
   compose:
     name: Docker Compose
     runs-on: ubuntu-latest
-    # Verified 2026-09-02: this job FAILS on the current baseline with
-    #   "env file .../ai/.env not found"
-    # because both Compose files declare an `ai-gateway` service whose env file
-    # ai/.env is gitignored and absent in CI. The ./ai build context now exists;
-    # the missing env file is what breaks it. ADR-014 adopts the gateway as a
-    # sixth service under five preconditions, one of which is that it boots.
-    # IR-58 removes the service; this job goes green then. Do not silence it.
+    # Was red from 2026-09-02 until IR-156: both Compose files declare an
+    # `ai-gateway` whose env file ai/.env is gitignored and absent in CI, so
+    # `docker compose config` failed before validating anything.
+    #
+    # The previous note here said "IR-58 removes the service; this job goes
+    # green then." Both halves were wrong. IR-58 does not exist -- it was
+    # superseded by IR-156 -- and the decision went the other way: ADR-014
+    # ADOPTS the gateway as a sixth service under five preconditions, and
+    # ADR-018-era work fixes it rather than deleting it. A reader following
+    # that comment would have removed a service the team decided to keep.
     steps:
       - uses: actions/checkout@v4
 
-      - name: Provide env file
-        # backend/.env is gitignored. Compose interpolation needs it to exist,
-        # so seed it from the committed example. Values are placeholders.
-        run: cp backend/.env.example backend/.env
+      - name: Provide env files
+        # backend/.env and ai/.env are both gitignored. Compose interpolation
+        # and the ai-gateway `env_file:` need them to exist, so seed both from
+        # their committed examples. Values are placeholders; ai/.env.example
+        # was added by IR-156 and is what unblocks this job.
+        run: |
+          cp backend/.env.example backend/.env
+          cp ai/.env.example ai/.env
 
       - name: Validate development stack
         run: docker compose -f docker-compose.yml config --quiet

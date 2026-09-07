@@ -4,25 +4,22 @@ import { cn } from "@/lib/utils";
 
 interface ClearanceTrackProps {
   clearances: RecordClearance[];
-  /**
-   * ISO timestamp of the most recent decline on this record.
-   *
-   * `resubmit_record` resets only the declining office's clearance, so a
-   * clearance decided *before* that decline is one that survived a
-   * resubmission. Null when the record has never been declined — in which case
-   * nothing can be preserved yet.
-   */
-  preservedBefore?: string | null;
 }
 
+/**
+ * Presentation only. The *wording* comes from the server as `status_label`
+ * (IR-139) so an institution can rename a status without a frontend release;
+ * what stays here is the icon and colour, which are this design system's
+ * business and not the server's.
+ */
 const STATUS_META: Record<
   RecordClearance["status"],
-  { label: string; icon: string; dot: string; text: string }
+  { icon: string; dot: string; text: string }
 > = {
-  cleared:  { label: "Cleared",  icon: "fa-check",            dot: "bg-emerald-500", text: "text-emerald-700" },
-  pending:  { label: "Pending",  icon: "fa-hourglass-half",   dot: "bg-stone-300",   text: "text-stone-500" },
-  declined: { label: "Revision", icon: "fa-arrow-rotate-left", dot: "bg-amber-500",  text: "text-amber-700" },
-  rejected: { label: "Rejected", icon: "fa-xmark",            dot: "bg-red-500",     text: "text-red-700" },
+  cleared:  { icon: "fa-check",             dot: "bg-emerald-500", text: "text-emerald-700" },
+  pending:  { icon: "fa-hourglass-half",    dot: "bg-stone-300",   text: "text-stone-500" },
+  declined: { icon: "fa-arrow-rotate-left", dot: "bg-amber-500",   text: "text-amber-700" },
+  rejected: { icon: "fa-xmark",             dot: "bg-red-500",     text: "text-red-700" },
 };
 
 /**
@@ -33,7 +30,7 @@ const STATUS_META: Record<
  * submission is a preserved one, and is labelled as such — otherwise the
  * contribution is invisible and the record just looks partly reviewed.
  */
-export function ClearanceTrack({ clearances, preservedBefore }: ClearanceTrackProps) {
+export function ClearanceTrack({ clearances }: ClearanceTrackProps) {
   if (clearances.length === 0) {
     return (
       <section className="bg-white border border-stone-200 rounded-2xl p-5">
@@ -63,10 +60,11 @@ export function ClearanceTrack({ clearances, preservedBefore }: ClearanceTrackPr
       <ul className="space-y-2.5">
         {clearances.map((c) => {
           const meta = STATUS_META[c.status];
-          const preserved =
-            c.status === "cleared" &&
-            Boolean(preservedBefore) &&
-            new Date(c.updated_at) < new Date(preservedBefore as string);
+          // Server-supplied (IR-139). This was derived here from the most
+          // recent decline, which dated preservation to the reviewer's
+          // decision rather than the owner's resubmission -- a different rule
+          // from the one `resubmit_record` actually applies.
+          const preserved = c.preserved;
 
           return (
             <li key={c.office} className="flex items-start gap-3">
@@ -76,7 +74,7 @@ export function ClearanceTrack({ clearances, preservedBefore }: ClearanceTrackPr
                   <span className="text-[13px] font-bold text-stone-900">{c.office_label}</span>
                   <span className={cn("text-[11px] font-semibold flex items-center gap-1", meta.text)}>
                     <i className={cn("fas", meta.icon, "text-[9px]")} aria-hidden />
-                    {meta.label}
+                    {c.status_label}
                   </span>
                   {preserved && (
                     <span

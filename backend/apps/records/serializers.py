@@ -1,4 +1,7 @@
 from rest_framework import serializers
+
+from apps.reviews.clearance_state import clearance_payload, resubmission_payload
+
 from .models import (
     Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
     Classification, PSCEDClassification, RecordType,
@@ -53,6 +56,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     file_count          = serializers.SerializerMethodField()
     reviews        = serializers.SerializerMethodField()
     clearances     = serializers.SerializerMethodField()
+    resubmission   = serializers.SerializerMethodField()
+    stage_label    = serializers.CharField(source="get_pipeline_status_display", read_only=True)
+    your_office    = serializers.SerializerMethodField()
+    your_office_label = serializers.SerializerMethodField()
     files          = serializers.SerializerMethodField()
 
     def get_reviews(self, obj):
@@ -75,23 +82,59 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             for r in qs
         ]
 
+    def _ordered_clearances(self, obj):
+        return list(obj.clearances.select_related("reviewed_by").order_by("office"))
+
     def get_clearances(self, obj):
         """
         Per-office clearance state. This is what makes clearance-aware
-        resubmission visible: a preserved clearance shows as cleared with a
-        decision date earlier than the current submission.
+        resubmission visible: `preserved` is true for a clearance that survived
+        a resubmission rather than being granted again.
+
+        The rule itself lives in `apps.reviews.clearance_state` so the server is
+        its only author -- `PaperViewPage` used to re-derive it in TypeScript
+        against a different definition (IR-139).
         """
         return [
-            {
-                "office":           c.office,
-                "office_label":     c.get_office_display(),
-                "status":           c.status,
-                "comment":          c.comment,
-                "reviewed_by_name": c.reviewed_by.get_full_name() if c.reviewed_by else None,
-                "updated_at":       c.updated_at.isoformat(),
-            }
-            for c in obj.clearances.select_related("reviewed_by").order_by("office")
+            clearance_payload(c, last_resubmitted_at=obj.last_resubmitted_at)
+            for c in self._ordered_clearances(obj)
         ]
+
+    def get_resubmission(self, obj):
+        """`resubmission{}` -- what happened, and which offices survived it."""
+        latest_decline = (
+            obj.reviews.filter(status="declined").order_by("-created_at").first()
+        )
+        return resubmission_payload(
+            obj,
+            clearances=self._ordered_clearances(obj),
+            latest_decline_stage=latest_decline.stage if latest_decline else None,
+        )
+
+    def _viewer_office(self, obj):
+        """Which office's clearance the requesting user would be recording.
+
+        Server-derived for the same reason `preserved` is (IR-139): the client
+        would otherwise need its own role->office table, and a second table is a
+        second thing to get wrong. None for Adviser and RDCO, who decide the
+        record at a sequential stage rather than clearing for an office.
+        """
+        from apps.reviews.services import ROLE_TO_OFFICE
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        role = getattr(getattr(user, "role", None), "name", "")
+        return ROLE_TO_OFFICE.get(role) or None
+
+    def get_your_office(self, obj):
+        return self._viewer_office(obj)
+
+    def get_your_office_label(self, obj):
+        office = self._viewer_office(obj)
+        if not office:
+            return None
+        match = next((c for c in self._ordered_clearances(obj) if c.office == office), None)
+        return match.get_office_display() if match else office.upper()
 
     def get_file_count(self, obj):
         return obj.files.count()
@@ -118,9 +161,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "adviser", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
-            "access_count", "pipeline_status", "is_deleted",
+            "access_count", "pipeline_status", "stage_label", "is_deleted",
+            "your_office", "your_office_label",
             "created_at", "updated_at",
-            "owners", "authors", "reviews", "clearances", "files",
+            "owners", "authors", "reviews", "clearances", "resubmission", "files",
         ]
 
 

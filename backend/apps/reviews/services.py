@@ -16,7 +16,7 @@ Pipeline routes (type-differentiated bookends; ADR-002):
           → published
 
 Which of ITSO/IERC/KTTO actually run is no longer fixed by record_type alone
-(ADR-018, Proposed — extends ADR-002's transition table rather than
+(ADR-018 — extends ADR-002's transition table rather than
 replacing it: pipeline_status transitions are still the same declarative
 table, only which offices get a RecordClearance row is now data on the
 record — record.requested_itso/ierc/ktto — rather than hardcoded here).
@@ -38,6 +38,8 @@ decline_record / reject_record.
 Clearance stages (itso_review, parallel_review) use submit_clearance;
 individual office statuses are tracked in RecordClearance rows.
 """
+from django.utils import timezone
+
 from core.exceptions import InvalidPipelineTransition
 from .models import Review, RecordClearance
 from apps.records.models import Record
@@ -157,7 +159,7 @@ def _enter_clearance_stage(record: Record) -> str:
     Create RecordClearance rows for whatever offices were requested, and
     return the pipeline_status that follows rdco_intake.
 
-    ADR-018 (Proposed): the office set is no longer hardcoded by record_type.
+    ADR-018: the office set is no longer hardcoded by record_type.
     requested_itso only takes effect for Project -- Thesis/Research has no
     ITSO stage at all, matching the structural distinction the type already
     encodes (see the module docstring's two route diagrams). A record
@@ -430,7 +432,20 @@ def resubmit_record(record: Record, submitted_by) -> Record:
         RecordClearance.objects.filter(record=record).delete()
         new_status = _first_status_for_type(record)
 
+    # Record the resubmission itself, not just its effect (IR-139). `preserved`
+    # is defined against this timestamp: a clearance decided before it survived
+    # a resubmission, one decided after it was granted fresh. Without this the
+    # distinction that carries the contribution cannot be recovered afterwards.
     record.pipeline_status = new_status
-    record.save(update_fields=["pipeline_status", "updated_at"])
+    record.resubmission_count = (record.resubmission_count or 0) + 1
+    record.last_resubmitted_at = timezone.now()
+    record.save(
+        update_fields=[
+            "pipeline_status",
+            "resubmission_count",
+            "last_resubmitted_at",
+            "updated_at",
+        ]
+    )
     notify_resubmit(record, submitted_by, new_status=new_status)
     return record

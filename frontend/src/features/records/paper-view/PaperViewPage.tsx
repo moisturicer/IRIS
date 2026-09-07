@@ -407,11 +407,6 @@ export default function PaperViewPage() {
   // the rest, so this button is only ever "the paper".
   const paperUrl = record.abstract_file ?? record.files[0]?.url ?? null;
 
-  // Clearances decided before the latest decline are the ones a resubmission
-  // carried over. Reviews arrive oldest-first from the API.
-  const lastDeclineAt =
-    [...record.reviews].reverse().find((r) => r.status === "declined")?.created_at ?? null;
-
   return (
     <div
       className={cn(
@@ -654,7 +649,7 @@ export default function PaperViewPage() {
           {/* Right rail                                                     */}
           {/* ------------------------------------------------------------- */}
           <aside className="space-y-4 lg:sticky lg:top-6">
-            <ClearanceTrack clearances={record.clearances} preservedBefore={lastDeclineAt} />
+            <ClearanceTrack clearances={record.clearances} />
             <PaperGovernance record={record} />
             <PaperDocuments recordId={record.id} files={record.files} />
           </aside>

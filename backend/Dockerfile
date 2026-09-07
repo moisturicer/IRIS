@@ -64,5 +64,8 @@ RUN SECRET_KEY=dummy python manage.py collectstatic --noinput
 EXPOSE 8000
 
 # Production entry point -- gunicorn
-# TODO: switch to uvicorn if async views are added
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
+# ASGI, per ADR-017 (IR-156). Django calls the AI gateway over HTTP;
+# under sync WSGI workers that call blocks one of only four workers for
+# the whole duration of a model round trip, so four concurrent questions
+# stall every other request in the system. config/asgi.py already exists.
+CMD ["gunicorn", "config.asgi:application", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]

@@ -118,7 +118,7 @@ class Record(models.Model):
     # subjects and sensitive data, which none of the flags above cover.
     requires_ethics_review  = models.BooleanField(default=False)
 
-    # Conditional parallel-office routing (ADR-018, Proposed -- extends
+    # Conditional parallel-office routing (ADR-018 -- extends
     # ADR-002's transition table rather than replacing it). The submitter
     # requests offices here; apps.reviews.services.approve_record() reads
     # these at rdco_intake to decide which RecordClearance rows to create,
@@ -149,6 +149,16 @@ class Record(models.Model):
     pipeline_status = models.CharField(
         max_length=20, choices=PIPELINE_STATUS, default="draft", db_index=True
     )
+
+    # Resubmission history (IR-139). Both are maintained by
+    # reviews.services.resubmit_record and exist because neither can be derived
+    # after the fact: a decline's timestamp is when the reviewer decided, not
+    # when the owner resubmitted, and the gap between them is exactly the window
+    # in which a clearance is either preserved or re-granted. Serializing
+    # `preserved` from a decline timestamp would call a re-granted clearance
+    # preserved whenever an office happened to clear before the decline landed.
+    resubmission_count   = models.PositiveIntegerField(default=0)
+    last_resubmitted_at  = models.DateTimeField(null=True, blank=True)
 
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)

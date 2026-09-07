@@ -55,9 +55,26 @@ export interface RecordClearance {
   office:           "itso" | "ierc" | "ktto";
   office_label:     string;
   status:           "pending" | "cleared" | "declined" | "rejected";
+  /** Server-supplied wording, so a status can be renamed without a release. */
+  status_label:     string;
   comment:          string;
   reviewed_by_name: string | null;
   updated_at:       string;
+  /**
+   * True when this clearance survived a resubmission rather than being granted
+   * again. Derived by the server (IR-139) -- the client used to compute it from
+   * the last decline, which is a different rule than `resubmit_record` applies.
+   */
+  preserved:        boolean;
+}
+
+/** What happened across resubmissions, and which offices survived them. */
+export interface RecordResubmission {
+  count:               number;
+  last_resubmitted_at: string | null;
+  /** Null when a sequential stage declined -- that path preserves nothing. */
+  declining_office:    "itso" | "ierc" | "ktto" | null;
+  offices_preserved:   Array<"itso" | "ierc" | "ktto">;
 }
 
 export interface RecordFileItem {
@@ -82,7 +99,7 @@ export interface RecordDetail extends RecordListItem {
   record_type:     string | null;
   adviser:         number | null;
   added_by:        number | null;
-  /** ADR-018 (Proposed): what the submitter requested; RDCO confirms at intake. */
+  /** ADR-018: what the submitter requested; RDCO confirms at intake. */
   requires_ethics_review: boolean;
   requested_itso:  boolean;
   requested_ierc:  boolean;
@@ -93,6 +110,16 @@ export interface RecordDetail extends RecordListItem {
   reviews:         RecordReview[];
   /** Per-office clearance state — makes clearance-aware resubmission visible. */
   clearances:      RecordClearance[];
+  resubmission:    RecordResubmission;
+  /** Server-worded stage. Never map a pipeline key to English on the client. */
+  stage_label:     string;
+  /**
+   * The office whose clearance the *requesting user* would be recording, or
+   * null for Adviser and RDCO, who decide the record at a sequential stage.
+   * Server-derived so the client needs no role->office table of its own.
+   */
+  your_office:       "itso" | "ierc" | "ktto" | null;
+  your_office_label: string | null;
   files:           RecordFileItem[];
 }
 
@@ -108,7 +135,7 @@ export interface RecordFormData {
   is_ip?:                boolean;
   for_commercialization?: boolean;
   community_extension?:  boolean;
-  /** ADR-018 (Proposed): conditional parallel-office routing. */
+  /** ADR-018: conditional parallel-office routing. */
   requires_ethics_review?: boolean;
   requested_itso?:        boolean;
   requested_ierc?:        boolean;
