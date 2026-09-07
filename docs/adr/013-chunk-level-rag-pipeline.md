@@ -2,11 +2,13 @@
 
 ## Status
 
-Accepted — 2026-09-02 · **amended 2026-09-04, §Research Impact**
+Accepted — 2026-09-02 · **amended 2026-09-04, §Research Impact** · **amended 2026-09-08, §Decision (retrieval scope)**
 
 **Supersedes [ADR-006](006-minimum-rag-pipeline.md).** ADR-006's exclusions of full-text chunking, reranking and multiple providers are reversed. Its retrieval-visibility requirement and its timebox-with-fallback discipline are **retained** and restated below.
 
 > **Amendment, 2026-09-04 — RAG is reclassified as thesis-critical.** §Research Impact below originally read "RAG remains a supporting capability, not the thesis contribution." That framing is reversed, on the instruction of the project lead: RAG is thesis-critical work, alongside the clearance-aware resubmission workflow [ADR-003](003-clearance-aware-resubmission.md) describes, not subordinate to it. `CLAUDE.md`'s Scope rule — "cut RAG first if capacity is short" — is corrected to match. This does **not** change what ADR-003/ADR-004's controlled comparison measures: that evaluation is still of the workflow mechanism, unaffected by chunking. What changes is priority and protection, not the evaluation design.
+
+> **Amendment, 2026-09-08 — retrieval scope is the manuscript, not every upload.** This ADR never stated which of a record's documents belong in the chunked corpus, and the implementation that shipped answered the question by accident: `extract_pdf_text` queues chunking for anything uploaded through `SubmitDocumentView`, regardless of `UploadSlot` — Ethics Clearance, Patent Draft, Release Form, all of it — while the manuscript itself (`Record.abstract_file`, attached at submission) never enters the pipeline at all, because it is stored through a separate code path with no consumer. §Decision below adds the rule this ADR should have stated from the start: **the retrievable unit is a chunk of the manuscript.** Supplementary/administrative uploads are excluded from the RAG corpus on purpose, not by omission. Tracked as [IR-195](https://citiris.atlassian.net/browse/IR-195).
 
 ## Context
 
@@ -44,6 +46,8 @@ PDF → extraction → normalize → chunk → embed (per chunk)
 - **A timebox with a pre-committed fallback.** Revised to **7 dev-days**, ending Week 7. If chunk-level retrieval is not working at that point, ship **abstract-level semantic search** — the ADR-006 pipeline, which the schema still supports — and reclassify chunking as Phase 2. This is a decision rule fixed now, not a judgement to be made under pressure.
 
 **Still excluded:** conversational memory and history · summarization (FR-M4-02, deferred by ADR-001) · agents · HyDE.
+
+**Retrieval scope, added 2026-09-08: the manuscript only.** A record's chunked corpus is its manuscript — the required paper attached at submission — and nothing else. Documents attached to supplementary `UploadSlot`s (Ethics Clearance, Patent Draft, Patent Search Report, Release Form, Assessment File, and the rest of the type-specific slots) are **not** chunked or embedded, however they arrive. This is a document-*type* distinction, not an endpoint distinction: whatever mechanism ends up feeding the chunker (see IR-195) must key off "is this the manuscript," not off which upload path was used to attach the file. Rationale: several supplementary slots are staff-produced *after* submission (Patent Draft, Patent Search Report), several carry a different, potentially stricter disclosure/embargo posture than the manuscript itself, and none of them contain the methodology/sample/findings content this ADR's retrieval-quality argument (§Context) is about. Mixing them into the same index risks Ask IRIS grounding an answer in a release form instead of the paper — the "fluent but wrong" failure mode this ADR already treats as worse than no answer.
 
 ## Alternatives Considered
 
@@ -104,3 +108,5 @@ FR-M3-01 (extraction) · FR-M3-02 (FTS) · FR-M3-03 (embeddings) · FR-M4-01 (RA
 ## Related Tasks
 
 `R-01`…`R-06`, revised. See [`06-rag.md`](../architecture-tasks/06-rag.md).
+
+**IR-195** (2026-09-08): implements the manuscript-only retrieval scope this amendment adds — the manuscript currently doesn't reach the chunker at all, and supplementary uploads currently do.
