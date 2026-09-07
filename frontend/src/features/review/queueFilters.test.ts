@@ -71,4 +71,11 @@ ok("each tone also changes weight, so the signal is not colour alone",
   waitTone(7).includes("font-semibold") && waitTone(14).includes("font-bold"));
 
 console.log(`\n${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+// `throw`, not `process.exit` -- this file is typechecked by
+// `npm run build` (`tsc && vite build`), and the frontend has no
+// @types/node, so `process` is not a name here. An uncaught throw still
+// exits non-zero under node, which is what the harness needs. Matches
+// lib/access.test.ts, which does the same for the same reason.
+if (failed > 0) {
+  throw new Error(`${failed} queue-filter test(s) failed`);
+}
