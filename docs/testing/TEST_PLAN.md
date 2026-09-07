@@ -10,7 +10,7 @@
 
 ## 1 · Current state — stated plainly
 
-**The backend harness exists (IR-82):** `pytest.ini` + `conftest.py`, with DB-required tests skipping cleanly when no Postgres is reachable. Coverage is concentrated where the RAG pipeline was built out — `apps/ai` (chunking, extraction, ingestion, repositories) and `apps/documents` — plus an import smoke test (`apps/tests/test_boot.py`) and targeted authorization tests in `apps/records`.
+**The backend harness exists (IR-82):** `pytest.ini` + `conftest.py`, with DB-required tests skipping cleanly when no Postgres is reachable — **except where `IRIS_REQUIRE_DB` is set, which CI does, and where that same condition fails the run instead (IR-163).** Skipping is a convenience for a laptop with no database running; in CI it is how a suite reports success having executed nothing, which is what happened to the authorization suite until IR-165. The decision lives in `backend/core/harness.py` and is covered by `apps/tests/test_harness.py`. Coverage is concentrated where the RAG pipeline was built out — `apps/ai` (chunking, extraction, ingestion, repositories) and `apps/documents` — plus an import smoke test (`apps/tests/test_boot.py`) and targeted authorization tests in `apps/records`.
 
 **The frontend still has zero automated tests.** No test runner is installed; `npm run lint` and `npm run build` are the only automated frontend checks.
 
@@ -76,7 +76,8 @@ Not everything is worth testing equally. In order:
 **Rules**
 - **Do not mark a test as passed without execution evidence.**
 - **Do not modify a test to make it pass.** If the test is wrong, fix it deliberately and say so in the PR.
-- A skipped test is a failing test in disguise. If it is skipped, record why and when it returns.
+- A skipped test is a failing test in disguise. If it is skipped, record why and when it returns. **In CI this is enforced, not asked for:** `IRIS_REQUIRE_DB=1` turns a wholesale environment skip into a failed run, so the only skips that can reach a green build are individual tests opting out for a stated reason.
+- **Judge a run by what it executed, not by its colour.** Two green suites in this repo had run nothing — one via a namespace-package discovery failure (`Found 0 test(s)`, exit 0), one via environment skipping. Both looked identical to a passing build.
 - CI output is the default evidence. Manual evidence is for things CI cannot do.
 
 **There is no `TEST_EVIDENCE.md`, and there should not be.** A document asserting that evidence exists is not evidence. Evidence lives in CI runs, recorded outputs and artefacts, and is linked from [`TRACEABILITY.md`](TRACEABILITY.md).
@@ -90,6 +91,10 @@ Not everything is worth testing equally. In order:
 cd backend && python -m pytest -q
 cd backend && python -m pytest apps/reviews -v
 cd backend && python -m pytest apps/ai apps/documents   # RAG pipeline suites
+
+# Reproduce CI's contract locally: a missing database fails the run instead of
+# skipping it. Use this before claiming a suite passed.
+cd backend && IRIS_REQUIRE_DB=1 python -m pytest -ra
 
 # frontend
 cd frontend && npm run lint

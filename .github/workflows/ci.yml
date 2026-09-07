@@ -92,15 +92,24 @@ jobs:
           DB_PASSWORD: iris
           DB_HOST: localhost
           DB_PORT: '5432'
+          # The other half of the IR-165 fix. The postgres service above makes
+          # the database-backed tests *able* to run; this makes them *have* to.
+          # Without it, if the service fails to come up, conftest.py skips every
+          # TransactionTestCase and the job passes having verified nothing —
+          # which is exactly how the authorization suite shipped green without
+          # ever executing. `-ra` below makes a skip visible; this makes it
+          # fatal, and visible-but-not-fatal is what let it go unnoticed for a
+          # day. See backend/core/harness.py (IR-163).
+          IRIS_REQUIRE_DB: '1'
         # pytest and pytest-django are pinned in requirements/development.txt
         # (IR-82), already installed above. The import smoke test in
         # apps/tests/test_boot.py is what actually fails when the URLconf
         # cannot import — this step just has to run it.
         #
         # `-p no:randomly --strict-markers` is inherited from pytest.ini.
-        # `-ra` surfaces the skip reasons, which is how you notice the database
-        # went away again: a skipped authorization suite must be visible in the
-        # log, not silently green.
+        # `-ra` surfaces the skip reasons for the skips that remain legitimate
+        # (an individual test opting out), not for a wholesale environment
+        # failure — IRIS_REQUIRE_DB above stops the run outright for that.
         run: pytest -ra
 
   frontend:
