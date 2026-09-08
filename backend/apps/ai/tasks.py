@@ -53,26 +53,16 @@ def embed_record(self, record_id: int):
         raise self.retry(exc=exc, countdown=60)
 
 
-@shared_task(bind=True, max_retries=3)
-def chunk_record_document(self, upload_id: int, *, force: bool = False):
-    """Chunk an extracted upload and make the result the record's active
-    chunk set (IR-116 H).
-
-    Queued by ``extract_pdf_text`` the moment extraction succeeds, so an
-    upload reaches an active chunk set with no manual step — and in a worker,
-    because chunking a thesis is CPU work that has no business on the request
-    path.
+def _run_ingestion(self, extraction, force: bool) -> dict:
+    """Shared body of ``chunk_record_document``/``chunk_manuscript`` (IR-195):
+    both are thin wrappers that differ only in how they look up the
+    ``PdfExtraction`` row, then chunk it identically.
 
     ``IngestionError`` is not retried: it means the extraction has no
     structure to chunk, which four more attempts will not change.
     """
     from apps.ai.ingestion.pipeline import IngestionError, ingest_extraction
     from apps.ai.repositories import DjangoChunkRepository
-    from apps.documents.models import PdfExtraction
-
-    extraction = PdfExtraction.objects.filter(upload_id=upload_id).first()
-    if not extraction:
-        return None  # upload deleted between the task being queued and running
 
     try:
         outcome = ingest_extraction(
@@ -93,6 +83,47 @@ def chunk_record_document(self, upload_id: int, *, force: bool = False):
         "reused": outcome.reused,
         "soft_deleted": outcome.soft_deleted,
     }
+
+
+@shared_task(bind=True, max_retries=3)
+def chunk_record_document(self, upload_id: int, *, force: bool = False):
+    """Chunk a supplementary upload's extraction and make the result the
+    record's active chunk set.
+
+    Not queued by anything as of IR-195 (ADR-013's 2026-09-08 amendment):
+    supplementary uploads are excluded from the RAG corpus on purpose. Kept
+    for a caller that explicitly wants a non-manuscript document chunked
+    despite that -- there is currently none -- and because deleting a task
+    with real, tested behaviour costs nothing to keep and something to
+    reintroduce later if this ADR is ever revisited.
+    """
+    from apps.documents.models import PdfExtraction
+
+    extraction = PdfExtraction.objects.filter(upload_id=upload_id).first()
+    if not extraction:
+        return None  # upload deleted between the task being queued and running
+
+    return _run_ingestion(self, extraction, force)
+
+
+@shared_task(bind=True, max_retries=3)
+def chunk_manuscript(self, record_id: int, *, force: bool = False):
+    """Chunk a record's manuscript extraction and make the result the
+    record's active chunk set (IR-195).
+
+    Queued by ``extract_manuscript_text`` the moment extraction succeeds, so
+    a submitted manuscript reaches an active chunk set with no manual step --
+    mirrors ``chunk_record_document``, but looked up by ``record`` rather
+    than ``upload``, since the manuscript has no ``UploadSlot``/``RecordUpload``
+    to hang a ``PdfExtraction`` off of.
+    """
+    from apps.documents.models import PdfExtraction
+
+    extraction = PdfExtraction.objects.filter(record_id=record_id).first()
+    if not extraction:
+        return None  # record deleted, or its manuscript removed, before the task ran
+
+    return _run_ingestion(self, extraction, force)
 
 
 @shared_task

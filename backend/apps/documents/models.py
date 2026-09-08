@@ -70,17 +70,25 @@ class UploadReview(models.Model):
 
 class PdfExtraction(models.Model):
     """
-    Tracks the Celery PDF text-extraction task for a RecordUpload.
+    Tracks the Celery PDF text-extraction task for either a RecordUpload
+    (a supplementary document) or a Record's manuscript directly.
     Created immediately when a PDF is submitted; updated by the background task.
 
-    Two outputs, not one (IR-107 / ADR-013 / ADR-016).  ``extracted_text`` is
-    the flat string ``Record.search_vector`` indexes, and it keeps working
-    exactly as it did.  ``structure`` is the document the chunker consumes:
-    element kinds, headings, table rows, and the page and bounding-box data a
-    citation is highlighted from.  Flattening at extraction is irreversible —
-    coordinates cannot be recovered by matching chunk text back against a PDF
-    — so both are persisted, and the flat one is derived from the structured
-    one rather than extracted separately.
+    ``structure`` is the document the chunker consumes: element kinds,
+    headings, table rows, and the page and bounding-box data a citation is
+    highlighted from. Flattening at extraction is irreversible — coordinates
+    cannot be recovered by matching chunk text back against a PDF — so
+    ``structure`` is persisted alongside ``extracted_text`` rather than
+    derived from it later.
+
+    Exactly one of ``upload``/``record`` is set (IR-195, ADR-013's
+    2026-09-08 amendment): a supplementary upload has no manuscript to be
+    confused with, and the manuscript has no UploadSlot to hang off. Two
+    nullable one-to-ones plus a check constraint, rather than a polymorphic
+    "owner" field, because the two things they extract are handled by
+    different tasks with different triggers -- there is no code that wants
+    to treat them uniformly except the chunker, which already reads through
+    ``resolved_record_id`` rather than caring which one is set.
     """
     STATUS = [
         ("queued",  "Queued"),
@@ -89,7 +97,12 @@ class PdfExtraction(models.Model):
         ("failed",  "Failed"),
     ]
     upload         = models.OneToOneField(
-        RecordUpload, on_delete=models.CASCADE, related_name="pdf_extraction"
+        RecordUpload, on_delete=models.CASCADE, related_name="pdf_extraction",
+        null=True, blank=True,
+    )
+    record         = models.OneToOneField(
+        "records.Record", on_delete=models.CASCADE, related_name="manuscript_extraction",
+        null=True, blank=True,
     )
     status         = models.CharField(max_length=10, choices=STATUS, default="queued", db_index=True)
     extracted_text = models.TextField(blank=True)
@@ -110,9 +123,23 @@ class PdfExtraction(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(upload__isnull=False, record__isnull=True)
+                    | models.Q(upload__isnull=True, record__isnull=False)
+                ),
+                name="pdfextraction_exactly_one_of_upload_or_record",
+            ),
+        ]
 
     def __str__(self):
-        return f"PdfExtraction upload={self.upload_id} status={self.status}"
+        return f"PdfExtraction upload={self.upload_id} record={self.record_id} status={self.status}"
+
+    @property
+    def resolved_record_id(self):
+        """The record this extraction belongs to, however it got here."""
+        return self.upload.record_id if self.upload_id else self.record_id
 
     def as_normalized_document(self):
         """The stored structure as the document the chunker consumes, or

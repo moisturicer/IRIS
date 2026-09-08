@@ -24,7 +24,7 @@ from apps.ai.models import IngestionJob, get_active_embedding_space
 from apps.ai.models.chunk import ChunkSet as ChunkSetModel
 from apps.ai.models.chunk import DocumentChunk
 from apps.ai.repositories import DjangoChunkRepository
-from apps.ai.tasks import chunk_record_document
+from apps.ai.tasks import chunk_manuscript, chunk_record_document
 from apps.documents.models import PdfExtraction, RecordUpload, UploadSlot
 from apps.records.models import Record, RecordType
 
@@ -347,3 +347,54 @@ def _raise(error):
         raise error
 
     return _fail
+
+
+# ---------------------------------------------------------------------------
+# The manuscript path (IR-195) -- same task body, keyed by record not upload
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def manuscript_record(db):
+    record_type = RecordType.objects.create(name="Thesis")
+    return Record.objects.create(
+        title="A thesis",
+        record_type=record_type,
+        abstract_file=SimpleUploadedFile("thesis.pdf", b"%PDF-1.7 fake bytes"),
+    )
+
+
+@pytest.fixture
+def manuscript_extraction(manuscript_record):
+    return PdfExtraction.objects.create(
+        record=manuscript_record,
+        status="done",
+        structure=document_to_json(TEXT_LAYER_THESIS),
+        content_hash=extraction_hash(TEXT_LAYER_THESIS),
+        extractor="docling",
+    )
+
+
+def test_chunk_manuscript_produces_an_active_chunk_set(space, manuscript_record, manuscript_extraction):
+    result = chunk_manuscript.apply(args=[manuscript_record.id])
+
+    assert result.successful()
+    active = ChunkSetModel.objects.get(record_id=manuscript_record.id, is_active=True)
+    assert result.result["chunk_set_id"] == active.id
+    assert result.result["chunk_count"] == active.chunks.count()
+
+
+def test_chunk_manuscript_does_not_retry_an_extraction_with_nothing_to_chunk(space, manuscript_record):
+    PdfExtraction.objects.create(record=manuscript_record, status="failed")
+
+    result = chunk_manuscript.apply(args=[manuscript_record.id])
+
+    assert result.failed()
+    assert isinstance(result.result, IngestionError)
+
+
+def test_chunk_manuscript_a_deleted_extraction_row_is_not_an_error(space, manuscript_record):
+    result = chunk_manuscript.apply(args=[manuscript_record.id])
+
+    assert result.successful()
+    assert result.result is None
