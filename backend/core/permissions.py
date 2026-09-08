@@ -140,12 +140,37 @@ class IsOpportunityPoster(BasePermission):
         return obj.posted_by_id == request.user.pk
 
 
+def owns_or_staffs_record(user, record) -> bool:
+    """
+    May `user` reach this record's documents and act on the record itself?
+
+    The single owner-or-staff rule (IR-153). It was previously written out by
+    hand at five call sites -- four in `apps/documents/views.py`, one in
+    `apps/reviews/views.py` -- each spelling `get_role_name(...) in STAFF_ROLES
+    or record.owners.filter(...)` again. Five copies of an authorization rule is
+    five places for one of them to drift, and drift in this direction is silent:
+    the endpoint keeps working, it just stops refusing the right people.
+
+    Deliberately narrower than `Record.objects.visible_to()`, which is the
+    *read* predicate for record metadata and lets any authenticated user see a
+    published record. Being able to read a record's catalogue entry is not
+    permission to download its manuscript -- that is what `DownloadRequest`
+    exists to mediate.
+
+    `record.owners` is a `RecordOwner` queryset, so ownership is a membership
+    test, not an equality test against a single field.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if get_role_name(user) in STAFF_ROLES:
+        return True
+    return record.owners.filter(user=user).exists()
+
+
 class IsOwnerOrStaff(BasePermission):
     """
     Object-level: the user owns the record OR is a staff member.
     The view must attach `obj.owners` as a queryset or list of users.
     """
     def has_object_permission(self, request, view, obj):
-        if get_role_name(request.user) in STAFF_ROLES:
-            return True
-        return obj.owners.filter(user=request.user).exists()
+        return owns_or_staffs_record(request.user, obj)

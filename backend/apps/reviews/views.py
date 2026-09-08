@@ -182,10 +182,8 @@ class ReviewViewSet(viewsets.GenericViewSet):
         except Record.DoesNotExist:
             return Response({"detail": "Record not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from core.permissions import STAFF_ROLES, get_role_name
-        is_owner = record.owners.filter(user=request.user).exists()
-        is_staff = get_role_name(request.user) in STAFF_ROLES
-        if not (is_owner or is_staff):
+        from core.permissions import owns_or_staffs_record
+        if not owns_or_staffs_record(request.user, record):
             return Response(
                 {"detail": "Only the record owner may resubmit."},
                 status=status.HTTP_403_FORBIDDEN,
