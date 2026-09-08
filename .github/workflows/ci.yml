@@ -73,11 +73,39 @@ jobs:
 
       - name: Django configuration check
         # Fails while the URLconf cannot import — this is the point.
+        #
+        # The DB_* vars are mandatory as of IR-154: base.py reads them through
+        # required() and refuses to start when one is missing, so this step
+        # must supply them even though it never opens a connection.
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
           DEBUG: 'False'
+          DB_NAME: iris
+          DB_USER: iris
+          DB_PASSWORD: iris
+          DB_HOST: localhost
+          DB_PORT: '5432'
         run: python manage.py check
+
+      - name: Production settings refuse a public-unsafe configuration
+        # IR-154's testing requirement, as two runs of the real module rather
+        # than an assertion about its source. The first proves a correctly
+        # configured production deployment boots; the second proves an empty
+        # ALLOWED_HOSTS stops it. `!` inverts the exit code, so this step fails
+        # if the bad configuration is ever accepted.
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.production
+          SECRET_KEY: ci-only-not-a-real-secret
+          DB_NAME: iris
+          DB_USER: iris
+          DB_PASSWORD: iris
+          DB_HOST: localhost
+          DB_PORT: '5432'
+        run: |
+          ALLOWED_HOSTS=iris.example.edu           CORS_ALLOWED_ORIGINS=https://iris.example.edu             python -c "import django; django.setup(); from django.conf import settings; assert settings.DEBUG is False; assert settings.ALLOWED_HOSTS == ['iris.example.edu']; print('production settings boot OK')"
+          ! ALLOWED_HOSTS=             CORS_ALLOWED_ORIGINS=https://iris.example.edu             python -c "import django; django.setup()"
+          echo "production settings correctly refused an empty ALLOWED_HOSTS"
 
       - name: Migration consistency
         # The DB_* vars matter: without them this step reached for the settings
@@ -174,6 +202,16 @@ jobs:
         run: |
           cp backend/.env.example backend/.env
           cp ai/.env.example ai/.env
+          # The repo-root .env is what Compose interpolates ${DB_*} from
+          # (IR-154). Copying .env.example is not enough: its values are blank
+          # by design and `${VAR:?}` rejects blank exactly as it rejects unset,
+          # which is the behaviour the dev stack wants and this job must
+          # satisfy with throwaway values.
+          {
+            echo "DB_NAME=iris"
+            echo "DB_USER=iris"
+            echo "DB_PASSWORD=ci-only-not-a-real-secret"
+          } > .env
 
       - name: Validate development stack
         run: docker compose -f docker-compose.yml config --quiet

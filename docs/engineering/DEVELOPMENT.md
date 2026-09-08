@@ -71,7 +71,7 @@ cd backend
 
 pip install -r requirements/development.txt
 
-cp .env.example .env          # then fill in real values
+cp .env.example .env          # then fill in real values; see §7 -- the repo root needs its own .env for Compose
 
 python manage.py check        # passes (one deprecation warning: AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP)
 python manage.py migrate
@@ -118,6 +118,7 @@ npm run lint       # eslint src --ext ts,tsx
 ```bash
 # from the repository root
 docker compose config              # validate without building
+cp .env.example .env               # repo root — Compose needs it; see §7
 docker compose up --build          # currently FAILS — see §1
 docker compose logs -f backend
 docker compose down                # add -v to drop volumes
@@ -135,14 +136,48 @@ Workers consume the `default`, `extraction` and `embedding` queues (`docker-comp
 
 ## 7 · Environment variables
 
-`backend/.env.example` is the authoritative list. It holds keys and no real values.
+There are **two** example files, and they are not alternatives (IR-154):
+
+| File | Read by | Holds |
+|---|---|---|
+| `backend/.env.example` → `backend/.env` | Django and Celery, via `decouple` | Every application key. The authoritative list |
+| `.env.example` (repo root) → `.env` | **Docker Compose**, for `${VAR}` substitution | `DB_NAME`, `DB_USER`, `DB_PASSWORD` only |
+
+Compose needs its own file because `${DB_PASSWORD}` in a compose file is interpolated by Compose itself, which reads the repo-root `.env` and never looks inside `backend/.env`. Putting the credential there means the same three values provision the Postgres container *and* reach Django and every worker, so the two cannot drift. Both example files hold keys and no real values.
+
+**`docker compose up` fails by name without the root `.env`** — every reference is written `${DB_NAME:?set DB_NAME in the repo-root .env}`, which is the intended behaviour, not a bug to work around:
+
+```bash
+python scripts/setup_env.py   # creates both, never overwrites either
+```
+
+It derives the repo-root `.env` from your existing `backend/.env` when you have
+one, so the credentials match the `postgres_data` volume already on your
+machine — which is the failure below, avoided rather than documented. On a
+fresh checkout it generates a real `SECRET_KEY` and a random DB password and
+prints the `CREATE USER` / `CREATE DATABASE` statements to run. It is
+idempotent; run it whenever you are unsure.
+
+By hand instead, if you prefer:
+
+```bash
+cp .env.example .env          # repo root, for Compose
+cp backend/.env.example backend/.env
+```
+
+> **If you already have a `postgres_data` volume**, it was initialised with the
+> credentials this change retired, and `POSTGRES_*` is only read on *first*
+> init — so new credentials in the root `.env` produce authentication failures
+> against the existing volume, not a re-provisioned database. Either put the
+> values the volume was created with into `.env`, or drop the volume and let it
+> re-init: `docker compose down -v` (**destroys local data**).
 
 **Rules**
 - Never commit a real secret. If one is committed, **rotate it** — removing it from the diff is not enough
-- The application should fail to start on a missing required secret rather than defaulting silently
-- Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`
+- The application fails to start on a missing required secret rather than defaulting silently. `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have **no defaults**: `config/settings/base.py`'s `required()` raises `ImproperlyConfigured` naming the variable, and a value set to the empty string counts as missing
+- Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`. `config/settings/production.py` re-reads the last two without base's `localhost` default and refuses to start on an empty, `*` or non-https value
 
-`CORS_ALLOW_ALL_ORIGINS` together with `CORS_ALLOW_CREDENTIALS` is currently set in development. It permits any origin to make authenticated requests on a logged-in user's behalf and is removed by IR-61.
+`CORS_ALLOW_ALL_ORIGINS` is **gone** from every settings module (IR-154 — earlier text here attributing this to IR-61 is superseded; IR-61 was replaced by IR-154). It was set in development and, combined with `CORS_ALLOW_CREDENTIALS`, permitted any origin to make authenticated requests on a logged-in user's behalf. `development.py` now lists its dev origins explicitly, and `production.py` refuses to start if the setting reappears anywhere.
 
 ---
 
