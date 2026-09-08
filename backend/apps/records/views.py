@@ -25,7 +25,11 @@ from core.enums import (
 from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO, IsAdmin, IsAuthor
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
-from .models import Record, DownloadRequest, DeleteRequest, PUBLICLY_VISIBLE_STATUSES
+# PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
+# .models: IR-153 added it to this line while IR-135 moved the definition into
+# core.enums, and taking it from both was a redefinition. The models module
+# still re-exports it, so either import resolves -- the canonical one wins.
+from .models import Record, DownloadRequest, DeleteRequest
 from .serializers import (
     RecordListSerializer,
     RecordDetailSerializer,
