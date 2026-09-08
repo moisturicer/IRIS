@@ -3,16 +3,25 @@
 Before this fix, every task published to Celery's own implicit "celery"
 queue while docker-compose.yml's three workers consumed only "default",
 "extraction" and "embedding" -- so nothing dispatched was ever picked up.
-No database and no broker container is needed to catch that regression:
-the first tests below inspect the router's own resolution, and the last
-dispatches a real task against Celery's in-process "memory://" transport
-and lets an actual worker thread consume it, so a route that looks right
-but that no worker is subscribed to still fails.
+No broker container is needed to catch that regression: the first tests
+below inspect the router's own resolution, and the last dispatches a real
+task against Celery's in-process "memory://" transport and lets an actual
+worker thread consume it, so a route that looks right but that no worker is
+subscribed to still fails.
+
+That last claim was untrue until IR-196. The broker was overridden with
+`app.conf.update(broker_url=...)`, which this project's Celery ignores --
+`config/celery.py` loads settings via `config_from_object("django.conf:settings")`,
+so Django's live settings win over anything written into `app.conf`, without
+raising. The test ran against real Redis throughout, which is why it passed on
+a developer machine and failed in CI. It now overrides the Django setting and
+drops Celery's cached connection, and asserts the broker really changed.
 """
 
 import pytest
 from celery.contrib.testing.worker import start_worker
 from django.conf import settings
+from django.test import override_settings
 
 from config.celery import app as celery_app
 
@@ -24,6 +33,19 @@ from config.celery import app as celery_app
 WORKER_QUEUES = {settings.CELERY_TASK_DEFAULT_QUEUE} | {
     route["queue"] for route in settings.CELERY_TASK_ROUTES.values()
 }
+
+
+def _drop_cached_broker() -> None:
+    """Forget the broker connection Celery cached against the previous URL.
+
+    `app.amqp` is a cached property and `app._pool` holds live connections,
+    both bound to whatever `broker_url` said when they were first touched --
+    and the routing tests above touch `app.amqp.router` before this one runs.
+    Changing the setting alone therefore leaves the old connection in place;
+    dropping both is what makes the override take effect.
+    """
+    celery_app.__dict__.pop("amqp", None)
+    celery_app._pool = None
 
 
 def _resolved_queue(task_name: str) -> str:
@@ -71,19 +93,24 @@ def test_a_dispatched_task_is_consumed_by_a_worker_listening_on_its_queue():
     """
     from apps.ai.tasks import chunk_record_document
 
-    original = {
-        "broker_url": celery_app.conf.broker_url,
-        "result_backend": celery_app.conf.result_backend,
-        "task_always_eager": celery_app.conf.task_always_eager,
-    }
-    celery_app.conf.update(
-        broker_url="memory://",
-        result_backend="cache+memory://",
-        task_always_eager=False,
-    )
-    try:
-        with start_worker(celery_app, queues=["default"], perform_ping_check=False):
-            result = chunk_record_document.delay(999_999)
-            assert result.get(timeout=10) is None  # ran to completion, not left queued
-    finally:
-        celery_app.conf.update(**original)
+    with override_settings(
+        CELERY_BROKER_URL="memory://",
+        CELERY_RESULT_BACKEND="cache+memory://",
+        CELERY_TASK_ALWAYS_EAGER=False,
+    ):
+        _drop_cached_broker()
+
+        # Asserted, never assumed (IR-196). This test previously set the broker
+        # with `celery_app.conf.update(broker_url=...)`, which is silently
+        # discarded here -- so it dispatched against the real Redis every time,
+        # passing locally where the dev stack has one and failing in CI where
+        # there is none. A test that quietly reconnects to the real broker is
+        # not evidence about the memory transport.
+        assert celery_app.conf.broker_url == "memory://"
+
+        try:
+            with start_worker(celery_app, queues=["default"], perform_ping_check=False):
+                result = chunk_record_document.delay(999_999)
+                assert result.get(timeout=10) is None  # ran, not left queued
+        finally:
+            _drop_cached_broker()
