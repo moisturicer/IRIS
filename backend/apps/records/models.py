@@ -66,6 +66,48 @@ class RecordManager(models.Manager):
         """Records readable by any authenticated user. Keep this the only predicate."""
         return self.get_queryset().filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
 
+    def visible_to(self, user):
+        """
+        Every record `user` is entitled to read. The one read-visibility
+        predicate (IR-153) -- `RecordViewSet` applies it on every action, and AI
+        retrieval must filter through it too, so a generated citation can never
+        point at a record the reader cannot open.
+
+        Four disjoint grounds, in the order they matter:
+
+        * **Office staff** (KTTO/RDCO/ITSO/IERC) see everything. They run the
+          clearance pipeline; RDCO cannot perform intake review on a record it
+          cannot open.
+        * **Owners** see their own records at any pipeline status, which is what
+          makes a draft readable to the person writing it.
+        * **The assigned adviser** sees the record they advise. `Adviser` is in
+          `REVIEWER_ROLES` but deliberately not in `STAFF_ROLES`, so the role
+          alone grants nothing -- the grant is the `adviser` FK pointing at this
+          user. Without this, `adviser_review`, the first gate in the Proposal
+          pipeline, would be unreachable by the person who has to clear it.
+        * **Anyone authenticated** sees the public catalogue.
+
+        Anonymous users get nothing; DRF refuses them before this runs, but a
+        predicate that quietly returned the public catalogue to `AnonymousUser`
+        would be a trap for the next caller that reuses it outside a view.
+
+        Wider than `publicly_visible()` and narrower than the bare manager. The
+        `distinct()` is required because the owner clause joins through
+        `RecordOwner`, which can match a record more than once.
+        """
+        from core.permissions import STAFF_ROLES, get_role_name
+
+        qs = self.get_queryset()
+        if not user or not user.is_authenticated:
+            return qs.none()
+        if get_role_name(user) in STAFF_ROLES:
+            return qs
+        return qs.filter(
+            models.Q(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
+            | models.Q(owners__user=user)
+            | models.Q(adviser=user)
+        ).distinct()
+
 
 class Record(models.Model):
     PIPELINE_STATUS = [
