@@ -17,20 +17,6 @@ Pure: no Django, no I/O, no environment access, no clock.
 from typing import Iterable, Mapping, Sequence
 
 
-def _is_blank(value: object) -> bool:
-    """A secret set to the empty string is not a secret that is present.
-
-    This is the failure mode a deployment actually hits: an unset shell
-    variable interpolated into an env file yields ``KEY=``, not an absent key.
-    """
-    return value is None or (isinstance(value, str) and not value.strip())
-
-
-def missing_required(values: Mapping[str, object]) -> tuple[str, ...]:
-    """The names in ``values`` that are absent or blank, in the order given."""
-    return tuple(name for name, value in values.items() if _is_blank(value))
-
-
 def non_blank(entries: Iterable[object]) -> tuple[str, ...]:
     """The entries that survive stripping.
 
@@ -41,6 +27,30 @@ def non_blank(entries: Iterable[object]) -> tuple[str, ...]:
     return tuple(
         str(entry).strip() for entry in entries if not _is_blank(entry)
     )
+
+
+def _is_blank(value: object) -> bool:
+    """A value that is set to nothing is not a value that is present.
+
+    Two failure modes, both of which a deployment actually hits. A secret set
+    to the empty string: an unset shell variable interpolated into an env file
+    yields ``KEY=``, not an absent key. And a list-valued variable that parsed
+    to nothing: ``ALLOWED_HOSTS=`` read through ``csv_list`` is ``[]``, which
+    is exactly as unconfigured as an absent key and must not read as present
+    merely because it is no longer a string.
+    """
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return not non_blank(value)
+    return False
+
+
+def missing_required(values: Mapping[str, object]) -> tuple[str, ...]:
+    """The names in ``values`` that are absent or blank, in the order given."""
+    return tuple(name for name, value in values.items() if _is_blank(value))
 
 
 def production_problems(

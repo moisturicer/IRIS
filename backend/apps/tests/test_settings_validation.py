@@ -13,7 +13,10 @@ no credential literal *remaining* are properties of the repository, and a
 runtime assertion cannot see a literal sitting in a settings module that the
 active environment happens not to load.
 
-Pure: this module needs no Django, no database and no network.
+Needs no Django, no database and no network. The two sweeps do read files,
+so they are not pure — and because a repo-root file is not visible from
+inside the backend container, they skip with a stated reason there rather
+than searching nothing and reporting a pass.
 """
 
 import re
@@ -48,6 +51,21 @@ def test_a_blank_value_is_missing_not_present(blank):
     process boots with an empty ``SECRET_KEY``.
     """
     assert missing_required({"SECRET_KEY": blank}) == ("SECRET_KEY",)
+
+
+@pytest.mark.parametrize("empty", [[], [""], ["  ", ""], ()])
+def test_a_list_valued_setting_that_parsed_to_nothing_is_missing(empty):
+    """``ALLOWED_HOSTS=`` through ``csv_list`` is ``[]``.
+
+    It stops being a string at that point, and an is-it-blank check written
+    only for strings calls it present — which is how a required list-valued
+    setting gets required in name only.
+    """
+    assert missing_required({"ALLOWED_HOSTS": empty}) == ("ALLOWED_HOSTS",)
+
+
+def test_a_populated_list_is_not_missing():
+    assert missing_required({"ALLOWED_HOSTS": ["iris.cit.edu"]}) == ()
 
 
 def test_every_missing_name_is_reported_not_just_the_first():
@@ -210,12 +228,21 @@ def test_no_retired_credential_literal_remains_in_tracked_configuration():
     deployment still uses them — rotation is the other half of this criterion
     and is an operations step, recorded on the ticket.
     """
+    present = [r for r in SEARCHED_FILES if (REPO_ROOT / r).exists()]
+    missing = [r for r in SEARCHED_FILES if r not in present]
+    # The backend container mounts only backend/ at /app, so the Compose files
+    # are unreachable from inside it. Skipping says so; searching four of six
+    # files and passing would report this criterion met on the strength of the
+    # two files that never held the credential.
+    if missing:
+        pytest.skip(
+            "not a full checkout — cannot see " + ", ".join(missing) + ". "
+            "This sweep runs in CI and on a developer machine."
+        )
+
     offenders = []
-    for relative in SEARCHED_FILES:
-        path = REPO_ROOT / relative
-        if not path.exists():
-            continue
-        for line in _code_lines(path.read_text(encoding="utf-8")):
+    for relative in present:
+        for line in _code_lines((REPO_ROOT / relative).read_text(encoding="utf-8")):
             for credential in RETIRED_CREDENTIALS:
                 if credential in line:
                     offenders.append(f"{relative}: {credential} -> {line}")
