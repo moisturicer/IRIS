@@ -387,7 +387,7 @@ Both files are currently unreachable (shadowed by the `views/` and `models/` pac
 | S3 / media storage | `# TODO: configure S3 for MEDIA_ROOT via django-storages` — `django-storages[s3]` installed, unconfigured |
 | Sentry | `# TODO: configure Sentry DSN` — `sentry-sdk` in `production.txt`, never initialised |
 | `SECRET_KEY` | No default (good — fails loudly), but `.env.example` ships `change-me-in-production` |
-| DB credentials | `base.py:79-82` defaults to `iris_user` / `iris_password`; both compose files hardcode the same values |
+| DB credentials | ~~`base.py` defaulted to a committed user/password; both compose files hardcoded the same values~~ **Superseded by IR-154 (2026-09-08): fixed.** |
 | `DEBUG` | Defaults to `False` (good), but `docker-compose.yml` runs the development settings module |
 | Media serving | nginx serves `/media/` directly from a shared volume with **no authorization** — see below |
 
