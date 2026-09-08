@@ -63,9 +63,26 @@ class SubmitOwnershipTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
     def test_non_owner_non_staff_cannot_submit_someone_elses_draft(self):
+        """
+        404, not 403, since IR-153.
+
+        The refusal this test exists to prove is unchanged -- a non-owner still
+        cannot move someone else's draft into the pipeline, which is what the
+        pipeline_status assertion below pins down. What changed is *which*
+        refusal: `RecordViewSet.get_queryset()` now filters by
+        `Record.objects.visible_to(user)`, so a draft this user cannot see is
+        already absent from the queryset by the time `get_object()` looks, and
+        DRF raises 404 before `IsOwnerOrStaff` ever runs.
+
+        The 403 asserted here previously was the weaker answer: it confirmed
+        that a record with this id exists and is someone's draft. Deliberately
+        updated rather than worked around -- a non-owner acting on a record they
+        *can* see (a published one) still gets 403 from `IsOwnerOrStaff`, so
+        both codes remain reachable and mean different things.
+        """
         self.client.force_authenticate(self.other)
         response = self._submit()
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND, response.data)
         self.record.refresh_from_db()
         self.assertEqual(self.record.pipeline_status, "draft")
 
