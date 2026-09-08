@@ -153,7 +153,7 @@ cp backend/.env.example backend/.env
 ```
 
 > **If you already have a `postgres_data` volume**, it was initialised with the
-> old `iris_user` / `iris_password` and `POSTGRES_*` is only read on *first*
+> credentials this change retired, and `POSTGRES_*` is only read on *first*
 > init — so new credentials in the root `.env` produce authentication failures
 > against the existing volume, not a re-provisioned database. Either put the
 > values the volume was created with into `.env`, or drop the volume and let it
