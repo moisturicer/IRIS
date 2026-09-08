@@ -137,17 +137,27 @@ def test_empty_cors_allowed_origins_is_a_problem():
     assert any("CORS_ALLOWED_ORIGINS" in p for p in problems), problems
 
 
-def test_a_plaintext_http_origin_is_a_problem_in_production():
-    """production.py sets ``SECURE_SSL_REDIRECT = True``, so an http origin in
-    the allowlist is either dead configuration or a downgrade."""
-    problems = production_problems(
-        **_production_kwargs(cors_allowed_origins=["http://iris.cit.edu"])
-    )
+def test_a_plaintext_http_origin_is_allowed_for_now():
+    """Deliberately NOT a problem.
 
-    assert any("http://iris.cit.edu" in p for p in problems), problems
+    An https-only rule is the obvious next check and production.py does set
+    SECURE_SSL_REDIRECT — but S-04 puts TLS termination out of scope (D-03),
+    and this ticket's Definition of Done requires an interim deployment running
+    with DEBUG=False. Refusing an http origin would stop that deployment
+    booting at all. This test pins the decision so adding the rule is a
+    deliberate change rather than a silent one.
+    """
+    assert (
+        production_problems(
+            **_production_kwargs(cors_allowed_origins=["http://iris.cit.edu"])
+        )
+        == ()
+    )
 
 
 def test_problems_accumulate_rather_than_short_circuiting():
+    """Asserted by content, not by count — a count breaks whenever a message
+    is added or reworded, which is not the property under test."""
     problems = production_problems(
         debug=True,
         allowed_hosts=[],
@@ -155,7 +165,14 @@ def test_problems_accumulate_rather_than_short_circuiting():
         cors_allow_all_origins=True,
     )
 
-    assert len(problems) == 4, problems
+    joined = " | ".join(problems)
+    for expected in (
+        "DEBUG",
+        "ALLOWED_HOSTS",
+        "CORS_ALLOW_ALL_ORIGINS",
+        "CORS_ALLOWED_ORIGINS is empty",
+    ):
+        assert expected in joined, (expected, problems)
 
 
 # ---- repository-level sweeps ---------------------------------------------
@@ -214,6 +231,12 @@ RETIRED_CREDENTIALS = ("iris_password", "change-me-in-production")
 SEARCHED_FILES = (
     "docker-compose.yml",
     "docker-compose.prod.yml",
+    # The AC is "no credential literal remains in the repository", which is
+    # wider than S-04's grep over docker-compose*.yml and backend/config/.
+    # README.md shipped the password three times -- a CREATE USER statement, a
+    # sample .env and a defaults table -- and that grep would never have seen
+    # it.
+    "README.md",
     "backend/.env.example",
     "backend/config/settings/base.py",
     "backend/config/settings/development.py",

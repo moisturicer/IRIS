@@ -202,6 +202,15 @@ jobs:
         run: |
           cp backend/.env.example backend/.env
           cp ai/.env.example ai/.env
+          # The repo-root .env is what Compose interpolates ${DB_*} from
+          # (IR-154). Copying .env.example is not enough: its values are blank
+          # by design and `${VAR:?}` rejects blank exactly as it rejects unset,
+          # which is the behaviour the dev stack wants and this job must
+          # satisfy with throwaway values.
+          printf 'DB_NAME=iris
+DB_USER=iris
+DB_PASSWORD=ci-only-not-a-real-secret
+' > .env
 
       - name: Validate development stack
         run: docker compose -f docker-compose.yml config --quiet

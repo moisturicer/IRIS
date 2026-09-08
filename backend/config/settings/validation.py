@@ -100,12 +100,11 @@ def production_problems(
             "CORS_ALLOWED_ORIGINS is empty — set it to the deployed frontend "
             "origin."
         )
-    for origin in origins:
-        if not origin.startswith("https://"):
-            problems.append(
-                f"CORS_ALLOWED_ORIGINS contains a non-https origin: {origin}. "
-                "production.py sets SECURE_SSL_REDIRECT, so this is either "
-                "dead configuration or a downgrade."
-            )
+    # No https-only rule here on purpose. It is the obvious next check, and
+    # production.py does set SECURE_SSL_REDIRECT — but S-04 puts TLS
+    # termination out of scope (D-03), and this ticket's Definition of Done
+    # requires an interim deployment running with DEBUG=False. Refusing an
+    # http origin would stop that deployment booting at all. Worth adding the
+    # day TLS lands, not before.
 
     return tuple(problems)

@@ -152,6 +152,13 @@ cp .env.example .env          # repo root, for Compose
 cp backend/.env.example backend/.env
 ```
 
+> **If you already have a `postgres_data` volume**, it was initialised with the
+> old `iris_user` / `iris_password` and `POSTGRES_*` is only read on *first*
+> init — so new credentials in the root `.env` produce authentication failures
+> against the existing volume, not a re-provisioned database. Either put the
+> values the volume was created with into `.env`, or drop the volume and let it
+> re-init: `docker compose down -v` (**destroys local data**).
+
 **Rules**
 - Never commit a real secret. If one is committed, **rotate it** — removing it from the diff is not enough
 - The application fails to start on a missing required secret rather than defaulting silently. `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have **no defaults**: `config/settings/base.py`'s `required()` raises `ImproperlyConfigured` naming the variable, and a value set to the empty string counts as missing
