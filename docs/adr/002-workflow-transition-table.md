@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-01
+Accepted — 2026-09-01. **Amended 2026-09-09** (see [Amendment](#amendment--2026-09-09-the-tables-shape-and-where-it-lives)): the table is two structures rather than one, stage kind is declared, and the table is settings-overridable per instance. The Decision itself — the key, the module, the rejections — is unchanged.
 
 ## Context
 
@@ -34,6 +34,62 @@ Introduce `records/lifecycle.py`: a **declarative transition table** keyed by `(
 Views name **events** (`submit`, `approve`, `decline`, `mark_complete`, `legacy_import`), never status strings. `reviews/services.py` calls the table instead of assigning. `core/enums.py` supplies the status, stage, office and event vocabularies.
 
 Resubmission policy is a table parameter, not a code branch (ADR-004).
+
+## Amendment — 2026-09-09: the table's shape and where it lives
+
+The Decision above fixes the *key* and names the module. It does not say what the table is made
+of, nor how "configuration rather than a fork" is actually discharged. Both were settled in
+design review on 2026-09-09, before IR-136 was started, and are recorded here because
+`docs/adr/` is the design authority — a mechanism this load-bearing should not exist only in a
+ticket comment.
+
+**1. Two structures, not one.** The key `(from_status, event, actor_role)` describes an *edge*.
+"IERC and KTTO clear concurrently" is a property of a *node*, and no edge table can express it.
+`records/lifecycle.py` therefore carries a `STAGES` registry — per stage: its kind, its
+participating offices, and its label — alongside the `TRANSITIONS` edge table.
+
+**2. Stage kind is declared, not inferred.** Each stage is declared `sequential` or `parallel`.
+This one declaration serves three call sites that today each re-derive it:
+
+- `resubmit_record` chooses preserve-vs-restart by testing `last_decline.stage` against a set
+  literal, `CLEARANCE_OFFICES`. **That set literal is where ADR-003's primary research
+  contribution currently lives**, which is not where a reader — or an examiner — would look for
+  it. It reads the table instead.
+- `submit_clearance`'s guard uses a second, parallel notion of the same idea at the status
+  level (`CLEARANCE_STATUSES = {itso_review, parallel_review}`). Two notions of "is this a
+  clearance stage" are two things to keep in sync.
+- `apply()` needs it to know how to populate `Review.stage` — see 5 below.
+
+**3. The table is settings-overridable per instance.** A dict literal edited per tenant is a
+fork of application code, which is precisely what the Consequences section says this ADR
+prevents. `lifecycle.py` holds CIT-U's table as the default; a Django setting overrides it per
+instance. This is what makes ADR-005's "configuration within the instance" literally true
+without a `tenant_id`, a migration, or DB-backed routing rows — and it is also how ADR-004's
+`RESTART_ALL` evaluation instance differs from production: one settings value, nothing else.
+
+**Consequently, "adding a fourth office requires no code change" stands as written**, provided
+"code" means application code. Adding an office is a settings edit. IR-136's acceptance
+criterion was briefly read as needing to be weakened; it does not.
+
+**4. Labels default from the enums and may be overridden.** `core/enums.py` (IR-135) supplies
+the label for every stage and office. The settings table may override any of them, so a tenant
+that calls IERC "Ethics Review Board" changes one key rather than restating twelve. The
+frontend still never maps a key to English — it reads whichever label the API serialized.
+
+**5. `Review.stage` is populated two different ways, and that asymmetry is deliberate.**
+`Review.stage` is a union: three sequential gates (`adviser`, `rdco_intake`, `rdco`) and three
+offices (`itso`, `ierc`, `ktto`) — `submit_clearance` already writes an office into it. For a
+sequential stage the value is a property of the stage, so `STAGES` declares it (absorbing
+`_STATUS_TO_STAGE`). For a parallel stage it is **not**: `parallel_review` records `ierc` or
+`ktto` depending on who acted, resolved through `ROLE_TO_OFFICE`, so `apply()` derives it from
+the actor's role.
+
+`ReviewStage` and `Office` therefore remain two enums that deliberately share three values, and
+the overlap is load-bearing rather than accidental. An invariant test asserts
+`Office.values ⊆ ReviewStage.values` so they cannot drift.
+
+**What this amendment does not change:** the key, the module, the rejection of `django-fsm` and
+BPM engines, and the instruction not to grow the table into a workflow engine.
 
 ## Alternatives Considered
 

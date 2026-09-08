@@ -13,7 +13,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | ADR | Title | Status | Impact |
 |---|---|---|---|
 | [001](001-mvp-scope-boundary.md) | MVP scope boundary for Semester 2 | Accepted | Scope |
-| [002](002-workflow-transition-table.md) | Workflow as a declarative transition table | Accepted | Architecture · Research · SaaS |
+| [002](002-workflow-transition-table.md) | Workflow as a declarative transition table | Accepted · amended 2026-09-09 | Architecture · Research · SaaS |
 | [003](003-clearance-aware-resubmission.md) | Clearance-aware resubmission | Accepted | **Research contribution** |
 | [004](004-restart-all-comparison-mode.md) | Restart-all as a configurable comparison policy | Accepted | **Research evaluation** |
 | [005](005-instance-per-tenant.md) | Instance-per-tenant rather than pooled multi-tenancy | Accepted | SaaS · Security |
