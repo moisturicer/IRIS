@@ -1,12 +1,49 @@
 from pathlib import Path
 from datetime import timedelta
-from decouple import config
+
+from decouple import UndefinedValueError, config
+from django.core.exceptions import ImproperlyConfigured
+
+from .validation import missing_required, non_blank
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = config("SECRET_KEY")
+
+def csv_list(value):
+    """A comma-separated environment variable as a list, blanks dropped.
+
+    ``"".split(",")`` is ``[""]`` — one blank entry, which reads as configured
+    everywhere it is checked for emptiness. Everything list-shaped here goes
+    through this instead.
+    """
+    return list(non_blank(str(value).split(",")))
+
+
+def required(name, cast=str):
+    """Read a mandatory setting, or refuse to start (IR-154).
+
+    CLAUDE.md's Environment and secrets rule: the app fails to start on a
+    missing required secret rather than defaulting silently. A default is what
+    turns a forgotten variable into a deployment running on the credential that
+    was committed to the repository — which is the bug this ticket exists to
+    close, not a convenience worth keeping.
+    """
+    try:
+        value = config(name, cast=cast)
+    except UndefinedValueError:
+        value = None
+
+    if missing_required({name: value}):
+        raise ImproperlyConfigured(
+            f"{name} is not set. It has no default: see backend/.env.example "
+            "for every variable this deployment must supply."
+        )
+    return value
+
+
+SECRET_KEY = required("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost").split(",")
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost", cast=csv_list)
 
 # ---- Apps ---------------------------------------------------------------
 
@@ -81,12 +118,18 @@ ASGI_APPLICATION = "config.asgi.application"
 
 # ---- Database -----------------------------------------------------------
 
+# The three credential components have no defaults on purpose (IR-154). The
+# defaults they replace were credential literals in the repository, and they
+# were live: both Compose files provisioned Postgres with exactly those
+# values, so a deployment that forgot to set them did not fail — it connected.
+# HOST and PORT keep defaults because neither is a credential and
+# localhost:5432 is the right guess when running outside Compose.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_NAME", default="iris_db"),
-        "USER": config("DB_USER", default="iris_user"),
-        "PASSWORD": config("DB_PASSWORD", default="iris_password"),
+        "NAME": required("DB_NAME"),
+        "USER": required("DB_USER"),
+        "PASSWORD": required("DB_PASSWORD"),
         "HOST": config("DB_HOST", default="localhost"),
         "PORT": config("DB_PORT", default="5432"),
     }
@@ -154,7 +197,15 @@ SIMPLE_JWT = {
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
 
-CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
+# An explicit allowlist, always — there is no "allow all" switch in any
+# settings module, and production.py refuses to start if one reappears.
+# CORS_ALLOW_CREDENTIALS below is why: with credentials enabled, a wildcard
+# origin lets any site make authenticated requests on a logged-in user's
+# behalf. Defaults to the single configured frontend origin; set
+# CORS_ALLOWED_ORIGINS when a deployment serves more than one.
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS", default=FRONTEND_URL, cast=csv_list
+)
 CORS_ALLOW_CREDENTIALS = True
 
 # ---- Email --------------------------------------------------------------

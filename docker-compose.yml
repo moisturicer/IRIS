@@ -13,15 +13,18 @@ services:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: iris_db
-      POSTGRES_USER: iris_user
-      POSTGRES_PASSWORD: iris_password
+      # Sourced from the repo-root .env (see .env.example). ":?" makes an
+      # unset value stop `docker compose up` with a named error instead of
+      # provisioning Postgres with a credential committed to the repository.
+      POSTGRES_DB: ${DB_NAME:?set DB_NAME in the repo-root .env}
+      POSTGRES_USER: ${DB_USER:?set DB_USER in the repo-root .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U iris_user -d iris_db" ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -55,6 +58,9 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
       - DB_HOST=db
+      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
+      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -116,7 +122,12 @@ services:
     env_file:
       - ./ai/.env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://iris_user:iris_password@db:5432/iris_db
+      # Same repo-root .env as every other service, so the credential is
+      # configured in exactly one place. Note ADR-014 precondition 4 says
+      # the gateway gets no direct DB access at all -- that this DSN
+      # exists is a contradiction recorded on IR-154, to be resolved by
+      # IR-58, not silently here.
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:?set DB_USER in the repo-root .env}:${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}@db:5432/${DB_NAME:?set DB_NAME in the repo-root .env}
       - UVICORN_WORKERS=4
       - MAX_CONCURRENT_LLM=80
     depends_on:
@@ -149,6 +160,9 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
       - DB_HOST=db
+      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
+      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -174,6 +188,9 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
       - DB_HOST=db
+      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
+      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -205,6 +222,9 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
       - DB_HOST=db
+      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
+      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -229,6 +249,10 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.development
       - CELERY_BROKER_URL=redis://redis:6379/0
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
+      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
     depends_on:
       redis:
         condition: service_healthy
