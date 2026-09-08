@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-01. **Amended 2026-09-09** (see [Amendment](#amendment--2026-09-09-the-tables-shape-and-where-it-lives)): the table is two structures rather than one, stage kind is declared, and the table is settings-overridable per instance. The Decision itself — the key, the module, the rejections — is unchanged.
+Accepted — 2026-09-01 · **amended 2026-09-09, §Amendment (shape and mechanism — PROPOSED, not yet built)**
 
 ## Context
 
@@ -37,15 +37,27 @@ Resubmission policy is a table parameter, not a code branch (ADR-004).
 
 ## Amendment — 2026-09-09: the table's shape and where it lives
 
+**Status of everything below: PROPOSED, not CURRENT.** None of it is built. It is the design
+IR-136 will be implemented to, settled in review on 2026-09-09 *before* that card was started,
+and recorded here because `docs/adr/` is the design authority — a mechanism this load-bearing
+should not exist only in a ticket comment. Read every "carries", "declares" and "asserts" below
+as *will*, and check the code before believing any of it describes today.
+
+**A conflict this amendment is recorded against, rather than reconciling.**
+[`SDLC.md`](../engineering/SDLC.md) §10 has two rows that disagree about this case: a *design
+change* takes "a new **or amended** ADR", while *an architectural decision* takes "a new ADR —
+never edit an accepted one; supersede it." Amending in place follows established practice
+here — ADR-010, ADR-013 and ADR-016 all do it — and this change records the shape of an
+already-accepted decision rather than making a new one, so it is treated as the first row. The
+contradiction in SDLC.md is real and is left standing to be resolved deliberately, per
+CLAUDE.md's source-of-truth rule.
+
 The Decision above fixes the *key* and names the module. It does not say what the table is made
-of, nor how "configuration rather than a fork" is actually discharged. Both were settled in
-design review on 2026-09-09, before IR-136 was started, and are recorded here because
-`docs/adr/` is the design authority — a mechanism this load-bearing should not exist only in a
-ticket comment.
+of, nor how "configuration rather than a fork" is actually discharged.
 
 **1. Two structures, not one.** The key `(from_status, event, actor_role)` describes an *edge*.
 "IERC and KTTO clear concurrently" is a property of a *node*, and no edge table can express it.
-`records/lifecycle.py` therefore carries a `STAGES` registry — per stage: its kind, its
+`records/lifecycle.py` will therefore carry a `STAGES` registry — per stage: its kind, its
 participating offices, and its label — alongside the `TRANSITIONS` edge table.
 
 **2. Stage kind is declared, not inferred.** Each stage is declared `sequential` or `parallel`.
@@ -64,12 +76,27 @@ This one declaration serves three call sites that today each re-derive it:
 fork of application code, which is precisely what the Consequences section says this ADR
 prevents. `lifecycle.py` holds CIT-U's table as the default; a Django setting overrides it per
 instance. This is what makes ADR-005's "configuration within the instance" literally true
-without a `tenant_id`, a migration, or DB-backed routing rows — and it is also how ADR-004's
-`RESTART_ALL` evaluation instance differs from production: one settings value, nothing else.
+without a `tenant_id`, a migration, or DB-backed routing rows. ADR-004 sets its resubmission
+policy "per instance", and this is the mechanism that will carry it.
 
-**Consequently, "adding a fourth office requires no code change" stands as written**, provided
-"code" means application code. Adding an office is a settings edit. IR-136's acceptance
-criterion was briefly read as needing to be weakened; it does not.
+**What this does NOT achieve: IR-136's "adding a fourth office requires no code change" is not
+satisfiable as written, and that criterion needs weakening.** A settings-overridable table
+*references* offices; it does not *define* them. Office identity lives in application code and
+in several places at once: `core/enums.py`'s `Office` hardcodes `itso`/`ierc`/`ktto`,
+`ROLE_TO_OFFICE` in `reviews/services.py` maps the same three, `RecordClearance.office` binds
+`choices=Office.choices`, and a fourth office also needs a `RoleName` member and a seeded
+`Role` row. Decision 3 above — offices stay in code, not database rows — is what makes this
+true; the two are consistent, not in tension, but only once stated plainly.
+
+An earlier draft of this amendment claimed the criterion *was* satisfied because a settings
+edit is not an application-code change. **That was wrong**, and it was caught in review rather
+than by its author. Recorded here rather than quietly deleted, because the reasoning is
+seductive and someone will re-derive it.
+
+**The honest criterion is: adding a fourth office touches one enum, one role map and the
+table — not eighteen call sites.** That is still the SaaS seam ADR-002 is claiming, and it is
+still a large improvement on today. Making the office roster itself configuration is a
+different, larger decision, out of scope for IR-136 and not taken here.
 
 **4. Labels default from the enums and may be overridden.** `core/enums.py` (IR-135) supplies
 the label for every stage and office. The settings table may override any of them, so a tenant
@@ -85,8 +112,17 @@ sequential stage the value is a property of the stage, so `STAGES` declares it (
 the actor's role.
 
 `ReviewStage` and `Office` therefore remain two enums that deliberately share three values, and
-the overlap is load-bearing rather than accidental. An invariant test asserts
+the overlap is load-bearing rather than accidental. An invariant test will assert
 `Office.values ⊆ ReviewStage.values` so they cannot drift.
+
+**6. The table does not become the authorization mechanism.** It declares which transitions are
+*legal*; it does not decide who may act — that stays where ADR-009 and IR-165 put it. This is
+forced rather than chosen, and the reason is worth recording because keying edges on
+`actor_role` makes the opposite look natural: `_can_review` checks
+`record.adviser_id == user.pk` — **the assigned adviser, not any Adviser.** That is a
+per-record condition, and a table keyed on a *role* cannot express it. Two checks, both of
+which must pass. IR-136 lists the role→stage authorization rule as out of scope, and this is
+why that boundary holds rather than being a convenience.
 
 **What this amendment does not change:** the key, the module, the rejection of `django-fsm` and
 BPM engines, and the instruction not to grow the table into a workflow engine.
