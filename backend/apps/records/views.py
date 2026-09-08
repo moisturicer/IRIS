@@ -25,7 +25,7 @@ from core.enums import (
 from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO, IsAdmin, IsAuthor
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
-from .models import Record, DownloadRequest, DeleteRequest
+from .models import Record, DownloadRequest, DeleteRequest, PUBLICLY_VISIBLE_STATUSES
 from .serializers import (
     RecordListSerializer,
     RecordDetailSerializer,
@@ -63,17 +63,33 @@ class RecordViewSet(viewsets.ModelViewSet):
     ordering         = ["-created_at"]
 
     def get_queryset(self):
-        # Public list shows published research, approved (ongoing) and completed proposals
-        if self.action == "list":
-            # distinct=True: the college/department filters join through owners.
-            return Record.objects.publicly_visible().annotate(
-                file_count=Count("files", distinct=True)
-            ).select_related(
-                "classification", "psced", "record_type", "adviser"
-            ).prefetch_related("owners__user", "authors")
-        return Record.objects.select_related(
+        # One visibility predicate, applied on EVERY action (IR-153). This
+        # previously filtered only on "list" and returned the bare manager for
+        # everything else, so GET /records/<id>/ served any record -- including
+        # unpublished drafts -- to any authenticated account.
+        #
+        # Filtering here rather than raising in a permission class is what makes
+        # the refusal a 404: DRF's get_object() looks the record up in this
+        # queryset, so "not yours" and "does not exist" produce the same
+        # response and the API never confirms someone else's draft exists.
+        qs = Record.objects.visible_to(self.request.user).select_related(
             "classification", "psced", "record_type", "adviser"
         ).prefetch_related("owners__user", "authors")
+
+        if self.action == "list":
+            # Discover is a public catalogue, not an authorization boundary, so
+            # it narrows further. visible_to() is wider than the catalogue --
+            # it also admits your own drafts and, for staff, everything -- and
+            # browse must not surface either. Own records live at
+            # /records/mine/ (MyRecordsViewSet). This filter only ever removes
+            # rows from what visible_to() already allowed.
+            #
+            # distinct=True on the count: the college/department filters join
+            # through owners.
+            qs = qs.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).annotate(
+                file_count=Count("files", distinct=True)
+            )
+        return qs
 
     def get_serializer_class(self):
         if self.action == "list":

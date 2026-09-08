@@ -198,15 +198,25 @@ class OwnershipMatrixTests(APITestCase):
     def test_a_student_cannot_submit_another_students_draft(self):
         url = reverse("record-submit", args=[self.record.pk])
 
+        # 404, not 403, since IR-153: the record is a draft, so
+        # `Record.objects.visible_to(stranger)` excludes it and `get_object()`
+        # raises before `IsOwnerOrStaff` runs. The refusal asserted here is the
+        # same refusal; only its code changed, and it changed to the one that
+        # does not confirm the draft exists. Updated deliberately -- see the
+        # docstring on SubmitOwnershipTests.
         self.client.force_authenticate(self.stranger)
         self.assertEqual(
-            self.client.post(url, {}, format="json").status_code, 403,
+            self.client.post(url, {}, format="json").status_code, 404,
             "a non-owning Student must not submit someone else's draft",
         )
 
+        # Widened from `!= 403` to cover both refusal codes: with visibility
+        # filtering in the queryset, a 404 is now just as much a refusal as a
+        # 403, and this half of the assertion exists to prove the owner is *not*
+        # refused.
         self.client.force_authenticate(self.owner)
-        self.assertNotEqual(
-            self.client.post(url, {}, format="json").status_code, 403,
+        self.assertNotIn(
+            self.client.post(url, {}, format="json").status_code, (403, 404),
             "the owner must be able to submit their own draft",
         )
 
