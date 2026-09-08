@@ -207,10 +207,11 @@ jobs:
           # by design and `${VAR:?}` rejects blank exactly as it rejects unset,
           # which is the behaviour the dev stack wants and this job must
           # satisfy with throwaway values.
-          printf 'DB_NAME=iris
-DB_USER=iris
-DB_PASSWORD=ci-only-not-a-real-secret
-' > .env
+          {
+            echo "DB_NAME=iris"
+            echo "DB_USER=iris"
+            echo "DB_PASSWORD=ci-only-not-a-real-secret"
+          } > .env
 
       - name: Validate development stack
         run: docker compose -f docker-compose.yml config --quiet
