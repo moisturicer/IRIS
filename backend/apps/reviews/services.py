@@ -40,6 +40,15 @@ individual office statuses are tracked in RecordClearance rows.
 """
 from django.utils import timezone
 
+from core.enums import (
+    ClearanceStatus,
+    Office,
+    PipelineStatus,
+    RecordTypeName,
+    ReviewDecision,
+    ReviewStage,
+    RoleName,
+)
 from core.exceptions import InvalidPipelineTransition
 from .models import Review, RecordClearance
 from apps.records.models import Record
@@ -61,22 +70,22 @@ def _type_name(record: Record) -> str:
 
 # Maps pipeline_status → Review.stage for sequential stages only
 _STATUS_TO_STAGE: dict[str, str] = {
-    "adviser_review": "adviser",
-    "rdco_intake":    "rdco_intake",
-    "rdco_review":    "rdco",
+    PipelineStatus.ADVISER_REVIEW: ReviewStage.ADVISER,
+    PipelineStatus.RDCO_INTAKE:    ReviewStage.RDCO_INTAKE,
+    PipelineStatus.RDCO_REVIEW:    ReviewStage.RDCO,
 }
 
 # Sequential stages where approve/decline/reject are used
 REVIEWABLE_STATUSES = set(_STATUS_TO_STAGE.keys())
 
 # Clearance stages — handled exclusively via submit_clearance
-CLEARANCE_STATUSES = {"itso_review", "parallel_review"}
+CLEARANCE_STATUSES = {PipelineStatus.ITSO_REVIEW, PipelineStatus.PARALLEL_REVIEW}
 
 # Maps reviewer role name → clearance office key
 ROLE_TO_OFFICE: dict[str, str] = {
-    "ITSO": "itso",
-    "IERC": "ierc",
-    "KTTO": "ktto",
+    RoleName.ITSO: Office.ITSO,
+    RoleName.IERC: Office.IERC,
+    RoleName.KTTO: Office.KTTO,
 }
 
 
@@ -95,10 +104,10 @@ def _can_review(user, record: Record) -> bool:
     """
     role_name = user.role.name if user.role else ""
     status    = record.pipeline_status
-    if role_name == "Adviser":
-        return status == "adviser_review" and record.adviser_id == user.pk
-    if role_name == "RDCO":
-        return status in ("rdco_intake", "rdco_review")
+    if role_name == RoleName.ADVISER:
+        return status == PipelineStatus.ADVISER_REVIEW and record.adviser_id == user.pk
+    if role_name == RoleName.RDCO:
+        return status in (PipelineStatus.RDCO_INTAKE, PipelineStatus.RDCO_REVIEW)
     return False
 
 
@@ -130,28 +139,34 @@ def _can_submit_clearance(user, record: Record) -> tuple[bool, str]:
         return False, office
 
     has_pending = RecordClearance.objects.filter(
-        record=record, office=office, status="pending"
+        record=record, office=office, status=ClearanceStatus.PENDING
     ).exists()
 
     if not has_pending:
         return False, office
 
     status = record.pipeline_status
-    if status == "itso_review" and office in ("itso", "ktto"):
+    if status == PipelineStatus.ITSO_REVIEW and office in (Office.ITSO, Office.KTTO):
         return True, office
-    if status == "parallel_review" and office in ("ierc", "ktto"):
+    if status == PipelineStatus.PARALLEL_REVIEW and office in (Office.IERC, Office.KTTO):
         return True, office
     return False, office
 
 
 def _all_clearances_done(record: Record) -> bool:
     """Return True when no pending clearances remain for this record."""
-    return not RecordClearance.objects.filter(record=record, status="pending").exists()
+    return not RecordClearance.objects.filter(
+        record=record, status=ClearanceStatus.PENDING
+    ).exists()
 
 
 def _first_status_for_type(record: Record) -> str:
     """The pipeline_status a record enters when submitted or resubmitted."""
-    return "adviser_review" if _type_name(record) == "Proposal" else "rdco_intake"
+    return (
+        PipelineStatus.ADVISER_REVIEW
+        if _type_name(record) == RecordTypeName.PROPOSAL
+        else PipelineStatus.RDCO_INTAKE
+    )
 
 
 def _enter_clearance_stage(record: Record) -> str:
@@ -168,21 +183,21 @@ def _enter_clearance_stage(record: Record) -> str:
     """
     rt = _type_name(record)
     offices: list[str] = []
-    if rt == "Project" and record.requested_itso:
-        offices.append("itso")
+    if rt == RecordTypeName.PROJECT and record.requested_itso:
+        offices.append(Office.ITSO)
     if record.requested_ierc:
-        offices.append("ierc")
+        offices.append(Office.IERC)
     if record.requested_ktto:
-        offices.append("ktto")
+        offices.append(Office.KTTO)
 
     for office in offices:
         RecordClearance.objects.get_or_create(record=record, office=office)
 
-    if "itso" in offices:
-        return "itso_review"
+    if Office.ITSO in offices:
+        return PipelineStatus.ITSO_REVIEW
     if offices:
-        return "parallel_review"
-    return "rdco_review"
+        return PipelineStatus.PARALLEL_REVIEW
+    return PipelineStatus.RDCO_REVIEW
 
 
 # ---------------------------------------------------------------------------
@@ -208,18 +223,22 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
 
     review = Review.objects.create(
         record=record, reviewed_by=reviewed_by,
-        stage=stage, status="approved", comment=comment,
+        stage=stage, status=ReviewDecision.APPROVED, comment=comment,
     )
 
-    if record.pipeline_status == "rdco_intake":
+    if record.pipeline_status == PipelineStatus.RDCO_INTAKE:
         next_status = _enter_clearance_stage(record)
-    elif record.pipeline_status == "adviser_review":
+    elif record.pipeline_status == PipelineStatus.ADVISER_REVIEW:
         # Proposals end at 'approved' (visible as ongoing); all other types published at rdco_review
-        next_status = "approved" if _type_name(record) == "Proposal" else "published"
-    elif record.pipeline_status == "rdco_review":
-        next_status = "published"
+        next_status = (
+            PipelineStatus.APPROVED
+            if _type_name(record) == RecordTypeName.PROPOSAL
+            else PipelineStatus.PUBLISHED
+        )
+    elif record.pipeline_status == PipelineStatus.RDCO_REVIEW:
+        next_status = PipelineStatus.PUBLISHED
     else:
-        next_status = "published"  # fallback; should never be reached
+        next_status = PipelineStatus.PUBLISHED  # fallback; should never be reached
 
     record.pipeline_status = next_status
     record.save(update_fields=["pipeline_status", "updated_at"])
@@ -244,9 +263,9 @@ def decline_record(record: Record, reviewed_by, comment: str = "") -> Review:
 
     review = Review.objects.create(
         record=record, reviewed_by=reviewed_by,
-        stage=stage, status="declined", comment=comment,
+        stage=stage, status=ReviewDecision.DECLINED, comment=comment,
     )
-    record.pipeline_status = "declined"
+    record.pipeline_status = PipelineStatus.DECLINED
     record.save(update_fields=["pipeline_status", "updated_at"])
     notify_record_reviewed(record, review)
     return review
@@ -269,9 +288,9 @@ def reject_record(record: Record, reviewed_by, comment: str = "") -> Review:
 
     review = Review.objects.create(
         record=record, reviewed_by=reviewed_by,
-        stage=stage, status="rejected", comment=comment,
+        stage=stage, status=ReviewDecision.REJECTED, comment=comment,
     )
-    record.pipeline_status = "rejected"
+    record.pipeline_status = PipelineStatus.REJECTED
     record.save(update_fields=["pipeline_status", "updated_at"])
     notify_record_reviewed(record, review)
     return review
@@ -312,15 +331,15 @@ def submit_clearance(
         office = resolved_office
 
     # Map external decision labels to internal model values
-    if decision == "approved":
-        review_status     = "approved"
-        clearance_status  = "cleared"
-    elif decision == "rejected":
-        review_status     = "rejected"
-        clearance_status  = "rejected"
+    if decision == ReviewDecision.APPROVED:
+        review_status     = ReviewDecision.APPROVED
+        clearance_status  = ClearanceStatus.CLEARED
+    elif decision == ReviewDecision.REJECTED:
+        review_status     = ReviewDecision.REJECTED
+        clearance_status  = ClearanceStatus.REJECTED
     else:  # declined
-        review_status     = "declined"
-        clearance_status  = "declined"
+        review_status     = ReviewDecision.DECLINED
+        clearance_status  = ClearanceStatus.DECLINED
 
     # Always create an audit Review row
     review = Review.objects.create(
@@ -336,34 +355,40 @@ def submit_clearance(
     clearance.save(update_fields=["status", "reviewed_by", "comment", "updated_at"])
 
     # ── Decline or reject: pause the pipeline ─────────────────────────────
-    if decision in ("declined", "rejected"):
-        record.pipeline_status = "rejected" if decision == "rejected" else "declined"
+    if decision in (ReviewDecision.DECLINED, ReviewDecision.REJECTED):
+        record.pipeline_status = (
+            PipelineStatus.REJECTED
+            if decision == ReviewDecision.REJECTED
+            else PipelineStatus.DECLINED
+        )
         record.save(update_fields=["pipeline_status", "updated_at"])
         notify_clearance_result(record, review, office=office, advanced=False)
         return review
 
     # ── ITSO approved at itso_review (Project only) ───────────────────────
-    if office == "itso" and record.pipeline_status == "itso_review":
+    if office == Office.ITSO and record.pipeline_status == PipelineStatus.ITSO_REVIEW:
         # IERC begins after ITSO clears -- but only if it was actually
         # requested (ADR-018). Unconditionally creating it here, as before,
         # would force an ethics review nobody asked for.
         if record.requested_ierc:
-            RecordClearance.objects.get_or_create(record=record, office="ierc")
+            RecordClearance.objects.get_or_create(record=record, office=Office.IERC)
         # KTTO may have already cleared, be pending, or never have been
         # requested at all -- _all_clearances_done reflects whichever is true.
         if _all_clearances_done(record):
-            record.pipeline_status = "rdco_review"
+            record.pipeline_status = PipelineStatus.RDCO_REVIEW
             record.save(update_fields=["pipeline_status", "updated_at"])
-            notify_clearance_result(record, review, office="itso", advanced=True, all_done=True)
+            notify_clearance_result(
+                record, review, office=Office.ITSO, advanced=True, all_done=True
+            )
         else:
-            record.pipeline_status = "parallel_review"
+            record.pipeline_status = PipelineStatus.PARALLEL_REVIEW
             record.save(update_fields=["pipeline_status", "updated_at"])
-            notify_clearance_result(record, review, office="itso", advanced=True)
+            notify_clearance_result(record, review, office=Office.ITSO, advanced=True)
         return review
 
     # ── All other approved clearances ─────────────────────────────────────
     if _all_clearances_done(record):
-        record.pipeline_status = "rdco_review"
+        record.pipeline_status = PipelineStatus.RDCO_REVIEW
         record.save(update_fields=["pipeline_status", "updated_at"])
         notify_clearance_result(record, review, office=office, advanced=True, all_done=True)
     else:
@@ -388,14 +413,14 @@ def resubmit_record(record: Record, submitted_by) -> Record:
 
     Requires at least one document to have been uploaded after the last decline.
     """
-    if record.pipeline_status != "declined":
+    if record.pipeline_status != PipelineStatus.DECLINED:
         raise InvalidPipelineTransition(
             "Only records in 'declined' status can be resubmitted."
         )
 
     # Validate that the owner uploaded something new since the decline
     last_decline = (
-        Review.objects.filter(record=record, status="declined")
+        Review.objects.filter(record=record, status=ReviewDecision.DECLINED)
         .order_by("-created_at")
         .first()
     )
@@ -409,24 +434,32 @@ def resubmit_record(record: Record, submitted_by) -> Record:
                 "Please upload at least one updated document before resubmitting."
             )
 
-    CLEARANCE_OFFICES = {"itso", "ierc", "ktto"}
+    # Office values, compared against `Review.stage`, which is a ReviewStage.
+    # The two vocabularies deliberately share these three values: the stage a
+    # clearance review is recorded at *is* the office that reviewed it. Naming
+    # the set `Office` says which meaning is intended here -- the branch below
+    # goes straight on to filter RecordClearance by it. Worth pinning before
+    # IR-136 keys a transition table on one or the other.
+    CLEARANCE_OFFICES = {Office.ITSO, Office.IERC, Office.KTTO}
 
     if last_decline and last_decline.stage in CLEARANCE_OFFICES:
         # Smart resubmit: only reset the declining office's clearance
         office = last_decline.stage
         RecordClearance.objects.filter(record=record, office=office).update(
-            status="pending", reviewed_by=None, comment=""
+            status=ClearanceStatus.PENDING, reviewed_by=None, comment=""
         )
         # Route back to the clearance stage this office reviews at
-        if office == "itso":
-            new_status = "itso_review"
-        elif office == "ierc":
-            new_status = "parallel_review"
+        if office == Office.ITSO:
+            new_status = PipelineStatus.ITSO_REVIEW
+        elif office == Office.IERC:
+            new_status = PipelineStatus.PARALLEL_REVIEW
         else:  # ktto — can review at both itso_review (Project) and parallel_review
             itso_pending = RecordClearance.objects.filter(
-                record=record, office="itso", status="pending"
+                record=record, office=Office.ITSO, status=ClearanceStatus.PENDING
             ).exists()
-            new_status = "itso_review" if itso_pending else "parallel_review"
+            new_status = (
+                PipelineStatus.ITSO_REVIEW if itso_pending else PipelineStatus.PARALLEL_REVIEW
+            )
     else:
         # Sequential stage decline: full reset, restart from the beginning
         RecordClearance.objects.filter(record=record).delete()

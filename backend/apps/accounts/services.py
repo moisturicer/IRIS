@@ -2,6 +2,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
+from core.enums import RequestStatus
 from core.utils import send_email_async
 from .models import User, RoleRequest
 
@@ -45,7 +46,7 @@ def approve_role_request(role_request: RoleRequest, reviewed_by: User):
     user.role = role_request.requested_role
     user.save(update_fields=["role"])
 
-    role_request.status      = "approved"
+    role_request.status      = RequestStatus.APPROVED
     role_request.reviewed_by = reviewed_by
     role_request.save(update_fields=["status", "reviewed_by"])
 
@@ -67,7 +68,7 @@ def approve_role_request(role_request: RoleRequest, reviewed_by: User):
 
 def decline_role_request(role_request: RoleRequest, reviewed_by: User):
     """Decline a role request and notify the user."""
-    role_request.status      = "declined"
+    role_request.status      = RequestStatus.DECLINED
     role_request.reviewed_by = reviewed_by
     role_request.save(update_fields=["status", "reviewed_by"])
 

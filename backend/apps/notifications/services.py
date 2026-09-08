@@ -9,6 +9,7 @@ Design rules:
   - Use send_email_async from core.utils for all outbound mail.
 """
 from django.conf import settings
+from core.enums import Office, PipelineStatus, RecordTypeName, ReviewDecision, ReviewStage, RoleName
 from core.utils import send_email_async
 from .models import Notification, NotificationType
 
@@ -28,7 +29,7 @@ def _role(name: str):
 
 def _record_notif_type(record) -> NotificationType:
     rt_name = record.record_type.name if record.record_type else ""
-    if rt_name == "Project":
+    if rt_name == RecordTypeName.PROJECT:
         return _get_type("New Record (Project)")
     return _get_type("New Record (Proposal / Thesis)")
 
@@ -52,7 +53,7 @@ def notify_new_record(record, submitted_by):
     try:
         rt_name = record.record_type.name if record.record_type else ""
 
-        if rt_name == "Proposal":
+        if rt_name == RecordTypeName.PROPOSAL:
             adviser = record.adviser
             if not adviser:
                 return
@@ -80,7 +81,7 @@ def notify_new_record(record, submitted_by):
 
         else:
             # Thesis/Research and Project go to RDCO intake
-            rdco_role = _role("RDCO")
+            rdco_role = _role(RoleName.RDCO)
             if not rdco_role:
                 return
             Notification.objects.create(
@@ -120,16 +121,19 @@ def notify_record_reviewed(record, review):
         outcome = review.status  # approved | declined | rejected
 
         _STAGE_LABELS = {
-            "adviser":     "your Adviser",
-            "rdco_intake": "RDCO (intake review)",
-            "rdco":        "RDCO",
+            ReviewStage.ADVISER:     "your Adviser",
+            ReviewStage.RDCO_INTAKE: "RDCO (intake review)",
+            # `.label`, not the bare string: this map is prose shown to a
+            # person ("your Adviser"), and the office's display name is the
+            # label rather than the stored key.
+            ReviewStage.RDCO:        RoleName.RDCO.label,
         }
         stage_label = _STAGE_LABELS.get(stage, stage)
 
-        if outcome == "approved":
+        if outcome == ReviewDecision.APPROVED:
             new_status = record.pipeline_status  # already advanced before this call
 
-            if stage == "adviser":
+            if stage == ReviewStage.ADVISER:
                 # Proposal approved → published
                 _notify_owners(
                     record, review,
@@ -146,12 +150,12 @@ def notify_record_reviewed(record, review):
                     ),
                 )
 
-            elif stage == "rdco_intake":
-                if new_status == "itso_review":
+            elif stage == ReviewStage.RDCO_INTAKE:
+                if new_status == PipelineStatus.ITSO_REVIEW:
                     # Project: ITSO reviews first; KTTO also starts here in parallel
                     _notify_roles_of_advance(
                         record, review,
-                        role_names=["ITSO", "KTTO"],
+                        role_names=[RoleName.ITSO, RoleName.KTTO],
                         message=(
                             f'Record "{record.title}" has passed RDCO intake review '
                             f"and is ready for ITSO and KTTO review."
@@ -172,7 +176,7 @@ def notify_record_reviewed(record, review):
                     # Thesis/Research: parallel_review — IERC + KTTO both start now in parallel
                     _notify_roles_of_advance(
                         record, review,
-                        role_names=["IERC", "KTTO"],
+                        role_names=[RoleName.IERC, RoleName.KTTO],
                         message=(
                             f'Record "{record.title}" has passed RDCO intake review '
                             f"and is ready for IERC and KTTO parallel review."
@@ -191,7 +195,7 @@ def notify_record_reviewed(record, review):
                         ),
                     )
 
-            elif stage == "rdco":
+            elif stage == ReviewStage.RDCO:
                 # RDCO final approval → published
                 _notify_owners(
                     record, review,
@@ -205,7 +209,7 @@ def notify_record_reviewed(record, review):
                     ),
                 )
 
-        elif outcome == "declined":
+        elif outcome == ReviewDecision.DECLINED:
             reason = review.comment or "No reason was provided."
             _notify_owners(
                 record, review,
@@ -262,13 +266,13 @@ def notify_clearance_result(record, review, *, office: str, advanced: bool, all_
         reason  = review.comment or "No reason was provided."
 
         _OFFICE_LABELS = {
-            "itso": "ITSO",
-            "ierc": "IERC",
-            "ktto": "KTTO",
+            Office.ITSO: RoleName.ITSO,
+            Office.IERC: RoleName.IERC,
+            Office.KTTO: RoleName.KTTO,
         }
         office_label = _OFFICE_LABELS.get(office, office.upper())
 
-        if outcome == "declined":
+        if outcome == ReviewDecision.DECLINED:
             _notify_owners(
                 record, review,
                 notif_type=_get_type("Record Declined"),
@@ -287,7 +291,7 @@ def notify_clearance_result(record, review, *, office: str, advanced: bool, all_
             )
             return
 
-        if outcome == "rejected":
+        if outcome == ReviewDecision.REJECTED:
             _notify_owners(
                 record, review,
                 notif_type=_get_type("Record Declined"),
@@ -310,7 +314,7 @@ def notify_clearance_result(record, review, *, office: str, advanced: bool, all_
             # All offices cleared → RDCO final review
             _notify_roles_of_advance(
                 record, review,
-                role_names=["RDCO"],
+                role_names=[RoleName.RDCO],
                 message=(
                     f'Record "{record.title}" has been cleared by all reviewing offices '
                     f"and is ready for RDCO final review."
@@ -327,11 +331,11 @@ def notify_clearance_result(record, review, *, office: str, advanced: bool, all_
                     f"and is now awaiting RDCO final review."
                 ),
             )
-        elif advanced and office == "itso":
+        elif advanced and office == Office.ITSO:
             # ITSO cleared → IERC now starts; KTTO may still be running
             _notify_roles_of_advance(
                 record, review,
-                role_names=["IERC"],
+                role_names=[RoleName.IERC],
                 message=(
                     f'Record "{record.title}" has been cleared by ITSO. '
                     f"IERC ethics review is now required."
@@ -384,7 +388,7 @@ def notify_resubmit(record, submitted_by, new_status: str):
         notif_type = _get_type("Record Resubmission")
         url        = _record_url(record)
 
-        if new_status == "adviser_review":
+        if new_status == PipelineStatus.ADVISER_REVIEW:
             adviser = record.adviser
             if not adviser:
                 return
@@ -410,10 +414,14 @@ def notify_resubmit(record, submitted_by, new_status: str):
                 recipient_list=[adviser.email],
             )
 
-        elif new_status in ("parallel_review", "itso_review"):
+        elif new_status in (PipelineStatus.PARALLEL_REVIEW, PipelineStatus.ITSO_REVIEW):
             # Smart resubmit: notify only the office(s) with a pending clearance
             from apps.reviews.models import RecordClearance
-            _OFFICE_TO_ROLE = {"ierc": "IERC", "ktto": "KTTO", "itso": "ITSO"}
+            _OFFICE_TO_ROLE = {
+                Office.IERC: RoleName.IERC,
+                Office.KTTO: RoleName.KTTO,
+                Office.ITSO: RoleName.ITSO,
+            }
             pending_offices = list(
                 RecordClearance.objects.filter(record=record, status="pending")
                 .values_list("office", flat=True)
@@ -448,7 +456,7 @@ def notify_resubmit(record, submitted_by, new_status: str):
 
         else:
             # rdco_intake: Thesis/Research or Project resubmitted to RDCO
-            rdco_role = _role("RDCO")
+            rdco_role = _role(RoleName.RDCO)
             if not rdco_role:
                 return
             Notification.objects.create(
@@ -518,12 +526,12 @@ def notify_role_request(user, requested_role):
     staff accounts (RDCO, KTTO, ITSO, IERC) are managed directly by Admin.
     """
     try:
-        if requested_role.name == "Adviser":
+        if requested_role.name == RoleName.ADVISER:
             notif_type_name = "Role Request - Adviser"
         else:
             notif_type_name = "Role Request - Student"
 
-        rdco_role = _role("RDCO")
+        rdco_role = _role(RoleName.RDCO)
         if rdco_role:
             Notification.objects.create(
                 sender=user,
@@ -539,7 +547,7 @@ def notify_download_request(record, requested_by):
     """Broadcast to KTTO and RDCO when a user requests to download a record's files."""
     try:
         notif_type = _get_type("Download Request Submitted")
-        for role_name in ("KTTO", "RDCO"):
+        for role_name in (RoleName.KTTO, RoleName.RDCO):
             role = _role(role_name)
             if role:
                 Notification.objects.create(
