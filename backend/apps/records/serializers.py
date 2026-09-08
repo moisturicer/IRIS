@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from core.enums import ReviewDecision
 
 from apps.reviews.clearance_state import clearance_payload, resubmission_payload
 
@@ -103,7 +104,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_resubmission(self, obj):
         """`resubmission{}` -- what happened, and which offices survived it."""
         latest_decline = (
-            obj.reviews.filter(status="declined").order_by("-created_at").first()
+            obj.reviews.filter(status=ReviewDecision.DECLINED).order_by("-created_at").first()
         )
         return resubmission_payload(
             obj,

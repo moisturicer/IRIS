@@ -1,12 +1,18 @@
 from rest_framework.permissions import BasePermission
 
-# Role name constants -- match the Role.name values in the DB exactly
-ROLE_STUDENT = "Student"
-ROLE_ADVISER = "Adviser"
-ROLE_KTTO    = "KTTO"
-ROLE_RDCO    = "RDCO"
-ROLE_ITSO    = "ITSO"
-ROLE_IERC    = "IERC"
+from core.enums import RoleName
+
+# Role name constants -- match the Role.name values in the DB exactly.
+# Aliases onto `RoleName` since IR-135: the names are kept because the sets
+# below and a dozen call sites read better with them, but the *values* are
+# single-sourced now. A typo in a role comparison fails open -- an unknown name
+# simply matches nobody -- so these must never drift from the seeded rows.
+ROLE_STUDENT = RoleName.STUDENT
+ROLE_ADVISER = RoleName.ADVISER
+ROLE_KTTO    = RoleName.KTTO
+ROLE_RDCO    = RoleName.RDCO
+ROLE_ITSO    = RoleName.ITSO
+ROLE_IERC    = RoleName.IERC
 
 # Convenience sets
 REVIEWER_ROLES = {ROLE_ADVISER, ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}

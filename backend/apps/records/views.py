@@ -13,6 +13,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
+from core.enums import (
+    PUBLICLY_VISIBLE_STATUSES,
+    IPType,
+    PipelineStatus,
+    RecordTypeName,
+    RequestStatus,
+    ReviewStage,
+    RoleName,
+)
 from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO, IsAdmin, IsAuthor
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
@@ -106,20 +115,20 @@ class RecordViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         from .models import RecordOwner
-        record = serializer.save(added_by=self.request.user, pipeline_status="draft")
+        record = serializer.save(added_by=self.request.user, pipeline_status=PipelineStatus.DRAFT)
         # Add the creator as the primary owner automatically
         RecordOwner.objects.create(record=record, user=self.request.user, is_primary=True)
         # Record starts as draft — notification fires only when the owner calls /submit/
 
     def perform_destroy(self, instance):
         # Publicly visible records go through delete request flow
-        if instance.pipeline_status in ("published", "approved", "completed"):
+        if instance.pipeline_status in PUBLICLY_VISIBLE_STATUSES:
             DeleteRequest.objects.create(
                 record=instance,
                 requested_by=self.request.user,
                 previous_pipeline_status=instance.pipeline_status,
             )
-            instance.pipeline_status = "pending_delete"
+            instance.pipeline_status = PipelineStatus.PENDING_DELETE
             instance.save(update_fields=["pipeline_status"])
         else:
             soft_delete_record(instance, deleted_by=self.request.user)
@@ -149,7 +158,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         record = self.get_object()  # enforces IsOwnerOrStaff object permission
 
-        if record.pipeline_status not in ("draft", "declined"):
+        if record.pipeline_status not in (PipelineStatus.DRAFT, PipelineStatus.DECLINED):
             return Response(
                 {"detail": f"Record is in '{record.pipeline_status}' status and cannot be submitted."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -163,15 +172,15 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         rt_name = record.record_type.name  # "Proposal" | "Thesis/Research" | "Project"
 
-        if rt_name == "Proposal":
+        if rt_name == RecordTypeName.PROPOSAL:
             if not record.adviser:
                 return Response(
                     {"detail": "An adviser must be assigned before a Proposal can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            first_status = "adviser_review"
+            first_status = PipelineStatus.ADVISER_REVIEW
         else:
-            first_status = "rdco_intake"
+            first_status = PipelineStatus.RDCO_INTAKE
 
         record.pipeline_status = first_status
         record.save(update_fields=["pipeline_status", "updated_at"])
@@ -179,7 +188,13 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
 
-        stage_label = "adviser" if rt_name == "Proposal" else "RDCO"
+        # `.label` so the prose below stays single-sourced; lower() keeps the
+        # sentence reading "the adviser has been notified" exactly as before.
+        stage_label = (
+            ReviewStage.ADVISER.label.lower()
+            if rt_name == RecordTypeName.PROPOSAL
+            else RoleName.RDCO.label
+        )
         return Response(
             {"detail": f"Record submitted successfully. The {stage_label} has been notified."},
             status=status.HTTP_200_OK,
@@ -228,7 +243,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         record = self.get_object()
 
         BOOL_FIELDS   = {"is_ip", "for_commercialization", "community_extension"}
-        VALID_IP_TYPES = {"patent", "copyright", "trade_secret", "utility_model", ""}
+        VALID_IP_TYPES = set(IPType.values) | {""}   # "" clears the classification
         updates: dict = {}
 
         for field in BOOL_FIELDS:
@@ -290,20 +305,20 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         record = self.get_object()
 
-        if record.pipeline_status != "approved":
+        if record.pipeline_status != PipelineStatus.APPROVED:
             return Response(
                 {"detail": f"Only approved proposals can be marked as completed (current status: '{record.pipeline_status}')."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         rt_name = record.record_type.name if record.record_type else ""
-        if rt_name != "Proposal":
+        if rt_name != RecordTypeName.PROPOSAL:
             return Response(
                 {"detail": "Only Proposal records can be marked as completed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        record.pipeline_status = "completed"
+        record.pipeline_status = PipelineStatus.COMPLETED
         record.save(update_fields=["pipeline_status", "updated_at"])
 
         notify_proposal_completed(record, marked_by=request.user)
@@ -390,7 +405,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                     for_commercialization= row["for_commercialization"],
                     community_extension  = row["community_extension"],
                     added_by             = request.user,
-                    pipeline_status      = "published",
+                    pipeline_status      = PipelineStatus.PUBLISHED,
                 )
 
                 from .models import RecordOwner
@@ -572,7 +587,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         record = serializer.validated_data["record"]
         user   = self.request.user
         if DownloadRequest.objects.filter(
-            record=record, requested_by=user, status="pending"
+            record=record, requested_by=user, status=RequestStatus.PENDING
         ).exists():
             from rest_framework.exceptions import ValidationError
             raise ValidationError(
@@ -589,7 +604,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
                 {"detail": "Provide action: 'approve' or 'decline'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if instance.status != "pending":
+        if instance.status != RequestStatus.PENDING:
             return Response(
                 {"detail": "This request has already been reviewed."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -597,7 +612,9 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
 
         instance.reviewed_by = request.user
         instance.reviewed_at = timezone.now()
-        instance.status = "approved" if action == "approve" else "declined"
+        instance.status = (
+            RequestStatus.APPROVED if action == "approve" else RequestStatus.DECLINED
+        )
         instance.save(update_fields=["status", "reviewed_by", "reviewed_at"])
 
         data = self.get_serializer(instance).data
@@ -614,12 +631,12 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     def approve(self, request, pk=None):
         """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
         dr = self.get_object()
-        if dr.status != "pending":
+        if dr.status != RequestStatus.PENDING:
             return Response(
                 {"detail": f"Request is already '{dr.status}'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        dr.status      = "approved"
+        dr.status      = RequestStatus.APPROVED
         dr.reviewed_by = request.user
         dr.reviewed_at = timezone.now()
         dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
@@ -630,12 +647,12 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     def decline(self, request, pk=None):
         """POST /download-requests/<id>/decline/ — set declined, notify requester in-app."""
         dr = self.get_object()
-        if dr.status != "pending":
+        if dr.status != RequestStatus.PENDING:
             return Response(
                 {"detail": f"Request is already '{dr.status}'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        dr.status      = "declined"
+        dr.status      = RequestStatus.DECLINED
         dr.reviewed_by = request.user
         dr.reviewed_at = timezone.now()
         dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
@@ -664,7 +681,7 @@ class DownloadRedeemView(APIView):
 
         try:
             dl_request = DownloadRequest.objects.select_related("record").get(
-                pk=claims["drid"], status="approved"
+                pk=claims["drid"], status=RequestStatus.APPROVED
             )
         except DownloadRequest.DoesNotExist:
             return Response({"detail": "Download request not found or not approved."}, status=404)
@@ -720,12 +737,12 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
         """
         from django.utils import timezone
         dr = self.get_object()
-        if dr.status != "pending":
+        if dr.status != RequestStatus.PENDING:
             return Response(
                 {"detail": f"Request is already '{dr.status}'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        dr.status      = "approved"
+        dr.status      = RequestStatus.APPROVED
         dr.reviewed_by = request.user
         dr.reviewed_at = timezone.now()
         dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
@@ -741,12 +758,12 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
         """
         from django.utils import timezone
         dr = self.get_object()
-        if dr.status != "pending":
+        if dr.status != RequestStatus.PENDING:
             return Response(
                 {"detail": f"Request is already '{dr.status}'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        dr.status      = "declined"
+        dr.status      = RequestStatus.DECLINED
         dr.reviewed_by = request.user
         dr.reviewed_at = timezone.now()
         dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
@@ -755,7 +772,11 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
             dr.record.pipeline_status = dr.previous_pipeline_status
         else:
             rt = dr.record.record_type.name if dr.record.record_type else ""
-            dr.record.pipeline_status = "approved" if rt == "Proposal" else "published"
+            dr.record.pipeline_status = (
+                PipelineStatus.APPROVED
+                if rt == RecordTypeName.PROPOSAL
+                else PipelineStatus.PUBLISHED
+            )
         dr.record.save(update_fields=["pipeline_status", "updated_at"])
         notify_delete_declined(dr, reviewed_by=request.user)
         return Response({"detail": "Delete request declined. The record has been restored."})

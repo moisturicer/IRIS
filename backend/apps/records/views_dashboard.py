@@ -3,6 +3,18 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count
 from .models import Record
+from core.enums import PUBLICLY_VISIBLE_STATUSES, PipelineStatus
+
+#: The five statuses that mean "somebody is still reviewing this". Named here
+#: rather than inline so the dashboard's "pending" tile and any future caller
+#: agree on what pending means (IR-135).
+IN_REVIEW_STATUSES = (
+    PipelineStatus.ADVISER_REVIEW,
+    PipelineStatus.RDCO_INTAKE,
+    PipelineStatus.ITSO_REVIEW,
+    PipelineStatus.PARALLEL_REVIEW,
+    PipelineStatus.RDCO_REVIEW,
+)
 
 
 class DashboardStatsView(APIView):
@@ -17,11 +29,11 @@ class DashboardStatsView(APIView):
         my_ids = Record.objects.filter(owners__user=user).values_list("pk", flat=True)
         return Response({
             "total_mine":       my_ids.count(),
-            "pending_mine":     Record.objects.filter(pk__in=my_ids, pipeline_status__in=["adviser_review","rdco_intake","itso_review","parallel_review","rdco_review"]).count(),
-            "approved_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status__in=("published", "approved", "completed")).count(),
-            "declined_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status="declined").count(),
+            "pending_mine":     Record.objects.filter(pk__in=my_ids, pipeline_status__in=IN_REVIEW_STATUSES).count(),
+            "approved_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count(),
+            "declined_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status=PipelineStatus.DECLINED).count(),
             # Staff-only totals -- return 0 for students
-            "total_published":  Record.objects.filter(pipeline_status__in=("published", "approved", "completed")).count() if request.user.role else 0,
+            "total_published":  Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count() if request.user.role else 0,
         })
 
 
@@ -30,7 +42,7 @@ class ClassificationChartView(APIView):
 
     def get(self, request):
         data = (
-            Record.objects.filter(pipeline_status__in=("published", "approved", "completed"))
+            Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
             .values("classification__name")
             .annotate(count=Count("id"))
             .order_by("-count")
@@ -43,7 +55,7 @@ class PSCEDChartView(APIView):
 
     def get(self, request):
         data = (
-            Record.objects.filter(pipeline_status__in=("published", "approved", "completed"))
+            Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
             .values("psced__name")
             .annotate(count=Count("id"))
             .order_by("-count")

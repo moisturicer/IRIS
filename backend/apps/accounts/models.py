@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
+from core.enums import RequestStatus
+
 
 class Role(models.Model):
     """
@@ -110,14 +112,14 @@ class RoleRequest(models.Model):
     Created at signup when a user requests Student or Adviser role.
     An admin approves or declines.
     """
-    STATUS_CHOICES = [
-        ("pending",  "Pending"),
-        ("approved", "Approved"),
-        ("declined", "Declined"),
-    ]
+    #: Values live in core.enums (IR-135) -- the same three outcomes as a
+    #: download or delete request: asked, granted, refused.
+    STATUS_CHOICES = RequestStatus.choices
     user           = models.ForeignKey(User, on_delete=models.CASCADE, related_name="role_requests")
     requested_role = models.ForeignKey(Role, on_delete=models.CASCADE)
-    status         = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    status         = models.CharField(
+        max_length=10, choices=RequestStatus.choices, default=RequestStatus.PENDING
+    )
     reviewed_by    = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_role_requests"
     )

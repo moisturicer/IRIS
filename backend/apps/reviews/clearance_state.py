@@ -20,11 +20,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Iterable, Optional
+from core.enums import ClearanceStatus, Office
 
 #: Offices that hold an individual clearance. Mirrors
 #: `RecordClearance.OFFICE_CHOICES`; the sequential stages (adviser, RDCO) do
 #: not appear because they gate the record rather than clear it.
-CLEARANCE_OFFICES = frozenset({"itso", "ierc", "ktto"})
+CLEARANCE_OFFICES = frozenset({Office.ITSO, Office.IERC, Office.KTTO})
 
 
 def is_preserved(
@@ -43,7 +44,7 @@ def is_preserved(
     resubmitted has nothing to preserve — every clearance on it was granted the
     first time round, which is emphatically not the contribution.
     """
-    if status != "cleared":
+    if status != ClearanceStatus.CLEARED:
         return False
     if last_resubmitted_at is None or clearance_updated_at is None:
         return False

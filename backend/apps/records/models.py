@@ -2,6 +2,18 @@ from django.db import models
 from django.contrib.postgres.search import SearchVectorField
 from django.contrib.postgres.indexes import GinIndex
 
+# Re-exported deliberately: PUBLICLY_VISIBLE_STATUSES now lives in core.enums
+# beside the vocabulary it is built from, but `apps.records.models` has been its
+# import site since IR-152 and callers (including IR-153's visibility predicate)
+# reach for it here. Keeping the name importable from both places costs one line
+# and avoids a rename that has nothing to do with this ticket.
+from core.enums import (  # noqa: F401
+    PUBLICLY_VISIBLE_STATUSES,
+    IPType,
+    PipelineStatus,
+    RequestStatus,
+)
+
 
 # ---- Reference / lookup tables ------------------------------------------
 
@@ -48,10 +60,10 @@ class CollaborationType(models.Model):
 
 # ---- Core record --------------------------------------------------------
 
-#: The single definition of "a record any authenticated user may read".
-#: Used by the public record list AND by AI retrieval, so a generated citation
-#: can never point at a record the reader is not allowed to open.
-PUBLICLY_VISIBLE_STATUSES = ("published", "approved", "completed")
+#: The single definition of "a record any authenticated user may read" now lives
+#: in `core.enums` and is re-exported at the top of this module. Used by the
+#: public record list AND by AI retrieval, so a generated citation can never
+#: point at a record the reader is not allowed to open.
 
 
 class RecordManager(models.Manager):
@@ -68,23 +80,11 @@ class RecordManager(models.Manager):
 
 
 class Record(models.Model):
-    PIPELINE_STATUS = [
-        ("draft",          "Draft"),
-        # Proposal pipeline
-        ("adviser_review", "Adviser Review"),          # back-and-forth with adviser until approved
-        ("approved",       "Approved"),                # Proposal approved by adviser — visible as ongoing
-        ("completed",      "Completed"),               # Proposal research finished — toggled manually by RDCO
-        # Thesis/Research and Project pipeline
-        ("rdco_intake",    "RDCO Intake Review"),      # RDCO checks completeness; may reject outright
-        ("itso_review",     "ITSO Review"),              # Project only: ITSO sequential gate; KTTO also starts here in parallel
-        ("parallel_review", "Parallel Office Review"), # T/R: IERC+KTTO; Project: IERC+KTTO after ITSO clears — offices tracked via RecordClearance
-        ("rdco_review",     "RDCO Final Review"),      # RDCO consolidates all office clearances
-        # Terminal / visible states
-        ("published",      "Published"),
-        ("declined",       "Declined"),                # revision requested; owner may resubmit
-        ("rejected",       "Rejected"),                # terminal rejection; no resubmission
-        ("pending_delete", "Pending Deletion"),
-    ]
+    #: Kept as a class attribute for callers that reach for
+    #: `Record.PIPELINE_STATUS`; the values themselves are `core.enums`
+    #: (IR-135). The per-status commentary that used to live here is on
+    #: `PipelineStatus` now, beside the values it explains.
+    PIPELINE_STATUS = PipelineStatus.choices
 
     title              = models.CharField(max_length=500)
     year_accomplished  = models.PositiveIntegerField(null=True, blank=True)
@@ -130,15 +130,10 @@ class Record(models.Model):
     requested_ktto           = models.BooleanField(default=False)
 
     # Structured IP classification type (FR-M5-05)
-    IP_TYPE_CHOICES = [
-        ("patent",        "Patent"),
-        ("copyright",     "Copyright"),
-        ("trade_secret",  "Trade Secret"),
-        ("utility_model", "Utility Model"),
-    ]
+    IP_TYPE_CHOICES = IPType.choices
     ip_type = models.CharField(
         max_length=20,
-        choices=IP_TYPE_CHOICES,
+        choices=IPType.choices,
         blank=True,
         default="",
         db_index=True,
@@ -147,7 +142,8 @@ class Record(models.Model):
 
     # Denormalized pipeline status -- updated by reviews.services on every review action
     pipeline_status = models.CharField(
-        max_length=20, choices=PIPELINE_STATUS, default="draft", db_index=True
+        max_length=20, choices=PipelineStatus.choices,
+        default=PipelineStatus.DRAFT, db_index=True
     )
 
     # Resubmission history (IR-139). Both are maintained by
@@ -260,10 +256,12 @@ class Collaboration(models.Model):
 # ---- Download / Delete requests -----------------------------------------
 
 class DownloadRequest(models.Model):
-    STATUS = [("pending", "Pending"), ("approved", "Approved"), ("declined", "Declined")]
+    STATUS = RequestStatus.choices
     record       = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="download_requests")
     requested_by = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="download_requests")
-    status       = models.CharField(max_length=10, choices=STATUS, default="pending")
+    status       = models.CharField(
+        max_length=10, choices=RequestStatus.choices, default=RequestStatus.PENDING
+    )
     reviewed_by  = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="reviewed_download_requests"
@@ -273,11 +271,13 @@ class DownloadRequest(models.Model):
 
 
 class DeleteRequest(models.Model):
-    STATUS = [("pending", "Pending"), ("approved", "Approved"), ("declined", "Declined")]
+    STATUS = RequestStatus.choices
     record       = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="delete_requests")
     requested_by = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="delete_requests")
     reason       = models.TextField(blank=True)
-    status       = models.CharField(max_length=10, choices=STATUS, default="pending")
+    status       = models.CharField(
+        max_length=10, choices=RequestStatus.choices, default=RequestStatus.PENDING
+    )
     previous_pipeline_status = models.CharField(max_length=20, blank=True, default="")
     reviewed_by  = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
