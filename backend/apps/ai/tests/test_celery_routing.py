@@ -36,16 +36,28 @@ WORKER_QUEUES = {settings.CELERY_TASK_DEFAULT_QUEUE} | {
 
 
 def _drop_cached_broker() -> None:
-    """Forget the broker connection Celery cached against the previous URL.
+    """Forget every connection Celery cached against the previous URL.
 
-    `app.amqp` is a cached property and `app._pool` holds live connections,
-    both bound to whatever `broker_url` said when they were first touched --
-    and the routing tests above touch `app.amqp.router` before this one runs.
-    Changing the setting alone therefore leaves the old connection in place;
-    dropping both is what makes the override take effect.
+    Changing the setting is not enough: Celery memoises what it built from the
+    old one in four places, and each has to go or the "new" broker keeps using
+    the old socket.
+
+    * ``app.amqp`` -- a cached property. The routing tests above touch
+      ``app.amqp.router``, so it is always already cached by the time this runs.
+    * ``app._pool`` -- live broker connections.
+    * ``app._backend_cache`` and ``app._local.backend`` -- the result backend,
+      cached in *two* places. ``Celery._backend`` reads ``_backend_cache`` and
+      falls back to the thread-local, and which one is written depends on
+      ``backend.thread_safe``. RedisBackend is not thread safe, so it lands in
+      the thread-local and clearing only ``_backend_cache`` leaves it in place
+      -- which is exactly the way the first attempt at this fix still reached
+      for Redis after the broker itself had correctly switched.
     """
     celery_app.__dict__.pop("amqp", None)
     celery_app._pool = None
+    celery_app._backend_cache = None
+    if hasattr(celery_app._local, "backend"):
+        del celery_app._local.backend
 
 
 def _resolved_queue(task_name: str) -> str:
@@ -107,6 +119,10 @@ def test_a_dispatched_task_is_consumed_by_a_worker_listening_on_its_queue():
         # there is none. A test that quietly reconnects to the real broker is
         # not evidence about the memory transport.
         assert celery_app.conf.broker_url == "memory://"
+        assert "Redis" not in type(celery_app.backend).__name__, (
+            "the result backend is still Redis: the broker switched but "
+            "result.get() would reconnect to it"
+        )
 
         try:
             with start_worker(celery_app, queues=["default"], perform_ping_check=False):
