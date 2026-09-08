@@ -148,6 +148,19 @@ Compose needs its own file because `${DB_PASSWORD}` in a compose file is interpo
 **`docker compose up` fails by name without the root `.env`** — every reference is written `${DB_NAME:?set DB_NAME in the repo-root .env}`, which is the intended behaviour, not a bug to work around:
 
 ```bash
+python scripts/setup_env.py   # creates both, never overwrites either
+```
+
+It derives the repo-root `.env` from your existing `backend/.env` when you have
+one, so the credentials match the `postgres_data` volume already on your
+machine — which is the failure below, avoided rather than documented. On a
+fresh checkout it generates a real `SECRET_KEY` and a random DB password and
+prints the `CREATE USER` / `CREATE DATABASE` statements to run. It is
+idempotent; run it whenever you are unsure.
+
+By hand instead, if you prefer:
+
+```bash
 cp .env.example .env          # repo root, for Compose
 cp backend/.env.example backend/.env
 ```

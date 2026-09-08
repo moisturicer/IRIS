@@ -99,8 +99,10 @@ python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 
 # Docker  (repo root)
-cp .env.example .env               # REQUIRED first (IR-154): Compose interpolates DB_NAME/DB_USER/DB_PASSWORD
-                                   # from the repo-root .env and stops by name without it
+python scripts/setup_env.py         # REQUIRED first (IR-154): creates the repo-root .env Compose
+                                   # interpolates DB_NAME/DB_USER/DB_PASSWORD from, deriving it from
+                                   # backend/.env so it matches an existing postgres_data volume.
+                                   # Idempotent; never overwrites. Without it Compose stops by name
 docker compose up --build          # ai-gateway fails: needs ./ai/.env (gitignored, absent in CI); if that's supplied, it builds then crashes because ai/services/chat_service.py is missing
 docker compose config              # validate without building
 ```

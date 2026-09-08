@@ -101,6 +101,21 @@ IRIS/
 
 ---
 
+### 0 — Environment files
+
+```bash
+python scripts/setup_env.py
+```
+
+Creates `backend/.env` and the repo-root `.env` (the second is what Docker
+Compose interpolates the database credentials from). It never overwrites an
+existing file, and on a fresh checkout it generates a real `SECRET_KEY` and a
+random database password, then prints the SQL below already filled in. Since
+IR-154 `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have no defaults —
+Django refuses to start when any is missing or blank.
+
+---
+
 ### 1 — Database setup
 
 Open **pgAdmin** or `psql` and run:
