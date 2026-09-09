@@ -49,14 +49,6 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-PYEXCEL_AVAILABLE = importlib.util.find_spec("pyexcel") is not None
-
-#: `parse_excel_import` swallows a missing pyexcel and returns an error list rather
-#: than raising, so without this guard the import test would fail with "created no
-#: record" and send the reader hunting for a workflow bug that isn't there.
-#: `pyexcel-xls`/`pyexcel-xlsx` are in requirements/base.txt, so CI has them.
-NEEDS_PYEXCEL = "requires pyexcel (requirements/base.txt); present in CI"
-
 from apps.accounts.models import Role, User
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records.models import DeleteRequest, Record, RecordOwner, RecordType
@@ -71,6 +63,14 @@ from core.enums import (
     ReviewStage,
     RoleName,
 )
+
+PYEXCEL_AVAILABLE = importlib.util.find_spec("pyexcel") is not None
+
+#: `parse_excel_import` swallows a missing pyexcel and returns an error list rather
+#: than raising, so without this guard the import test would fail with "created no
+#: record" and send the reader hunting for a workflow bug that isn't there.
+#: `pyexcel-xls`/`pyexcel-xlsx` are in requirements/base.txt, so CI has them.
+NEEDS_PYEXCEL = "requires pyexcel (requirements/base.txt); present in CI"
 
 SUBMIT_REVIEW = "/api/v1/reviews/submit/"
 RESUBMIT = "/api/v1/reviews/resubmit/"
@@ -213,7 +213,7 @@ class SequentialReviewTests(WorkflowCharacterisationBase):
             adviser=self.adviser,
         )
         response = self.review(record, self.adviser, ReviewDecision.APPROVED)
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(self.status_of(record), PipelineStatus.APPROVED)
 
         review = Review.objects.get(record=record)
@@ -225,7 +225,7 @@ class SequentialReviewTests(WorkflowCharacterisationBase):
             RecordTypeName.THESIS_RESEARCH, pipeline_status=PipelineStatus.RDCO_REVIEW
         )
         response = self.review(record, self.rdco, ReviewDecision.APPROVED)
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(self.status_of(record), PipelineStatus.PUBLISHED)
         self.assertEqual(Review.objects.get(record=record).stage, ReviewStage.RDCO)
 
@@ -246,7 +246,7 @@ class SequentialReviewTests(WorkflowCharacterisationBase):
                     pipeline_status=PipelineStatus.RDCO_INTAKE,
                 )
                 response = self.review(record, self.rdco, decision, comment="Needs work.")
-                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
                 self.assertEqual(self.status_of(record), expected)
 
                 review = Review.objects.get(record=record)
@@ -269,7 +269,7 @@ class SequentialReviewTests(WorkflowCharacterisationBase):
                 extra = {"adviser": self.adviser} if type_name == RecordTypeName.PROPOSAL else {}
                 record = self.make_record(type_name, pipeline_status=stage, **extra)
                 response = self.review(record, actor, ReviewDecision.REJECTED)
-                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
                 self.assertEqual(self.status_of(record), PipelineStatus.REJECTED)
                 self.assertEqual(Review.objects.get(record=record).stage, expected_stage)
 
@@ -287,7 +287,7 @@ class ClearanceRoutingTests(WorkflowCharacterisationBase):
             requested_ierc=True, requested_ktto=True,
         )
         response = self.review(record, self.rdco, ReviewDecision.APPROVED)
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(self.status_of(record), PipelineStatus.PARALLEL_REVIEW)
         self.assertEqual(
             self.clearances(record),
@@ -332,7 +332,7 @@ class ClearanceRoutingTests(WorkflowCharacterisationBase):
         )
         self.review(record, self.rdco, ReviewDecision.APPROVED)
         response = self.review(record, self.itso, ReviewDecision.APPROVED)
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
 
         self.assertEqual(self.status_of(record), PipelineStatus.PARALLEL_REVIEW)
         self.assertEqual(self.clearances(record)[Office.ITSO], ClearanceStatus.CLEARED)
