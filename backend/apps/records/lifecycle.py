@@ -59,6 +59,7 @@ from enum import Enum
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
@@ -573,17 +574,33 @@ def _resolve_after_clearance(record, office=None, **_) -> str:
     return record.pipeline_status  # still waiting on a peer office
 
 
-#: What resetting a clearance means, written once.
-#:
-#: Both resubmission arms apply exactly this, differing only in which rows they
-#: apply it to. That is not tidiness: "the two arms differ in nothing but the
-#: policy" is IR-137's acceptance criterion, and two copies of these three
-#: fields is precisely how one arm quietly acquires a fourth.
-_CLEARANCE_RESET = {
-    "status": ClearanceStatus.PENDING,
-    "reviewed_by": None,
-    "comment": "",
-}
+def _clearance_reset_fields() -> dict:
+    """
+    What resetting a clearance means, written once.
+
+    Both resubmission arms apply exactly this, differing only in which rows they
+    apply it to. That is not tidiness: "the two arms differ in nothing but the
+    policy" is IR-137's acceptance criterion, and two copies of these fields is
+    precisely how one arm quietly acquires a different one.
+
+    **`updated_at` is set by hand because `.update()` bypasses `auto_now`.**
+    Without it a reset row keeps the timestamp of the moment it *cleared*, and
+    `clearance_state.clearance_payload` publishes that as the office's decision
+    time — so a reviewer would see a stale "decided at" for a clearance that is
+    now pending again. Under `RESTART_ALL` that applies to every row rather than
+    one, which would put a visible difference between the two arms that is not
+    the policy, in an experiment measuring time-on-task.
+
+    A function, not a module constant: `timezone.now()` in a constant would be
+    evaluated once at import and every reset for the life of the process would
+    claim the same instant.
+    """
+    return {
+        "status": ClearanceStatus.PENDING,
+        "reviewed_by": None,
+        "comment": "",
+        "updated_at": timezone.now(),
+    }
 
 
 def _resolve_after_resubmission(record, declining_stage=None, **_) -> str:
@@ -624,11 +641,11 @@ def _resolve_after_resubmission(record, declining_stage=None, **_) -> str:
             # the record re-enters, and re-reading it afterwards would be a
             # second query for an answer that cannot have changed.
             offices = set(clearances.values_list("office", flat=True))
-            clearances.update(**_CLEARANCE_RESET)
+            clearances.update(**_clearance_reset_fields())
             return _clearance_entry_for(offices)
 
         office = declining_stage
-        clearances.filter(office=office).update(**_CLEARANCE_RESET)
+        clearances.filter(office=office).update(**_clearance_reset_fields())
         return _stage_reviewed_by(record, office)
 
     RecordClearance.objects.filter(record=record).delete()

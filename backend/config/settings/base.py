@@ -275,6 +275,37 @@ WORKFLOW_TABLE = {
     "RESUBMISSION_POLICY": config("RESUBMISSION_POLICY", default="clearance_aware"),
 }
 
+# ---- Logging -------------------------------------------------------------
+
+# Until IR-137 there was no LOGGING at all, so the root logger sat at its
+# default WARNING with no handlers and every `logger.info` in `apps/` was
+# discarded. That made ADR-004's "record which policy was active for each
+# evaluation run" false in practice: the line was written and thrown away.
+#
+# Deliberately minimal. Root stays at WARNING so Django's own noise is
+# unchanged; only `apps.*` is lifted to INFO, and `disable_existing_loggers`
+# is False so Django's default loggers survive. `apps/records/test_lifecycle.py`
+# asserts INFO really is enabled, because this failing silently is exactly how
+# it went unnoticed the first time.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "apps": {
+            "handlers": ["console"],
+            "level": config("APP_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+    },
+}
+
 # ---- AI -----------------------------------------------------------------
 
 AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")

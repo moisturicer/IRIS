@@ -369,6 +369,33 @@ class ResubmissionPolicyTests(SimpleTestCase):
         self.assertIs(transitions, TRANSITIONS)
 
 
+class PolicyIsRecordedTests(SimpleTestCase):
+    """
+    The `apps.*` logger must actually emit INFO (IR-137, ADR-004).
+
+    ADR-004 requires that the arm a run used be recoverable afterwards, and this
+    branch records it with `logger.info` in `resubmit_record`. That line is only
+    a record if something is listening: before this ticket there was no `LOGGING`
+    setting at all, the root logger sat at WARNING with no handlers, and the line
+    was composed and dropped.
+
+    Deliberately asserts on the *configuration* rather than capturing a log.
+    `assertLogs` attaches its own handler and lowers the level itself, so a test
+    written that way passes whether or not the deployed settings would emit
+    anything — it would not have caught the bug it exists to prevent.
+    """
+
+    def test_app_logs_are_enabled_at_info(self):
+        import logging
+
+        self.assertTrue(
+            logging.getLogger("apps.reviews.services").isEnabledFor(logging.INFO),
+            "apps.* logging is not enabled at INFO, so the line naming which "
+            "resubmission policy ran is discarded and the evaluation arm cannot "
+            "be recovered from a run",
+        )
+
+
 class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
     """
     ADR-004's hard operational rule, enforced rather than trusted.
@@ -395,6 +422,19 @@ class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
         "config/settings/base.py",  # loads it from the environment
     }
 
+    #: Both spellings of the policy, plus the table it lives in.
+    #:
+    #: Underscores are stripped from the haystack before matching, so one needle
+    #: catches `resubmission_policy` *and* `ResubmissionPolicy` — the earlier
+    #: version lowercased only, which missed the class entirely: a serializer
+    #: could import the enum and expose `ChoiceField(choices=...)` under any
+    #: field name and the guard would have passed it.
+    #:
+    #: `WORKFLOW_TABLE` is here because reading the policy is not the only way to
+    #: reach it — an endpoint writing the table wholesale would set the policy
+    #: without ever naming it.
+    NEEDLES = ("resubmissionpolicy", "workflowtable")
+
     def test_only_the_permitted_modules_mention_the_policy(self):
         from pathlib import Path
 
@@ -402,10 +442,14 @@ class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
         offenders = sorted(
             path.relative_to(backend).as_posix()
             for path in backend.rglob("*.py")
-            if "test" not in path.name
+            if not path.name.startswith("test_")
+            and "tests" not in path.parts
             and ".venv" not in path.parts
             and "migrations" not in path.parts
-            and "resubmission_policy" in path.read_text(encoding="utf-8").lower()
+            and any(
+                needle in path.read_text(encoding="utf-8").lower().replace("_", "")
+                for needle in self.NEEDLES
+            )
             and path.relative_to(backend).as_posix() not in self.PERMITTED
         )
         self.assertEqual(

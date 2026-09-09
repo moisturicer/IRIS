@@ -144,6 +144,32 @@ class RestartAllArmTests(ResubmissionPolicyBase):
             {Office.IERC, Office.KTTO},
         )
 
+    def test_a_reset_row_stops_reporting_the_moment_it_cleared(self):
+        """
+        `.update()` bypasses `auto_now`, so `updated_at` has to be set by hand.
+
+        Without that, a row reset to `pending` still carries the timestamp of the
+        clearance it just lost, and `clearance_payload` publishes it as the
+        office's decision time. Under this arm that is every row rather than one,
+        so the stale timestamps would be a visible difference between the two
+        arms that is not the policy — in an experiment measuring time-on-task.
+        """
+        record = self._thesis_at_parallel_review()
+        self._one_office_declines_after_a_peer_cleared(record)
+        cleared_at = RecordClearance.objects.get(
+            record=record, office=Office.IERC
+        ).updated_at
+
+        self.resubmit(record)
+
+        after = RecordClearance.objects.get(record=record, office=Office.IERC)
+        self.assertEqual(after.status, ClearanceStatus.PENDING)
+        self.assertGreater(
+            after.updated_at,
+            cleared_at,
+            "a row reset to pending still claims the time it was cleared",
+        )
+
     def test_the_reviewer_and_comment_are_cleared_on_every_row(self):
         record = self._thesis_at_parallel_review()
         self._one_office_declines_after_a_peer_cleared(record)
@@ -186,6 +212,29 @@ class RestartAllArmTests(ResubmissionPolicyBase):
                 record=record, status=ClearanceStatus.PENDING
             ).count(),
             3,
+        )
+
+    def test_the_resubmission_names_the_arm_that_ran(self):
+        """
+        ADR-004: the arm must be recoverable from a run afterwards.
+
+        That the `apps.*` logger is actually enabled to emit this is a separate
+        assertion, in `test_lifecycle.py` — `assertLogs` here would pass even
+        with logging switched off, so it proves the line's *content*, not that
+        anyone would ever see it.
+        """
+        record = self._thesis_at_parallel_review()
+        self._one_office_declines_after_a_peer_cleared(record)
+
+        with self.assertLogs("apps.reviews.services", level="INFO") as captured:
+            self.resubmit(record)
+
+        self.assertTrue(
+            any(
+                lifecycle.ResubmissionPolicy.RESTART_ALL.value in line
+                for line in captured.output
+            ),
+            f"no log line named the active arm: {captured.output}",
         )
 
     def test_nothing_is_preserved_so_the_frontend_needs_no_policy_branch(self):
