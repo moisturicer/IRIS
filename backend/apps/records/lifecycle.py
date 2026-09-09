@@ -97,6 +97,22 @@ class WorkflowEvent(str, Enum):
     RESTORE = "restore"
 
 
+#: The events a reviewer performs *at a gate*.
+#:
+#: Only these require their origin to be a declared `STAGES` node, because only
+#: these need a stage's kind (to know whether the acting party is an office) and
+#: its `records_as` (to write `Review.stage`). The record-lifecycle events added
+#: in stage 2 — submitting, completing, deleting, restoring — happen at statuses
+#: where nothing is reviewed, so `draft`, `approved` and `pending_delete` are
+#: deliberately absent from `STAGES`. Naming the split here keeps it in one
+#: place rather than as a growing list of exceptions inside a test.
+REVIEW_EVENTS = frozenset({
+    WorkflowEvent.APPROVE,
+    WorkflowEvent.DECLINE,
+    WorkflowEvent.REJECT,
+})
+
+
 class StageKind(str, Enum):
     """
     Sequential gate or parallel clearance group.
