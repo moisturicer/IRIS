@@ -61,6 +61,7 @@ from django.conf import settings
 from django.db import transaction
 
 from core.enums import (
+    PUBLICLY_VISIBLE_STATUSES,
     ClearanceStatus,
     Office,
     PipelineStatus,
@@ -86,6 +87,14 @@ class WorkflowEvent(str, Enum):
     DECLINE = "decline"
     REJECT = "reject"
     RESUBMIT = "resubmit"
+
+    # --- stage 2 (IR-136): the record-owned edges, previously assigned by hand
+    # --- in records/views.py and records/services.py.
+    SUBMIT = "submit"
+    MARK_COMPLETE = "mark_complete"
+    REQUEST_DELETE = "request_delete"
+    SOFT_DELETE = "soft_delete"
+    RESTORE = "restore"
 
 
 class StageKind(str, Enum):
@@ -265,7 +274,78 @@ TRANSITIONS: dict[tuple, Edge] = {
         decision=ReviewDecision.APPROVED,  # unused: resubmission writes no Review
         resolver="after_resubmission",
     ),
+
+    # --- Stage 2: the record-owned edges -----------------------------------
+    # These were seven hand-written assignments in records/views.py and
+    # records/services.py. None of them writes a Review, so `decision` is unused
+    # on every edge below -- it stays on the dataclass because the review edges
+    # above need it.
+
+    # Submission out of draft. Type-differentiated, so a resolver: a Proposal
+    # enters adviser_review and everything else rdco_intake.
+    (PipelineStatus.DRAFT, WorkflowEvent.SUBMIT): Edge(
+        decision=ReviewDecision.APPROVED,
+        resolver="first_status",
+    ),
+    # RDCO marks an approved Proposal finished. Only Proposals reach `approved`
+    # -- approve_record sends every other type to `published` -- so keying on
+    # the status is sufficient; the view keeps an explicit record-type check as
+    # a defensive precondition rather than as routing.
+    (PipelineStatus.APPROVED, WorkflowEvent.MARK_COMPLETE): Edge(
+        decision=ReviewDecision.APPROVED,
+        gate_role=RoleName.RDCO,
+        to=PipelineStatus.COMPLETED,
+    ),
+    # Restoring a record whose delete request was declined. The destination is
+    # the status it held before, which lives on the DeleteRequest row, so the
+    # caller supplies it.
+    (PipelineStatus.PENDING_DELETE, WorkflowEvent.RESTORE): Edge(
+        decision=ReviewDecision.APPROVED,
+        gate_role=RoleName.RDCO,
+        resolver="restore_previous",
+    ),
 }
+
+# Deleting a publicly visible record raises a delete request for review rather
+# than removing it; anything not yet public is soft-deleted outright. Generated
+# rather than typed out so the two sets cannot drift from
+# PUBLICLY_VISIBLE_STATUSES, which is what `perform_destroy` branches on.
+for _status in PUBLICLY_VISIBLE_STATUSES:
+    TRANSITIONS[(_status, WorkflowEvent.REQUEST_DELETE)] = Edge(
+        decision=ReviewDecision.APPROVED,
+        to=PipelineStatus.PENDING_DELETE,
+    )
+
+# Soft delete is legal from **every** status, deliberately. Before IR-136 it was
+# an unguarded assignment reachable from two places -- `perform_destroy` for a
+# not-yet-public record, and delete-request *approve*, where the record is
+# already at `pending_delete`. Declaring a partial edge set here would turn a
+# silent success into an InvalidPipelineTransition, which stage 2 must not do:
+# this stage makes the edges visible, it does not tighten them. Whether every
+# one of these should stay permitted is a separate, deliberate decision.
+for _status in PipelineStatus.values:
+    TRANSITIONS[(_status, WorkflowEvent.SOFT_DELETE)] = Edge(
+        decision=ReviewDecision.APPROVED,
+        to=PipelineStatus.PENDING_DELETE,
+    )
+
+del _status
+
+
+# ---------------------------------------------------------------------------
+# Creation. Not edges: a record being created has no status to come *from*.
+# ---------------------------------------------------------------------------
+
+#: What a newly created record starts as.
+INITIAL_STATUS = PipelineStatus.DRAFT
+
+#: Where the legacy Excel importer places records -- **straight to published,
+#: bypassing the review pipeline entirely**. ADR-002 calls this "the Excel
+#: bypass" and asks that it become "a declared, auditable edge"; naming it here
+#: is that declaration. It is recorded, not endorsed: whether the bypass stays
+#: permitted is a decision for a person, and stage 2 deliberately preserves
+#: today's behaviour rather than quietly removing it inside a refactor.
+LEGACY_IMPORT_STATUS = PipelineStatus.PUBLISHED
 
 
 def load_table() -> tuple[dict, dict]:
@@ -455,11 +535,37 @@ def _stage_reviewed_by(record, office: str) -> str:
     return candidates[-1]
 
 
+def _resolve_first_status(record, **_) -> str:
+    """Submission out of draft — the same type-differentiated entry the pipeline uses."""
+    return first_status_for(record)
+
+
+def _resolve_restore_previous(record, restore_to=None, **_) -> str:
+    """
+    Where a record goes when its delete request is declined.
+
+    `restore_to` is the `DeleteRequest.previous_pipeline_status` the caller
+    holds. The fallback reproduces today's behaviour exactly: an older row may
+    predate that column being populated, and those records fall back to
+    `approved` for a Proposal and `published` for anything else.
+    """
+    if restore_to:
+        return restore_to
+    type_name = record.record_type.name if record.record_type else ""
+    return (
+        PipelineStatus.APPROVED
+        if type_name == RecordTypeName.PROPOSAL
+        else PipelineStatus.PUBLISHED
+    )
+
+
 _RESOLVERS = {
     "after_adviser_review": _resolve_after_adviser_review,
     "enter_clearance_stage": _resolve_enter_clearance_stage,
     "after_clearance": _resolve_after_clearance,
     "after_resubmission": _resolve_after_resubmission,
+    "first_status": _resolve_first_status,
+    "restore_previous": _resolve_restore_previous,
 }
 
 
@@ -496,7 +602,15 @@ def edge_for(status: str, event: WorkflowEvent) -> Edge | None:
 # ---------------------------------------------------------------------------
 
 @transaction.atomic
-def apply(record, event: WorkflowEvent, actor=None, *, office=None, declining_stage=None) -> str:
+def apply(
+    record,
+    event: WorkflowEvent,
+    actor=None,
+    *,
+    office=None,
+    declining_stage=None,
+    restore_to=None,
+) -> str:
     """
     Resolve and persist the record's next `pipeline_status`. Returns it.
 
@@ -530,7 +644,11 @@ def apply(record, event: WorkflowEvent, actor=None, *, office=None, declining_st
                 f"the table names resolver '{edge.resolver}', which does not exist"
             )
         destination = resolver(
-            record, office=office, declining_stage=declining_stage, actor=actor
+            record,
+            office=office,
+            declining_stage=declining_stage,
+            restore_to=restore_to,
+            actor=actor,
         )
 
     if destination != record.pipeline_status:
