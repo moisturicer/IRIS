@@ -219,6 +219,18 @@ jobs:
       - name: Validate production stack
         run: docker compose -f docker-compose.prod.yml config --quiet
 
+      # `config --quiet` resolves and validates the compose files; it does not
+      # run a build. That gap let main reach a state where the backend image
+      # could not be built at all while all four jobs reported green (IR-198) --
+      # the same shape of hole as IR-163's skipped suite and IR-165's
+      # everything-skips-without-a-database. Building the image is the only
+      # thing that actually proves it builds.
+      #
+      # Backend only, deliberately: it is the image with a Django build step to
+      # break. The frontend job already runs a real `npm run build`.
+      - name: Build the backend image
+        run: docker compose -f docker-compose.yml build backend
+
   security:
     name: Security
     runs-on: ubuntu-latest
