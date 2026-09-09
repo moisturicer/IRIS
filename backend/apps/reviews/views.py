@@ -8,13 +8,14 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.permissions import IsReviewer, IsStaff
 from core.exceptions import InvalidPipelineTransition
+from apps.records import lifecycle
 from core.enums import PipelineStatus, ReviewDecision, RoleName
 from .models import Review, RecordAuthPin, RecordClearance
 from .serializers import ReviewSerializer, ReviewWriteSerializer
 from .services import (
     approve_record, decline_record, reject_record,
     resubmit_record, submit_clearance,
-    CLEARANCE_STATUSES, ROLE_TO_OFFICE,
+    ROLE_TO_OFFICE,
 )
 from apps.records.models import Record
 from apps.audit.services import create_audit_event
@@ -141,7 +142,7 @@ class ReviewViewSet(viewsets.GenericViewSet):
         comment  = data.get("comment", "")
 
         try:
-            if record.pipeline_status in CLEARANCE_STATUSES:
+            if lifecycle.is_clearance_stage(record.pipeline_status):
                 # Clearance stage — office is inferred from the reviewer's role
                 role_name = request.user.role.name if request.user.role else ""
                 office    = ROLE_TO_OFFICE.get(role_name, "")
