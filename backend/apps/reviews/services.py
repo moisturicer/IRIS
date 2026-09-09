@@ -370,12 +370,17 @@ def resubmit_record(record: Record, submitted_by) -> Record:
     # is defined against this timestamp: a clearance decided before it survived
     # a resubmission, one decided after it was granted fresh. Without this the
     # distinction that carries the contribution cannot be recovered afterwards.
-    record.pipeline_status = new_status
+    #
+    # `pipeline_status` is deliberately absent from both the assignment and
+    # `update_fields`: `apply()` above already set and saved it (IR-136 stage
+    # 3). Re-assigning the value it returned wrote the same status a second
+    # time, which was harmless but left a hand-written status write in a module
+    # that is supposed to have none -- and it would have quietly won if the
+    # table ever returned something the caller did not expect.
     record.resubmission_count = (record.resubmission_count or 0) + 1
     record.last_resubmitted_at = timezone.now()
     record.save(
         update_fields=[
-            "pipeline_status",
             "resubmission_count",
             "last_resubmitted_at",
             "updated_at",
