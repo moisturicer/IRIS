@@ -249,6 +249,63 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# ---- Workflow (ADR-002, ADR-004, ADR-005) --------------------------------
+
+# The per-instance workflow table. `apps.records.lifecycle.load_table()` reads
+# `STAGES` and `TRANSITIONS` from here; both are absent by default, so CIT-U's
+# table in that module is used unchanged.
+#
+# `RESUBMISSION_POLICY` is ADR-004's experimental control (IR-137):
+# `clearance_aware` preserves every non-declining office's completed review and
+# is the contribution; `restart_all` resets them all, and exists so the claim
+# can be measured against something instead of asserted.
+#
+# **This is deployment configuration and must stay that way.** ADR-004 makes it
+# a hard operational rule: the comparison arm runs on a dedicated, short-lived
+# evaluation instance, never on a customer's production one, because a policy
+# that resets clearances would destroy live reviewers' completed work. It has no
+# endpoint and no serializer field, and `apps/records/test_lifecycle.py` fails
+# if any module outside a short allowlist so much as names it.
+#
+# The value is validated by `RecordsConfig.ready()`, so an unrecognised one
+# stops the app at startup instead of defaulting — a silent fallback would run
+# the evaluation on the production arm and say nothing. The spec's own upper-case
+# spelling (`RESTART_ALL`) is accepted.
+WORKFLOW_TABLE = {
+    "RESUBMISSION_POLICY": config("RESUBMISSION_POLICY", default="clearance_aware"),
+}
+
+# ---- Logging -------------------------------------------------------------
+
+# Until IR-137 there was no LOGGING at all, so the root logger sat at its
+# default WARNING with no handlers and every `logger.info` in `apps/` was
+# discarded. That made ADR-004's "record which policy was active for each
+# evaluation run" false in practice: the line was written and thrown away.
+#
+# Deliberately minimal. Root stays at WARNING so Django's own noise is
+# unchanged; only `apps.*` is lifted to INFO, and `disable_existing_loggers`
+# is False so Django's default loggers survive. `apps/records/test_lifecycle.py`
+# asserts INFO really is enabled, because this failing silently is exactly how
+# it went unnoticed the first time.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "apps": {
+            "handlers": ["console"],
+            "level": config("APP_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+    },
+}
+
 # ---- AI -----------------------------------------------------------------
 
 AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")

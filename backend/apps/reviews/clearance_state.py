@@ -86,9 +86,13 @@ def clearance_payload(clearance, *, last_resubmitted_at: Optional[datetime]) -> 
 def resubmission_payload(record, *, clearances: Iterable, latest_decline_stage: Optional[str]) -> dict[str, Any]:
     """`resubmission{}` — what happened, and what survived it.
 
-    Under a RESTART_ALL policy (IR-137) `offices_preserved` is simply empty,
-    because `resubmit_record` deletes every clearance on that path. That is why
-    the UI needs no policy branch: the same shape answers both policies.
+    Under a RESTART_ALL policy (IR-137) `offices_preserved` is simply empty —
+    not because anything here knows the policy, but because that arm resets
+    every clearance to `pending`, and `is_preserved` requires `CLEARED`. The
+    rows themselves survive (ADR-004 resets rather than deletes, so the record
+    keeps the office set ADR-018 put on it). That is why the UI needs no policy
+    branch: the same shape answers both policies, and `PreservationNotice`
+    renders off an empty array rather than off a flag.
     """
     last = record.last_resubmitted_at
     return {

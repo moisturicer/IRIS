@@ -59,6 +59,7 @@ from enum import Enum
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
@@ -123,6 +124,51 @@ class StageKind(str, Enum):
 
     SEQUENTIAL = "sequential"
     PARALLEL = "parallel"
+
+
+class ResubmissionPolicy(str, Enum):
+    """
+    What a resubmission does to clearances already granted (IR-137, ADR-004).
+
+    Here rather than in `core.enums` for the same reason as `StageKind`: it is
+    configuration of the table, never a value written to a column.
+
+    `CLEARANCE_AWARE` is ADR-003's contribution and production's default.
+    `RESTART_ALL` is the *comparison arm*, and it exists because counting
+    preserved clearances cannot produce a negative result — given which office
+    declined, the count is deterministically computable, so the claim is only
+    testable against IRIS running the other policy. ADR-004's operational rule
+    is hard: the comparison runs on a dedicated evaluation instance, never on a
+    customer's production one.
+    """
+
+    CLEARANCE_AWARE = "clearance_aware"
+    RESTART_ALL = "restart_all"
+
+    @classmethod
+    def coerce(cls, value) -> "ResubmissionPolicy":
+        """
+        One policy from configuration, or a refusal naming what was allowed.
+
+        **Case-insensitive on purpose.** ADR-004 and IR-137 both write the
+        values in upper case (`RESTART_ALL`), so the single most likely thing
+        an operator types is the spec's own spelling. Rejecting it would fail
+        the person who read the documentation correctly.
+
+        Everything else raises. The alternative — treating an unrecognised
+        value as the default — would run the evaluation instance on the
+        production arm and report nothing, which is the one failure this
+        setting cannot be allowed to have.
+        """
+        if isinstance(value, cls):
+            return value
+        try:
+            return cls(str(value).strip().lower())
+        except ValueError:
+            raise ValueError(
+                f"RESUBMISSION_POLICY={value!r} is not a resubmission policy. "
+                f"Use one of: {', '.join(p.value for p in cls)}."
+            ) from None
 
 
 @dataclass(frozen=True)
@@ -380,6 +426,28 @@ def load_table() -> tuple[dict, dict]:
     )
 
 
+def resubmission_policy() -> ResubmissionPolicy:
+    """
+    The active resubmission policy — the third `WORKFLOW_TABLE` key (ADR-004).
+
+    Not returned by `load_table()` because it is not a structure: every existing
+    caller unpacks exactly two values, and widening that tuple would edit eight
+    call sites to deliver one setting.
+
+    **An unrecognised value raises rather than falling back**, and
+    `RecordsConfig.ready()` calls this at startup so it raises *there* — before
+    a participant is mid-session — rather than on the first resubmission. A
+    silent default would be the worst possible failure: the evaluation instance
+    would run the production arm, every measurement taken from it would be of
+    the wrong policy, and nothing in the output would say so. A container that
+    refuses to start is a cheaper mistake than a contaminated experiment.
+    """
+    override = getattr(settings, "WORKFLOW_TABLE", None) or {}
+    return ResubmissionPolicy.coerce(
+        override.get("RESUBMISSION_POLICY", ResubmissionPolicy.CLEARANCE_AWARE)
+    )
+
+
 def stage_for(status: str) -> Stage | None:
     """The `Stage` a status names, or None when nothing is reviewed there."""
     stages, _ = load_table()
@@ -458,6 +526,23 @@ def _resolve_enter_clearance_stage(record, **_) -> str:
     for office in offices:
         RecordClearance.objects.get_or_create(record=record, office=office)
 
+    return _clearance_entry_for(offices)
+
+
+def _clearance_entry_for(offices) -> str:
+    """
+    Where a record whose clearance set is `offices` enters the parallel phase.
+
+    Factored out because two callers need the same answer from different inputs:
+    intake asks it of the offices it just created, and `RESTART_ALL` asks it of
+    the offices already on the record. Two copies of this would be two ideas of
+    where a route begins, and the resubmission arm would drift from the arm it
+    is compared against — which is the one difference the experiment cannot
+    tolerate.
+
+    A record requesting nothing goes to `rdco_review`: a clearance stage with no
+    office attached would auto-clear, which is worse than skipping it.
+    """
     if Office.ITSO in offices:
         return PipelineStatus.ITSO_REVIEW
     if offices:
@@ -489,6 +574,35 @@ def _resolve_after_clearance(record, office=None, **_) -> str:
     return record.pipeline_status  # still waiting on a peer office
 
 
+def _clearance_reset_fields() -> dict:
+    """
+    What resetting a clearance means, written once.
+
+    Both resubmission arms apply exactly this, differing only in which rows they
+    apply it to. That is not tidiness: "the two arms differ in nothing but the
+    policy" is IR-137's acceptance criterion, and two copies of these fields is
+    precisely how one arm quietly acquires a different one.
+
+    **`updated_at` is set by hand because `.update()` bypasses `auto_now`.**
+    Without it a reset row keeps the timestamp of the moment it *cleared*, and
+    `clearance_state.clearance_payload` publishes that as the office's decision
+    time — so a reviewer would see a stale "decided at" for a clearance that is
+    now pending again. Under `RESTART_ALL` that applies to every row rather than
+    one, which would put a visible difference between the two arms that is not
+    the policy, in an experiment measuring time-on-task.
+
+    A function, not a module constant: `timezone.now()` in a constant would be
+    evaluated once at import and every reset for the life of the process would
+    claim the same instant.
+    """
+    return {
+        "status": ClearanceStatus.PENDING,
+        "reviewed_by": None,
+        "comment": "",
+        "updated_at": timezone.now(),
+    }
+
+
 def _resolve_after_resubmission(record, declining_stage=None, **_) -> str:
     """
     **ADR-003's contribution, as a table lookup rather than a set literal.**
@@ -501,14 +615,37 @@ def _resolve_after_resubmission(record, declining_stage=None, **_) -> str:
     `declining_stage` is a `Review.stage`, which is a union — the membership test
     against `clearance_offices()` is what decides which of the two this is, and
     that set now comes from `STAGES` rather than a literal.
+
+    **The first of those two is what `resubmission_policy()` switches** (IR-137).
+    Under `RESTART_ALL` a clearance decline resets every office instead of one
+    and the record re-enters at the stage its offices started from. The
+    sequential branch below is not policy-dependent and must never become so.
     """
     from apps.reviews.models import RecordClearance
 
     if declining_stage and declining_stage in clearance_offices():
+        # IR-137/ADR-004: the experimental switch, and it belongs *here* -- on
+        # the branch that preserves. Putting it on the `else` below would make
+        # the two arms differ in how non-clearance declines behave as well, and
+        # the comparison would then measure two changes at once.
+        #
+        # Both arms run the same statement against the same rows; only the
+        # filter differs. `RESTART_ALL` resets every office rather than deleting
+        # (ADR-004's wording is "reset every clearance row to pending"), because
+        # which offices a record engages is ADR-018 data on the record -- delete
+        # them and it would re-enter the phase with a different office set than
+        # it left, which is again a second difference.
+        clearances = RecordClearance.objects.filter(record=record)
+        if resubmission_policy() is ResubmissionPolicy.RESTART_ALL:
+            # Read the office set *before* the update: it is what decides where
+            # the record re-enters, and re-reading it afterwards would be a
+            # second query for an answer that cannot have changed.
+            offices = set(clearances.values_list("office", flat=True))
+            clearances.update(**_clearance_reset_fields())
+            return _clearance_entry_for(offices)
+
         office = declining_stage
-        RecordClearance.objects.filter(record=record, office=office).update(
-            status=ClearanceStatus.PENDING, reviewed_by=None, comment=""
-        )
+        clearances.filter(office=office).update(**_clearance_reset_fields())
         return _stage_reviewed_by(record, office)
 
     RecordClearance.objects.filter(record=record).delete()
