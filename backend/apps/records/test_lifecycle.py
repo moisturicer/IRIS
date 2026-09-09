@@ -61,18 +61,47 @@ class TableStructureTests(SimpleTestCase):
                 with self.subTest(edge=key):
                     self.assertIn(edge.resolver, lifecycle._RESOLVERS)
 
-    def test_every_reviewable_origin_is_a_declared_stage(self):
+    def test_every_review_edge_starts_at_a_declared_stage(self):
         """
-        An edge out of a status with no `STAGES` entry would have no kind, so
-        `apply()` could not tell a sequential gate from a parallel group.
-        Resubmission is the one exception: `declined` is a terminal state
-        nobody reviews at, and leaving it out of `STAGES` is what says so.
+        A **review** edge out of a status with no `STAGES` entry would have no
+        kind, so `apply()` could not tell a sequential gate from a parallel
+        group, and nothing would say what `Review.stage` should hold.
+
+        Only review events are covered, and that narrowing is the point. Stage 2
+        added record-lifecycle edges — submit, complete, request-delete, soft
+        delete, restore — that start at `draft`, `approved`, `pending_delete`
+        and the published statuses. **Nothing is reviewed at any of those**, so
+        they are correctly absent from `STAGES`.
+
+        This test previously exempted only `RESUBMIT` and asserted the rule
+        against every other edge. Stage 2 made it fail thirteen times, and the
+        test was wrong rather than the table: it had generalised from a table
+        that happened to contain only review edges. Corrected deliberately, with
+        the review/lifecycle split now named once in `lifecycle.REVIEW_EVENTS`
+        rather than re-listed here.
         """
         for (from_status, event) in TRANSITIONS:
-            if event is WorkflowEvent.RESUBMIT:
+            if event not in lifecycle.REVIEW_EVENTS:
                 continue
             with self.subTest(status=from_status, event=event):
                 self.assertIn(from_status, STAGES)
+
+    def test_lifecycle_edges_do_not_require_a_stage(self):
+        """
+        The other half, asserted rather than left implicit: the record-lifecycle
+        events genuinely do start outside `STAGES`, so the narrowing above is
+        describing the table as it is and not quietly excusing a gap.
+        """
+        lifecycle_origins = {
+            from_status
+            for (from_status, event) in TRANSITIONS
+            if event not in lifecycle.REVIEW_EVENTS
+        }
+        self.assertTrue(
+            lifecycle_origins - set(STAGES),
+            "no lifecycle edge starts outside STAGES -- if that is now true, the "
+            "narrowing in the test above is no longer earning its keep",
+        )
 
     def test_sequential_stages_declare_what_a_review_records_as(self):
         for status, stage in STAGES.items():

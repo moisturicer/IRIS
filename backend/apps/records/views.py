@@ -22,6 +22,7 @@ from core.enums import (
     ReviewStage,
     RoleName,
 )
+from . import lifecycle
 from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO, IsAdmin, IsAuthor
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
@@ -135,7 +136,9 @@ class RecordViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         from .models import RecordOwner
-        record = serializer.save(added_by=self.request.user, pipeline_status=PipelineStatus.DRAFT)
+        record = serializer.save(
+            added_by=self.request.user, pipeline_status=lifecycle.INITIAL_STATUS
+        )
         # Add the creator as the primary owner automatically
         RecordOwner.objects.create(record=record, user=self.request.user, is_primary=True)
         # Record starts as draft — notification fires only when the owner calls /submit/
@@ -148,8 +151,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                 requested_by=self.request.user,
                 previous_pipeline_status=instance.pipeline_status,
             )
-            instance.pipeline_status = PipelineStatus.PENDING_DELETE
-            instance.save(update_fields=["pipeline_status"])
+            lifecycle.apply(instance, lifecycle.WorkflowEvent.REQUEST_DELETE, self.request.user)
         else:
             soft_delete_record(instance, deleted_by=self.request.user)
 
@@ -192,18 +194,19 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         rt_name = record.record_type.name  # "Proposal" | "Thesis/Research" | "Project"
 
-        if rt_name == RecordTypeName.PROPOSAL:
-            if not record.adviser:
-                return Response(
-                    {"detail": "An adviser must be assigned before a Proposal can be submitted."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            first_status = PipelineStatus.ADVISER_REVIEW
-        else:
-            first_status = PipelineStatus.RDCO_INTAKE
+        # A Proposal's first gate is its adviser, so it cannot enter the pipeline
+        # without one. This is a **precondition on submitting**, not routing --
+        # the destination is the table's (IR-136 stage 2), which is why the
+        # if/else that used to compute `first_status` here is gone rather than
+        # kept alongside it. Two places deciding where a submission lands is
+        # exactly the drift the table removes.
+        if rt_name == RecordTypeName.PROPOSAL and not record.adviser:
+            return Response(
+                {"detail": "An adviser must be assigned before a Proposal can be submitted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        record.pipeline_status = first_status
-        record.save(update_fields=["pipeline_status", "updated_at"])
+        lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, request.user)
 
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
@@ -338,8 +341,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        record.pipeline_status = PipelineStatus.COMPLETED
-        record.save(update_fields=["pipeline_status", "updated_at"])
+        lifecycle.apply(record, lifecycle.WorkflowEvent.MARK_COMPLETE, request.user)
 
         notify_proposal_completed(record, marked_by=request.user)
 
@@ -425,7 +427,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                     for_commercialization= row["for_commercialization"],
                     community_extension  = row["community_extension"],
                     added_by             = request.user,
-                    pipeline_status      = PipelineStatus.PUBLISHED,
+                    pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
                 )
 
                 from .models import RecordOwner
@@ -787,16 +789,14 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
         dr.reviewed_by = request.user
         dr.reviewed_at = timezone.now()
         dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        # Restore the record to its pre-deletion visible state
-        if dr.previous_pipeline_status:
-            dr.record.pipeline_status = dr.previous_pipeline_status
-        else:
-            rt = dr.record.record_type.name if dr.record.record_type else ""
-            dr.record.pipeline_status = (
-                PipelineStatus.APPROVED
-                if rt == RecordTypeName.PROPOSAL
-                else PipelineStatus.PUBLISHED
-            )
-        dr.record.save(update_fields=["pipeline_status", "updated_at"])
+        # Restore the record to its pre-deletion visible state. The fallback for
+        # a row predating `previous_pipeline_status` lives in the table's
+        # `restore_previous` resolver now, not here.
+        lifecycle.apply(
+            dr.record,
+            lifecycle.WorkflowEvent.RESTORE,
+            request.user,
+            restore_to=dr.previous_pipeline_status,
+        )
         notify_delete_declined(dr, reviewed_by=request.user)
         return Response({"detail": "Delete request declined. The record has been restored."})
