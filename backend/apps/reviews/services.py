@@ -38,6 +38,8 @@ decline_record / reject_record.
 Clearance stages (itso_review, parallel_review) use submit_clearance;
 individual office statuses are tracked in RecordClearance rows.
 """
+import logging
+
 from django.utils import timezone
 
 from core.enums import (
@@ -56,6 +58,8 @@ from apps.notifications.services import (
     notify_resubmit,
     notify_clearance_result,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +337,10 @@ def resubmit_record(record: Record, submitted_by) -> Record:
             "Only records in 'declined' status can be resubmitted."
         )
 
+    # Read before anything is written, so a misconfigured policy fails this
+    # resubmission cleanly instead of halfway through one (IR-137).
+    policy = lifecycle.resubmission_policy()
+
     # Validate that the owner uploaded something new since the decline
     last_decline = (
         Review.objects.filter(record=record, status=ReviewDecision.DECLINED)
@@ -386,5 +394,26 @@ def resubmit_record(record: Record, submitted_by) -> Record:
             "updated_at",
         ]
     )
+    # Which policy was active, recorded per resubmission (IR-137, ADR-004's
+    # documentation requirement). An evaluation run whose arm cannot be
+    # established afterwards cannot be interpreted, and the policy is
+    # deployment configuration that leaves no trace on the record itself.
+    #
+    # Emitted identically on both arms: a log line that only appeared under one
+    # policy would be a second difference between them. `policy` was read at the
+    # top of this function, before anything was written -- reading it here would
+    # put a raising call after the record had already been resubmitted and
+    # counted, leaving `notify_resubmit` unsent on a bad configuration.
+    #
+    # This is a log line, not the audit trail ADR-004's original card asks for.
+    # Workflow `AuditEvent`s are IR-144, which is blocked on IR-138; pre-empting
+    # their shape here would be the wrong place to guess it.
+    logger.info(
+        "record %s resubmitted under %s policy; now at %s",
+        record.pk,
+        policy.value,
+        new_status,
+    )
+
     notify_resubmit(record, submitted_by, new_status=new_status)
     return record

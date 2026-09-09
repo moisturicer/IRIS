@@ -285,3 +285,134 @@ class ApplyRefusalTests(TestCase):
         message = str(caught.exception)
         self.assertIn(PipelineStatus.DRAFT, message)
         self.assertIn(WorkflowEvent.APPROVE.value, message)
+
+
+class ResubmissionPolicyTests(SimpleTestCase):
+    """
+    The policy as *table configuration* (IR-137, ADR-004).
+
+    What the two policies do to a record is asserted end to end in
+    `apps/reviews/test_resubmission_policy.py`. What is checked here is the
+    setting itself: that production defaults to the contribution, that an
+    instance can override it, and that a mistyped value fails loudly. The last
+    one matters more than it looks — a silent fallback to the default would run
+    the evaluation instance on the production arm and contaminate every
+    measurement taken from it, with nothing in the output to show for it.
+    """
+
+    @override_settings(WORKFLOW_TABLE={})
+    def test_the_production_default_is_clearance_aware(self):
+        """
+        Pinned to an empty table rather than read from live settings.
+
+        Reading the real setting would make this test assert what *this* deploy
+        happens to be configured as — so it would fail on the evaluation
+        instance ADR-004 requires, which is a correct configuration, not a bug.
+        What the acceptance criterion actually claims is that the code defaults
+        to the contribution when nothing selects an arm.
+        """
+        self.assertIs(
+            lifecycle.resubmission_policy(),
+            lifecycle.ResubmissionPolicy.CLEARANCE_AWARE,
+        )
+
+    @override_settings(WORKFLOW_TABLE={"RESUBMISSION_POLICY": "RESTART_ALL"})
+    def test_the_specs_own_upper_case_spelling_is_accepted(self):
+        """
+        ADR-004 and IR-137 both write `RESTART_ALL`.
+
+        An operator copying the value out of the document it is specified in is
+        the likeliest way this gets typed, so rejecting that spelling would fail
+        precisely the person who read the documentation.
+        """
+        self.assertIs(
+            lifecycle.resubmission_policy(), lifecycle.ResubmissionPolicy.RESTART_ALL
+        )
+
+    @override_settings(WORKFLOW_TABLE={"RESUBMISSION_POLICY": "restart-all"})
+    def test_the_refusal_names_the_values_that_would_have_worked(self):
+        """An operator who mistypes it should not have to read the source."""
+        with self.assertRaises(ValueError) as caught:
+            lifecycle.resubmission_policy()
+        message = str(caught.exception)
+        self.assertIn("restart-all", message)
+        self.assertIn(lifecycle.ResubmissionPolicy.CLEARANCE_AWARE.value, message)
+        self.assertIn(lifecycle.ResubmissionPolicy.RESTART_ALL.value, message)
+
+    @override_settings(
+        WORKFLOW_TABLE={"RESUBMISSION_POLICY": lifecycle.ResubmissionPolicy.RESTART_ALL}
+    )
+    def test_an_instance_can_select_the_comparison_arm(self):
+        self.assertIs(
+            lifecycle.resubmission_policy(), lifecycle.ResubmissionPolicy.RESTART_ALL
+        )
+
+    @override_settings(WORKFLOW_TABLE={"RESUBMISSION_POLICY": "restart_all"})
+    def test_the_setting_may_be_written_as_its_plain_string_value(self):
+        """Configuration arrives from the environment as a string, never as an enum."""
+        self.assertIs(
+            lifecycle.resubmission_policy(), lifecycle.ResubmissionPolicy.RESTART_ALL
+        )
+
+    @override_settings(WORKFLOW_TABLE={"RESUBMISSION_POLICY": "restart-all"})
+    def test_an_unrecognised_policy_refuses_rather_than_defaulting(self):
+        with self.assertRaises(ValueError):
+            lifecycle.resubmission_policy()
+
+    @override_settings(
+        WORKFLOW_TABLE={"RESUBMISSION_POLICY": lifecycle.ResubmissionPolicy.RESTART_ALL}
+    )
+    def test_overriding_the_policy_leaves_the_rest_of_the_table_alone(self):
+        """`WORKFLOW_TABLE` carries independent keys; one must not shadow another."""
+        stages, transitions = lifecycle.load_table()
+        self.assertIs(stages, STAGES)
+        self.assertIs(transitions, TRANSITIONS)
+
+
+class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
+    """
+    ADR-004's hard operational rule, enforced rather than trusted.
+
+    "A policy flag that resets clearances could corrupt live customer workflows
+    if enabled on the production instance" — so it is deployment configuration,
+    not an in-app setting. The risk is not that someone adds a policy endpoint
+    on purpose; it is that the name gets added to a serializer's `fields` during
+    some unrelated change and nobody notices it is now writable.
+    """
+
+    #: The only modules allowed to name the policy at all.
+    #:
+    #: An allowlist rather than a list of API filenames to search. Naming the
+    #: surfaces (`serializers.py`, `views.py`, ...) only catches a field added
+    #: to a file someone happened to name conventionally — it is blind to
+    #: `config/urls.py`, a `serializers/` package, `api.py`, `viewsets.py`, or
+    #: anything under `core/`. Inverting it means a new mention anywhere in the
+    #: backend fails until a person decides it belongs.
+    PERMITTED = {
+        "apps/records/lifecycle.py",  # defines it
+        "apps/records/apps.py",  # validates it at startup
+        "apps/reviews/services.py",  # reads it to log which arm ran
+        "config/settings/base.py",  # loads it from the environment
+    }
+
+    def test_only_the_permitted_modules_mention_the_policy(self):
+        from pathlib import Path
+
+        backend = Path(lifecycle.__file__).resolve().parent.parent.parent
+        offenders = sorted(
+            path.relative_to(backend).as_posix()
+            for path in backend.rglob("*.py")
+            if "test" not in path.name
+            and ".venv" not in path.parts
+            and "migrations" not in path.parts
+            and "resubmission_policy" in path.read_text(encoding="utf-8").lower()
+            and path.relative_to(backend).as_posix() not in self.PERMITTED
+        )
+        self.assertEqual(
+            offenders,
+            [],
+            "the resubmission policy is named in a module that is not permitted "
+            "to know about it. It is deployment configuration (ADR-004 Security "
+            "Impact), never a field, an endpoint or a serialized value -- if this "
+            "mention is legitimate, add it to PERMITTED deliberately",
+        )
