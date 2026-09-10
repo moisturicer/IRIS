@@ -234,12 +234,18 @@ def stateful_approval_cells(stages) -> set:
         for office in stage.offices
     }
 
-#: Statuses where nothing is reviewed -- everything a record can be that the
-#: table does not declare as a gate. Derived, so a status promoted into `STAGES`
-#: leaves this set on its own instead of being counted as both.
-NON_GATE_STATUSES = tuple(
-    s for s in PipelineStatus.values if s not in lifecycle.STAGES
-)
+def non_gate_statuses(stages) -> tuple:
+    """
+    Statuses where nothing is reviewed -- every status the table does not
+    declare as a gate.
+
+    Derived, so a status promoted into `STAGES` leaves this set on its own
+    rather than being counted as both. Takes `stages` for the same reason
+    `stateful_approval_cells` does: as a module constant it read
+    `lifecycle.STAGES` once at import, which is the CIT-U default and not
+    necessarily the table an overriding instance is running.
+    """
+    return tuple(s for s in PipelineStatus.values if s not in stages)
 
 
 class WorkflowMatrixMixin:
@@ -265,7 +271,27 @@ class WorkflowMatrixMixin:
     # --- helpers ---------------------------------------------------------
 
     def actor_for(self, name):
-        return getattr(self, name)
+        """
+        The fixture user a `Cell.actor` or an `Office` value names.
+
+        **This is where the "a fourth office needs no new test code" claim runs
+        out, and it is recorded rather than left to be discovered.** It resolves
+        by attribute name, which works for offices only because every `Office`
+        value happens to equal a fixture attribute on the base class -- `itso`,
+        `ierc`, `ktto`. A fourth office added to `STAGES` would be *enumerated*
+        by the table-driven cases and by the completeness check, and would then
+        fail here with `AttributeError` until someone adds the matching user. A
+        loud failure naming the missing fixture is the intended behaviour; a
+        silent skip would let the office look covered when it is not.
+        """
+        actor = getattr(self, name, None)
+        if actor is None:
+            raise AttributeError(
+                f"no fixture user named {name!r} on this test case. An office or "
+                f"actor named in the table needs a matching user in "
+                f"`setUpTestData` before it can be exercised."
+            )
+        return actor
 
     def record_at(self, type_name, stage, **extra):
         """
@@ -521,7 +547,21 @@ class WorkflowMatrixMixin:
         This is the one place the ticket's SaaS criterion can be honoured
         literally: which offices exist is the table's to say, and the assertion
         -- that an office can clear at a stage its group contains -- holds for
-        any office the table adds.
+        any office the table adds. Its limit is recorded on `actor_for`.
+
+        **The destination is asserted here too, not only the clearance row.**
+        These cells are what the completeness check credits for the parallel
+        `APPROVE` edges, and an earlier version asserted only that the office's
+        row went to `cleared` -- which would have held even if the record had
+        jumped to `published`, leaving the edge counted as covered while nothing
+        checked where it led. The rule asserted is the one `after_clearance`
+        implements: a record advances to `rdco_review` exactly when no clearance
+        is left pending, and otherwise stays where the route puts it. Stated as
+        a consequence of the *observed* pending set rather than as a literal,
+        because which offices remain differs per stage -- the fixed
+        stage-by-stage destinations are pinned separately, and literally, by
+        `test_ktto_may_clear_before_itso_at_the_itso_stage` and the two
+        completion tests above.
         """
         stages, _ = lifecycle.load_table()
         for stage, declared in stages.items():
@@ -548,6 +588,28 @@ class WorkflowMatrixMixin:
                     )
                     self.assertEqual(self.latest_review(record).stage, office)
 
+                    still_pending = set(
+                        RecordClearance.objects.filter(
+                            record=record, status=ClearanceStatus.PENDING
+                        ).values_list("office", flat=True)
+                    )
+                    landed = self.status_of(record)
+                    if still_pending:
+                        self.assertIn(
+                            landed,
+                            set(stages),
+                            f"cleared with {sorted(still_pending)} still pending, "
+                            f"but the record left the clearance phase for {landed!r}",
+                        )
+                        self.assertTrue(
+                            still_pending & set(stages[landed].offices),
+                            f"record moved to {landed!r}, whose offices "
+                            f"{stages[landed].offices} cannot clear the pending "
+                            f"{sorted(still_pending)}",
+                        )
+                    else:
+                        self.assertEqual(landed, PipelineStatus.RDCO_REVIEW)
+
     def test_a_clearance_is_recorded_against_its_own_office_only(self):
         """One office acting must not move another office's row."""
         record = self.walk_intake(
@@ -562,33 +624,75 @@ class WorkflowMatrixMixin:
 
     # --- invalid transitions ---------------------------------------------
 
-    def test_a_review_at_a_status_that_is_not_a_gate_is_refused(self):
+    def test_no_role_can_review_at_a_status_that_is_not_a_gate(self):
         """
         Refused, not silently ignored -- the distinction the criterion is about.
 
-        A no-op that answers 200 and leaves the record alone would satisfy a
-        status-only assertion, so both halves are checked: the call fails with
-        400, *and* the record did not move. Driven over every non-gate status
-        the enum has, so a new terminal state is covered the day it is added.
-        """
-        for from_status in NON_GATE_STATUSES:
-            for event in (WorkflowEvent.APPROVE, WorkflowEvent.DECLINE, WorkflowEvent.REJECT):
-                with self.subTest(from_status=from_status, event=event.value):
-                    record = self.make_record(
-                        RecordTypeName.THESIS_RESEARCH, pipeline_status=from_status
-                    )
-                    response = self.review(record, self.rdco, EVENT_DECISION[event])
+        A no-op answering 200 and leaving the record alone would satisfy a
+        status-only assertion, so all three halves are checked: the call fails
+        with 400, the record did not move, *and* no `Review` row was written.
+        Driven over every non-gate status the enum has, so a new terminal state
+        is covered the day it is added.
 
-                    self.assertEqual(
-                        response.status_code,
-                        status.HTTP_400_BAD_REQUEST,
-                        f"{event.value} at {from_status} was not refused: {response.data}",
-                    )
-                    self.assertEqual(self.status_of(record), from_status)
-                    self.assertFalse(
-                        Review.objects.filter(record=record).exists(),
-                        "a refused transition still wrote a Review row",
-                    )
+        **What this does and does not prove -- read before strengthening it.**
+        Every actor is tried, so the claim is that *nobody* can drive one of
+        these, which is the behaviour the acceptance criterion is about. It is
+        deliberately not a claim about *which layer* refuses: at this seam a view
+        guard always runs first (`_can_review` in `reviews/services.py`, the
+        status precondition in `records/views.py::complete`), and it raises the
+        same `InvalidPipelineTransition` the table would, so both arrive as an
+        identical 400. The table's refusal is therefore **not independently
+        observable through the API** -- it is defence in depth behind the view
+        guards, and it is asserted in isolation by
+        `apps/records/test_lifecycle.py::ApplyRefusalTests`, at the seam where it
+        is actually reachable. Saying that plainly here is the point: an earlier
+        version of this docstring claimed the table was being exercised, which
+        would have been evidence for something this test cannot see.
+
+        **Two layers refuse, and the expected code says which.** The owner is a
+        Student and `ReviewViewSet` is gated by `IsReviewer`, so their request is
+        refused by the permission class with **403** and never reaches the
+        workflow -- a stronger refusal than the reviewing roles get, not a weaker
+        one. Every reviewing role is admitted to the endpoint and refused with
+        **400** by `_can_review`. Asserting the exact code per role rather than
+        "any 4xx" is deliberate: it pins which layer is doing the work, so a
+        change that moved the owner's refusal from the permission class into the
+        service -- widening who can reach the workflow -- would fail here instead
+        of passing as just another refusal.
+        """
+        actors = ("rdco", "adviser", "itso", "ierc", "ktto", "owner")
+        stages, _ = lifecycle.load_table()
+        for from_status in non_gate_statuses(stages):
+            for event in (WorkflowEvent.APPROVE, WorkflowEvent.DECLINE, WorkflowEvent.REJECT):
+                for actor in actors:
+                    with self.subTest(
+                        from_status=from_status, event=event.value, actor=actor
+                    ):
+                        record = self.make_record(
+                            RecordTypeName.THESIS_RESEARCH,
+                            pipeline_status=from_status,
+                            adviser=self.adviser,
+                        )
+                        response = self.review(
+                            record, self.actor_for(actor), EVENT_DECISION[event]
+                        )
+
+                        expected = (
+                            status.HTTP_403_FORBIDDEN
+                            if actor == "owner"
+                            else status.HTTP_400_BAD_REQUEST
+                        )
+                        self.assertEqual(
+                            response.status_code,
+                            expected,
+                            f"{actor} drove {event.value} at {from_status}: "
+                            f"{response.data}",
+                        )
+                        self.assertEqual(self.status_of(record), from_status)
+                        self.assertFalse(
+                            Review.objects.filter(record=record).exists(),
+                            "a refused transition still wrote a Review row",
+                        )
 
     def test_the_refusal_says_what_was_wrong(self):
         """
