@@ -8,11 +8,11 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 
 ## Index
 
-**Seventeen active decisions.** Read these for "what does IRIS do today and why."
+**Eighteen active decisions.** Read these for "what does IRIS do today and why."
 
 | ADR | Title | Status | Impact |
 |---|---|---|---|
-| [001](001-mvp-scope-boundary.md) | MVP scope boundary for Semester 2 | Accepted | Scope |
+| [001](001-mvp-scope-boundary.md) | MVP scope boundary for Semester 2 | Accepted · **amended 4× (013, 016, 019, 020)** | Scope |
 | [002](002-workflow-transition-table.md) | Workflow as a declarative transition table | Accepted · **amended 2026-09-09** | Architecture · Research · SaaS |
 | [003](003-clearance-aware-resubmission.md) | Clearance-aware resubmission | Accepted | **Research contribution** |
 | [004](004-restart-all-comparison-mode.md) | Restart-all as a configurable comparison policy | Accepted | **Research evaluation** |
@@ -21,7 +21,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [008](008-ai-degradation-to-fts.md) | Graceful degradation to PostgreSQL FTS — no local model, ever | Accepted | Reliability |
 | [009](009-authorization-model.md) | Authorization model and `is_staff` semantics | Accepted | **Security** |
 | [010](010-deployment-topology.md) | Five-service topology and interim VPS deployment | Accepted · **amended by 014** | Deployment |
-| [011](011-evaluation-framework.md) | ISO 9241-11 as the evaluation spine | Accepted | Research |
+| [011](011-evaluation-framework.md) | ISO 9241-11 as the evaluation spine | Accepted · **amended 2026-09-10** | Research |
 | [013](013-chunk-level-rag-pipeline.md) | Chunk-level RAG pipeline with reranking | Accepted · **amended 2026-09-04, 2026-09-08** | Scope · Cost · Security · **Research** |
 | [014](014-ai-gateway-as-a-service.md) | The AI gateway is adopted as a deployed service, subject to five preconditions | Accepted · **completed by 017** | Architecture · Security · Deployment |
 | [015](015-voyage-embedding-and-reranking.md) | Voyage for embedding and reranking, always — `voyage-context-4` | Accepted | Architecture · Security · Cost |
@@ -29,6 +29,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [017](017-asgi-deployment-for-gateway-streaming.md) | ASGI deployment so Django can call the gateway asynchronously | Accepted | Architecture · Deployment · Performance |
 | [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Accepted** — 2026-09-07 | Architecture · Research |
 | [019](019-persisted-unified-conversation-history.md) | Persisted conversation history, unified across Ask IRIS and Paper Chat | Accepted | Architecture · **Research** |
+| [020](020-per-record-assessment-brief.md) | The IRIS Assessment Brief — per-record decision support at intake | **Accepted** — 2026-09-10 | Scope · Security · **Research** |
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 
@@ -50,6 +51,8 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 **ADRs 013–015 (2026-09-02) reverse the AI/RAG decisions in 006 and 012.** The review that produced 001–012 audited `refactor/docker-service`, where no part of the AI pipeline functioned. `feat/rag-service` implements pgvector, the extraction service and the gateway restructure, and the chunker is designed in [`../chunker_architecture.md`](../chunker_architecture.md). The superseded records are kept unedited: their cost and security arguments still hold, and 013's fallback *is* 006's pipeline.
 
 **013 and 016 were amended again 2026-09-04, on the instruction of the project lead: RAG is reclassified as thesis-critical**, reversing both ADRs' §Research Impact claim that RAG was "a supporting capability, not the thesis contribution." `CLAUDE.md`'s Scope rule is corrected to match. Unaffected: what ADR-003/ADR-004's controlled comparison measures — that experiment is still of the clearance-aware resubmission workflow mechanism, not RAG.
+
+**ADR-001's out-of-scope list has now been reversed four times**, and the Status line on ADR-001 carries the table. 013 took full-text chunking, 016 took Docling-serve, 019 took conversational RAG with history, and 020 took document summarization — the last two being the two halves of one exclusion line in ADR-013 §Decision, which 019 split deliberately rather than bundling. Each reversal draws on the same ~27 dev-day budget ADR-001 was costed against, so each is expected to name what it displaces; ADR-020 §Decision Rationale is explicit that four reversals is the point at which a scope boundary stops constraining anything. Read ADR-001's body together with that table, never alone.
 
 ADRs 001–012 record the conclusions of a structured architecture review conducted 31 August – 1 September 2026, in three passes:
 

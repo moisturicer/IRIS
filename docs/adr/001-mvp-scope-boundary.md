@@ -2,7 +2,16 @@
 
 ## Status
 
-Accepted — 2026-09-01
+Accepted — 2026-09-01. **Amended four times; the out-of-scope list below is no longer complete on its own.**
+
+| Amendment | Reverses | Date |
+|---|---|---|
+| [ADR-013](013-chunk-level-rag-pipeline.md) | full-text chunking | 2026-09-02 |
+| [ADR-016](016-docling-structured-extraction.md) | Docling-serve | 2026-09-03 |
+| [ADR-019](019-persisted-unified-conversation-history.md) | conversational RAG with history | 2026-09-07 |
+| [ADR-020](020-per-record-assessment-brief.md) | document summarization | 2026-09-10 |
+
+Each reversal draws on the same ~27 dev-day budget this ADR was costed against, and each is expected to name what it displaces. The body below is unedited.
 
 ## Context
 

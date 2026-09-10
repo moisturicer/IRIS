@@ -4,6 +4,8 @@
 
 Accepted — 2026-09-01. **Subject to adviser approval of the framework combination.**
 
+**Amended 2026-09-10 by [ADR-020](020-per-record-assessment-brief.md).** Phase 3 is changed in two ways: the IRIS Assessment Brief is **disabled for the ADR-004 comparison scenarios** (it interacts asymmetrically with time-on-task — see ADR-020 §Decision Rationale), and a **separate brief-rating block** is appended to the same session to evidence MVP areas 5 and 7. The body below is unedited and does not describe those two changes. That amendment carries the same adviser-approval condition as the line above.
+
 ## Context
 
 Semester 2 requires a validation framework aligned to SMART goals and measurable outcomes, covering usefulness, effectiveness, efficiency, usability, user experience, acceptance and project-specific outcomes. It must also evidence the research contribution (ADR-003).
