@@ -150,7 +150,11 @@ export default function LoginPage() {
     }
   };
 
-  const showFieldError = loginAlert !== null && !lockoutOpen;
+  // Only a rejected credential says anything about what is *in* the fields.
+  // "Unverified" and a generic server failure do not, and marking the fields
+  // invalid for those now announces a wrong claim to a screen reader rather
+  // than just tinting a border, as it did before IR-204.
+  const showFieldError = loginAlert?.kind === "credentials" && !lockoutOpen;
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row font-sans relative">

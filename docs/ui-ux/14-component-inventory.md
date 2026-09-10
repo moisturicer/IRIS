@@ -39,8 +39,8 @@ A component library exists. Roughly a tenth of the product uses it.
 
 | Component | Lines | Verdict | Work |
 |---|---|---|---|
-| `Button` | 48 | **FIX** | Replace `bg-[#6B0F12]` with `bg-brand`. 5 variants × 3 sizes is right; keep the API |
-| `Input` | 49 | **FIX** | **Add `aria-invalid` and `aria-describedby`.** Highest-leverage fix in the product ([12](12-accessibility.md) §2E) |
+| `Button` | 48 | **DONE (IR-204)** | `bg-[#6B0F12]` → `bg-brand`, `hover:bg-[#8B1316]` → `hover:bg-brand-light`. **The "keep the API" line is superseded: there are now 5 variants × 4 sizes.** IR-204 added `full` (full width, ≥ 44 px) because the entry screens need one, and because with plain `clsx` and no tailwind-merge a caller-supplied `py-3.5` does not replace the primitive's `py-2.5` — both survive and stylesheet order decides. The three original sizes keep their arbitrary font sizes on purpose: the `text-*` tokens carry line-heights these do not set, so converting them would resize every existing button |
+| `Input` | 49 | **DONE (IR-158, IR-204)** | **`aria-invalid` and `aria-describedby`** landed in IR-158. IR-204 added a `size` step (`lg`, ≥ 44 px), a `trailing` slot for in-field controls such as a show/hide toggle, moved the error text to `red-600` (4.83 : 1; `red-500` was 3.76 : 1 and failed AA), and made a bare caller `aria-invalid` mark a field invalid when the explaining message lives in one alert above the form. **Not the highest-leverage fix in the product after all** — see [12](12-accessibility.md) §2E: `SettingsPage` and three of the wizard's four fields never adopted `Input`, so the primitive fix did not reach them |
 | `Modal` | 56 | **FIX** | **Add focus trap and focus restore.** Has `role`, `aria-modal`, `aria-labelledby`, Escape, `aria-hidden` backdrop already |
 | `Badge` | 27 | **KEEP** | Sound |
 | `Card` | 24 | **KEEP** | Sound |
