@@ -67,6 +67,12 @@ function LoginBackgroundDecor() {
 
 /**
  * Left-panel branding for login/signup — logo + wordmark as one lockup.
+ *
+ * Desktop only. Below `lg` this used to stack above the form as a ~500px
+ * block, which put the first field under the fold on every phone visit.
+ * `AuthFormBrandMark` below is the mobile branding and has always been
+ * `lg:hidden`, so rendering both was the bug: a phone got the branding
+ * twice and the form not at all (IR-208).
  */
 export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
   const isSignup = variant === "signup";
@@ -74,8 +80,8 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
   return (
     <div
       className={cn(
-        "relative lg:w-1/2 bg-cream flex flex-col justify-between overflow-hidden",
-        "px-8 py-10 sm:px-12 lg:px-14 lg:py-12 min-h-[300px] lg:min-h-screen",
+        "relative lg:w-1/2 bg-cream hidden lg:flex flex-col justify-between overflow-hidden",
+        "px-8 py-10 sm:px-12 lg:px-14 lg:py-12 lg:min-h-screen",
         className
       )}
     >
