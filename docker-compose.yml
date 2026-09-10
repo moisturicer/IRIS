@@ -152,6 +152,16 @@ services:
         REQUIREMENT_FILE: development.txt
     restart: unless-stopped
     command: celery -A config worker -l info -Q default -n default@%h
+    healthcheck:
+      # A crash-looping worker must report `unhealthy`, not `Restarting` (IR-225).
+      # `inspect ping` round-trips through the broker to this specific node, so it
+      # fails if the process is dead, wedged, or cannot reach Redis -- which a
+      # `pgrep celery` style check would not. start_period covers Django boot.
+      test: ["CMD-SHELL", "celery -A config inspect ping -d default@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     volumes:
       - ./backend:/app
       - media_files:/app/media
@@ -180,6 +190,12 @@ services:
         REQUIREMENT_FILE: development.txt
     restart: unless-stopped
     command: celery -A config worker -l info -Q extraction -n extraction@%h --concurrency=2
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d extraction@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     volumes:
       - ./backend:/app
       - media_files:/app/media
@@ -214,6 +230,12 @@ services:
         REQUIREMENT_FILE: development.txt
     restart: unless-stopped
     command: celery -A config worker -l info -Q embedding -n embedding@%h --concurrency=4
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d embedding@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     volumes:
       - ./backend:/app
       - media_files:/app/media
