@@ -49,14 +49,17 @@ function LoginBackgroundDecor() {
       <div
         className="absolute rounded-full bg-white/60 pointer-events-none"
         style={{ width: 280, height: 280, top: -60, right: -40 }}
+        aria-hidden
       />
       <div
         className="absolute rounded-full bg-white/40 pointer-events-none"
         style={{ width: 200, height: 200, bottom: 120, left: -50 }}
+        aria-hidden
       />
       <div
         className="absolute rounded-full bg-white/50 pointer-events-none"
         style={{ width: 140, height: 140, bottom: 280, right: 60 }}
+        aria-hidden
       />
     </>
   );
@@ -64,6 +67,12 @@ function LoginBackgroundDecor() {
 
 /**
  * Left-panel branding for login/signup — logo + wordmark as one lockup.
+ *
+ * Desktop only. Below `lg` this used to stack above the form as a ~500px
+ * block, which put the first field under the fold on every phone visit.
+ * `AuthFormBrandMark` below is the mobile branding and has always been
+ * `lg:hidden`, so rendering both was the bug: a phone got the branding
+ * twice and the form not at all (IR-208).
  */
 export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
   const isSignup = variant === "signup";
@@ -71,8 +80,8 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
   return (
     <div
       className={cn(
-        "relative lg:w-1/2 bg-cream flex flex-col justify-between overflow-hidden",
-        "px-8 py-10 sm:px-12 lg:px-14 lg:py-12 min-h-[300px] lg:min-h-screen",
+        "relative lg:w-1/2 bg-cream hidden lg:flex flex-col justify-between overflow-hidden",
+        "px-8 py-10 sm:px-12 lg:px-14 lg:py-12 lg:min-h-screen",
         className
       )}
     >
@@ -103,10 +112,10 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
               />
             </div>
             <div className="min-w-0 border-l border-brand/15 pl-4 sm:pl-5">
-              <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.14em] text-gold uppercase leading-snug">
+              <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.14em] text-brand uppercase leading-snug">
                 Cebu Institute of Technology
               </p>
-              <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.12em] text-gold/90 uppercase">
+              <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.12em] text-brand/90 uppercase">
                 University
               </p>
               <p className="mt-2 text-[32px] sm:text-[36px] font-extrabold text-brand leading-none tracking-[0.2em]">
@@ -131,7 +140,7 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
         ) : (
           <>
             <h1 className="mt-10 sm:mt-14 font-serif leading-[1.05]">
-              <span className="block text-[40px] sm:text-[48px] font-bold text-gold">The</span>
+              <span className="block text-[40px] sm:text-[48px] font-bold text-brand-dark">The</span>
               <span className="block text-[40px] sm:text-[48px] font-bold text-brand">
                 Academic Curator.
               </span>
@@ -146,29 +155,18 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
                 as permanent as a physical archive.&rdquo;
               </p>
             </blockquote>
-            <p className="mt-4 text-[10px] font-bold tracking-[0.12em] text-gold uppercase">
+            <p className="mt-4 text-[10px] font-bold tracking-[0.12em] text-brand uppercase">
               Cebu Institute of Technology – University
             </p>
           </>
         )}
       </div>
 
-      {variant === "login" && (
-        <div className="relative z-10 flex gap-12 sm:gap-16 mt-10 lg:mt-0">
-          <div>
-            <div className="text-[32px] font-bold text-brand leading-none">1,200+</div>
-            <div className="mt-1 text-[10px] font-bold tracking-[0.14em] text-brand uppercase">
-              Registered Assets
-            </div>
-          </div>
-          <div>
-            <div className="text-[32px] font-bold text-brand leading-none">450+</div>
-            <div className="mt-1 text-[10px] font-bold tracking-[0.14em] text-brand uppercase">
-              Active Patents
-            </div>
-          </div>
-        </div>
-      )}
+      {/* "1,200+ Registered Assets" and "450+ Active Patents" were removed here
+          (IR-206). They were hard-coded: no endpoint supplied them and the pilot
+          database holds nothing near them. They are not replaced with a live
+          count — that needs an unauthenticated aggregate endpoint, which is a
+          visibility-surface decision and not one a UI repair gets to make. */}
 
       <p
         className={cn(
@@ -191,7 +189,7 @@ export function AuthFormBrandMark() {
       </div>
       <div>
         <p className="text-[20px] font-extrabold text-brand tracking-[0.15em] leading-none">IRIS</p>
-        <p className="text-[10px] font-semibold text-gold uppercase tracking-wider mt-0.5">
+        <p className="text-[10px] font-semibold text-brand uppercase tracking-wider mt-0.5">
           CIT-U Research Hub
         </p>
       </div>
