@@ -1,34 +1,42 @@
 /**
- * The office evaluation screen's two routes to the evidence (IR-235).
+ * The office evaluation screen: reaching the evidence without losing the
+ * decision (IR-237).
  *
- * **What this file is guarding, and why it is not obvious.**
+ * **What changed, and why the previous assertions are gone.**
  *
- * The reviewer decides a clearance here, and reaches the documents that decision
- * is about through two links that open in a new tab. Those links used to carry
- * `rel="noopener noreferrer"` -- the near-universal advice for `target="_blank"`
- * -- and that silently signed the reviewer out of the new tab.
+ * This file used to assert that both links carried `target="_blank"` and *no*
+ * `rel`, guarding IR-235's fix for a reviewer being signed out in the new tab.
+ * Those assertions are deliberately replaced rather than quietly deleted,
+ * because the behaviour they pinned does not work:
  *
- * **The mechanism is documented once, at the links themselves** -- see the
- * comment above the two anchors in `EvaluationPage.tsx`, which is where someone
- * is standing when they are tempted to re-add `rel`. Explaining it twice would
- * only give the two copies somewhere to drift apart. The short version: the
- * session lives in `sessionStorage`, and `noopener` is what stops the browser
- * cloning it into the new tab.
+ *   - `target="_blank"` has *implied* `noopener` since Chrome 88 (Firefox 79,
+ *     Safari 12.1), so removing `rel` changed nothing. Measured on a bare
+ *     same-origin page: with `rel` and without it, `sessionStorage` was not
+ *     cloned and `window.opener` was null both times.
+ *   - The refresh token lives only in `sessionStorage` (FR-M6-01), so the new
+ *     tab had nothing to restore and the route guard sent the reviewer to the
+ *     login screen -- which is what a human hit in manual testing after IR-235
+ *     merged.
  *
- * **This suite cannot prove the fix.** jsdom has a single browsing context: it
- * cannot open a second tab and cannot reproduce `sessionStorage` cloning. What
- * it can do is fail if the `rel` attribute comes back, which is the realistic
- * regression -- someone hardening `target="_blank"` links in a sweep. The
- * "the new tab is signed in" check is manual today, and belongs to the
- * Playwright harness in IR-219.
+ * The old suite could not have caught that, and said so in its own docstring:
+ * jsdom has a single browsing context, so "is the new tab signed in?" was
+ * never testable here. It could only check the `rel` attribute, which was the
+ * wrong mechanism. **A green suite over the wrong assertion is how a no-op
+ * ships** -- worth remembering next time a fix cannot be tested at the level
+ * it operates on.
+ *
+ * So the links navigate in-app now, and what gets protected instead is the
+ * reviewer's unsent decision (`lib/reviewDraft.ts`), which *is* testable here
+ * and covers more: an accidental back, a reload, an expired session.
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Route, Routes, useLocation } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { readReviewDraft, writeReviewDraft } from "@/lib/reviewDraft";
 import type { RecordDetail } from "@/types/records";
 
 import EvaluationPage from "./EvaluationPage";
@@ -88,57 +96,87 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
-/** Both links announce the new tab, so that suffix is part of the name. */
-const DOCUMENTS_LINK = "View & Attach Documents (opens in a new tab)";
-const DETAIL_LINK = "Record Detail (opens in a new tab)";
+const submitReview = vi.fn((_payload: unknown) => Promise.resolve({ data: {} }));
+// The factory is hoisted above the imports, so it must not *read*
+// `submitReview` until it is called -- by which time the const exists.
+vi.mock("@/api/reviews", () => ({
+  reviewsApi: {
+    submit: (payload: unknown) => submitReview(payload),
+  },
+}));
+
+/** Plain names now -- nothing claims a new tab, because nothing opens one. */
+const DOCUMENTS_LINK = "View & Attach Documents";
+const DETAIL_LINK = "Record Detail";
+
+/** Renders wherever the router ends up, so a navigation is observable. */
+function LandedOn() {
+  const location = useLocation();
+  return <h1>{`landed on ${location.pathname}`}</h1>;
+}
 
 function renderEvaluationScreen() {
   return renderScreen(
     <Routes>
       <Route path="/review/:id/evaluate" element={<EvaluationPage />} />
+      <Route path="*" element={<LandedOn />} />
     </Routes>,
     { route: `/review/${RECORD_ID}/evaluate` },
   );
 }
 
-describe("the office evaluation screen", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  sessionStorage.clear();
+});
 
-  it("names both routes to the evidence, and says they open a new tab", async () => {
+afterEach(() => {
+  sessionStorage.clear();
+});
+
+describe("the office evaluation screen", () => {
+  it("names both routes to the evidence", async () => {
     renderEvaluationScreen();
 
     // `findBy` rather than `getBy`: the screen renders a skeleton until the
-    // record arrives. Resolving by accessible *name* is also the assertion
-    // that the "(opens in a new tab)" warning reaches assistive technology --
-    // a sighted user sees a new tab appear, a screen reader user does not.
+    // record arrives.
     expect(await screen.findByRole("link", { name: DOCUMENTS_LINK })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: DETAIL_LINK })).toBeInTheDocument();
   });
 
-  it("opens the record's documents in a new tab without severing the session", async () => {
+  it("reaches the documents without leaving the app", async () => {
     renderEvaluationScreen();
 
     const documents = await screen.findByRole("link", { name: DOCUMENTS_LINK });
 
     expect(documents).toHaveAttribute("href", `/records/${RECORD_ID}/documents`);
-    expect(documents).toHaveAttribute("target", "_blank");
-
-    // The regression guard. `noreferrer` implies `noopener`, so either token
-    // alone re-breaks the session -- which is why this asserts on the whole
-    // attribute being absent rather than on one keyword.
-    expect(documents).not.toHaveAttribute("rel");
+    // The regression guard, and the point of IR-237. A new tab is a fresh
+    // browsing context that never receives the `sessionStorage` the refresh
+    // token lives in, so opening one signs the reviewer out at exactly the
+    // moment they are deciding a clearance.
+    expect(documents).not.toHaveAttribute("target");
   });
 
-  it("opens the record detail in a new tab without severing the session", async () => {
+  it("reaches the record detail without leaving the app", async () => {
     renderEvaluationScreen();
 
     const detail = await screen.findByRole("link", { name: DETAIL_LINK });
 
     expect(detail).toHaveAttribute("href", `/records/${RECORD_ID}`);
-    expect(detail).toHaveAttribute("target", "_blank");
-    expect(detail).not.toHaveAttribute("rel");
+    expect(detail).not.toHaveAttribute("target");
+  });
+
+  it("actually navigates in-tab when the link is followed", async () => {
+    // Asserting the absence of `target` says the tab will not be replaced;
+    // this says the link goes where it claims.
+    const user = userEvent.setup();
+    renderEvaluationScreen();
+
+    await user.click(await screen.findByRole("link", { name: DOCUMENTS_LINK }));
+
+    expect(
+      await screen.findByRole("heading", { name: `landed on /records/${RECORD_ID}/documents` }),
+    ).toBeInTheDocument();
   });
 
   it("has no serious or critical accessibility violations", async () => {
@@ -147,5 +185,82 @@ describe("the office evaluation screen", () => {
     await screen.findByRole("link", { name: DOCUMENTS_LINK });
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * The half-written clearance decision (IR-237).
+ *
+ * This is the requirement IR-143 was protecting with a new tab, met directly.
+ */
+describe("the reviewer's unsent decision", () => {
+  const commentBox = () => screen.getByRole("textbox");
+
+  it("is kept as the reviewer types", async () => {
+    const user = userEvent.setup();
+    renderEvaluationScreen();
+
+    await screen.findByRole("link", { name: DOCUMENTS_LINK });
+    await user.type(commentBox(), "Consent forms are missing from section 3.");
+
+    await waitFor(() => {
+      expect(readReviewDraft(RECORD_ID)?.comment).toBe(
+        "Consent forms are missing from section 3.",
+      );
+    });
+  });
+
+  it("comes back after leaving the screen and returning", async () => {
+    // The whole journey the ticket is about: read the evidence, come back,
+    // find the comment still there.
+    writeReviewDraft(RECORD_ID, {
+      status: "declined",
+      comment: "Consent forms are missing from section 3.",
+    });
+
+    renderEvaluationScreen();
+
+    await screen.findByRole("link", { name: DOCUMENTS_LINK });
+    expect(commentBox()).toHaveValue("Consent forms are missing from section 3.");
+    expect(screen.getByRole("radio", { name: /Request Revision/ })).toBeChecked();
+  });
+
+  it("does not borrow another record's draft", async () => {
+    writeReviewDraft(RECORD_ID + 1, { status: "rejected", comment: "A different submission." });
+
+    renderEvaluationScreen();
+
+    await screen.findByRole("link", { name: DOCUMENTS_LINK });
+    expect(commentBox()).toHaveValue("");
+  });
+
+  it("is cleared once the review is submitted", async () => {
+    // Otherwise the next visit to this record opens with a comment about a
+    // decision that has already been made.
+    const user = userEvent.setup();
+    writeReviewDraft(RECORD_ID, { status: "approved", comment: "Looks complete." });
+
+    renderEvaluationScreen();
+
+    await screen.findByRole("link", { name: DOCUMENTS_LINK });
+    await user.click(screen.getByRole("button", { name: /Submit/i }));
+
+    await waitFor(() => {
+      expect(submitReview).toHaveBeenCalled();
+    });
+    expect(readReviewDraft(RECORD_ID)).toBeNull();
+  });
+
+  it("renders the form even when the browser refuses storage", async () => {
+    // A private window can throw from the accessor itself. Losing the draft is
+    // acceptable; failing to render the decision form is not.
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("access denied");
+    });
+
+    renderEvaluationScreen();
+
+    expect(await screen.findByRole("link", { name: DOCUMENTS_LINK })).toBeInTheDocument();
+    expect(commentBox()).toHaveValue("");
   });
 });
