@@ -93,6 +93,20 @@ python manage.py showmigrations
 
 Rules: every model change ships with its migration · test against a copy of a realistic database, not only an empty one · **never edit a migration that has been applied anywhere** — supersede it.
 
+### Demo data
+
+```bash
+python manage.py seed_demo                 # 7 accounts + a record in every pipeline state
+python manage.py seed_demo --password hunter2
+python manage.py seed_test_users           # accounts only, no records
+```
+
+`seed_demo` (IR-227) exists so a validation rehearsal can start mid-workflow rather than with somebody editing `pipeline_status` by hand. It seeds the six application roles as `iris-<role>@cit.edu`, plus `iris-admin@cit.edu` — a **Django superuser holding no application role**, because `core.permissions.ADMIN_ROLES` is `{RDCO}`: RDCO is IRIS's administrator, and IR-165 deliberately left `is_superuser` with no API standing. Default password `testpass123`. It refuses to run with `DEBUG` off unless you pass `--force`.
+
+It then creates one record per pipeline state, **driven entirely through `lifecycle.apply` and the review services** — never by assigning a status. That constraint is the point: a seeder that wrote statuses directly could manufacture states the transition table forbids, and every reviewer screen would be demonstrating a fiction. Records are keyed by title, so re-running changes nothing.
+
+The one to demo is **`[DEMO] Declined by IERC, ITSO and KTTO preserved`**: IERC declined while ITSO and KTTO had already cleared. Resubmit it and only IERC resets — ADR-003's clearance-aware resubmission, which is the thesis contribution and the one behaviour better shown than described. Upload a document as the student first; `resubmit_record` requires one since IR-139, and that refusal is part of the demo rather than an obstacle to it.
+
 ---
 
 ## 5 · Frontend
