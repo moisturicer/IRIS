@@ -10,8 +10,10 @@ rehearsal that begins with "first, let a developer fix the database" has already
 failed the thing it was meant to measure.
 
 **Everything here goes through the real services.** `lifecycle.apply`,
-`approve_record`, `submit_clearance`, `decline_record`, `reject_record` -- never
-an assignment to `pipeline_status`. This is the constraint that makes the seed
+`approve_record`, `submit_clearance`, `reject_record` -- never an assignment to
+`pipeline_status`. (`decline_record` is deliberately absent: it declines at a
+*sequential* gate, and the only decline seeded here is IERC's, which is a
+clearance decline and so goes through `submit_clearance`.) This is the constraint that makes the seed
 worth anything: a seeder that writes statuses directly would cheerfully produce
 states the transition table forbids, and the demo would then prove nothing about
 the workflow it is supposed to demonstrate. If a scenario below cannot be built
@@ -39,12 +41,7 @@ from django.utils import timezone
 from apps.accounts.models import Role, User
 from apps.records import lifecycle
 from apps.records.models import Record, RecordOwner, RecordType
-from apps.reviews.services import (
-    approve_record,
-    decline_record,
-    reject_record,
-    submit_clearance,
-)
+from apps.reviews.services import approve_record, reject_record, submit_clearance
 from core.enums import Office, RecordTypeName, ReviewDecision, RoleName
 
 #: The six application roles, one account each. Emails match `seed_test_users`
