@@ -6,7 +6,7 @@ import {
   getStoredRefreshToken,
   setStoredRefreshToken,
 } from "@/lib/authStorage";
-import { __resetRefreshState } from "@/lib/tokenRefresh";
+import { __resetRefreshState, refreshOnce } from "@/lib/tokenRefresh";
 import { REVIEWER_ROLES, STAFF_ROLES, type RoleName } from "@/lib/constants";
 
 interface AuthState {
@@ -100,14 +100,36 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     try {
-      const { data: tokenData } = await authApi.refreshToken(refresh);
-      const access = tokenData.access as string;
-      const newRefresh =
-        (tokenData as { refresh?: string }).refresh ?? refresh;
+      /**
+       * Through the gate, not around it (IR-238).
+       *
+       * `AuthBootstrap` calls this from an effect, and `React.StrictMode`
+       * double-invokes effects in development, so two calls read the same
+       * stored token in the same tick. The server rotates on refresh and
+       * blacklists what it rotated away, so presenting that token twice means
+       * the second attempt 401s, falls into the `catch` below, and logs out a
+       * session the first attempt had just restored -- the user reloads a page
+       * and finds themselves at the login screen.
+       *
+       * `refreshOnce` makes the second caller wait on the first's promise, so
+       * the token is spent exactly once. This is the same gate `api/client.ts`
+       * uses; `hydrateAuth` was the only refresh path that had been left
+       * outside it. Note the token is read from storage *per call*, so a later,
+       * non-overlapping load still picks up the rotated one.
+       */
+      const tokens = await refreshOnce(async () => {
+        const { data } = await authApi.refreshToken(refresh);
+        return {
+          access: data.access as string,
+          refresh: (data as { refresh?: string }).refresh,
+        };
+      });
+
+      const newRefresh = tokens.refresh ?? refresh;
 
       setStoredRefreshToken(newRefresh);
       set({
-        accessToken: access,
+        accessToken: tokens.access,
         refreshToken: newRefresh,
         isAuthenticated: true,
       });
