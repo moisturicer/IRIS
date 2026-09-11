@@ -8,7 +8,7 @@
  * test picks it up.
  */
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, parsePath } from "react-router-dom";
 import type { ReactElement, ReactNode } from "react";
 
 export interface RenderScreenOptions extends Omit<RenderOptions, "wrapper"> {
@@ -18,14 +18,23 @@ export interface RenderScreenOptions extends Omit<RenderOptions, "wrapper"> {
    * rather than reaching into the component.
    */
   route?: string;
+  /**
+   * Router state on that entry — what a `<Navigate state={...}>` would have
+   * left behind. The route guard hands the login screen the page the visitor
+   * asked for this way (IR-236), so a test of that hand-off has to be able to
+   * set it up the same way the guard does, rather than by stubbing a hook.
+   */
+  state?: unknown;
 }
 
 export function renderScreen(
   ui: ReactElement,
-  { route = "/", ...options }: RenderScreenOptions = {},
+  { route = "/", state, ...options }: RenderScreenOptions = {},
 ): RenderResult {
   function Providers({ children }: { children: ReactNode }) {
-    return <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>;
+    return (
+      <MemoryRouter initialEntries={[{ ...parsePath(route), state }]}>{children}</MemoryRouter>
+    );
   }
 
   return render(ui, { wrapper: Providers, ...options });
