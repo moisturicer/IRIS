@@ -87,7 +87,12 @@ npm install
 npm run dev          # vite
 npm run build        # tsc && vite build
 npm run lint         # eslint src --ext ts,tsx
-# NOTE: there is no `npm test` — no test runner is installed yet
+npm test             # vitest run — non-interactive, jsdom, axe-core (IR-210)
+npm run test:watch   # vitest in watch mode
+# Queries go through the accessible tree (role + accessible name), never a class
+# or a test id. axe-core fails the build on serious/critical only, and cannot
+# check colour contrast under jsdom — contrast stays a manual check.
+# On Windows the runner needs vitest's `forks` pool; see vitest.config.ts.
 
 # Backend  (backend/)
 pip install -r requirements/development.txt
