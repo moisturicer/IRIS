@@ -166,26 +166,50 @@ export default function EvaluationPage() {
             {/* New tab, deliberately: these were <Link>s, so reading the
                 documents unmounted this form and silently discarded a typed
                 comment -- after which the reviewer retypes it or, worse,
-                shortens it (IR-143). */}
+                shortens it (IR-143).
+
+                **No `rel` here, deliberately -- do not add one (IR-235).**
+                `rel="noopener"` makes the new tab a fresh top-level browsing
+                context rather than an auxiliary one, and browsers clone
+                `sessionStorage` only into auxiliary contexts. The refresh token
+                lives in `sessionStorage` and nowhere else (FR-M6-01, so no
+                credential is left on disk on a shared machine), so the new tab
+                booted with nothing to restore and the route guard bounced the
+                reviewer to the login screen -- from the one screen where a
+                clearance decision gets made. `noreferrer` implies `noopener`,
+                so neither may come back. The reverse-tabnabbing that `rel`
+                guards against is a cross-origin attack; both of these are
+                same-origin app routes, where it buys nothing.
+                `EvaluationPage.test.tsx` fails if either is reinstated.
+
+                The new-tab warning is an `aria-label` rather than an `sr-only`
+                span because the accessible-name algorithm trims each node
+                before concatenating, so a leading space -- ordinary or
+                `&nbsp;`, both of which `trim()` removes -- is dropped and the
+                name ran together as "...Documents(opens in a new tab)". The
+                label spells the whole name out, and starts with the visible
+                text so WCAG 2.5.3 still holds. **That start is a duplication:
+                if the visible text below ever changes, the label has to change
+                with it, or the name stops matching what a speaking user can
+                see and 2.5.3 breaks.** The suite asserts the full name, so it
+                fails if they drift apart. */}
             <a
               href={`/records/${id}/documents`}
               target="_blank"
-              rel="noopener noreferrer"
+              aria-label="View & Attach Documents (opens in a new tab)"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#6B0F12] text-white text-[12px] font-semibold hover:bg-[#7d1215] transition-colors"
             >
               <i className="fas fa-folder-open text-[11px]" aria-hidden />
               View &amp; Attach Documents
-              <span className="sr-only"> (opens in a new tab)</span>
             </a>
             <a
               href={`/records/${id}`}
               target="_blank"
-              rel="noopener noreferrer"
+              aria-label="Record Detail (opens in a new tab)"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
             >
               <i className="fas fa-external-link-alt text-[11px]" aria-hidden />
               Record Detail
-              <span className="sr-only"> (opens in a new tab)</span>
             </a>
           </div>
         </div>
