@@ -18,6 +18,7 @@ import {
   setLockoutUntil,
 } from "@/lib/authSession";
 import { getRoleDashboardPath } from "@/lib/roleDashboard";
+import { safeRedirectPath } from "@/lib/redirectTarget";
 
 const LOCKOUT_MS = 15 * 60 * 1000;
 
@@ -37,6 +38,25 @@ export default function LoginPage() {
   const [lockoutUntil, setLockoutUntilState] = useState<number | undefined>();
   const [lockoutIdentifier, setLockoutIdentifier] = useState("");
   const [identifier, setIdentifier] = useState("");
+  /**
+   * The page this visitor asked for before they were sent here, or `null` to
+   * use the role's normal landing page (IR-236).
+   *
+   * **Captured once, on mount, on purpose.** The guard passes it in router
+   * state, and `dismissSessionAlert` below navigates to clear that state — so
+   * reading it at submit time would mean a visitor who dismisses the
+   * "session expired" banner before signing in silently loses their
+   * destination. It is also validated once here rather than at the point of
+   * navigation, so there is no path from an unchecked string to `navigate`.
+   *
+   * `?next=` is read as well as router state because the idle-timeout path in
+   * `lib/authSession.ts` reaches the login screen through a full page load,
+   * which no in-memory state survives.
+   */
+  const [redirectTo] = useState<string | null>(() => {
+    const fromState = (location.state as { from?: unknown } | null)?.from;
+    return safeRedirectPath(fromState) ?? safeRedirectPath(searchParams.get("next"));
+  });
   const sessionExpiredFromState =
     (location.state as { reason?: string } | null)?.reason === "session_expired";
   const [sessionAlert, setSessionAlert] = useState(
@@ -70,6 +90,9 @@ export default function LoginPage() {
       setSearchParams(searchParams, { replace: true });
     }
     if ((location.state as { reason?: string } | null)?.reason === "session_expired") {
+      // Clearing the state wholesale is safe: `redirectTo` was captured on
+      // mount, so the destination does not live here any more. Writing it back
+      // would only look like it mattered.
       navigate("/login", { replace: true, state: null });
     }
   };
@@ -108,7 +131,10 @@ export default function LoginPage() {
       resetLoginAttempts(loginId);
       clearLockout(loginId);
       login(res.data.user, res.data.access, res.data.refresh);
-      navigate(getRoleDashboardPath(res.data.user.role_name), { replace: true });
+      // Back to the page they asked for, or -- when they simply came to sign
+      // in, or asked for somewhere `safeRedirectPath` refused -- the landing
+      // page their role has always had.
+      navigate(redirectTo ?? getRoleDashboardPath(res.data.user.role_name), { replace: true });
     } catch (err: unknown) {
       const res = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
       const detail = res?.data?.detail ?? "Invalid email or password.";
