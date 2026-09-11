@@ -1,13 +1,9 @@
 /**
  * Tests for the logout-during-in-flight-refresh race (IR-159 follow-up).
  *
- * There is no test runner in this repo yet (IR-82 / IR-163). Run these today with:
- *
- *   docker exec iris-frontend-1 sh -c "cd /app && \
- *     ./node_modules/.bin/esbuild src/store/auth.store.test.ts \
- *       --bundle --platform=node --format=esm --define:import.meta.env={} \
- *       --outfile=/tmp/t.mjs && node /tmp/t.mjs"
- *
+ * Runs under vitest: `npm test` from `frontend/` (IR-210). This file predates
+ * the runner and was executed by a hand-written esbuild-plus-node incantation;
+ * its assertions are unchanged, only the harness around them is now real.
  * Two things `tokenRefresh.test.ts` didn't need to work around, because this
  * file pulls in the real store rather than an isolated module:
  * `--define:import.meta.env={}` stands in for the Vite-injected env object that
@@ -49,6 +45,14 @@ g.localStorage ??= makeStorage();
 const { useAuthStore } = await import("./auth.store");
 const { refreshOnce, __resetRefreshState } = await import("../lib/tokenRefresh");
 
+import { beforeEach, test } from "vitest";
+
+// The hand-rolled harness called this before every case; vitest needs it
+// said once, here, or the cases leak refresh state into each other.
+beforeEach(() => {
+  __resetRefreshState();
+});
+
 // --- the smallest assert that does the job ---------------------------------
 
 function assertEqual<T>(actual: T, expected: T, what: string) {
@@ -57,19 +61,9 @@ function assertEqual<T>(actual: T, expected: T, what: string) {
   }
 }
 
-// --- harness ---------------------------------------------------------------
-
-const results: string[] = [];
-
-async function test(name: string, fn: () => Promise<void>) {
-  __resetRefreshState();
-  await fn();
-  results.push(`ok   ${name}`);
-}
-
 // --- cases -----------------------------------------------------------------
 
-await test("logout bumps sessionEpoch even while a refresh is in flight", async () => {
+test("logout bumps sessionEpoch even while a refresh is in flight", async () => {
   const epochBefore = useAuthStore.getState().sessionEpoch;
 
   let release!: (v: { access: string }) => void;
@@ -101,7 +95,7 @@ await test("logout bumps sessionEpoch even while a refresh is in flight", async 
   );
 });
 
-await test("a refresh started after logout is not flagged stale", async () => {
+test("a refresh started after logout is not flagged stale", async () => {
   useAuthStore.getState().logout();
   const epochBefore = useAuthStore.getState().sessionEpoch;
 
@@ -119,7 +113,7 @@ await test("a refresh started after logout is not flagged stale", async () => {
   );
 });
 
-await test("clearTokens bumps sessionEpoch the same way logout does", async () => {
+test("clearTokens bumps sessionEpoch the same way logout does", async () => {
   const epochBefore = useAuthStore.getState().sessionEpoch;
   useAuthStore.getState().clearTokens();
   assertEqual(
@@ -130,6 +124,3 @@ await test("clearTokens bumps sessionEpoch the same way logout does", async () =
 });
 
 // --- report ----------------------------------------------------------------
-
-console.log(results.join("\n"));
-console.log(`\n${results.length} passed, 0 failed`);

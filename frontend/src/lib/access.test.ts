@@ -1,17 +1,11 @@
 /**
  * The role -> screen matrix, asserted (IR-160).
  *
- * There is no test runner in this repo yet (IR-82 / IR-163). Run from `frontend/`:
- *
- *   ./node_modules/.bin/esbuild src/lib/access.test.ts \
- *     --bundle --platform=node --format=esm --define:import.meta.env={} \
- *     --outfile=.tmp-access.mjs && node .tmp-access.mjs
- *
- * The `--define` is required: this pulls in `lib/constants.ts`, which reads
- * `import.meta.env.VITE_API_BASE_URL`, and node has no `import.meta.env`. Same
- * workaround `auth.store.test.ts` documents.
- *
- * Same hand-rolled conventions as `tokenRefresh.test.ts` and `focusTrap.test.ts`.
+ * Runs under vitest: `npm test` from `frontend/` (IR-210). This file predates
+ * the runner and was executed by a hand-written esbuild-plus-node incantation;
+ * its assertions are unchanged, only the harness around them is now real. The
+ * `--define:import.meta.env={}` that incantation needed is gone with it: vitest
+ * runs through Vite, so `lib/constants.ts` reading `import.meta.env` just works.
  *
  * Why this file exists: the defect IR-160 closes is that `Sidebar` and the router
  * each decided access independently -- the sidebar from `is_staff`, the router
@@ -32,6 +26,8 @@ import {
   type ScreenKey,
 } from "./access";
 import { ROLES, type RoleName } from "./constants";
+import { test } from "vitest";
+
 
 const EVERY_ROLE: RoleName[] = [
   ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO,
@@ -42,17 +38,6 @@ const EVERY_ROLE: RoleName[] = [
 function assertEqual<T>(actual: T, expected: T, what: string) {
   if (actual !== expected) {
     throw new Error(`${what}: expected ${String(expected)}, got ${String(actual)}`);
-  }
-}
-
-const results: string[] = [];
-
-function test(name: string, fn: () => void) {
-  try {
-    fn();
-    results.push(`ok   ${name}`);
-  } catch (err) {
-    results.push(`FAIL ${name}\n     ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -160,11 +145,3 @@ test("Student sees no administration section at all", () => {
 });
 
 // --- report ----------------------------------------------------------------
-
-const failed = results.filter((r) => r.startsWith("FAIL")).length;
-console.log(results.join("\n"));
-console.log(`\n${results.length - failed} passed, ${failed} failed`);
-
-if (failed > 0) {
-  throw new Error(`${failed} access-matrix test(s) failed`);
-}
