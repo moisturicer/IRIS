@@ -96,8 +96,13 @@ python manage.py migrate
 python manage.py runserver
 python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db_required
                                           # tests skip cleanly with no Postgres reachable
-python manage.py seed_demo                # 7 accounts + a record in every pipeline state (IR-227);
-                                          # idempotent; refuses with DEBUG off unless --force
+python manage.py seed_demo                # accounts + Discover catalogue + every pipeline state
+                                          # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
+                                          # plus admin@cit.edu (Django superuser, no app role).
+                                          # Replaced scripts/seed_demo_{users,records,clearances}.py
+                                          # and seed_test_users, all deleted. Idempotent for records;
+                                          # re-running resets passwords. Refuses with DEBUG off
+                                          # unless --force. --accounts-only for logins alone
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 
 # Docker  (repo root)
