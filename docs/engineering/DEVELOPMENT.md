@@ -132,6 +132,10 @@ docker compose down                # add -v to drop volumes
 
 Workers consume the `default`, `extraction` and `embedding` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding` services). `config/settings/base.py` sets `CELERY_TASK_ROUTES` (`extract_pdf_text` → `extraction`, `embed_record` → `embedding`) and `CELERY_TASK_DEFAULT_QUEUE = "default"` for everything else, including `chunk_record_document` (IR-164) — so publishers and consumers agree on queue names. Verified against the real docker-compose stack, not just the config: a task dispatched over the real Redis broker was consumed and completed by the real `celery-default` and `celery-extraction` containers.
 
+**Each worker declares a healthcheck** (IR-225). `celery -A config inspect ping -d <node>@$HOSTNAME` round-trips through the broker to that specific node, so it fails if the process is dead, wedged, or cannot reach Redis. This exists because `celery-extraction` once crash-looped for nine hours on a missing dependency in a stale image while `docker ps` showed only `Restarting` — with `restart: unless-stopped` and no healthcheck, a permanently broken worker looks exactly like one that happened to bounce. **When a worker misbehaves, check `docker ps` for `unhealthy` first, and rebuild it (`docker compose up -d --build <service>`) before debugging the task**: the three workers share one build spec but are separate images, and only one of them going stale is the failure that hides best.
+
+`apps/tests/test_worker_boot.py` keeps the two halves honest — every queue named in `CELERY_TASK_ROUTES` has a worker consuming it, and every worker still declares a healthcheck. It reads `docker-compose.yml`, so it skips inside the `backend` container (which mounts only `backend/`) and runs in CI, where `IRIS_REQUIRE_DB` turns that skip into a failure.
+
 ---
 
 ## 7 · Environment variables
@@ -217,7 +221,7 @@ Full process: [`SDLC.md`](SDLC.md). Done gates: [`DEFINITION_OF_DONE.md`](DEFINI
 |---|---|
 | Nothing responds | IR-57 — the URLconf fails at import. `python manage.py check` |
 | Compose will not start / `ai-gateway` container exits | IR-58 — `ai-gateway` has no `ai/.env`, and even with one, its service package is missing (`ai.services.chat_service`, `ai.services.embedding_service`); do not deploy it |
-| Celery task never runs | Routing was the gap and is fixed (IR-164, see §6 Celery above) — if a task still doesn't run, look at the task itself, not queue names |
+| Celery task never runs | First check the worker is actually up: `docker ps` for `unhealthy` or `Restarting`, then `docker compose up -d --build <service>` — a stale image missing a dependency crash-loops silently (IR-225). Routing itself is fixed (IR-164, §6 above), so once the worker is healthy, look at the task, not queue names |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
 | Uploads not extracted | `DoclingExtractor` calls `POST {DOCLING_API_URL}/v1/convert/file` — check the `docling` service is up and reachable; there is no fallback extractor (ADR-016) |
 | Migrations conflict | `showmigrations`, then resolve deliberately; never edit an applied migration |
