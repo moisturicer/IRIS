@@ -7,7 +7,10 @@ rest_framework.test.APITestCase, which need no extra setup. Run with:
 
     docker compose exec -T backend python manage.py test apps.records
 """
+from datetime import timedelta
+
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -48,7 +51,18 @@ class SubmitOwnershipTests(APITestCase):
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
 
     def _submit(self):
-        return self.client.post(reverse("record-submit", args=[self.record.id]))
+        # Consent is sent here so these tests keep testing what they were
+        # written for -- ownership (IR-226). Submitting now also requires DPA
+        # consent, and without it every case below would fail on the consent
+        # gate before the permission check it exists to exercise ever ran.
+        # Changed deliberately, not to make a red test green: the assertions
+        # are untouched, and consent has its own suite in
+        # `DpaConsentAtSubmitTests` below.
+        return self.client.post(
+            reverse("record-submit", args=[self.record.id]),
+            {"dpa_accepted": True},
+            format="json",
+        )
 
     def test_owner_can_submit_own_draft(self):
         self.client.force_authenticate(self.owner)
@@ -364,3 +378,142 @@ class RecordVisibilityTests(APITestCase):
         response = self.client.get(reverse("record-list"))
         returned = {row["id"] for row in response.data["results"]}
         self.assertNotIn(self.draft.id, returned)
+
+
+class DpaConsentAtSubmitTests(APITestCase):
+    """
+    DPA consent is recorded per disclosure, at submission (IR-226, FR-M6-02).
+
+    The wizard has shown a consent gate at step 3 since IR-88, but it lived
+    entirely in the browser: `submit()` neither checked nor stored anything, so
+    a direct API call bypassed it and left no trace either way. The only
+    persisted consent in the system was `User.consent_given` -- one boolean, set
+    once, at signup. "This person ticked a box months ago" is not evidence that
+    *this disclosure* was submitted under the terms.
+
+    What these tests pin down is that the refusal happens **before** the
+    transition. A record that reaches a review queue with no consent behind it
+    is worse than one that was never submitted, because the workflow has
+    already started acting on it.
+    """
+
+    def setUp(self):
+        self.record_type = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        self.owner = make_user("dpa-owner@cit.edu", "Student")
+        self.record = Record.objects.create(
+            title="C" * 10, abstract="D" * 40, record_type=self.record_type,
+            added_by=self.owner, pipeline_status="draft",
+        )
+        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+        self.url = reverse("record-submit", args=[self.record.id])
+        self.client.force_authenticate(self.owner)
+
+    def _post(self, payload=None):
+        return self.client.post(self.url, payload or {}, format="json")
+
+    def test_submitting_without_consent_is_refused(self):
+        response = self._post()
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("10173", str(response.data))
+
+    def test_a_refused_submit_leaves_the_record_in_draft(self):
+        """The assertion that matters more than the status code.
+
+        If the consent check ran after `lifecycle.apply`, this endpoint would
+        return 400 while the record sat in `rdco_intake` -- refused, and in a
+        review queue anyway.
+        """
+        self._post()
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, "draft")
+        self.assertIsNone(self.record.dpa_accepted_at)
+        self.assertIsNone(self.record.dpa_accepted_by)
+
+    def test_explicitly_declining_consent_is_refused(self):
+        """`false` must be refused, not merely absent-vs-present.
+
+        A check that only tested for the key's presence would accept
+        `{"dpa_accepted": false}` -- an explicit refusal recorded as consent.
+        """
+        response = self._post({"dpa_accepted": False})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, "draft")
+
+    def test_consent_is_stamped_with_who_and_when(self):
+        response = self._post({"dpa_accepted": True})
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, "rdco_intake")
+        self.assertIsNotNone(self.record.dpa_accepted_at)
+        self.assertEqual(self.record.dpa_accepted_by, self.owner)
+        self.assertTrue(self.record.dpa_accepted)
+
+    def test_dpa_accepted_is_derived_not_stored(self):
+        """The property must follow the timestamp, having no state of its own."""
+        self.assertFalse(self.record.dpa_accepted)
+        self.record.dpa_accepted_at = timezone.now()
+        self.assertTrue(self.record.dpa_accepted)
+
+    def test_resubmission_preserves_the_original_consent(self):
+        """Consent is given once per disclosure and survives revision.
+
+        Re-stamping on resubmission would quietly replace "when the owner
+        accepted the terms" with "when they last fixed a typo", which is the
+        one thing this timestamp exists to answer.
+        """
+        from apps.reviews.services import resubmit_record
+
+        original = timezone.now() - timedelta(days=3)
+        Record.objects.filter(pk=self.record.pk).update(
+            pipeline_status="declined",
+            dpa_accepted_at=original,
+            dpa_accepted_by=self.owner,
+        )
+        self.record.refresh_from_db()
+
+        resubmit_record(self.record, self.owner)
+
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.dpa_accepted_at, original)
+        self.assertEqual(self.record.dpa_accepted_by, self.owner)
+        self.assertNotEqual(
+            self.record.pipeline_status, "declined",
+            "the resubmission itself should still have moved the record",
+        )
+
+    def test_consent_fields_are_not_writable_through_the_record_serializer(self):
+        """Consent the subject can set on themselves is not evidence.
+
+        `RecordWriteSerializer.fields` is an explicit allowlist, so this holds
+        today by construction -- which is exactly why it needs a test. Nothing
+        else would stop someone adding these two names to that list.
+        """
+        from .serializers import RecordWriteSerializer
+
+        writable = set(RecordWriteSerializer().fields)
+        self.assertNotIn("dpa_accepted_at", writable)
+        self.assertNotIn("dpa_accepted_by", writable)
+        self.assertNotIn("dpa_accepted", writable)
+
+    def test_patching_consent_directly_does_not_stamp_it(self):
+        """The allowlist above, exercised over HTTP rather than by inspection."""
+        self.client.patch(
+            reverse("record-detail", args=[self.record.id]),
+            {"dpa_accepted_at": timezone.now().isoformat()},
+            format="json",
+        )
+        self.record.refresh_from_db()
+        self.assertIsNone(
+            self.record.dpa_accepted_at,
+            "PATCH must not be able to stamp consent -- only submit() may",
+        )
+
+    def test_detail_serializer_exposes_consent_read_only(self):
+        Record.objects.filter(pk=self.record.pk).update(
+            dpa_accepted_at=timezone.now(), dpa_accepted_by=self.owner
+        )
+        response = self.client.get(reverse("record-detail", args=[self.record.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data["dpa_accepted"])
+        self.assertIsNotNone(response.data["dpa_accepted_at"])

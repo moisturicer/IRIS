@@ -122,7 +122,15 @@ class WorkflowCharacterisationBase(APITestCase):
 
     def submit_record(self, record, as_user=None):
         self.client.force_authenticate(as_user or self.owner)
-        return self.client.post(reverse("record-submit", args=[record.pk]))
+        # DPA consent is a precondition on submitting (IR-226), not a workflow
+        # edge. This suite characterises routing, so it supplies consent and
+        # goes on asserting about destinations; the consent gate itself is
+        # covered in `apps.records.tests.DpaConsentAtSubmitTests`.
+        return self.client.post(
+            reverse("record-submit", args=[record.pk]),
+            {"dpa_accepted": True},
+            format="json",
+        )
 
     def review(self, record, as_user, decision, comment=""):
         self.client.force_authenticate(as_user)

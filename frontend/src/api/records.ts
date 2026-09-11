@@ -54,7 +54,12 @@ export const recordsApi = {
     });
   },
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
-  submit:         (id: number) => apiClient.post<{ detail: string }>(`/records/${id}/submit/`),
+  // `dpaAccepted` is required, not optional (IR-226). The backend refuses a
+  // submit without consent, and an optional flag would let a future caller
+  // omit it and discover that at runtime instead of at compile time. A record
+  // that already carries consent ignores the value, so passing it is always safe.
+  submit:         (id: number, dpaAccepted: boolean) =>
+    apiClient.post<{ detail: string }>(`/records/${id}/submit/`, { dpa_accepted: dpaAccepted }),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),

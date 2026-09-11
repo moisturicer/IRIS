@@ -206,6 +206,31 @@ class RecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). The
+        # wizard's step-3 gate has always been browser-side only: nothing here
+        # checked it, and nothing recorded it, so any direct API call submitted
+        # without consent and left no trace either way.
+        #
+        # Checked *before* `lifecycle.apply` deliberately -- a refused submit
+        # must leave the record in `draft`, not in a review queue with no
+        # consent behind it.
+        #
+        # Consent already on the record is not re-asked. A resubmission after
+        # revision is the same disclosure under the same terms; re-prompting
+        # would either nag the owner or, worse, overwrite the original
+        # acceptance timestamp with a later one and lose when consent was
+        # actually given.
+        if not record.dpa_accepted:
+            if not request.data.get("dpa_accepted"):
+                return Response(
+                    {"detail": "You must accept the Data Privacy Act (RA 10173) terms "
+                               "before this disclosure can be submitted."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            record.dpa_accepted_at = timezone.now()
+            record.dpa_accepted_by = request.user
+            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+
         lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, request.user)
 
         # Notify the correct party — never raises (wrapped inside the service)
