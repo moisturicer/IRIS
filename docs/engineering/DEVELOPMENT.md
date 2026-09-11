@@ -93,6 +93,37 @@ python manage.py showmigrations
 
 Rules: every model change ships with its migration · test against a copy of a realistic database, not only an empty one · **never edit a migration that has been applied anywhere** — supersede it.
 
+### Demo data
+
+```bash
+python manage.py seed_demo                  # accounts + catalogue + every pipeline state
+python manage.py seed_demo --accounts-only  # the seven logins, nothing else
+python manage.py seed_demo --password hunter2
+```
+
+**One command replaced four** (IR-227). `scripts/seed_demo_users.py`, `scripts/seed_demo_records.py` and `scripts/seed_demo_clearances.py` — each run by hand through `manage.py shell <`, in the right order — plus `seed_test_users`, which seeded a second `iris-*` account set at a different password. All four are deleted.
+
+**The credentials are unchanged**: `<role>@cit.edu` at `IrisDemo123!`, the convention that already existed.
+
+| Login | Role |
+|---|---|
+| `student@cit.edu` | Student — owns the demo records |
+| `adviser@cit.edu` | Adviser |
+| `rdco@cit.edu` | RDCO — **IRIS's administrator** (`ADMIN_ROLES` is `{RDCO}`) |
+| `itso@cit.edu` · `ierc@cit.edu` · `ktto@cit.edu` | The three clearing offices |
+| `admin@cit.edu` | Django superuser, **no application role** — `/admin` only (IR-165) |
+
+Re-running is idempotent for records (keyed by title) but **resets all seven passwords** to the default, so say so before a rehearsal if someone has changed one.
+
+**Everything is driven through `lifecycle.apply` and the review services, never by assigning `pipeline_status`.** That is the point rather than a style preference: the deleted scripts wrote `pipeline_status = "published"` directly, and `seed_demo_clearances.py` hand-built `Review` and `RecordClearance` rows and backdated their timestamps past the ORM. Both produced states the workflow never produced, so neither proved anything about it — and a faked state drifts silently the moment the real routing changes.
+
+Two records carry the thesis contribution:
+
+- **`[DEMO] Declined by IERC, ITSO and KTTO preserved`** — the one you *drive*. It sits in `declined`. Upload a document as the student (resubmission requires one since IR-139 — that refusal is part of the demo), resubmit, and watch IERC reset while ITSO and KTTO survive.
+- **`[DEMO] Resubmitted, ITSO and KTTO preserved`** — the one you *look at*. Already resubmitted, so the paper view's "Preserved" badges render on arrival.
+
+`scripts/seed_demo_opportunities.py` is still a shell script — it seeds the Calls & Conferences board (IR-121), a separate feature, and depends on `rdco@cit.edu` which `seed_demo` creates.
+
 ---
 
 ## 5 · Frontend

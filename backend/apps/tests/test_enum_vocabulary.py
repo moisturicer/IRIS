@@ -67,9 +67,15 @@ GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in en
 #: Sites where a bare literal is correct and must stay. Each entry needs a
 #: reason -- an allowlist without one is just a silenced test.
 ALLOWED = {
-    # Seeds the demo accounts by role name. It is a fixture script describing
-    # rows to create, not workflow logic reading them back.
-    "accounts/management/commands/seed_test_users.py",
+    # (IR-227) Replaces the entry for the deleted `seed_test_users.py`. Every
+    # *workflow* value in this seeder is an enum member -- it drives the real
+    # services, so it has to be. The two literals here are the demo students'
+    # **surnames**: "Sam Student" and "Ana Adviser", carried over from the
+    # seed_demo_users.py script this command absorbed, so the logins keep
+    # reading the way people already know them. Same shape as the
+    # embedding_space.py entry below: two concepts, one string. Renaming the
+    # humans to satisfy a workflow guard would be the tail wagging the dog.
+    "records/management/commands/seed_demo.py",
     # Declares its own `EmbeddingSpaceStatus` for a backfill state machine
     # (pending/active/retired). The word "pending" collides with
     # RequestStatus.PENDING and means something unrelated -- an embedding space

@@ -198,6 +198,39 @@ class Record(models.Model):
     resubmission_count   = models.PositiveIntegerField(default=0)
     last_resubmitted_at  = models.DateTimeField(null=True, blank=True)
 
+    # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
+    # `RecordViewSet.submit` and by nothing else -- neither field is writable
+    # through a serializer, because a consent record the subject can set on
+    # themselves through the ordinary update path is not evidence of anything.
+    #
+    # **The timestamp's presence is the acceptance.** There is deliberately no
+    # accompanying boolean: two fields encoding one fact can disagree, and the
+    # disagreement would surface exactly when someone needs to prove consent.
+    #
+    # `User.consent_given` is a different fact and stays where it is -- it
+    # records that this person accepted the terms once, at signup (FR-M6-06).
+    # This records that *this disclosure* was submitted under them, which is
+    # what the wizard's step-3 gate has always claimed to collect and, until
+    # now, only ever enforced in the browser.
+    dpa_accepted_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When DPA consent was accepted for this disclosure. Null means never.",
+    )
+    dpa_accepted_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="dpa_accepted_records",
+        help_text="Who accepted. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+
+    @property
+    def dpa_accepted(self) -> bool:
+        """Whether this disclosure carries DPA consent.
+
+        Derived, never stored, so it cannot drift from the timestamp it
+        describes. Serializers expose this; nothing writes it.
+        """
+        return self.dpa_accepted_at is not None
+
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)
     deleted_at  = models.DateTimeField(null=True, blank=True)
