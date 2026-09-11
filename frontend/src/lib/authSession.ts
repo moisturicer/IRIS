@@ -1,3 +1,5 @@
+import { safeRedirectPath, wholePath } from "@/lib/redirectTarget";
+
 /** SRS FR-M1-01: lock account after 3 consecutive failed logins */
 export const LOGIN_FAILURE_LIMIT = 3;
 
@@ -48,9 +50,22 @@ export function clearLockout(identifier: string): void {
   sessionStorage.removeItem(`${LOCKOUT_KEY_PREFIX}${loginKey(identifier)}`);
 }
 
-/** NFR-S2 — send user to login with session-expired banner */
+/**
+ * NFR-S2 — send user to login with session-expired banner.
+ *
+ * This is a full page load, not a router navigation, so nothing in memory
+ * survives it and the page the user was on has to travel in the URL. `?next=`
+ * is validated on arrival by `safeRedirectPath`, the same check the router
+ * state goes through (IR-236) — the login screen does not trust this value
+ * just because we wrote it.
+ */
 export function redirectToLoginSessionExpired(): void {
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login?reason=session_expired";
-  }
+  if (window.location.pathname === "/login") return;
+
+  const next = safeRedirectPath(wholePath(window.location));
+  const query = next
+    ? `?reason=session_expired&next=${encodeURIComponent(next)}`
+    : "?reason=session_expired";
+
+  window.location.href = `/login${query}`;
 }
