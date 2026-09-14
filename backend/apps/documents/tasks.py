@@ -23,9 +23,13 @@ table shape, coordinate origin, what counts as a failure — lives in
 """
 
 import os
+from typing import TYPE_CHECKING
 
 from celery import shared_task
 from django.utils import timezone
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from apps.documents.models import PdfExtraction
 
 
 def _build_extractor():
@@ -152,7 +156,7 @@ def extract_manuscript_text(self, record_id: int):
     _queue_chunking_if_manuscript(extraction)
 
 
-def _queue_chunking_if_manuscript(extraction) -> None:
+def _queue_chunking_if_manuscript(extraction: "PdfExtraction") -> None:
     """The one place that decides whether an extraction enters the RAG corpus.
 
     Both extraction tasks call this, and it asks the row what it holds

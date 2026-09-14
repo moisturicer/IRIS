@@ -150,7 +150,6 @@ def test_the_submit_endpoint_marks_what_it_writes(record, upload, tmp_path, sett
     """
     from unittest import mock
 
-    from django.core.files.uploadedfile import SimpleUploadedFile
     from rest_framework.test import APIClient
 
     from apps.accounts.models import Role, User
