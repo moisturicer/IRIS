@@ -517,3 +517,63 @@ def test_a_page_entry_without_a_size_is_skipped_not_fatal():
     doc = _doc(texts=[_text_item("#/texts/0", "text", "x")], pages={"1": {}, "2": {"size": {"width": 1.0, "height": 2.0}}})
 
     assert normalized_document_from_docling(doc).page_sizes == {2: (1.0, 2.0)}
+
+
+# ---------------------------------------------------------------------------
+# Heading depth from section numbering (IR-242)
+# ---------------------------------------------------------------------------
+
+
+def _heading_levels(*headings):
+    """Map (text, docling_level) pairs through the translation and return the
+    levels the elements come out carrying."""
+    texts = [
+        _text_item(f"#/texts/{i}", "section_header", text, level=level)
+        for i, (text, level) in enumerate(headings)
+    ]
+    document = normalized_document_from_docling(_doc(texts=texts))
+    return [e.level for e in document.elements if e.kind == HEADING]
+
+
+def test_a_numbered_subsection_is_nested_by_its_numbering():
+    """Docling reports every `section_header` at level 1 — all 74 of them on a
+    real 47-page submission, `2.1.1 Kimi Delta Attention` included. The
+    context-path stack evicts everything at level >= N, so a document of
+    uniform level 1 collapses to a depth-1 path and IR-112's disambiguation
+    never happens.
+    """
+    assert _heading_levels(
+        ("2 Model Architecture", 1),
+        ("2.1 Hybrid Attention", 1),
+        ("2.1.1 Kimi Delta Attention", 1),
+    ) == [1, 2, 3]
+
+
+def test_numbering_variants_are_all_read():
+    assert _heading_levels(("1. Introduction", 1)) == [1]
+    assert _heading_levels(("3.2. Sampling Procedure", 1)) == [2]
+    assert _heading_levels(("6.1.4 Results", 1)) == [3]
+
+
+def test_an_unnumbered_heading_keeps_the_level_docling_gave_it():
+    """Front matter and appendices carry no section number. `A Contributions`
+    is an appendix letter, not a numbering scheme, and must not be mistaken
+    for one."""
+    assert _heading_levels(
+        ("Abstract", 1),
+        ("Conclusion", 2),
+        ("A Contributions", 1),
+    ) == [1, 2, 1]
+
+
+def test_a_leading_number_that_is_not_a_section_number_is_left_alone():
+    """`1,000` is not `1.000`, and a bare number is not an outline."""
+    assert _heading_levels(("1,000 Samples Analysed", 1)) == [1]
+    assert _heading_levels(("2024 Results", 1)) == [1]
+
+
+def test_derived_depth_never_makes_a_heading_shallower_than_docling_said():
+    """The derivation may only add depth. If Docling has genuinely resolved a
+    heading as nested deeper than its numbering suggests, that is information
+    this must not throw away."""
+    assert _heading_levels(("3 Methodology", 4)) == [4]
