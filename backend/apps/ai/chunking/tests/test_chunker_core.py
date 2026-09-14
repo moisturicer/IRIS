@@ -11,7 +11,7 @@ import sys
 import textwrap
 
 import pytest
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from apps.ai.chunking import (
     Chunk,
@@ -166,7 +166,7 @@ def test_options_are_immutable():
 # --------------------------------------------------------------------------
 
 
-@settings(max_examples=60, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=60)
 @given(document=_document, max_tokens=st.integers(min_value=4, max_value=40))
 def test_property_token_ceiling_is_a_guarantee(strategy_id, document, max_tokens):
     options = ChunkingOptions(strategy=strategy_id, max_tokens=max_tokens)
@@ -177,7 +177,7 @@ def test_property_token_ceiling_is_a_guarantee(strategy_id, document, max_tokens
         assert count_tokens(chunk.content) <= max_tokens
 
 
-@settings(max_examples=60, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=60)
 @given(document=_document)
 def test_property_chunking_is_deterministic(strategy_id, document):
     options = ChunkingOptions(strategy=strategy_id, max_tokens=16)
@@ -190,7 +190,7 @@ def test_property_chunking_is_deterministic(strategy_id, document):
     assert first.content_hash == second.content_hash
 
 
-@settings(max_examples=60, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=60)
 @given(document=_document)
 def test_property_no_content_is_lost(strategy_id, document):
     """Concatenating every chunk's content in sequence order reproduces the
@@ -209,7 +209,7 @@ def test_property_no_content_is_lost(strategy_id, document):
     assert rejoined == original
 
 
-@settings(max_examples=40, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=40)
 @given(document=_document)
 def test_property_sequence_is_dense_and_ascending(strategy_id, document):
     options = ChunkingOptions(strategy=strategy_id, max_tokens=16)
@@ -218,7 +218,7 @@ def test_property_sequence_is_dense_and_ascending(strategy_id, document):
     assert [c.sequence for c in result.chunks] == list(range(len(result.chunks)))
 
 
-@settings(max_examples=40, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=40)
 @given(document=_document)
 def test_property_no_chunk_is_empty(strategy_id, document):
     options = ChunkingOptions(strategy=strategy_id, max_tokens=16)

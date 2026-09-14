@@ -8,7 +8,7 @@ header repetition, list-item atomicity, section-scoped merging, and the
 grapheme-safe hard split.
 """
 
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from apps.ai.chunking.document import (
     HEADING,
@@ -257,7 +257,7 @@ def test_registered_under_its_own_strategy_id():
     )
 
 
-@settings(max_examples=40, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=40)
 @given(
     n_rows=st.integers(min_value=1, max_value=60),
     max_tokens=st.integers(min_value=6, max_value=30),

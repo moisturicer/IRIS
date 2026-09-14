@@ -46,12 +46,24 @@ class HarnessDecision(NamedTuple):
     reason: str
 
 
-def strict_mode_requested(environ: Mapping[str, str]) -> bool:
-    """Read the strict switch out of an environment mapping."""
-    raw = environ.get(STRICT_ENV_VAR)
+def env_flag_enabled(environ: Mapping[str, str], name: str) -> bool:
+    """Is this environment variable switched on?
+
+    Absent means off. Present means on, unless it holds one of the handful of
+    values that conventionally mean "no" — so a typo in a workflow file fails
+    closed rather than quietly restoring the lenient behaviour. Shared with
+    `testing.hypothesis_profiles` so there is one definition of how this
+    project reads a boolean out of the environment (IR-194).
+    """
+    raw = environ.get(name)
     if raw is None:
         return False
     return raw.strip().lower() not in _LENIENT_VALUES
+
+
+def strict_mode_requested(environ: Mapping[str, str]) -> bool:
+    """Read the strict switch out of an environment mapping."""
+    return env_flag_enabled(environ, STRICT_ENV_VAR)
 
 
 def harness_decision(
