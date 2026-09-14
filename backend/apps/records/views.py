@@ -162,12 +162,19 @@ class RecordViewSet(viewsets.ModelViewSet):
         if "abstract_file" not in serializer.validated_data or not record.abstract_file:
             return
 
-        from apps.documents.models import PdfExtraction
+        from apps.documents.models import DocumentKind, PdfExtraction
         from apps.documents.tasks import extract_manuscript_text
 
+        # kind, explicitly: abstract_file *is* the manuscript, and IR-239
+        # moved that judgement onto the row so the chunker reads it there
+        # rather than inferring it from which task was queued.
         PdfExtraction.objects.update_or_create(
             record=record,
-            defaults={"status": "queued", "error": ""},
+            defaults={
+                "status": "queued",
+                "error": "",
+                "kind": DocumentKind.MANUSCRIPT,
+            },
         )
         transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
 

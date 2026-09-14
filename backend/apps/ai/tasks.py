@@ -54,9 +54,7 @@ def embed_record(self, record_id: int):
 
 
 def _run_ingestion(self, extraction, force: bool) -> dict:
-    """Shared body of ``chunk_record_document``/``chunk_manuscript`` (IR-195):
-    both are thin wrappers that differ only in how they look up the
-    ``PdfExtraction`` row, then chunk it identically.
+    """Chunk ``extraction`` and make the result the record's active chunk set.
 
     ``IngestionError`` is not retried: it means the extraction has no
     structure to chunk, which four more attempts will not change.
@@ -86,42 +84,22 @@ def _run_ingestion(self, extraction, force: bool) -> dict:
 
 
 @shared_task(bind=True, max_retries=3)
-def chunk_record_document(self, upload_id: int, *, force: bool = False):
-    """Chunk a supplementary upload's extraction and make the result the
-    record's active chunk set.
+def chunk_extraction(self, extraction_id: int, *, force: bool = False):
+    """Chunk one extraction and make the result its record's active chunk set.
 
-    Not queued by anything as of IR-195 (ADR-013's 2026-09-08 amendment):
-    supplementary uploads are excluded from the RAG corpus on purpose. Kept
-    for a caller that explicitly wants a non-manuscript document chunked
-    despite that -- there is currently none -- and because deleting a task
-    with real, tested behaviour costs nothing to keep and something to
-    reintroduce later if this ADR is ever revisited.
+    Keyed on the extraction, not on the record or the upload it hangs off
+    (IR-239). IR-195's two tasks were keyed on those, which made the
+    manuscript/supplementary split a property of *which task you called* --
+    and left a manuscript attached to an ``UploadSlot`` unreachable, since
+    that row's ``record`` column is null. The caller decides what belongs in
+    the corpus by reading ``PdfExtraction.kind``; this task's only job is to
+    chunk what it is handed.
     """
     from apps.documents.models import PdfExtraction
 
-    extraction = PdfExtraction.objects.filter(upload_id=upload_id).first()
+    extraction = PdfExtraction.objects.filter(pk=extraction_id).first()
     if not extraction:
-        return None  # upload deleted between the task being queued and running
-
-    return _run_ingestion(self, extraction, force)
-
-
-@shared_task(bind=True, max_retries=3)
-def chunk_manuscript(self, record_id: int, *, force: bool = False):
-    """Chunk a record's manuscript extraction and make the result the
-    record's active chunk set (IR-195).
-
-    Queued by ``extract_manuscript_text`` the moment extraction succeeds, so
-    a submitted manuscript reaches an active chunk set with no manual step --
-    mirrors ``chunk_record_document``, but looked up by ``record`` rather
-    than ``upload``, since the manuscript has no ``UploadSlot``/``RecordUpload``
-    to hang a ``PdfExtraction`` off of.
-    """
-    from apps.documents.models import PdfExtraction
-
-    extraction = PdfExtraction.objects.filter(record_id=record_id).first()
-    if not extraction:
-        return None  # record deleted, or its manuscript removed, before the task ran
+        return None  # deleted between the task being queued and running
 
     return _run_ingestion(self, extraction, force)
 
