@@ -13,6 +13,15 @@ Two rules hold throughout: a table split across chunks repeats its header
 row in every fragment, and a list never splits mid-item. Short chunks merge
 with their next sibling within a heading section, and never across one.
 
+One narrow exception to "never across one", added by IR-241: a chunk holding
+*nothing but a heading* folds forward into the chunk that follows it. Such a
+chunk arises when a heading's first child is another heading — `_sectionize`
+opens a section at every heading, so the parent's section holds one element
+and section-scoped merging returns before the floor is consulted. It is a
+label rather than a topic, so folding it into the section it labels does not
+put two topics in one vector, which is what the rule above protects (IR-89
+user story 21). Two sections that both carry a body still never merge.
+
 Sectioning (stage 2) runs before the fits-check (stage 1) is applied, not
 after: "fits" is evaluated per section rather than for the document as a
 whole, because checking the whole document first and only falling back to
@@ -65,6 +74,11 @@ class StructuralCascadeChunker:
         chunks: list[Chunk] = []
         for section in _sectionize(document.elements):
             chunks.extend(_chunk_section(section, options))
+
+        # Runs across sections, so it must sit here rather than in
+        # _chunk_section, which can only ever see one section at a time --
+        # that blindness is the whole cause of the heading-only chunk.
+        chunks = _merge_heading_only_chunks(chunks, options)
 
         chunks = [
             Chunk(
@@ -334,6 +348,78 @@ def _hard_split_text(text: str, max_tokens: int) -> list[str]:
 # --------------------------------------------------------------------------
 # Merging short chunks within a section
 # --------------------------------------------------------------------------
+
+
+def _combine(chunks: list[Chunk]) -> Chunk:
+    """Join adjacent chunks into one, carrying their provenance with them.
+
+    Shared by both merge passes so that regions, pages and element kinds are
+    accumulated the same way whichever pass does the joining -- a chunk that
+    loses a region loses the ability to be cited.
+    """
+    content = " ".join(c.content for c in chunks)
+    pages = [c.source_page for c in chunks if c.source_page is not None]
+    kinds: frozenset[str] = frozenset()
+    bboxes: list = []
+    for c in chunks:
+        kinds |= c.element_kinds
+        bboxes.extend(c.bboxes)
+    return Chunk(
+        text=content,
+        content=content,
+        context_path=chunks[0].context_path,
+        sequence=0,
+        token_count=count_tokens(content),
+        source_page=pages[0] if pages else None,
+        element_kinds=kinds,
+        bboxes=dedupe_regions(bboxes),
+    )
+
+
+def _is_heading_only(chunk: Chunk) -> bool:
+    """A chunk assembled from headings and nothing else."""
+    return chunk.element_kinds == frozenset({HEADING})
+
+
+def _merge_heading_only_chunks(
+    chunks: list[Chunk], options: ChunkingOptions
+) -> list[Chunk]:
+    """Fold a heading-only chunk forward into the chunk it labels (IR-241).
+
+    Consecutive heading-only chunks accumulate and fold together, because a
+    real document stacks them -- a part heading, then a chapter heading, then
+    the first section with a body.
+
+    All-or-nothing, and the ceiling wins: if the fold would exceed
+    ``max_tokens`` the chunks are left exactly as they were, the same
+    precedence ``_merge_short_siblings`` gives the ceiling over the floor. A
+    trailing heading with nothing after it is also left alone -- there is
+    nothing to fold into, and dropping it would lose content.
+    """
+    if len(chunks) <= 1:
+        return list(chunks)
+
+    result: list[Chunk] = []
+    pending: list[Chunk] = []
+
+    for chunk in chunks:
+        if _is_heading_only(chunk):
+            pending.append(chunk)
+            continue
+
+        if pending:
+            candidate = _combine([*pending, chunk])
+            if _fits(candidate.content, options.max_tokens):
+                result.append(candidate)
+            else:
+                result.extend(pending)
+                result.append(chunk)
+            pending = []
+        else:
+            result.append(chunk)
+
+    result.extend(pending)
+    return result
 
 
 def _merge_short_siblings(chunks: list[Chunk], options: ChunkingOptions) -> list[Chunk]:

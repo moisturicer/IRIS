@@ -232,3 +232,34 @@ def test_empty_chunkset_is_passed_through_unchanged():
     result = build_context_path_chunker(options).chunk(document, options)
 
     assert result.chunks == ()
+
+
+def test_a_folded_heading_keeps_the_path_of_the_section_it_folded_into():
+    """IR-241 folds a heading-only chunk forward, so a chunk can now span a
+    heading boundary — which no chunk could do before, because sectioning
+    split on every heading.
+
+    The merged chunk must carry the *child's* path. Taking the first word's
+    trail would hand it "3 Methodology" and silently drop "3.2 Sampling
+    Procedure", making the path less specific than before the fold — the
+    opposite of what the context path is for (IR-112).
+    """
+    document = doc(
+        DocumentElement(kind=HEADING, text="3 Methodology", level=1),
+        DocumentElement(kind=HEADING, text="3.2 Sampling Procedure", level=2),
+        DocumentElement(
+            kind=PARAGRAPH, text="Samples were collected weekly from twelve ponds."
+        ),
+        title="Optimization of Tilapia Feed Conversion",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=50)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    merged = [c for c in result.chunks if "Samples were collected" in c.content]
+    assert len(merged) == 1
+    assert merged[0].context_path == (
+        "Optimization of Tilapia Feed Conversion",
+        "3 Methodology",
+        "3.2 Sampling Procedure",
+    )
+    assert "3 Methodology" in merged[0].content, "the heading text is not lost"
