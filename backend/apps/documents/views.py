@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from core.permissions import IsStaff, owns_or_staffs_record
-from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile, PdfExtraction
+from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile, PdfExtraction, DocumentKind
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
@@ -129,7 +129,13 @@ class SubmitDocumentView(APIView):
         upload = create_upload(record, slot, file, uploaded_by=request.user)
 
         # --- Create extraction tracker and queue the background task ---
-        extraction = PdfExtraction.objects.create(upload=upload)
+        # Every seeded UploadSlot is supplementary -- an Ethics Clearance
+        # form, a Patent Draft -- so this endpoint says so on the row rather
+        # than leaving the chunker to infer it (IR-239). If a manuscript slot
+        # is ever seeded, this is the line that changes, and nothing else.
+        extraction = PdfExtraction.objects.create(
+            upload=upload, kind=DocumentKind.SUPPLEMENTARY
+        )
         extract_pdf_text.delay(upload.id)
 
         return Response(
