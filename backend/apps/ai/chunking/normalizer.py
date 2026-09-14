@@ -19,7 +19,14 @@ and nothing else.
 
 import re
 
-from .document import HEADING, PAGE_FOOTER, PAGE_HEADER, DocumentElement, NormalizedDocument
+from .document import (
+    HEADING,
+    PAGE_FOOTER,
+    PAGE_HEADER,
+    PARAGRAPH,
+    DocumentElement,
+    NormalizedDocument,
+)
 from .values import ChunkingOptions
 
 # A line that is nothing but a page number: plain digits, or a lowercase
@@ -48,6 +55,7 @@ def normalize(document: NormalizedDocument, options: ChunkingOptions) -> Normali
     untouched."""
     elements = list(document.elements)
     elements = _drop_running_headers_and_footers(elements)
+    elements = _drop_repeating_furniture(elements)
     elements = _drop_stranded_page_numbers(elements)
     elements = _rejoin_hyphenation(elements)
     elements = _drop_excluded_sections(elements, options.exclude_sections)
@@ -63,6 +71,72 @@ def _drop_running_headers_and_footers(
     elements: list[DocumentElement],
 ) -> list[DocumentElement]:
     return [e for e in elements if e.kind not in (PAGE_HEADER, PAGE_FOOTER)]
+
+
+# Furniture is terse. A full sentence repeating across pages is a boilerplate
+# clause -- a confidentiality notice, a licence line -- and deleting it is
+# content loss, so only short lines are eligible.
+_FURNITURE_MAX_WORDS = 10
+
+# Two conditions, and it needs both. The absolute floor stops a four-page
+# document deleting something that happens to fall on two of them; the
+# fraction stops a 300-page thesis deleting a phrase that legitimately recurs
+# on a handful. Measured against the documents that motivated this: on record
+# 30 the footer spans 27 of 48 pages (56%) and the next-highest short
+# paragraph spans 1, while record 29 has nothing above 1 -- so the separation
+# is wide and these thresholds sit in the middle of it rather than on an edge.
+_FURNITURE_MIN_PAGES = 3
+_FURNITURE_MIN_PAGE_FRACTION = 0.25
+
+
+def _furniture_key(element: DocumentElement) -> str | None:
+    """The comparable form of an element eligible to be furniture, or ``None``.
+
+    Only a ``PARAGRAPH`` qualifies. A repeated table header is the one thing
+    another rule works to *preserve* -- IR-111 repeats it into every fragment
+    of a split table -- and a repeated heading is section structure, so
+    neither may be swept up here.
+    """
+    if element.kind != PARAGRAPH:
+        return None
+    text = " ".join(element.text.split())
+    if not text or len(text.split()) > _FURNITURE_MAX_WORDS:
+        return None
+    return text.casefold()
+
+
+def _drop_repeating_furniture(elements: list[DocumentElement]) -> list[DocumentElement]:
+    """Drop a short line that repeats across most of the document's pages.
+
+    Running furniture is defined by *repetition across pages*, which is the
+    property that actually makes it furniture. Detecting it by the extractor's
+    label alone cannot work, because the extractor is not consistent: Docling
+    labelled `Published Date: 17/04/2026` `page_header` 18 times and
+    `paragraph` 27 times in one document, and the 27 survivors reached 27% of
+    the corpus, twice over in some chunks (IR-247).
+
+    Counts *distinct pages*, never occurrences, so a line repeated eight times
+    on one page -- a list label, a table cell -- is left alone.
+    """
+    pages_seen: set[int] = {e.page for e in elements if e.page is not None}
+    if len(pages_seen) < _FURNITURE_MIN_PAGES:
+        return elements
+
+    pages_by_key: dict[str, set[int]] = {}
+    for element in elements:
+        key = _furniture_key(element)
+        if key is None or element.page is None:
+            continue
+        pages_by_key.setdefault(key, set()).add(element.page)
+
+    threshold = max(
+        _FURNITURE_MIN_PAGES, len(pages_seen) * _FURNITURE_MIN_PAGE_FRACTION
+    )
+    furniture = {key for key, pages in pages_by_key.items() if len(pages) >= threshold}
+    if not furniture:
+        return elements
+
+    return [e for e in elements if _furniture_key(e) not in furniture]
 
 
 def _is_stranded_page_number(element: DocumentElement) -> bool:
@@ -132,18 +206,61 @@ def _rejoin_hyphenation(elements: list[DocumentElement]) -> list[DocumentElement
     return result
 
 
+# A section number opening a heading -- "5. ", "1.4.   ", "2.1.1 " -- which
+# names the section's position rather than the section. Stripped before an
+# exclusion name is compared, because `AI_CHUNK_EXCLUDE_SECTIONS` lists what a
+# section *is* ("References"), not where it sits in a particular document.
+#
+# The trailing `\s+` is what keeps this from eating a real title: it requires
+# whitespace after the number, so "3.5 kg of Feed" loses "3.5 " and compares as
+# "kg of feed", which matches no exclusion name and is therefore kept anyway.
+_SECTION_NUMBER_PREFIX = re.compile(r"^\d+(?:\.\d+)*\.?\s+")
+
+# Punctuation a heading may carry that its name does not: "References:",
+# "References."
+_HEADING_PUNCTUATION = ".:;-–—"
+
+
+def _comparable_heading(text: str) -> str:
+    """A heading reduced to the form an exclusion name is written in.
+
+    Drops any leading section number, strips edge punctuation, collapses
+    internal whitespace -- record 30 writes "1.4.   References" with three
+    spaces -- and lowercases. Comparison stays *exact* on what remains: a
+    substring rule would drop "Reference Architecture" and
+    "References and Further Reading", and losing a real section is worse than
+    keeping a bibliography (IR-244).
+    """
+    without_number = _SECTION_NUMBER_PREFIX.sub("", text.strip())
+    trimmed = without_number.strip().strip(_HEADING_PUNCTUATION).strip()
+    return " ".join(trimmed.split()).lower()
+
+
 def _drop_excluded_sections(
     elements: list[DocumentElement], exclude_sections: tuple[str, ...]
 ) -> list[DocumentElement]:
+    """Drop each named section, and everything under it up to the next heading.
+
+    Both sides go through `_comparable_heading`, so the configured name and the
+    document's own heading are compared in the same form. Before IR-244 this
+    compared whole heading text, which meant the shipped default list only ever
+    fired on a heading reading exactly "References" -- and both real CIT-U
+    submissions number their sections, so both kept their bibliography, where it
+    then outranked real content on a third of test queries.
+    """
     if not exclude_sections:
         return elements
 
-    excluded = {name.strip().lower() for name in exclude_sections}
+    excluded = {_comparable_heading(name) for name in exclude_sections}
+    excluded.discard("")
+    if not excluded:
+        return elements
+
     result: list[DocumentElement] = []
     dropping = False
     for element in elements:
         if element.kind == HEADING:
-            dropping = element.text.strip().lower() in excluded
+            dropping = _comparable_heading(element.text) in excluded
         if not dropping:
             result.append(element)
     return result
