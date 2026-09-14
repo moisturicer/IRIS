@@ -8,6 +8,11 @@ of erroring at collection or, worse, appearing to pass.
 Skipping is the right answer on a laptop with no Postgres running and the wrong
 one in CI, so the choice is not made here — `testing.harness` decides, and CI sets
 ``IRIS_REQUIRE_DB`` to turn a skip into a failed run (IR-163).
+
+It also selects the Hypothesis profile, for the mirror-image reason: a shared
+CI runner may stall a draw and fail a property test that has nothing wrong with
+it, while a developer's machine should still be told when a strategy really has
+become slow. `testing.hypothesis_profiles` decides that one (IR-194).
 """
 
 import os
@@ -20,6 +25,37 @@ from testing.harness import (
     harness_decision,
     strict_mode_requested,
 )
+
+
+def pytest_configure(config):
+    """Select the Hypothesis profile for this machine (IR-194).
+
+    Guarded like the backend dependencies below: the chunking domain is pure
+    and its tests are the only ones using Hypothesis, so an environment
+    without it must still be able to collect and run everything else.
+    """
+    try:
+        from testing.hypothesis_profiles import activate_profile
+    except ImportError:
+        return
+
+    try:
+        config.hypothesis_profile = activate_profile(os.environ)
+    except ValueError as exc:
+        # A pure ValueError from the domain becomes pytest's own "you invoked
+        # this wrongly" error, so a typo reads as a one-line usage message
+        # rather than an INTERNALERROR traceback.
+        raise pytest.UsageError(str(exc)) from exc
+
+
+def pytest_report_header(config):
+    """Name the Hypothesis profile in the run header.
+
+    Without this the profile is invisible, and "why did this pass locally and
+    fail in CI" is exactly the question it changes the answer to.
+    """
+    name = getattr(config, "hypothesis_profile", None)
+    return f"hypothesis profile: {name}" if name else None
 
 
 def _backend_deps_installed() -> bool:
