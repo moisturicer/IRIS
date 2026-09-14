@@ -292,3 +292,88 @@ def test_a_fixed_window_chunk_ending_on_a_heading_keeps_its_own_sections_path():
                 f"Introduction prose labelled {chunk.context_path} "
                 f"in chunk {chunk.content!r}"
             )
+
+
+
+# ---------------------------------------------------------------------------
+# Unnumbered headings and the numbered outline (IR-248)
+# ---------------------------------------------------------------------------
+
+
+def test_an_unnumbered_heading_does_not_evict_the_numbered_section_it_sits_in():
+    """IR-248. Docling promotes plenty of things to `section_header` that carry
+    no section number — on a real 45-page SRS, 61 of 92 headings. At level 1
+    each of them evicted the numbered parent, so `1.3` and `1.4` ended up
+    trailed to a bullet-list lead-in (`IRIS shall NOT:`) instead of to
+    `1. Introduction`.
+    """
+    document = doc(
+        DocumentElement(kind=HEADING, text="1.   Introduction", level=1),
+        DocumentElement(kind=PARAGRAPH, text="opening"),
+        DocumentElement(kind=HEADING, text="IRIS shall NOT:", level=1),
+        DocumentElement(kind=PARAGRAPH, text="a bullet lead-in"),
+        DocumentElement(kind=HEADING, text="1.3.   Definitions", level=2),
+        DocumentElement(kind=PARAGRAPH, text="the terms used"),
+        title="SRS",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    defs = [c for c in result.chunks if "the terms used" in c.content][0]
+    assert defs.context_path == ("SRS", "1.   Introduction", "1.3.   Definitions")
+
+    lead_in = [c for c in result.chunks if "bullet lead-in" in c.content][0]
+    assert lead_in.context_path[:2] == ("SRS", "1.   Introduction"), (
+        "the fragment should nest inside the section, not replace it"
+    )
+
+
+def test_consecutive_unnumbered_headings_are_siblings_under_their_numbered_parent():
+    """`Assumptions` and `Dependencies` are real subsections of `2.5`; they are
+    siblings of each other, not ancestors."""
+    document = doc(
+        DocumentElement(kind=HEADING, text="2.   Overall Description", level=1),
+        DocumentElement(kind=HEADING, text="Assumptions", level=1),
+        DocumentElement(kind=PARAGRAPH, text="we assume things"),
+        DocumentElement(kind=HEADING, text="Dependencies", level=1),
+        DocumentElement(kind=PARAGRAPH, text="we depend on things"),
+        title="SRS",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    dep = [c for c in result.chunks if "depend on things" in c.content][0]
+    assert dep.context_path == ("SRS", "2.   Overall Description", "Dependencies")
+    assert "Assumptions" not in dep.context_path, "siblings, not ancestors"
+
+
+def test_front_matter_before_any_numbered_heading_is_unaffected():
+    """`ABSTRACT`, `Keywords` and the like arrive before the outline starts, so
+    there is no numbered parent to nest under and nothing changes."""
+    document = doc(
+        DocumentElement(kind=HEADING, text="ABSTRACT", level=1),
+        DocumentElement(kind=PARAGRAPH, text="the summary"),
+        DocumentElement(kind=HEADING, text="Keywords", level=1),
+        DocumentElement(kind=PARAGRAPH, text="rag, chunking"),
+        title="A Paper",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    kw = [c for c in result.chunks if "rag, chunking" in c.content][0]
+    assert kw.context_path == ("A Paper", "Keywords")
+
+
+def test_a_document_with_no_numbering_at_all_is_unchanged():
+    document = doc(
+        DocumentElement(kind=HEADING, text="Introduction", level=1),
+        DocumentElement(kind=PARAGRAPH, text="alpha"),
+        DocumentElement(kind=HEADING, text="Method", level=1),
+        DocumentElement(kind=PARAGRAPH, text="beta"),
+        title="Essay",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    beta = [c for c in result.chunks if "beta" in c.content][0]
+    assert beta.context_path == ("Essay", "Method")
