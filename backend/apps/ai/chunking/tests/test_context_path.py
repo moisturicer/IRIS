@@ -4,7 +4,7 @@ Runs against every registered strategy, wrapped, plus decorator-specific
 truncation and no-heading behaviour.
 """
 
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from apps.ai.chunking import (
     ChunkingOptions,
@@ -202,7 +202,7 @@ _document = st.lists(_paragraph, min_size=1, max_size=6).map(
 )
 
 
-@settings(max_examples=40, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=40)
 @given(document=_document)
 def test_property_no_content_is_lost_with_decorator_applied(document):
     options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=16)
@@ -213,7 +213,7 @@ def test_property_no_content_is_lost_with_decorator_applied(document):
     assert rejoined == original
 
 
-@settings(max_examples=40, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=40)
 @given(document=_document)
 def test_property_decorated_chunking_is_deterministic(document):
     options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=16)
