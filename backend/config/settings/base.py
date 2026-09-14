@@ -363,12 +363,27 @@ AI_CHUNK_CONTEXT_PATH_MAX_TOKENS = config(
 )
 # A bibliography is 10-20% of a thesis by tokens and retrieves uniformly
 # badly, so it is excluded here and kept in extracted_text for full-text
-# search. Front matter (acknowledgements, table of contents) is deliberately
-# NOT excluded yet: whether the extractor detects those headings reliably on
-# real submissions is one of the questions IR-116's manual inspection answers.
+# search.
+#
+# The navigation indexes join it as of IR-246. IR-116's run on two real CIT-U
+# submissions answered the open question this comment used to pose: Docling
+# does emit a real `Table of Contents` heading, so these are detectable by
+# name. They earn exclusion on the same grounds as a bibliography and then
+# some -- a table of contents holds every section name in the document and
+# none of their content, so it scores against a query about any section and
+# returns a page number. On record 30 it ranked within 0.005 of the correct
+# answer for "user characteristics and constraints".
+#
+# The title block is deliberately still chunked: institution, title and
+# authors are the document's identity, which is the one part of front matter
+# worth retrieving. Acknowledgements are still undecided -- neither test
+# submission had one, and guessing is what this list is trying to stop.
 AI_CHUNK_EXCLUDE_SECTIONS = config(
     "AI_CHUNK_EXCLUDE_SECTIONS",
-    default="References,Bibliography,Works Cited,Literature Cited",
+    default=(
+        "References,Bibliography,Works Cited,Literature Cited,"
+        "Table of Contents,Contents,List of Tables,List of Figures"
+    ),
     cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
 )
 
