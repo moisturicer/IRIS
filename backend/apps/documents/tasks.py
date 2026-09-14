@@ -100,11 +100,13 @@ def extract_pdf_text(self, upload_id: int):
     so the API response is never blocked on a conversion that can take
     minutes on a scanned thesis. Retries three times, sixty seconds apart.
 
-    Deliberately does not queue chunking (IR-195, ADR-013's 2026-09-08
-    amendment): every ``UploadSlot`` a real record uses is supplementary --
-    an Ethics Clearance form, a Patent Draft, and so on -- never the
-    manuscript, so nothing extracted here belongs in the RAG corpus. See
-    ``extract_manuscript_text`` below for the path that does chunk.
+    Whether the result is chunked is not this task's call (IR-239): it asks
+    ``_queue_chunking_if_manuscript`` below, which reads the row's ``kind``.
+    In practice every ``UploadSlot`` a real record uses is supplementary --
+    an Ethics Clearance form, a Patent Draft, and so on -- so in practice
+    nothing extracted here is chunked. The difference from IR-195, where this
+    task simply never chunked, is that "in practice" is now a fact about the
+    data rather than a fact about this function.
     """
     from apps.documents.models import PdfExtraction, RecordUpload
 
@@ -114,6 +116,9 @@ def extract_pdf_text(self, upload_id: int):
 
     upload = RecordUpload.objects.get(pk=upload_id)
     _run_extraction(self, extraction, file_field=upload.file)
+
+    # Reachable only on success -- _run_extraction's handler always raises.
+    _queue_chunking_if_manuscript(extraction)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -127,15 +132,11 @@ def extract_manuscript_text(self, record_id: int):
     Queued by ``RecordViewSet.perform_update`` whenever a PATCH changes
     ``abstract_file`` (IR-195).
 
-    Unlike ``extract_pdf_text``, a successful run here does queue chunking
-    (``chunk_manuscript``): the manuscript is the one document ADR-013's
-    2026-09-08 amendment says belongs in the RAG corpus. That distinction is
-    still drawn by *which task ran*, not by an inspectable field on the
-    document itself -- sound today only because ``abstract_file`` structurally
-    can never hold a supplementary document and no ``UploadSlot`` is seeded as
-    "Manuscript". If a manuscript ``UploadSlot`` is ever introduced (the
-    alternative IR-195 considered and did not take), this exclusion needs a
-    real document-type marker instead of relying on which endpoint was hit.
+    Whether the result is chunked is decided the same way as in
+    ``extract_pdf_text`` -- by the row's ``kind``, through the one guard
+    below (IR-239). A manuscript is what this path normally carries, so in
+    practice it chunks; but the rule lives on the data, not in the choice of
+    which task to call.
     """
     from apps.documents.models import PdfExtraction
     from apps.records.models import Record
@@ -148,11 +149,29 @@ def extract_manuscript_text(self, record_id: int):
     _run_extraction(self, extraction, file_field=record.abstract_file)
 
     # Reachable only on success -- _run_extraction's handler always raises.
-    _queue_manuscript_chunking(record_id)
+    _queue_chunking_if_manuscript(extraction)
 
 
-def _queue_manuscript_chunking(record_id: int) -> None:
-    """Hand the extracted manuscript to the chunker, in another worker.
+def _queue_chunking_if_manuscript(extraction) -> None:
+    """The one place that decides whether an extraction enters the RAG corpus.
+
+    Both extraction tasks call this, and it asks the row what it holds
+    (IR-239). Neither task decides by being itself, which is what ADR-013
+    §Decision ("Retrieval scope") means by keying off "is this the
+    manuscript" rather than off the upload path -- and is why a manuscript
+    attached to an ``UploadSlot``, a thing no endpoint can produce today,
+    would nonetheless be chunked correctly the day one can.
+    """
+    from apps.documents.models import DocumentKind
+
+    if extraction.kind != DocumentKind.MANUSCRIPT:
+        return
+
+    _queue_chunk_extraction(extraction.pk)
+
+
+def _queue_chunk_extraction(extraction_id: int) -> None:
+    """Hand the extraction to the chunker, in another worker.
 
     ``on_commit`` rather than a bare ``delay``, for the same reason IR-116's
     original ``_queue_chunking`` used it: the chunker reads the row this task
@@ -161,6 +180,6 @@ def _queue_manuscript_chunking(record_id: int) -> None:
     """
     from django.db import transaction
 
-    from apps.ai.tasks import chunk_manuscript
+    from apps.ai.tasks import chunk_extraction
 
-    transaction.on_commit(lambda: chunk_manuscript.delay(record_id))
+    transaction.on_commit(lambda: chunk_extraction.delay(extraction_id))

@@ -68,6 +68,24 @@ class UploadReview(models.Model):
         return f"Review of upload {self.upload_id} by {self.reviewed_by_id}"
 
 
+class DocumentKind(models.TextChoices):
+    """What kind of document an extraction holds — the RAG corpus boundary.
+
+    [ADR-013](docs/adr/013-chunk-level-rag-pipeline.md) §Decision
+    ("Retrieval scope," amended 2026-09-08) draws this as a document-*type*
+    distinction, explicitly not an endpoint one: whatever feeds the chunker
+    "must key off 'is this the manuscript,' not off which upload path was
+    used to attach the file."
+
+    It lives here rather than in ``core.enums`` for the reason that module's
+    own "What is not here" note gives about ``PdfExtraction.STATUS``: this is
+    ingestion-pipeline vocabulary, and shares no value with the workflow's.
+    """
+
+    MANUSCRIPT = "manuscript", "Manuscript"
+    SUPPLEMENTARY = "supplementary", "Supplementary"
+
+
 class PdfExtraction(models.Model):
     """
     Tracks the Celery PDF text-extraction task for either a RecordUpload
@@ -85,10 +103,15 @@ class PdfExtraction(models.Model):
     2026-09-08 amendment): a supplementary upload has no manuscript to be
     confused with, and the manuscript has no UploadSlot to hang off. Two
     nullable one-to-ones plus a check constraint, rather than a polymorphic
-    "owner" field, because the two things they extract are handled by
-    different tasks with different triggers -- there is no code that wants
-    to treat them uniformly except the chunker, which already reads through
-    ``resolved_record_id`` rather than caring which one is set.
+    "owner" field, because the two carry different files and are written by
+    different triggers.
+
+    **Which FK is set is not what decides whether this is chunked** (IR-239).
+    ``kind`` is, and it is stored rather than derived precisely so that the
+    answer survives a path that does not exist yet — a manuscript attached
+    through an ``UploadSlot``, say. Deriving it from ``record_id is not None``
+    would re-encode the endpoint coincidence ADR-013's amendment blames for
+    the original defect.
     """
     STATUS = [
         ("queued",  "Queued"),
@@ -105,6 +128,17 @@ class PdfExtraction(models.Model):
         null=True, blank=True,
     )
     status         = models.CharField(max_length=10, choices=STATUS, default="queued", db_index=True)
+    # The RAG corpus boundary, stored on the row the chunker reads (IR-239).
+    # Defaults to SUPPLEMENTARY so the failure mode is closed: a row whose
+    # creator forgot to say what it holds is left out of the corpus rather
+    # than quietly indexed into it. Both production creation sites set it
+    # explicitly anyway -- the default is the backstop, not the mechanism.
+    kind           = models.CharField(
+        max_length=16,
+        choices=DocumentKind.choices,
+        default=DocumentKind.SUPPLEMENTARY,
+        db_index=True,
+    )
     extracted_text = models.TextField(blank=True)
     # The serialized NormalizedDocument -- see apps.ai.extraction.serialization
     # for the format, and as_normalized_document() below for the way back.

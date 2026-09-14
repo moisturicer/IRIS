@@ -20,7 +20,7 @@ from apps.ai.extraction import (
     extraction_hash,
 )
 from apps.documents import tasks
-from apps.documents.models import PdfExtraction
+from apps.documents.models import DocumentKind, PdfExtraction
 from apps.records.models import Record, RecordType
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
@@ -60,9 +60,11 @@ class FailingExtractor:
 
 
 @pytest.fixture(autouse=True)
-def queued_manuscript_chunkings(monkeypatch):
+def queued_chunkings(monkeypatch):
+    """Patched below the kind guard (IR-239), so the guard still runs and
+    what these tests assert is a consequence of the row's ``kind``."""
     calls = []
-    monkeypatch.setattr(tasks, "_queue_manuscript_chunking", calls.append)
+    monkeypatch.setattr(tasks, "_queue_chunk_extraction", calls.append)
     return calls
 
 
@@ -78,7 +80,9 @@ def record(db):
 
 @pytest.fixture
 def extraction(record):
-    return PdfExtraction.objects.create(record=record)
+    # kind is stated, not implied by the record FK (IR-239) -- this fixture
+    # stands in for what RecordViewSet writes, and that is what it writes.
+    return PdfExtraction.objects.create(record=record, kind=DocumentKind.MANUSCRIPT)
 
 
 def _run(monkeypatch, extractor, record_id):
@@ -144,18 +148,19 @@ def test_a_deleted_extraction_row_is_not_an_error(monkeypatch, record):
 
 
 def test_a_successful_extraction_queues_chunking(
-    monkeypatch, record, extraction, queued_manuscript_chunkings
+    monkeypatch, record, extraction, queued_chunkings
 ):
-    """IR-195: unlike a supplementary upload, the manuscript is exactly what
-    ADR-013's 2026-09-08 amendment says belongs in the RAG corpus."""
+    """The manuscript is exactly what ADR-013's 2026-09-08 amendment says
+    belongs in the RAG corpus. Queued by extraction id (IR-239), since that
+    is the row the chunker reads."""
     _run(monkeypatch, FakeExtractor(), record.id)
 
-    assert queued_manuscript_chunkings == [record.id]
+    assert queued_chunkings == [extraction.id]
 
 
 def test_a_failed_extraction_does_not_queue_chunking(
-    monkeypatch, record, extraction, queued_manuscript_chunkings
+    monkeypatch, record, extraction, queued_chunkings
 ):
     _run(monkeypatch, FailingExtractor(ExtractionError("boom")), record.id)
 
-    assert queued_manuscript_chunkings == []
+    assert queued_chunkings == []

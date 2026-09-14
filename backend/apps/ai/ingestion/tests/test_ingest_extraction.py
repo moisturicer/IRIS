@@ -24,8 +24,8 @@ from apps.ai.models import IngestionJob, get_active_embedding_space
 from apps.ai.models.chunk import ChunkSet as ChunkSetModel
 from apps.ai.models.chunk import DocumentChunk
 from apps.ai.repositories import DjangoChunkRepository
-from apps.ai.tasks import chunk_manuscript, chunk_record_document
-from apps.documents.models import PdfExtraction, RecordUpload, UploadSlot
+from apps.ai.tasks import chunk_extraction
+from apps.documents.models import DocumentKind, PdfExtraction, RecordUpload, UploadSlot
 from apps.records.models import Record, RecordType
 
 from .thesis_fixtures import ALL_FIXTURES, TEXT_LAYER_THESIS
@@ -304,7 +304,7 @@ def test_an_extraction_with_no_content_hash_cannot_be_keyed(space, upload):
 
 
 def test_the_task_produces_an_active_chunk_set(space, upload, extraction):
-    result = chunk_record_document.apply(args=[upload.id])
+    result = chunk_extraction.apply(args=[extraction.id])
 
     assert result.successful()
     active = ChunkSetModel.objects.get(record_id=upload.record_id, is_active=True)
@@ -317,7 +317,7 @@ def test_the_task_uses_the_configured_defaults(settings, space, upload, extracti
     criterion — so it has to reach the pipeline from settings."""
     settings.AI_CHUNK_MAX_TOKENS = 30
 
-    chunk_record_document.apply(args=[upload.id])
+    chunk_extraction.apply(args=[extraction.id])
 
     active = ChunkSetModel.objects.get(record_id=upload.record_id, is_active=True)
     assert active.options["max_tokens"] == 30
@@ -327,16 +327,18 @@ def test_the_task_uses_the_configured_defaults(settings, space, upload, extracti
 def test_the_task_does_not_retry_an_extraction_with_nothing_to_chunk(space, upload):
     """Four more attempts will not conjure a structure. The failure is
     reported rather than queued again."""
-    PdfExtraction.objects.create(upload=upload, status="failed")
+    empty = PdfExtraction.objects.create(upload=upload, status="failed")
 
-    result = chunk_record_document.apply(args=[upload.id])
+    result = chunk_extraction.apply(args=[empty.id])
 
     assert result.failed()
     assert isinstance(result.result, IngestionError)
 
 
 def test_a_deleted_extraction_row_is_not_an_error(space, upload):
-    result = chunk_record_document.apply(args=[upload.id])
+    """The row can go between the task being queued and running. Keyed on the
+    extraction id (IR-239), so a vanished row is simply not found."""
+    result = chunk_extraction.apply(args=[999_999])
 
     assert result.successful()
     assert result.result is None
@@ -350,8 +352,13 @@ def _raise(error):
 
 
 # ---------------------------------------------------------------------------
-# The manuscript path (IR-195) -- same task body, keyed by record not upload
+# The manuscript path -- a record-keyed extraction, chunked by the same task
 # ---------------------------------------------------------------------------
+#
+# IR-195 gave this path its own task, keyed by record. IR-239 collapsed both
+# into `chunk_extraction`, so what these cases now pin down is that a
+# record-keyed row (no RecordUpload behind it) chunks identically to an
+# upload-keyed one -- the asymmetry that justified a second task is gone.
 
 
 @pytest.fixture
@@ -368,6 +375,7 @@ def manuscript_record(db):
 def manuscript_extraction(manuscript_record):
     return PdfExtraction.objects.create(
         record=manuscript_record,
+        kind=DocumentKind.MANUSCRIPT,
         status="done",
         structure=document_to_json(TEXT_LAYER_THESIS),
         content_hash=extraction_hash(TEXT_LAYER_THESIS),
@@ -375,8 +383,10 @@ def manuscript_extraction(manuscript_record):
     )
 
 
-def test_chunk_manuscript_produces_an_active_chunk_set(space, manuscript_record, manuscript_extraction):
-    result = chunk_manuscript.apply(args=[manuscript_record.id])
+def test_a_record_keyed_extraction_produces_an_active_chunk_set(
+    space, manuscript_record, manuscript_extraction
+):
+    result = chunk_extraction.apply(args=[manuscript_extraction.id])
 
     assert result.successful()
     active = ChunkSetModel.objects.get(record_id=manuscript_record.id, is_active=True)
@@ -384,17 +394,12 @@ def test_chunk_manuscript_produces_an_active_chunk_set(space, manuscript_record,
     assert result.result["chunk_count"] == active.chunks.count()
 
 
-def test_chunk_manuscript_does_not_retry_an_extraction_with_nothing_to_chunk(space, manuscript_record):
-    PdfExtraction.objects.create(record=manuscript_record, status="failed")
+def test_a_record_keyed_extraction_with_nothing_to_chunk_is_not_retried(space, manuscript_record):
+    empty = PdfExtraction.objects.create(
+        record=manuscript_record, kind=DocumentKind.MANUSCRIPT, status="failed"
+    )
 
-    result = chunk_manuscript.apply(args=[manuscript_record.id])
+    result = chunk_extraction.apply(args=[empty.id])
 
     assert result.failed()
     assert isinstance(result.result, IngestionError)
-
-
-def test_chunk_manuscript_a_deleted_extraction_row_is_not_an_error(space, manuscript_record):
-    result = chunk_manuscript.apply(args=[manuscript_record.id])
-
-    assert result.successful()
-    assert result.result is None
