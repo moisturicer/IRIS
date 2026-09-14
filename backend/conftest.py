@@ -40,12 +40,22 @@ def pytest_configure(config):
         return
 
     try:
-        config.hypothesis_profile_in_use = activate_profile(os.environ)
+        config.hypothesis_profile = activate_profile(os.environ)
     except ValueError as exc:
         # A pure ValueError from the domain becomes pytest's own "you invoked
         # this wrongly" error, so a typo reads as a one-line usage message
         # rather than an INTERNALERROR traceback.
         raise pytest.UsageError(str(exc)) from exc
+
+
+def pytest_report_header(config):
+    """Name the Hypothesis profile in the run header.
+
+    Without this the profile is invisible, and "why did this pass locally and
+    fail in CI" is exactly the question it changes the answer to.
+    """
+    name = getattr(config, "hypothesis_profile", None)
+    return f"hypothesis profile: {name}" if name else None
 
 
 def _backend_deps_installed() -> bool:
