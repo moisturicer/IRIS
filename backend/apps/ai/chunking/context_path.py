@@ -21,6 +21,7 @@ to whatever strategy is registered after them.
 Pure: no Django, no I/O, no clock, no randomness.
 """
 
+import re
 from dataclasses import replace
 
 from .document import HEADING, NormalizedDocument
@@ -29,6 +30,11 @@ from .ports import Chunker
 from .registry import build_chunker
 from .tokens import count_tokens
 from .values import Chunk, ChunkingOptions, ChunkSet
+
+#: A section number opening a heading. Mirrors the pattern the extraction
+#: mapping uses to derive depth (IR-242), kept in step with it by shape
+#: rather than shared, because the domain must not import an adapter.
+_SECTION_NUMBER = re.compile(r"^\d+(?:\.\d+)*\.?\s+\S")
 
 _TRUNCATION_MARKER = "..."
 _PATH_SEPARATOR = " > "
@@ -45,7 +51,9 @@ def _words_with_paths(document: NormalizedDocument) -> list[tuple[str, tuple[str
     first, so a word with no enclosing heading yet still gets a valid path.
     """
     words_with_paths: list[tuple[str, tuple[str, ...], bool]] = []
-    stack: list[tuple[int, str]] = []
+    # (level, text, numbered) — `numbered` is what lets an unnumbered heading
+    # be placed relative to the outline rather than on top of it.
+    stack: list[tuple[int, str, bool]] = []
 
     for element in document.elements:
         words = element.text.split()
@@ -53,13 +61,60 @@ def _words_with_paths(document: NormalizedDocument) -> list[tuple[str, tuple[str
             continue
         is_heading = element.kind == HEADING
         if is_heading:
-            level = element.level if element.level is not None else 1
-            stack = [(lv, text) for lv, text in stack if lv < level]
-            stack.append((level, element.text.strip()))
-        path = (document.title,) + tuple(text for _, text in stack)
+            level = _effective_level(element, stack)
+            stack = [entry for entry in stack if entry[0] < level]
+            stack.append((level, element.text.strip(), _is_numbered(element.text)))
+        path = (document.title,) + tuple(text for _, text, _ in stack)
         words_with_paths.extend((word, path, is_heading) for word in words)
 
     return words_with_paths
+
+
+def _is_numbered(text: str) -> bool:
+    """Whether a heading opens with a section number — `3`, `3.2`, `2.1.1`."""
+    return _SECTION_NUMBER.match(text.strip()) is not None
+
+
+def _effective_level(
+    element, stack: list[tuple[int, str, bool]]
+) -> int:
+    """The level at which a heading should sit in the outline.
+
+    A numbered heading keeps the level it was given: IR-242 already derives
+    that from its own numbering, and the numbering is the outline.
+
+    An **unnumbered** heading is placed one level *below* the deepest numbered
+    entry currently open, rather than at whatever level the extractor guessed
+    (IR-248). Docling promotes a great deal to `section_header` that carries no
+    number — 61 of 92 headings on a real SRS: `Assumptions`, `Dependencies`,
+    `Backup Strategy`, and lead-in fragments like `IRIS shall NOT:`. At level 1
+    each of those evicted the numbered section it actually belongs to, so the
+    subsections that followed were trailed to a bullet-list lead-in instead of
+    to `1. Introduction`.
+
+    **The trade-off, stated rather than buried:** a genuinely top-level
+    unnumbered section that follows numbered ones — an appendix such as
+    `A Contributions` after `8 Conclusion` — is now nested under that last
+    numbered section instead of beside it. Nothing distinguishes the two cases
+    from the heading alone. The exchange is deliberate: it costs a wrong parent
+    on a handful of trailing sections and buys a correct parent for the 61,
+    and in both cases the heading itself is still the nearest entry in its own
+    trail. Telling them apart needs the document's numbering *sequence*, which
+    is the same document-level context IR-242's recorded false positive wants;
+    when that lands, this rule should be revisited with it.
+    """
+    declared = element.level if element.level is not None else 1
+    if _is_numbered(element.text):
+        return declared
+
+    deepest_numbered = max(
+        (level for level, _, numbered in stack if numbered), default=0
+    )
+    if deepest_numbered == 0:
+        # No numbered outline open — front matter, or a document that numbers
+        # nothing. Behaves exactly as before.
+        return declared
+    return max(declared, deepest_numbered + 1)
 
 
 def _path_for_span(
