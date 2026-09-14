@@ -44,21 +44,58 @@ def _words_with_paths(document: NormalizedDocument) -> list[tuple[str, tuple[str
     heading inherits the path built so far, with the document title always
     first, so a word with no enclosing heading yet still gets a valid path.
     """
-    words_with_paths: list[tuple[str, tuple[str, ...]]] = []
+    words_with_paths: list[tuple[str, tuple[str, ...], bool]] = []
     stack: list[tuple[int, str]] = []
 
     for element in document.elements:
         words = element.text.split()
         if not words:
             continue
-        if element.kind == HEADING:
+        is_heading = element.kind == HEADING
+        if is_heading:
             level = element.level if element.level is not None else 1
             stack = [(lv, text) for lv, text in stack if lv < level]
             stack.append((level, element.text.strip()))
         path = (document.title,) + tuple(text for _, text in stack)
-        words_with_paths.extend((word, path) for word in words)
+        words_with_paths.extend((word, path, is_heading) for word in words)
 
     return words_with_paths
+
+
+def _path_for_span(
+    words_with_paths: list[tuple[str, tuple[str, ...], bool]],
+    start: int,
+    end: int,
+    fallback: tuple[str, ...],
+) -> tuple[str, ...]:
+    """The trail to label a chunk spanning ``words_with_paths[start:end]``.
+
+    The trail of the chunk's **first word that is not part of a heading** --
+    its first actual content -- because that is what the chunk is *about*.
+
+    Neither endpoint alone survives both strategies. Taking the first word's
+    trail loses the child heading when the structural cascade folds a
+    heading-only section forward (IR-241), handing the merged chunk its
+    parent's path. Taking the last word's trail breaks the fixed-window
+    baseline, which knows nothing about headings and happily ends a window on
+    one: a window of Introduction prose that happens to close on the
+    "2 Methods" heading would be labelled Methods. Both are chunks that span a
+    heading, and the first-content rule is right for both.
+
+    A chunk that is *only* headings has no content word to ask, so it keeps
+    the trail of its own last heading -- which is its own position in the
+    outline.
+    """
+    span = words_with_paths[start:end]
+    if not span:
+        if start < len(words_with_paths):
+            return words_with_paths[start][1]
+        return fallback
+
+    for _, path, is_heading in span:
+        if not is_heading:
+            return path
+    return span[-1][1]
 
 
 def _advance_cursor(
@@ -137,15 +174,16 @@ class ContextPathChunker:
             return inner_set
 
         words_with_paths = _words_with_paths(document)
-        document_words = [word for word, _ in words_with_paths]
+        document_words = [word for word, _, _ in words_with_paths]
         last_path = (document.title,)
         cursor = 0
         decorated: list[Chunk] = []
 
         for chunk in inner_set.chunks:
-            path = words_with_paths[cursor][1] if cursor < len(words_with_paths) else last_path
-            last_path = path
+            start = cursor
             cursor = _advance_cursor(document_words, cursor, chunk.content.split())
+            path = _path_for_span(words_with_paths, start, cursor, last_path)
+            last_path = path
 
             path = _truncate_middle(path, options.context_path_max_tokens)
             prefix = _PATH_SEPARATOR.join(path)
