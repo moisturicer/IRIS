@@ -391,6 +391,19 @@ Two structural rules carry over verbatim from teammind's `handleTable` and `hand
 
 Neither reference implementation does this, and both corpora suffer for it. A thesis produces many 15-token chunks — a heading followed by one sentence, a figure caption, a single table row. Each costs a full embedding call and each retrieves noisily.
 
+> **The unit is words, not tokens (IR-243, 2026-09-15).** `count_tokens` is `len(text.split())` — a deliberate
+> whitespace estimator, so the count is deterministic across processes and versions and the pure domain carries no
+> vendor tokenizer. The consequence had never been measured: on a real 47-page submission an IRIS chunk at the
+> ceiling holds **511 words**, where docling-core's `HybridChunker(max_tokens=512)` — a real BPE tokenizer, same
+> source PDF — caps at **355 words**. So `max_tokens=512` here is ~44% more real tokens than it reads as, and the
+> equivalent of that reference default is nearer **360**.
+>
+> **The default was deliberately not changed.** Nothing overflows (`voyage-context-4` has the context), and what
+> the right ceiling is for theses is a retrieval-quality question that [section 14](#14-open-questions) already
+> lists as open — IR-133's recall@10 harness is what can answer it. Recalibrating now would substitute taste for
+> that measurement and re-chunk the corpus on a guess. Swapping in a real tokenizer later is safe regardless:
+> `token_count` is excluded from the chunk-set hash exactly so it does not stale the corpus.
+
 `min_tokens` with `merge_short_siblings` folds a chunk below the floor into its next sibling **within the same heading section**. Never across a heading boundary: that would merge two unrelated topics into one vector, which is exactly the failure the context path is trying to prevent.
 
 ### The chunker is a Strategy behind a Registry

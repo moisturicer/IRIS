@@ -345,6 +345,13 @@ AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:800
 # from the registry, because a settings module must not import an app
 # package to check itself against it.
 AI_CHUNK_STRATEGY      = config("AI_CHUNK_STRATEGY", default="")
+# NOTE THE UNIT: whitespace-delimited *words*, not tokenizer tokens
+# (apps.ai.chunking.tokens.count_tokens). Measured against docling-core's
+# HybridChunker on the same PDF, 512 words is ~44% more real BPE tokens than
+# "512" suggests -- the equivalent of that reference default is nearer 360.
+# Nothing overflows (voyage-context-4 has the context for it), so IR-243
+# deliberately left the number alone: what the right ceiling is for theses is
+# a retrieval-quality question for IR-133's recall@10 harness, not a guess.
 AI_CHUNK_MAX_TOKENS    = config("AI_CHUNK_MAX_TOKENS", default=512, cast=int)
 # Blank means "derive from max_tokens" — see ChunkingOptions.effective_min_tokens,
 # which explains why a fixed default would be a footgun.
