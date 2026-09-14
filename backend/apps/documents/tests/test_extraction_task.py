@@ -80,16 +80,17 @@ class FailingExtractor:
 
 
 @pytest.fixture(autouse=True)
-def queued_manuscript_chunkings(monkeypatch):
-    """Every record id handed to the manuscript chunking task, in place of a
-    real ``delay`` -- which blocks on a broker this test process has no
-    reason to need. Autouse, because a test that forgot it would hang rather
-    than fail. Named for the manuscript path specifically: as of IR-195,
-    supplementary uploads (the only thing this file's ``extract_pdf_text``
-    tests exercise) never reach this at all -- see
-    ``test_a_successful_extraction_does_not_queue_chunking`` below."""
+def queued_chunkings(monkeypatch):
+    """Every extraction id handed to the chunking task, in place of a real
+    ``delay`` -- which blocks on a broker this test process has no reason to
+    need. Autouse, because a test that forgot it would hang rather than fail.
+
+    Patched *below* the kind guard (IR-239), so the guard itself still runs:
+    these tests exercise a supplementary upload, and what they assert is that
+    such a row is not chunked -- a fact about its ``kind``, not about which
+    task read it."""
     calls = []
-    monkeypatch.setattr(tasks, "_queue_manuscript_chunking", calls.append)
+    monkeypatch.setattr(tasks, "_queue_chunk_extraction", calls.append)
     return calls
 
 
@@ -208,15 +209,18 @@ def test_a_re_extraction_clears_a_previous_error(monkeypatch, upload, extraction
 
 
 def test_a_successful_extraction_does_not_queue_chunking(
-    monkeypatch, upload, extraction, queued_manuscript_chunkings
+    monkeypatch, upload, extraction, queued_chunkings
 ):
-    """IR-195: a supplementary upload (an Ethics Clearance form, a Patent
-    Draft -- everything ``UploadSlot`` seeds) is never the manuscript, so it
-    must never reach the RAG corpus. Only the manuscript path
-    (``extract_manuscript_text``) queues chunking."""
+    """A supplementary upload (an Ethics Clearance form, a Patent Draft --
+    everything ``UploadSlot`` seeds today) must never reach the RAG corpus.
+
+    IR-239 moved the reason: this row is skipped because its ``kind`` says
+    supplementary, not because ``extract_pdf_text`` is a task that never
+    chunks. The ``extraction`` fixture leaves ``kind`` at its default, which
+    is exactly the supplementary case."""
     _run(monkeypatch, FakeExtractor(), upload.id)
 
-    assert queued_manuscript_chunkings == []
+    assert queued_chunkings == []
 
 
 # ---------------------------------------------------------------------------

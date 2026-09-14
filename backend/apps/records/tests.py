@@ -306,7 +306,7 @@ class ManuscriptExtractionTriggerTests(APITestCase):
     def test_patching_abstract_file_creates_a_pdf_extraction_row(self):
         from unittest.mock import patch
 
-        from apps.documents.models import PdfExtraction
+        from apps.documents.models import DocumentKind, PdfExtraction
 
         with patch("apps.documents.tasks.extract_manuscript_text.delay"):
             with self.captureOnCommitCallbacks(execute=True):
@@ -314,6 +314,9 @@ class ManuscriptExtractionTriggerTests(APITestCase):
 
         extraction = PdfExtraction.objects.get(record=self.record)
         self.assertEqual(extraction.status, "queued")
+        # IR-239: the row says what it holds. Without this the chunker would
+        # be back to inferring it from which endpoint wrote the row.
+        self.assertEqual(extraction.kind, DocumentKind.MANUSCRIPT)
 
     def test_posting_a_new_record_with_abstract_file_also_queues_extraction(self):
         """The spec review on IR-195 caught this gap: RecordWriteSerializer
