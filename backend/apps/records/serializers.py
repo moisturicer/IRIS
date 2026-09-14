@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from core.enums import ReviewDecision
 
 from apps.reviews.clearance_state import clearance_payload, resubmission_payload
 
@@ -103,7 +104,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_resubmission(self, obj):
         """`resubmission{}` -- what happened, and which offices survived it."""
         latest_decline = (
-            obj.reviews.filter(status="declined").order_by("-created_at").first()
+            obj.reviews.filter(status=ReviewDecision.DECLINED).order_by("-created_at").first()
         )
         return resubmission_payload(
             obj,
@@ -163,9 +164,17 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "your_office", "your_office_label",
+            "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
         ]
+        # Consent is stamped by `RecordViewSet.submit` and read everywhere else
+        # (IR-226). `dpa_accepted` is a model property so DRF would infer it as
+        # read-only anyway; naming both here states the intent rather than
+        # relying on that inference, and keeps `dpa_accepted_at` -- a real,
+        # writable column -- from becoming settable if this serializer is ever
+        # given a write path.
+        read_only_fields = ["dpa_accepted", "dpa_accepted_at"]
 
 
 class RecordWriteSerializer(serializers.ModelSerializer):

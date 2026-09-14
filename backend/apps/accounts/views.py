@@ -2,6 +2,7 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from core.enums import RequestStatus, RoleName
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
@@ -125,7 +126,7 @@ class AdviserListView(generics.ListAPIView):
     def get_queryset(self):
         return (
             User.objects
-            .filter(role__name="Adviser", is_active=True)
+            .filter(role__name=RoleName.ADVISER, is_active=True)
             .select_related("role")
             .order_by("last_name", "first_name")
         )
@@ -262,7 +263,7 @@ class RoleRequestListView(generics.ListAPIView):
     """
     serializer_class   = RoleRequestSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
-    queryset           = RoleRequest.objects.filter(status="pending").select_related("user", "requested_role")
+    queryset           = RoleRequest.objects.filter(status=RequestStatus.PENDING).select_related("user", "requested_role")
 
 
 class RoleRequestDetailView(APIView):

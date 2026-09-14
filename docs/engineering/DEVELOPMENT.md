@@ -71,7 +71,7 @@ cd backend
 
 pip install -r requirements/development.txt
 
-cp .env.example .env          # then fill in real values
+cp .env.example .env          # then fill in real values; see §7 -- the repo root needs its own .env for Compose
 
 python manage.py check        # passes (one deprecation warning: AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP)
 python manage.py migrate
@@ -92,6 +92,37 @@ python manage.py showmigrations
 ```
 
 Rules: every model change ships with its migration · test against a copy of a realistic database, not only an empty one · **never edit a migration that has been applied anywhere** — supersede it.
+
+### Demo data
+
+```bash
+python manage.py seed_demo                  # accounts + catalogue + every pipeline state
+python manage.py seed_demo --accounts-only  # the seven logins, nothing else
+python manage.py seed_demo --password hunter2
+```
+
+**One command replaced four** (IR-227). `scripts/seed_demo_users.py`, `scripts/seed_demo_records.py` and `scripts/seed_demo_clearances.py` — each run by hand through `manage.py shell <`, in the right order — plus `seed_test_users`, which seeded a second `iris-*` account set at a different password. All four are deleted.
+
+**The credentials are unchanged**: `<role>@cit.edu` at `IrisDemo123!`, the convention that already existed.
+
+| Login | Role |
+|---|---|
+| `student@cit.edu` | Student — owns the demo records |
+| `adviser@cit.edu` | Adviser |
+| `rdco@cit.edu` | RDCO — **IRIS's administrator** (`ADMIN_ROLES` is `{RDCO}`) |
+| `itso@cit.edu` · `ierc@cit.edu` · `ktto@cit.edu` | The three clearing offices |
+| `admin@cit.edu` | Django superuser, **no application role** — `/admin` only (IR-165) |
+
+Re-running is idempotent for records (keyed by title) but **resets all seven passwords** to the default, so say so before a rehearsal if someone has changed one.
+
+**Everything is driven through `lifecycle.apply` and the review services, never by assigning `pipeline_status`.** That is the point rather than a style preference: the deleted scripts wrote `pipeline_status = "published"` directly, and `seed_demo_clearances.py` hand-built `Review` and `RecordClearance` rows and backdated their timestamps past the ORM. Both produced states the workflow never produced, so neither proved anything about it — and a faked state drifts silently the moment the real routing changes.
+
+Two records carry the thesis contribution:
+
+- **`[DEMO] Declined by IERC, ITSO and KTTO preserved`** — the one you *drive*. It sits in `declined`. Upload a document as the student (resubmission requires one since IR-139 — that refusal is part of the demo), resubmit, and watch IERC reset while ITSO and KTTO survive.
+- **`[DEMO] Resubmitted, ITSO and KTTO preserved`** — the one you *look at*. Already resubmitted, so the paper view's "Preserved" badges render on arrival.
+
+`scripts/seed_demo_opportunities.py` is still a shell script — it seeds the Calls & Conferences board (IR-121), a separate feature, and depends on `rdco@cit.edu` which `seed_demo` creates.
 
 ---
 
@@ -118,6 +149,7 @@ npm run lint       # eslint src --ext ts,tsx
 ```bash
 # from the repository root
 docker compose config              # validate without building
+cp .env.example .env               # repo root — Compose needs it; see §7
 docker compose up --build          # currently FAILS — see §1
 docker compose logs -f backend
 docker compose down                # add -v to drop volumes
@@ -131,18 +163,56 @@ docker compose down                # add -v to drop volumes
 
 Workers consume the `default`, `extraction` and `embedding` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding` services). `config/settings/base.py` sets `CELERY_TASK_ROUTES` (`extract_pdf_text` → `extraction`, `embed_record` → `embedding`) and `CELERY_TASK_DEFAULT_QUEUE = "default"` for everything else, including `chunk_record_document` (IR-164) — so publishers and consumers agree on queue names. Verified against the real docker-compose stack, not just the config: a task dispatched over the real Redis broker was consumed and completed by the real `celery-default` and `celery-extraction` containers.
 
+**Each worker declares a healthcheck** (IR-225). `celery -A config inspect ping -d <node>@$HOSTNAME` round-trips through the broker to that specific node, so it fails if the process is dead, wedged, or cannot reach Redis. This exists because `celery-extraction` once crash-looped for nine hours on a missing dependency in a stale image while `docker ps` showed only `Restarting` — with `restart: unless-stopped` and no healthcheck, a permanently broken worker looks exactly like one that happened to bounce. **When a worker misbehaves, check `docker ps` for `unhealthy` first, and rebuild it (`docker compose up -d --build <service>`) before debugging the task**: the three workers share one build spec but are separate images, and only one of them going stale is the failure that hides best.
+
+`apps/tests/test_worker_boot.py` keeps the two halves honest — every queue named in `CELERY_TASK_ROUTES` has a worker consuming it, and every worker still declares a healthcheck. It reads `docker-compose.yml`, so it skips inside the `backend` container (which mounts only `backend/`) and runs in CI, where `IRIS_REQUIRE_DB` turns that skip into a failure.
+
 ---
 
 ## 7 · Environment variables
 
-`backend/.env.example` is the authoritative list. It holds keys and no real values.
+There are **two** example files, and they are not alternatives (IR-154):
+
+| File | Read by | Holds |
+|---|---|---|
+| `backend/.env.example` → `backend/.env` | Django and Celery, via `decouple` | Every application key. The authoritative list |
+| `.env.example` (repo root) → `.env` | **Docker Compose**, for `${VAR}` substitution | `DB_NAME`, `DB_USER`, `DB_PASSWORD` only |
+
+Compose needs its own file because `${DB_PASSWORD}` in a compose file is interpolated by Compose itself, which reads the repo-root `.env` and never looks inside `backend/.env`. Putting the credential there means the same three values provision the Postgres container *and* reach Django and every worker, so the two cannot drift. Both example files hold keys and no real values.
+
+**`docker compose up` fails by name without the root `.env`** — every reference is written `${DB_NAME:?set DB_NAME in the repo-root .env}`, which is the intended behaviour, not a bug to work around:
+
+```bash
+python scripts/setup_env.py   # creates both, never overwrites either
+```
+
+It derives the repo-root `.env` from your existing `backend/.env` when you have
+one, so the credentials match the `postgres_data` volume already on your
+machine — which is the failure below, avoided rather than documented. On a
+fresh checkout it generates a real `SECRET_KEY` and a random DB password and
+prints the `CREATE USER` / `CREATE DATABASE` statements to run. It is
+idempotent; run it whenever you are unsure.
+
+By hand instead, if you prefer:
+
+```bash
+cp .env.example .env          # repo root, for Compose
+cp backend/.env.example backend/.env
+```
+
+> **If you already have a `postgres_data` volume**, it was initialised with the
+> credentials this change retired, and `POSTGRES_*` is only read on *first*
+> init — so new credentials in the root `.env` produce authentication failures
+> against the existing volume, not a re-provisioned database. Either put the
+> values the volume was created with into `.env`, or drop the volume and let it
+> re-init: `docker compose down -v` (**destroys local data**).
 
 **Rules**
 - Never commit a real secret. If one is committed, **rotate it** — removing it from the diff is not enough
-- The application should fail to start on a missing required secret rather than defaulting silently
-- Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`
+- The application fails to start on a missing required secret rather than defaulting silently. `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have **no defaults**: `config/settings/base.py`'s `required()` raises `ImproperlyConfigured` naming the variable, and a value set to the empty string counts as missing
+- Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`. `config/settings/production.py` re-reads the last two without base's `localhost` default and refuses to start on an empty, `*` or non-https value
 
-`CORS_ALLOW_ALL_ORIGINS` together with `CORS_ALLOW_CREDENTIALS` is currently set in development. It permits any origin to make authenticated requests on a logged-in user's behalf and is removed by IR-61.
+`CORS_ALLOW_ALL_ORIGINS` is **gone** from every settings module (IR-154 — earlier text here attributing this to IR-61 is superseded; IR-61 was replaced by IR-154). It was set in development and, combined with `CORS_ALLOW_CREDENTIALS`, permitted any origin to make authenticated requests on a logged-in user's behalf. `development.py` now lists its dev origins explicitly, and `production.py` refuses to start if the setting reappears anywhere.
 
 ---
 
@@ -182,7 +252,7 @@ Full process: [`SDLC.md`](SDLC.md). Done gates: [`DEFINITION_OF_DONE.md`](DEFINI
 |---|---|
 | Nothing responds | IR-57 — the URLconf fails at import. `python manage.py check` |
 | Compose will not start / `ai-gateway` container exits | IR-58 — `ai-gateway` has no `ai/.env`, and even with one, its service package is missing (`ai.services.chat_service`, `ai.services.embedding_service`); do not deploy it |
-| Celery task never runs | Routing was the gap and is fixed (IR-164, see §6 Celery above) — if a task still doesn't run, look at the task itself, not queue names |
+| Celery task never runs | First check the worker is actually up: `docker ps` for `unhealthy` or `Restarting`, then `docker compose up -d --build <service>` — a stale image missing a dependency crash-loops silently (IR-225). Routing itself is fixed (IR-164, §6 above), so once the worker is healthy, look at the task, not queue names |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
 | Uploads not extracted | `DoclingExtractor` calls `POST {DOCLING_API_URL}/v1/convert/file` — check the `docling` service is up and reachable; there is no fallback extractor (ADR-016) |
 | Migrations conflict | `showmigrations`, then resolve deliberately; never edit an applied migration |

@@ -1,5 +1,7 @@
 from django.db import models
 
+from core.enums import ClearanceStatus, Office, ReviewDecision, ReviewStage
+
 
 class Review(models.Model):
     """
@@ -8,19 +10,10 @@ class Review(models.Model):
     parallel clearance stages (itso, ierc, ktto). The comment is embedded
     directly so you never need a second JOIN.
     """
-    STAGE_CHOICES = [
-        ("adviser",     "Adviser"),
-        ("rdco_intake", "RDCO Intake"),
-        ("itso",        "ITSO"),
-        ("ierc",        "IERC"),
-        ("ktto",        "KTTO"),
-        ("rdco",        "RDCO Final"),
-    ]
-    STATUS_CHOICES = [
-        ("approved",  "Approved"),
-        ("declined",  "Declined"),   # revision requested; owner may resubmit
-        ("rejected",  "Rejected"),   # terminal; owner cannot resubmit
-    ]
+    #: Values live in core.enums (IR-135). `declined` requests a revision and
+    #: the owner may resubmit; `rejected` is terminal.
+    STAGE_CHOICES = ReviewStage.choices
+    STATUS_CHOICES = ReviewDecision.choices
 
     record      = models.ForeignKey(
         "records.Record", on_delete=models.CASCADE, related_name="reviews"
@@ -28,8 +21,8 @@ class Review(models.Model):
     reviewed_by = models.ForeignKey(
         "accounts.User", on_delete=models.CASCADE, related_name="reviews_given"
     )
-    stage       = models.CharField(max_length=20, choices=STAGE_CHOICES, db_index=True)
-    status      = models.CharField(max_length=20, choices=STATUS_CHOICES, db_index=True)
+    stage       = models.CharField(max_length=20, choices=ReviewStage.choices, db_index=True)
+    status      = models.CharField(max_length=20, choices=ReviewDecision.choices, db_index=True)
     comment     = models.TextField(blank=True)
     created_at  = models.DateTimeField(auto_now_add=True)
 
@@ -53,23 +46,17 @@ class RecordClearance(models.Model):
         "pending"; other offices' clearance progress is preserved.
       - On resubmit after a sequential-stage decline: all rows are deleted for a clean restart.
     """
-    OFFICE_CHOICES = [
-        ("itso", "ITSO"),
-        ("ierc", "IERC"),
-        ("ktto", "KTTO"),
-    ]
-    STATUS_CHOICES = [
-        ("pending",  "Pending"),
-        ("cleared",  "Cleared"),
-        ("declined", "Declined"),  # revision requested
-        ("rejected", "Rejected"),  # terminal
-    ]
+    #: Values live in core.enums (IR-135).
+    OFFICE_CHOICES = Office.choices
+    STATUS_CHOICES = ClearanceStatus.choices
 
     record      = models.ForeignKey(
         "records.Record", on_delete=models.CASCADE, related_name="clearances"
     )
-    office      = models.CharField(max_length=10, choices=OFFICE_CHOICES)
-    status      = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    office      = models.CharField(max_length=10, choices=Office.choices)
+    status      = models.CharField(
+        max_length=10, choices=ClearanceStatus.choices, default=ClearanceStatus.PENDING
+    )
     reviewed_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="clearances_given"

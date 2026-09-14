@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
@@ -10,6 +10,7 @@ import type { ReviewStatus } from "@/types/reviews";
 import { pipelineLabel } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { clearReviewDraft, readReviewDraft, writeReviewDraft } from "@/lib/reviewDraft";
 
 interface FormData {
   status:  ReviewStatus;
@@ -66,14 +67,41 @@ export default function EvaluationPage() {
   const [pendingReject, setPendingReject] = useState<FormData | null>(null);
   const [rejecting, setRejecting] = useState(false);
 
+  /**
+   * Read once, at mount. `useForm` only consults `defaultValues` on its first
+   * render, and re-reading later would fight the reviewer's typing.
+   */
+  const [restoredDraft] = useState(() => (id ? readReviewDraft(id) : null));
+
   const {
     register,
     handleSubmit,
     watch,
     formState: { isSubmitting },
   } = useForm<FormData>({
-    defaultValues: { status: "approved", comment: "" },
+    defaultValues: {
+      status:  restoredDraft?.status  ?? "approved",
+      comment: restoredDraft?.comment ?? "",
+    },
   });
+
+  /**
+   * Keep the unsent decision, so reading the evidence cannot cost the reviewer
+   * their comment (IR-237).
+   *
+   * `watch` with a callback subscribes to changes. `watch()` bare returns a
+   * fresh object every render, so an effect depending on it would loop.
+   */
+  useEffect(() => {
+    if (!id) return;
+    const subscription = watch((values) => {
+      writeReviewDraft(id, {
+        status:  (values.status as ReviewStatus) ?? "approved",
+        comment: values.comment ?? "",
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, id]);
 
   const selectedStatus = watch("status");
   const commentRequired = selectedStatus === "declined" || selectedStatus === "rejected";
@@ -85,6 +113,9 @@ export default function EvaluationPage() {
   const send = async (data: FormData) => {
     try {
       await reviewsApi.submit({ record_id: Number(id), ...data });
+      // The decision is recorded, so the draft is spent. Left behind, it would
+      // greet the next visit to this record with a stale comment.
+      if (id) clearReviewDraft(id);
       navigate("/review");
     } catch (err: unknown) {
       const msg =
@@ -163,30 +194,44 @@ export default function EvaluationPage() {
           </div>
 
           <div className="pt-1 flex gap-2">
-            {/* New tab, deliberately: these were <Link>s, so reading the
-                documents unmounted this form and silently discarded a typed
-                comment -- after which the reviewer retypes it or, worse,
-                shortens it (IR-143). */}
-            <a
-              href={`/records/${id}/documents`}
-              target="_blank"
-              rel="noopener noreferrer"
+            {/* Ordinary in-app navigation -- **do not make these open a new
+                tab** (IR-237).
+
+                They did, from IR-143 until IR-237, because navigating away
+                unmounted this form and silently discarded a typed comment.
+                That cure was worse: a new tab is a fresh top-level browsing
+                context, browsers do not clone `sessionStorage` into one, and
+                the refresh token lives in `sessionStorage` and nowhere else
+                (FR-M6-01) -- so the reviewer arrived at the login screen
+                instead of the evidence.
+
+                IR-235 tried to rescue the new tab by removing
+                `rel="noopener noreferrer"`, on the theory that `noopener` was
+                what suppressed the clone. **It is not, and that change was a
+                no-op**: since Chrome 88 (Firefox 79, Safari 12.1)
+                `target="_blank"` *implies* `noopener`, so the tab was a fresh
+                context either way. Measured both ways on a bare same-origin
+                page before this was written -- neither spelling cloned
+                anything.
+
+                So the form's state is what gets protected now, by
+                `lib/reviewDraft.ts`, and the links are left alone. That covers
+                strictly more than the new tab ever did: an accidental back, a
+                reload and an expired session all used to lose the comment too. */}
+            <Link
+              to={`/records/${id}/documents`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#6B0F12] text-white text-[12px] font-semibold hover:bg-[#7d1215] transition-colors"
             >
               <i className="fas fa-folder-open text-[11px]" aria-hidden />
               View &amp; Attach Documents
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>
-            <a
-              href={`/records/${id}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            </Link>
+            <Link
+              to={`/records/${id}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
             >
               <i className="fas fa-external-link-alt text-[11px]" aria-hidden />
               Record Detail
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>
+            </Link>
           </div>
         </div>
 

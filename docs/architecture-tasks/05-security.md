@@ -263,7 +263,7 @@ Production settings are 13 lines, four of them `TODO`s; credentials are hardcode
 |---|---|
 | `ALLOWED_HOSTS` | `# TODO: set to real domain`; `base.py:8` defaults to `"localhost"` |
 | `SECRET_KEY` | No default (correct — fails loudly), but `.env.example` ships `change-me-in-production` |
-| DB credentials | `base.py:79-82` defaults to `iris_user`/`iris_password`; **both Compose files hardcode the same** |
+| DB credentials | ~~`base.py` defaulted to a committed user/password; both Compose files hardcoded the same~~ **Fixed by IR-154** — no defaults, and Compose interpolates from the repo-root `.env` |
 | Dev CORS | `development.py:11` `CORS_ALLOW_ALL_ORIGINS = True` with `base.py:150` `CORS_ALLOW_CREDENTIALS = True` |
 | Sentry | `sentry-sdk` in `production.txt`, never initialised |
 | Download tokens | Signed with `SECRET_KEY`, same key as JWT |
@@ -313,12 +313,15 @@ P0 — Weeks 1–3
 S
 
 ## Acceptance Criteria
-- [ ] Production settings with no `ALLOWED_HOSTS` fail at startup with a clear error.
-- [ ] `grep -rn "iris_password" docker-compose*.yml backend/config/` returns nothing.
-- [ ] `CORS_ALLOW_ALL_ORIGINS` appears nowhere; dev uses an explicit origin list.
-- [ ] `.env.example` contains no usable secret.
-- [ ] `DEBUG` is False in every deployed profile (smoke test).
-- [ ] Sentry initialised or `sentry-sdk` removed.
+- [x] Production settings with no `ALLOWED_HOSTS` fail at startup with a clear error. **IR-154** — `production.py` raises `ImproperlyConfigured` naming the variable; `apps/tests/test_settings_validation.py`
+- [x] `grep -rn "iris_password" docker-compose*.yml backend/config/` returns nothing. **IR-154** — also cleared from `README.md`, `backend/.env.example`, the gateway `DATABASE_URL` and the archived snippet in `docs/archive/`
+- [x] `CORS_ALLOW_ALL_ORIGINS` appears nowhere; dev uses an explicit origin list. **IR-154**
+- [x] `.env.example` contains no usable secret. **IR-154** — and there are now two, `backend/.env.example` plus a repo-root one for Compose
+- [ ] `DEBUG` is False in every deployed profile (smoke test). **Partly** — `production.py` hardcodes `DEBUG = False` and a CI step boots it, but the *deployment* smoke test belongs to `IR-157`
+- [ ] Sentry initialised or `sentry-sdk` removed. **Not done** — outside IR-154's own acceptance criteria; still a `# TODO` in `production.py`
+
+> Rotation of the previously committed credentials is the remaining half of
+> criterion 2 and is an operations step, not a code change (`IR-157`).
 
 ## Testing Requirements
 Deployment smoke test asserting `DEBUG=False` and a rejected bad Host header.

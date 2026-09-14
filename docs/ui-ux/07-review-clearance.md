@@ -104,7 +104,7 @@ A resubmitted record whose peers are marked preserved (`✓🛡`) tells the revi
 
 | Rule | Reason |
 |---|---|
-| **Documents open in place** — a viewer panel or a new tab, never an in-app navigation | Problem 3. The comment survives |
+| **The comment survives reaching the documents** — by a viewer panel, or by in-app navigation with the draft preserved. **Amended 2026-09-11 (IR-237); see the note below** | Problem 3. The comment survives |
 | **State which office the decision records** | Problem 5. *"You are recording IERC clearance."* — text supplied by `W-07`'s `office_label` |
 | **Reject requires confirmation** | Problem 4. `ConfirmDialog`; a second deliberate action, not a typed acknowledgement |
 | **Every option carries an icon** | Problem 8 |
@@ -112,7 +112,15 @@ A resubmitted record whose peers are marked preserved (`✓🛡`) tells the revi
 | **Preserved clearances explained in one sentence** | The same sentence used everywhere else ([08](08-workflow-resubmission.md)) |
 | Comment required for Revision and Reject | Already correct. Keep |
 
-### Stale state
+> **Amendment, 2026-09-11 (IR-237) — recorded rather than silently reconciled.**
+>
+> This table used to read *"Documents open in place — a viewer panel or a new tab, **never an in-app navigation**"*. The prohibition was a means, not the requirement: its Reason column has always said **"the comment survives"**, and in-app navigation was banned only because it unmounted the form and discarded the comment.
+>
+> The new tab turned out to cost more than it saved. A new tab is a fresh top-level browsing context, browsers do not clone `sessionStorage` into one, and the refresh token lives in `sessionStorage` and nowhere else (FR-M6-01) — so the reviewer landed on the **login screen** instead of the evidence, from the one screen where a clearance decision is made. IR-235 tried to rescue it by removing `rel="noopener noreferrer"`; that was a **no-op**, because `target="_blank"` has implied `noopener` since Chrome 88 (Firefox 79, Safari 12.1). Measured both ways on a bare same-origin page: neither spelling cloned anything.
+>
+> So the requirement is now met directly — the unsent decision is persisted per record (`lib/reviewDraft.ts`) and restored when the reviewer returns. That covers strictly more than the new tab ever did: an accidental back, a reload, and an expired session all used to lose the comment even with it.
+>
+> **A viewer panel remains the better answer** and is not ruled out — it keeps the evidence and the form on screen together, which neither a tab nor a navigation does. It was not built here because `DocumentsPage` and `PaperViewPage` are full route pages with their own fetching and layout. If it is built later, this rule needs no further change.
 
 If the record moved while the form was open:
 
@@ -204,7 +212,7 @@ Never discard the reviewer's typed text. Never submit into a changed state. This
 - The confirmation dialog traps focus and restores it on close — **`Modal` has no focus trap today** ([01](01-design-system.md), [12](12-accessibility.md))
 - The clearance panel is an `<ol>` with a text status per office
 
-**Responsive.** ≥ 1024 px two columns as drawn. 768–1023 px single column, context above the form. < 768 px single column; the clearance panel collapses to a summary line — *"2 of 3 offices cleared"* — expandable; actions full-width and stacked. The document viewer becomes a new tab rather than a side panel.
+**Responsive.** ≥ 1024 px two columns as drawn. 768–1023 px single column, context above the form. < 768 px single column; the clearance panel collapses to a summary line — *"2 of 3 offices cleared"* — expandable; actions full-width and stacked. The document viewer becomes a separate screen rather than a side panel — reached by in-app navigation, **not a new tab**, per the amendment above (IR-237).
 
 **MVP/Post-MVP.** **MVP** — self-sufficient decision screen, clearance context, office statement, reject confirmation, stale handling. **Post-MVP** — inline PDF annotation, decision templates, delegation, request-more-information as a fourth option.
 

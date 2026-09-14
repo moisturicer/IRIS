@@ -6,7 +6,7 @@ export default function ReviewAnalyticsPage() {
       title="Review Analytics"
       description="Track review cycle times, approval rates by office, and pipeline throughput across all record types. This dashboard is currently being developed."
       icon="fa-chart-line"
-      backTo="/review/pending"
+      backTo="/review"
       backLabel="Back to Review Queue"
     />
   );

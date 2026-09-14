@@ -1,12 +1,9 @@
 /**
  * Tests for the modal focus-trap seam (IR-158).
  *
- * There is no test runner in this repo yet (IR-82 / IR-163). Run these today with:
- *
- *   docker exec iris-frontend-1 sh -c "cd /app && \
- *     ./node_modules/.bin/esbuild src/lib/focusTrap.test.ts \
- *       --bundle --platform=node --format=esm --outfile=/tmp/t.mjs && node /tmp/t.mjs"
- *
+ * Runs under vitest: `npm test` from `frontend/` (IR-210). This file predates
+ * the runner and was executed by a hand-written esbuild-plus-node incantation;
+ * its assertions are unchanged, only the harness around them is now real.
  * Or, without the container, from `frontend/`:
  *
  *   ./node_modules/.bin/esbuild src/lib/focusTrap.test.ts \
@@ -28,6 +25,8 @@
  */
 
 import { nextTrapFocus } from "./focusTrap";
+import { test } from "vitest";
+
 
 // --- the smallest assert that does the job ---------------------------------
 
@@ -37,18 +36,7 @@ function assertEqual<T>(actual: T, expected: T, what: string) {
   }
 }
 
-// --- harness ---------------------------------------------------------------
-
-const results: string[] = [];
-
-function test(name: string, fn: () => void) {
-  try {
-    fn();
-    results.push(`ok   ${name}`);
-  } catch (err) {
-    results.push(`FAIL ${name}\n     ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
+// --- fixtures --------------------------------------------------------------
 
 const FWD = false;
 const BACK = true;
@@ -110,14 +98,3 @@ test("a panel with nothing focusable traps nothing", () => {
   assertEqual(nextTrapFocus([], "close", FWD), null, "forward on an empty panel");
   assertEqual(nextTrapFocus([], null, BACK), null, "backward on an empty panel");
 });
-
-// --- report ----------------------------------------------------------------
-
-const failed = results.filter((r) => r.startsWith("FAIL")).length;
-console.log(results.join("\n"));
-console.log(`\n${results.length - failed} passed, ${failed} failed`);
-
-if (failed > 0) {
-  // Throwing gives node a non-zero exit without needing @types/node for `process`.
-  throw new Error(`${failed} focus-trap test(s) failed`);
-}

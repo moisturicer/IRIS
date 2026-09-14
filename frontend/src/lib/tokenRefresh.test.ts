@@ -1,12 +1,9 @@
 /**
  * Tests for the refresh-deduplication seam (IR-159).
  *
- * There is no test runner in this repo yet (IR-82 / IR-163). Run these today with:
- *
- *   docker exec iris-frontend-1 sh -c "cd /app && \
- *     ./node_modules/.bin/esbuild src/lib/tokenRefresh.test.ts \
- *       --bundle --platform=node --format=esm --outfile=/tmp/t.mjs && node /tmp/t.mjs"
- *
+ * Runs under vitest: `npm test` from `frontend/` (IR-210). This file predates
+ * the runner and was executed by a hand-written esbuild-plus-node incantation;
+ * its assertions are unchanged, only the harness around them is now real.
  * esbuild is already present as a Vite dependency, so this adds nothing to
  * package.json. The assertions are hand-rolled rather than `node:assert` on
  * purpose: `npm run build` runs `tsc` across `src/`, there is no `@types/node`,
@@ -21,6 +18,14 @@
  * parallel calls does. Clicking around will not surface it.
  */
 import { refreshOnce, __resetRefreshState, type RefreshedTokens } from "./tokenRefresh";
+import { beforeEach, test } from "vitest";
+
+// The hand-rolled harness called this before every case; vitest needs it
+// said once, here, or the cases leak refresh state into each other.
+beforeEach(() => {
+  __resetRefreshState();
+});
+
 
 // --- the smallest assert that does the job ---------------------------------
 
@@ -51,18 +56,6 @@ async function assertRejects(p: Promise<unknown>, match: string, what: string) {
 
 // --- harness ---------------------------------------------------------------
 
-const results: string[] = [];
-
-async function test(name: string, fn: () => Promise<void>) {
-  __resetRefreshState();
-  try {
-    await fn();
-    results.push(`ok   ${name}`);
-  } catch (err) {
-    results.push(`FAIL ${name}\n     ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
 /** A refresh that resolves only when we say so, and counts its invocations. */
 function deferredRefresh() {
   let calls = 0;
@@ -87,7 +80,7 @@ function deferredRefresh() {
 
 // --- cases -----------------------------------------------------------------
 
-await test("concurrent callers share one in-flight refresh", async () => {
+test("concurrent callers share one in-flight refresh", async () => {
   const r = deferredRefresh();
 
   const a = refreshOnce(r.fn);
@@ -104,7 +97,7 @@ await test("concurrent callers share one in-flight refresh", async () => {
   assertSame(rb, rc, "third caller got a different result");
 });
 
-await test("a later refresh starts fresh once the first has settled", async () => {
+test("a later refresh starts fresh once the first has settled", async () => {
   const first = deferredRefresh();
   const p = refreshOnce(first.fn);
   first.release({ access: "one" });
@@ -118,7 +111,7 @@ await test("a later refresh starts fresh once the first has settled", async () =
   assertEqual(second.calls, 1, "second refresh call count");
 });
 
-await test("a rejected refresh reaches every waiter", async () => {
+test("a rejected refresh reaches every waiter", async () => {
   const r = deferredRefresh();
   const a = refreshOnce(r.fn);
   const b = refreshOnce(r.fn);
@@ -130,7 +123,7 @@ await test("a rejected refresh reaches every waiter", async () => {
   assertEqual(r.calls, 1, "a failure must not fan out into several refresh attempts");
 });
 
-await test("the gate reopens after a failure so a fresh login can refresh again", async () => {
+test("the gate reopens after a failure so a fresh login can refresh again", async () => {
   const failing = deferredRefresh();
   const a = refreshOnce(failing.fn);
   failing.fail(new Error("nope"));
@@ -144,12 +137,3 @@ await test("the gate reopens after a failure so a fresh login can refresh again"
 });
 
 // --- report ----------------------------------------------------------------
-
-const failed = results.filter((r) => r.startsWith("FAIL")).length;
-console.log(results.join("\n"));
-console.log(`\n${results.length - failed} passed, ${failed} failed`);
-
-if (failed > 0) {
-  // Throwing gives node a non-zero exit without needing @types/node for `process`.
-  throw new Error(`${failed} token-refresh test(s) failed`);
-}

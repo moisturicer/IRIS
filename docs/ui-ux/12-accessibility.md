@@ -41,6 +41,8 @@ The `sr-only: 0` result is the structural one. It means the 768–1279 px icon r
 
 **Fix:** replace `text-gray-400` with `text-gray-500` for text. Keep `text-gray-400` only for genuinely decorative glyphs that are `aria-hidden`. **Gold is a decorative and border colour only** — never body text, never a label, never a link ([01](01-design-system.md)).
 
+**Gold as a button fill is the same failure, inverted.** White text on gold is **2.76 : 1** — it fails AA and even the 3 : 1 large-text floor, so the rule above extends to fills: gold never sits behind text of any size. The brand maroon is the primary-action colour, at **12.34 : 1** resting and **9.53 : 1** on `brand-light` hover. The login submit adopted the shared button primitive in IR-204; the signup and email-verify actions are still hand-rolled gold and are tracked in IR-205.
+
 The brand colour passing at AAA is a real asset: primary actions, links and active states are already well above the threshold. The contrast problem is entirely in the greys.
 
 ### B. Icons announce as noise — 1.1.1
@@ -74,11 +76,35 @@ This blocks two flows that matter: reject confirmation ([07](07-review-clearance
 
 **Fix:** trap Tab within the dialog, focus the first interactive element on open, restore focus to the trigger on close. ~30 lines, one component, every dialog in the product fixed at once.
 
-### E. Form errors are not associated — 3.3.1, 4.1.2
+### E. Form errors are not associated — 3.3.1, 4.1.2 — **PRIMITIVE FIXED, ADOPTION PARTIAL**
 
-`Input.tsx` renders `label`, `error` and `hint` correctly and derives an `id` — but sets **neither `aria-invalid` nor `aria-describedby`**. A screen reader announces the field name and nothing else; the error is visible text floating near an input it is not connected to.
+**Original finding.** `Input.tsx` rendered `label`, `error` and `hint` correctly and derived an `id` — but set **neither `aria-invalid` nor `aria-describedby`**. A screen reader announced the field name and nothing else; the error was visible text floating near an input it was not connected to.
 
-This is the highest-leverage fix in the document. `Input` is the shared primitive: fixing it corrects the submission wizard, the decision comment, the audit filter and the login form simultaneously. ~10 lines.
+This was the highest-leverage fix in the document, because `Input` is the shared primitive — but leverage only pays out through the components that actually *use* it, and the login form did not.
+
+**The primitive is fixed. Adoption is not finished.**
+
+| Step | Ticket | What changed |
+|---|---|---|
+| The primitive | IR-158 | `Input` carries `aria-invalid` and `aria-describedby`, and drops the `hint` reference while an error is showing so `aria-describedby` never points at a removed node |
+| The login form | IR-204 | Stopped hand-rolling its `<input>` elements and adopted the primitive, so its errors are associated too |
+
+**The original claim that fixing `Input` corrects "the submission wizard, the decision comment, the audit filter and the login form simultaneously" was never true, and is not true now.** A primitive only reaches the screens that use it. Audited 2026-09-10, `<Input>` has five consumers: `LoginForm`, `UserListPage`, `AuditLogPage`, and — in the submission wizard — `RecordDetailsStep` and one field of `PaperDetailsStep`.
+
+These text controls are still hand-rolled and are **not** covered by IR-158:
+
+| Where | Fields | Associated today? |
+|---|---|---|
+| `PaperDetailsStep.tsx` | Title, Abstract, Adviser (only *Year* uses `Input`) | Yes — but by hand, each setting its own `aria-invalid` / `aria-describedby` |
+| `SettingsPage.tsx` | Three name fields, three password fields | **No** |
+
+So the remaining exposure is `SettingsPage`, and the wizard carries a hand-maintained duplicate of what the primitive already does. Neither is IR-204's scope; both need a ticket.
+
+Two refinements landed with IR-204 and apply to **every** consumer:
+
+- The error message is `text-red-600` (**4.83 : 1**), not `text-red-500` (**3.76 : 1**, which fails AA for text at this size — an unreadable error defeats the association).
+- A field can be invalid **without owning the message that explains why**. A rejected sign-in is described by one alert above the form; the caller passes a bare `aria-invalid`, and the field looks and announces invalid without repeating the sentence under every field. Only a *credential* rejection does this — an unverified account or a server failure says nothing about what is in the fields, so neither marks them invalid.
+- `Input` gained a `size` step (`lg`) and `Button` a `full` step, both ≥ 44 px, so a screen adopting the primitives is not forced to choose between the primitive's sizing and the target size in section 4 below.
 
 ### F. Icon rail is unlabelled — 4.1.2
 

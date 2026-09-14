@@ -59,7 +59,32 @@ USER appuser
 
 # Collect static files (WhiteNoise will serve them)
 # TODO: run this during CI/CD, not at image build time in production
-RUN SECRET_KEY=dummy python manage.py collectstatic --noinput
+#
+# The DB_* values are build-time throwaways and are never baked into the image:
+# they exist only for the lifetime of this RUN. `collectstatic` does not touch
+# the database -- it needs them purely because importing settings does, since
+# IR-154 made DB_NAME/DB_USER/DB_PASSWORD `required()` with no defaults. Before
+# that, the defaults it removed were quietly satisfying this line, so dropping
+# them broke the image build (IR-198) while every CI job stayed green, because
+# CI validates the compose files and never builds.
+#
+# Do NOT "simplify" this by restoring defaults in settings. The whole point of
+# IR-154 is that a deployment missing a real credential fails loudly instead of
+# connecting to something it guessed.
+# The full set is exactly six: SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD from
+# base.py, plus ALLOWED_HOSTS and CORS_ALLOWED_ORIGINS, which production.py adds.
+# Every one is a throwaway that lives only for this RUN. Enumerating them keeps
+# the image built against the *real* production settings path rather than
+# quietly switching to development settings for the build -- and the static
+# output is identical either way, since STATIC_ROOT and the WhiteNoise storage
+# both live in base.py.
+RUN SECRET_KEY=build-time-only \
+    DB_NAME=build-time-only \
+    DB_USER=build-time-only \
+    DB_PASSWORD=build-time-only \
+    ALLOWED_HOSTS=localhost \
+    CORS_ALLOWED_ORIGINS=http://localhost \
+    python manage.py collectstatic --noinput
 
 EXPOSE 8000
 

@@ -8,12 +8,14 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.permissions import IsReviewer, IsStaff
 from core.exceptions import InvalidPipelineTransition
+from apps.records import lifecycle
+from core.enums import PipelineStatus, ReviewDecision, RoleName
 from .models import Review, RecordAuthPin, RecordClearance
 from .serializers import ReviewSerializer, ReviewWriteSerializer
 from .services import (
     approve_record, decline_record, reject_record,
     resubmit_record, submit_clearance,
-    CLEARANCE_STATUSES, ROLE_TO_OFFICE,
+    ROLE_TO_OFFICE,
 )
 from apps.records.models import Record
 from apps.audit.services import create_audit_event
@@ -59,11 +61,11 @@ class ReviewViewSet(viewsets.GenericViewSet):
 
         # Map role → pipeline statuses to filter by
         role_to_statuses: dict[str, list[str]] = {
-            "Adviser": ["adviser_review"],
-            "RDCO":    ["rdco_intake", "rdco_review"],
-            "ITSO":    ["itso_review"],
-            "IERC":    ["parallel_review"],
-            "KTTO":    ["itso_review", "parallel_review"],
+            RoleName.ADVISER: [PipelineStatus.ADVISER_REVIEW],
+            RoleName.RDCO:    [PipelineStatus.RDCO_INTAKE, PipelineStatus.RDCO_REVIEW],
+            RoleName.ITSO:    [PipelineStatus.ITSO_REVIEW],
+            RoleName.IERC:    [PipelineStatus.PARALLEL_REVIEW],
+            RoleName.KTTO:    [PipelineStatus.ITSO_REVIEW, PipelineStatus.PARALLEL_REVIEW],
         }
 
         pipeline_statuses = role_to_statuses.get(role_name)
@@ -75,7 +77,7 @@ class ReviewViewSet(viewsets.GenericViewSet):
         ).select_related("classification", "record_type", "adviser")
 
         # Advisers only see records assigned to them
-        if role_name == "Adviser":
+        if role_name == RoleName.ADVISER:
             records = records.filter(adviser=request.user)
 
         # Clearance roles: further filter to records where this office's clearance is pending
@@ -140,7 +142,7 @@ class ReviewViewSet(viewsets.GenericViewSet):
         comment  = data.get("comment", "")
 
         try:
-            if record.pipeline_status in CLEARANCE_STATUSES:
+            if lifecycle.is_clearance_stage(record.pipeline_status):
                 # Clearance stage — office is inferred from the reviewer's role
                 role_name = request.user.role.name if request.user.role else ""
                 office    = ROLE_TO_OFFICE.get(role_name, "")
@@ -150,9 +152,9 @@ class ReviewViewSet(viewsets.GenericViewSet):
                 )
             else:
                 # Sequential stage
-                if decision == "approved":
+                if decision == ReviewDecision.APPROVED:
                     review = approve_record(record, reviewed_by=request.user, comment=comment)
-                elif decision == "rejected":
+                elif decision == ReviewDecision.REJECTED:
                     review = reject_record(record, reviewed_by=request.user, comment=comment)
                 else:
                     review = decline_record(record, reviewed_by=request.user, comment=comment)
@@ -182,10 +184,8 @@ class ReviewViewSet(viewsets.GenericViewSet):
         except Record.DoesNotExist:
             return Response({"detail": "Record not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from core.permissions import STAFF_ROLES, get_role_name
-        is_owner = record.owners.filter(user=request.user).exists()
-        is_staff = get_role_name(request.user) in STAFF_ROLES
-        if not (is_owner or is_staff):
+        from core.permissions import owns_or_staffs_record
+        if not owns_or_staffs_record(request.user, record):
             return Response(
                 {"detail": "Only the record owner may resubmit."},
                 status=status.HTTP_403_FORBIDDEN,

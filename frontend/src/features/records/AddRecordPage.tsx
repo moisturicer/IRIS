@@ -153,7 +153,7 @@ export default function AddRecordPage() {
         await recordsApi.uploadManuscript(id, manuscriptRef.current);
       }
 
-      await recordsApi.submit(id);
+      await recordsApi.submit(id, dpaAccepted);
       setConfirmOpen(false);
       navigate(`/records/${id}`);
     } catch (err: unknown) {

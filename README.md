@@ -101,15 +101,37 @@ IRIS/
 
 ---
 
+### 0 — Environment files
+
+```bash
+python scripts/setup_env.py
+```
+
+Creates `backend/.env` and the repo-root `.env` (the second is what Docker
+Compose interpolates the database credentials from). It never overwrites an
+existing file, and on a fresh checkout it generates a real `SECRET_KEY` and a
+random database password, then prints the SQL below already filled in. Since
+IR-154 `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have no defaults —
+Django refuses to start when any is missing or blank.
+
+---
+
 ### 1 — Database setup
 
 Open **pgAdmin** or `psql` and run:
 
 ```sql
-CREATE USER iris_user WITH PASSWORD 'iris_password';
-CREATE DATABASE iris_db OWNER iris_user;
-GRANT ALL PRIVILEGES ON DATABASE iris_db TO iris_user;
+-- Choose your own name and password; nothing in the repository supplies them
+-- (IR-154), and whatever you pick here must match backend/.env, and the
+-- repo-root .env if you run the stack under Docker.
+CREATE USER <db_user> WITH PASSWORD '<db_password>';
+CREATE DATABASE <db_name> OWNER <db_user>;
+GRANT ALL PRIVILEGES ON DATABASE <db_name> TO <db_user>;
 ```
+
+> The user needs `CREATEDB` if you intend to run the test suite: Django builds
+> and drops a `test_<db_name>` database per run.
+> `ALTER USER <db_user> CREATEDB;`
 
 ---
 
@@ -132,12 +154,15 @@ pip install -r requirements/development.txt
 Minimum `.env` (copy-paste and adjust):
 
 ```env
-SECRET_KEY=change-me-to-a-long-random-string
+# SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD have no defaults: Django
+# refuses to start when one is missing or blank (IR-154).
+# python -c "import secrets; print(secrets.token_urlsafe(64))"
+SECRET_KEY=<generate one>
 DEBUG=True
 
-DB_NAME=iris_db
-DB_USER=iris_user
-DB_PASSWORD=iris_password
+DB_NAME=<db_name>
+DB_USER=<db_user>
+DB_PASSWORD=<db_password>
 DB_HOST=localhost
 DB_PORT=5432
 
@@ -222,9 +247,9 @@ celery -A config worker -l info
 | `SECRET_KEY`          | _(required)_               | Django secret key                      |
 | `DEBUG`               | `False`                    | Set `True` for local development       |
 | `ALLOWED_HOSTS`       | `localhost`                | Comma-separated list of allowed hosts  |
-| `DB_NAME`             | `iris_db`                  | PostgreSQL database name               |
-| `DB_USER`             | `iris_user`                | PostgreSQL user                        |
-| `DB_PASSWORD`         | `iris_password`            | PostgreSQL password                    |
+| `DB_NAME`             | _(required)_               | PostgreSQL database name               |
+| `DB_USER`             | _(required)_               | PostgreSQL user                        |
+| `DB_PASSWORD`         | _(required)_               | PostgreSQL password                    |
 | `DB_HOST`             | `localhost`                | PostgreSQL host                        |
 | `DB_PORT`             | `5432`                     | PostgreSQL port                        |
 | `FRONTEND_URL`        | `http://localhost:5173`    | Used to build email verification links |

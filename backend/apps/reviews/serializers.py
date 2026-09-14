@@ -1,5 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
+from core.enums import ReviewDecision
 
 from .clearance_state import peer_summary
 from .models import Review, RecordAuthPin
@@ -70,7 +71,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class ReviewWriteSerializer(serializers.Serializer):
     record_id = serializers.IntegerField()
-    status    = serializers.ChoiceField(choices=["approved", "declined", "rejected"])
+    status    = serializers.ChoiceField(choices=ReviewDecision.values)
     comment   = serializers.CharField(required=False, allow_blank=True)
 
 

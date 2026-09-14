@@ -87,7 +87,12 @@ npm install
 npm run dev          # vite
 npm run build        # tsc && vite build
 npm run lint         # eslint src --ext ts,tsx
-# NOTE: there is no `npm test` — no test runner is installed yet
+npm test             # vitest run — non-interactive, jsdom, axe-core (IR-210)
+npm run test:watch   # vitest in watch mode
+# Queries go through the accessible tree (role + accessible name), never a class
+# or a test id. axe-core fails the build on serious/critical only, and cannot
+# check colour contrast under jsdom — contrast stays a manual check.
+# On Windows the runner needs vitest's `forks` pool; see vitest.config.ts.
 
 # Backend  (backend/)
 pip install -r requirements/development.txt
@@ -96,9 +101,20 @@ python manage.py migrate
 python manage.py runserver
 python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db_required
                                           # tests skip cleanly with no Postgres reachable
+python manage.py seed_demo                # accounts + Discover catalogue + every pipeline state
+                                          # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
+                                          # plus admin@cit.edu (Django superuser, no app role).
+                                          # Replaced scripts/seed_demo_{users,records,clearances}.py
+                                          # and seed_test_users, all deleted. Idempotent for records;
+                                          # re-running resets passwords. Refuses with DEBUG off
+                                          # unless --force. --accounts-only for logins alone
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 
 # Docker  (repo root)
+python scripts/setup_env.py         # REQUIRED first (IR-154): creates the repo-root .env Compose
+                                   # interpolates DB_NAME/DB_USER/DB_PASSWORD from, deriving it from
+                                   # backend/.env so it matches an existing postgres_data volume.
+                                   # Idempotent; never overwrites. Without it Compose stops by name
 docker compose up --build          # ai-gateway fails: needs ./ai/.env (gitignored, absent in CI); if that's supplied, it builds then crashes because ai/services/chat_service.py is missing
 docker compose config              # validate without building
 ```
@@ -108,9 +124,9 @@ docker compose config              # validate without building
 ## Known-broken — do not be surprised
 
 - **Corrected on this merge (2026-09-06), verified against the code, not assumed:** the URLconf imports cleanly (`manage.py check` and `python -c "import config.urls"` both pass) and `apps/ai` has real, field-bearing models (`chunk.py`, `embedding.py`, `embedding_space.py`, `ingestion_job.py`) — the "six undefined names" and "field-less stub models" claims below were stale and are removed. `frontend/nginx.conf` no longer serves `/media/` unauthenticated — the nginx alias, prod web-container mount, and Django's `DEBUG` `static()` route were all removed (IR-152); see `docs/testing/TRACEABILITY.md` NFR-S4
-- `RecordViewSet.get_queryset` filters only on `list`; `retrieve` and every other action return any record to any authenticated user, with no ownership or visibility check
+- **Fixed 2026-09-09 (IR-153):** `RecordViewSet.get_queryset` now applies `Record.objects.visible_to(user)` on **every** action — office staff, owner, assigned adviser, or the public catalogue. Because the filtering is in the queryset rather than a permission class, a refusal is a **404 identical to a missing record**, so the API never confirms someone else's draft exists. `list` narrows further to `PUBLICLY_VISIBLE_STATUSES` so Discover stays a catalogue rather than surfacing your own drafts. Supersedes the "returns any record to any authenticated user" claim previously here
 - **Fixed 2026-09-07 (IR-164):** `CELERY_TASK_ROUTES` and `CELERY_TASK_DEFAULT_QUEUE` are now set in `config/settings/base.py`, routing `extract_pdf_text` to `extraction`, `embed_record` to `embedding`, and everything else (including `chunk_record_document`) to `default` — matching the three queues docker-compose's workers actually consume. Verified against the real stack, not just asserted from config: a task dispatched over the real Redis broker was observed consumed and completed by the real `celery-default` and `celery-extraction` containers. Supersedes the "no Celery task is ever processed" claim previously here — see `docs/engineering/DEVELOPMENT.md` §6
-- `apps/documents/` endpoints have `IsAuthenticated` (two also `IsStaff`), but object-level ownership checks have not been audited endpoint-by-endpoint since IR-120's fixes to `RecordViewSet`
+- **Audited and fixed 2026-09-09 (IR-153):** `apps/documents/` has now been swept endpoint-by-endpoint. Six endpoints resolved a record from a request parameter with **no ownership check at all** — `submit/`, `records/<id>/slots/`, `uploads/?record=`, `uploads/create/`, `files/?record=`, and `files/download-all/?record=`, the last returning a ZIP of every supplementary file on any record to anyone who knew its id. All six now go through `authorize_record_documents()`. The five hand-written `get_role_name(...) in STAFF_ROLES or record.owners.filter(...)` checks (four here, one in `apps/reviews/views.py`) are replaced by the single `core.permissions.owns_or_staffs_record()`
 - `AuditEvent` has 14 event types, **none of them workflow events**
 
 ## Rules

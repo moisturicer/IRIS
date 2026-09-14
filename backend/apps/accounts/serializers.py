@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from core.enums import RoleName
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 
 
@@ -98,9 +99,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
 
         role_name = data.get("role_name")
-        if role_name == "Student" and not data.get("course_id"):
+        if role_name == RoleName.STUDENT and not data.get("course_id"):
             raise serializers.ValidationError({"course_id": "Course is required for students."})
-        if role_name == "Adviser":
+        if role_name == RoleName.ADVISER:
             if not data.get("college_id"):
                 raise serializers.ValidationError({"college_id": "College is required for advisers."})
             if not data.get("department_id"):
@@ -121,10 +122,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.save()
 
         # Create role-specific profile rows immediately so data is not lost
-        if role_name == "Student" and course_id:
+        if role_name == RoleName.STUDENT and course_id:
             from .models import StudentProfile
             StudentProfile.objects.create(user=user, course_id=course_id)
-        elif role_name == "Adviser":
+        elif role_name == RoleName.ADVISER:
             from .models import AdviserProfile
             AdviserProfile.objects.create(
                 user=user,
