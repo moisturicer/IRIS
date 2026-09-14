@@ -181,6 +181,124 @@ def test_short_chunks_never_merge_across_a_heading_boundary():
     assert not any("Intro" in c and "Methods" in c for c in contents)
 
 
+def test_a_heading_followed_by_a_subheading_does_not_become_its_own_chunk():
+    """IR-241. `_sectionize` opens a section at every heading, so a heading
+    whose first child is another heading forms a section of one element, and
+    section-scoped merging cannot reach it — it returns at `len(chunks) <= 1`
+    before the floor is ever consulted. A real 47-page submission produced six
+    such chunks, 2-3 tokens each ("6 Evaluations", "6.1 Main Results"), which
+    embed as near-pure noise and retrieve for their section's topic while
+    carrying none of it.
+    """
+    document = build(
+        DocumentElement(kind=HEADING, text="6 Evaluations", level=1),
+        DocumentElement(kind=HEADING, text="6.1 Main Results", level=2),
+        DocumentElement(kind=PARAGRAPH, text="alpha beta gamma delta"),
+    )
+    result = chunker().chunk(document, options(max_tokens=50))
+
+    for chunk in result.chunks:
+        assert chunk.element_kinds != frozenset({HEADING}), (
+            f"heading-only chunk survived: {chunk.content!r}"
+        )
+    assert any(
+        "6 Evaluations" in c.content and "alpha" in c.content for c in result.chunks
+    ), "the bare heading must have merged forward into the content it labels"
+
+
+def test_consecutive_heading_only_sections_all_merge_forward():
+    """The real document stacked two of these ("6 Evaluations" then "6.1 Main
+    Results"), so folding only the nearest one forward would leave the other."""
+    document = build(
+        DocumentElement(kind=HEADING, text="6 Evaluations", level=1),
+        DocumentElement(kind=HEADING, text="6.1 Main Results", level=2),
+        DocumentElement(kind=HEADING, text="6.1.1 Benchmarks", level=3),
+        DocumentElement(kind=PARAGRAPH, text="alpha beta"),
+    )
+    result = chunker().chunk(document, options(max_tokens=50))
+
+    assert len(result.chunks) == 1
+    content = result.chunks[0].content
+    for heading in ("6 Evaluations", "6.1 Main Results", "6.1.1 Benchmarks"):
+        assert heading in content
+
+
+def test_a_heading_only_chunk_stays_when_merging_would_breach_the_ceiling():
+    """The ceiling is IR-110's guarantee and outranks this fix, exactly as it
+    outranks the short-chunk floor."""
+    document = build(
+        DocumentElement(kind=HEADING, text="6 Evaluations", level=1),
+        DocumentElement(kind=HEADING, text="6.1 Main Results", level=2),
+        DocumentElement(kind=PARAGRAPH, text=("word " * 10).strip()),
+    )
+    result = chunker().chunk(document, options(max_tokens=11))
+
+    assert all(c.token_count <= 11 for c in result.chunks)
+    assert any("word" in c.content for c in result.chunks)
+
+
+def test_the_nearest_headings_still_fold_when_the_whole_stack_will_not_fit():
+    """All-or-nothing would keep every bare heading whenever the outermost one
+    pushed the block over the ceiling, leaving behind exactly the chunks this
+    pass exists to remove. Greedy from the nearest takes what fits."""
+    document = build(
+        DocumentElement(kind=HEADING, text="Part One Of The Whole Work", level=1),
+        DocumentElement(kind=HEADING, text="6 Evaluations", level=2),
+        DocumentElement(kind=PARAGRAPH, text=("word " * 8).strip()),
+    )
+    result = chunker().chunk(document, options(max_tokens=11))
+
+    assert all(c.token_count <= 11 for c in result.chunks)
+    assert any(
+        "6 Evaluations" in c.content and "word" in c.content for c in result.chunks
+    ), "the nearest heading should have folded even though the outer one could not"
+
+
+def test_folding_respects_a_caller_who_turned_merging_off():
+    """`merge_short_siblings=False` means the caller asked for no merging.
+    Folding is merging, so it must honour that rather than quietly happening
+    anyway — otherwise there is no way to get the unmerged output back."""
+    document = build(
+        DocumentElement(kind=HEADING, text="6 Evaluations", level=1),
+        DocumentElement(kind=HEADING, text="6.1 Main Results", level=2),
+        DocumentElement(kind=PARAGRAPH, text="alpha beta"),
+    )
+    result = chunker().chunk(
+        document, options(max_tokens=50, merge_short_siblings=False)
+    )
+
+    assert any(c.element_kinds == frozenset({HEADING}) for c in result.chunks)
+
+
+def test_a_trailing_heading_with_nothing_after_it_is_left_alone():
+    """There is nothing to merge forward into. Dropping it instead would
+    violate the no-content-loss property."""
+    document = build(
+        DocumentElement(kind=PARAGRAPH, text="alpha beta gamma"),
+        DocumentElement(kind=HEADING, text="Appendix", level=1),
+    )
+    result = chunker().chunk(document, options(max_tokens=50))
+
+    assert "Appendix" in " ".join(c.content for c in result.chunks)
+
+
+def test_merging_a_bare_heading_does_not_merge_two_content_bearing_sections():
+    """The narrowing that keeps IR-89's user story 21 true. A chunk carrying
+    only a heading is a label, not a topic, so folding it into the section it
+    labels cannot put two topics in one vector — but two sections that both
+    have a body must still never merge."""
+    document = build(
+        DocumentElement(kind=HEADING, text="1 Intro", level=1),
+        DocumentElement(kind=PARAGRAPH, text="a"),
+        DocumentElement(kind=HEADING, text="2 Methods", level=1),
+        DocumentElement(kind=PARAGRAPH, text="b"),
+    )
+    result = chunker().chunk(document, options(max_tokens=50, min_tokens=10))
+
+    contents = [c.content for c in result.chunks]
+    assert not any("Intro" in c and "Methods" in c for c in contents)
+
+
 def test_the_ceiling_wins_when_a_short_chunks_only_neighbour_is_already_full():
     """A short chunk merges into its next sibling only when the ceiling
     allows it. When the only adjacent chunk is already at the ceiling, no
