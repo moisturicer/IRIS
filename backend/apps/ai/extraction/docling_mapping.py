@@ -153,7 +153,39 @@ def _walk(
             # its own. Its children are the content.
             yield from _walk(item.get("children"), by_ref, seen)
             continue
+
+        # A caption belongs to the figure or table it labels, so Docling hangs
+        # it off `#/pictures/N` or `#/tables/N` rather than off the body, and
+        # walking `body.children` alone never reaches it. Yielded *before* the
+        # item so a table caption introduces its rows; a picture contributes no
+        # element of its own, so for figures the position is the same either
+        # way (IR-245).
+        yield from _captions_of(item, by_ref, seen)
         yield item
+
+
+def _captions_of(
+    item: Mapping[str, Any], by_ref: Mapping[str, Mapping[str, Any]], seen: set[str]
+) -> Iterator[Mapping[str, Any]]:
+    """The caption items a picture or table owns, each yielded at most once.
+
+    Shares the caller's ``seen`` set, so a caption Docling lists both under the
+    body and under its figure is emitted exactly once whichever is reached
+    first — the same guard that already stops a repeated ``$ref`` being walked
+    twice.
+
+    A caption carries its own ``prov``, so it keeps its own page and rectangle
+    rather than inheriting the figure's. That is what a citation wants: the
+    highlight lands on the caption text, not on the whole image.
+    """
+    for entry in item.get("captions") or []:
+        ref = entry.get("$ref") if isinstance(entry, Mapping) else None
+        if not ref or ref in seen:
+            continue
+        seen.add(ref)
+        caption = by_ref.get(ref)
+        if caption is not None:
+            yield caption
 
 
 def _in_array_order(payload: Mapping[str, Any]) -> Iterator[Mapping[str, Any]]:
