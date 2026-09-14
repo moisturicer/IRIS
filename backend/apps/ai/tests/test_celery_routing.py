@@ -68,6 +68,63 @@ def test_the_extraction_task_routes_to_the_worker_with_docling_access():
     assert _resolved_queue("apps.documents.tasks.extract_pdf_text") == "extraction"
 
 
+def _tasks_that_build_an_extractor() -> set[str]:
+    """Every task in ``apps.documents.tasks`` whose body reaches for Docling.
+
+    Read out of the source rather than listed here on purpose (IR-240). A
+    hand-maintained list is what failed: `base.py` stated the rule in a
+    comment, the routing tests asserted it for named tasks, and
+    ``extract_manuscript_text`` was added between them without either
+    noticing. Discovering the callers means the next such task is covered
+    the moment it is written.
+    """
+    import inspect
+
+    from apps.documents import tasks as document_tasks
+
+    # `_build_extractor` is the only way to get an extractor, but no task
+    # calls it directly -- they go through `_run_extraction`. So resolve one
+    # level: collect the module's own helpers that reach for it, then treat a
+    # task as Docling-dependent if it names any of them. Matching only the
+    # direct name finds nothing, which is what the guard below caught.
+    extractor_helpers = {"_build_extractor"} | {
+        name
+        for name, obj in vars(document_tasks).items()
+        if inspect.isfunction(obj) and "_build_extractor" in inspect.getsource(obj)
+    }
+
+    found = set()
+    for name in dir(document_tasks):
+        task = getattr(document_tasks, name)
+        if not hasattr(task, "delay"):  # not a Celery task
+            continue
+        source = inspect.getsource(task.run)
+        if any(helper in source for helper in extractor_helpers):
+            found.add(task.name)
+    return found
+
+
+def test_every_task_that_calls_docling_routes_to_the_worker_that_can_reach_it():
+    """The rule, not a list of names.
+
+    `celery-default` is deliberately not given DOCLING_API_URL, so a task
+    that calls Docling and is left unrouted silently falls back to
+    http://localhost:5001 and fails against its own container -- the IR-240
+    regression, which cost a manuscript its chunks and three retries.
+    """
+    docling_tasks = _tasks_that_build_an_extractor()
+
+    # Guards the discovery itself: if the helper silently matched nothing,
+    # every assertion below would vacuously pass.
+    assert docling_tasks, "found no Docling-dependent tasks -- the discovery broke"
+
+    for task_name in sorted(docling_tasks):
+        assert _resolved_queue(task_name) == "extraction", (
+            f"{task_name} builds an extractor but is routed to "
+            f"'{_resolved_queue(task_name)}', a worker with no DOCLING_API_URL"
+        )
+
+
 def test_the_embedding_task_routes_to_the_worker_with_vendor_access():
     assert _resolved_queue("apps.ai.tasks.embed_record") == "embedding"
 

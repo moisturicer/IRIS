@@ -231,12 +231,25 @@ CELERY_RESULT_SERIALIZER = "json"
 # (they run `-Q default` / `-Q extraction` / `-Q embedding`) -- so nothing
 # dispatched is ever picked up. CELERY_TASK_DEFAULT_QUEUE catches any task
 # with no explicit route below, present or future, and lands it on the
-# worker with no special dependencies. The two tasks with a real dependency
-# (a Docling container, the embedding vendor) are routed to the workers
-# built for them.
+# worker with no special dependencies. Tasks with a real dependency (a
+# Docling container, the embedding vendor) are routed to the workers built
+# for them.
+#
+# IR-240: `default` is the safe fallback for a task that needs nothing, and
+# the wrong one for a task that needs Docling -- `celery-default` is not
+# given DOCLING_API_URL, so an unrouted extractor task falls back to
+# http://localhost:5001 and fails against its own container. That is what
+# happened to extract_manuscript_text between IR-195 and IR-240, and it
+# broke the manuscript path in every Docker deployment while the test suite
+# stayed green, because the tasks are tested against a fake extractor with
+# no queue involved. **Every task that reaches an extractor belongs on
+# `extraction`** -- apps/ai/tests/test_celery_routing.py now derives that
+# set from the source and enforces it, rather than trusting this list to be
+# kept in step by hand.
 CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
+    "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
 }
 
