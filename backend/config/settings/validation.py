@@ -1,0 +1,110 @@
+"""Configuration checks, as functions that return problems (IR-154).
+
+The settings modules decide *policy* — which variables are mandatory, what a
+production deployment may look like. This module decides *nothing*; it reports
+what is wrong with a set of values it is handed, and the caller raises. That
+split exists so the rules can be tested against crafted inputs rather than by
+booting Django once per broken environment, which is the only way anyone
+actually verifies a fail-fast path.
+
+Every function returns **all** the problems it finds, never the first. A
+deployment that fixes one variable per restart is a bad afternoon, and a
+half-configured process that starts is worse than one that refuses.
+
+Pure: no Django, no I/O, no environment access, no clock.
+"""
+
+from typing import Iterable, Mapping, Sequence
+
+
+def non_blank(entries: Iterable[object]) -> tuple[str, ...]:
+    """The entries that survive stripping.
+
+    ``"".split(",")`` is ``[""]`` — truthy as a list, empty as a
+    configuration. Every list-valued setting here goes through this so that
+    ``ALLOWED_HOSTS=`` cannot read as "one host configured".
+    """
+    return tuple(
+        str(entry).strip() for entry in entries if not _is_blank(entry)
+    )
+
+
+def _is_blank(value: object) -> bool:
+    """A value that is set to nothing is not a value that is present.
+
+    Two failure modes, both of which a deployment actually hits. A secret set
+    to the empty string: an unset shell variable interpolated into an env file
+    yields ``KEY=``, not an absent key. And a list-valued variable that parsed
+    to nothing: ``ALLOWED_HOSTS=`` read through ``csv_list`` is ``[]``, which
+    is exactly as unconfigured as an absent key and must not read as present
+    merely because it is no longer a string.
+    """
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return not non_blank(value)
+    return False
+
+
+def missing_required(values: Mapping[str, object]) -> tuple[str, ...]:
+    """The names in ``values`` that are absent or blank, in the order given."""
+    return tuple(name for name, value in values.items() if _is_blank(value))
+
+
+def production_problems(
+    *,
+    debug: bool,
+    allowed_hosts: Sequence[object],
+    cors_allowed_origins: Sequence[object],
+    cors_allow_all_origins: bool,
+) -> tuple[str, ...]:
+    """What is wrong with this configuration for a publicly reachable deployment.
+
+    Keyword-only on purpose: four values, three of them list-shaped, is exactly
+    the signature where a positional swap type-checks and silently inverts a
+    security check.
+    """
+    problems: list[str] = []
+
+    if debug:
+        problems.append(
+            "DEBUG is True in production — it serves tracebacks containing "
+            "settings values, including secrets, to anyone who triggers a 500."
+        )
+
+    hosts = non_blank(allowed_hosts)
+    if not hosts:
+        problems.append(
+            "ALLOWED_HOSTS is empty — Django refuses every request without it, "
+            "and a value inherited from the development default is not a "
+            "production configuration."
+        )
+    elif "*" in hosts:
+        problems.append(
+            "ALLOWED_HOSTS contains '*' — that disables the Host header check "
+            "entirely, which is what it exists to perform."
+        )
+
+    if cors_allow_all_origins:
+        problems.append(
+            "CORS_ALLOW_ALL_ORIGINS is enabled — combined with "
+            "CORS_ALLOW_CREDENTIALS it lets any origin make authenticated "
+            "requests on a logged-in user's behalf."
+        )
+
+    origins = non_blank(cors_allowed_origins)
+    if not origins:
+        problems.append(
+            "CORS_ALLOWED_ORIGINS is empty — set it to the deployed frontend "
+            "origin."
+        )
+    # No https-only rule here on purpose. It is the obvious next check, and
+    # production.py does set SECURE_SSL_REDIRECT — but S-04 puts TLS
+    # termination out of scope (D-03), and this ticket's Definition of Done
+    # requires an interim deployment running with DEBUG=False. Refusing an
+    # http origin would stop that deployment booting at all. Worth adding the
+    # day TLS lands, not before.
+
+    return tuple(problems)

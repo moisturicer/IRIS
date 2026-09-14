@@ -20,11 +20,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Iterable, Optional
+from core.enums import ClearanceStatus, Office
 
 #: Offices that hold an individual clearance. Mirrors
 #: `RecordClearance.OFFICE_CHOICES`; the sequential stages (adviser, RDCO) do
 #: not appear because they gate the record rather than clear it.
-CLEARANCE_OFFICES = frozenset({"itso", "ierc", "ktto"})
+CLEARANCE_OFFICES = frozenset({Office.ITSO, Office.IERC, Office.KTTO})
 
 
 def is_preserved(
@@ -43,7 +44,7 @@ def is_preserved(
     resubmitted has nothing to preserve — every clearance on it was granted the
     first time round, which is emphatically not the contribution.
     """
-    if status != "cleared":
+    if status != ClearanceStatus.CLEARED:
         return False
     if last_resubmitted_at is None or clearance_updated_at is None:
         return False
@@ -85,9 +86,13 @@ def clearance_payload(clearance, *, last_resubmitted_at: Optional[datetime]) -> 
 def resubmission_payload(record, *, clearances: Iterable, latest_decline_stage: Optional[str]) -> dict[str, Any]:
     """`resubmission{}` — what happened, and what survived it.
 
-    Under a RESTART_ALL policy (IR-137) `offices_preserved` is simply empty,
-    because `resubmit_record` deletes every clearance on that path. That is why
-    the UI needs no policy branch: the same shape answers both policies.
+    Under a RESTART_ALL policy (IR-137) `offices_preserved` is simply empty —
+    not because anything here knows the policy, but because that arm resets
+    every clearance to `pending`, and `is_preserved` requires `CLEARED`. The
+    rows themselves survive (ADR-004 resets rather than deletes, so the record
+    keeps the office set ADR-018 put on it). That is why the UI needs no policy
+    branch: the same shape answers both policies, and `PreservationNotice`
+    renders off an empty array rather than off a flag.
     """
     last = record.last_resubmitted_at
     return {

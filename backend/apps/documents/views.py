@@ -3,13 +3,59 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
-from core.permissions import IsStaff
+from core.permissions import IsStaff, owns_or_staffs_record
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile, PdfExtraction
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
 
 MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+
+
+def authorize_record_documents(request, record_id):
+    """
+    Resolve `record_id` and confirm the caller may reach that record's documents.
+
+    Returns `(record, None)` when allowed and `(None, Response)` when not, so a
+    view can do:
+
+        record, denied = authorize_record_documents(request, record_id)
+        if denied:
+            return denied
+
+    IR-153. Six endpoints in this module took a record id straight from a
+    request parameter and acted on it with no ownership check at all -- the
+    worst being `files/download-all/`, where a record id in a query string
+    returned a ZIP of every supplementary file on someone else's record. The
+    four endpoints that *did* check spelled the rule out by hand, four times.
+    Both problems have the same fix: one function, calling the one rule in
+    `core.permissions`.
+
+    The refusal is 403 rather than the 404 `RecordViewSet` returns. That split
+    is deliberate: the caller named the record id themselves, so a 404 would
+    hide nothing, and 403 says what actually happened. `RecordViewSet` has the
+    opposite problem -- there, the id is the thing being probed.
+    """
+    from apps.records.models import Record
+
+    if record_id in (None, ""):
+        return None, Response(
+            {"detail": "record is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        record = Record.objects.get(pk=record_id)
+    except (Record.DoesNotExist, ValueError, TypeError):
+        return None, Response(
+            {"detail": "Record not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    if not owns_or_staffs_record(request.user, record):
+        return None, Response(
+            {"detail": "Permission denied."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return record, None
 
 
 class SubmitDocumentView(APIView):
@@ -33,7 +79,6 @@ class SubmitDocumentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from apps.records.models import Record
         from .tasks import extract_pdf_text
 
         record_id = request.data.get("record")
@@ -64,11 +109,18 @@ class SubmitDocumentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # --- Authorization (IR-153) ---
+        # Before this, any authenticated account could upload a PDF into any
+        # record. Checked after the cheap format/size validation but before
+        # anything is persisted.
+        record, denied = authorize_record_documents(request, record_id)
+        if denied:
+            return denied
+
         # --- Persist the upload ---
         try:
-            record = Record.objects.get(pk=record_id)
-            slot   = UploadSlot.objects.get(pk=slot_id)
-        except (Record.DoesNotExist, UploadSlot.DoesNotExist):
+            slot = UploadSlot.objects.get(pk=slot_id)
+        except (UploadSlot.DoesNotExist, ValueError, TypeError):
             return Response(
                 {"detail": "Record or slot not found."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -112,12 +164,13 @@ class RecordSlotListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        from apps.records.models import Record
         from .serializers import SlotWithUploadsSerializer
-        try:
-            record = Record.objects.select_related("record_type").get(pk=pk)
-        except Record.DoesNotExist:
-            return Response({"detail": "Record not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # IR-153: this returned the full upload history of any record to any
+        # authenticated caller -- the serializer embeds every upload per slot.
+        record, denied = authorize_record_documents(request, pk)
+        if denied:
+            return denied
         slots = UploadSlot.objects.filter(record_type=record.record_type)
         data  = SlotWithUploadsSerializer(slots, many=True, context={"record_id": pk, "request": request}).data
         return Response(data)
@@ -127,6 +180,16 @@ class RecordUploadListView(generics.ListAPIView):
     """GET /documents/uploads/?record=<id> -- all uploads for a record."""
     serializer_class   = RecordUploadSerializer
     permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        # IR-153. Authorization lives in list() rather than get_queryset()
+        # because get_queryset() can only narrow rows, and narrowing to nothing
+        # would answer a stranger with an empty 200 -- indistinguishable from a
+        # record that genuinely has no uploads. A refusal should say so.
+        _, denied = authorize_record_documents(request, request.query_params.get("record"))
+        if denied:
+            return denied
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         record_id = self.request.query_params.get("record")
@@ -196,9 +259,19 @@ class RecordUploadCreateView(APIView):
         if not all([record_id, slot_id, file]):
             return Response({"detail": "record, slot, and file are required."}, status=400)
 
-        from apps.records.models import Record
-        record = Record.objects.get(pk=record_id)
-        slot   = UploadSlot.objects.get(pk=slot_id)
+        # IR-153: any authenticated account could push a new "version" of a
+        # document into anyone's record. The bare Record.objects.get() here also
+        # raised an unhandled DoesNotExist (a 500) for a bad id; resolving
+        # through the helper answers 404 instead.
+        record, denied = authorize_record_documents(request, record_id)
+        if denied:
+            return denied
+
+        try:
+            slot = UploadSlot.objects.get(pk=slot_id)
+        except (UploadSlot.DoesNotExist, ValueError, TypeError):
+            return Response({"detail": "Slot not found."}, status=status.HTTP_404_NOT_FOUND)
+
         upload = create_upload(record, slot, file, uploaded_by=request.user)
         create_audit_event(
             "UPLOAD", request.user, record=record,
@@ -217,16 +290,12 @@ class RecordUploadDownloadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        from core.permissions import STAFF_ROLES, get_role_name
         try:
             upload = RecordUpload.objects.select_related("record", "slot", "uploaded_by").get(pk=pk)
         except RecordUpload.DoesNotExist:
             return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES
-        is_owner      = upload.record.owners.filter(user=request.user).exists()
-
-        if not (is_owner or is_staff_user):
+        if not owns_or_staffs_record(request.user, upload.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
@@ -251,6 +320,13 @@ class RecordFileListView(generics.ListAPIView):
     """GET /documents/files/?record=<id>"""
     serializer_class   = RecordFileSerializer
     permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        # IR-153, same reasoning as RecordUploadListView.list().
+        _, denied = authorize_record_documents(request, request.query_params.get("record"))
+        if denied:
+            return denied
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         record_id = self.request.query_params.get("record")
@@ -297,16 +373,18 @@ class RecordUploadDeleteView(APIView):
         except RecordUpload.DoesNotExist:
             return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Permission: owner or staff
-        from core.permissions import STAFF_ROLES, get_role_name
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES
-        is_owner = upload.record.owners.filter(user=request.user).exists()
-
-        if not (is_owner or is_staff_user):
+        if not owns_or_staffs_record(request.user, upload.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
+        # Read separately and on purpose: `force` answers "is this an office
+        # overriding the normal delete rules", which is a different question
+        # from "may you touch this record at all". Collapsing the two would let
+        # a future widening of the access rule silently widen the override too.
+        from core.permissions import STAFF_ROLES, get_role_name
+        is_office_override = get_role_name(request.user) in STAFF_ROLES
+
         try:
-            delete_upload(upload, deleted_by=request.user, force=is_staff_user)
+            delete_upload(upload, deleted_by=request.user, force=is_office_override)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -327,16 +405,12 @@ class RecordFileDownloadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        from core.permissions import STAFF_ROLES, get_role_name
         try:
             record_file = RecordFile.objects.select_related("record").get(pk=pk)
         except RecordFile.DoesNotExist:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES
-        is_owner      = record_file.record.owners.filter(user=request.user).exists()
-
-        if not (is_owner or is_staff_user):
+        if not owns_or_staffs_record(request.user, record_file.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
@@ -374,11 +448,7 @@ class RecordFileDeleteView(APIView):
         except RecordFile.DoesNotExist:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        from core.permissions import STAFF_ROLES, get_role_name
-        is_staff_user = get_role_name(request.user) in STAFF_ROLES
-        is_owner = record_file.record.owners.filter(user=request.user).exists()
-
-        if not (is_owner or is_staff_user):
+        if not owns_or_staffs_record(request.user, record_file.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         record = record_file.record
@@ -406,18 +476,23 @@ class RecordFileDownloadAllView(APIView):
     def get(self, request):
         from core.utils import build_zip
         from django.http import HttpResponse
+
+        # IR-153, and the worst of the six: a record id in a query string was
+        # the only thing needed to receive a ZIP of every supplementary file on
+        # any record in the system. Resolving the record here also replaces the
+        # old best-effort lookup that logged the audit event with record=None
+        # when the id did not resolve.
         record_id = request.query_params.get("record")
-        files = RecordFile.objects.filter(record_id=record_id)
+        record, denied = authorize_record_documents(request, record_id)
+        if denied:
+            return denied
+
+        files = RecordFile.objects.filter(record_id=record.pk)
         buffer = build_zip(files)
         response = HttpResponse(buffer, content_type="application/zip")
-        response["Content-Disposition"] = f'attachment; filename="record_{record_id}_files.zip"'
-        from apps.records.models import Record as RecordModel
-        try:
-            record_obj = RecordModel.objects.get(pk=record_id)
-        except RecordModel.DoesNotExist:
-            record_obj = None
+        response["Content-Disposition"] = f'attachment; filename="record_{record.pk}_files.zip"'
         create_audit_event(
-            "DOWNLOAD", request.user, record=record_obj,
-            metadata={"record_id": record_id, "file_count": files.count()},
+            "DOWNLOAD", request.user, record=record,
+            metadata={"record_id": record.pk, "file_count": files.count()},
         )
         return response

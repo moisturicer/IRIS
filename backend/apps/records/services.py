@@ -1,4 +1,5 @@
 from django.contrib.postgres.search import SearchVector
+from core.enums import RecordTypeName
 from .models import Record, RecordOwner
 
 
@@ -24,13 +25,21 @@ def set_primary_owner(record: Record, user):
 
 
 def soft_delete_record(record: Record, deleted_by):
-    """Mark a record as deleted without removing it from the DB."""
+    """
+    Mark a record as deleted without removing it from the DB.
+
+    The status move is the table's (IR-136 stage 2); the deletion bookkeeping --
+    the flag, who did it and when -- is not workflow data and stays here. Two
+    writes rather than one, both inside `apply()`'s transaction.
+    """
     from django.utils import timezone
-    record.is_deleted       = True
-    record.deleted_at       = timezone.now()
-    record.deleted_by       = deleted_by
-    record.pipeline_status  = "pending_delete"
-    record.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "pipeline_status", "updated_at"])
+    from . import lifecycle
+
+    lifecycle.apply(record, lifecycle.WorkflowEvent.SOFT_DELETE, deleted_by)
+    record.is_deleted = True
+    record.deleted_at = timezone.now()
+    record.deleted_by = deleted_by
+    record.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
 
 
 def parse_excel_import(file) -> tuple[list[dict], list[str]]:
@@ -132,7 +141,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
             "abstract":              get_col(row, "abstract") or "",
             "year_accomplished":     parse_year(get_col(row, "year accomplished")),
             "year_completed":        parse_year(get_col(row, "year completed")),
-            "record_type_name":      get_col(row, "record type") or "Project",
+            "record_type_name":      get_col(row, "record type") or RecordTypeName.PROJECT,
             "classification_name":   get_col(row, "classification"),
             "psced_name":            get_col(row, "psced classification"),
             "is_ip":                 parse_bool(get_col(row, "is ip")),

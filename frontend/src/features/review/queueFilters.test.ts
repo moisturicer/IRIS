@@ -1,28 +1,28 @@
 /**
  * The queue's small rules (IR-143).
  *
- * Run:
- *   npx esbuild src/features/review/queueFilters.test.ts --bundle \
- *     --platform=node --format=esm --define:import.meta.env='{}' | node
+ * Runs under vitest: `npm test` from `frontend/` (IR-210). This file predates
+ * the runner and was executed by a hand-written esbuild-plus-node incantation;
+ * its assertions are unchanged, only the harness around them is now real.
  *
- * No test runner is installed (IR-82 covers the backend only), so this uses the
- * same esbuild+node harness as `lib/access.test.ts`. These rules are worth
- * pinning because they are product decisions, not formatting: the escalation
- * thresholds are a claim about when a wait becomes a problem.
+ * These rules are worth pinning because they are product decisions, not
+ * formatting: the escalation thresholds are a claim about when a wait becomes
+ * a problem.
  */
 import { isQueueFilter, waitLabel, waitTone } from "./queueFilters";
 
-let passed = 0;
-let failed = 0;
+import { expect, test } from "vitest";
 
+/**
+ * Kept as `ok(name, condition)` rather than rewritten into `expect` at every
+ * call site: the assertions below read as a table of product decisions, and
+ * reshaping them would bury the diff that converted this file to a real runner
+ * (IR-210). The failure message now comes from vitest.
+ */
 function ok(name: string, condition: boolean) {
-  if (condition) {
-    passed += 1;
-    console.log(`ok   ${name}`);
-  } else {
-    failed += 1;
-    console.log(`FAIL ${name}`);
-  }
+  test(name, () => {
+    expect(condition).toBe(true);
+  });
 }
 
 // --- isQueueFilter ---------------------------------------------------------
@@ -69,13 +69,3 @@ ok("a fortnight old escalates to red",
 
 ok("each tone also changes weight, so the signal is not colour alone",
   waitTone(7).includes("font-semibold") && waitTone(14).includes("font-bold"));
-
-console.log(`\n${passed} passed, ${failed} failed`);
-// `throw`, not `process.exit` -- this file is typechecked by
-// `npm run build` (`tsc && vite build`), and the frontend has no
-// @types/node, so `process` is not a name here. An uncaught throw still
-// exits non-zero under node, which is what the harness needs. Matches
-// lib/access.test.ts, which does the same for the same reason.
-if (failed > 0) {
-  throw new Error(`${failed} queue-filter test(s) failed`);
-}

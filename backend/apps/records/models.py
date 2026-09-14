@@ -2,6 +2,18 @@ from django.db import models
 from django.contrib.postgres.search import SearchVectorField
 from django.contrib.postgres.indexes import GinIndex
 
+# Re-exported deliberately: PUBLICLY_VISIBLE_STATUSES now lives in core.enums
+# beside the vocabulary it is built from, but `apps.records.models` has been its
+# import site since IR-152 and callers (including IR-153's visibility predicate)
+# reach for it here. Keeping the name importable from both places costs one line
+# and avoids a rename that has nothing to do with this ticket.
+from core.enums import (  # noqa: F401
+    PUBLICLY_VISIBLE_STATUSES,
+    IPType,
+    PipelineStatus,
+    RequestStatus,
+)
+
 
 # ---- Reference / lookup tables ------------------------------------------
 
@@ -48,10 +60,10 @@ class CollaborationType(models.Model):
 
 # ---- Core record --------------------------------------------------------
 
-#: The single definition of "a record any authenticated user may read".
-#: Used by the public record list AND by AI retrieval, so a generated citation
-#: can never point at a record the reader is not allowed to open.
-PUBLICLY_VISIBLE_STATUSES = ("published", "approved", "completed")
+#: The single definition of "a record any authenticated user may read" now lives
+#: in `core.enums` and is re-exported at the top of this module. Used by the
+#: public record list AND by AI retrieval, so a generated citation can never
+#: point at a record the reader is not allowed to open.
 
 
 class RecordManager(models.Manager):
@@ -66,25 +78,55 @@ class RecordManager(models.Manager):
         """Records readable by any authenticated user. Keep this the only predicate."""
         return self.get_queryset().filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
 
+    def visible_to(self, user):
+        """
+        Every record `user` is entitled to read. The one read-visibility
+        predicate (IR-153) -- `RecordViewSet` applies it on every action, and AI
+        retrieval must filter through it too, so a generated citation can never
+        point at a record the reader cannot open.
+
+        Four disjoint grounds, in the order they matter:
+
+        * **Office staff** (KTTO/RDCO/ITSO/IERC) see everything. They run the
+          clearance pipeline; RDCO cannot perform intake review on a record it
+          cannot open.
+        * **Owners** see their own records at any pipeline status, which is what
+          makes a draft readable to the person writing it.
+        * **The assigned adviser** sees the record they advise. `Adviser` is in
+          `REVIEWER_ROLES` but deliberately not in `STAFF_ROLES`, so the role
+          alone grants nothing -- the grant is the `adviser` FK pointing at this
+          user. Without this, `adviser_review`, the first gate in the Proposal
+          pipeline, would be unreachable by the person who has to clear it.
+        * **Anyone authenticated** sees the public catalogue.
+
+        Anonymous users get nothing; DRF refuses them before this runs, but a
+        predicate that quietly returned the public catalogue to `AnonymousUser`
+        would be a trap for the next caller that reuses it outside a view.
+
+        Wider than `publicly_visible()` and narrower than the bare manager. The
+        `distinct()` is required because the owner clause joins through
+        `RecordOwner`, which can match a record more than once.
+        """
+        from core.permissions import STAFF_ROLES, get_role_name
+
+        qs = self.get_queryset()
+        if not user or not user.is_authenticated:
+            return qs.none()
+        if get_role_name(user) in STAFF_ROLES:
+            return qs
+        return qs.filter(
+            models.Q(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
+            | models.Q(owners__user=user)
+            | models.Q(adviser=user)
+        ).distinct()
+
 
 class Record(models.Model):
-    PIPELINE_STATUS = [
-        ("draft",          "Draft"),
-        # Proposal pipeline
-        ("adviser_review", "Adviser Review"),          # back-and-forth with adviser until approved
-        ("approved",       "Approved"),                # Proposal approved by adviser — visible as ongoing
-        ("completed",      "Completed"),               # Proposal research finished — toggled manually by RDCO
-        # Thesis/Research and Project pipeline
-        ("rdco_intake",    "RDCO Intake Review"),      # RDCO checks completeness; may reject outright
-        ("itso_review",     "ITSO Review"),              # Project only: ITSO sequential gate; KTTO also starts here in parallel
-        ("parallel_review", "Parallel Office Review"), # T/R: IERC+KTTO; Project: IERC+KTTO after ITSO clears — offices tracked via RecordClearance
-        ("rdco_review",     "RDCO Final Review"),      # RDCO consolidates all office clearances
-        # Terminal / visible states
-        ("published",      "Published"),
-        ("declined",       "Declined"),                # revision requested; owner may resubmit
-        ("rejected",       "Rejected"),                # terminal rejection; no resubmission
-        ("pending_delete", "Pending Deletion"),
-    ]
+    #: Kept as a class attribute for callers that reach for
+    #: `Record.PIPELINE_STATUS`; the values themselves are `core.enums`
+    #: (IR-135). The per-status commentary that used to live here is on
+    #: `PipelineStatus` now, beside the values it explains.
+    PIPELINE_STATUS = PipelineStatus.choices
 
     title              = models.CharField(max_length=500)
     year_accomplished  = models.PositiveIntegerField(null=True, blank=True)
@@ -130,15 +172,10 @@ class Record(models.Model):
     requested_ktto           = models.BooleanField(default=False)
 
     # Structured IP classification type (FR-M5-05)
-    IP_TYPE_CHOICES = [
-        ("patent",        "Patent"),
-        ("copyright",     "Copyright"),
-        ("trade_secret",  "Trade Secret"),
-        ("utility_model", "Utility Model"),
-    ]
+    IP_TYPE_CHOICES = IPType.choices
     ip_type = models.CharField(
         max_length=20,
-        choices=IP_TYPE_CHOICES,
+        choices=IPType.choices,
         blank=True,
         default="",
         db_index=True,
@@ -147,7 +184,8 @@ class Record(models.Model):
 
     # Denormalized pipeline status -- updated by reviews.services on every review action
     pipeline_status = models.CharField(
-        max_length=20, choices=PIPELINE_STATUS, default="draft", db_index=True
+        max_length=20, choices=PipelineStatus.choices,
+        default=PipelineStatus.DRAFT, db_index=True
     )
 
     # Resubmission history (IR-139). Both are maintained by
@@ -159,6 +197,39 @@ class Record(models.Model):
     # preserved whenever an office happened to clear before the decline landed.
     resubmission_count   = models.PositiveIntegerField(default=0)
     last_resubmitted_at  = models.DateTimeField(null=True, blank=True)
+
+    # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
+    # `RecordViewSet.submit` and by nothing else -- neither field is writable
+    # through a serializer, because a consent record the subject can set on
+    # themselves through the ordinary update path is not evidence of anything.
+    #
+    # **The timestamp's presence is the acceptance.** There is deliberately no
+    # accompanying boolean: two fields encoding one fact can disagree, and the
+    # disagreement would surface exactly when someone needs to prove consent.
+    #
+    # `User.consent_given` is a different fact and stays where it is -- it
+    # records that this person accepted the terms once, at signup (FR-M6-06).
+    # This records that *this disclosure* was submitted under them, which is
+    # what the wizard's step-3 gate has always claimed to collect and, until
+    # now, only ever enforced in the browser.
+    dpa_accepted_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When DPA consent was accepted for this disclosure. Null means never.",
+    )
+    dpa_accepted_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="dpa_accepted_records",
+        help_text="Who accepted. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+
+    @property
+    def dpa_accepted(self) -> bool:
+        """Whether this disclosure carries DPA consent.
+
+        Derived, never stored, so it cannot drift from the timestamp it
+        describes. Serializers expose this; nothing writes it.
+        """
+        return self.dpa_accepted_at is not None
 
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)
@@ -260,10 +331,12 @@ class Collaboration(models.Model):
 # ---- Download / Delete requests -----------------------------------------
 
 class DownloadRequest(models.Model):
-    STATUS = [("pending", "Pending"), ("approved", "Approved"), ("declined", "Declined")]
+    STATUS = RequestStatus.choices
     record       = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="download_requests")
     requested_by = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="download_requests")
-    status       = models.CharField(max_length=10, choices=STATUS, default="pending")
+    status       = models.CharField(
+        max_length=10, choices=RequestStatus.choices, default=RequestStatus.PENDING
+    )
     reviewed_by  = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="reviewed_download_requests"
@@ -273,11 +346,13 @@ class DownloadRequest(models.Model):
 
 
 class DeleteRequest(models.Model):
-    STATUS = [("pending", "Pending"), ("approved", "Approved"), ("declined", "Declined")]
+    STATUS = RequestStatus.choices
     record       = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="delete_requests")
     requested_by = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="delete_requests")
     reason       = models.TextField(blank=True)
-    status       = models.CharField(max_length=10, choices=STATUS, default="pending")
+    status       = models.CharField(
+        max_length=10, choices=RequestStatus.choices, default=RequestStatus.PENDING
+    )
     previous_pipeline_status = models.CharField(max_length=20, blank=True, default="")
     reviewed_by  = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,

@@ -1,3 +1,9 @@
+> **Credentials scrubbed 2026-09-08 (IR-154).** The Compose snippets below
+> originally carried the database credential verbatim. They are archived,
+> not live, but "no credential literal remains in the repository" is a
+> criterion about the repository, so the values are replaced with the
+> `${VAR:?}` form the real Compose files now use. Nothing else is changed.
+
 # Docker Compose Service Map — IRIS RAG & Extraction Pipeline
 
 > **Status: LEGACY — superseded, retained for reference.**
@@ -134,14 +140,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: iris_db
-      POSTGRES_USER: iris_user
-      POSTGRES_PASSWORD: iris_password
+      POSTGRES_USER: ${DB_USER:?set DB_USER in the repo-root .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U iris_user -d iris_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -214,7 +220,7 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://iris_user:iris_password@db:5432/iris_db
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - JWT_SECRET_KEY=${SECRET_KEY}
       - AI_EMBEDDING_MODEL=${AI_EMBEDDING_MODEL:-text-embedding-3-small}

@@ -311,7 +311,7 @@ There is no scanning of any kind — no dependency audit, no secret detection, n
 
 Concrete instances the review already found:
 
-- `docker-compose.yml` and `docker-compose.prod.yml` both hardcode `POSTGRES_PASSWORD: iris_password`
+- ~~`docker-compose.yml` and `docker-compose.prod.yml` both hardcode the database password~~ **Superseded by IR-154 (2026-09-08): fixed.**
 - `settings/base.py:79-82` defaults `DB_PASSWORD` to the same value
 - `.env.example` ships `SECRET_KEY=change-me-in-production`
 - `requirements/base.txt` lists `pgvector` **twice** with conflicting constraints (`>=0.3` line 11, `>=0.2.4` line 21)

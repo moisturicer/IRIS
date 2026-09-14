@@ -127,6 +127,20 @@ export function rolesFor(key: ScreenKey): RoleName[] {
   return SCREEN_ACCESS[key].roles as unknown as RoleName[];
 }
 
+/**
+ * The route a screen is registered at.
+ *
+ * Exists so nothing outside this file writes a path string of its own. Before
+ * IR-201, `roleDashboard.ts` kept its own copy of the login landing paths and
+ * still pointed at `/review/pending` long after IR-143 replaced it with
+ * `/review` — four of the six roles 404'd immediately after signing in, and
+ * nothing caught it, because a hand-written string cannot be checked against
+ * the router. Ask for a `ScreenKey` and the compiler does that work.
+ */
+export function pathFor(key: ScreenKey): string {
+  return SCREEN_ACCESS[key].path;
+}
+
 export function canAccess(role: RoleName | null | undefined, key: ScreenKey): boolean {
   if (!role) return false;
   return (SCREEN_ACCESS[key].roles as readonly RoleName[]).includes(role);

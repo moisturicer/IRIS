@@ -1,12 +1,49 @@
 from pathlib import Path
 from datetime import timedelta
-from decouple import config
+
+from decouple import UndefinedValueError, config
+from django.core.exceptions import ImproperlyConfigured
+
+from .validation import missing_required, non_blank
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = config("SECRET_KEY")
+
+def csv_list(value):
+    """A comma-separated environment variable as a list, blanks dropped.
+
+    ``"".split(",")`` is ``[""]`` — one blank entry, which reads as configured
+    everywhere it is checked for emptiness. Everything list-shaped here goes
+    through this instead.
+    """
+    return list(non_blank(str(value).split(",")))
+
+
+def required(name, cast=str):
+    """Read a mandatory setting, or refuse to start (IR-154).
+
+    CLAUDE.md's Environment and secrets rule: the app fails to start on a
+    missing required secret rather than defaulting silently. A default is what
+    turns a forgotten variable into a deployment running on the credential that
+    was committed to the repository — which is the bug this ticket exists to
+    close, not a convenience worth keeping.
+    """
+    try:
+        value = config(name, cast=cast)
+    except UndefinedValueError:
+        value = None
+
+    if missing_required({name: value}):
+        raise ImproperlyConfigured(
+            f"{name} is not set. It has no default: see backend/.env.example "
+            "for every variable this deployment must supply."
+        )
+    return value
+
+
+SECRET_KEY = required("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost").split(",")
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost", cast=csv_list)
 
 # ---- Apps ---------------------------------------------------------------
 
@@ -81,12 +118,18 @@ ASGI_APPLICATION = "config.asgi.application"
 
 # ---- Database -----------------------------------------------------------
 
+# The three credential components have no defaults on purpose (IR-154). The
+# defaults they replace were credential literals in the repository, and they
+# were live: both Compose files provisioned Postgres with exactly those
+# values, so a deployment that forgot to set them did not fail — it connected.
+# HOST and PORT keep defaults because neither is a credential and
+# localhost:5432 is the right guess when running outside Compose.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_NAME", default="iris_db"),
-        "USER": config("DB_USER", default="iris_user"),
-        "PASSWORD": config("DB_PASSWORD", default="iris_password"),
+        "NAME": required("DB_NAME"),
+        "USER": required("DB_USER"),
+        "PASSWORD": required("DB_PASSWORD"),
         "HOST": config("DB_HOST", default="localhost"),
         "PORT": config("DB_PORT", default="5432"),
     }
@@ -154,7 +197,15 @@ SIMPLE_JWT = {
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
 
-CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
+# An explicit allowlist, always — there is no "allow all" switch in any
+# settings module, and production.py refuses to start if one reappears.
+# CORS_ALLOW_CREDENTIALS below is why: with credentials enabled, a wildcard
+# origin lets any site make authenticated requests on a logged-in user's
+# behalf. Defaults to the single configured frontend origin; set
+# CORS_ALLOWED_ORIGINS when a deployment serves more than one.
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS", default=FRONTEND_URL, cast=csv_list
+)
 CORS_ALLOW_CREDENTIALS = True
 
 # ---- Email --------------------------------------------------------------
@@ -197,6 +248,63 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# ---- Workflow (ADR-002, ADR-004, ADR-005) --------------------------------
+
+# The per-instance workflow table. `apps.records.lifecycle.load_table()` reads
+# `STAGES` and `TRANSITIONS` from here; both are absent by default, so CIT-U's
+# table in that module is used unchanged.
+#
+# `RESUBMISSION_POLICY` is ADR-004's experimental control (IR-137):
+# `clearance_aware` preserves every non-declining office's completed review and
+# is the contribution; `restart_all` resets them all, and exists so the claim
+# can be measured against something instead of asserted.
+#
+# **This is deployment configuration and must stay that way.** ADR-004 makes it
+# a hard operational rule: the comparison arm runs on a dedicated, short-lived
+# evaluation instance, never on a customer's production one, because a policy
+# that resets clearances would destroy live reviewers' completed work. It has no
+# endpoint and no serializer field, and `apps/records/test_lifecycle.py` fails
+# if any module outside a short allowlist so much as names it.
+#
+# The value is validated by `RecordsConfig.ready()`, so an unrecognised one
+# stops the app at startup instead of defaulting — a silent fallback would run
+# the evaluation on the production arm and say nothing. The spec's own upper-case
+# spelling (`RESTART_ALL`) is accepted.
+WORKFLOW_TABLE = {
+    "RESUBMISSION_POLICY": config("RESUBMISSION_POLICY", default="clearance_aware"),
+}
+
+# ---- Logging -------------------------------------------------------------
+
+# Until IR-137 there was no LOGGING at all, so the root logger sat at its
+# default WARNING with no handlers and every `logger.info` in `apps/` was
+# discarded. That made ADR-004's "record which policy was active for each
+# evaluation run" false in practice: the line was written and thrown away.
+#
+# Deliberately minimal. Root stays at WARNING so Django's own noise is
+# unchanged; only `apps.*` is lifted to INFO, and `disable_existing_loggers`
+# is False so Django's default loggers survive. `apps/records/test_lifecycle.py`
+# asserts INFO really is enabled, because this failing silently is exactly how
+# it went unnoticed the first time.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "apps": {
+            "handlers": ["console"],
+            "level": config("APP_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+    },
+}
 
 # ---- AI -----------------------------------------------------------------
 

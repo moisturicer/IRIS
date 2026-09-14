@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-02 · **amended 2026-09-04, §Research Impact** · **amended 2026-09-08, §Decision (retrieval scope)**
+Accepted — 2026-09-02 · **amended 2026-09-04, §Research Impact** · **amended 2026-09-08, §Decision (retrieval scope)** · **amended 2026-09-10 by [ADR-020](020-per-record-assessment-brief.md), §Decision (exclusions)** — summarization (FR-M4-02) is no longer excluded; it is specified as the IRIS Assessment Brief. Conversational memory and history had already been reversed by [ADR-019](019-persisted-unified-conversation-history.md); agents and HyDE remain excluded
 
 **Supersedes [ADR-006](006-minimum-rag-pipeline.md).** ADR-006's exclusions of full-text chunking, reranking and multiple providers are reversed. Its retrieval-visibility requirement and its timebox-with-fallback discipline are **retained** and restated below.
 
