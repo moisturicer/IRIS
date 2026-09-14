@@ -319,6 +319,22 @@ Note it is **synchronous and pure.** Docling-Studio's port is `async` because it
 
 > **Amended 2026-09-04 — see [section 14](#14-open-questions).** `voyage-context-4`'s contextualized embeddings now do inside the model roughly what this decorator does by string concatenation, so the prefixed string this section describes is no longer what gets sent to Voyage. The decorator, and `Chunk.context_path`, are unchanged in shape and stay for one reason: display — a citation's breadcrumb. There is no local-model fallback in this architecture (see ADR-008 and ADR-015) for the prefix to otherwise serve.
 
+> **Amended 2026-09-15 (IR-242) — the trail depends on heading levels the extractor does not supply.**
+> `context_path.py` keys its stack on `DocumentElement.level`, evicting everything at level >= N. Docling does not
+> infer outline depth: it labels every heading `section_header` and reports `level` 1 for all of them — all 74 of
+> them on a real 47-page submission, `2.1.1 Kimi Delta Attention` alongside `2 Model Architecture`. A document of
+> uniform level 1 therefore collapsed to a depth-1 trail (`Title > Heading`) on **every** chunk, and the
+> disambiguation this section is about never happened.
+>
+> This is not an IRIS defect: docling-core's own `HybridChunker` and `HierarchicalChunker` produce the same flat
+> trails on the same document, so any consumer of Docling inherits it. It is compensated for at the **mapping
+> layer** — `extraction/docling_mapping.py::_level` derives depth from the heading's own section numbering
+> (`3` → 1, `3.2` → 2, `2.1.1` → 3), applied as a floor and never a ceiling, so a heading Docling has genuinely
+> resolved as nested keeps that and an unnumbered heading (front matter, `A Contributions`) is untouched. CIT-U
+> theses are numbered outlines, which is what makes this reliable here where it would not be for a general tool.
+>
+> Measured on the same submission afterwards: 38 chunks at `Title > Heading`, 22 at two headings deep, 45 at three.
+
 teammind prefixes every chunk with its heading trail before embedding:
 
 ```
