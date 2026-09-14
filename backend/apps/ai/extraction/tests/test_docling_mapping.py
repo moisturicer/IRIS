@@ -37,12 +37,12 @@ def _topleft(left, top, right, bottom):
     return {"l": left, "t": top, "r": right, "b": bottom, "coord_origin": "TOPLEFT"}
 
 
-def _doc(*, texts=(), tables=(), groups=(), body_refs=None, pages=None, name="thesis.pdf"):
+def _doc(*, texts=(), tables=(), groups=(), pictures=(), body_refs=None, pages=None, name="thesis.pdf"):
     payload = {
         "name": name,
         "texts": list(texts),
         "tables": list(tables),
-        "pictures": [],
+        "pictures": list(pictures),
         "groups": list(groups),
         "pages": pages if pages is not None else {"1": {"size": {"width": 612.0, "height": 792.0}}},
     }
@@ -607,3 +607,114 @@ def test_derived_depth_never_makes_a_heading_shallower_than_docling_said():
     heading as nested deeper than its numbering suggests, that is information
     this must not throw away."""
     assert _heading_levels(("3 Methodology", 4)) == [4]
+
+
+# ---------------------------------------------------------------------------
+# Captions that hang off a picture or a table (IR-245)
+# ---------------------------------------------------------------------------
+
+
+def _picture(ref, *, caption_ref=None, page=1, bbox=None):
+    item = {"self_ref": ref, "label": "picture", "children": []}
+    if caption_ref:
+        item["captions"] = [{"$ref": caption_ref}]
+    if page is not None:
+        prov = {"page_no": page}
+        if bbox is not None:
+            prov["bbox"] = bbox
+        item["prov"] = [prov]
+    return item
+
+
+def test_a_caption_hanging_off_a_picture_is_emitted():
+    """`_items_in_reading_order` walks `body.children`, and Docling hangs a
+    caption off the figure it labels, not off the body. On record 30 that lost
+    13 of 15 captions — including "Figure 1. - IRIS System Flow Diagram" — in a
+    document carrying 33 figures. The caption is the only retrievable text a
+    figure has, so those diagrams were invisible to search (IR-245).
+    """
+    doc = _doc(
+        texts=[
+            _text_item("#/texts/0", "text", "before the figure"),
+            _text_item(
+                "#/texts/1", "caption", "Figure 1. - IRIS System Flow Diagram",
+                page=1, bbox=_topleft(72, 100, 400, 120),
+            ),
+        ],
+        pictures=[_picture("#/pictures/0", caption_ref="#/texts/1")],
+        body_refs=["#/texts/0", "#/pictures/0"],
+    )
+
+    result = normalized_document_from_docling(doc)
+    captions = [e for e in result.elements if e.kind == CAPTION]
+
+    assert [c.text for c in captions] == ["Figure 1. - IRIS System Flow Diagram"]
+    assert captions[0].page == 1, "the caption keeps its own page"
+    assert captions[0].bboxes, "and its own region, so a citation can point at it"
+
+
+def test_a_caption_hanging_off_a_table_is_emitted_beside_its_rows():
+    doc = _doc(
+        texts=[
+            _text_item("#/texts/0", "caption", "Table #1: Definitions", page=1),
+        ],
+        tables=[
+            {
+                "self_ref": "#/tables/0",
+                "label": "table",
+                "captions": [{"$ref": "#/texts/0"}],
+                "prov": [{"page_no": 1}],
+                "data": {
+                    "table_cells": [
+                        {"text": "Term", "row_span": 1, "col_span": 1,
+                         "start_row_offset_idx": 0, "start_col_offset_idx": 0,
+                         "column_header": True},
+                        {"text": "IPAMS", "row_span": 1, "col_span": 1,
+                         "start_row_offset_idx": 1, "start_col_offset_idx": 0},
+                    ]
+                },
+            }
+        ],
+        body_refs=["#/tables/0"],
+    )
+
+    result = normalized_document_from_docling(doc)
+    kinds = [e.kind for e in result.elements]
+    texts = [e.text for e in result.elements]
+
+    assert "Table #1: Definitions" in texts
+    assert kinds.index(CAPTION) < kinds.index(TABLE_HEADER), (
+        "the caption should introduce its table, not trail it"
+    )
+
+
+def test_a_caption_reachable_from_both_body_and_its_picture_is_emitted_once():
+    """`_walk` already carries a `seen` set. Emitting captions must respect it,
+    or a caption Docling lists in both places is embedded twice."""
+    doc = _doc(
+        texts=[
+            _text_item("#/texts/0", "caption", "Figure 2. Architecture", page=1),
+        ],
+        pictures=[_picture("#/pictures/0", caption_ref="#/texts/0")],
+        body_refs=["#/texts/0", "#/pictures/0"],
+    )
+
+    result = normalized_document_from_docling(doc)
+    captions = [e.text for e in result.elements if e.kind == CAPTION]
+
+    assert captions == ["Figure 2. Architecture"]
+
+
+def test_a_picture_with_no_caption_still_contributes_nothing():
+    """A figure with no caption has no retrievable text. Emitting a placeholder
+    is a separate question (see IR-245); this pins today's behaviour so the
+    change above did not quietly introduce one."""
+    doc = _doc(
+        texts=[_text_item("#/texts/0", "text", "prose")],
+        pictures=[_picture("#/pictures/0")],
+        body_refs=["#/texts/0", "#/pictures/0"],
+    )
+
+    result = normalized_document_from_docling(doc)
+
+    assert [e.text for e in result.elements] == ["prose"]
