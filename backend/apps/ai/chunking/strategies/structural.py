@@ -390,13 +390,14 @@ def _merge_heading_only_chunks(
     real document stacks them -- a part heading, then a chapter heading, then
     the first section with a body.
 
-    All-or-nothing, and the ceiling wins: if the fold would exceed
-    ``max_tokens`` the chunks are left exactly as they were, the same
-    precedence ``_merge_short_siblings`` gives the ceiling over the floor. A
-    trailing heading with nothing after it is also left alone -- there is
-    nothing to fold into, and dropping it would lose content.
+    Folding is merging, so it honours ``merge_short_siblings``: a caller who
+    asked for no merging gets none, and there is a way back to the unmerged
+    output. The ceiling wins over this pass exactly as it wins over the floor
+    -- see ``_fold_into`` for what happens when the whole stack will not fit.
+    A trailing heading with nothing after it is left alone: there is nothing
+    to fold into, and dropping it would lose content.
     """
-    if len(chunks) <= 1:
+    if not options.merge_short_siblings or len(chunks) <= 1:
         return list(chunks)
 
     result: list[Chunk] = []
@@ -408,18 +409,34 @@ def _merge_heading_only_chunks(
             continue
 
         if pending:
-            candidate = _combine([*pending, chunk])
-            if _fits(candidate.content, options.max_tokens):
-                result.append(candidate)
-            else:
-                result.extend(pending)
-                result.append(chunk)
+            result.extend(_fold_into(pending, chunk, options))
             pending = []
         else:
             result.append(chunk)
 
     result.extend(pending)
     return result
+
+
+def _fold_into(
+    pending: list[Chunk], chunk: Chunk, options: ChunkingOptions
+) -> list[Chunk]:
+    """Fold as many of ``pending``'s trailing headings into ``chunk`` as fit.
+
+    Greedy from the nearest rather than all-or-nothing: with a part heading, a
+    chapter heading and a section heading stacked, a block too large to fold
+    whole can usually still take the nearest one or two, and leaving all three
+    bare because the outermost did not fit would keep exactly the chunks this
+    pass exists to remove.
+
+    The ceiling still wins outright -- if not even the nearest heading fits,
+    every one is emitted unchanged.
+    """
+    for first in range(len(pending)):
+        candidate = _combine([*pending[first:], chunk])
+        if _fits(candidate.content, options.max_tokens):
+            return [*pending[:first], candidate]
+    return [*pending, chunk]
 
 
 def _merge_short_siblings(chunks: list[Chunk], options: ChunkingOptions) -> list[Chunk]:
@@ -447,20 +464,7 @@ def _merge_short_siblings(chunks: list[Chunk], options: ChunkingOptions) -> list
             pending.token_count < floor
             and count_tokens(combined_content) <= options.max_tokens
         ):
-            pending = Chunk(
-                text=combined_content,
-                content=combined_content,
-                context_path=pending.context_path,
-                sequence=0,
-                token_count=count_tokens(combined_content),
-                source_page=(
-                    pending.source_page
-                    if pending.source_page is not None
-                    else nxt.source_page
-                ),
-                element_kinds=pending.element_kinds | nxt.element_kinds,
-                bboxes=dedupe_regions(pending.bboxes + nxt.bboxes),
-            )
+            pending = _combine([pending, nxt])
         else:
             result.append(pending)
             pending = nxt
