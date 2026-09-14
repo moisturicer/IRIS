@@ -166,7 +166,7 @@ def ingest_extraction(
     from apps.ai.models import get_active_embedding_space
 
     options = options or default_chunking_options()
-    record_id = extraction.upload.record_id
+    record_id = extraction.resolved_record_id
 
     document = extraction.as_normalized_document()
     if document is None:
