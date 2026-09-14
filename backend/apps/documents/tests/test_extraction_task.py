@@ -80,13 +80,16 @@ class FailingExtractor:
 
 
 @pytest.fixture(autouse=True)
-def queued_chunkings(monkeypatch):
-    """Every upload id handed to the chunking task, in place of a real
-    ``delay`` — which blocks on a broker this test process has no reason to
-    need. Autouse, because a test that forgot it would hang rather than
-    fail."""
+def queued_manuscript_chunkings(monkeypatch):
+    """Every record id handed to the manuscript chunking task, in place of a
+    real ``delay`` -- which blocks on a broker this test process has no
+    reason to need. Autouse, because a test that forgot it would hang rather
+    than fail. Named for the manuscript path specifically: as of IR-195,
+    supplementary uploads (the only thing this file's ``extract_pdf_text``
+    tests exercise) never reach this at all -- see
+    ``test_a_successful_extraction_does_not_queue_chunking`` below."""
     calls = []
-    monkeypatch.setattr(tasks, "_queue_chunking", calls.append)
+    monkeypatch.setattr(tasks, "_queue_manuscript_chunking", calls.append)
     return calls
 
 
@@ -204,14 +207,16 @@ def test_a_re_extraction_clears_a_previous_error(monkeypatch, upload, extraction
     assert (extraction.status, extraction.error) == ("done", "")
 
 
-def test_a_successful_extraction_hands_the_document_to_the_chunker(
-    monkeypatch, upload, extraction, queued_chunkings
+def test_a_successful_extraction_does_not_queue_chunking(
+    monkeypatch, upload, extraction, queued_manuscript_chunkings
 ):
-    """IR-116: an upload reaches an active chunk set with no manual step, and
-    the chunking runs in a worker of its own rather than on this one."""
+    """IR-195: a supplementary upload (an Ethics Clearance form, a Patent
+    Draft -- everything ``UploadSlot`` seeds) is never the manuscript, so it
+    must never reach the RAG corpus. Only the manuscript path
+    (``extract_manuscript_text``) queues chunking."""
     _run(monkeypatch, FakeExtractor(), upload.id)
 
-    assert queued_chunkings == [upload.id]
+    assert queued_manuscript_chunkings == []
 
 
 # ---------------------------------------------------------------------------
@@ -243,14 +248,6 @@ def test_a_failure_leaves_no_half_written_structure(monkeypatch, upload, extract
     assert extraction.structure == {}
     assert extraction.extracted_text == ""
     assert extraction.as_normalized_document() is None
-
-
-def test_a_failed_extraction_hands_nothing_to_the_chunker(
-    monkeypatch, upload, extraction, queued_chunkings
-):
-    _run(monkeypatch, FailingExtractor(ExtractionError("boom")), upload.id)
-
-    assert queued_chunkings == []
 
 
 def test_the_task_retries_three_times_before_giving_up(monkeypatch, upload, extraction):
