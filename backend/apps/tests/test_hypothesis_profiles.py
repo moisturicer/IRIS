@@ -5,6 +5,10 @@ decides how the suite behaves must not itself depend on the environment it is
 deciding about (IR-194).
 """
 
+import ast
+from pathlib import Path
+
+import pytest
 from hypothesis import HealthCheck, settings as hypothesis_settings
 
 from testing.hypothesis_profiles import (
@@ -40,8 +44,6 @@ class ProfileSelectionTests:
     def test_an_unknown_explicit_profile_is_rejected_rather_than_ignored(self):
         """A typo must not silently hand back the strict default — that is the
         same silent-fallback failure the chunker registry refuses (IR-110)."""
-        import pytest
-
         with pytest.raises(ValueError) as excinfo:
             profile_for({PROFILE_ENV_VAR: "nonesuch"})
         assert "nonesuch" in str(excinfo.value)
@@ -94,17 +96,31 @@ class ProfileIsActuallyReachedTests:
     hold on a developer's machine too.
     """
 
-    def _property_test_sources(self):
-        from pathlib import Path
+    def _offenders(self):
+        """Files whose `@settings(...)` passes `suppress_health_check`.
 
+        Parsed rather than grepped: a substring search also matches the word
+        in a comment or a docstring — including one explaining this very rule —
+        and a test that fails on prose is worse than no test.
+        """
         root = Path(__file__).resolve().parent.parent / "ai"
-        sources = [
-            p for p in root.rglob("test_*.py") if "suppress_health_check" in p.read_text(encoding="utf-8")
-        ]
-        return sources
+        offenders = []
+        for path in root.rglob("test_*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                name = getattr(func, "id", None) or getattr(func, "attr", None)
+                if name != "settings":
+                    continue
+                if any(kw.arg == "suppress_health_check" for kw in node.keywords):
+                    offenders.append(path)
+                    break
+        return offenders
 
     def test_no_property_test_overrides_the_profiles_health_checks(self):
-        offenders = [str(p) for p in self._property_test_sources()]
+        offenders = [str(p) for p in self._offenders()]
         assert offenders == [], (
             "These tests pass suppress_health_check themselves, which replaces "
             "the profile's list and re-exposes them to the too_slow flake "
