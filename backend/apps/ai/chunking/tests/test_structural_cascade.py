@@ -237,6 +237,39 @@ def test_a_heading_only_chunk_stays_when_merging_would_breach_the_ceiling():
     assert any("word" in c.content for c in result.chunks)
 
 
+def test_the_nearest_headings_still_fold_when_the_whole_stack_will_not_fit():
+    """All-or-nothing would keep every bare heading whenever the outermost one
+    pushed the block over the ceiling, leaving behind exactly the chunks this
+    pass exists to remove. Greedy from the nearest takes what fits."""
+    document = build(
+        DocumentElement(kind=HEADING, text="Part One Of The Whole Work", level=1),
+        DocumentElement(kind=HEADING, text="6 Evaluations", level=2),
+        DocumentElement(kind=PARAGRAPH, text=("word " * 8).strip()),
+    )
+    result = chunker().chunk(document, options(max_tokens=11))
+
+    assert all(c.token_count <= 11 for c in result.chunks)
+    assert any(
+        "6 Evaluations" in c.content and "word" in c.content for c in result.chunks
+    ), "the nearest heading should have folded even though the outer one could not"
+
+
+def test_folding_respects_a_caller_who_turned_merging_off():
+    """`merge_short_siblings=False` means the caller asked for no merging.
+    Folding is merging, so it must honour that rather than quietly happening
+    anyway — otherwise there is no way to get the unmerged output back."""
+    document = build(
+        DocumentElement(kind=HEADING, text="6 Evaluations", level=1),
+        DocumentElement(kind=HEADING, text="6.1 Main Results", level=2),
+        DocumentElement(kind=PARAGRAPH, text="alpha beta"),
+    )
+    result = chunker().chunk(
+        document, options(max_tokens=50, merge_short_siblings=False)
+    )
+
+    assert any(c.element_kinds == frozenset({HEADING}) for c in result.chunks)
+
+
 def test_a_trailing_heading_with_nothing_after_it_is_left_alone():
     """There is nothing to merge forward into. Dropping it instead would
     violate the no-content-loss property."""

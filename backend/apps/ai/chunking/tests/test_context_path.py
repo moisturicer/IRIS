@@ -263,3 +263,32 @@ def test_a_folded_heading_keeps_the_path_of_the_section_it_folded_into():
         "3.2 Sampling Procedure",
     )
     assert "3 Methodology" in merged[0].content, "the heading text is not lost"
+
+
+def test_a_fixed_window_chunk_ending_on_a_heading_keeps_its_own_sections_path():
+    """The fixed-window baseline knows nothing about headings — its own
+    docstring says so — so it will happily close a window on one.
+
+    Such a window is mostly the *previous* section's prose, and labelling it
+    with the trailing heading would put Introduction text under Methods. This
+    is why the rule is "first word that is not a heading" rather than simply
+    the chunk's last word: the last-word rule fixes IR-241's folded chunk and
+    silently breaks the strategy the cascade is measured against on the eval
+    set, which would confound that comparison.
+    """
+    document = doc(
+        DocumentElement(kind=HEADING, text="1 Intro", level=1),
+        DocumentElement(kind=PARAGRAPH, text="alpha beta gamma delta epsilon"),
+        DocumentElement(kind=HEADING, text="2 Methods", level=1),
+        DocumentElement(kind=PARAGRAPH, text="zeta eta theta"),
+        title="A Thesis",
+    )
+    options = ChunkingOptions(strategy="fixed-window", max_tokens=9)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    for chunk in result.chunks:
+        if "alpha" in chunk.content:
+            assert chunk.context_path == ("A Thesis", "1 Intro"), (
+                f"Introduction prose labelled {chunk.context_path} "
+                f"in chunk {chunk.content!r}"
+            )
