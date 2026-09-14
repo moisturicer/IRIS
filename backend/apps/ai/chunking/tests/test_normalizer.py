@@ -14,6 +14,8 @@ from apps.ai.chunking.document import (
     PAGE_FOOTER,
     PAGE_HEADER,
     PARAGRAPH,
+    TABLE_HEADER,
+    TABLE_ROW,
     DocumentElement,
     NormalizedDocument,
 )
@@ -29,6 +31,100 @@ def build(*elements: DocumentElement, title: str = "A Thesis") -> NormalizedDocu
 
 def box(page: int = 1) -> BoundingBox:
     return BoundingBox(page=page, left=0, top=0, right=100, bottom=10)
+
+
+def _para(text, page):
+    return DocumentElement(kind=PARAGRAPH, text=text, page=page, bboxes=(box(page),))
+
+
+def test_a_short_line_repeating_across_pages_is_dropped_whatever_its_label():
+    """IR-247. Record 30 carries `Published Date: 17/04/2026` on nearly every
+    page, and Docling labels the same string `page_header` 18 times and
+    `paragraph` 27 times. Normalization dropped furniture by trusting the
+    label, so the 27 survivors landed in 20 of 75 chunks — 27% of the corpus —
+    sometimes twice in one chunk.
+    """
+    elements = [_para("Published Date: 17/04/2026", page) for page in range(1, 11)]
+    # Distinct per page, as real prose is. An identical short line on every
+    # page would be furniture by this rule's own definition, whatever it says
+    # about itself — see the test below, which pins that deliberately.
+    elements += [_para(f"Findings for section {page}.", page) for page in range(1, 11)]
+    result = normalize(build(*elements), ChunkingOptions())
+    texts = [e.text for e in result.elements]
+
+    assert "Published Date: 17/04/2026" not in texts
+    assert sum(t.startswith("Findings for section") for t in texts) == 10, (
+        "content must be untouched"
+    )
+
+
+def test_a_short_line_identical_on_every_page_is_furniture_whatever_it_says():
+    """The rule cannot read meaning, only shape. A short line repeated verbatim
+    across most pages is furniture by definition — that is the whole premise —
+    and a document that puts real content in that shape loses it.
+
+    Recorded rather than hidden: the escape hatch is that furniture must be
+    short, so anything above ten words survives regardless.
+    """
+    elements = [_para("Confidential draft.", page) for page in range(1, 11)]
+    result = normalize(build(*elements), ChunkingOptions())
+
+    assert [e.text for e in result.elements] == []
+
+
+def test_a_line_repeating_within_one_page_is_kept():
+    """The rule keys on *page spread*, not raw frequency. A line repeated
+    several times on one page is a list label or a table cell, not furniture."""
+    elements = [_para("Status: pending", 1) for _ in range(8)]
+    elements.append(_para("Some prose.", 1))
+    result = normalize(build(*elements), ChunkingOptions())
+
+    assert [e.text for e in result.elements].count("Status: pending") == 8
+
+
+def test_a_repeated_table_header_is_never_treated_as_furniture():
+    """`repeat_table_header` is a feature (IR-111): a table split across pages
+    carries its header into every fragment. Furniture detection must not
+    delete the very thing another rule works to repeat."""
+    elements = []
+    for page in range(1, 11):
+        elements.append(
+            DocumentElement(kind=TABLE_HEADER, text="| FR-ID | Label |", page=page,
+                            bboxes=(box(page),))
+        )
+        elements.append(
+            DocumentElement(kind=TABLE_ROW, text=f"| FR-{page} | thing |", page=page,
+                            bboxes=(box(page),))
+        )
+    result = normalize(build(*elements), ChunkingOptions())
+
+    assert [e.text for e in result.elements].count("| FR-ID | Label |") == 10
+
+
+def test_a_long_repeated_paragraph_is_not_furniture():
+    """Furniture is terse. A full sentence repeating across pages is a
+    boilerplate clause, and deleting it is content loss."""
+    sentence = (
+        "This document is confidential and may not be reproduced without the "
+        "written permission of the university research office."
+    )
+    elements = [_para(sentence, page) for page in range(1, 11)]
+    result = normalize(build(*elements), ChunkingOptions())
+
+    assert [e.text for e in result.elements].count(sentence) == 10
+
+
+def test_dropping_furniture_leaves_surviving_regions_untouched():
+    """Normalization drops elements rather than rewriting a string precisely so
+    page and bbox data survives for the citation overlay."""
+    elements = [_para("Published Date: 17/04/2026", page) for page in range(1, 11)]
+    keeper = _para("Real content.", 4)
+    elements.append(keeper)
+    result = normalize(build(*elements), ChunkingOptions())
+    survivor = [e for e in result.elements if e.text == "Real content."][0]
+
+    assert survivor.page == 4
+    assert survivor.bboxes == keeper.bboxes
 
 
 # --------------------------------------------------------------------------
