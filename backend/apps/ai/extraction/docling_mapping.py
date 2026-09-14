@@ -29,6 +29,7 @@ Docling emits either origin; PDF.js viewports are top-left. Normalizing at
 the one place that knows the page height means no later consumer can forget.
 """
 
+import re
 from typing import Any, Iterator, Mapping, Optional
 
 from apps.ai.chunking.document import (
@@ -60,6 +61,12 @@ _LABEL_KINDS: Mapping[str, str] = {
 _DEFAULT_PAGE_HEIGHT = 792.0
 
 _TITLE_LABEL = "title"
+
+# Derived from the map above rather than restated, so a label that starts
+# mapping to HEADING cannot be missed here.
+_HEADING_LABELS = frozenset(
+    label for label, kind in _LABEL_KINDS.items() if kind == HEADING
+)
 
 # Docling's table-shaped labels. ``document_index`` is a table of contents,
 # which Docling emits with the same cell structure as a table.
@@ -206,13 +213,70 @@ def _is_table(item: Mapping[str, Any]) -> bool:
     return isinstance(data, Mapping) and "table_cells" in data
 
 
+#: A section number opening a heading: ``3``, ``3.2``, ``2.1.1``, with an
+#: optional trailing dot, followed by whitespace and then actual words.
+#:
+#: The trailing ``\s+\S`` matters. Without it ``1,000 Samples`` matches its
+#: leading ``1`` and a heading about a sample size is read as a top-level
+#: section; requiring the separator to be whitespace rejects it, because a
+#: comma is not a dot. A bare number with no text after it is not an outline
+#: entry either, and is rejected the same way.
+_SECTION_NUMBER = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+\S")
+
+
+def _numbered_depth(text: str) -> Optional[int]:
+    """Depth implied by a heading's own section numbering, if it has any.
+
+    ``3`` is depth 1, ``3.2`` is 2, ``2.1.1`` is 3. Returns ``None`` for a
+    heading that carries no section number — front matter ("Abstract"),
+    appendices ("A Contributions", which is a letter rather than a numbering
+    scheme), and anything else unnumbered.
+    """
+    match = _SECTION_NUMBER.match(text.strip())
+    if match is None:
+        return None
+    return match.group(1).count(".") + 1
+
+
 def _level(item: Mapping[str, Any], label: str) -> Optional[int]:
+    """The heading depth the context path nests on.
+
+    Docling does not infer outline depth: it labels every heading
+    ``section_header`` and reports ``level`` 1 for all of them — all 74 on a
+    real 47-page submission, ``2.1.1 Kimi Delta Attention`` alongside
+    ``2 Model Architecture``. `context_path.py` keys its stack on level and
+    evicts everything at level >= N, so a document of uniform level 1
+    collapses to a depth-1 trail and the disambiguation IR-112 exists for
+    never happens (IR-242).
+
+    The document's own numbering is the reliable signal, and CIT-U theses are
+    numbered outlines. It is applied as a *floor*, never a ceiling: the
+    derived depth is used only where it is deeper than what Docling reported,
+    so a heading Docling has genuinely resolved as nested keeps that, and an
+    unnumbered heading is left exactly as it was.
+
+    Confirmed not to be an IRIS-only problem: docling-core's own
+    ``HybridChunker`` produces the same flat depth-1 trails on the same
+    document. This compensates at the mapping layer rather than waiting on
+    the extractor.
+    """
     if label == _TITLE_LABEL:
         # The document's own title is its top heading. Without a level the
         # context path has no root to hang the rest of the document from.
         return 1
-    level = item.get("level")
-    return level if isinstance(level, int) else None
+
+    reported = item.get("level")
+    reported = reported if isinstance(reported, int) else None
+
+    if label not in _HEADING_LABELS:
+        return reported
+
+    derived = _numbered_depth(item.get("text") or "")
+    if derived is None:
+        return reported
+    if reported is None:
+        return derived
+    return max(reported, derived)
 
 
 def _table_elements(
