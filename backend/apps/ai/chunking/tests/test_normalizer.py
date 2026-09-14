@@ -6,7 +6,7 @@ case is stated as "this document goes in, that document comes out."
 """
 
 import pytest
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import given, settings, strategies as st
 
 from apps.ai.chunking.document import (
     BoundingBox,
@@ -294,7 +294,7 @@ _paragraph = st.lists(_words, min_size=1, max_size=40).map(" ".join)
 _texts = st.lists(_paragraph, min_size=1, max_size=8)
 
 
-@settings(max_examples=60, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(max_examples=60)
 @given(texts=_texts, artefacts=st.booleans())
 @pytest.mark.parametrize("strategy_id", sorted(registered_strategies()))
 def test_property_no_content_is_lost_after_normalization(strategy_id, texts, artefacts):
