@@ -14,6 +14,7 @@ from apps.ai.chunking.document import (
     PAGE_FOOTER,
     PAGE_HEADER,
     PARAGRAPH,
+    TABLE_ROW,
     DocumentElement,
     NormalizedDocument,
 )
@@ -189,6 +190,104 @@ def test_an_excluded_section_ends_at_the_next_heading():
     result = normalize(document, ChunkingOptions(exclude_sections=("references",)))
 
     assert [e.text for e in result.elements] == ["Appendix", "Appendix content."]
+
+
+def test_a_numbered_reference_heading_is_excluded():
+    """IR-244. The matcher compared whole heading text, so the shipped default
+    list only ever fired on a heading reading exactly "References". Both real
+    CIT-U submissions run through IR-116 number their sections, and both kept
+    their bibliography: record 29 has "5. REFERENCES", record 30 has
+    "1.4.   References" (three spaces, as the document writes it).
+    """
+    for heading in ("5. REFERENCES", "1.4.   References", "2.1.1 References", "5 References"):
+        document = build(
+            DocumentElement(kind=HEADING, text="4. Results", level=1),
+            DocumentElement(kind=PARAGRAPH, text="findings"),
+            DocumentElement(kind=HEADING, text=heading, level=1),
+            DocumentElement(kind=PARAGRAPH, text="Adebiyi, M. O. et al."),
+        )
+        result = normalize(document, ChunkingOptions(exclude_sections=("References",)))
+        texts = [e.text for e in result.elements]
+        assert heading not in texts, f"{heading!r} was not excluded"
+        assert "Adebiyi, M. O. et al." not in texts, f"body under {heading!r} survived"
+        assert "findings" in texts, "the preceding section must be untouched"
+
+
+def test_a_heading_that_merely_contains_the_word_is_not_excluded():
+    """The fix must not become a substring match. These are real sections with
+    real content, and losing one is worse than keeping a bibliography."""
+    for heading in ("Reference Architecture", "References and Further Reading",
+                    "3. Referencing Conventions"):
+        document = build(
+            DocumentElement(kind=HEADING, text=heading, level=1),
+            DocumentElement(kind=PARAGRAPH, text="real content here"),
+        )
+        result = normalize(document, ChunkingOptions(exclude_sections=("References",)))
+        texts = [e.text for e in result.elements]
+        assert heading in texts, f"{heading!r} was wrongly excluded"
+        assert "real content here" in texts
+
+
+def test_the_shipped_default_list_excludes_what_the_real_documents_use():
+    """The defaults in .env.example, against the headings the two real
+    submissions actually carry."""
+    shipped = ("References", "Bibliography", "Works Cited", "Literature Cited")
+    for heading in ("5. REFERENCES", "1.4.   References", "7. BIBLIOGRAPHY",
+                    "Works Cited", "6.2 Literature Cited"):
+        document = build(
+            DocumentElement(kind=HEADING, text=heading, level=1),
+            DocumentElement(kind=PARAGRAPH, text="citation list"),
+        )
+        result = normalize(document, ChunkingOptions(exclude_sections=shipped))
+        assert [e.text for e in result.elements] == [], f"{heading!r} survived"
+
+
+def test_the_table_of_contents_is_excluded_but_the_title_block_is_not():
+    """IR-246. A table of contents is the worst retrieval bait in a thesis: it
+    holds every section name and none of their content, so it scores against a
+    query about any section and returns a page number. On record 30 it ranked
+    within 0.005 of the correct answer for "user characteristics and
+    constraints".
+
+    The title block is deliberately kept — it carries the document's identity,
+    which is the one part of front matter worth retrieving.
+    """
+    from django.conf import settings as django_settings
+
+    document = build(
+        DocumentElement(kind=HEADING, text="CEBU INSTITUTE OF TECHNOLOGY UNIVERSITY", level=1),
+        DocumentElement(kind=HEADING, text="Software Requirements Specifications", level=1),
+        DocumentElement(kind=HEADING, text="Table of Contents", level=1),
+        DocumentElement(kind=TABLE_ROW, text="| 1.1. Purpose | 4 |"),
+        DocumentElement(kind=TABLE_ROW, text="| 1.2. Scope | 4 |"),
+        DocumentElement(kind=HEADING, text="1.   Introduction", level=1),
+        DocumentElement(kind=PARAGRAPH, text="This document is the SRS."),
+    )
+    result = normalize(
+        document,
+        ChunkingOptions(exclude_sections=tuple(django_settings.AI_CHUNK_EXCLUDE_SECTIONS)),
+    )
+    texts = [e.text for e in result.elements]
+
+    assert "Table of Contents" not in texts
+    assert not any("Purpose | 4" in t for t in texts), "TOC rows survived"
+    assert "CEBU INSTITUTE OF TECHNOLOGY UNIVERSITY" in texts, "the title block must survive"
+    assert "This document is the SRS." in texts, "the section after the TOC must survive"
+
+
+def test_the_navigation_indexes_are_excluded_by_default():
+    """`List of Tables` / `List of Figures` are the same shape as a table of
+    contents: section or caption names plus page numbers, no content."""
+    from django.conf import settings as django_settings
+
+    shipped = tuple(django_settings.AI_CHUNK_EXCLUDE_SECTIONS)
+    for heading in ("Table of Contents", "Contents", "List of Tables", "List of Figures"):
+        document = build(
+            DocumentElement(kind=HEADING, text=heading, level=1),
+            DocumentElement(kind=PARAGRAPH, text="page-number filler"),
+        )
+        result = normalize(document, ChunkingOptions(exclude_sections=shipped))
+        assert [e.text for e in result.elements] == [], f"{heading!r} survived"
 
 
 def test_no_exclude_sections_means_nothing_is_dropped_on_that_basis():
