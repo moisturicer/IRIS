@@ -143,9 +143,23 @@ class ContextPathChunker:
         decorated: list[Chunk] = []
 
         for chunk in inner_set.chunks:
-            path = words_with_paths[cursor][1] if cursor < len(words_with_paths) else last_path
-            last_path = path
+            start = cursor
             cursor = _advance_cursor(document_words, cursor, chunk.content.split())
+
+            # The trail at the chunk's *last* word, not its first. The two
+            # differ only for a chunk that spans a heading, which before
+            # IR-241 no chunk could do -- sectioning split on every heading.
+            # A heading-only chunk now folds forward into the section it
+            # labels, and taking the first word's trail would hand the merged
+            # chunk the parent's path and silently drop the more specific
+            # child heading the content actually sits under.
+            index = cursor - 1 if cursor > start else start
+            path = (
+                words_with_paths[index][1]
+                if index < len(words_with_paths)
+                else last_path
+            )
+            last_path = path
 
             path = _truncate_middle(path, options.context_path_max_tokens)
             prefix = _PATH_SEPARATOR.join(path)
