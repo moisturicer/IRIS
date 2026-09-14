@@ -566,10 +566,40 @@ def test_an_unnumbered_heading_keeps_the_level_docling_gave_it():
     ) == [1, 2, 1]
 
 
-def test_a_leading_number_that_is_not_a_section_number_is_left_alone():
-    """`1,000` is not `1.000`, and a bare number is not an outline."""
-    assert _heading_levels(("1,000 Samples Analysed", 1)) == [1]
-    assert _heading_levels(("2024 Results", 1)) == [1]
+def test_a_thousands_separator_is_not_a_section_number():
+    """`1,000` is not `1.000`. Docling's level is deliberately 2 here so the
+    assertion fails if the derivation wrongly fires — with a reported level of
+    1 this passes either way and tests nothing."""
+    assert _heading_levels(("1,000 Samples Analysed", 2)) == [2]
+
+
+def test_a_year_is_read_as_a_top_level_number_which_costs_nothing():
+    """`2024 Results` does match the pattern, at depth 1. Harmless: depth 1 is
+    what an unnumbered top-level heading gets anyway, and the floor rule means
+    it can only ever raise a level, never lower one. Asserted with a deeper
+    reported level so this documents the real behaviour rather than passing by
+    coincidence."""
+    assert _heading_levels(("2024 Results", 3)) == [3]
+
+
+def test_a_decimal_measurement_in_a_heading_is_a_known_false_positive():
+    """Recorded rather than hidden: `3.5 kg of Feed` and `2.4 GHz Antenna
+    Design` are lexically identical to `3.2 Sampling Procedure`, so they are
+    read as depth 2.
+
+    The blast radius is contained. Because the derivation is a floor, the
+    heading itself is still the nearest entry in its own trail; it gains a
+    parent it should not have, and the next genuinely top-level heading evicts
+    it correctly. Distinguishing them needs the document's numbering sequence
+    (a real outline is monotonic — `3.2` follows `3.1`), which is document-level
+    context `_level` does not have and which should be tuned against real
+    theses rather than guessed at here.
+
+    This test exists so that whoever adds that check sees the case already
+    written down, and so the limitation cannot be mistaken for an oversight.
+    """
+    assert _heading_levels(("3.5 kg of Feed", 1)) == [2]
+    assert _heading_levels(("2.4 GHz Antenna Design", 1)) == [2]
 
 
 def test_derived_depth_never_makes_a_heading_shallower_than_docling_said():

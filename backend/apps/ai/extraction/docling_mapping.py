@@ -231,6 +231,17 @@ def _numbered_depth(text: str) -> Optional[int]:
     heading that carries no section number — front matter ("Abstract"),
     appendices ("A Contributions", which is a letter rather than a numbering
     scheme), and anything else unnumbered.
+
+    **Known false positive, recorded rather than hidden:** a decimal
+    measurement is lexically identical to a section number, so "3.5 kg of
+    Feed" and "2.4 GHz Antenna Design" read as depth 2. Contained rather than
+    harmless — because the caller treats this as a floor, such a heading is
+    still the nearest entry in its own trail and merely gains a parent it
+    should not have, and the next genuinely top-level heading evicts it. Telling
+    the two apart needs the document's numbering *sequence* (a real outline is
+    monotonic: ``3.2`` follows ``3.1``), which is document-level context this
+    function does not have, and which wants tuning against real theses rather
+    than guessing here. See the characterisation test of the same name.
     """
     match = _SECTION_NUMBER.match(text.strip())
     if match is None:
