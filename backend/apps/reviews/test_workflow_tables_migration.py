@@ -85,9 +85,14 @@ def test_the_routing_tables_migrate_in_without_changing_any_existing_row():
         offices = {office: _user(f"ir256-mig-{office}@cit.edu", office.upper())
                    for office in ("itso", "ierc", "ktto")}
 
+        # get_or_create, not get: a TransactionTestCase earlier in the run
+        # flushes the database, which removes the rows records/0002 seeds.
+        project = OldRecordType.objects.get_or_create(name="Project")[0]
+        thesis = OldRecordType.objects.get_or_create(name="Thesis / Research")[0]
+
         record = OldRecord.objects.create(
             title="Declined by IERC, peers cleared",
-            record_type=OldRecordType.objects.get(name="Project"),
+            record_type=project,
             added_by_id=owner.pk,
             pipeline_status="declined",
             requested_itso=True, requested_ierc=True, requested_ktto=True,
@@ -95,7 +100,7 @@ def test_the_routing_tables_migrate_in_without_changing_any_existing_row():
         )
         published = OldRecord.objects.create(
             title="Published",
-            record_type=OldRecordType.objects.get(name="Thesis / Research"),
+            record_type=thesis,
             added_by_id=owner.pk,
             pipeline_status="published",
         )
