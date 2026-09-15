@@ -2,542 +2,556 @@
 
 ## Status
 
-**Proposed** — 2026-09-15. **Revised the same day**, before acceptance, on a business-rule
-clarification from the project lead. Tracked on
-[IR-254](https://citiris.atlassian.net/browse/IR-254).
+**Accepted** — 2026-09-15. The workflow was settled as a business decision by **Lee Jasmin
+Adolfo** (project lead). This ADR records that decision and the design that implements it. It
+takes effect when [PR #81](https://github.com/moisturicer/IRIS/pull/81) merges. Tracked on
+[IR-254](https://citiris.atlassian.net/browse/IR-254); implementation is
+[IR-255](https://citiris.atlassian.net/browse/IR-255).
 
-**Not accepted. Three questions in it are not the author's to settle** and are marked
-**OPEN** where they arise: whether a Proposal must reach an RDCO institutional decision (§3.2),
-whether the derived lifecycle states of §4 should instead be stored, and — in §Research
-Impact — whether ad-hoc routing strengthens or weakens ADR-003's novelty argument. A fourth,
-what this displaces against ADR-001's budget, is in §MVP Impact.
+**Partially supersedes [ADR-018](018-conditional-parallel-office-routing.md)**, including its
+rule that ITSO is Project-only. **Amends [ADR-002](002-workflow-transition-table.md).**
 
-**Partially supersedes [ADR-018](018-conditional-parallel-office-routing.md)** — including
-reversing its ITSO-is-Project-only rule — and **amends
-[ADR-002](002-workflow-transition-table.md)**.
+The code inspection this rests on — the exact current-to-new mapping, the migration plan, the
+test migration plan and the Jira breakdown — is
+[`docs/workflow_routing_architecture.md`](../workflow_routing_architecture.md). This ADR holds
+the decisions; that document shows how the code gets there.
 
-The inspection this rests on, with file-and-line evidence for every claim about current
-behaviour, is [`docs/workflow_routing_architecture.md`](../workflow_routing_architecture.md).
-This ADR states decisions; that document states findings.
+### How this decision was reached, in brief
 
-### What the revision changed
+This ADR went through three drafts on the same day.
 
-The first draft got the routing mechanism right and the **semantics of intake wrong**. It
-carried `rdco_intake` forward as a party named `rdco`, which reproduced the very reading the
-clarification rejects: RDCO substantively reviewing a paper and then handing it down to a
-specialist office. §1 and §2 below are new. §3.2 (Proposal → RDCO) and §5 (ITSO on
-Thesis/Research) are new conflicts the first draft did not surface.
+1. **The first draft** introduced assignments and routing. It kept intake as part of a single
+   `rdco` party, which preserved the reading the project lead objected to: RDCO reviewing a
+   paper substantively and then handing it *down* to a specialist office.
+2. **The second draft** separated intake from RDCO. It left the Proposal decision authority
+   and the stored-versus-derived lifecycle question open.
+3. **This version** records how both were settled.
+
+One statement from the settling instruction was **withdrawn by the project lead** before this
+version was written: *"A Proposal MUST be capable of reaching RDCO for a final institutional
+decision."* Two things depended on it and are withdrawn with it:
+
+- the instruction that a Proposal "still proceeds to RDCO for final institutional decision";
+- the listed defect "Proposal approval ending without a real RDCO final institutional decision".
+
+The settled Proposal rule is **"Adviser or RDCO completes"** (§3). RDCO is *not* a mandatory
+gate for a Proposal.
 
 ## Context
 
 ### The reading being corrected
 
-Written as `Submitter → RDCO Intake → ITSO/IERC/KTTO → RDCO`, the workflow invites a backwards
-reading: the institution's senior office reviews the work, then passes it *down* to a smaller
-office, then takes it back. Under that reading every reroute looks like a regression and the
-model is incoherent.
+Written as `Submitter → RDCO Intake → ITSO/IERC/KTTO → RDCO`, the old workflow reads backwards.
+The institution's senior office appears to review the work, pass it down to a smaller office,
+and then take it back.
 
-The intended model has three different things in it, and the pipeline names only two:
+The settled model has three separate acts:
 
 | | What it is | Who |
 |---|---|---|
-| **Intake & Triage** | *Administrative.* IRIS has received a submission; determine what reviews, documents or corrections are required before an institutional decision can be made. | RDCO staff, acting administratively |
-| **Specialist review** | *Substantive, narrow.* Ethics, protectability, commercial viability — whichever are actually engaged by this work. | ITSO / IERC / KTTO, and the Adviser |
-| **Final institutional review** | *Substantive, whole-record.* The institution's decision, informed by whatever specialist findings exist. | RDCO |
+| **Intake & Triage** | *Administrative.* The submission has arrived; work out which reviews, documents or corrections are needed before a decision can be made. | RDCO staff, working administratively |
+| **Specialist review** | *Substantive, narrow.* Ethics, protectability, commercial viability — only the ones this work actually raises. | ITSO / IERC / KTTO, and the Adviser |
+| **Decision** | *Substantive, whole-record.* | RDCO for Thesis/Research and Project; the Adviser or RDCO for a Proposal |
 
-Triage dispatching to a specialist office is forward movement. The first and third being
-performed by the same people is a staffing fact, not a workflow fact, and the model must not
-confuse the two.
+When triage sends a record to a specialist office, the record moves *forward*. Intake and the
+final decision being done by the same people is a staffing arrangement. It is not a workflow
+state.
 
-### What the code does, and where it contradicts that
+### Where the code contradicts the settled model
 
-Nine conflicts are catalogued in
-[`workflow_routing_architecture.md` §3](../workflow_routing_architecture.md#3-conflicts-with-the-clarified-rule).
-The four that drive decisions here:
+[`workflow_routing_architecture.md` §3](../workflow_routing_architecture.md#3-conflicts-with-the-settled-model)
+lists every conflict with its file and line. The ones that shape the decisions below:
 
-- **Intake is a substantive review that can terminally reject.** `core/enums.py:57` labels it
-  "RDCO Intake **Review**"; it writes a `Review` row carrying a decision; and
-  `lifecycle.py:285` gives it an edge straight to `rejected`.
-- **Triage has none of the triage actions.** Which offices review is read off three booleans
-  *the student* set (`lifecycle.py:505`); ADR-018 records that RDCO's ability to amend them "is
-  not implemented"; requesting a document has no mechanism; routing does not exist.
-- **Thesis/Research cannot reach ITSO at all** (`lifecycle.py:519`), so the clarification's own
-  example — *thesis involving IP + ethics → ITSO + IERC* — is impossible.
-- **Specialist offices can terminally reject** (`reviews/services.py`, `EvaluationPage.tsx:39`).
+- **Intake is a substantive review that can reject.** `core/enums.py:57` labels it "RDCO
+  Intake **Review**". It writes a `Review` row with a decision, and `lifecycle.py:285` gives it
+  an edge straight to `rejected`.
+- **Triage cannot do triage.** The set of offices is read from three booleans the *student* set
+  (`lifecycle.py:505`). Intake has no way to request a document and no way to route.
+- **Thesis/Research cannot reach ITSO** (`lifecycle.py:519`).
+- **Specialist offices can terminally reject** (`reviews/services.py:submit_clearance`,
+  `EvaluationPage.tsx:39`).
+- **The Adviser cannot complete a Proposal, and RDCO cannot decide one.** A Proposal stops at
+  `approved` (`lifecycle.py:495`), and `/complete/` is RDCO-only (`records/views.py:345`).
+- **`pipeline_status` is one field.** It cannot represent two offices reviewing at once, or two
+  offices each waiting on a resubmission.
+- **Discover lists Proposals.** `approved` and `completed` are statuses only a Proposal can
+  reach, and both are in `PUBLICLY_VISIBLE_STATUSES` (`core/enums.py:72`), which Ask IRIS
+  retrieval also reads.
 
-And two things are already right and are not being rebuilt: a record requesting no specialist
-office already goes intake → RDCO final (`lifecycle.py:550`), and IERC/KTTO genuinely run
-concurrently.
+Two things the code already gets right, and which this ADR does not rebuild:
+
+- a record that requests no specialist office already goes straight from intake to RDCO final
+  (`lifecycle.py:550`);
+- IERC and KTTO already review genuinely concurrently.
 
 ## Decision
 
-**A record's position is a set of open assignments plus a routing history, over six parties of
-which `intake` and `rdco` are distinct. Any party holding an open assignment may route to one
-or more other parties, with a reason. Entry is fixed by record type; only RDCO decides.**
+**A record's position is a set of open assignments plus a routing history, over six parties.
+`intake` and `rdco` are separate parties. Any party holding an open assignment may route the
+record to one or more other parties, with a reason. Entry is fixed by record type. Decision
+authority is fixed by record type.**
 
-### 1. Intake is a party, distinct from RDCO
+### 1. Parties — intake is its own party
 
 ```
 Party = intake | adviser | itso | ierc | ktto | rdco
 ```
 
-`intake` and `rdco` are **two parties staffed by the same role** (`RoleName.RDCO`), resolved
-through a role→party map that is configuration, not code.
+**No new enum is needed.** `core.enums.ReviewStage` already holds exactly these six values;
+the only difference is that one of them is called `rdco_intake`. Renaming that one value
+(§2) turns `ReviewStage` into the party vocabulary. `Party` is added as an alias for
+readability.
 
-This is the decision that dissolves the backwards reading. Triage and final decision are
-different acts with different authority, and modelling them as one party named `rdco` — which
-the first draft did — keeps the confusion alive in the identifiers no matter what the labels
-say. The clarification's own tracker example already assumes the split: it shows
-`Submitter → Intake` in the routing history and `○ RDCO — Awaiting specialist reviews` as a
-separate row.
+`intake` and `rdco` are **two parties staffed by the same role**, `RoleName.RDCO`. The mapping
+from role to parties is configuration. An RDCO user acting on a record states which party they
+are acting as (`acting_as`). The server checks that their role can staff that party *and* that
+the party holds an active assignment on the record.
 
-**Intake's authority is deliberately narrower than RDCO's.** It may route, request documents,
-request resubmission, and clear (dispatching the record onward). **It may not reject and it may
-not publish.** A triage step that can end a submission is not triage; that is conflict A above,
-and removing the edge is most of the fix.
+**What Intake & Triage may do:** check completeness; identify missing information; decide which
+specialist reviews are needed; route to one or more parties; request documents; request
+resubmission; record an initial assessment or clearance.
 
-**Intake gains the actions that make it triage** — routing and document requests — which today
-it lacks entirely (conflict B). Confirming or amending the submitter's suggested office set
-*is* rerouting; no separate "amend" screen is needed, which subsumes ADR-018's unimplemented
-fast-follow.
+**What Intake & Triage may not do:** make the final decision, reject the record, or publish it.
 
 ### 2. Terminology
 
-**Key `intake`. Staff-facing label "Intake & Triage". Student-facing label "Intake".**
+**Identifier `intake`. Staff see "Intake & Triage". Students see "Intake".**
 
-The full comparison of candidates is in
-[`workflow_routing_architecture.md` §11](../workflow_routing_architecture.md#11-terminology-recommendation-clarification-13).
-In short: the key must lose `rdco`, because `rdco_intake` is a stored value in `PipelineStatus`,
-`ReviewStage`, every `Review.stage` row and eight frontend files, and while that word is in the
-identifier every reader re-derives the wrong model. "Institutional Intake" was rejected because
-*institutional* is the word carrying RDCO's authority in "final institutional decision", and
-reusing it for triage blurs the exact distinction being drawn. "Intake" alone was rejected
-because it loses the *determines what is required* half — the half that makes routing out of
-intake forward movement.
+The identifier must drop `rdco`. `rdco_intake` is a *stored* value, not just a label, and as
+long as the stored name ties intake to RDCO, every reader will rebuild the wrong picture of the
+workflow. "Institutional Intake" was rejected: *institutional* is the word that carries RDCO's
+authority in "institutional decision", so using it for triage blurs the very distinction this
+ADR draws. The full comparison is in
+[`workflow_routing_architecture.md` §13](../workflow_routing_architecture.md#13-terminology).
 
-Two labels off one key costs nothing: ADR-002's amendment §4 already establishes that labels
-are configuration and that the frontend never maps a key to English.
+Showing different labels to staff and students costs nothing. ADR-002's amendment §4 already
+treats labels as configuration.
 
-**This rename is a deliberate data migration, never a find-and-replace.**
-`apps/tests/test_enum_vocabulary.py:8` exists to catch exactly this — *"if someone 'tidies'
-`rdco_intake` to `intake`, this fails before a migration is ever written."* That test is
-correct. It should fail, be read, and be updated alongside the migration.
+**The rename is a deliberate data migration, never a find-and-replace.**
+`apps/tests/test_enum_vocabulary.py:8` exists to catch exactly this rename. Let it fail, read
+it, and update it together with the migration.
 
-### 3. Entry and exit are fixed by type; the middle is not
+### 3. Workflow and decision authority by record type
 
-#### 3.1 Entry
+| | Proposal | Thesis / Research | Project |
+|---|---|---|---|
+| **Enters at** | `adviser` | `intake` | `intake` |
+| **Specialist review** | if needed | if needed | if needed |
+| **Decides** | assigned **Adviser or RDCO**: approve → `approved`, or reject → `rejected` | **RDCO**: publish → `published`, complete → `completed`, or reject → `rejected` | same as Thesis |
+| **Completes** | assigned **Adviser or RDCO**: `approved` → `completed` | — (a decision is terminal) | — |
+| **RDCO a mandatory gate?** | **No** | Yes | Yes |
+| **In Discover?** | **No** | when `published` | when `published` |
 
-| Type | Enters at |
+**A Proposal can be decided and completed without any RDCO assignment ever existing.** An
+Adviser may still route a Proposal to RDCO. When RDCO holds a Proposal, RDCO's authority is the
+same as the Adviser's.
+
+**How "Adviser or RDCO completes" maps onto the existing states.** The repository already
+separates `approved` ("proposal approved, research ongoing" — My Workspace's *Research Ongoing*)
+from `completed` ("research finished"), and `/complete/` already moves a record from one to the
+other. The smallest faithful implementation keeps both states and widens both acts: *deciding*
+a Proposal and *completing* it each become available to the assigned Adviser or RDCO. Before,
+deciding was Adviser-only and completing was RDCO-only.
+
+**Thesis/Research and Project reach RDCO.** When every non-RDCO assignment has closed, IRIS
+opens an RDCO assignment (§10). RDCO then decides whether the output is **published**
+(institutional visibility, Discover) or **completed** (retained, not listed).
+
+### 4. Lifecycle state: store facts, derive everything else
+
+`Record.pipeline_status` keeps **only durable facts about the record**. Anything that can be
+worked out from assignments, requests or reviews is **derived** and never stored. Otherwise two
+places hold the same answer and can drift apart. The code already shows that failure:
+`_stage_reviewed_by` (`lifecycle.py:655`) exists only because `pipeline_status` and
+`RecordClearance` each hold half of the answer to "where is KTTO?".
+
+| Stored in `pipeline_status` | Meaning |
 |---|---|
-| Proposal | `adviser` |
-| Thesis / Research | `intake` |
-| Project | `intake` |
+| `draft` | not yet submitted |
+| `in_review` | in the workflow |
+| `approved` | Proposal approved; research ongoing |
+| `completed` | closed and retained, not published |
+| `published` | approved for institutional visibility |
+| `rejected` | terminally refused |
+| `pending_delete` | awaiting a delete decision |
 
-A submitter never chooses their first reviewer.
+**Retired as stored values:** `adviser_review`, `rdco_intake`, `itso_review`,
+`parallel_review`, `rdco_review` — and **`declined`**.
 
-#### 3.2 Exit — **OPEN QUESTION**
+`declined` is retired because it breaks the rule above once several parties hold a record at
+the same time. ITSO and IERC can both be reviewing and can both ask for a resubmission. One
+scalar cannot record *who* is waiting for a resubmission or *how many* requests are open. That
+fact now lives in `ResubmissionRequest` rows (§8), and `awaiting_resubmission` is derived from
+them.
 
-RDCO holds final institutional authority. For Thesis/Research and Project that is settled: only
-`rdco` may reach `published`, `completed` or `rejected`.
+**`workflow_state`** is exposed to the frontend and never stored. Terminal states pass through
+as-is. For an `in_review` record, the first rule that matches wins:
 
-**For a Proposal it is not settled, and this ADR does not settle it.** The clarification's §3
-says a Proposal reaches an *"RDCO final institutional decision"*. Today it does not: a Proposal
-goes `adviser_review → approved` and stops (`lifecycle.py:495`), with RDCO's only involvement a
-bookkeeping `/complete/` call. ADR-003's route table records the same. The first draft of this
-ADR also assumed the Adviser was the sole reviewer, and gave them reject authority on that
-basis — so this contradicts the previous draft as well as the code.
+1. `awaiting_resubmission` — at least one open `ResubmissionRequest`
+2. `awaiting_document` — at least one open `DocumentRequest` (ADR-022)
+3. `submitted` — the only active assignment belongs to the entry party, and that party has not
+   yet recorded a review or a routing event
+4. `final_review` — every active assignment belongs to a party that can decide this record type
+5. `in_review` — anything else
 
-Three readings, costed in
-[`workflow_routing_architecture.md` §5.1](../workflow_routing_architecture.md#51-the-party-set--and-the-question-3g-raises):
-mandatory RDCO review for Proposals; `/complete/` relabelled as the decision it already is; or
-the Adviser routing to RDCO at discretion. **This analysis favours the third** as the most
-literal reading of *"route toward RDCO when institutional decision is required"*, but it leaves
-"required" undefined, and the first changes real workload at CIT-U. It is a business decision.
+`submitted` comes before `final_review` on purpose. A Proposal enters at the Adviser, who is
+also a deciding party. With the order reversed, a Proposal nobody has opened would show as
+being in final review.
 
-**It blocks nothing.** Every other part of this design is identical under all three readings,
-so implementation of stages 1–2 can proceed while it is decided.
+`pipeline_status` is **narrowed, not deleted**. `Record.objects.visible_to()` and
+`PUBLICLY_VISIBLE_STATUSES` still read it.
 
-### 4. Lifecycle state: stored versus derived — **OPEN QUESTION**
+### 5. Specialist review is conditional, and ITSO is open to every record type
 
-The clarification §11 lists ten lifecycle states and says not to collapse everything into one
-field. **Agreed on the instruction; this ADR proposes a different split than the literal list,
-and flags it rather than making it quietly.**
+No record goes through an office just because the office exists. Triage decides which
+specialists are needed, based on the work itself. Any holder who later spots a need adds
+another.
 
-Store what is a fact about the *record*. Derive what is a fact about its *assignments and
-requests*. Expose the whole list as a derived `workflow_state` the UI reads, so nothing is lost
-to the user.
+**ADR-018's Project-only rule for ITSO is reversed.** A thesis that produces patentable work can
+now reach ITSO. ADR-018's requested-office booleans stay on the record, but their role changes:
+they are a **suggestion to triage**, not the route.
 
-| Stored on `Record.pipeline_status` | Derived |
-|---|---|
-| `draft` · `in_review` · `declined` · `rejected` · `approved` · `completed` · `published` · `pending_delete` | `submitted` · `awaiting_document` · `awaiting_resubmission` · `final_review` |
+### 6. Initial routing and dynamic rerouting use one mechanism
 
-The reasoning is the defect being removed. The moment `awaiting_document` is a stored status,
-two things can disagree — the status column and the open-request table. That is today's bug
-class exactly: `_stage_reviewed_by` (`lifecycle.py:655`) exists because `pipeline_status` and
-`RecordClearance` each half-know where KTTO is. Deriving gives the question one answer by
-construction.
+There is one action:
 
-`pipeline_status` is **narrowed, not deleted**: `Record.objects.visible_to()` and
-`PUBLICLY_VISIBLE_STATUSES` filter on it and IR-153 only just secured that predicate.
+```python
+route(record, actor, acting_as, targets, reason)
+```
 
-**If the team prefers these stored, say so** — one migration either way. The cost lands on
-consistency, not on effort.
+**Initial routing** is triage's first use of it. **Dynamic rerouting** is any later use by any
+holder. The difference matters to someone reading the tracker, and `RoutingEvent` records it:
+the first event whose `from_party` is `intake` is the initial routing. It is still one
+mechanism. Building two would be the start of the hardcoded state machine this decision
+rejects.
 
-### 5. Specialist review is conditional, and ITSO opens to Thesis/Research
+`route()`:
 
-No record is forced through an office because the office exists. Which specialists review is
-determined at triage from the work itself, and revised by whoever discovers a need later.
-
-**ADR-018's rule that ITSO is structurally Project-only is reversed.** It makes the
-clarification's own example impossible, and a thesis that produces patentable work is exactly
-the case IRIS exists for. `requested_itso` stops being ignored for Thesis/Research; ITSO becomes
-a party any record may be routed to.
-
-ADR-018's four `Record` fields survive with a demoted job: the submitter's requested set becomes
-a **triage suggestion**, not the route. Its stated negative — *"a submitter can under-request…
-the only present safeguard is RDCO noticing"* — stops being a safeguard problem, because any
-holder can correct an under-request at any time.
-
-### 6. Initial routing and dynamic rerouting are the same mechanism, named differently
-
-One action, `route(record, actor, targets, reason)`. What the clarification calls **initial
-routing** is triage's first use of it; **dynamic rerouting** is any later use by any holder. The
-distinction is real to a reader of the tracker and is recoverable from `RoutingEvent`
-(`from_party is null` ⇒ submission; `from_party == intake` and first ⇒ initial routing). It is
-**not** two mechanisms, and making it two would be the beginning of the hardcoded state machine
-§12 of the clarification forbids.
-
-The action:
-
-- Refuses unless `actor` holds an open assignment on the record.
-- Refuses a target the actor's party may not route to, per the party graph.
-- Opens a `RecordAssignment` per target if none is active, and writes one `RoutingEvent` per
-  target, all sharing a `group_id` — so `Intake → ITSO + IERC` renders as one movement.
+- Refuses unless `acting_as` holds an active assignment and the actor may staff `acting_as`.
+- Refuses any target the party graph (§9) does not permit from `acting_as`.
+- Refuses `adviser` as a target when `record.adviser` is empty. Access is granted through that
+  foreign key (`visible_to()`, `_can_review`), so there would be nobody to assign.
+- Opens a `RecordAssignment` for each target that has no active one, and writes one
+  `RoutingEvent` per target. All events from one call share a `group_id`, so "Intake → ITSO +
+  IERC" appears as a single movement.
 - Opens a `RecordClearance` for a clearing-office target if none exists. **An existing
-  `cleared` row is not reset by routing.** Re-routing to an office that has already cleared is
-  a legitimate "please look again"; whether that invalidates the prior clearance is that
-  office's call, made by its next `Review`, not the router's.
-- Does not close the actor's own assignment. An office may bring in a peer and keep working.
-- `transaction.atomic()`, like every other lifecycle write (IR-138).
+  `cleared` row is never reset by routing.** Sending a record back to an office that already
+  cleared it means "please look again". Whether that cancels the earlier clearance is for that
+  office to say in its next `Review`.
+- Does not close the actor's own assignment.
+- Runs inside `transaction.atomic()`.
 
-### 7. The action set
+### 7. Actions and authority
 
 | Action | Intake | Adviser | ITSO / IERC / KTTO | RDCO |
 |---|---|---|---|---|
-| **Clear** (close my assignment) | ✓ | ✓ | ✓ | ✓ |
-| **Reroute** (multi-select) | ✓ | ✓ | ✓ | ✓ |
-| **Request document** | ✓ | ✓ | ✓ | ✓ |
-| **Request resubmission** | ✓ | ✓ | ✓ | ✓ |
-| **Record a finding / recommendation** | — | ✓ | ✓ | ✓ |
-| **Reject** (terminal) | ✗ | **OPEN, §3.2** | ✗ | ✓ |
-| **Final decision** (publish / complete) | ✗ | **OPEN, §3.2** | ✗ | ✓ |
+| Clear / record assessment | ✓ | ✓ | ✓ | ✓ |
+| Record negative finding or recommendation | ✓ | ✓ | ✓ | ✓ |
+| Reroute (multi-select) | ✓ | ✓ | ✓ | ✓ |
+| Request document (ADR-022) | ✓ | ✓ | ✓ | ✓ |
+| Request resubmission | ✓ | ✓ | ✓ | ✓ |
+| **Decide** a Proposal (approve / reject) | ✗ | ✓ *assigned* | ✗ | ✓ |
+| **Complete** an approved Proposal | ✗ | ✓ *assigned* | ✗ | ✓ |
+| **Decide** a Thesis/Research or Project (publish / complete / reject) | ✗ | ✗ | ✗ | ✓ |
 
-**A specialist office cannot reject, and this is a change to current behaviour.** Today
-`submit_clearance` maps a `rejected` decision straight to `PipelineStatus.REJECTED`, and
-`EvaluationPage` offers Reject to every reviewer — so one ITSO officer can end a submission the
-institution has not ruled on. Per the clarification §8, a specialist's negative finding feeds
-the institutional decision; it is not the decision. An objecting office clears with a negative
-`Review` and routes to RDCO. Three terminal vetoes would make the final decision structurally
-meaningless — RDCO would be ratifying whichever office moved first.
+**A specialist office never ends a record.** Today it can: `submit_clearance` maps `rejected`
+straight to `PipelineStatus.REJECTED`. That changes. An office with an objection records a
+negative finding, which is kept as a `Review` and on its `RecordClearance`, and routes the
+record onward. The finding is shown to whoever decides.
 
-**Authorization stays out of the table.** ADR-002's amendment §6 makes the point and it holds
-harder here: `_can_review` checks `record.adviser_id == user.pk` — the *assigned* adviser — and
-now also "does this user's party hold an open assignment", which is a per-record condition a
-role-keyed table cannot express. The table declares which routes are *legal*; `core.permissions`
-decides who may take them. Two checks, both must pass.
+**An Adviser on a Thesis/Research or Project** is one consulted party among several. They
+recommend; they do not decide.
+
+**Authorization stays out of the transition table.** The table says which routes are *legal*.
+`core.permissions` decides *who* may take them. The reason: "the assigned adviser" and "holds
+an active assignment" are conditions on a particular record, and a table keyed on roles cannot
+express them.
 
 ### 8. Data model
 
 ```
-NEW  RecordAssignment  (record, party, state, opened_by/at, closed_by/at, reason)
-                       state ∈ active | cleared | declined | rejected | withdrawn
-                       ≤ 1 active row per (record, party)
-NEW  RoutingEvent      (record, actor, from_party, to_party, reason, group_id, created_at)
+NEW  RecordAssignment    record, party, state, opened_by, opened_at,
+                         closed_by, closed_at, reason
+                         state ∈ active | completed | withdrawn
+                         at most one active row per (record, party)
+
+NEW  RoutingEvent        record, actor, from_party, to_party, reason, group_id, created_at
+
+NEW  ResubmissionRequest record, party, assignment, review, requested_by, reason,
+                         state, created_at, resolved_by, resolved_at
+                         state ∈ open | resubmitted | withdrawn
+
 NEW  DocumentRequest + DocumentRequestItem                       — ADR-022
-EXT  Review            + assignment FK (nullable); `stage` unchanged, so historical
-                         rdco_intake rows stay readable
-KEEP RecordClearance   unchanged
+
+EXT  Review              + assignment (FK, nullable)
+KEEP RecordClearance     unchanged
 ```
 
-**`RecordAssignment` and `RecordClearance` are deliberately not merged.** An assignment answers
-*"is this party acting now?"*; a clearance answers *"has this office signed off, and does that
-signature still stand?"* The whole contribution is that the second survives events ending the
-first. One row with one status makes a preserved clearance unrepresentable.
+**An assignment has no outcome field.** Its state only says whether the party is still acting.
+*What* the party concluded is recorded in `Review` and `RecordClearance`. Storing the outcome on
+the assignment as well would create exactly the duplicate this ADR removes.
 
-`RecordClearance` stays the three clearing offices per `core.enums.Office`. Intake, Adviser and
-RDCO record `Review` rows against their assignment instead. Widening `Office` would let a caller
-construct an RDCO clearance the workflow has no gate for — the same argument `core/enums.py`
-already makes for keeping RDCO out of that enum.
+**`RecordAssignment` and `RecordClearance` stay separate.** An assignment answers *"who needs to
+act now?"*. A clearance answers *"what clearance has already been obtained?"*. Clearance-aware
+resubmission depends on the second surviving events that end the first. Put both in one row and
+a preserved clearance can no longer be represented.
 
-### 9. `lifecycle.py` — evolved, not extended
+**Vocabulary changes:**
 
-The module stays, settings-overridable, as ADR-002 decided:
+- `ReviewStage.RDCO_INTAKE` → `INTAKE`.
+- `ReviewDecision` gains `NEGATIVE_FINDING`. `DECLINED` keeps its stored value, relabelled
+  *"Resubmission requested"*.
+- `ClearanceStatus` gains `NOT_CLEARED`. `REJECTED` is kept for historical rows; nothing new
+  writes it.
+- `PipelineStatus` gains `IN_REVIEW` and loses six values (§4).
+- `PUBLICLY_VISIBLE_STATUSES` narrows to `(PUBLISHED,)` (§13).
+- A new `DELETE_REVIEW_STATUSES` holds `(PUBLISHED, APPROVED, COMPLETED)`.
 
-- **`STAGES` → `PARTIES`**: per party, its labels, whether it clears or gates, and which parties
-  it may route to.
-- **`TRANSITIONS` narrows to record-level edges** — roughly nine rows: submit, decline,
-  resubmit, publish, complete, reject, and the delete/restore edges. Inter-party movement stops
-  being an edge.
-- **`ENTRY_PARTY`** replaces `_resolve_first_status`.
-- `_resolve_after_clearance`, `_resolve_enter_clearance_stage`, `_clearance_entry_for` and
-  `_stage_reviewed_by` are **deleted**. They compute a status from an office set; the office set
-  is now the answer, not the input.
+### 9. `lifecycle.py` evolves; it is not extended
 
-**Why not just add edges — `RDCO → ITSO`, `ITSO → IERC`, and so on.** The clarification §12
-forbids it on complexity grounds, and the code supplies a sharper reason. `_resolve_after_
-adviser_review` (`lifecycle.py:495`) ends `else PipelineStatus.PUBLISHED`. That branch is
-unreachable today because a non-Proposal never enters `adviser_review`. Add an edge letting an
-Adviser hold a Thesis and **an adviser approving it publishes it, bypassing RDCO entirely.** The
-existing statuses carry assumptions about which types can reach them; extending the table arms
-those assumptions as live defects one at a time.
+- **`STAGES` is replaced by `PARTIES`.** For each party: its labels, whether it clears or gates,
+  and which parties it may route to. It stays overridable in settings, as ADR-002 decided.
+- **`TRANSITIONS` shrinks to record-level edges:** submit, decide, complete, the delete edges,
+  and restore.
+- **`ENTRY_PARTY` and `DECIDING_PARTIES`** are declared per record type.
+- **`_resolve_after_clearance`, `_resolve_enter_clearance_stage`, `_clearance_entry_for`,
+  `_stage_reviewed_by` and `_resolve_after_adviser_review` are deleted.** They work out a
+  status from a set of offices; with assignments, the set of offices *is* the answer.
 
-### 10. "All clear" becomes a notification, not a transition
+**Why not simply add edges such as `intake → itso`, `itso → ierc`, `ierc → rdco`?**
+`_resolve_after_adviser_review` ends in `else PipelineStatus.PUBLISHED`. That branch is
+unreachable today, because a Thesis never enters `adviser_review`. Add an edge that lets an
+Adviser hold a Thesis, and an Adviser approving it would **publish it without RDCO**. The
+existing statuses carry assumptions about which record types can reach them. Extending the
+table turns each of those assumptions into a live defect.
 
-Today `_all_clearances_done()` advancing to `rdco_review` is the pipeline's engine. Under
-assignments: when the last non-RDCO assignment closes and RDCO holds none, IRIS opens one for
-RDCO and tells them the record is ready. The phase was already `in_review` and does not change.
+### 10. Handing a record back to its decider
 
-The two models differ in one line: **the old pipeline advanced records; the new one hands them
-to RDCO.**
+When the last active assignment that does not belong to a deciding party closes:
 
-### 11. Clearance-aware resubmission
+- **Thesis/Research and Project:** if RDCO has no active assignment, IRIS opens one and notifies
+  RDCO.
+- **Proposal:** if neither the Adviser nor RDCO has an active assignment, IRIS reopens the
+  Adviser's. RDCO is never opened on a Proposal automatically.
 
-ADR-003's rule is unchanged in substance and simpler to state, because "which offices had
-cleared" is a set of rows rather than a set inferred from a status:
+This is a hand-back, not a status change: `pipeline_status` stays `in_review`. The old pipeline
+*advanced* records from stage to stage; this model *hands them back* to whoever decides.
 
-**On resubmission after a decline, every `cleared` `RecordClearance` is preserved except the
-declining party's, which resets to `pending`. The declining party's assignment is reopened.
-Assignments closed as `cleared` stay closed. Review and routing history are never deleted.**
+### 11. Resubmission
 
-The sequential-vs-parallel branch in `_resolve_after_resubmission` disappears — there is no
-"restart from the top", because there is no top. A decline at intake reopens intake; a decline
-by IERC reopens IERC. Two policies become one rule.
+**Requesting a resubmission** does four things:
 
-**ADR-004's restart-all arm survives**, unchanged: reset *every* clearance row rather than one.
-The arms still differ in exactly one statement against the same rows, which is IR-137's
-acceptance criterion.
+1. writes a `Review` with decision `declined` ("resubmission requested");
+2. opens a `ResubmissionRequest` for the requesting party;
+3. for a clearing office, sets its `RecordClearance` to `declined`;
+4. leaves every assignment exactly as it is.
 
-### 12. Read surface
+**While any resubmission request is open,** reviewers can still route, request documents, record
+findings and add further resubmission requests. They **cannot** clear, decide or complete,
+because there is no point signing off a version the submitter is about to change.
 
-`GET /api/v1/records/<id>/tracker/` answers all nine questions the clarification §10 requires,
-each from rows that exist for other reasons — mapping in
-[`workflow_routing_architecture.md` §6](../workflow_routing_architecture.md#6-the-tracker-mechanically).
-Nothing about it is stored, and nothing is frontend-only state.
+**Resubmitting** requires that the submitter changed something since the earliest open request:
+**a new upload or an edit to the record's metadata**. Today's guard accepts only an upload, so a
+revision that changes only metadata is refused. On resubmission:
 
-The distinction the current UI cannot draw — a party never asked versus asked and not started —
-falls out of the model: "never asked" is *has no assignment row at all*.
+- every open `ResubmissionRequest` is resolved as `resubmitted`, which is also the resubmission
+  history the tracker shows;
+- under `CLEARANCE_AWARE` (the default), **only the requesting parties' clearances** reset to
+  `pending`, and every other `cleared` row is preserved;
+- under `RESTART_ALL` (ADR-004's comparison arm), every clearance resets;
+- the requesting parties' assignments are still active, so review continues where it paused;
+- **nothing is deleted.** Today's sequential-decline branch, which deletes every
+  `RecordClearance` (`lifecycle.py:651`), goes away.
 
-The payload goes through `Record.objects.visible_to(user)`; a refusal is a 404 identical to a
-missing record (IR-153).
+ADR-003's rule still holds, in a more general form: *only the parties that asked for changes
+lose their clearance.* The two ADR-004 arms still differ in exactly one statement, which is
+IR-137's acceptance criterion.
+
+There is **one** resubmission entry point, `POST /reviews/resubmit/`. The comment in
+`records/views.py:submit` saying it "also handles resubmission" describes a path with no
+declared edge, and it is removed.
+
+### 12. A decision closes the record's open work
+
+A decision — or completing a Proposal — marks every other active assignment `withdrawn` and
+every open `DocumentRequest` `withdrawn`, with the decision as the reason. The history is kept.
+**A decision is refused while any resubmission request is open.**
+
+### 13. Discover and visibility
+
+`PUBLICLY_VISIBLE_STATUSES = (PUBLISHED,)`. Before this change it also contained `approved` and
+`completed`, and only a Proposal can reach those two statuses.
+
+The **single visibility predicate** changes, not only the Discover list. Per CLAUDE.md,
+visibility is one predicate used everywhere, so Discover, record detail, dashboards and Ask
+IRIS retrieval move together. A filter that only hid Proposals from Discover would add a second
+predicate: an unrelated user could still open a Proposal by its id, and Ask IRIS could still
+cite it.
+
+Owners, the assigned adviser and office staff keep access through `visible_to()`'s other
+clauses.
+
+**Deletion is decoupled from visibility.** `perform_destroy` (`records/views.py:148`) and the
+`REQUEST_DELETE` edges (`lifecycle.py:375`) currently branch on `PUBLICLY_VISIBLE_STATUSES`.
+Narrowing that tuple alone would let an owner soft-delete an approved or completed Proposal
+without review. They branch on `DELETE_REVIEW_STATUSES` instead, so deletion behaves exactly as
+it does today.
+
+### 14. Review & Routing Tracker
+
+`GET /api/v1/records/<id>/tracker/` answers every question the tracker must answer. It derives
+all of them from persisted rows, with no frontend-only state: current active parties; completed,
+active, requested-but-incomplete and not-requested parties; document requests and their status;
+routing history; review history; resubmission history. The field-by-field mapping is in
+[`workflow_routing_architecture.md` §8](../workflow_routing_architecture.md#8-the-review--routing-tracker).
+
+RDCO's row depends on record type. On a Thesis/Research or Project it is never "not
+requested", because RDCO always decides; it shows *awaiting* until RDCO is assigned. On a
+Proposal it is "not requested" unless RDCO was actually routed to.
+
+The endpoint uses `Record.objects.visible_to(user)`. A user without access gets a 404, the same
+response as for a record that does not exist (IR-153).
 
 ## What this changes in the accepted record
 
-**ADR-018 — partially superseded.** Its ITSO-is-Project-only rule is reversed (§5). Its
-requested-office booleans become a triage suggestion. Its unimplemented "RDCO amend UI"
-fast-follow is subsumed by rerouting. Its recorded gap — no `request_document` mechanism — is
-closed by ADR-022.
-
-**ADR-002 — amended, and the amendment costs it something.** Its key
-`(from_status, event, actor_role) → to_status` no longer describes inter-party movement, because
-the destination is now an argument rather than a computation. The table keeps the record's own
-lifecycle and gains a party graph. What it loses is the claim that *all* routing is a table
-lookup, and that should be recorded plainly rather than sold as an enhancement: a reader told
-"the workflow is thirty rows of data" will find nine rows and a graph.
-
-**ADR-003 — untouched at the mechanism level.** Its §Context route table becomes historical.
-§Research Impact below is open.
-
-**ADR-009 — additive.** One new per-record predicate, `holds_open_assignment`.
-
-**ADR-011 — needs a look before implementation**, per §Research Impact.
+- **ADR-018 — partially superseded.** The ITSO-is-Project-only rule is reversed. The
+  requested-office booleans become a suggestion to triage. Its unbuilt "RDCO amend UI" is no
+  longer needed, because amending the office set is rerouting. The `request_document` gap it
+  recorded is closed by ADR-022.
+- **ADR-002 — amended.** Its key `(from_status, event, actor_role) → to_status` no longer
+  describes movement between parties. The table keeps the record's own lifecycle and gains a
+  party graph. It can no longer claim that *all* routing is a table lookup, and that is recorded
+  here rather than presented as an improvement.
+- **ADR-003 — mechanism kept, generalised** from "the one declining office" to "every party with
+  an open resubmission request". The route table in its §Context is now historical.
+- **ADR-004 — both arms kept**, still differing in one statement.
+- **ADR-009 — one predicate added**, `holds_open_assignment`.
+- **IR-153's visibility predicate — narrowed** (§13).
 
 ## Alternatives Considered
 
-**Relabel `rdco_intake` and change nothing else.** The cheapest response to the clarification:
-the objection was about how the workflow *reads*, so fix the words. Rejected because conflict B
-survives it — the triage step would still have no way to determine what reviews or documents are
-required, which is the entire job the clarified rule assigns it. A correct label on a step that
-cannot do the thing it is named for is worse than the wrong label, because it stops anyone
-looking.
+The workflow itself is a settled business decision and is not reargued here. These are the
+*implementation* alternatives that were considered.
 
-**Keep the fixed pipeline; let intake amend the office set at intake only.** ADR-018's own
-fast-follow. Rejected: the information deciding which specialists are needed arrives *while
-they are reading*, so a better intake screen improves the initial guess without removing the
-need to revise it. It also leaves ITSO closed to Thesis/Research, and leaves no routing history.
+**Rename `rdco_intake` and change nothing else.** Rejected. Intake would still be unable to
+request documents or route — the whole job the settled model gives it. A correct label on a step
+that cannot do its named job is worse than a wrong one, because it stops anyone looking.
 
-**Add the transitions as edges** — `intake → itso`, `itso → ierc`, `ierc → ktto`, `ktto → rdco`.
-Rejected on the clarification's own §12 grounds and on §9's evidence: the existing statuses
-carry unreachable-branch assumptions that extending the table turns into live defects.
+**Add routing as edges in the existing table.** Rejected, for the dead-branch reason in §9.
 
-**Model intake as a `Party` but keep RDCO as one party performing both roles.** Nearly this
-design, one identifier cheaper. Rejected because it is the first draft's mistake: while the same
-party name covers triage and final decision, the tracker cannot show "✓ Intake / ○ RDCO awaiting
-specialist reviews", and the backwards reading has nowhere to be corrected.
+**Keep a single `rdco` party that covers both intake and final decision.** Rejected. This was the
+first draft's mistake: the tracker could not show "✓ Intake / ○ RDCO awaiting".
 
-**Model it as free-form assignment with no fixed bookends.** Rejected. Type-differentiated entry
-and RDCO's exclusive terminal authority are what make this an *institutional* workflow rather
-than a shared inbox, and they are what is left of the type-differentiation half of the thesis
-claim.
+**Keep `declined` as a stored status next to `ResubmissionRequest`.** Rejected. Once several
+parties hold a record, two parties can each have an open resubmission request, and one column
+cannot represent that.
 
-**Adopt a case-management engine (CMMN — Flowable, Camunda's case module).** The honest prior
-art, and it deserves naming rather than the BPMN comparison ADR-002 and ADR-003 both use:
-ad-hoc, reviewer-directed routing over a shared case file is exactly CMMN's subject. Rejected
-for the reasons ADR-002 rejected BPM engines — a JVM service beside the existing five, for a
-graph that fits in a dict, and it would move the contribution into a third-party engine. But
-rejecting the *engine* does not dispose of the *prior art*: see §Research Impact.
+**Hide Proposals from Discover only, and leave `visible_to()` unchanged.** Rejected. It creates a
+second visibility predicate, which CLAUDE.md forbids, and Ask IRIS could still cite a record that
+Discover hides.
 
-**Ship the fixed pipeline; describe this as future work.** Viable, and worth weighing because
-§MVP Impact's number is large. Against it: the pilot runs real disclosures in Week 11, and this
-pipeline's failure mode under real use is a decline sent to a student for an office-routing
-problem the student cannot fix — plus a thesis with patentable output that cannot reach ITSO at
-all.
+**Adopt a case-management engine (CMMN — Flowable, Camunda's case module).** Rejected for the
+reasons ADR-002 rejected BPM engines. See §Research considerations.
 
 ## Decision Rationale
 
-The subtractive argument is the strong one. Four pieces of machinery exist today purely because
-a scalar is asked to encode a set: `_stage_reviewed_by` disambiguating KTTO's two stages,
-`_clearance_entry_for` reconstructing an entry status from an office set,
-`_resolve_after_clearance`'s ITSO special case, and the `itso_review` / `parallel_review` split
-itself — which is a sequence artefact, not a real distinction, since both mean "some offices are
-clearing". All four are deleted and none is replaced. On that axis the new model is *smaller*,
-not merely more capable.
+This model removes more than it adds. Five pieces of machinery exist only because one status
+field is being asked to describe a set of offices: `_stage_reviewed_by`, `_clearance_entry_for`,
+the ITSO special case in `_resolve_after_clearance`, `_resolve_after_adviser_review`, and the
+split between `itso_review` and `parallel_review`. All five are deleted, and nothing replaces
+them.
 
-The deletion test passes on the new structures too: remove `RecordAssignment` and `RoutingEvent`
-and the questions they answer — who holds this, who sent it there, why — become unanswerable
-rather than answered elsewhere. "Who asked IERC to look at this?" is currently unrecoverable at
-any price.
+The new structures pass the deletion test. Remove `RecordAssignment`, `RoutingEvent` or
+`ResubmissionRequest`, and the questions they answer — who holds this record, who sent it there
+and why, who is waiting on a resubmission — cannot be answered from anything else. Today, "who
+asked IERC to look at this?" cannot be recovered at all.
 
-Separating `intake` from `rdco` earns its place differently: it costs one identifier and buys
-the coherence of the whole model. With one `rdco` party, "RDCO reviews it, then sends it to
-ITSO, then reviews it again" is the only available description, and it is the description the
-clarification was written to reject.
-
-What this costs is honesty about ADR-002. "The workflow is a declarative table" was a clean
-claim; it becomes a compound one — the table holds the record's lifecycle, the party graph holds
-who may hand work to whom, and what a reviewer does is neither, it is an action with an
-argument. That is a less elegant sentence to defend at a panel, and it is the real price.
+Separating `intake` from `rdco` costs one identifier. It is what lets the model describe triage
+dispatching to a specialist without implying that RDCO has already reviewed the paper.
 
 ## Consequences
 
-**Positive.** A thesis with patentable output can reach ITSO. Triage can do the job it is named
-for. "Which offices have this?" and "who sent it to IERC?" become fields rather than
-inferences — the second is currently unrecoverable. No office can unilaterally end another
-person's submission. The audit trail IR-144/IR-216 needs is largely a serialization of
-`RoutingEvent`. Four pieces of sequence-reconstruction machinery are deleted.
+**Positive.**
+- A thesis with patentable work can reach ITSO.
+- Triage can actually triage.
+- An Adviser can close out a Proposal without waiting on RDCO.
+- No specialist office can end someone else's submission on its own.
+- "Who holds this?", "who sent it there?" and "what was asked of the submitter?" all become
+  stored fields instead of guesswork.
+- A revision that changes only metadata can be resubmitted.
+- Proposals no longer leak into Discover or Ask IRIS.
 
-**Negative.** A data migration on `Record.pipeline_status`, the central domain object, touched
-by the visibility predicate IR-153 just secured. Roughly 2,700 lines of backend test describe
-the pipeline being replaced (inventory in
-[`workflow_routing_architecture.md` §8](../workflow_routing_architecture.md#8-tests-that-must-change)),
-including IR-197's characterisation suite, whose retirement is a decision to record rather than
-a cleanup. Every reviewer-facing frontend surface is rebuilt. And a reviewer can now route a
-record somewhere useless; nothing prevents a record circulating between two offices
-indefinitely.
+**Negative.**
+- A non-additive migration on `Record.pipeline_status`, the column that IR-153's visibility
+  predicate reads.
+- About 2,700 lines of workflow tests describe the pipeline being replaced, including the
+  characterisation suite from IR-197. Retiring them is a recorded decision, not tidying up.
+- Every reviewer-facing screen is rebuilt.
+- A record can bounce between two offices indefinitely; nothing in the model stops that.
+- Unrelated authenticated users lose read access to approved and completed Proposals.
 
-**Risk.** [IR-233](https://citiris.atlassian.net/browse/IR-233) is open and is an `mvp-blocker`:
-resubmitting a declined record lands straight back in `declined`, so clearance-aware
-resubmission — the thesis contribution — **does not visibly run today**. This ADR rewrites the
-module that bug lives in. **Reproduce and understand IR-233 before implementing**, even if the
-rewrite is what fixes it; otherwise it travels across and nobody can say whether it was ever
-fixed.
+**Risk.** IR-233 is an open `mvp-blocker`: a resubmitted record lands straight back in
+`declined`, so clearance-aware resubmission cannot be seen working today. The implementation
+plan makes it slice 0. It is reproduced first and captured as a behaviour-level strict-xfail
+test *outside* any suite that gets retired, so the refactor cannot make the failure invisible.
 
 ## MVP Impact
 
-| Piece | Estimate |
-|---|---|
-| Data model, migration, `lifecycle.py` and `reviews/services.py` rewrite | 6–7 d |
-| Permission predicate, authorization tests, new workflow suite | 3 d |
-| API: routing action, tracker and history | 1–2 d |
-| Frontend: reroute modal, tracker, routing history, action set | 3–4 d |
-| **Total (routing only)** | **13–16 d** |
-
-ADR-022 adds ~3 d.
-
-**That is roughly half the semester's implementation budget, on a budget ADR-001 costed at ~27
-dev-days and which has already been reversed four times** (ADR-013, ADR-016, ADR-019, ADR-020).
-Each reversal is expected to name what it displaces. **This one does not — that is the team's
-call.** In the order this author would cut: ADR-020's assessment brief, ADR-019's persisted
-conversation history, then the supporting frontend work CLAUDE.md's Scope rule already names as
-first to go.
-
-**Sequencing — three stages, not interleaved.** (1) Model and services, with the API still
-serving today's shape so nothing downstream breaks. (2) Surfaces. (3) ADR-022. Stage 1 touches
-the write path for the central domain object; ADR-002 already calls that the highest-risk
-refactor in the plan, and that was before it also carried a migration.
+MVP-required and thesis-critical. Rough effort: 13–16 dev-days for this ADR and about 3 for
+ADR-022, across the slices in IR-255. **Deciding which other work this displaces from the
+semester budget is a project-management call, recorded separately. It does not reopen this
+workflow.**
 
 ## SaaS Impact
 
-Positive, and this is arguably what makes ADR-002's SaaS claim true rather than nearly true. Its
-amendment concedes that adding a fourth office "touches one enum, one role map and the table";
-under a party graph the routing half is genuinely data. The role→party map also means a second
-institution that separates triage from its research office into two actual teams changes
-configuration, not code. Office *identity* still lives in code — `core.enums.Office`, `RoleName`,
-a seeded `Role` row — so ADR-002's honest criterion is unchanged, not improved.
+Positive. The party graph makes a second institution's routing configuration rather than code.
+An institution that staffs triage and its research office with different teams changes the
+role-to-party map, nothing else. Offices themselves are still defined in code (`Office`,
+`RoleName`, seeded `Role` rows), so ADR-002's criterion for a fourth office is unchanged.
 
 ## Security Impact
 
-**One new object-level predicate, written once.** `holds_open_assignment(user, record)` joins
-`owns_or_staffs_record()` in `core/permissions.py`. Three new endpoints (route, tracker, history)
-check it — CLAUDE.md's rule that no endpoint ships without an object-level check.
-
-**The tracker and history are record data, not metadata.** Both through
-`Record.objects.visible_to(user)`; refusal is a 404 identical to a missing record (IR-153). A
-routing history naming which offices hold a colleague's unpublished disclosure is exactly as
-sensitive as the disclosure.
-
-**Two authority reductions are net security improvements**: intake loses terminal rejection, and
-specialist offices lose it too. No single office account can end someone else's submission.
+- **`holds_open_assignment(user, record)` is added to `core/permissions.py`** and used by the
+  route, action, tracker and document-request endpoints.
+- **The tracker is record data**, gated by `visible_to()`, and refuses with 404 rather than 403.
+- **Two reductions in authority:** intake and specialist offices can no longer reject.
+- **One narrowing of visibility:** approved and completed Proposals leave the public catalogue
+  and Ask IRIS retrieval.
+- **Deletion review is unchanged**, because it now branches on its own tuple.
 
 ## Deployment Impact
 
-One migration, **not** additive: it rewrites `pipeline_status` on every non-terminal record,
-renames the intake vocabulary, and backfills two new tables from `RecordClearance` plus record
-type. Per CLAUDE.md, test it against a copy of a realistic database, not an empty one. Take a
-`postgres_data` backup before applying it in the pilot environment.
+One migration that is **not** additive:
 
-## Research Impact
+- rewrites `pipeline_status` on every in-flight record;
+- renames the intake value in `Review.stage`;
+- turns `declined` records into `in_review` with an open `ResubmissionRequest`.
 
-**OPEN — this is the team's to answer, not the author's.**
+It runs after the additive migration and backfill have been verified. Test it against a copy of
+a seeded database, and back up `postgres_data` before applying it to the pilot. The full plan is
+in [`workflow_routing_architecture.md` §7](../workflow_routing_architecture.md#7-migration-plan).
 
-ADR-003 answers the anticipated objection — *"BPMN has done parallel gateways for fifteen
-years"* — by arguing that standard BPMN does not natively express "on rejection at branch B,
-reset B only, preserve A and C". **That answer is unaffected at the mechanism level: the rule
-survives verbatim, and §11 states it more cleanly than the pipeline did.**
+## Research considerations
 
-What changes is the comparison class. A workflow where any holder may route to any party, over a
-shared case file with a clearance ledger, is not an extended BPMN workflow — it is close to
-**CMMN**, and to the ad-hoc-routing literature in case and document management. A panel that
-would have asked about Camunda will ask about Flowable's case engine, DSpace/EPrints workflow
-steps, and ticketing systems with arbitrary reassignment. Two readings, and the team must pick
-one rather than discover which at defence:
+These are **separate research questions. They do not change the settled workflow.**
 
-- *Strengthens it.* Per-office clearance surviving **ad-hoc** rerouting is a sharper claim than
-  the same state surviving a fixed pipeline, because ad-hoc routing is precisely where naive
-  implementations reset everything. The contribution is demonstrated against a harder baseline.
-- *Weakens it.* Ad-hoc routing moves IRIS into a well-populated prior-art field; the novelty
-  argument must now clear CMMN as well as BPMN. A narrow defensible claim becomes a narrow claim
-  in a crowded area.
+**Where the novelty claim sits.** ADR-003 answered the BPMN objection ("parallel gateways have
+existed for years") by pointing out that BPMN has no native way to express "reset only the
+branch that rejected". That answer still holds, and §11 states the rule more generally. But
+routing chosen by reviewers over a shared case file sits closer to CMMN and to ad-hoc case
+management, so a thesis panel may bring that literature up. The team should decide how to
+position the claim before the defence.
 
-**A second, concrete problem for ADR-004's evaluation.** The comparison measures clearance-aware
-against restart-all on time-on-task. Under a fixed pipeline, route length was determined by
-record type, so the arms differed in one variable. Under reviewer-directed routing **the route
-is chosen by participants**, so route length becomes variance the design did not account for.
-The comparison stays well-defined — one statement differs — but the measurement is noisier, and
-with a capstone-sized participant pool that may matter. **ADR-011's protocol needs a look before
-implementation, not after data collection.**
-
-Per CLAUDE.md, AI does not make research decisions. Both are recorded here unresolved.
+**ADR-004's evaluation.** Participants now choose the route, so route length becomes a source of
+variance that the controlled comparison did not plan for. ADR-011's protocol should be reviewed
+before data collection.
 
 ## Related Requirements
 
-FR-M5-01 (hierarchical submission workflow) · FR-M5-03 · NFR-R3 (integrity under concurrency) ·
-NFR-S4 (object-level authorization). Ids are stable labels only — do not read the SRS for their
-meaning (CLAUDE.md, source-of-truth hierarchy).
+FR-M5-01 · FR-M5-03 · NFR-R3 · NFR-S4. These IDs are stable labels only.
 
 ## Related Tasks
 
-[IR-254](https://citiris.atlassian.net/browse/IR-254) (this ADR) · IR-53 (Epic B) ·
-IR-134/IR-136 (the table this amends) · IR-144 and IR-216 (workflow audit events — `RoutingEvent`
-is most of what they need) · IR-197 (characterisation suite, retired by this change) ·
-IR-224 (end-to-end clearance-aware demonstration) · **IR-233 (open `mvp-blocker`; reproduce
-first)** · IR-118 (Office Checklists — deferred, see ADR-022).
+IR-254 (this ADR) · **IR-255** and its subtasks IR-256 to IR-264 (implementation) · **IR-233**
+(slice 0) · IR-53 · IR-134/IR-136 · IR-144, IR-216 · IR-197, IR-140 (suites retired by IR-260) ·
+IR-224 · IR-118.
