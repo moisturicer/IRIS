@@ -70,6 +70,16 @@ class Reranker(ABC):
     with any embedding space and why turning one on requires no re-indexing.
     """
 
+    #: Whether reranking sends candidate text outside the deployment.
+    #:
+    #: The disclosure gate (IR-127) exists to stop record content reaching a
+    #: commercial vendor. A reranker that makes no outbound call transmits
+    #: nothing, so withholding candidates from it protects nobody and costs
+    #: recall. Declared on the port rather than inferred from the class name,
+    #: because the caller has to branch on it and guessing is how a real
+    #: transmission ends up ungated.
+    transmits_externally: bool = True
+
     @abstractmethod
     def rerank(
         self, query: str, candidates: Sequence[str]
