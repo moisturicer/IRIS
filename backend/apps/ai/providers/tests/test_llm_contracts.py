@@ -77,10 +77,10 @@ class LLMProviderContractTests:
 class AdapterRequestTests:
     def test_the_configured_model_is_requested(self, settings):
         client = _FakeClient()
-        settings.LLM_MODEL = "llama-3.3-70b-versatile"
+        settings.LLM_MODEL = "openai/gpt-oss-120b"
         OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
 
-        assert client.calls[0]["model"] == "llama-3.3-70b-versatile"
+        assert client.calls[0]["model"] == "openai/gpt-oss-120b"
 
     def test_the_system_prompt_and_user_message_are_sent_as_separate_roles(self):
         """Folding the instructions into the user turn makes them look like
