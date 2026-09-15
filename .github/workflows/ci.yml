@@ -3,8 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+  # Deliberately unfiltered. A `branches:` filter here matches the PR's *base*,
+  # so with `[main]` a PR stacked on another feature branch ran no CI at all --
+  # and the IR-127..IR-131 chain is five deep, leaving #77, #78, #79 and #80
+  # entirely ungated. That is how six flake8 violations reached four PRs while
+  # only the one PR that happened to target main went red. Every pull request
+  # is gated now, whatever it is based on.
   pull_request:
-    branches: [main]
 
 # CI is evidence, not decoration.
 # Application boot was restored by IR-155 (not IR-57, which no longer
