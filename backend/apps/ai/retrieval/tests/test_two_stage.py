@@ -106,7 +106,7 @@ class EligibilityTests:
     def test_nothing_is_returned_when_no_space_is_active(self, embedder, reader):
         """Comparing vectors across spaces returns rows, ranked plausibly, and
         wrong. Returning nothing is the honest answer."""
-        record = published_record("Thesis", reader, embedder)
+        published_record("Thesis", reader, embedder)
         EmbeddingSpace.objects.update(state="retired")
 
         assert TwoStageRetriever(embedder).retrieve("passage", reader) == []

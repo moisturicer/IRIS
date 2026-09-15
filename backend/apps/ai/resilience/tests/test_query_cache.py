@@ -6,8 +6,6 @@ question under a different embedding space is a different vector and must never
 share an entry.
 """
 
-import pytest
-
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.resilience.query_cache import CachingEmbeddingProvider, query_cache_key
 

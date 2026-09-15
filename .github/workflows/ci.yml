@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [feat/rag-service, main]
+    branches: [main]
   pull_request:
-    branches: [feat/rag-service, main]
+    branches: [main]
 
 # CI is evidence, not decoration.
 # Application boot was restored by IR-155 (not IR-57, which no longer
@@ -17,6 +17,11 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    # A hang must fail, not bill. Before IR-251 this job had no bound, so a
+    # 4h31m test run reported success and the default 6-hour cap was the only
+    # thing that would ever have stopped it. The suite's honest runtime is
+    # minutes; 30 is headroom, not a target.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -43,9 +48,9 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: pip
@@ -146,23 +151,34 @@ jobs:
         # apps/tests/test_boot.py is what actually fails when the URLconf
         # cannot import — this step just has to run it.
         #
-        # `-p no:randomly --strict-markers` is inherited from pytest.ini.
+        # `--strict-markers` is inherited from pytest.ini's addopts. The
+        # `-p no:randomly` this line used to also claim was never there:
+        # pytest-randomly is neither in addopts nor in
+        # requirements/development.txt, so ordering is plain collection
+        # order and disabling a plugin nobody installed did nothing.
         # `-ra` surfaces the skip reasons for the skips that remain legitimate
         # (an individual test opting out), not for a wholesale environment
         # failure — IRIS_REQUIRE_DB above stops the run outright for that.
-        run: pytest -ra
+        #
+        # `--durations` is not decoration: IR-251 spent its first hours
+        # bisecting a 4h31m run from progress-dot timestamps in the log,
+        # because the run reported no per-test timing at all. A suite that
+        # cannot say which test was slow cannot be fixed from its own
+        # evidence.
+        run: pytest -ra --durations=25
 
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '18'
           cache: npm
@@ -181,6 +197,7 @@ jobs:
   compose:
     name: Docker Compose
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Was red from 2026-09-02 until IR-156: both Compose files declare an
     # `ai-gateway` whose env file ai/.env is gitignored and absent in CI, so
     # `docker compose config` failed before validating anything.
@@ -192,7 +209,7 @@ jobs:
     # ADR-018-era work fixes it rather than deleting it. A reader following
     # that comment would have removed a service the team decided to keep.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Provide env files
         # backend/.env and ai/.env are both gitignored. Compose interpolation
@@ -234,8 +251,9 @@ jobs:
   security:
     name: Security
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -244,7 +262,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 

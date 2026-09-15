@@ -15,7 +15,6 @@ from apps.ai.resilience.rate_limit import RateLimited
 from apps.ai.retrieval.degraded import (
     DegradableRetriever,
     FullTextRetriever,
-    RetrievedChunks,
 )
 from apps.ai.retrieval.ports import RetrievedChunk, Retriever
 from apps.records.models import Record, RecordOwner
