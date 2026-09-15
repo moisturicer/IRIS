@@ -90,3 +90,28 @@ class Reranker(ABC):
         and it needs the scores to make it. Implementations must not drop,
         duplicate or rewrite a candidate.
         """
+
+
+class LLMProvider(ABC):
+    """Text in, text out.
+
+    Deliberately smaller than the gateway's version of this port, which takes
+    ``(prompt, context)``. Two loosely-typed strings invite a caller to shove
+    retrieved passages into ``context`` and hope the adapter formats them; here
+    the *caller* assembles the prompt (see `apps/ai/answers/`) and this port
+    only transports it. Prompt assembly is the part with citation numbering in
+    it, and it belongs in the domain where it can be tested without a vendor.
+
+    One method, and no streaming: ADR-017's streaming work is gateway-side and
+    gated on an ASGI deployment IRIS does not yet run.
+    """
+
+    @abstractmethod
+    def generate(self, system: str, user: str) -> str:
+        """Answer ``user`` under the instructions in ``system``.
+
+        Separate arguments rather than one concatenated prompt: folding the
+        instructions into the user turn makes them look like something the
+        asker said, which is how a prompt injection sitting in an uploaded
+        document ends up outranking the system prompt.
+        """
