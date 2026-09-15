@@ -44,6 +44,13 @@ class PipelineStatus(models.TextChoices):
     rdco_intake -> [itso_review] -> parallel_review -> rdco_review ->
     published`. `declined`, `rejected` and `pending_delete` can interrupt
     either.
+
+    **`IN_REVIEW` is added beside the stage values, not instead of them**
+    (IR-256, ADR-021 §4). Under reviewer-directed routing a record's place in
+    review is its active assignments, so one stored value replaces the five
+    stage values and `declined`. Nothing stores it until IR-260 migrates those
+    six away, and until then no review edge in `lifecycle.TRANSITIONS` leads to
+    it.
     """
 
     DRAFT = "draft", "Draft"
@@ -58,6 +65,9 @@ class PipelineStatus(models.TextChoices):
     ITSO_REVIEW = "itso_review", "ITSO Review"
     PARALLEL_REVIEW = "parallel_review", "Parallel Office Review"
     RDCO_REVIEW = "rdco_review", "RDCO Final Review"
+
+    # Reviewer-directed routing (ADR-021 §4). Unused until IR-260.
+    IN_REVIEW = "in_review", "In Review"
 
     # Terminal / visible states
     PUBLISHED = "published", "Published"
@@ -83,14 +93,29 @@ class ReviewStage(models.TextChoices):
     Note these are *not* pipeline statuses, though they read similarly: the
     stage names the reviewing party (`itso`), while the pipeline status names
     the state the record is in (`itso_review`).
+
+    **This is also the party vocabulary** (ADR-021 §1), aliased as `Party`
+    below. The six parties are these six values with `rdco_intake` renamed to
+    `intake`. IR-256 adds `INTAKE` beside `RDCO_INTAKE` rather than renaming it:
+    `rdco_intake` is a stored `Review.stage`, and IR-260's migration rewrites
+    those rows and removes the old value in the same step. Until then, nothing
+    new may name a party `rdco_intake`; see `RecordAssignment.party`.
     """
 
     ADVISER = "adviser", "Adviser"
     RDCO_INTAKE = "rdco_intake", "RDCO Intake"
+    #: Staff see "Intake & Triage", students see "Intake" (ADR-021 §2). The
+    #: label here is the staff one; the student label is IR-258's to serve.
+    INTAKE = "intake", "Intake & Triage"
     ITSO = "itso", "ITSO"
     IERC = "ierc", "IERC"
     KTTO = "ktto", "KTTO"
     RDCO = "rdco", "RDCO Final"
+
+
+#: ADR-021 §1: "No new enum is needed." A party is a `ReviewStage`, named for
+#: what it means at the call site.
+Party = ReviewStage
 
 
 class ReviewDecision(models.TextChoices):
@@ -100,11 +125,19 @@ class ReviewDecision(models.TextChoices):
     `DECLINED` and `REJECTED` are not synonyms and the difference is the whole
     point: a decline requests a revision and the owner may resubmit, a rejection
     is terminal.
+
+    **IR-256 (ADR-021 §8).** `DECLINED` keeps its stored value and is relabelled
+    "Resubmission requested", which is what it has always meant. No API response
+    carries this label. `NEGATIVE_FINDING` is a specialist office's finding
+    against a record, which under ADR-021 replaces an office's power to reject.
+    No endpoint accepts it yet: `ReviewWriteSerializer` pins the three decisions
+    `/reviews/submit/` actually implements.
     """
 
     APPROVED = "approved", "Approved"
-    DECLINED = "declined", "Declined"
+    DECLINED = "declined", "Resubmission requested"
     REJECTED = "rejected", "Rejected"
+    NEGATIVE_FINDING = "negative_finding", "Negative finding"
 
 
 class ClearanceStatus(models.TextChoices):
@@ -115,12 +148,18 @@ class ClearanceStatus(models.TextChoices):
     approve the record. The distinction carries the thesis contribution --
     on resubmission after a decline, only the declining office's row resets to
     `PENDING` and every other office's `CLEARED` is preserved.
+
+    **IR-256 (ADR-021 §8).** `NOT_CLEARED` is an office's recorded negative
+    outcome, the clearance-side twin of `ReviewDecision.NEGATIVE_FINDING`.
+    `REJECTED` stays for historical rows, and nothing new will write it once
+    IR-260 lands.
     """
 
     PENDING = "pending", "Pending"
     CLEARED = "cleared", "Cleared"
     DECLINED = "declined", "Declined"
     REJECTED = "rejected", "Rejected"
+    NOT_CLEARED = "not_cleared", "Not cleared"
 
 
 class Office(models.TextChoices):
@@ -137,6 +176,35 @@ class Office(models.TextChoices):
     ITSO = "itso", "ITSO"
     IERC = "ierc", "IERC"
     KTTO = "ktto", "KTTO"
+
+
+class AssignmentState(models.TextChoices):
+    """
+    Whether a party is still acting on a record. `RecordAssignment.state`.
+
+    **Not an outcome** (ADR-021 §8). What the party concluded lives in `Review`
+    and `RecordClearance`; putting it here as well would be a second source of
+    truth for the same fact. `COMPLETED` means the party finished, and
+    `WITHDRAWN` means a decision closed the assignment before it did (§12).
+    """
+
+    ACTIVE = "active", "Active"
+    COMPLETED = "completed", "Completed"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+
+
+class ResubmissionRequestState(models.TextChoices):
+    """
+    Where one party's request for changes stands. `ResubmissionRequest.state`.
+
+    Replaces the stored `declined` pipeline status (ADR-021 §11). One stored
+    status cannot say that two parties are each waiting on a revision; one row
+    per request can.
+    """
+
+    OPEN = "open", "Open"
+    RESUBMITTED = "resubmitted", "Resubmitted"
+    WITHDRAWN = "withdrawn", "Withdrawn"
 
 
 class RequestStatus(models.TextChoices):
