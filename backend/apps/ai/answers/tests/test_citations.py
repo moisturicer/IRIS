@@ -133,6 +133,13 @@ class NonAsciiMarkerTests:
         _, citations = parse_citations("A [1] and B【2】.", [chunk(1), chunk(2)])
         assert [c.marker for c in citations] == [1, 2]
 
+    def test_a_mismatched_bracket_pair_is_not_a_citation(self):
+        """`[1】` is not a citation style any model produces, and treating it
+        as one would mean the pattern accepts shapes nobody writes."""
+        text, citations = parse_citations("Yes [1】.", [chunk(1)])
+        assert citations == ()
+        assert text == "Yes [1】."
+
 
 class GroundedAnswerTests:
     def test_an_answer_with_citations_is_grounded(self):

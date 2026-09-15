@@ -31,7 +31,18 @@ from apps.ai.retrieval.ports import RetrievedChunk
 #: and the raw marker left sitting in the rendered text. Fullwidth brackets
 #: appear for the same reason. `keep` re-emits `[n]`, so whatever comes in,
 #: what a reader sees is canonical.
-_MARKER = re.compile(r"[\[【［]\s*(\d+(?:\s*,\s*\d+)*)\s*[\]】］]")
+#:
+#: Three balanced alternatives rather than one wide opening class and one wide
+#: closing class: the cheap version also matches `[1】` and `【1]`, which no
+#: model produces and which a reader would have to squint at to call a
+#: citation. Each branch captures the digits, so exactly one group is ever
+#: populated -- `keep` takes whichever that is.
+_NUMBERS = r"\d+(?:\s*,\s*\d+)*"
+_MARKER = re.compile(
+    rf"\[\s*({_NUMBERS})\s*\]"
+    rf"|【\s*({_NUMBERS})\s*】"
+    rf"|［\s*({_NUMBERS})\s*］"
+)
 
 SYSTEM_PROMPT = (
     "You are IRIS, the research assistant for Cebu Institute of Technology - "
@@ -112,7 +123,10 @@ def parse_citations(
     seen: set[int] = set()
 
     def keep(match: re.Match) -> str:
-        numbers = [int(n) for n in match.group(1).replace(" ", "").split(",")]
+        # Exactly one alternative in `_MARKER` matched, so exactly one group is
+        # non-None; which bracket style it came from does not matter past here.
+        digits = next(g for g in match.groups() if g is not None)
+        numbers = [int(n) for n in digits.replace(" ", "").split(",")]
         valid = [n for n in numbers if 1 <= n <= len(chunks)]
         for number in valid:
             if number in seen:
