@@ -14,7 +14,6 @@ from apps.ai.answers.service import (
     UNAVAILABLE_TEXT,
     GroundedAnswerService,
 )
-from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
 from apps.ai.retrieval.degraded import RetrievedChunks

@@ -17,7 +17,7 @@ to read themselves instead of a sentence nobody wrote.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional, Sequence
+from typing import Callable, Sequence
 
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
