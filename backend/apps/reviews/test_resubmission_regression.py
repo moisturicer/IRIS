@@ -8,35 +8,38 @@ with them, and the refactor could hide the defect. So nothing here imports from
 those suites.
 
 **What reproducing the report found (2026-09-15).** The Record in the report is
-seed_demo's `[DEMO] Declined by IERC, ITSO and KTTO preserved` (id 38 in the
-dev database). The backend log shows the owner's first resubmission refused:
-`POST /api/v1/reviews/resubmit/` returned 400 with a 77-byte body, which is
-exactly `{"detail":"Please upload at least one updated document before
-resubmitting."}`. The Record never left `declined`. The paper view kept showing
-the IERC decline in both the clearance track and the review history, and the
-refusal appeared as a small red line under the button. Seventeen seconds after
-an upload, the second resubmission succeeded: IERC reset to pending, and ITSO
-and KTTO stayed cleared and preserved. **So the clearance-aware transition
-works. The upload guard (candidate 1) refused the resubmission, and the paper
-view made the refusal look like a new decline.**
+seed_demo's `[DEMO] Declined by IERC, ITSO and KTTO preserved`. The backend log
+shows the owner's first resubmission refused with a 400. Its 77-byte body is
+exactly the upload guard's `{"detail":"Please upload at least one updated
+document before resubmitting."}`. The Record never left `declined`. The paper
+view kept showing the IERC decline in both the clearance track and the review
+history, and showed the refusal as a small red line under the button. After an
+upload, the next resubmission succeeded: IERC reset to pending, and ITSO and
+KTTO stayed cleared and preserved. **So the clearance-aware transition works.
+The upload guard refused a resubmission that had no revision, and the paper
+view made the refusal look like a second decline.**
 
-That is why this module has two tests, not one:
+That is why this module has three tests, not one:
 
-- **After an upload**, resubmission already behaves correctly. That test passes
-  today and must keep passing through the cutover. Under a strict xfail it
-  would pass unexpectedly and fail the build.
-- **After a metadata-only revision**, the guard still refuses, because it
+- **No revision.** The resubmission is refused and the Record still awaits
+  resubmission. That is the reported click path, and it stays correct under
+  ADR-021 §11. It also stops IR-260 from making the expected failure below
+  pass just by deleting the guard.
+- **After an upload.** Resubmission already behaves correctly. This test
+  passes today and must keep passing through the cutover. Under a strict xfail
+  it would pass unexpectedly and fail the build.
+- **After a metadata-only revision.** The guard still refuses, because it
   accepts only an upload. ADR-021 §11 settles that "a new upload or an edit to
-  the record's metadata" both count, and IR-260 is the cutover that implements
-  it. That test carries the strict expected-failure marker, and IR-260 removes
-  it.
+  the record's metadata" both count, and IR-260 implements that. This test
+  carries the strict expected-failure marker, and IR-260 removes it.
 
-**The rules for editing this module at the cutover.** The assertions describe
-behaviour: the resubmission succeeds, the Record no longer awaits resubmission,
-the office that asked for changes is pending again, and its peers are still
-cleared and preserved. None of them names a pipeline stage. Only the setup
-helpers, marked below, may change when IR-260 replaces the decline action with
-a resubmission request. Do not edit an assertion to make either test pass.
+What no test here covers is the display half: that the paper view shows a
+refusal as a refusal. That is IR-259's Action required panel.
+
+**The rules for editing this module at the cutover.** Only the setup helpers,
+marked below, may change when IR-260 replaces the decline action with a
+resubmission request. The observation helpers and the assertions describe
+behaviour and name no pipeline stage. Do not edit either to make a test pass.
 """
 
 import shutil
@@ -51,7 +54,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import Role, User
 from apps.documents.models import UploadSlot
 from apps.records.models import Record, RecordOwner, RecordType
-from core.enums import PipelineStatus, RecordTypeName, RoleName
+from core.enums import PipelineStatus, RecordTypeName, ReviewDecision, RoleName
 
 REVIEW_SUBMIT = "/api/v1/reviews/submit/"
 RESUBMIT = "/api/v1/reviews/resubmit/"
@@ -64,7 +67,7 @@ PEER_OFFICES = ("itso", "ktto")
 
 class SetupFailed(Exception):
     """
-    A setup step did not produce the state the test needs.
+    A step outside the behaviour under test did not produce the state the test needs.
 
     Deliberately not an `AssertionError`. The expected-failure marker below is
     limited to `AssertionError`, so a broken setup errors the test instead of
@@ -72,7 +75,7 @@ class SetupFailed(Exception):
     """
 
 
-def _expect(response, status_code, step):
+def _require_status(response, status_code, step):
     if response.status_code != status_code:
         raise SetupFailed(
             f"{step}: expected HTTP {status_code}, got {response.status_code} "
@@ -119,7 +122,7 @@ class ResubmissionRegressionTests(APITestCase):
 
     def _decide(self, record, as_user, decision, comment=""):
         self.client.force_authenticate(as_user)
-        return _expect(
+        return _require_status(
             self.client.post(
                 REVIEW_SUBMIT,
                 {"record_id": record.pk, "status": decision, "comment": comment},
@@ -149,16 +152,18 @@ class ResubmissionRegressionTests(APITestCase):
         )
         RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
 
-        self._decide(record, self.rdco, "approved", "Routing to all three offices.")
-        self._decide(record, self.itso, "approved", "Prior-art search complete.")
-        self._decide(record, self.ktto, "approved", "Commercialisation potential noted.")
+        self._decide(record, self.rdco, ReviewDecision.APPROVED, "Routing to all three offices.")
+        self._decide(record, self.itso, ReviewDecision.APPROVED, "Prior-art search complete.")
+        self._decide(record, self.ktto, ReviewDecision.APPROVED, "Commercialisation potential noted.")
         self._decide(
-            record, self.ierc, "declined",
+            record, self.ierc, ReviewDecision.DECLINED,
             "Consent form for human participants is missing.",
         )
 
         if not self._awaits_resubmission(self._detail(record)):
-            raise SetupFailed("the office's request for changes did not leave the Record awaiting resubmission")
+            raise SetupFailed(
+                "the office's request for changes did not leave the Record awaiting resubmission"
+            )
         return record
 
     def _revise_by_uploading_a_document(self, record):
@@ -168,7 +173,7 @@ class ResubmissionRegressionTests(APITestCase):
         self.client.force_authenticate(self.owner)
         # Extraction is queued work, and this test is about the workflow.
         with mock.patch("apps.documents.tasks.extract_pdf_text.delay"):
-            _expect(
+            _require_status(
                 self.client.post(
                     DOCUMENT_SUBMIT,
                     {
@@ -186,7 +191,7 @@ class ResubmissionRegressionTests(APITestCase):
 
     def _revise_metadata_only(self, record):
         self.client.force_authenticate(self.owner)
-        _expect(
+        _require_status(
             self.client.patch(
                 f"/api/v1/records/{record.pk}/",
                 {"abstract": "Revised to describe how participant consent is obtained. " * 2},
@@ -196,21 +201,7 @@ class ResubmissionRegressionTests(APITestCase):
             "owner edits the record's metadata",
         )
 
-    def _awaits_resubmission(self, detail):
-        """
-        Whether the owner still has to resubmit, read from the record detail.
-
-        Today only `pipeline_status == "declined"` means that. IR-258 adds a
-        computed `workflow_state` whose `awaiting_resubmission` value means it
-        under the new model (ADR-021 §4), and `declined` then stops being
-        stored. Reading whichever the API provides keeps the assertions
-        unchanged across the cutover.
-        """
-        if "workflow_state" in detail:
-            return detail["workflow_state"] == "awaiting_resubmission"
-        return detail["pipeline_status"] == "declined"
-
-    # -- observation: the API the frontend reads ---------------------------
+    # -- observation: must not change at the cutover -----------------------
 
     def _resubmit(self, record):
         self.client.force_authenticate(self.owner)
@@ -218,9 +209,38 @@ class ResubmissionRegressionTests(APITestCase):
 
     def _detail(self, record):
         self.client.force_authenticate(self.owner)
-        return _expect(
+        return _require_status(
             self.client.get(f"/api/v1/records/{record.pk}/"), 200, "owner reads the record"
         ).json()
+
+    def _clearances(self, detail):
+        return {c["office"]: c for c in detail["clearances"]}
+
+    def _awaits_resubmission(self, detail):
+        """
+        Whether the owner still has to resubmit, read from the record detail.
+
+        Today only `pipeline_status == "declined"` means that. Under ADR-021 §4,
+        IR-258 adds a computed `workflow_state` to the detail payload
+        (`docs/workflow_routing_architecture.md` §4.1, §8.2), whose
+        `awaiting_resubmission` value means it, and IR-260 stops storing
+        `declined`. Reading whichever the API provides keeps every assertion
+        unchanged across the cutover.
+
+        **The fallback refuses to answer rather than guess.** If `declined` is no
+        longer a pipeline status but `workflow_state` is missing, the field was
+        named differently. A plain `== "declined"` would then report "not
+        awaiting" for every Record, and the assertions would pass vacuously.
+        """
+        if "workflow_state" in detail:
+            return detail["workflow_state"] == "awaiting_resubmission"
+        if "declined" not in {s.value for s in PipelineStatus}:
+            raise SetupFailed(
+                "`declined` is no longer a pipeline status and the detail payload has no "
+                "`workflow_state`; point this helper at whatever now says a Record awaits "
+                "resubmission"
+            )
+        return detail["pipeline_status"] == "declined"
 
     # -- the behaviour: must not change at the cutover ---------------------
 
@@ -236,7 +256,7 @@ class ResubmissionRegressionTests(APITestCase):
             "the Record still awaits resubmission after a successful resubmit",
         )
 
-        clearances = {c["office"]: c for c in detail["clearances"]}
+        clearances = self._clearances(detail)
         self.assertEqual(
             clearances[REQUESTING_OFFICE]["status"], "pending",
             "the office that asked for changes must review the revision",
@@ -252,6 +272,32 @@ class ResubmissionRegressionTests(APITestCase):
                 clearances[office]["preserved"],
                 f"{office}'s clearance must be marked as carried over, not granted again",
             )
+
+    def test_resubmission_with_no_revision_is_refused_and_still_awaits_resubmission(self):
+        """The reported click path. Correct today and under ADR-021 §11."""
+        record = self._project_where_one_office_asked_for_changes()
+        before = self._clearances(self._detail(record))
+
+        response = self._resubmit(record)
+
+        self.assertEqual(
+            response.status_code, 400,
+            "a resubmission with nothing revised must be refused, not accepted",
+        )
+        self.assertTrue(
+            response.data.get("detail"),
+            "the refusal must say why, so the owner is not left guessing",
+        )
+        detail = self._detail(record)
+        self.assertTrue(
+            self._awaits_resubmission(detail),
+            "a refused resubmission must leave the Record awaiting resubmission",
+        )
+        self.assertEqual(
+            {office: c["status"] for office, c in self._clearances(detail).items()},
+            {office: c["status"] for office, c in before.items()},
+            "a refused resubmission must not touch any clearance",
+        )
 
     def test_resubmission_after_an_upload_resets_only_the_requesting_office(self):
         """The part of the report that already works. It must keep working through IR-260."""
