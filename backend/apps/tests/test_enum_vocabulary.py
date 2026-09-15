@@ -35,6 +35,7 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 
 from core.enums import (
+    AssignmentState,
     ClearanceStatus,
     IPType,
     Office,
@@ -60,6 +61,12 @@ GOVERNED_ENUMS = (
     IPType,
     RecordTypeName,
     RoleName,
+    # IR-256: governed from the start, so IR-257 onward cannot write
+    # `"active"` by hand. `ResubmissionRequestState` is deliberately not here:
+    # its `"resubmitted"` is also the review-queue row's response key in
+    # `reviews/serializers.py`, and a key is wire format, not a stored value.
+    # Its `"withdrawn"` is still governed, through `AssignmentState`.
+    AssignmentState,
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
