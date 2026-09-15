@@ -321,6 +321,29 @@ LOGGING = {
 
 # ---- AI -----------------------------------------------------------------
 
+# ---- Voyage (ADR-015, IR-128) -------------------------------------------
+#
+# One vendor for both stages, embedding and reranking, with no alternative in
+# scope. `voyage-context-4` is a *contextualized* chunk embedder: it sees a
+# chunk's neighbours, which is why ADR-015 notes it may reduce the need for
+# the context-path prefix on the embedded string specifically.
+#
+# The key has no default and no local fallback -- ADR-008 rejected a local
+# model and ADR-015's short-lived local lane was removed the same day for
+# contradicting it. `VoyageEmbeddingProvider` therefore raises when the key is
+# absent rather than degrading silently.
+#
+# Deliberately *not* wired into `required()` or `production_problems()`: the
+# query lane that consumes Voyage is not built yet (IR-129 onward), and a
+# start-up check would break every deployment and CI job that does not use
+# RAG. The start-up assertion belongs with the switch that turns the query
+# lane on, not with the adapter.
+VOYAGE_API_KEY         = config("VOYAGE_API_KEY", default="")
+VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4")
+VOYAGE_EMBED_DIMENSIONS= config("VOYAGE_EMBED_DIMENSIONS", default=1024, cast=int)
+VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-2")
+VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
+
 AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")
 AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
 OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
