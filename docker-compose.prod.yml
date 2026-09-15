@@ -61,6 +61,9 @@ services:
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
+      # Django's cache (IR-132). Database 1, so flushing the Celery
+      # broker on 0 cannot take the query-embedding cache with it.
+      - REDIS_CACHE_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DOCLING_API_URL=http://docling:5001
@@ -154,6 +157,9 @@ services:
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
+      # Django's cache (IR-132). Database 1, so flushing the Celery
+      # broker on 0 cannot take the query-embedding cache with it.
+      - REDIS_CACHE_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
@@ -187,6 +193,9 @@ services:
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
+      # Django's cache (IR-132). Database 1, so flushing the Celery
+      # broker on 0 cannot take the query-embedding cache with it.
+      - REDIS_CACHE_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DOCLING_API_URL=http://docling:5001
@@ -226,6 +235,9 @@ services:
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
       - REDIS_URL=redis://redis:6379/0
+      # Django's cache (IR-132). Database 1, so flushing the Celery
+      # broker on 0 cannot take the query-embedding cache with it.
+      - REDIS_CACHE_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - AI_GATEWAY_URL=http://ai-gateway:8001

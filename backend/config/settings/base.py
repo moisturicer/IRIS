@@ -220,6 +220,13 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # ---- Celery -------------------------------------------------------------
 
+# Both Compose files have set REDIS_URL on every backend service since the
+# stack was written, and until IR-132 nothing in Django read it -- the same
+# shape as the EXTRACTION_TIMEOUT the compose comments record as declared and
+# unread. The rate limiter needs a raw client (atomic INCR plus an expiry,
+# which django.core.cache cannot express), so it is a real setting now.
+REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
+
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -320,6 +327,38 @@ LOGGING = {
 }
 
 # ---- AI -----------------------------------------------------------------
+
+# ---- Cache (IR-132) ------------------------------------------------------
+#
+# Absent until now: Celery and Redis were configured, but Django itself had no
+# CACHES at all, so `django.core.cache` fell back to the local-memory backend
+# -- per process. That is the same defect the rate limiter is built to avoid:
+# correct with one process, wrong with four.
+#
+# Django 5 ships a Redis backend, so this needs no extra dependency. The same
+# Redis as Celery, on a different database number, so flushing a queue cannot
+# take the query-embedding cache with it.
+REDIS_CACHE_URL = config("REDIS_CACHE_URL", default="redis://localhost:6379/1")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_CACHE_URL,
+        "KEY_PREFIX": "iris",
+        # A query embedding is valid for as long as the embedding space is,
+        # which is far longer than a day -- but an unbounded cache is a slow
+        # memory leak, and the space id is in the key, so an expired entry is
+        # recomputed rather than wrong.
+        "TIMEOUT": config("CACHE_TIMEOUT_SECONDS", default=86_400, cast=int),
+    }
+}
+
+# The vendor account's per-minute token budget, divided between the ingestion
+# and query lanes by `apps.ai.resilience.rate_limit`. The query lane is given
+# the larger share because a person is waiting on it (ADR-015).
+AI_RATE_LIMIT_TOKENS_PER_MINUTE = config(
+    "AI_RATE_LIMIT_TOKENS_PER_MINUTE", default=1_000_000, cast=int
+)
 
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
