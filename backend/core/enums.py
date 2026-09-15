@@ -117,6 +117,12 @@ class ReviewStage(models.TextChoices):
 #: what it means at the call site.
 Party = ReviewStage
 
+#: The six parties of ADR-021 §1: `Party` without `RDCO_INTAKE`. That value is
+#: a stored stage's history until IR-260 renames the rows, never a party's
+#: identity (§2), so nothing new may be assigned to, routed to, or asked for
+#: changes by it. When IR-260 deletes `RDCO_INTAKE`, this is simply `tuple(Party)`.
+ASSIGNABLE_PARTIES = tuple(p for p in Party if p is not Party.RDCO_INTAKE)
+
 
 class ReviewDecision(models.TextChoices):
     """
@@ -127,8 +133,8 @@ class ReviewDecision(models.TextChoices):
     is terminal.
 
     **IR-256 (ADR-021 §8).** `DECLINED` keeps its stored value and is relabelled
-    "Resubmission requested", which is what it has always meant. No API response
-    carries this label. `NEGATIVE_FINDING` is a specialist office's finding
+    "Resubmission requested", which is what it has always meant. The record
+    detail and review-queue payloads send the value, never this label. `NEGATIVE_FINDING` is a specialist office's finding
     against a record, which under ADR-021 replaces an office's power to reject.
     No endpoint accepts it yet: `ReviewWriteSerializer` pins the three decisions
     `/reviews/submit/` actually implements.

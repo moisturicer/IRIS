@@ -2,21 +2,16 @@ from django.db import models
 from django.utils import timezone
 
 from core.enums import (
+    ASSIGNABLE_PARTIES,
     AssignmentState,
     ClearanceStatus,
     Office,
-    Party,
     ResubmissionRequestState,
     ReviewDecision,
     ReviewStage,
 )
 
-#: The six parties of ADR-021 §1. `Party` still carries `RDCO_INTAKE` until
-#: IR-260 renames the stored `Review.stage` rows, but that value is a stage's
-#: history, never a party's identity (§2). So nothing new is allowed to be
-#: assigned to, routed to, or asked for changes by `rdco_intake`. When IR-260
-#: deletes `RDCO_INTAKE`, this becomes `Party.choices`.
-PARTY_CHOICES = [(p.value, p.label) for p in Party if p is not Party.RDCO_INTAKE]
+PARTY_CHOICES = [(p.value, p.label) for p in ASSIGNABLE_PARTIES]
 
 
 class Review(models.Model):
@@ -213,9 +208,11 @@ class ResubmissionRequest(models.Model):
         RecordAssignment, on_delete=models.SET_NULL,
         null=True, blank=True, related_name="resubmission_requests",
     )
-    #: The `declined` review that carries the request's comment.
+    #: The `declined` review that carries the request's comment. `RESTRICT`,
+    #: not `CASCADE`: deleting that review alone must not quietly delete the
+    #: request history. Deleting the whole Record still removes both.
     review       = models.ForeignKey(
-        Review, on_delete=models.CASCADE, related_name="resubmission_requests"
+        Review, on_delete=models.RESTRICT, related_name="resubmission_requests"
     )
     requested_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL,
