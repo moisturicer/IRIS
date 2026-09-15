@@ -360,6 +360,27 @@ AI_RATE_LIMIT_TOKENS_PER_MINUTE = config(
     "AI_RATE_LIMIT_TOKENS_PER_MINUTE", default=1_000_000, cast=int
 )
 
+# ---- Inference provider (ADR-021) ---------------------------------------
+#
+# Groq in development, OpenRouter in production, and the switch is these three
+# values -- no second adapter. Every vendor worth using here speaks the OpenAI
+# chat-completions format, so `OpenAICompatibleAdapter` covers Groq,
+# OpenRouter, OpenAI, Together, vLLM and Ollama alike.
+#
+# Anthropic is deliberately absent: it was chosen in an import statement rather
+# than a decision record, was never declared as a dependency, and silently
+# degraded every environment to extractive answers. ADR-021 supersedes it.
+#
+# No default key and no local fallback -- the adapter raises rather than
+# degrading to a mock, which is the failure ADR-021 records the previous
+# provider factory for.
+LLM_BASE_URL  = config("LLM_BASE_URL", default="https://api.groq.com/openai/v1")
+LLM_API_KEY   = config("LLM_API_KEY", default="")
+LLM_MODEL     = config("LLM_MODEL", default="llama-3.3-70b-versatile")
+# Grounded answering is extraction from supplied sources, not composition. A
+# higher temperature buys variety nobody asked for and invites invention.
+LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in
@@ -386,8 +407,11 @@ VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")
 AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
 OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
-ANTHROPIC_API_KEY      = config("ANTHROPIC_API_KEY", default="")       # Ask IRIS synthesis; unset -> retrieval-only mode
-AI_LLM_MODEL           = config("AI_LLM_MODEL", default="claude-sonnet-5")
+# ANTHROPIC_API_KEY and AI_LLM_MODEL were removed by ADR-021. Anthropic is not
+# used, and a setting nothing reads is the defect this codebase keeps finding
+# (REDIS_URL in IR-132, EXTRACTION_TIMEOUT in the compose comments). The
+# inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
+# above.
 DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.
