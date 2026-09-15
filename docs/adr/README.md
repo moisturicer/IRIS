@@ -8,12 +8,12 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 
 ## Index
 
-**Eighteen active decisions.** Read these for "what does IRIS do today and why."
+**Eighteen active decisions, plus two Proposed.** Read the accepted ones for "what does IRIS do today and why." **ADR-021 and ADR-022 are Proposed and describe nothing that exists** — they are the workflow revision of 2026-09-15, awaiting the team's decision.
 
 | ADR | Title | Status | Impact |
 |---|---|---|---|
 | [001](001-mvp-scope-boundary.md) | MVP scope boundary for Semester 2 | Accepted · **amended 4× (013, 016, 019, 020)** | Scope |
-| [002](002-workflow-transition-table.md) | Workflow as a declarative transition table | Accepted · **amended 2026-09-09** | Architecture · Research · SaaS |
+| [002](002-workflow-transition-table.md) | Workflow as a declarative transition table | Accepted · **amended 2026-09-09** · *amendment proposed by [021](021-reviewer-directed-routing.md)* | Architecture · Research · SaaS |
 | [003](003-clearance-aware-resubmission.md) | Clearance-aware resubmission | Accepted | **Research contribution** |
 | [004](004-restart-all-comparison-mode.md) | Restart-all as a configurable comparison policy | Accepted | **Research evaluation** |
 | [005](005-instance-per-tenant.md) | Instance-per-tenant rather than pooled multi-tenancy | Accepted | SaaS · Security |
@@ -27,9 +27,11 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [015](015-voyage-embedding-and-reranking.md) | Voyage for embedding and reranking, always — `voyage-context-4` | Accepted | Architecture · Security · Cost |
 | [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Accepted · **amended 2026-09-04 (twice)** | Architecture · Scope · **Research** |
 | [017](017-asgi-deployment-for-gateway-streaming.md) | ASGI deployment so Django can call the gateway asynchronously | Accepted | Architecture · Deployment · Performance |
-| [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Accepted** — 2026-09-07 | Architecture · Research |
+| [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Accepted** — 2026-09-07 · *partial supersession proposed by [021](021-reviewer-directed-routing.md)* | Architecture · Research |
 | [019](019-persisted-unified-conversation-history.md) | Persisted conversation history, unified across Ask IRIS and Paper Chat | Accepted | Architecture · **Research** |
 | [020](020-per-record-assessment-brief.md) | The IRIS Assessment Brief — per-record decision support at intake | **Accepted** — 2026-09-10 | Scope · Security · **Research** |
+| [021](021-reviewer-directed-routing.md) | Reviewer-directed routing | **Proposed** — 2026-09-15 | Architecture · Scope · Security · **Research** |
+| [022](022-explicit-document-requests.md) | Explicit document requests, distinct from resubmission | **Proposed** — 2026-09-15 | Architecture · Scope |
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 
@@ -53,6 +55,8 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 **013 and 016 were amended again 2026-09-04, on the instruction of the project lead: RAG is reclassified as thesis-critical**, reversing both ADRs' §Research Impact claim that RAG was "a supporting capability, not the thesis contribution." `CLAUDE.md`'s Scope rule is corrected to match. Unaffected: what ADR-003/ADR-004's controlled comparison measures — that experiment is still of the clearance-aware resubmission workflow mechanism, not RAG.
 
 **ADR-001's out-of-scope list has now been reversed four times**, and the Status line on ADR-001 carries the table. 013 took full-text chunking, 016 took Docling-serve, 019 took conversational RAG with history, and 020 took document summarization — the last two being the two halves of one exclusion line in ADR-013 §Decision, which 019 split deliberately rather than bundling. Each reversal draws on the same ~27 dev-day budget ADR-001 was costed against, so each is expected to name what it displaces; ADR-020 §Decision Rationale is explicit that four reversals is the point at which a scope boundary stops constraining anything. Read ADR-001's body together with that table, never alone.
+
+**ADR-021 and ADR-022 (2026-09-15) propose revising the MVP workflow itself**, and are the first pair to question ADR-002's shape rather than extend it. 021 replaces the fixed office pipeline with reviewer-directed routing over open assignments — partially superseding 018, whose submitter-requested office set becomes a suggestion rather than the route — and 022 makes "please upload this document" an object rather than a decline comment, closing a gap ADR-018 filed against itself. **Both are Proposed.** 021 leaves two questions explicitly unresolved for the team: what this displaces against ADR-001's budget, and whether ad-hoc routing strengthens ADR-003's novelty argument or moves it into CMMN's prior art. Do not read either as describing current behaviour.
 
 ADRs 001–012 record the conclusions of a structured architecture review conducted 31 August – 1 September 2026, in three passes:
 
