@@ -119,8 +119,8 @@ Each item is a defect relative to the settled MVP.
 
 | Current | Becomes | Slice |
 |---|---|---|
-| `core/enums.py` `PipelineStatus` | `IN_REVIEW` added; `ADVISER_REVIEW`, `RDCO_INTAKE`, `ITSO_REVIEW`, `PARALLEL_REVIEW`, `RDCO_REVIEW`, `DECLINED` removed | IR-260 |
-| `ReviewStage.RDCO_INTAKE = "rdco_intake"` | `ReviewStage.INTAKE = "intake"`; `Party = ReviewStage` alias | IR-260 (alias in IR-256) |
+| `core/enums.py` `PipelineStatus` | `IN_REVIEW` added; `ADVISER_REVIEW`, `RDCO_INTAKE`, `ITSO_REVIEW`, `PARALLEL_REVIEW`, `RDCO_REVIEW`, `DECLINED` removed | IR-256 adds `IN_REVIEW` beside the old values; IR-260 removes them |
+| `ReviewStage.RDCO_INTAKE = "rdco_intake"` | `ReviewStage.INTAKE = "intake"`; `Party = ReviewStage` alias | IR-256 adds `INTAKE` beside `RDCO_INTAKE`, plus the alias and `ASSIGNABLE_PARTIES` (the six parties without `rdco_intake`); IR-260 renames the stored rows and removes `RDCO_INTAKE` |
 | `ReviewDecision` | `NEGATIVE_FINDING` added; `DECLINED` relabelled "Resubmission requested" (stored value unchanged) | IR-256 |
 | `ClearanceStatus` | `NOT_CLEARED` added; `REJECTED` kept for history, no new writes | IR-256 / IR-260 |
 | `PUBLICLY_VISIBLE_STATUSES` | `(PUBLISHED,)` | IR-264 |
@@ -199,7 +199,7 @@ ResubmissionRequest
 DocumentRequest, DocumentRequestItem           — ADR-022 §1
 
 Review            + assignment FK (null)
-RecordClearance   unchanged
+RecordClearance   status widened from 10 to 20 characters for `not_cleared` (IR-256); otherwise unchanged
 Record            pipeline_status narrowed; resubmission_count / last_resubmitted_at kept
                   (IR-139's `preserved` rule reads last_resubmitted_at)
 ```

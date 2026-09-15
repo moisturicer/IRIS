@@ -20,12 +20,19 @@ The migration itself, applied over existing rows, is tested separately in
 import uuid
 
 from django.db import IntegrityError, transaction
+from django.db.models import RestrictedError
 from django.test import TestCase
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
-from apps.reviews.models import RecordAssignment, ResubmissionRequest, Review, RoutingEvent
+from apps.reviews.models import (
+    RecordAssignment,
+    RecordClearance,
+    ResubmissionRequest,
+    Review,
+    RoutingEvent,
+)
 from core.enums import (
     AssignmentState,
     ClearanceStatus,
@@ -154,6 +161,21 @@ class NewRowsLinkTogetherTests(TestCase):
         self.assertEqual(request.state, ResubmissionRequestState.OPEN)
         self.assertEqual(list(record.resubmission_requests.all()), [request])
 
+    def test_a_request_keeps_its_review_from_being_deleted_alone(self):
+        """No workflow action deletes request history (architecture §5), so its review cannot go first."""
+        record = _record(self.owner, PipelineStatus.PARALLEL_REVIEW)
+        review = Review.objects.create(
+            record=record, reviewed_by=self.ierc, stage=ReviewStage.IERC,
+            status=ReviewDecision.DECLINED,
+        )
+        ResubmissionRequest.objects.create(record=record, party=Party.IERC, review=review)
+
+        with self.assertRaises(RestrictedError):
+            review.delete()
+
+        record.delete()
+        self.assertFalse(ResubmissionRequest.objects.exists())
+
     def test_an_existing_review_needs_no_assignment(self):
         """Every review written before IR-257 has none, so the link must be optional."""
         record = _record(self.owner, PipelineStatus.PARALLEL_REVIEW)
@@ -228,12 +250,10 @@ class VocabularyIsAddedBesideTheOldTests(TestCase):
             list(ResubmissionRequestState.choices),
         )
 
-    def test_the_new_clearance_status_fits_its_column(self):
-        field_length = Review._meta.get_field("status").max_length
-        self.assertLessEqual(len(ReviewDecision.NEGATIVE_FINDING), field_length)
-
-        from apps.reviews.models import RecordClearance
-
+    def test_the_new_decision_and_clearance_values_fit_their_columns(self):
+        self.assertLessEqual(
+            len(ReviewDecision.NEGATIVE_FINDING), Review._meta.get_field("status").max_length
+        )
         self.assertLessEqual(
             len(ClearanceStatus.NOT_CLEARED),
             RecordClearance._meta.get_field("status").max_length,
