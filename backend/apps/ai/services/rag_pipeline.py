@@ -27,7 +27,7 @@ NO_RESULTS_MESSAGE = (
 EXTRACTIVE_NOTE = (
     "_Retrieval-only mode: IRIS found and ranked these records, but no language "
     "model is configured, so this answer quotes the records rather than "
-    "synthesising them. Set `ANTHROPIC_API_KEY` to enable written answers._"
+    "synthesising them. Set `LLM_API_KEY` to enable written answers._"
 )
 
 

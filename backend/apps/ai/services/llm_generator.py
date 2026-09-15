@@ -1,10 +1,17 @@
 """
 LLM synthesis for grounded answers.
 
-The provider is optional on purpose. IRIS ships with placeholder credentials in
-`.env.example`, so `is_configured()` is false on a fresh checkout and the caller
-falls back to extractive synthesis. Adding a real key upgrades the same endpoint
-to full generative RAG with no other change.
+The provider is optional on purpose. IRIS ships with no key in `.env.example`,
+so `is_configured()` is false on a fresh checkout and the caller falls back to
+extractive synthesis. Adding a real key upgrades the same endpoint to full
+generative RAG with no other change.
+
+**Repointed off Anthropic by ADR-021.** This called `anthropic` directly, a
+vendor chosen in an import statement rather than a decision record -- and the
+package was never declared as a dependency, so the import failed and every
+environment silently degraded to extractive answers. It now goes through
+`OpenAICompatibleAdapter`, which serves Groq (development) and OpenRouter
+(production) from the same code.
 """
 from __future__ import annotations
 
@@ -15,7 +22,10 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 #: Values that appear in .env.example — present, but not real credentials.
-PLACEHOLDER_KEYS = {"", "your-anthropic-key", "your-openai-key", "changeme", "sk-local-dev-placeholder"}
+PLACEHOLDER_KEYS = {
+    "", "your-anthropic-key", "your-openai-key", "your-groq-key",
+    "changeme", "sk-local-dev-placeholder",
+}
 
 SYSTEM_PROMPT = (
     "You are IRIS, the research assistant for Cebu Institute of Technology – University. "
@@ -28,12 +38,20 @@ SYSTEM_PROMPT = (
 class LLMGenerator:
     """Thin wrapper over the configured provider. Never raises to the caller."""
 
-    def __init__(self) -> None:
-        self.api_key = (getattr(settings, "ANTHROPIC_API_KEY", "") or "").strip()
-        self.model = getattr(settings, "AI_LLM_MODEL", "claude-sonnet-5")
+    def __init__(self, provider=None) -> None:
+        self.api_key = (getattr(settings, "LLM_API_KEY", "") or "").strip()
+        self.model = getattr(settings, "LLM_MODEL", "")
+        self._provider = provider
 
     def is_configured(self) -> bool:
-        return self.api_key not in PLACEHOLDER_KEYS and self.api_key.startswith("sk-")
+        """Whether a usable key is present.
+
+        No vendor prefix check. The previous version required the key to start
+        with `sk-`, which is OpenAI's and Anthropic's shape -- a Groq key
+        (`gsk_...`) would have been rejected as malformed even when perfectly
+        valid. Under ADR-021 the key's shape is the vendor's business.
+        """
+        return self.api_key not in PLACEHOLDER_KEYS
 
     def build_prompt(self, question: str, sources) -> str:
         blocks = []
@@ -53,20 +71,14 @@ class LLMGenerator:
             return None
 
         try:
-            import anthropic
-        except ImportError:
-            logger.info("anthropic SDK not installed; falling back to extractive synthesis")
-            return None
+            provider = self._provider
+            if provider is None:
+                from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
 
-        try:
-            client = anthropic.Anthropic(api_key=self.api_key)
-            message = client.messages.create(
-                model=self.model,
-                max_tokens=1024,
-                system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": self.build_prompt(question, sources)}],
-            )
-            return "".join(block.text for block in message.content if block.type == "text").strip()
+                provider = OpenAICompatibleAdapter()
+            return provider.generate(
+                system=SYSTEM_PROMPT, user=self.build_prompt(question, sources)
+            ).strip()
         except Exception:
             # A provider outage must not take the endpoint down — the extractive
             # answer below is still grounded and still cites real records.

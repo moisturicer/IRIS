@@ -16,7 +16,7 @@ import hashlib
 import math
 from typing import Sequence
 
-from .ports import EmbeddingProvider, RerankedCandidate, Reranker
+from .ports import EmbeddingProvider, LLMProvider, RerankedCandidate, Reranker
 
 
 #: Reserved dimension carrying the document/query marker. Reproducing
@@ -109,3 +109,20 @@ class ScriptedReranker(Reranker):
         # Stable on ties: equal scores keep input order, so the output is
         # deterministic rather than dependent on sort implementation.
         return sorted(scored, key=lambda c: (-c.score, c.index))
+
+
+class ScriptedLLM(LLMProvider):
+    """A deterministic stand-in for an inference vendor.
+
+    Echoes a citation marker back so the citation-parsing tests in
+    `apps/ai/answers/` have something realistic to parse, and so the whole
+    answer path is exercisable with no key and no network.
+    """
+
+    def __init__(self, reply: str = "Based on the sources, yes [1]."):
+        self._reply = reply
+        self.calls: list[tuple[str, str]] = []
+
+    def generate(self, system: str, user: str) -> str:
+        self.calls.append((system, user))
+        return self._reply
