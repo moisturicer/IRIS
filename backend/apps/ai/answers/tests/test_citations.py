@@ -107,6 +107,33 @@ class HallucinatedMarkerTests:
         assert text.endswith("weekly.")
 
 
+class NonAsciiMarkerTests:
+    """A model is not bound by the bracket the prompt asks for.
+
+    gpt-oss-120b, the configured default, cites with the CJK lenticular form.
+    Against an ASCII-only pattern that resolved to nothing: no citations, and
+    the raw marker left in the text where a reader would see it.
+    """
+
+    def test_a_lenticular_marker_resolves(self):
+        text, citations = parse_citations("Drying took 3 days【1】.", [chunk(1)])
+        assert [c.marker for c in citations] == [1]
+        assert "【" not in text and "[1]" in text
+
+    def test_a_fullwidth_marker_resolves(self):
+        _, citations = parse_citations("Yes［1］.", [chunk(1)])
+        assert [c.marker for c in citations] == [1]
+
+    def test_a_lenticular_marker_out_of_range_is_still_dropped(self):
+        text, citations = parse_citations("Yes【7】.", [chunk(1)])
+        assert citations == ()
+        assert "7" not in text
+
+    def test_mixed_bracket_styles_in_one_answer_both_resolve(self):
+        _, citations = parse_citations("A [1] and B【2】.", [chunk(1), chunk(2)])
+        assert [c.marker for c in citations] == [1, 2]
+
+
 class GroundedAnswerTests:
     def test_an_answer_with_citations_is_grounded(self):
         answer = GroundedAnswer(text="Yes [1].", citations=(object(),))

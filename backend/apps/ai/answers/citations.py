@@ -23,7 +23,15 @@ from apps.ai.retrieval.ports import RetrievedChunk
 
 #: Inline markers: [1], [2]. Also matches [1, 2] and [1][2], which models
 #: produce whether or not the prompt asks for them.
-_MARKER = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+#:
+#: The bracket class is wider than the prompt asks for because a model is not
+#: bound by it. gpt-oss-120b, the configured default, answers with the CJK
+#: lenticular form -- `【1】` -- and against an ASCII-only pattern every
+#: citation silently failed to resolve: zero citations, `is_grounded` false,
+#: and the raw marker left sitting in the rendered text. Fullwidth brackets
+#: appear for the same reason. `keep` re-emits `[n]`, so whatever comes in,
+#: what a reader sees is canonical.
+_MARKER = re.compile(r"[\[【［]\s*(\d+(?:\s*,\s*\d+)*)\s*[\]】］]")
 
 SYSTEM_PROMPT = (
     "You are IRIS, the research assistant for Cebu Institute of Technology - "

@@ -376,7 +376,7 @@ AI_RATE_LIMIT_TOKENS_PER_MINUTE = config(
 # provider factory for.
 LLM_BASE_URL  = config("LLM_BASE_URL", default="https://api.groq.com/openai/v1")
 LLM_API_KEY   = config("LLM_API_KEY", default="")
-LLM_MODEL     = config("LLM_MODEL", default="llama-3.3-70b-versatile")
+LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
 # Grounded answering is extraction from supplied sources, not composition. A
 # higher temperature buys variety nobody asked for and invites invention.
 LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
