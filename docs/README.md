@@ -38,6 +38,7 @@ A requirement is not satisfied because code exists for it. It is satisfied when 
 | [`chunker_architecture.md`](chunker_architecture.md) | Chunk as the retrievable unit, context-path prefixing, idempotent re-chunking, citation provenance. The design [ADR-013](adr/013-chunk-level-rag-pipeline.md) adopts |
 | [`rag_third_party_services_architecture.md`](rag_third_party_services_architecture.md) | Provider survey and the prerequisites behind [ADR-015](adr/015-voyage-embedding-and-reranking.md) |
 | [`document_requirements_architecture.md`](document_requirements_architecture.md) | Target three-layer department-template / office-checklist model for FR-M2-01 |
+| [`workflow_routing_architecture.md`](workflow_routing_architecture.md) | **Current workflow vs the clarified business rule** — nine conflicts with file-and-line evidence, the minimal domain change, tracker mechanics, test impact, terminology recommendation. The inspection behind [ADR-021](adr/021-reviewer-directed-routing.md) and [ADR-022](adr/022-explicit-document-requests.md) |
 
 ### Decisions
 | Document | Owns |

@@ -4,6 +4,13 @@
 
 **Proposed** — 2026-09-15. Tracked on [IR-254](https://citiris.atlassian.net/browse/IR-254).
 
+**Confirmed, not revised, by the business-rule clarification of the same day.** Its §9 restates
+this decision in its own words — a document request must not reset the workflow, a resubmission
+request must, and previous review and routing history is preserved either way. Two small
+additions were made below: `intake` joins the parties that may request a document (§1), and
+`awaiting_document` is named as a derived lifecycle state (§3). ADR-021 was rewritten for the
+same clarification; this one was not.
+
 Depends on [ADR-021](021-reviewer-directed-routing.md) for the notion of a party *holding* a
 record; everything else here stands alone. **Closes a gap ADR-018 recorded against itself** and
 takes a narrow slice of what [IR-118](https://citiris.atlassian.net/browse/IR-118) (FR-M2-01,
@@ -75,8 +82,15 @@ different meanings:
 | Requesting party's clearance | unchanged | reset to `pending` |
 | Other parties' clearances | unchanged | preserved (ADR-003) |
 | Other parties' work | continues | interrupted |
+| Review and routing history | preserved | **preserved** — never deleted, on either action |
 | Submitter's action | upload against the request | edit, upload, resubmit |
-| Returns to | the requesting party only | the declining party (ADR-021 §7) |
+| Returns to | the requesting party only | the declining party (ADR-021 §11) |
+
+The history row is worth stating explicitly because today's code does delete: on a
+sequential-stage decline, `_resolve_after_resubmission` (`lifecycle.py:651`) calls
+`RecordClearance.objects.filter(record=record).delete()`. ADR-021 §11 removes that branch —
+there is no "restart from the top" once there is no top — and this ADR depends on it. `Review`
+and `RoutingEvent` rows are never deleted by any action in either ADR.
 
 ### 1. Data model
 
@@ -104,6 +118,11 @@ DocumentRequestItem
 assignment while a request is still open — it cleared on everything except the form — and the
 request must still say who is waiting.
 
+**`party` includes `intake`.** Determining that a submission is incomplete is triage's first
+job (ADR-021 §1), and "you have not attached the endorsement sheet" is the most common thing
+intake will ever say. Today it can only say it by declining, which sends the record out of
+review — the worst available outcome for the cheapest possible problem.
+
 ### 2. The request menu
 
 The reviewer's picker is `UploadSlot` rows for the record's type, plus a free-text **Other**.
@@ -125,7 +144,14 @@ the office asks. Nothing in this ADR has to be undone for that to happen; `slot`
 ### 3. Fulfilment
 
 1. Reviewer creates the request. The submitter is notified; the record's tracker shows the
-   requesting party as **awaiting document** (derived from `state="open"`, not stored).
+   requesting party as **awaiting document**.
+
+   `awaiting_document` is one of ADR-021 §4's **derived** lifecycle states — it is true when an
+   open `DocumentRequest` exists, and is computed rather than stored. Storing it would create a
+   second place the answer lives, free to disagree with the request table; that is the bug class
+   ADR-021 §4 exists to remove. The clarification §11 lists it among the lifecycle states, and
+   ADR-021 §4 flags stored-versus-derived as an open question for the team — if the answer comes
+   back "stored", this state moves with the others and nothing else here changes.
 2. The submitter uploads through the existing `DocumentsPage` flow against a request item. A
    slot-backed item creates a normal `RecordUpload`; an **Other** item creates one against a
    per-record ad-hoc slot so the file is still slot-shaped rather than a loose `RecordFile`.
