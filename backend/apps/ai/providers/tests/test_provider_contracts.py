@@ -107,3 +107,30 @@ class NoOpRerankerTests:
     def test_it_scores_everything_equally_rather_than_inventing_a_ranking(self):
         result = NoOpReranker().rerank("a question", ["alpha", "beta"])
         assert len({r.score for r in result}) == 1
+
+
+class DeterministicEmbedderSimilarityTests:
+    """The fake has to behave like an embedder in the one way the retrieval
+    tests depend on, or those tests have nothing to find.
+
+    Asserted on the fake specifically, not through the contract suite: the
+    *port* promises nothing about similarity, and a real vendor's numbers are
+    not ours to predict.
+    """
+
+    @staticmethod
+    def _cosine(a, b):
+        return sum(x * y for x, y in zip(a, b))
+
+    def test_text_sharing_words_embeds_closer_than_text_that_does_not(self):
+        embedder = DeterministicEmbeddingProvider(dimensions=256)
+        query = embedder.embed_query("weekly pond sampling procedure")
+        near, far = embedder.embed_documents(
+            ["weekly pond sampling procedure", "unrelated budget narrative"]
+        )
+        assert self._cosine(query, near) > self._cosine(query, far)
+
+    def test_a_document_and_a_query_of_the_same_text_still_differ(self):
+        """ADR-015 rule 3's asymmetry is reproduced, not papered over."""
+        embedder = DeterministicEmbeddingProvider(dimensions=256)
+        assert embedder.embed_documents(["alpha beta"])[0] != embedder.embed_query("alpha beta")

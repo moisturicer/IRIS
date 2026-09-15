@@ -19,20 +19,39 @@ from typing import Sequence
 from .ports import EmbeddingProvider, RerankedCandidate, Reranker
 
 
-def _unit_vector_from(text: str, dimensions: int, salt: str) -> list[float]:
-    """A stable unit vector derived from the text itself.
+#: Reserved dimension carrying the document/query marker. Reproducing
+#: Voyage's asymmetry matters (ADR-015 rule 3), but a fake whose asymmetry
+#: *destroys* similarity cannot stand in for one: retrieval tests would have
+#: no closest passage to find. A small marker on one axis keeps
+#: `embed_documents(x) != embed_query(x)` assertable while leaving cosine
+#: similarity dominated by the shared tokens.
+_MARKER_DIMENSION = 0
+_MARKER_WEIGHT = 0.05
 
-    Hash-derived rather than random so the same text always embeds the same
-    way, across runs and processes -- the property the contract suite asserts
-    and the one that makes a cached vector testable. Normalised because cosine
-    distance is what the HNSW indexes are built for, and unnormalised vectors
-    would make similarity scores depend on text length.
+
+def _feature_vector(text: str, dimensions: int, marker: float) -> list[float]:
+    """A hashed bag-of-words vector.
+
+    Feature hashing rather than a random draw, so the fake behaves like an
+    embedder in the one way the tests depend on: **text that shares words
+    lands close together**. That is what lets retrieval, ranking and reranking
+    be tested end to end with no vendor account -- and IR-129's tests are the
+    security tests, so they must run everywhere.
+
+    Deterministic across runs and processes: the same text always produces the
+    same vector, which is the property the contract suite asserts and the one
+    that makes a cached vector testable.
     """
-    raw = hashlib.sha256(f"{salt}:{text}".encode("utf-8")).digest()
-    # Stretch the digest to the requested width; 32 bytes is rarely enough.
-    while len(raw) < dimensions:
-        raw += hashlib.sha256(raw).digest()
-    values = [(byte / 255.0) - 0.5 for byte in raw[:dimensions]]
+    values = [0.0] * dimensions
+    for token in text.lower().split():
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        index = int.from_bytes(digest[:4], "big") % dimensions
+        # Sign from a second byte, so unrelated tokens can cancel rather than
+        # only ever accumulating towards one corner of the space.
+        values[index] += 1.0 if digest[4] % 2 else -1.0
+
+    values[_MARKER_DIMENSION] += marker
+
     norm = math.sqrt(sum(v * v for v in values)) or 1.0
     return [v / norm for v in values]
 
@@ -40,10 +59,11 @@ def _unit_vector_from(text: str, dimensions: int, salt: str) -> list[float]:
 class DeterministicEmbeddingProvider(EmbeddingProvider):
     """Embeds by hashing. Same text, same vector, forever.
 
-    Documents and queries use different salts, so the asymmetry ADR-015 rule 3
-    exists to protect is *reproduced* rather than papered over: a test that
-    accidentally embeds a query with the document method gets different
-    numbers here, exactly as it would against Voyage.
+    Documents and queries carry opposite markers, so the asymmetry ADR-015
+    rule 3 exists to protect is *reproduced* rather than papered over: a test
+    that accidentally embeds a query with the document method gets different
+    numbers here, exactly as it would against Voyage -- while text that
+    shares words still lands close, so ranking is testable.
     """
 
     def __init__(self, dimensions: int = 1024) -> None:
@@ -54,10 +74,12 @@ class DeterministicEmbeddingProvider(EmbeddingProvider):
         return self._dimensions
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
-        return [_unit_vector_from(t, self._dimensions, "document") for t in texts]
+        return [
+            _feature_vector(t, self._dimensions, _MARKER_WEIGHT) for t in texts
+        ]
 
     def embed_query(self, text: str) -> list[float]:
-        return _unit_vector_from(text, self._dimensions, "query")
+        return _feature_vector(text, self._dimensions, -_MARKER_WEIGHT)
 
 
 class ScriptedReranker(Reranker):
