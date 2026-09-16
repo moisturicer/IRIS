@@ -122,7 +122,7 @@ Each item is a defect relative to the settled MVP.
 | `core/enums.py` `PipelineStatus` | `IN_REVIEW` added; `ADVISER_REVIEW`, `RDCO_INTAKE`, `ITSO_REVIEW`, `PARALLEL_REVIEW`, `RDCO_REVIEW`, `DECLINED` removed | IR-256 adds `IN_REVIEW` beside the old values; IR-260 removes them |
 | `ReviewStage.RDCO_INTAKE = "rdco_intake"` | `ReviewStage.INTAKE = "intake"`; `Party = ReviewStage` alias | IR-256 adds `INTAKE` beside `RDCO_INTAKE`, plus the alias and `ASSIGNABLE_PARTIES` (the six parties without `rdco_intake`); IR-260 renames the stored rows and removes `RDCO_INTAKE` |
 | `ReviewDecision` | `NEGATIVE_FINDING` added; `DECLINED` relabelled "Resubmission requested" (stored value unchanged) | IR-256 |
-| `ClearanceStatus` | `NOT_CLEARED` added; `REJECTED` kept for history, no new writes | IR-256 / IR-260 |
+| `ClearanceStatus` | `NOT_CLEARED` added; `REJECTED` kept for history, no new writes | IR-256 adds `NOT_CLEARED` (and widens the column); IR-260 stops writing `REJECTED` |
 | `PUBLICLY_VISIBLE_STATUSES` | `(PUBLISHED,)` | IR-264 |
 | — | `DELETE_REVIEW_STATUSES = (PUBLISHED, APPROVED, COMPLETED)` | IR-264 |
 | `lifecycle.STAGES` | `PARTIES` (labels, clears-or-gates, allowed route targets) | IR-260 |
@@ -204,6 +204,17 @@ Record            pipeline_status narrowed; resubmission_count / last_resubmitte
                   (IR-139's `preserved` rule reads last_resubmitted_at)
 ```
 
+**The vocabulary values land in step 1, not at the cutover.** `in_review`, `intake`,
+`negative_finding` and `not_cleared` are added in IR-256 beside the values they will replace,
+which is what the expand step is for and what IR-256's card asks for; the old values stay until
+IR-260 removes them. **Adding a value to an enum is not inert**: `ReviewWriteSerializer`
+validated `status` against every `ReviewDecision` value, so `negative_finding` became postable to
+`/reviews/submit/` the moment it existed, and was recorded as a decline. IR-256 pins that
+serializer to the three decisions the endpoint implements (`SUBMITTABLE_DECISIONS`), and IR-260
+replaces it. Anything else that iterates a workflow enum — `lifecycle.py`'s soft-delete edges,
+IR-140's matrix, DRF's OPTIONS metadata — takes the new values silently, which is safe only
+because nothing stores them yet.
+
 **Deliberate constraints:**
 
 - **An assignment has no outcome field.** Outcomes live in `Review` and `RecordClearance`.
@@ -251,7 +262,7 @@ and can be deployed.
 | Step | Slice | Schema | Behaviour | Verification |
 |---|---|---|---|---|
 | 0 | IR-233 | none | none | Regression test is committed as `xfail(strict=True)` and its failure is recorded |
-| 1 | IR-256 | **additive**: 3 tables and 1 nullable FK | none | Constraint tests; migration run against a copy of a seeded database |
+| 1 | IR-256 | **additive**: 3 tables, 1 nullable FK, the new vocabulary values beside the old ones, and `RecordClearance.status` widened to 20 for `not_cleared` | none | Constraint tests; migration run against a copy of a seeded database; record-detail and review-queue snapshots identical before and after |
 | 2 | IR-257 | data only (backfill) | services **also** write the new tables (dual-write) | IR-140's matrix acts as oracle: shadow rows equal the §6 mapping in every cell; per-status counts before and after |
 | 3 | IR-258 + IR-259 | none | the frontend reads `workflow_state` and the tracker; no screen reads stage values | grep gate; Vitest + axe |
 | 4 | IR-260 | **contract** (below) | assignments become authoritative | New suite green; IR-233 flips to passing |
@@ -423,7 +434,7 @@ is retired deliberately, in the same PR that makes it obsolete, and the PR says 
 | `reviews/test_clearance_payload.py` (12 tests) | 226 | **Kept.** `preserved` is unchanged | — |
 | `reviews/tests.py` | 150 | **Rewritten** (service-level pipeline assertions) | IR-260 |
 | `reviews/test_clearance_state.py` (13 tests, pure) | 107 | **Kept**; `declining_office` → `requesting_parties` | IR-260 |
-| `apps/tests/test_enum_vocabulary.py` | — | **Changed deliberately.** Its `:8` docstring names the `rdco_intake` rename; `:299` asserts `len(PUBLICLY_VISIBLE_STATUSES) == 3` | IR-260, IR-264 |
+| `apps/tests/test_enum_vocabulary.py` | — | **Changed deliberately.** IR-256 extends `GOVERNED_ENUMS` with `AssignmentState`, so the new tables' states cannot be hand-written as literals (`ResubmissionRequestState` stays out: its `resubmitted` is also a queue-row response key). Its `:8` docstring names the `rdco_intake` rename; `:299` asserts `len(PUBLICLY_VISIBLE_STATUSES) == 3` | IR-256, then IR-260, IR-264 |
 
 ### 10.2 IR-233 — keeping the failure visible
 

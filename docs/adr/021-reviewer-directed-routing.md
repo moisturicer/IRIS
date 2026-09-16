@@ -2,8 +2,9 @@
 
 ## Status
 
-**Accepted** — 2026-09-15. The workflow was settled as a business decision by **Lee Jasmin
-Adolfo** (project lead). This ADR records that decision and the design that implements it. It
+**Accepted** — 2026-09-15 · **corrected 2026-09-16, §8 (schema compatibility: the
+`RecordClearance.status` column width).** The workflow was settled as a business decision by
+**Lee Jasmin Adolfo** (project lead). This ADR records that decision and the design that implements it. It
 takes effect when [PR #81](https://github.com/moisturicer/IRIS/pull/81) merges. Tracked on
 [IR-254](https://citiris.atlassian.net/browse/IR-254); implementation is
 [IR-255](https://citiris.atlassian.net/browse/IR-255).
@@ -284,12 +285,23 @@ NEW  ResubmissionRequest record, party, assignment, review, requested_by, reason
 NEW  DocumentRequest + DocumentRequestItem                       — ADR-022
 
 EXT  Review              + assignment (FK, nullable)
-KEEP RecordClearance     unchanged
+EXT  RecordClearance     status column widened 10 -> 20 chars; no row, value or
+                         behaviour changed
 ```
 
 **An assignment has no outcome field.** Its state only says whether the party is still acting.
 *What* the party concluded is recorded in `Review` and `RecordClearance`. Storing the outcome on
 the assignment as well would create exactly the duplicate this ADR removes.
+
+**Correction, 2026-09-16 (IR-256): `RecordClearance` is not quite unchanged.** This section
+listed it as `KEEP ... unchanged` while also giving `ClearanceStatus` a value that does not fit
+its column. The two could not both hold, and the column is the half that gives way:
+`reviews/0007` widens `status` from `varchar(10)` to `varchar(20)`. **This is a schema
+compatibility correction, not a workflow redesign** — no row is rewritten, no stored value
+changes, no clearance behaves differently, and the widening is the whole of it. Everything this
+ADR decides about clearances, above all that a peer's `cleared` row survives another party's
+resubmission request, is untouched. `ALTER COLUMN ... TYPE varchar(20)` is a catalogue-only
+change in PostgreSQL: it neither rewrites the table nor takes a long lock.
 
 **`RecordAssignment` and `RecordClearance` stay separate.** An assignment answers *"who needs to
 act now?"*. A clearance answers *"what clearance has already been obtained?"*. Clearance-aware
@@ -302,7 +314,8 @@ a preserved clearance can no longer be represented.
 - `ReviewDecision` gains `NEGATIVE_FINDING`. `DECLINED` keeps its stored value, relabelled
   *"Resubmission requested"*.
 - `ClearanceStatus` gains `NOT_CLEARED`. `REJECTED` is kept for historical rows; nothing new
-  writes it.
+  writes it. **`RecordClearance.status` is `varchar(10)`, and `not_cleared` is eleven
+  characters, so the column widens to 20** — see the correction below.
 - `PipelineStatus` gains `IN_REVIEW` and loses six values (§4).
 - `PUBLICLY_VISIBLE_STATUSES` narrows to `(PUBLISHED,)` (§13).
 - A new `DELETE_REVIEW_STATUSES` holds `(PUBLISHED, APPROVED, COMPLETED)`.
