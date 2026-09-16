@@ -1,2 +1,0 @@
-class CohereReranker:
-    pass
