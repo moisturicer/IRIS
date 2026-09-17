@@ -28,7 +28,7 @@ from pgvector.django import CosineDistance
 
 from apps.ai.models.chunk import ChunkEmbedding
 from apps.ai.models.embedding import RecordEmbedding
-from apps.ai.models.embedding_space import EmbeddingSpace
+from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.providers.ports import EmbeddingProvider
 from apps.records.models import Record
 
@@ -58,7 +58,7 @@ class TwoStageRetriever(Retriever):
     def _active_space(self) -> Optional[EmbeddingSpace]:
         if self._space is not None:
             return self._space
-        return EmbeddingSpace.objects.filter(state="active").first()
+        return EmbeddingSpace.objects.filter(state=EmbeddingSpaceState.ACTIVE).first()
 
     def retrieve(self, question: str, user, limit: int = DEFAULT_CHUNK_LIMIT):
         space = self._active_space()
