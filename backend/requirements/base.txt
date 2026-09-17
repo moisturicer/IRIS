@@ -7,18 +7,35 @@ django-axes>=6.4
 psycopg2-binary>=2.9
 celery[redis]>=5.3
 redis>=5.0
-openai>=1.30                   # FR-M4-02: GPT-4.1-mini LLM inference + FR-M3-03: third-party embeddings (text-embedding-3-small)
-pgvector>=0.3                  # FR-M3-03: vector storage in PostgreSQL (VectorField + HNSW index)
-# Docling-serve (FR-M3-01, ADR-016) is called over HTTP with httpx, declared
-# below and already used for the ai-gateway call. The extractor libraries the
-# prototype chain imported (unstructured, pymupdf, pytesseract) were never
-# declared here and are gone with it — extraction is one on-prem service now.
+
+# pgvector: FR-M3-03, vector storage in PostgreSQL (VectorField + HNSW index).
+# Pinned once. A second, weaker pin (>=0.2.4) sat further down this file and was
+# removed 2026-09-17 — two pins for one package is how they drift apart.
+pgvector>=0.3
+
+# Extraction is one on-premise service (ADR-016): Docling-serve over HTTP. The
+# extractor libraries the prototype chain imported — unstructured, pymupdf,
+# pytesseract — were never declared here and are gone with it.
+#
+# `openai` was declared here too, for "GPT-4.1-mini inference + text-embedding-3-small
+# embeddings". Both halves are superseded and nothing under backend/ ever imported
+# the package: ADR-021 made inference an OpenAI-*compatible* HTTP call
+# (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL, Groq by default) rather than an SDK call;
+# ADR-015 made Voyage the only embedding provider; ADR-024 took embedding off the
+# gateway entirely. The SDK remains a real dependency of the gateway and stays
+# declared in ai/requirements.txt, which is where it is actually imported.
+# Removed 2026-09-17.
+
+# httpx: Docling-serve extraction (ADR-016), Voyage embedding and reranking
+# (ADR-015), and the OpenAI-compatible inference call (ADR-021). It no longer
+# proxies to the ai-gateway — ADR-024 took the embedding path off it, and nothing
+# else in Django called it.
+httpx>=0.27.0
+
 pyexcel-xls>=0.7
 pyexcel-xlsx>=0.6
 openpyxl>=3.1                  # FR-M2-04: styled .xlsx template download
 python-docx>=1.1
-httpx>=0.27.0                  # For proxying requests to ai-gateway
-pgvector>=0.2.4                # For vector field handling in models
 python-decouple>=3.8
 django-storages[s3]>=1.14
 whitenoise>=6.6
