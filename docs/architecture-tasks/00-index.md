@@ -109,7 +109,7 @@ Nothing else can be validated, demonstrated or safely deployed until these clear
 | `V-04` | Scenario-based evaluation design | Controlled N when pilot volume is small |
 | `V-05` | Final evaluation execution | The result |
 
-If capacity slips, cut from `06-rag.md` and `03-frontend.md` before touching this list.
+If capacity slips, cut from `03-frontend.md` before touching this list. **Not `06-rag.md`** — RAG is thesis-critical as of [ADR-013](../adr/013-chunk-level-rag-pipeline.md)'s 2026-09-04 amendment, and is protected alongside the workflow contribution (corrected 2026-09-17).
 
 ---
 
