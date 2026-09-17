@@ -83,6 +83,9 @@ class DeterministicEmbeddingProvider(EmbeddingProvider):
 
 
 class ScriptedReranker(Reranker):
+    #: A test double makes no outbound call.
+    transmits_externally = False
+
     """Scores by word overlap with the query.
 
     A fixed, explainable rule rather than a random one: a test can predict
