@@ -10,7 +10,7 @@ Pipeline routes (type-differentiated bookends; ADR-002):
 
   Thesis / Research and Project
     draft → rdco_intake
-          → [ itso_review ]   Project only, and only if ITSO was requested
+          → [ itso_review ]   only if ITSO was requested
           → [ parallel_review ]   IERC and/or KTTO, whichever were requested
           → rdco_review
           → published
@@ -20,12 +20,12 @@ Which of ITSO/IERC/KTTO actually run is no longer fixed by record_type alone
 replacing it: pipeline_status transitions are still the same declarative
 table, only which offices get a RecordClearance row is now data on the
 record — record.requested_itso/ierc/ktto — rather than hardcoded here).
-ITSO remains structurally Project-only: Thesis/Research never enters
-itso_review regardless of what requested_itso says. A record requesting no
-offices at all skips straight from rdco_intake to rdco_review — see
-_enter_clearance_stage(). Project's ITSO-before-IERC sequencing (KTTO starts
-in parallel with ITSO; IERC only joins once ITSO clears, if requested) is
-unchanged in shape, just conditional in which offices actually populate it.
+ITSO is open to both types since IR-266 (ADR-021 §5 reversed ADR-018's
+Project-only rule). A record requesting no offices at all skips straight from
+rdco_intake to rdco_review — see lifecycle._resolve_enter_clearance_stage().
+The ITSO-before-IERC sequencing (KTTO starts in parallel with ITSO; IERC only
+joins once ITSO clears, if requested) is the same for both types, just
+conditional in which offices actually populate it.
 
 At every stage, a reviewer may:
   approve / clear  -- advance to the next stage
@@ -280,7 +280,7 @@ def submit_clearance(
 
     Transition logic:
       • decline           → record enters declined; all clearances paused.
-      • ITSO approves at itso_review (Project):
+      • ITSO approves at itso_review (either type, since IR-266):
           – Creates an IERC clearance (IERC starts after ITSO).
           – Advances pipeline to parallel_review.
       • Any other approval (KTTO at itso_review; IERC/KTTO at parallel_review):

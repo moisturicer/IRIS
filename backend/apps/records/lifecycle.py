@@ -498,16 +498,16 @@ def _resolve_enter_clearance_stage(record, **_) -> str:
     Create the requested offices' clearance rows and say where the record lands.
 
     ADR-018: the office set is data on the record, not a function of its type.
-    `requested_itso` takes effect for Project only — Thesis/Research has no ITSO
-    stage at all. A record requesting nothing goes straight to `rdco_review`,
-    because a clearance stage with no office attached would auto-clear, which is
-    worse than skipping it.
+    That now holds for ITSO too: ADR-021 §5 reversed ADR-018's Project-only rule
+    (IR-266), so a Thesis/Research requesting ITSO takes the Project's route. A
+    record requesting nothing goes straight to `rdco_review`, because a clearance
+    stage with no office attached would auto-clear, which is worse than skipping
+    it.
     """
     from apps.reviews.models import RecordClearance
 
-    type_name = record.record_type.name if record.record_type else ""
     offices: list = []
-    if type_name == RecordTypeName.PROJECT and record.requested_itso:
+    if record.requested_itso:
         offices.append(Office.ITSO)
     if record.requested_ierc:
         offices.append(Office.IERC)
