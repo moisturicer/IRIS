@@ -24,6 +24,7 @@ import { useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/Input";
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
+import { routeForTypeName } from "@/lib/submissionRoutes";
 import type { User } from "@/types/auth";
 import type { RecordType, Classification, PSCEDClassification } from "@/types/records";
 import type { RecordFormValues } from "../recordFormSchema";
@@ -50,7 +51,7 @@ export function PaperDetailsStep() {
 
   const selectedTypeName = recordTypes.find((rt) => String(rt.id) === selectedTypeId)?.name;
   const isProposal       = selectedTypeName === "Proposal";
-  const hasOfficeRouting = selectedTypeName === "Thesis / Research" || selectedTypeName === "Project";
+  const hasOfficeRouting = routeForTypeName(selectedTypeName)?.hasConditionalOffices ?? false;
 
   // Suggestion signals -> office requests. Mapped from each office's own
   // SRS-defined scope: ITSO does technical/patentability review, KTTO does

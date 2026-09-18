@@ -152,7 +152,8 @@ def notify_record_reviewed(record, review):
 
             elif stage == ReviewStage.RDCO_INTAKE:
                 if new_status == PipelineStatus.ITSO_REVIEW:
-                    # Project: ITSO reviews first; KTTO also starts here in parallel
+                    # ITSO was requested (either type since IR-266): ITSO reviews
+                    # first; KTTO, if requested, starts here in parallel
                     _notify_roles_of_advance(
                         record, review,
                         role_names=[RoleName.ITSO, RoleName.KTTO],
@@ -173,7 +174,8 @@ def notify_record_reviewed(record, review):
                         ),
                     )
                 else:
-                    # Thesis/Research: parallel_review — IERC + KTTO both start now in parallel
+                    # No ITSO requested: the record went to parallel_review (or
+                    # straight to rdco_review if nothing was requested)
                     _notify_roles_of_advance(
                         record, review,
                         role_names=[RoleName.IERC, RoleName.KTTO],
