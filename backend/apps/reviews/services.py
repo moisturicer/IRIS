@@ -280,7 +280,7 @@ def submit_clearance(
 
     Transition logic:
       • decline           → record enters declined; all clearances paused.
-      • ITSO approves at itso_review (Project):
+      • ITSO approves at itso_review (either type, since IR-266):
           – Creates an IERC clearance (IERC starts after ITSO).
           – Advances pipeline to parallel_review.
       • Any other approval (KTTO at itso_review; IERC/KTTO at parallel_review):
