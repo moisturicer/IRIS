@@ -282,11 +282,10 @@ TRANSITIONS: dict[tuple, Edge] = {
         gate_role=RoleName.RDCO,
         to=PipelineStatus.DECLINED,
     ),
-    (PipelineStatus.RDCO_INTAKE, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        gate_role=RoleName.RDCO,
-        to=PipelineStatus.REJECTED,
-    ),
+    # No REJECT edge at intake, nor at either clearance stage below (IR-265).
+    # ADR-021: intake and the specialist offices inform the decision; they do
+    # not make it. Rejection is kept only where the decision is made -- the
+    # assigned Adviser on a Proposal and RDCO at final review.
     # --- RDCO final review ---
     (PipelineStatus.RDCO_REVIEW, WorkflowEvent.APPROVE): Edge(
         decision=ReviewDecision.APPROVED,
@@ -313,10 +312,6 @@ TRANSITIONS: dict[tuple, Edge] = {
         decision=ReviewDecision.DECLINED,
         to=PipelineStatus.DECLINED,
     ),
-    (PipelineStatus.ITSO_REVIEW, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        to=PipelineStatus.REJECTED,
-    ),
     (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.APPROVE): Edge(
         decision=ReviewDecision.APPROVED,
         resolver="after_clearance",
@@ -324,10 +319,6 @@ TRANSITIONS: dict[tuple, Edge] = {
     (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.DECLINE): Edge(
         decision=ReviewDecision.DECLINED,
         to=PipelineStatus.DECLINED,
-    ),
-    (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        to=PipelineStatus.REJECTED,
     ),
     # --- Resubmission out of `declined`. Where it lands depends on whether the
     # --- decline came from a clearance office or a sequential gate -- which is
@@ -750,6 +741,22 @@ def edge_for(status: str, event: WorkflowEvent) -> Edge | None:
     return transitions.get((status, event))
 
 
+def require_edge(record, event: WorkflowEvent) -> Edge:
+    """
+    The declared edge from the record's current status, or a refusal.
+
+    `apply()` calls this, and so may a caller that must refuse *before* it
+    writes anything of its own (IR-265) -- one legality check, one message.
+    """
+    edge = edge_for(record.pipeline_status, event)
+    if edge is None:
+        raise InvalidPipelineTransition(
+            f"'{event.value}' is not a legal transition from "
+            f"'{record.pipeline_status}'."
+        )
+    return edge
+
+
 # ---------------------------------------------------------------------------
 # The single entry point
 # ---------------------------------------------------------------------------
@@ -781,12 +788,7 @@ def apply(
     `reviews.services`, which is also what honours IR-136's "do not rebuild the
     eleven transitions" instruction.
     """
-    edge = edge_for(record.pipeline_status, event)
-    if edge is None:
-        raise InvalidPipelineTransition(
-            f"'{event.value}' is not a legal transition from "
-            f"'{record.pipeline_status}'."
-        )
+    edge = require_edge(record, event)
 
     if edge.to is not None:
         destination = edge.to

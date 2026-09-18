@@ -30,7 +30,11 @@ unchanged in shape, just conditional in which offices actually populate it.
 At every stage, a reviewer may:
   approve / clear  -- advance to the next stage
   decline          -- send back to owner for revision (→ declined; owner resubmits)
+
+Only the deciding reviewers may also:
   reject           -- terminal rejection (→ rejected; owner cannot resubmit)
+The assigned Adviser (adviser_review) and RDCO at final review (rdco_review)
+decide. RDCO intake and the offices do not (IR-265, ADR-021).
 
 Sequential stages (adviser_review, rdco_intake, rdco_review) use approve_record /
 decline_record / reject_record.
@@ -145,6 +149,28 @@ def _can_submit_clearance(user, record: Record) -> tuple[bool, str]:
     return False, office
 
 
+def _require_edge(record: Record, event) -> None:
+    """
+    Refuse an event the table does not declare here, before anything is written.
+
+    `lifecycle.apply()` refuses too, but only after the caller has already
+    written its `Review` row and, for a clearance, the office's
+    `RecordClearance` row. The request is not atomic, so a late refusal would
+    leave both behind. Since IR-265 this is reachable: intake and the
+    specialist offices have no REJECT edge, and that refusal gets a message a
+    reviewer can act on rather than the table's generic one.
+    """
+    if (
+        event is lifecycle.WorkflowEvent.REJECT
+        and lifecycle.edge_for(record.pipeline_status, event) is None
+    ):
+        raise InvalidPipelineTransition(
+            "Rejection is not available at this stage. Request revision "
+            "instead; only the deciding reviewer may reject a record."
+        )
+    lifecycle.require_edge(record, event)
+
+
 # ---------------------------------------------------------------------------
 # Sequential review actions: adviser_review, rdco_intake, rdco_review
 # ---------------------------------------------------------------------------
@@ -160,6 +186,7 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
         raise InvalidPipelineTransition(
             f"You are not authorised to review this record at '{record.pipeline_status}'."
         )
+    _require_edge(record, lifecycle.WorkflowEvent.APPROVE)
     stage = lifecycle.review_stage_for(record.pipeline_status)
     if not stage:
         raise InvalidPipelineTransition(
@@ -189,6 +216,7 @@ def decline_record(record: Record, reviewed_by, comment: str = "") -> Review:
         raise InvalidPipelineTransition(
             f"You are not authorised to review this record at '{record.pipeline_status}'."
         )
+    _require_edge(record, lifecycle.WorkflowEvent.DECLINE)
     stage = lifecycle.review_stage_for(record.pipeline_status)
     if not stage:
         raise InvalidPipelineTransition(
@@ -208,11 +236,15 @@ def reject_record(record: Record, reviewed_by, comment: str = "") -> Review:
     """
     Terminal rejection at a sequential stage.
     The record enters 'rejected'; the owner cannot resubmit.
+
+    Only adviser_review and rdco_review declare this edge; intake cannot
+    reject (IR-265, ADR-021).
     """
     if not _can_review(reviewed_by, record):
         raise InvalidPipelineTransition(
             f"You are not authorised to review this record at '{record.pipeline_status}'."
         )
+    _require_edge(record, lifecycle.WorkflowEvent.REJECT)
     stage = lifecycle.review_stage_for(record.pipeline_status)
     if not stage:
         raise InvalidPipelineTransition(
@@ -242,10 +274,12 @@ def submit_clearance(
     """
     Submit an office clearance during a parallel review stage.
 
-    decision: 'approved' (cleared) | 'declined' (revision requested) | 'rejected' (terminal)
+    decision: 'approved' (cleared) | 'declined' (revision requested).
+    An office cannot reject (IR-265, ADR-021): its negative finding informs the
+    decision rather than making it, so 'rejected' is refused before any write.
 
     Transition logic:
-      • decline / reject  → record enters declined / rejected; all clearances paused.
+      • decline           → record enters declined; all clearances paused.
       • ITSO approves at itso_review (Project):
           – Creates an IERC clearance (IERC starts after ITSO).
           – Advances pipeline to parallel_review.
@@ -262,11 +296,19 @@ def submit_clearance(
     if not office:
         office = resolved_office
 
+    event = {
+        ReviewDecision.DECLINED: lifecycle.WorkflowEvent.DECLINE,
+        ReviewDecision.REJECTED: lifecycle.WorkflowEvent.REJECT,
+    }.get(decision, lifecycle.WorkflowEvent.APPROVE)
+    _require_edge(record, event)
+
     # Map external decision labels to internal model values
     if decision == ReviewDecision.APPROVED:
         review_status     = ReviewDecision.APPROVED
         clearance_status  = ClearanceStatus.CLEARED
     elif decision == ReviewDecision.REJECTED:
+        # Unreachable under CIT-U's table; kept so an instance whose
+        # WORKFLOW_TABLE declares an office REJECT edge records it truthfully.
         review_status     = ReviewDecision.REJECTED
         clearance_status  = ClearanceStatus.REJECTED
     else:  # declined
@@ -288,16 +330,11 @@ def submit_clearance(
 
     # ── Where the record goes next is the table's call (IR-136) ───────────
     # The ITSO-then-IERC sequencing and the "have all offices cleared" check
-    # are `after_clearance`; declines and rejections are literal edges. What
+    # are `after_clearance`; a decline is a literal edge. What
     # stays here is orchestration: the notification, and the distinction
     # between advancing and merely recording partial progress, which is a
     # message to a person rather than a workflow rule.
     was = record.pipeline_status
-    event = {
-        ReviewDecision.DECLINED: lifecycle.WorkflowEvent.DECLINE,
-        ReviewDecision.REJECTED: lifecycle.WorkflowEvent.REJECT,
-    }.get(decision, lifecycle.WorkflowEvent.APPROVE)
-
     destination = lifecycle.apply(record, event, reviewed_by, office=office)
 
     if decision in (ReviewDecision.DECLINED, ReviewDecision.REJECTED):
