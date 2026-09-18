@@ -60,13 +60,19 @@ class ApproveRecordConditionalOfficesTests(TestCase):
         self.assertEqual(self.offices(record), set())
         self.assertEqual(record.pipeline_status, "rdco_review")
 
-    def test_thesis_requesting_itso_is_ignored(self):
-        """Thesis/Research structurally never routes through ITSO."""
+    def test_thesis_requesting_itso_enters_the_itso_stage(self):
+        """
+        Rule change, IR-266 (ADR-021 §5): ITSO is open to Thesis/Research.
+
+        This test used to be `test_thesis_requesting_itso_is_ignored`, pinning
+        ADR-018's Project-only rule. It is inverted deliberately, not to make a
+        red test green: the rule it pinned was reversed.
+        """
         record = self._record(self.thesis, requested_itso=True, requested_ktto=True)
         approve_record(record, self.rdco)
         record.refresh_from_db()
-        self.assertEqual(self.offices(record), {"ktto"})
-        self.assertEqual(record.pipeline_status, "parallel_review")
+        self.assertEqual(self.offices(record), {"itso", "ktto"})
+        self.assertEqual(record.pipeline_status, "itso_review")
 
     def test_project_requesting_itso_only_then_clearing_it_goes_straight_to_rdco_review(self):
         record = self._record(self.project, requested_itso=True)

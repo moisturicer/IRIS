@@ -183,6 +183,16 @@ MATRIX: tuple[Cell, ...] = (
          WorkflowEvent.DECLINE, "ktto",
          PipelineStatus.DECLINED, Office.KTTO,
          "KTTO starts in parallel with ITSO, so it acts at this stage too"),
+    # Rule change, IR-266 (ADR-021 §5): ITSO is no longer Project-only, so a
+    # Thesis/Research requesting it reaches `itso_review` and these two cells
+    # are on its route now. The ITSO approval that follows is stateful and is
+    # walked end to end in `test_itso_for_thesis.py`, which outlives this matrix.
+    Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.ITSO_REVIEW,
+         WorkflowEvent.DECLINE, "itso",
+         PipelineStatus.DECLINED, Office.ITSO),
+    Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.ITSO_REVIEW,
+         WorkflowEvent.DECLINE, "ktto",
+         PipelineStatus.DECLINED, Office.KTTO),
     Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.PARALLEL_REVIEW,
          WorkflowEvent.DECLINE, "ierc",
          PipelineStatus.DECLINED, Office.IERC),
