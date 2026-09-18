@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { RecordDetail } from "@/types/records";
 import type { ReviewStatus } from "@/types/reviews";
 import { pipelineLabel } from "@/lib/utils";
+import type { PipelineStatus } from "@/lib/constants";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { clearReviewDraft, readReviewDraft, writeReviewDraft } from "@/lib/reviewDraft";
@@ -46,6 +47,17 @@ const DECISION_OPTIONS: { value: ReviewStatus; label: string; description: strin
   },
 ];
 
+/**
+ * The stages whose reviewer makes the decision, and so may reject (IR-265,
+ * ADR-021): the assigned Adviser on a Proposal and RDCO at final review.
+ * Intake and the specialist offices inform the decision instead; the API
+ * refuses a rejection from them, so the form does not offer one.
+ */
+const REJECTING_STAGES: ReadonlySet<PipelineStatus> = new Set<PipelineStatus>([
+  "adviser_review",
+  "rdco_review",
+]);
+
 /** Map pipeline_status -> readable stage label shown on the review form. */
 function stageLabel(pipelineStatus: string): string {
   const map: Record<string, string> = {
@@ -77,6 +89,8 @@ export default function EvaluationPage() {
     register,
     handleSubmit,
     watch,
+    getValues,
+    setValue,
     formState: { isSubmitting },
   } = useForm<FormData>({
     defaultValues: {
@@ -109,6 +123,22 @@ export default function EvaluationPage() {
   useEffect(() => {
     if (id) recordsApi.detail(Number(id)).then(({ data }) => setRecord(data));
   }, [id]);
+
+  const canReject = record !== null && REJECTING_STAGES.has(record.pipeline_status);
+  const decisionOptions = canReject
+    ? DECISION_OPTIONS
+    : DECISION_OPTIONS.filter((opt) => opt.value !== "rejected");
+
+  /**
+   * A restored draft can hold "rejected" where the form no longer offers it.
+   * Left alone, the hidden choice would still be sent. Fall back to Request
+   * Revision: still a negative finding, never terminal, and visibly selected.
+   */
+  useEffect(() => {
+    if (record && !canReject && getValues("status") === "rejected") {
+      setValue("status", "declined");
+    }
+  }, [record, canReject, getValues, setValue]);
 
   const send = async (data: FormData) => {
     try {
@@ -259,7 +289,7 @@ export default function EvaluationPage() {
 
           {/* Decision radio group */}
           <div className="space-y-3">
-            {DECISION_OPTIONS.map((opt) => (
+            {decisionOptions.map((opt) => (
               <label
                 key={opt.value}
                 className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -302,7 +332,9 @@ export default function EvaluationPage() {
               placeholder={
                 selectedStatus === "approved"
                   ? "Add an optional note for the next reviewer or the record owner..."
-                  : "Explain what needs to be revised or why the record is being rejected..."
+                  : canReject
+                    ? "Explain what needs to be revised or why the record is being rejected..."
+                    : "Explain what needs to be revised..."
               }
               className="w-full border border-gray-200 rounded-lg p-3 text-[13px] resize-y focus:outline-none focus:border-[#6B0F12]"
             />
@@ -343,11 +375,7 @@ export default function EvaluationPage() {
       <ConfirmDialog
         open={pendingReject !== null}
         title="Reject this record permanently?"
-        message={
-          record.your_office_label
-            ? `This records a ${record.your_office_label} rejection and is terminal — the owner cannot resubmit. Request Revision instead if they should be able to fix it.`
-            : "Rejection is terminal — the owner cannot resubmit. Request Revision instead if they should be able to fix it."
-        }
+        message="Rejection is terminal — the owner cannot resubmit. Request Revision instead if they should be able to fix it."
         confirmLabel="Reject permanently"
         danger
         confirming={rejecting}
