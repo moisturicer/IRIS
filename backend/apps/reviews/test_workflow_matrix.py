@@ -135,6 +135,10 @@ MATRIX: tuple[Cell, ...] = (
     # office is the canonical cell -- it skips the clearance phase rather than
     # entering one that would auto-clear. The requested-office variants are
     # IR-197's `ClearanceRoutingTests`, re-run under both arms at the bottom.
+    #
+    # Rule change, IR-265 (ADR-021): intake has no REJECT cell any more, and
+    # neither office stage below does. Their refusal is asserted in
+    # `test_reject_authority.py`, which outlives this matrix.
     Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.RDCO_INTAKE,
          WorkflowEvent.APPROVE, "rdco",
          PipelineStatus.RDCO_REVIEW, ReviewStage.RDCO_INTAKE,
@@ -142,18 +146,12 @@ MATRIX: tuple[Cell, ...] = (
     Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.RDCO_INTAKE,
          WorkflowEvent.DECLINE, "rdco",
          PipelineStatus.DECLINED, ReviewStage.RDCO_INTAKE),
-    Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.RDCO_INTAKE,
-         WorkflowEvent.REJECT, "rdco",
-         PipelineStatus.REJECTED, ReviewStage.RDCO_INTAKE),
     Cell(RecordTypeName.PROJECT, PipelineStatus.RDCO_INTAKE,
          WorkflowEvent.APPROVE, "rdco",
          PipelineStatus.RDCO_REVIEW, ReviewStage.RDCO_INTAKE),
     Cell(RecordTypeName.PROJECT, PipelineStatus.RDCO_INTAKE,
          WorkflowEvent.DECLINE, "rdco",
          PipelineStatus.DECLINED, ReviewStage.RDCO_INTAKE),
-    Cell(RecordTypeName.PROJECT, PipelineStatus.RDCO_INTAKE,
-         WorkflowEvent.REJECT, "rdco",
-         PipelineStatus.REJECTED, ReviewStage.RDCO_INTAKE),
 
     # --- RDCO final review --------------------------------------------------
     Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.RDCO_REVIEW,
@@ -175,34 +173,22 @@ MATRIX: tuple[Cell, ...] = (
          WorkflowEvent.REJECT, "rdco",
          PipelineStatus.REJECTED, ReviewStage.RDCO),
 
-    # --- Clearance stages: decline and reject are literal edges -------------
+    # --- Clearance stages: decline is a literal edge; offices cannot reject -
     # A `Review` at a parallel stage records the acting *office*, not a gate
     # name -- `Review.stage` is a union (ADR-002 amendment, point 5).
     Cell(RecordTypeName.PROJECT, PipelineStatus.ITSO_REVIEW,
          WorkflowEvent.DECLINE, "itso",
          PipelineStatus.DECLINED, Office.ITSO),
     Cell(RecordTypeName.PROJECT, PipelineStatus.ITSO_REVIEW,
-         WorkflowEvent.REJECT, "itso",
-         PipelineStatus.REJECTED, Office.ITSO),
-    Cell(RecordTypeName.PROJECT, PipelineStatus.ITSO_REVIEW,
          WorkflowEvent.DECLINE, "ktto",
          PipelineStatus.DECLINED, Office.KTTO,
          "KTTO starts in parallel with ITSO, so it acts at this stage too"),
-    Cell(RecordTypeName.PROJECT, PipelineStatus.ITSO_REVIEW,
-         WorkflowEvent.REJECT, "ktto",
-         PipelineStatus.REJECTED, Office.KTTO),
     Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.PARALLEL_REVIEW,
          WorkflowEvent.DECLINE, "ierc",
          PipelineStatus.DECLINED, Office.IERC),
     Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.PARALLEL_REVIEW,
-         WorkflowEvent.REJECT, "ierc",
-         PipelineStatus.REJECTED, Office.IERC),
-    Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.PARALLEL_REVIEW,
          WorkflowEvent.DECLINE, "ktto",
          PipelineStatus.DECLINED, Office.KTTO),
-    Cell(RecordTypeName.THESIS_RESEARCH, PipelineStatus.PARALLEL_REVIEW,
-         WorkflowEvent.REJECT, "ktto",
-         PipelineStatus.REJECTED, Office.KTTO),
 )
 
 #: The decision string each event carries over the wire.
