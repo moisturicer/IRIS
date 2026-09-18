@@ -57,9 +57,10 @@ class RecordClearance(models.Model):
     Used during clearance stages (itso_review, parallel_review).
 
     Lifecycle:
-      - Created by approve_record at rdco_intake (creates ITSO+KTTO for Project;
-        IERC+KTTO for Thesis/Research).
-      - For Project, the IERC clearance is created when ITSO clears (pipeline → parallel_review).
+      - Created by approve_record at rdco_intake, one row per office the record
+        requested (ADR-018; ITSO for either type since IR-266).
+      - When ITSO was requested, the record waits at itso_review and IERC only
+        joins once ITSO clears (pipeline → parallel_review).
       - On resubmit after a clearance-office decline: only that office's row is reset to
         "pending"; other offices' clearance progress is preserved.
       - On resubmit after a sequential-stage decline: all rows are deleted for a clean restart.
