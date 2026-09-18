@@ -156,8 +156,8 @@ class RejectAuthorityTests(APITestCase):
         )
         for type_name, stage, office in cases:
             with self.subTest(stage=stage, office=office):
-                # ITSO is requested only where the case parks at `itso_review`.
-                # Since IR-266 a Thesis requesting ITSO enters `itso_review` too,
+                # Rule change, IR-266: ITSO is requested only where the case parks
+                # at `itso_review`. A Thesis requesting ITSO now enters it too,
                 # so requesting it for the parallel-stage cases would park them
                 # at the wrong stage.
                 record = self.record_with_pending_clearances(
