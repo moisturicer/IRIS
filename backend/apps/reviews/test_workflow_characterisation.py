@@ -319,16 +319,26 @@ class ClearanceRoutingTests(WorkflowCharacterisationBase):
         self.assertEqual(self.status_of(record), PipelineStatus.RDCO_REVIEW)
         self.assertEqual(self.clearances(record), {})
 
-    def test_itso_is_structurally_project_only(self):
-        """A Thesis/Research record requesting ITSO does not get an ITSO clearance."""
+    def test_a_thesis_requesting_itso_enters_the_itso_stage_first(self):
+        """
+        Rule change, IR-266 (ADR-021 §5): ITSO is no longer Project-only.
+
+        This was `test_itso_is_structurally_project_only`, which pinned ADR-018's
+        rule that a Thesis/Research request for ITSO is ignored. That rule was
+        reversed, so the characterisation is updated deliberately: a thesis now
+        takes exactly the Project's route below.
+        """
         record = self.make_record(
             RecordTypeName.THESIS_RESEARCH,
             pipeline_status=PipelineStatus.RDCO_INTAKE,
             requested_itso=True, requested_ktto=True,
         )
         self.review(record, self.rdco, ReviewDecision.APPROVED)
-        self.assertNotIn(Office.ITSO, self.clearances(record))
-        self.assertEqual(self.status_of(record), PipelineStatus.PARALLEL_REVIEW)
+        self.assertEqual(
+            self.clearances(record),
+            {Office.ITSO: ClearanceStatus.PENDING, Office.KTTO: ClearanceStatus.PENDING},
+        )
+        self.assertEqual(self.status_of(record), PipelineStatus.ITSO_REVIEW)
 
     def test_a_project_requesting_itso_enters_the_itso_stage_first(self):
         record = self.make_record(
