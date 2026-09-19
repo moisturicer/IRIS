@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count
 from .models import Record
-from core.enums import PUBLICLY_VISIBLE_STATUSES, PipelineStatus
+from core.enums import DELETE_REVIEW_STATUSES, PUBLICLY_VISIBLE_STATUSES, PipelineStatus
 
 #: The five statuses that mean "somebody is still reviewing this". Named here
 #: rather than inline so the dashboard's "pending" tile and any future caller
@@ -30,7 +30,12 @@ class DashboardStatsView(APIView):
         return Response({
             "total_mine":       my_ids.count(),
             "pending_mine":     Record.objects.filter(pk__in=my_ids, pipeline_status__in=IN_REVIEW_STATUSES).count(),
-            "approved_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count(),
+            # The owner's own *accepted* work, not the public catalogue: since
+            # IR-264 narrowed the public set to published only, reading it here
+            # would drop a student's approved Proposal from their own count.
+            # DELETE_REVIEW_STATUSES is exactly "accepted" (published, or an
+            # approved/completed Proposal).
+            "approved_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status__in=DELETE_REVIEW_STATUSES).count(),
             "declined_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status=PipelineStatus.DECLINED).count(),
             # Staff-only totals -- return 0 for students
             "total_published":  Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count() if request.user.role else 0,

@@ -62,7 +62,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.enums import (
-    PUBLICLY_VISIBLE_STATUSES,
+    DELETE_REVIEW_STATUSES,
     ClearanceStatus,
     Office,
     PipelineStatus,
@@ -362,11 +362,12 @@ TRANSITIONS: dict[tuple, Edge] = {
     ),
 }
 
-# Deleting a publicly visible record raises a delete request for review rather
-# than removing it; anything not yet public is soft-deleted outright. Generated
-# rather than typed out so the two sets cannot drift from
-# PUBLICLY_VISIBLE_STATUSES, which is what `perform_destroy` branches on.
-for _status in PUBLICLY_VISIBLE_STATUSES:
+# Deleting accepted work raises a delete request for review rather than removing
+# it; anything not yet accepted is soft-deleted outright. Generated rather than
+# typed out so the two sets cannot drift from DELETE_REVIEW_STATUSES, which is
+# what `perform_destroy` branches on. (It branched on PUBLICLY_VISIBLE_STATUSES
+# until IR-264 narrowed that to published only; see core.enums.)
+for _status in DELETE_REVIEW_STATUSES:
     TRANSITIONS[(_status, WorkflowEvent.REQUEST_DELETE)] = Edge(
         decision=ReviewDecision.APPROVED,
         to=PipelineStatus.PENDING_DELETE,
