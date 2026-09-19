@@ -131,7 +131,7 @@ class RecallWideningTests:
             TwoStageRetriever(embedder), reranker=NoOpReranker(), recall_limit=25
         ).retrieve("passage", reader, limit=3)
 
-        assert len(results) == 3
+        assert len(results.passages) == 3
 
 
 class DisclosureGateTests:
@@ -162,7 +162,7 @@ class DisclosureGateTests:
             TwoStageRetriever(embedder), reranker=NoOpReranker(), policy_enabled=True
         ).retrieve("passage", reader)
 
-        assert [r.content for r in results] == ["a secret passage"]
+        assert [p.content for p in results.passages] == ["a secret passage"]
 
     def test_permitted_content_still_reaches_a_transmitting_reranker(
         self, embedder, space, reader
@@ -192,7 +192,7 @@ class SubstitutabilityTests:
             results = RerankingRetriever(
                 inner, reranker=reranker, policy_enabled=False
             ).retrieve("weekly pond sampling", reader, limit=2)
-            assert len(results) == 2
+            assert len(results.passages) == 2
 
     def test_a_real_reranker_puts_the_best_match_first(self, embedder, space, reader):
         """IR-133 measures whether reranking earns its cost; both arms have to
@@ -205,7 +205,7 @@ class SubstitutabilityTests:
             inner, reranker=ScriptedReranker(), policy_enabled=False
         ).retrieve("weekly pond sampling", reader)
 
-        assert reranked[0].content == "weekly pond sampling"
+        assert reranked.passages[0].content == "weekly pond sampling"
 
     def test_the_no_op_arm_preserves_the_retrievers_own_order(
         self, embedder, space, reader
@@ -214,12 +214,15 @@ class SubstitutabilityTests:
                     ["budget narrative", "weekly pond sampling"])
         inner = TwoStageRetriever(embedder)
 
-        baseline = [c.content for c in inner.retrieve("weekly pond sampling", reader)]
+        baseline = [
+            p.content
+            for p in inner.retrieve("weekly pond sampling", reader).passages
+        ]
         through_noop = [
-            c.content
-            for c in RerankingRetriever(
+            p.content
+            for p in RerankingRetriever(
                 inner, reranker=NoOpReranker(), policy_enabled=False
-            ).retrieve("weekly pond sampling", reader)
+            ).retrieve("weekly pond sampling", reader).passages
         ]
 
         assert through_noop == baseline

@@ -92,7 +92,10 @@ class EligibilityTests:
         add_chunks(record, space, embedder, ["the current passage"], active=True)
         add_chunks(record, space, embedder, ["a superseded passage"], active=False)
 
-        found = [r.content for r in TwoStageRetriever(embedder).retrieve("passage", reader)]
+        found = [
+            p.content
+            for p in TwoStageRetriever(embedder).retrieve("passage", reader).passages
+        ]
         assert found == ["the current passage"]
 
     def test_a_soft_deleted_chunk_is_never_returned(self, embedder, space, reader):
@@ -101,7 +104,7 @@ class EligibilityTests:
         record = published_record("Thesis", reader, embedder)
         add_chunks(record, space, embedder, ["a removed passage"], deleted=True)
 
-        assert TwoStageRetriever(embedder).retrieve("passage", reader) == []
+        assert TwoStageRetriever(embedder).retrieve("passage", reader).passages == ()
 
     def test_nothing_is_returned_when_no_space_is_active(self, embedder, reader):
         """Comparing vectors across spaces returns rows, ranked plausibly, and
@@ -109,7 +112,7 @@ class EligibilityTests:
         published_record("Thesis", reader, embedder)
         EmbeddingSpace.objects.update(state="retired")
 
-        assert TwoStageRetriever(embedder).retrieve("passage", reader) == []
+        assert TwoStageRetriever(embedder).retrieve("passage", reader).passages == ()
 
 
 class RankingTests:
@@ -123,20 +126,24 @@ class RankingTests:
         results = TwoStageRetriever(embedder).retrieve(
             "weekly pond sampling procedure", reader
         )
-        assert results[0].content == "weekly pond sampling procedure"
+        assert results.passages[0].content == "weekly pond sampling procedure"
 
     def test_scores_descend(self, embedder, space, reader):
         record = published_record("Thesis", reader, embedder)
         add_chunks(record, space, embedder, ["alpha one", "beta two", "gamma three"])
 
-        scores = [r.score for r in TwoStageRetriever(embedder).retrieve("alpha", reader)]
+        scores = [
+            p.score
+            for p in TwoStageRetriever(embedder).retrieve("alpha", reader).passages
+        ]
         assert scores == sorted(scores, reverse=True)
 
     def test_the_limit_is_honoured(self, embedder, space, reader):
         record = published_record("Thesis", reader, embedder)
         add_chunks(record, space, embedder, [f"passage number {i}" for i in range(10)])
 
-        assert len(TwoStageRetriever(embedder).retrieve("passage", reader, limit=3)) == 3
+        found = TwoStageRetriever(embedder).retrieve("passage", reader, limit=3)
+        assert len(found.passages) == 3
 
     def test_stage_one_bounds_how_many_records_stage_two_searches(
         self, embedder, space, reader
@@ -148,7 +155,10 @@ class RankingTests:
             add_chunks(record, space, embedder, [f"passage from thesis {i}"])
 
         retriever = TwoStageRetriever(embedder, record_candidates=2)
-        record_ids = {r.record_id for r in retriever.retrieve("passage", reader, limit=50)}
+        record_ids = {
+            p.record_id
+            for p in retriever.retrieve("passage", reader, limit=50).passages
+        }
         assert len(record_ids) <= 2
 
 
@@ -157,7 +167,7 @@ class ResultShapeTests:
         record = published_record("Tilapia Feed Study", reader, embedder)
         add_chunks(record, space, embedder, ["weekly pond sampling"])
 
-        result = TwoStageRetriever(embedder).retrieve("sampling", reader)[0]
+        result = TwoStageRetriever(embedder).retrieve("sampling", reader).passages[0]
         assert result.record_id == record.pk
         assert result.record_title == "Tilapia Feed Study"
         assert result.source_page == 1

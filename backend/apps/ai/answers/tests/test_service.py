@@ -16,8 +16,7 @@ from apps.ai.answers.service import (
 )
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
-from apps.ai.retrieval.degraded import RetrievedChunks
-from apps.ai.retrieval.ports import RetrievedChunk, Retriever
+from apps.ai.retrieval.ports import RetrievalResult, RetrievedChunk, Retriever
 from apps.records.models import Record
 from core.enums import PipelineStatus
 from core.permissions import ROLE_STUDENT
@@ -29,10 +28,10 @@ User = get_user_model()
 
 class _FixedRetriever(Retriever):
     def __init__(self, chunks, degraded=False):
-        self._chunks = RetrievedChunks(chunks, degraded=degraded)
+        self._result = RetrievalResult(passages=tuple(chunks), degraded=degraded)
 
     def retrieve(self, question, user, limit=20):
-        return self._chunks
+        return self._result
 
 
 class _BrokenLLM(LLMProvider):
