@@ -42,7 +42,7 @@ export const PIPELINE_STATUS = {
   DRAFT:          "draft",
   // Proposal pipeline
   ADVISER_REVIEW: "adviser_review",
-  APPROVED:       "approved",       // Proposal approved by adviser — visible as ongoing
+  APPROVED:       "approved",       // Proposal approved by adviser — research ongoing; not public (IR-264)
   // Thesis/Research and Project pipeline
   RDCO_INTAKE:      "rdco_intake",
   ITSO_REVIEW:      "itso_review",

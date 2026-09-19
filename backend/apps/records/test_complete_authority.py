@@ -10,9 +10,10 @@ complete -- a student, ITSO, IERC, KTTO -- is refused by the permission class
 with **403** before the record is looked up, so the answer says nothing about
 the record. An Adviser passes that gate, but their queryset for this action is
 narrowed to the records they advise, so an Adviser who is *not* assigned gets
-**404** -- identical to a record that does not exist. That matters here because
-an approved Proposal is publicly readable today, so the unassigned Adviser can
-open it; the 404 is about completing it, not about seeing it.
+**404** -- identical to a record that does not exist. (Written when an approved
+Proposal was publicly readable; since IR-264 it is not, so `visible_to()` now
+refuses the unassigned Adviser too. The narrowing still decides the case of an
+Adviser who can read the Proposal on other grounds, such as owning it.)
 
 **Intake is not a separate case yet.** Intake is staffed by the RDCO role, and
 until the party model lands (IR-256 onward) nothing on a request distinguishes
@@ -152,6 +153,19 @@ class CompleteAuthorityTests(APITestCase):
         self.assertEqual(refused.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(missing.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(refused.data, missing.data)
+
+    def test_an_adviser_who_owns_but_does_not_advise_is_refused_with_404(self):
+        """
+        The case the queryset narrowing still decides after IR-264. An Adviser
+        can author records, so one may own a Proposal someone else advises:
+        `visible_to()` lets them read it, and only the narrowing stops them
+        completing it.
+        """
+        record = self.make_record()
+        RecordOwner.objects.create(record=record, user=self.other_adviser, is_primary=False)
+        self.assert_refused_without_effect(
+            record, self.other_adviser, status.HTTP_404_NOT_FOUND
+        )
 
     def test_offices_are_refused(self):
         for name, office_user in self.offices.items():
