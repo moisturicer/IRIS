@@ -82,7 +82,11 @@ export default function DiscoverPage() {
         }
         if (typeRes.status === "fulfilled") {
           setRecordTypes(
-            (typeRes.value.data.results ?? []).map((t) => ({ value: String(t.id), label: t.name })),
+            (typeRes.value.data.results ?? [])
+              // A Proposal is never in the catalogue (IR-264, ADR-021 §13), so
+              // a Proposal filter could only ever return an empty page.
+              .filter((t) => t.name !== "Proposal")
+              .map((t) => ({ value: String(t.id), label: t.name })),
           );
         }
       })
