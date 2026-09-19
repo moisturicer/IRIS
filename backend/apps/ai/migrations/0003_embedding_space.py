@@ -9,17 +9,22 @@
 # that already holds RecordEmbedding rows is unaffected by this migration
 # beyond gaining this new, independent table.
 
-from django.conf import settings
 from django.db import migrations, models
+
+#: What this migration seeded when it was written: the OpenAI model the code
+#: then assumed, at the dimension migration 0002 hardcoded. Frozen as literals
+#: by IR-280, which deleted the `AI_EMBEDDING_*` settings this used to read.
+#: A migration is a record of what happened, so it must keep describing that
+#: even once the settings it read are gone; migration 0007 supersedes this row
+#: with the `voyage-context-4` space ADR-015 decided on.
+_SEEDED_MODEL_ID = "text-embedding-3-small"
+_SEEDED_DIMENSIONS = 1536
 
 
 def seed_active_embedding_space(apps, schema_editor):
-    """Seed exactly one active space from current settings.
+    """Seed exactly one active space: the one this deployment was embedding
+    with when this migration was written.
 
-    Reads live settings rather than a value frozen into the migration,
-    because this is a one-time bootstrap of "whatever this deployment is
-    already configured to embed with" — not a schema change, so there is
-    nothing here for a future settings change to silently invalidate.
     Guarded by ``get_or_create`` so replaying this migration (e.g. in a
     fresh test database) never creates a second active row and trips the
     partial unique constraint above it.
@@ -28,8 +33,8 @@ def seed_active_embedding_space(apps, schema_editor):
     EmbeddingSpace.objects.get_or_create(
         state="active",
         defaults={
-            "model_id": settings.AI_EMBEDDING_MODEL,
-            "dimensions": settings.AI_EMBEDDING_DIMENSIONS,
+            "model_id": _SEEDED_MODEL_ID,
+            "dimensions": _SEEDED_DIMENSIONS,
             "metric": "cosine",
         },
     )

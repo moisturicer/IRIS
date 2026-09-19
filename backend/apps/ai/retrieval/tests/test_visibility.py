@@ -12,9 +12,9 @@ test that does not run.
 """
 
 import pytest
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace
@@ -28,9 +28,9 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 User = get_user_model()
 
-#: The vector columns are declared at `AI_EMBEDDING_DIMENSIONS`, so test
+#: The vector columns are declared at `VECTOR_COLUMN_DIMENSIONS`, so test
 #: vectors have to be that wide whatever the fake would rather produce.
-DIMENSIONS = settings.AI_EMBEDDING_DIMENSIONS
+DIMENSIONS = VECTOR_COLUMN_DIMENSIONS
 
 
 @pytest.fixture

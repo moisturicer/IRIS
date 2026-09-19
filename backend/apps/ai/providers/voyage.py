@@ -91,7 +91,16 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
         transport: Optional[Transport] = None,
     ) -> None:
         self._model = model or getattr(settings, "VOYAGE_EMBED_MODEL", "voyage-context-4")
-        self._dimensions = dimensions or getattr(settings, "VOYAGE_EMBED_DIMENSIONS", 1024)
+        # Not a setting of its own (IR-280). What this asks Voyage to emit
+        # and what the vector columns can hold are the same number, and the
+        # moment they are two settings they can disagree — `VOYAGE_EMBED_
+        # DIMENSIONS=512` would have produced 512-vectors for a 1024 column,
+        # which is the bug class this ticket exists to close, one hop along.
+        # Explicit `dimensions` stays, because a test embedding at 4 is how
+        # the request shaping is asserted without an account.
+        from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+
+        self._dimensions = dimensions or VECTOR_COLUMN_DIMENSIONS
         self._post = transport or _post
 
     @property

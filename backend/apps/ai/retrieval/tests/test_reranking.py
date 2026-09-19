@@ -12,10 +12,10 @@ Three properties, and the order they happen in is the point:
 """
 
 import pytest
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace
@@ -31,7 +31,7 @@ from core.permissions import ROLE_STUDENT
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 User = get_user_model()
-DIMENSIONS = settings.AI_EMBEDDING_DIMENSIONS
+DIMENSIONS = VECTOR_COLUMN_DIMENSIONS
 
 
 class _TransmittingReranker(Reranker):

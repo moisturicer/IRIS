@@ -4,7 +4,13 @@ from django.utils import timezone
 
 @shared_task(bind=True, max_retries=3)
 def embed_record(self, record_id: int):
-    from apps.ai.models import EmbeddingJob, RecordEmbedding, assert_embedding_space_consistent
+    from apps.ai.models import (
+        VECTOR_COLUMN_DIMENSIONS,
+        EmbeddingJob,
+        RecordEmbedding,
+        assert_embedding_space_consistent,
+        get_active_embedding_space,
+    )
     from apps.records.models import Record
     from django.conf import settings
 
@@ -18,13 +24,18 @@ def embed_record(self, record_id: int):
         # Fail loudly, before spending a vendor call, if this path's own
         # dimension has drifted from the active EmbeddingSpace (ADR-015).
         assert_embedding_space_consistent(
-            settings.AI_EMBEDDING_DIMENSIONS, context="indexing"
+            VECTOR_COLUMN_DIMENSIONS, context="indexing"
         )
+        space = get_active_embedding_space()
 
         record = Record.objects.get(pk=record_id)
         text   = f"{record.title}. {record.abstract}"
 
-        # Phase 5: celery-embedding -> ai-gateway internal API
+        # NOTE (ADR-024): this route does not exist on the gateway and this
+        # call has never succeeded, so `model_name` below labels a vector
+        # that is not produced here. IR-280 changed that label only because
+        # the setting it used to read is deleted; replacing the call with
+        # the `EmbeddingProvider` port is IR-281's, not a drive-by fix here.
         import httpx
         url = f"{settings.AI_GATEWAY_URL}/api/v1/ai/internal/embed/"
         
@@ -36,7 +47,7 @@ def embed_record(self, record_id: int):
             record=record,
             defaults={
                 "embedding": vector,
-                "model_name": settings.AI_EMBEDDING_MODEL,
+                "model_name": space.model_id,
             },
         )
 
