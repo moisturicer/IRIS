@@ -12,10 +12,10 @@ and would put a second visibility rule on the retrieval path. ADR-014 rejected
 exactly that for exactly that reason, so the fallback searches chunks through
 `visible_to(user)` like everything else.
 
-**The indication reaches the caller without changing the interface.** The
-result is still a list of `RetrievedChunk` -- a caller that iterates needs no
-special case, which is the property ADR-008 asks for -- and carries `degraded`
-for the one that wants to say so in the UI.
+**The indication reaches the caller as data, in the result itself.** It used
+to ride on a `list` subclass so that a caller could iterate unchanged; that
+ergonomic is what let `RerankingRetriever` drop it (IR-279). It is now a field
+on `RetrievalResult`, which a decorator has to work to lose.
 """
 
 from __future__ import annotations
@@ -30,22 +30,9 @@ from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.resilience.rate_limit import RateLimited
 from apps.records.models import Record
 
-from .ports import RetrievedChunk, Retriever
+from .ports import FULL_TEXT, RetrievalResult, RetrievedChunk, Retriever
 
 logger = logging.getLogger(__name__)
-
-
-class RetrievedChunks(list):
-    """A list of `RetrievedChunk` that knows whether it came the slow way.
-
-    A subclass rather than a wrapper object so the healthy and degraded paths
-    really are the same interface: every existing caller iterates, indexes and
-    slices it unchanged, and only a caller that cares reads ``degraded``.
-    """
-
-    def __init__(self, chunks=(), degraded: bool = False):
-        super().__init__(chunks)
-        self.degraded = degraded
 
 
 class FullTextRetriever(Retriever):
@@ -59,7 +46,7 @@ class FullTextRetriever(Retriever):
 
     def retrieve(self, question: str, user, limit: int = 20):
         if not question.strip():
-            return RetrievedChunks(degraded=True)
+            return RetrievalResult(degraded=True, mode=FULL_TEXT)
 
         visible = Record.objects.visible_to(user).values("pk")
         query = SearchQuery(question, config="english")
@@ -77,8 +64,8 @@ class FullTextRetriever(Retriever):
             .order_by("-rank")[:limit]
         )
 
-        return RetrievedChunks(
-            (
+        return RetrievalResult(
+            passages=tuple(
                 RetrievedChunk(
                     chunk_id=row.pk,
                     record_id=row.record_id,
@@ -91,6 +78,7 @@ class FullTextRetriever(Retriever):
                 for row in rows
             ),
             degraded=True,
+            mode=FULL_TEXT,
         )
 
 
@@ -123,8 +111,7 @@ class DegradableRetriever(Retriever):
             )
             return self._fallback.retrieve(question, user, limit=limit)
 
-        return (
-            results
-            if isinstance(results, RetrievedChunks)
-            else RetrievedChunks(results, degraded=False)
-        )
+        # Returned as it came: the primary is a `Retriever`, so its result
+        # already says how it was produced. Rewrapping it here is what would
+        # overwrite that.
+        return results

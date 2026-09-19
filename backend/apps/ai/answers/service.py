@@ -74,9 +74,12 @@ class GroundedAnswerService:
 
     def answer(self, question: str, user) -> GroundedAnswer:
         retrieved = self._retriever.retrieve(question, user, limit=self._max_sources)
-        degraded = bool(getattr(retrieved, "degraded", False))
+        # Read off the result, not off the object with `getattr(..., False)`:
+        # that default is what turned a dropped flag into a confident "the
+        # vendor was fine" instead of an error (IR-279).
+        degraded = retrieved.degraded
 
-        sources = self._disclosable(retrieved)[: self._max_sources]
+        sources = self._disclosable(retrieved.passages)[: self._max_sources]
         if not sources:
             # Nothing to ground an answer in. Saying so beats asking a model to
             # answer from nothing, which is how an invention gets written.

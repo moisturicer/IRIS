@@ -20,7 +20,7 @@ from apps.ai.providers.noop import NoOpReranker
 from apps.ai.providers.ports import Reranker
 from apps.records.models import Record
 
-from .ports import RetrievedChunk, Retriever
+from .ports import RetrievalResult, RetrievedChunk, Retriever
 
 #: How many candidates to recall before reranking. Retrieving a handful and
 #: reranking that handful achieves nothing: recall is cheap in Postgres and
@@ -95,11 +95,15 @@ class RerankingRetriever(Retriever):
 
     # -- the port -----------------------------------------------------------
 
-    def retrieve(self, question: str, user, limit: int = 20) -> list[RetrievedChunk]:
-        candidates = self._inner.retrieve(question, user, limit=self._recall_limit)
-        candidates = self._permitted(candidates)
+    def retrieve(self, question: str, user, limit: int = 20) -> RetrievalResult:
+        # The inner result is carried through rather than unpacked and
+        # rebuilt: this decorator reorders passages, and everything else it
+        # was told -- that the vendor was out, which path ran, which space --
+        # is not its to restate (IR-279).
+        inner = self._inner.retrieve(question, user, limit=self._recall_limit)
+        candidates = self._permitted(inner.passages)
         if not candidates:
-            return []
+            return inner.with_passages(())
 
         key = self._cache_key(question, candidates)
         if self._cache is not None and key in self._cache:
@@ -110,15 +114,17 @@ class RerankingRetriever(Retriever):
             if self._cache is not None:
                 self._cache[key] = order
 
-        return [
-            RetrievedChunk(
-                chunk_id=candidates[index].chunk_id,
-                record_id=candidates[index].record_id,
-                record_title=candidates[index].record_title,
-                content=candidates[index].content,
-                context_path=candidates[index].context_path,
-                source_page=candidates[index].source_page,
-                score=score,
-            )
-            for index, score in order
-        ][:limit]
+        return inner.with_passages(
+            [
+                RetrievedChunk(
+                    chunk_id=candidates[index].chunk_id,
+                    record_id=candidates[index].record_id,
+                    record_title=candidates[index].record_title,
+                    content=candidates[index].content,
+                    context_path=candidates[index].context_path,
+                    source_page=candidates[index].source_page,
+                    score=score,
+                )
+                for index, score in order
+            ][:limit]
+        )
