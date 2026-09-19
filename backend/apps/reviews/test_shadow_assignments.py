@@ -272,6 +272,50 @@ class ShadowRowsTests(WorkflowCharacterisationBase):
         self.assertEqual(intake.state, AssignmentState.COMPLETED)
         self.assertEqual(intake.closed_by_id, self.rdco.pk)
 
+    def test_the_hand_back_to_rdco_is_not_a_route(self):
+        """
+        ADR-021 §10: when the last office finishes, IRIS opens RDCO's
+        assignment. That is a hand-back, not a party's routing decision, so it
+        writes no `RoutingEvent` and has no `opened_by`. Intake's decision is
+        the only route here, to both offices at once: intake creates every
+        requested office's clearance row, so IERC is pending -- and held --
+        from the start (§6).
+        """
+        record = self.submitted(
+            RecordTypeName.PROJECT, requested_itso=True, requested_ierc=True
+        )
+        self.review(record, self.rdco, ReviewDecision.APPROVED)
+        self.review(record, self.itso, ReviewDecision.APPROVED)
+        self.review(record, self.ierc, ReviewDecision.APPROVED)
+
+        self.assertEqual(self.status_of(record), PipelineStatus.RDCO_REVIEW)
+        self.assertEqual(
+            list(RoutingEvent.objects.filter(record=record)
+                 .order_by("created_at", "to_party")
+                 .values_list("from_party", "to_party")),
+            [(None, Party.INTAKE), (Party.INTAKE, Party.IERC), (Party.INTAKE, Party.ITSO)],
+        )
+        rdco = RecordAssignment.objects.get(record=record, party=Party.RDCO)
+        self.assertIsNone(rdco.opened_by_id, "opened by IRIS, not a person")
+        ierc = RecordAssignment.objects.get(record=record, party=Party.IERC)
+        self.assertEqual(ierc.opened_by_id, self.rdco.pk, "routed by Intake's decision")
+
+    def test_resubmitting_routes_nothing(self):
+        """ADR-021 §11: resubmission resolves requests; it is not a new route."""
+        record = self.submitted(RecordTypeName.THESIS_RESEARCH)
+        self.review(record, self.rdco, ReviewDecision.APPROVED)
+        self.review(record, self.rdco, ReviewDecision.DECLINED)
+        self.add_upload_after_decline(record)
+        routed_before = RoutingEvent.objects.filter(record=record).count()
+
+        self.resubmit(record)
+
+        self.assertEqual(self.status_of(record), PipelineStatus.RDCO_INTAKE)
+        self.assertEqual(active_parties(record), {Party.INTAKE})
+        self.assertEqual(
+            RoutingEvent.objects.filter(record=record).count(), routed_before
+        )
+
     def test_a_decline_at_intake_is_attributed_to_intake(self):
         record = self.submitted(RecordTypeName.THESIS_RESEARCH)
         self.review(record, self.rdco, ReviewDecision.DECLINED, comment="Missing abstract")
