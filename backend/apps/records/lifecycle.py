@@ -774,9 +774,17 @@ def apply(
     office=None,
     declining_stage=None,
     restore_to=None,
+    review=None,
 ) -> str:
     """
     Resolve and persist the record's next `pipeline_status`. Returns it.
+
+    **Also writes the shadow routing rows** (IR-257): who holds the record, who
+    sent it where, and what revision is outstanding. They land in this same
+    transaction, after the status, so they can never describe a move that did
+    not happen. `review` is the `Review` the caller wrote for this transition,
+    if any; it is linked to the assignment it was made under. See
+    `apps.reviews.shadow`.
 
     **Atomic from the first commit** (ADR-002's Decision, and its Security
     Impact: this closes the partial-application defect where a record could
@@ -792,7 +800,16 @@ def apply(
     `reviews.services`, which is also what honours IR-136's "do not rebuild the
     eleven transitions" instruction.
     """
+    from apps.reviews import shadow
+
     edge = require_edge(record, event)
+    # Who acted, read before the move: a reviewer acts as the party of the
+    # stage the record was *at*. Anything else was the submitter or the system.
+    acting_party = (
+        shadow.party_for_stage(review_stage_for(record.pipeline_status, office))
+        if event in REVIEW_EVENTS
+        else None
+    )
 
     if edge.to is not None:
         destination = edge.to
@@ -813,4 +830,6 @@ def apply(
     if destination != record.pipeline_status:
         record.pipeline_status = destination
         record.save(update_fields=["pipeline_status", "updated_at"])
+
+    shadow.sync(record, event, actor, acting_party=acting_party, review=review)
     return destination
