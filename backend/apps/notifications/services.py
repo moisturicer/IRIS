@@ -10,6 +10,7 @@ Design rules:
 """
 from django.conf import settings
 from core.enums import Office, PipelineStatus, RecordTypeName, ReviewDecision, ReviewStage, RoleName
+from core.permissions import get_role_name
 from core.utils import send_email_async
 from .models import Notification, NotificationType
 
@@ -487,12 +488,19 @@ def notify_resubmit(record, submitted_by, new_status: str):
 
 def notify_proposal_completed(record, marked_by):
     """
-    Notify record owners when RDCO marks a Proposal as completed.
+    Notify record owners when a Proposal is marked completed -- by RDCO or by
+    its assigned Adviser (ADR-021 §3, IR-267). The message names which; it
+    used to say "by RDCO" whoever had acted.
     """
     try:
         notif_type = _get_type("Record Approved")
+        marked_by_label = (
+            "your Adviser"
+            if get_role_name(marked_by) == RoleName.ADVISER
+            else "RDCO"
+        )
         message = (
-            f'Your Proposal "{record.title}" has been marked as completed by RDCO. '
+            f'Your Proposal "{record.title}" has been marked as completed by {marked_by_label}. '
             f"It remains visible in the repository as a completed research proposal."
         )
         owners = list(record.owners.select_related("user").all())
@@ -510,7 +518,7 @@ def notify_proposal_completed(record, marked_by):
                 subject=f"[IRIS] Your proposal has been marked as completed: {record.title[:60]}",
                 message=(
                     f"Hello {primary.first_name},\n\n"
-                    f'Your Proposal "{record.title}" has been marked as completed by RDCO.\n\n'
+                    f'Your Proposal "{record.title}" has been marked as completed by {marked_by_label}.\n\n'
                     f"It remains publicly visible in the IRIS repository as a completed research proposal.\n\n"
                     f"You can view it here:\n{_record_url(record)}\n\n"
                     f"-- The IRIS Team"

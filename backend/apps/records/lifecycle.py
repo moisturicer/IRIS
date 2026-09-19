@@ -340,7 +340,10 @@ TRANSITIONS: dict[tuple, Edge] = {
         decision=ReviewDecision.APPROVED,
         resolver="first_status",
     ),
-    # RDCO marks an approved Proposal finished. Only Proposals reach `approved`
+    # RDCO -- or, since IR-267 (ADR-021 §3), the Proposal's assigned Adviser --
+    # marks an approved Proposal finished. `gate_role` holds one role and is
+    # documentation only; the view's permission and queryset decide who may
+    # act, as the module docstring explains. Only Proposals reach `approved`
     # -- approve_record sends every other type to `published` -- so keying on
     # the status is sufficient; the view keeps an explicit record-type check as
     # a defensive precondition rather than as routing.
