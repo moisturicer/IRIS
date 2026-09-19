@@ -62,15 +62,19 @@ def party_for_stage(stage):
     return Party(stage)
 
 
-def declining_party(record):
-    """The party of the record's last decline, which is who asked for changes."""
-    stage = (
+def _last_decline(record):
+    """The record's most recent decline `Review`, or None."""
+    return (
         Review.objects.filter(record=record, status=ReviewDecision.DECLINED)
         .order_by("-created_at", "-pk")
-        .values_list("stage", flat=True)
         .first()
     )
-    return party_for_stage(stage)
+
+
+def declining_party(record):
+    """The party of the record's last decline, which is who asked for changes."""
+    decline = _last_decline(record)
+    return party_for_stage(decline.stage) if decline else None
 
 
 def _pending_offices(record) -> set:
@@ -84,8 +88,11 @@ def active_parties_for(record) -> set:
     """
     Who holds the record now: §6's "Active assignments" column.
 
-    A clearance stage is held by every office still pending, so IERC is not
-    active at `itso_review` until ITSO clears and its row exists. A declined
+    A clearance stage is held by every office still pending. That includes
+    IERC at `itso_review`: intake creates every requested office's clearance
+    row at once, so IERC is pending there even though the old pipeline will not
+    let it act until ITSO clears -- which is §6 read literally, and is what
+    Intake routing to ITSO and IERC together means in ADR-021. A declined
     record is still held by the party that asked for changes, and by any office
     whose clearance is still pending: they have not finished either.
     """
@@ -151,23 +158,28 @@ def sync(record, event, actor, *, acting_party=None, review=None):
         assignment.save(update_fields=["state", "closed_by", "closed_at"])
         closed[party] = assignment
 
+    # Only two of today's transitions are routes in ADR-021's sense (§6): the
+    # submitter sending the record in, and Intake's triage decision sending it
+    # on. Everything else that opens an assignment is IRIS: the old pipeline's
+    # ITSO-then-IERC sequencing, the hand-back to RDCO once the offices are done
+    # (§10), and the restart after a sequential decline. None of those is a
+    # party's choice, so none writes a `RoutingEvent`, and each is opened by
+    # nobody -- the model's rule for "opened by submission or the system".
+    triaged = acting_party == Party.INTAKE
+    submitted = event is WorkflowEvent.SUBMIT
+
     opened = {}
     for party in sorted(expected - held.keys()):
         opened[party] = RecordAssignment.objects.create(
             record=record,
             party=party,
-            # Null when submission or the system opened it (the model's rule).
-            opened_by=actor if acting_party else None,
+            opened_by=actor if triaged else None,
             opened_at=now,
         )
     held.update(opened)
 
     if event is WorkflowEvent.DECLINE and review is None:
-        review = (
-            Review.objects.filter(record=record, status=ReviewDecision.DECLINED)
-            .order_by("-created_at", "-pk")
-            .first()
-        )
+        review = _last_decline(record)
 
     if review is not None and acting_party:
         assignment = held.get(acting_party) or closed.get(acting_party)
@@ -198,12 +210,10 @@ def sync(record, event, actor, *, acting_party=None, review=None):
             resolved_at=now,
         )
 
-    # Routing is recorded where it actually happened: a reviewer's decision
-    # sent the record on, or the submitter sent it in. One call to several
-    # parties is one decision, so the events share a group.
+    # One decision to several parties is one movement, so the events share a
+    # group (§6). The first events from `intake` are the initial routing.
     targets = [party for party in opened if party != acting_party]
-    submitted = event in (WorkflowEvent.SUBMIT, WorkflowEvent.RESUBMIT)
-    if targets and (acting_party or submitted):
+    if targets and (triaged or submitted):
         group_id = uuid.uuid4()
         RoutingEvent.objects.bulk_create([
             RoutingEvent(
