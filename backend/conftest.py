@@ -130,31 +130,53 @@ TEST_CELERY_RESULT_BACKEND = "cache+memory://"
 def _use_in_process_celery_broker() -> None:
     """Point Celery at its in-process transport, if Django is importable.
 
-    Set on `settings` because this project's Celery reads its configuration
-    from Django settings (`config/celery.py`, namespace ``CELERY``) and
-    ignores `app.conf.update` -- the trap IR-196 found. Nothing has been
-    dispatched this early, so there is no cached connection to drop.
+    Set through the **environment**, not `settings`: Celery reads
+    ``CELERY_BROKER_URL`` and ``CELERY_RESULT_BACKEND`` from `os.environ`
+    *before* anything configured (`celery.app.utils.Settings.broker_url` is
+    ``os.environ.get('CELERY_BROKER_URL') or ...``). CI sets neither; the
+    backend container sets both to its real Redis, so a settings-only switch
+    worked in one and was silently ignored in the other.
 
-    **Asserted, never assumed.** If the app has already materialised its
-    configuration, the settings change would be silently ignored and the run
-    would crawl again; that has to fail the session, not slow it.
+    **Why the check inspects built objects, not configuration.** Once the
+    environment is written, reading `conf.broker_url` back can only return what
+    was just written -- the first version of this check compared exactly that,
+    and could never fail (found in review of #89/#90). What can still go wrong
+    is Celery having *already built* a Redis backend or connection before this
+    ran, and caching it: then the configuration says memory while `.delay()`
+    still blocks on Redis. So the check asks the app what it actually built.
+
+    Side effect, stated rather than hidden: `os.environ` stays set for the
+    session, so a test's `override_settings(CELERY_BROKER_URL=...)` no longer
+    changes the broker. `apps/ai/tests/test_celery_routing.py` relies on that
+    override to prove the IR-196 fix; flagged on IR-199 for its owner.
     """
     try:
-        from django.conf import settings
         from config.celery import app as celery_app
     except ImportError:
         return
 
-    settings.CELERY_BROKER_URL = TEST_CELERY_BROKER_URL
-    settings.CELERY_RESULT_BACKEND = TEST_CELERY_RESULT_BACKEND
-    # Both, because the ~20s stall measured above is the *result backend*
-    # retrying, not the broker -- switching only one would still crawl.
-    actual = (celery_app.conf.broker_url, celery_app.conf.result_backend)
-    if actual != (TEST_CELERY_BROKER_URL, TEST_CELERY_RESULT_BACKEND):
+    os.environ["CELERY_BROKER_URL"] = TEST_CELERY_BROKER_URL
+    os.environ["CELERY_RESULT_BACKEND"] = TEST_CELERY_RESULT_BACKEND
+    _assert_celery_runs_in_process(celery_app)
+
+
+def _assert_celery_runs_in_process(celery_app) -> None:
+    """Fail the session unless Celery really built in-process objects.
+
+    Both halves, because the ~20s stall measured above is the *result
+    backend* retrying, not the broker -- switching only one would still crawl.
+    """
+    from celery.backends.cache import CacheBackend
+
+    backend = celery_app.backend
+    with celery_app.connection_for_write() as connection:
+        transport = connection.transport.driver_type
+
+    if not isinstance(backend, CacheBackend) or transport != "memory":
         raise pytest.UsageError(
             "conftest could not point Celery at its in-process transport (it "
-            f"reads broker={actual[0]!r}, backend={actual[1]!r}); every .delay() "
-            "would block on an unreachable broker. See IR-251."
+            f"built backend={type(backend).__name__}, transport={transport!r}); "
+            "every .delay() would block on an unreachable broker. See IR-251."
         )
 
 
