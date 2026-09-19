@@ -38,6 +38,7 @@ def pytest_configure(config):
     # block returns early when Hypothesis is absent, and the hasher matters
     # to the Django half of the suite whether or not Hypothesis is installed.
     _use_fast_password_hashing()
+    _use_in_process_celery_broker()
 
     try:
         from testing.hypothesis_profiles import activate_profile
@@ -103,6 +104,58 @@ def _use_fast_password_hashing() -> None:
 
     settings.PASSWORD_HASHERS = FAST_PASSWORD_HASHERS
     reset_hashers(setting="PASSWORD_HASHERS")
+
+
+#: What `.delay()` publishes to during the test run. IR-251's measured cause of
+#: the 4h31m CI run: CI runs no Redis, so `CELERY_BROKER_URL` falls back to
+#: `redis://localhost:6379`, nothing listens there, and every `.delay()` blocks
+#: for ~20s retrying the result backend before raising. `send_email_async`
+#: catches that and sends synchronously, so the suite still passed -- it just
+#: paid ~20s per notification, and the workflow tests fire hundreds.
+#: Measured on the characterisation module, with the cheap hasher above: all 31
+#: tests in ~2 minutes with a reachable broker, 14 of 31 after 11 minutes without.
+#:
+#: Celery's in-process transport is the one `apps/ai/tests/test_celery_routing.py`
+#: already uses. A published task sits in memory and nothing consumes it, which
+#: is what every test except that one wants: none asserts that an email was
+#: delivered through the fallback (nothing reads `mail.outbox`), and tests that
+#: care about email patch `send_email_async` at the boundary. It also makes a
+#: run independent of whether the machine happens to have a Redis -- the
+#: backend container has one and CI does not, which is how the same suite took
+#: 20 minutes in one and hours in the other.
+TEST_CELERY_BROKER_URL = "memory://"
+TEST_CELERY_RESULT_BACKEND = "cache+memory://"
+
+
+def _use_in_process_celery_broker() -> None:
+    """Point Celery at its in-process transport, if Django is importable.
+
+    Set on `settings` because this project's Celery reads its configuration
+    from Django settings (`config/celery.py`, namespace ``CELERY``) and
+    ignores `app.conf.update` -- the trap IR-196 found. Nothing has been
+    dispatched this early, so there is no cached connection to drop.
+
+    **Asserted, never assumed.** If the app has already materialised its
+    configuration, the settings change would be silently ignored and the run
+    would crawl again; that has to fail the session, not slow it.
+    """
+    try:
+        from django.conf import settings
+        from config.celery import app as celery_app
+    except ImportError:
+        return
+
+    settings.CELERY_BROKER_URL = TEST_CELERY_BROKER_URL
+    settings.CELERY_RESULT_BACKEND = TEST_CELERY_RESULT_BACKEND
+    # Both, because the ~20s stall measured above is the *result backend*
+    # retrying, not the broker -- switching only one would still crawl.
+    actual = (celery_app.conf.broker_url, celery_app.conf.result_backend)
+    if actual != (TEST_CELERY_BROKER_URL, TEST_CELERY_RESULT_BACKEND):
+        raise pytest.UsageError(
+            "conftest could not point Celery at its in-process transport (it "
+            f"reads broker={actual[0]!r}, backend={actual[1]!r}); every .delay() "
+            "would block on an unreachable broker. See IR-251."
+        )
 
 
 def pytest_report_header(config):
