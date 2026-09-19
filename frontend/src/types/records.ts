@@ -154,6 +154,28 @@ export type TrackerPartyState =
   | "not_requested"
   | "awaiting";
 
+/**
+ * What a finished (or reviewing) party concluded: its clearance status for an
+ * office, else its latest review decision. Named so an outcome the UI has not
+ * styled fails `tsc` rather than falling through.
+ */
+export type TrackerOutcome =
+  | RecordClearance["status"]
+  | "approved"
+  | "rejected"
+  | "negative_finding";
+
+export interface TrackerReview {
+  id:               number;
+  party:            Party | null;
+  label:            string | null;
+  status:           string;
+  status_label:     string;
+  comment:          string;
+  reviewed_by_name: string | null;
+  created_at:       string | null;
+}
+
 export interface TrackerHolder {
   party:     Party;
   label:     string;
@@ -167,9 +189,13 @@ export interface TrackerPartyRow {
   label:         string;
   state:         TrackerPartyState;
   state_label:   string;
-  /** Active and has recorded something, vs requested but not yet started. */
+  /**
+   * Only for an active party: true once it has recorded a review, false while
+   * it is requested but not yet started. Always false in any other state.
+   */
   started:       boolean;
-  outcome:       string | null;
+  /** Null for a party that was never assigned. */
+  outcome:       TrackerOutcome | null;
   outcome_label: string | null;
   at:            string | null;
   preserved:     boolean;
@@ -210,11 +236,7 @@ export interface RecordTracker {
   routing_history:       TrackerRoutingGroup[];
   /** Routing was not recorded before this date (IR-257's backfill wrote none). */
   routing_recorded_from: string | null;
-  reviews:               Array<{
-    id: number; party: Party | null; label: string | null; status: string;
-    status_label: string; comment: string; reviewed_by_name: string | null;
-    created_at: string | null;
-  }>;
+  reviews:               TrackerReview[];
   resubmissions:         TrackerResubmission[];
   document_requests:     unknown[];
   clearances:            RecordClearance[];

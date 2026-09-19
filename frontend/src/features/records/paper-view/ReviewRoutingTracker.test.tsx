@@ -134,6 +134,21 @@ const afterResubmission = payload({
   ],
 });
 
+const newProposal = payload({
+  record_type: "Proposal",
+  current_holders: [
+    { party: "adviser", label: "Adviser", opened_at: "2026-09-18T02:00:00Z", opened_by: null },
+  ],
+  parties: [
+    row("intake", "Intake", "not_requested"),
+    row("adviser", "Adviser", "active"),
+    row("itso", "ITSO", "not_requested"),
+    row("ierc", "IERC", "not_requested"),
+    row("ktto", "KTTO", "not_requested"),
+    row("rdco", "RDCO Final", "not_requested"),
+  ],
+});
+
 beforeEach(() => {
   tracker.mockReset();
 });
@@ -164,6 +179,17 @@ describe("ReviewRoutingTracker", () => {
     expect(within(region).getByText("Submitted")).toBeInTheDocument();
 
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows a new Proposal as submitted, with RDCO not requested", async () => {
+    tracker.mockResolvedValue({ data: newProposal });
+    renderTracker();
+
+    expect(await partyRow(/adviser/i)).toHaveTextContent(/active/i);
+    expect(await partyRow(/rdco/i)).toHaveTextContent(/not requested/i);
+    const region = screen.getByRole("region", { name: /review & routing/i });
+    expect(within(region).getByText("Submitted")).toBeInTheDocument();
+    expect(within(region).queryByText("Final review")).not.toBeInTheDocument();
   });
 
   it("shows who holds the record now", async () => {

@@ -154,6 +154,8 @@ def _open_document_requests(record) -> int:
 
 def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
     """The record's derived `workflow_state`."""
+    # `derive_workflow_state` passes terminal statuses through too; returning
+    # here first just skips the three queries it would not need.
     if record.pipeline_status not in IN_REVIEW_STATUSES:
         return str(record.pipeline_status)
     active = active_assignments if active_assignments is not None else _active_assignments(record)
@@ -309,11 +311,12 @@ def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list
 
         if assignment is None:
             # RDCO always decides a Thesis/Research or Project, so it is
-            # awaited there, never "not requested" (ADR-021 §14). Stated
-            # generally: a party that is the type's only decider is awaited.
+            # awaited there, never "not requested"; on a Proposal, which the
+            # Adviser may decide alone, it is not requested until routed to
+            # (ADR-021 §14, stated per party as the ADR states it).
             state = (
                 TrackerPartyState.AWAITING
-                if deciders == {party}
+                if party == Party.RDCO and deciders == {party}
                 else TrackerPartyState.NOT_REQUESTED
             )
             at = None
@@ -324,7 +327,12 @@ def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list
         else:
             state, at = TrackerPartyState.COMPLETED, assignment.closed_at
 
-        if clearance is not None:
+        # An outcome belongs to a party that was actually asked. A party with
+        # no assignment shows none, even if an old clearance row exists (§8.2:
+        # "never requested" means no assignment at all).
+        if assignment is None:
+            outcome = outcome_label = None
+        elif clearance is not None:
             outcome, outcome_label = clearance.status, clearance.get_status_display()
         elif review is not None:
             outcome, outcome_label = review.status, review.get_status_display()
@@ -336,7 +344,9 @@ def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list
             "label": party_label(party, staff_viewer=staff),
             "state": state.value,
             "state_label": str(state.label),
-            "started": review is not None,
+            # §8.2's split of an active party: reviewing already, or
+            # requested but not yet started. Meaningless for any other state.
+            "started": state is TrackerPartyState.ACTIVE and review is not None,
             "outcome": outcome,
             "outcome_label": outcome_label,
             "at": _iso(at),
@@ -412,7 +422,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
 
     payload = {
         "record_id": record.pk,
-        "record_type": record.record_type.name if record.record_type else None,
+        "record_type": lifecycle.type_name_of(record) or None,
         **workflow_fields(record, user),
         "parties": _party_rows(record, reviews=reviews, clearances=clearances, staff=staff),
         "routing_history": _routing_history(record, staff=staff),

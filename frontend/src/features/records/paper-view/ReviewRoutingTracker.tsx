@@ -5,6 +5,7 @@ import { cn, formatDate } from "@/lib/utils";
 import type {
   RecordTracker,
   TrackerPartyRow,
+  TrackerOutcome,
   TrackerPartyState,
   TrackerRoutingGroup,
 } from "@/types/records";
@@ -27,8 +28,9 @@ const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted
   not_requested: { glyph: "○", tone: "text-stone-500",   muted: true },
 };
 
-/** Outcome colour. Pending is not an outcome worth colouring. */
-const OUTCOME_TONE: Record<string, string> = {
+/** Outcome colour. Exhaustive, so an unstyled outcome fails `tsc`. */
+const OUTCOME_TONE: Record<TrackerOutcome, string> = {
+  pending: "text-stone-700",
   cleared: "text-emerald-700",
   approved: "text-emerald-700",
   declined: "text-amber-700",
@@ -180,7 +182,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
 function PartyRow({ row }: { row: TrackerPartyRow }) {
   const meta = STATE_META[row.state];
   // An outcome is shown once there is one. "Pending" is not a conclusion.
-  const outcome = row.outcome && row.outcome !== "pending" ? row : null;
+  const outcome = row.outcome && row.outcome !== "pending" ? row.outcome : null;
 
   return (
     <tr className="border-t border-stone-100 first:border-t-0 align-top">
@@ -203,8 +205,8 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
         <span className="flex items-center gap-1.5 flex-wrap text-[11px]">
           <span className={cn("font-semibold", meta.tone)}>{row.state_label}</span>
           {outcome && (
-            <span className={cn("font-semibold", OUTCOME_TONE[outcome.outcome ?? ""] ?? "text-stone-700")}>
-              · {outcome.outcome_label}
+            <span className={cn("font-semibold", OUTCOME_TONE[outcome])}>
+              · {row.outcome_label}
             </span>
           )}
           {row.preserved && (
