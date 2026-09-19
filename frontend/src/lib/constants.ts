@@ -53,7 +53,7 @@ export const PIPELINE_STATUS = {
   DECLINED:       "declined",       // sent back for revision; owner may resubmit
   REJECTED:       "rejected",       // outright rejection; no resubmission
   PENDING_DELETE: "pending_delete",
-  COMPLETED:      "completed",      // Proposal research finished — toggled by RDCO
+  COMPLETED:      "completed",      // Proposal research finished — marked by RDCO or the assigned Adviser
 } as const;
 
 export type PipelineStatus = (typeof PIPELINE_STATUS)[keyof typeof PIPELINE_STATUS];
