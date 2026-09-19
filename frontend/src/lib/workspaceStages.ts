@@ -45,10 +45,9 @@ export function currentStage(record: RecordDetail): WorkspaceStage {
       return "office_review";
     case "rdco_review":
       return "final_review";
-    // `approved` is NOT finished: SRS describes it as "visible as ongoing" --
-    // the adviser signed off and the research is now actually being done.
-    // Only a manual /complete/ call -- by RDCO or the assigned Adviser
-    // (IR-267) -- ends a Proposal. Collapsing the two
+    // `approved` is NOT finished: the adviser signed off and the research is
+    // now actually being done. Only a manual /complete/ call -- by RDCO or the
+    // assigned Adviser (ADR-021 §3, IR-267) -- ends a Proposal. Collapsing the two
     // told a student their proposal was "Completed" while they were still
     // working on it.
     case "approved":
