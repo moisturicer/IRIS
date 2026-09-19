@@ -179,6 +179,18 @@ class ProposalVisibilityTests(APITestCase):
                     self.assertNotIn(proposal.pk, cited)
                     self.assertNotIn(proposal.pk, sourced)
 
+    def test_similar_records_never_suggest_a_proposal(self):
+        # The paper view's "similar" list reuses Ask IRIS retrieval. Every
+        # fixture shares MARKER, so both Proposals would rank as matches for the
+        # thesis if they were still in the catalogue.
+        self.as_user(self.stranger)
+        response = self.client.get(f"{RECORDS}{self.published_thesis.pk}/similar/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        suggested = {row["id"] for row in response.data["results"]}
+        for proposal in self.proposals:
+            self.assertNotIn(proposal.pk, suggested)
+
     def test_ask_iris_status_count_excludes_proposals(self):
         self.as_user(self.stranger)
         response = self.client.get(AI_STATUS)
