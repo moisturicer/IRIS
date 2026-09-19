@@ -751,18 +751,18 @@ DECIDING_PARTIES = {RecordTypeName.PROPOSAL: frozenset({Party.ADVISER, Party.RDC
 DEFAULT_DECIDING_PARTIES = frozenset({Party.RDCO})
 
 
-def _type_name_of(record) -> str:
+def type_name_of(record) -> str:
     return record.record_type.name if record.record_type else ""
 
 
 def entry_party_for(record) -> str:
     """The party a record of this type is submitted to."""
-    return ENTRY_PARTY.get(_type_name_of(record), DEFAULT_ENTRY_PARTY)
+    return ENTRY_PARTY.get(type_name_of(record), DEFAULT_ENTRY_PARTY)
 
 
 def deciding_parties_for(record) -> frozenset:
     """The parties with decision authority over a record of this type."""
-    return DECIDING_PARTIES.get(_type_name_of(record), DEFAULT_DECIDING_PARTIES)
+    return DECIDING_PARTIES.get(type_name_of(record), DEFAULT_DECIDING_PARTIES)
 
 
 def edge_for(status: str, event: WorkflowEvent) -> Edge | None:
