@@ -29,7 +29,6 @@ Docling emits either origin; PDF.js viewports are top-left. Normalizing at
 the one place that knows the page height means no later consumer can forget.
 """
 
-import re
 from typing import Any, Iterator, Mapping, Optional
 
 from apps.ai.chunking.document import (
@@ -43,6 +42,7 @@ from apps.ai.chunking.document import (
     DocumentElement,
     NormalizedDocument,
 )
+from apps.ai.chunking.numbering import DECIMAL_SECTION_NUMBER
 
 # Docling label → the kind the chunker splits on. A label absent from this
 # map is not an error: it is carried through unchanged (see module docstring).
@@ -245,15 +245,6 @@ def _is_table(item: Mapping[str, Any]) -> bool:
     return isinstance(data, Mapping) and "table_cells" in data
 
 
-#: A section number opening a heading: ``3``, ``3.2``, ``2.1.1``, with an
-#: optional trailing dot, followed by whitespace and then actual words.
-#:
-#: The trailing ``\s+\S`` matters. Without it ``1,000 Samples`` matches its
-#: leading ``1`` and a heading about a sample size is read as a top-level
-#: section; requiring the separator to be whitespace rejects it, because a
-#: comma is not a dot. A bare number with no text after it is not an outline
-#: entry either, and is rejected the same way.
-_SECTION_NUMBER = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+\S")
 
 
 def _numbered_depth(text: str) -> Optional[int]:
@@ -264,18 +255,17 @@ def _numbered_depth(text: str) -> Optional[int]:
     appendices ("A Contributions", which is a letter rather than a numbering
     scheme), and anything else unnumbered.
 
-    **Known false positive, recorded rather than hidden:** a decimal
-    measurement is lexically identical to a section number, so "3.5 kg of
-    Feed" and "2.4 GHz Antenna Design" read as depth 2. Contained rather than
-    harmless — because the caller treats this as a floor, such a heading is
-    still the nearest entry in its own trail and merely gains a parent it
-    should not have, and the next genuinely top-level heading evicts it. Telling
-    the two apart needs the document's numbering *sequence* (a real outline is
-    monotonic: ``3.2`` follows ``3.1``), which is document-level context this
-    function does not have, and which wants tuning against real theses rather
-    than guessing here. See the characterisation test of the same name.
+    Dotted decimals only, deliberately. Roman-numeral and lettered outlines
+    are recognised too (IR-314), but resolving an ambiguous single letter
+    needs the whole sequence of headings, which this per-item mapping does
+    not have — so that happens in `chunking/numbering.py`, and what this
+    contributes is a floor the domain then raises where it can.
+
+    The known decimal false positive — "3.5 kg of Feed" reading as depth 2 —
+    is described where the pattern now lives, in `chunking/numbering.py`.
+    Both the characterisation test here and the one there assert it.
     """
-    match = _SECTION_NUMBER.match(text.strip())
+    match = DECIMAL_SECTION_NUMBER.match(text.strip())
     if match is None:
         return None
     return match.group(1).count(".") + 1
