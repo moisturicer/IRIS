@@ -47,7 +47,8 @@ export function currentStage(record: RecordDetail): WorkspaceStage {
       return "final_review";
     // `approved` is NOT finished: SRS describes it as "visible as ongoing" --
     // the adviser signed off and the research is now actually being done.
-    // Only RDCO's manual /complete/ call ends a Proposal. Collapsing the two
+    // Only a manual /complete/ call -- by RDCO or the assigned Adviser
+    // (IR-267) -- ends a Proposal. Collapsing the two
     // told a student their proposal was "Completed" while they were still
     // working on it.
     case "approved":
@@ -69,7 +70,7 @@ export function currentStage(record: RecordDetail): WorkspaceStage {
 export function stageSequence(record: RecordDetail): WorkspaceStage[] {
   if (record.record_type_name === "Proposal") {
     // Four stages, not three: adviser approval lands on `ongoing`, and only
-    // RDCO marking it complete reaches `completed`. Only Proposals ever have
+    // RDCO or the assigned Adviser marking it complete reaches `completed`. Only Proposals ever have
     // an `ongoing` stage -- approve_record() sends every other type straight
     // to `published` from its final review.
     return ["validation", "review_routing", "ongoing", "completed"];
