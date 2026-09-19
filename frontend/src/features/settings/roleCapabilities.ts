@@ -24,6 +24,7 @@ export const ROLE_CAPABILITIES: Record<string, string[]> = {
   Adviser: [
     "Everything a student can do.",
     "Review disclosures on which you are named as adviser, and approve or return them.",
+    "Mark an approved proposal you advise complete once the research concludes.",
   ],
 
   RDCO: [

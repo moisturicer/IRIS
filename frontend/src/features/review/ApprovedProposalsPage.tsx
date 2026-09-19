@@ -47,7 +47,7 @@ export default function ApprovedProposalsPage() {
     <div>
       <PageHeader
         title="Approved Proposals"
-        description="Ongoing research proposals awaiting completion mark by RDCO."
+        description="Ongoing research proposals awaiting completion by RDCO or the assigned Adviser."
       />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
