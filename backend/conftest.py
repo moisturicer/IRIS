@@ -147,6 +147,14 @@ def _use_in_process_celery_broker() -> None:
 
     settings.CELERY_BROKER_URL = TEST_CELERY_BROKER_URL
     settings.CELERY_RESULT_BACKEND = TEST_CELERY_RESULT_BACKEND
+    # And the environment, because Celery lets the ``CELERY_BROKER_URL`` and
+    # ``CELERY_RESULT_BACKEND`` environment variables override whatever the
+    # settings say. CI sets neither, so the settings alone were enough there;
+    # the backend container sets both (to its real Redis), so without this the
+    # guard below refused every run in the dev container -- the same override
+    # that makes IR-199's routing test fail there.
+    os.environ["CELERY_BROKER_URL"] = TEST_CELERY_BROKER_URL
+    os.environ["CELERY_RESULT_BACKEND"] = TEST_CELERY_RESULT_BACKEND
     # Both, because the ~20s stall measured above is the *result backend*
     # retrying, not the broker -- switching only one would still crawl.
     actual = (celery_app.conf.broker_url, celery_app.conf.result_backend)
