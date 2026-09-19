@@ -78,8 +78,23 @@ class PipelineStatus(models.TextChoices):
 
 #: The statuses any authenticated user may read. Kept as a tuple of raw values
 #: because it is compared against a database column and consumed by
-#: `Record.objects.publicly_visible()` and `visible_to()` (IR-153).
-PUBLICLY_VISIBLE_STATUSES = (
+#: `Record.objects.publicly_visible()` and `visible_to()` (IR-153) -- and through
+#: them by Discover, record detail, the dashboard charts and Ask IRIS retrieval.
+#:
+#: Published only (ADR-021 §13, IR-264). It also held `approved` and `completed`
+#: until then, and only a Proposal reaches those, so every approved or completed
+#: Proposal was public: listed in Discover, openable by any account, citable by
+#: Ask IRIS. A Proposal stays readable by its owners, its assigned adviser and
+#: office staff through `visible_to()`'s other clauses.
+PUBLICLY_VISIBLE_STATUSES = (PipelineStatus.PUBLISHED,)
+
+#: The statuses whose deletion needs RDCO review: `perform_destroy` raises a
+#: `DeleteRequest` instead of soft-deleting. Deliberately *not* derived from
+#: `PUBLICLY_VISIBLE_STATUSES`: deletion used to branch on visibility, so
+#: narrowing visibility alone would have let an owner soft-delete an approved or
+#: completed Proposal with no review (ADR-021 §13). Accepted work needs review to
+#: delete whether or not the public can see it.
+DELETE_REVIEW_STATUSES = (
     PipelineStatus.PUBLISHED,
     PipelineStatus.APPROVED,
     PipelineStatus.COMPLETED,

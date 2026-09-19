@@ -15,6 +15,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
 from core.enums import (
+    DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
     IPType,
     PipelineStatus,
@@ -98,8 +99,10 @@ class RecordViewSet(viewsets.ModelViewSet):
             # IR-267). The role gate in get_permissions() admits every Adviser;
             # narrowing here, rather than refusing in a permission class, makes
             # an unassigned Adviser's refusal the same 404 as a missing record.
-            # An approved Proposal is publicly readable, so a 403 would not leak
-            # its existence -- but it would confirm it is completable by someone.
+            # Since IR-264 visible_to() already hides an approved Proposal from
+            # most unassigned Advisers; this narrowing still matters for one who
+            # can read it on other grounds -- an Adviser can author records, so
+            # may *own* a Proposal someone else advises.
             qs = qs.filter(adviser=self.request.user)
 
         if self.action == "list":
@@ -202,8 +205,9 @@ class RecordViewSet(viewsets.ModelViewSet):
         transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
 
     def perform_destroy(self, instance):
-        # Publicly visible records go through delete request flow
-        if instance.pipeline_status in PUBLICLY_VISIBLE_STATUSES:
+        # Accepted work goes through the delete request flow (RDCO review);
+        # DELETE_REVIEW_STATUSES, not the public set -- see core.enums (IR-264).
+        if instance.pipeline_status in DELETE_REVIEW_STATUSES:
             DeleteRequest.objects.create(
                 record=instance,
                 requested_by=self.request.user,
