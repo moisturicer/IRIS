@@ -228,6 +228,45 @@ class ResubmissionRequestState(models.TextChoices):
     WITHDRAWN = "withdrawn", "Withdrawn"
 
 
+class WorkflowState(models.TextChoices):
+    """
+    Where an in-review record stands, as the API states it (ADR-021 §4).
+
+    **Derived, never stored** -- no model field takes these as choices, and
+    `apps/records/test_tracker.py` fails if a column named `workflow_state`
+    appears. `apps.reviews.tracker.derive_workflow_state` is the only author.
+    A record that is not in review reports its stored `PipelineStatus` instead,
+    so the wire value is one of these *or* a terminal status.
+
+    `IN_REVIEW` deliberately shares its value with `PipelineStatus.IN_REVIEW`:
+    it is the same fact, seen from the stored side and the derived side.
+    """
+
+    AWAITING_RESUBMISSION = "awaiting_resubmission", "Awaiting resubmission"
+    AWAITING_DOCUMENT = "awaiting_document", "Awaiting document"
+    SUBMITTED = "submitted", "Submitted"
+    FINAL_REVIEW = "final_review", "Final review"
+    IN_REVIEW = "in_review", "In review"
+
+
+class TrackerPartyState(models.TextChoices):
+    """
+    One party's row on the Review & Routing Tracker (`workflow_routing_architecture.md` §8.2).
+
+    Not stored. The first three restate `AssignmentState` for a party whose
+    latest assignment is in that state; the last two describe a party with no
+    assignment at all, and differ only in whether the party will certainly be
+    needed: RDCO on a Thesis/Research or Project is `awaiting`, never
+    `not_requested`, because RDCO always decides those (ADR-021 §14).
+    """
+
+    ACTIVE = "active", "Active"
+    COMPLETED = "completed", "Completed"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+    NOT_REQUESTED = "not_requested", "Not requested"
+    AWAITING = "awaiting", "Awaiting"
+
+
 class RequestStatus(models.TextChoices):
     """
     The outcome of a request a person makes and staff rule on:

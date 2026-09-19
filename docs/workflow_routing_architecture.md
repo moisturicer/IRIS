@@ -157,7 +157,7 @@ Each item is a defect relative to the settled MVP.
 |---|---|---|
 | `lib/constants.ts:44–50`, `lib/utils.ts:17–23`, `components/shared/StatusBadge.tsx` | Stored statuses plus `workflow_state`; labels come from the API | IR-259 |
 | `lib/workspaceStages.ts` `currentStage`, `currentOfficeLabel`, `needsAuthorAction` | Read `workflow_state` and `current_holders`; `needsAuthorAction` = open resubmission **or** document request | IR-259 / IR-263 |
-| `features/records/paper-view/ClearanceTrack.tsx` (105 lines) | `ReviewRoutingTracker`; the `preserved` badge is kept verbatim | IR-259 |
+| `features/records/paper-view/ClearanceTrack.tsx` (105 lines) | `ReviewRoutingTracker`; the `preserved` badge is kept verbatim. **Done in IR-258**, whose card asks for the panel on the paper view; the reviewer-page placement stays IR-259's | IR-258 |
 | `features/review/PeerClearanceStrip.tsx` (59 lines) | Reads the tracker; still shows no peer comments | IR-259 |
 | `PaperViewPage.tsx:44–48 canReview` | The server's `can_act` | IR-259 |
 | `features/review/EvaluationPage.tsx` (359 lines) | Rebuilt around `acting_as`: six actions plus decision controls per ADR-021 §7 | IR-261 |

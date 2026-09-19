@@ -325,6 +325,18 @@ class RecordViewSet(viewsets.ModelViewSet):
         matches = search_records(seed, top_k=3, exclude_id=record.id)
         return Response({"results": [s.as_dict() for s in matches]})
 
+    @action(detail=True, methods=["get"])
+    def tracker(self, request, pk=None):
+        """
+        GET /records/<id>/tracker/ -- the Review & Routing Tracker (IR-258).
+
+        ADR-021 §14. `get_object()` looks the record up in `visible_to()`, so a
+        viewer without access gets the same 404 as a missing record (IR-153).
+        """
+        from apps.reviews.tracker import tracker_payload
+
+        return Response(tracker_payload(self.get_object(), request.user))
+
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):
         """POST /records/<id>/increment_access/"""

@@ -47,6 +47,8 @@ from core.enums import (
     ReviewDecision,
     ReviewStage,
     RoleName,
+    TrackerPartyState,
+    WorkflowState,
 )
 
 APPS_DIR = Path(settings.BASE_DIR) / "apps"
@@ -68,6 +70,10 @@ GOVERNED_ENUMS = (
     # `reviews/serializers.py`, and a key is wire format, not a stored value.
     # Its `"withdrawn"` is still governed, through `AssignmentState`.
     AssignmentState,
+    # IR-258: the derived tracker vocabulary. Never stored, but the frontend
+    # branches on these values, so a hand-typed copy is the same drift risk.
+    WorkflowState,
+    TrackerPartyState,
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}

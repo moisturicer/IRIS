@@ -88,6 +88,10 @@ const record: RecordDetail = {
   your_office: "ierc",
   your_office_label: "IERC",
   files: [],
+  workflow_state: "in_review",
+  workflow_state_label: "In review",
+  current_holders: [],
+  can_act: [],
 };
 
 /** What the mocked detail endpoint returns; a test may park it at another stage. */
