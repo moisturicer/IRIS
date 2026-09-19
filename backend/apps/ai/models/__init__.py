@@ -3,6 +3,7 @@ from .summary import DocumentSummary
 from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, EmbeddingJob
 from .embedding_space import (
+    VECTOR_COLUMN_DIMENSIONS,
     EmbeddingSpace,
     EmbeddingSpaceState,
     assert_embedding_space_consistent,
@@ -18,6 +19,7 @@ __all__ = [
     "DocumentMetadata",
     "RecordEmbedding",
     "EmbeddingJob",
+    "VECTOR_COLUMN_DIMENSIONS",
     "EmbeddingSpace",
     "EmbeddingSpaceState",
     "get_active_embedding_space",

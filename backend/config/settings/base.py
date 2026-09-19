@@ -400,12 +400,24 @@ LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
 # lane on, not with the adapter.
 VOYAGE_API_KEY         = config("VOYAGE_API_KEY", default="")
 VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4")
-VOYAGE_EMBED_DIMENSIONS= config("VOYAGE_EMBED_DIMENSIONS", default=1024, cast=int)
+# VOYAGE_EMBED_DIMENSIONS was removed by IR-280. The dimension Voyage is asked
+# to emit and the width of the column that stores it are one number, and two
+# settings for one number is the drift this ticket closed everywhere else:
+# `VOYAGE_EMBED_DIMENSIONS=512` would have produced 512-vectors for a 1024
+# column. The adapter now takes it from `apps.ai.models.VECTOR_COLUMN_DIMENSIONS`,
+# which a migration ties to the active `EmbeddingSpace` row.
 VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-2")
 VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 
-AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")
-AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
+# AI_EMBEDDING_MODEL and AI_EMBEDDING_DIMENSIONS were removed by IR-280. They
+# named a second embedding model and dimension alongside the VOYAGE_EMBED_*
+# family above, and the three declarations disagreed: 1536 here, 1024 there,
+# and `all-MiniLM-L6-v2` in .env.example. `voyage-context-4` emits 2048, 1024,
+# 512 or 256 and never 1536, so the vector columns those settings sized could
+# not have held a real vector. What produced a vector is now the active
+# `EmbeddingSpace` row (ADR-015); what the columns are wide enough for is
+# `apps.ai.models.VECTOR_COLUMN_DIMENSIONS`, which a migration and a test tie
+# to that row.
 OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
 # ANTHROPIC_API_KEY and AI_LLM_MODEL were removed by ADR-021. Anthropic is not
 # used, and a setting nothing reads is the defect this codebase keeps finding

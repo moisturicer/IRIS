@@ -1,10 +1,11 @@
 from django.db import models
-from django.conf import settings
 from pgvector.django import VectorField, HnswIndex
+
+from .embedding_space import VECTOR_COLUMN_DIMENSIONS
 
 class RecordEmbedding(models.Model):
     record     = models.OneToOneField("records.Record", on_delete=models.CASCADE, related_name="embedding")
-    embedding  = VectorField(dimensions=settings.AI_EMBEDDING_DIMENSIONS)
+    embedding  = VectorField(dimensions=VECTOR_COLUMN_DIMENSIONS)
     model_name = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

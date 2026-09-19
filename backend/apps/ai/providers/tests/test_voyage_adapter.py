@@ -127,3 +127,18 @@ class MissingKeyTests:
         settings.VOYAGE_API_KEY = ""
         with pytest.raises(VoyageError, match="VOYAGE_API_KEY"):
             VoyageEmbeddingProvider().embed_documents(["alpha"])
+
+
+class OutputDimensionTests:
+    def test_the_adapter_asks_for_exactly_what_the_vector_columns_hold(self):
+        """IR-280. The dimension Voyage is asked to emit and the width of the
+        column the vector lands in are one number. When they were two settings
+        they could disagree, and a 512-vector against a 1024 column is the
+        silent-drift bug this ticket closed everywhere else."""
+        from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+
+        transport = _RecordingTransport(dimensions=VECTOR_COLUMN_DIMENSIONS)
+        VoyageEmbeddingProvider(transport=transport).embed_documents(["alpha"])
+
+        _, payload = transport.calls[0]
+        assert payload["output_dimension"] == VECTOR_COLUMN_DIMENSIONS

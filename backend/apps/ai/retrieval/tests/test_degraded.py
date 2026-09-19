@@ -6,9 +6,9 @@ not which method was called in which order.
 """
 
 import pytest
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkSet, DocumentChunk
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.resilience.rate_limit import RateLimited
@@ -24,7 +24,7 @@ from core.permissions import ROLE_STUDENT
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 User = get_user_model()
-DIMENSIONS = settings.AI_EMBEDDING_DIMENSIONS
+DIMENSIONS = VECTOR_COLUMN_DIMENSIONS
 
 
 class _Failing(Retriever):
