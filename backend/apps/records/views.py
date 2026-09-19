@@ -24,7 +24,15 @@ from core.enums import (
     RoleName,
 )
 from . import lifecycle
-from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO, IsAdmin, IsAuthor
+from core.permissions import (
+    IsAdmin,
+    IsAdviser,
+    IsAuthor,
+    IsOwnerOrStaff,
+    IsRDCO,
+    IsStaff,
+    get_role_name,
+)
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
@@ -82,6 +90,18 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser"
         ).prefetch_related("owners__user", "authors")
 
+        if (
+            self.action == "complete"
+            and get_role_name(self.request.user) == RoleName.ADVISER
+        ):
+            # An Adviser completes only the Proposal they advise (ADR-021 §3,
+            # IR-267). The role gate in get_permissions() admits every Adviser;
+            # narrowing here, rather than refusing in a permission class, makes
+            # an unassigned Adviser's refusal the same 404 as a missing record.
+            # An approved Proposal is publicly readable, so a 403 would not leak
+            # its existence -- but it would confirm it is completable by someone.
+            qs = qs.filter(adviser=self.request.user)
+
         if self.action == "list":
             # Discover is a public catalogue, not an authorization boundary, so
             # it narrows further. visible_to() is wider than the catalogue --
@@ -120,7 +140,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         if self.action in ("update", "partial_update", "destroy", "submit"):
             return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "complete":
-            return [IsAuthenticated(), IsRDCO()]
+            # RDCO or the *assigned* Adviser (IR-267). The assignment is
+            # per-record, so get_queryset() narrows an Adviser to their own
+            # records; this gate only turns away roles that can never complete.
+            return [IsAuthenticated(), (IsRDCO | IsAdviser)()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -380,9 +403,10 @@ class RecordViewSet(viewsets.ModelViewSet):
     def complete(self, request, pk=None):
         """
         POST /records/<id>/complete/
-        RDCO marks an approved Proposal as completed (research finished).
-        The record remains publicly visible.
-        Permission enforced by get_permissions() → IsRDCO.
+        RDCO or the Proposal's assigned Adviser marks an approved Proposal as
+        completed (research finished; ADR-021 §3). The record remains publicly
+        visible. Permission: get_permissions() admits RDCO and Advisers, and
+        get_queryset() narrows an Adviser to the records they advise.
         """
         from apps.notifications.services import notify_proposal_completed
 

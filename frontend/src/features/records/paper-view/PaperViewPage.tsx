@@ -4,7 +4,7 @@ import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
-import { STAFF_ROLES } from "@/lib/constants";
+import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { RecordDetail, IpType, RecordReview } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
@@ -395,8 +395,12 @@ export default function PaperViewPage() {
   const canBeResubmitted = record.pipeline_status === "declined" && userIsOwner;
   const showIpTagger =
     canTag(user?.role_name ?? undefined) && record.pipeline_status === "published";
+  // RDCO or the Proposal's assigned Adviser (ADR-021 §3, IR-267) -- the same
+  // two parties the server's /complete/ admits. "Assigned" is the record's
+  // `adviser` id, not the Adviser role alone.
   const canComplete =
-    user?.role_name === "RDCO" &&
+    (user?.role_name === ROLES.RDCO ||
+      (user?.role_name === ROLES.ADVISER && user.id === record.adviser)) &&
     record.pipeline_status === "approved" &&
     record.record_type_name === "Proposal";
 
