@@ -12,7 +12,7 @@ import type { SemanticSearchResult } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
-import { ClearanceTrack } from "./ClearanceTrack";
+import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import {
   usePaperChat,
   PaperChatPanel,
@@ -653,7 +653,7 @@ export default function PaperViewPage() {
           {/* Right rail                                                     */}
           {/* ------------------------------------------------------------- */}
           <aside className="space-y-4 lg:sticky lg:top-6">
-            <ClearanceTrack clearances={record.clearances} />
+            <ReviewRoutingTracker recordId={record.id} />
             <PaperGovernance record={record} />
             <PaperDocuments recordId={record.id} files={record.files} />
           </aside>

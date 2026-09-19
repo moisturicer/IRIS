@@ -54,7 +54,7 @@ export interface RecordReview {
 export interface RecordClearance {
   office:           "itso" | "ierc" | "ktto";
   office_label:     string;
-  status:           "pending" | "cleared" | "declined" | "rejected";
+  status:           "pending" | "cleared" | "declined" | "rejected" | "not_cleared";
   /** Server-supplied wording, so a status can be renamed without a release. */
   status_label:     string;
   comment:          string;
@@ -121,6 +121,104 @@ export interface RecordDetail extends RecordListItem {
   your_office:       "itso" | "ierc" | "ktto" | null;
   your_office_label: string | null;
   files:           RecordFileItem[];
+  /**
+   * Derived by the server from the routing tables, never stored (ADR-021 §4,
+   * IR-258). A terminal record reports its stored status here instead.
+   */
+  workflow_state:       WorkflowState;
+  workflow_state_label: string;
+  current_holders:      TrackerHolder[];
+  /** The parties this viewer may act as. Empty for almost everyone. */
+  can_act:              Party[];
+}
+
+// ---------------------------------------------------------------------------
+// Review & Routing Tracker (IR-258, ADR-021 §14)
+// ---------------------------------------------------------------------------
+
+/** ADR-021 §1. `intake` is its own party, even though RDCO staffs it. */
+export type Party = "intake" | "adviser" | "itso" | "ierc" | "ktto" | "rdco";
+
+export type WorkflowState =
+  | "awaiting_resubmission"
+  | "awaiting_document"
+  | "submitted"
+  | "final_review"
+  | "in_review"
+  | PipelineStatus;
+
+export type TrackerPartyState =
+  | "active"
+  | "completed"
+  | "withdrawn"
+  | "not_requested"
+  | "awaiting";
+
+export interface TrackerHolder {
+  party:     Party;
+  label:     string;
+  opened_at: string | null;
+  opened_by: string | null;
+}
+
+export interface TrackerPartyRow {
+  party:         Party;
+  /** Server-worded; Intake reads differently to staff and to students. */
+  label:         string;
+  state:         TrackerPartyState;
+  state_label:   string;
+  /** Active and has recorded something, vs requested but not yet started. */
+  started:       boolean;
+  outcome:       string | null;
+  outcome_label: string | null;
+  at:            string | null;
+  preserved:     boolean;
+}
+
+export interface TrackerRoutingGroup {
+  group_id:   string;
+  /** Null when the submitter sent the record in. */
+  from:       Party | null;
+  from_label: string | null;
+  to:         Party[];
+  to_labels:  string[];
+  actor:      string | null;
+  reason:     string;
+  at:         string | null;
+}
+
+export interface TrackerResubmission {
+  id:           number;
+  party:        Party;
+  label:        string;
+  state:        "open" | "resubmitted" | "withdrawn";
+  state_label:  string;
+  reason:       string;
+  requested_by: string | null;
+  created_at:   string | null;
+  resolved_at:  string | null;
+}
+
+export interface RecordTracker {
+  record_id:             number;
+  record_type:           string | null;
+  workflow_state:        WorkflowState;
+  workflow_state_label:  string;
+  current_holders:       TrackerHolder[];
+  can_act:               Party[];
+  parties:               TrackerPartyRow[];
+  routing_history:       TrackerRoutingGroup[];
+  /** Routing was not recorded before this date (IR-257's backfill wrote none). */
+  routing_recorded_from: string | null;
+  reviews:               Array<{
+    id: number; party: Party | null; label: string | null; status: string;
+    status_label: string; comment: string; reviewed_by_name: string | null;
+    created_at: string | null;
+  }>;
+  resubmissions:         TrackerResubmission[];
+  document_requests:     unknown[];
+  clearances:            RecordClearance[];
+  resubmission:          RecordResubmission;
 }
 
 export interface RecordFormData {

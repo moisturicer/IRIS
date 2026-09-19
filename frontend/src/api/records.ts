@@ -2,7 +2,7 @@ import { apiClient } from "./client";
 import type {
   RecordListItem, RecordDetail, RecordFormData,
   Classification, PSCEDClassification, RecordType,
-  DownloadRequest, DeleteRequest,
+  DownloadRequest, DeleteRequest, RecordTracker,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -34,6 +34,7 @@ export const recordsApi = {
    * service, so this returns the retrieval shape (RetrievedSource.as_dict()),
    * not a RecordListItem.
    */
+  tracker:        (id: number) => apiClient.get<RecordTracker>(`/records/${id}/tracker/`),
   similar:        (id: number) =>
     apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
   create:         (data: RecordFormData) => apiClient.post<RecordDetail>("/records/", data),
