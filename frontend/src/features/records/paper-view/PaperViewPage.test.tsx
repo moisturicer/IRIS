@@ -64,6 +64,10 @@ const approvedProposal: RecordDetail = {
   your_office: null,
   your_office_label: null,
   files: [],
+  workflow_state: "approved",
+  workflow_state_label: "Approved",
+  current_holders: [],
+  can_act: [],
 };
 
 let shownRecord: RecordDetail = approvedProposal;
@@ -75,6 +79,8 @@ vi.mock("@/api/records", () => ({
     detail: vi.fn(() => Promise.resolve({ data: shownRecord })),
     incrementAccess: vi.fn(() => Promise.resolve({ data: {} })),
     similar: vi.fn(() => Promise.resolve({ data: { results: [] } })),
+    // The tracker panel loads itself; it has its own test file (IR-258).
+    tracker: vi.fn(() => Promise.reject(new Error("not under test"))),
     completeProposal: (id: number) => completeProposal(id),
   },
 }));

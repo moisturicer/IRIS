@@ -65,6 +65,7 @@ from core.enums import (
     DELETE_REVIEW_STATUSES,
     ClearanceStatus,
     Office,
+    Party,
     PipelineStatus,
     RecordTypeName,
     ReviewDecision,
@@ -737,6 +738,31 @@ def first_status_for(record) -> str:
         if type_name == RecordTypeName.PROPOSAL
         else PipelineStatus.RDCO_INTAKE
     )
+
+
+#: Where each record type enters, and who may decide it (ADR-021 §3, §9).
+#: Declared here because §9 puts them beside the table; IR-258's tracker is
+#: their first reader, and IR-260 makes submission and decisions read them
+#: too. Keyed by `RecordTypeName`; a type not listed takes the
+#: Thesis/Research route, as `first_status_for` already does.
+ENTRY_PARTY = {RecordTypeName.PROPOSAL: Party.ADVISER}
+DEFAULT_ENTRY_PARTY = Party.INTAKE
+DECIDING_PARTIES = {RecordTypeName.PROPOSAL: frozenset({Party.ADVISER, Party.RDCO})}
+DEFAULT_DECIDING_PARTIES = frozenset({Party.RDCO})
+
+
+def type_name_of(record) -> str:
+    return record.record_type.name if record.record_type else ""
+
+
+def entry_party_for(record) -> str:
+    """The party a record of this type is submitted to."""
+    return ENTRY_PARTY.get(type_name_of(record), DEFAULT_ENTRY_PARTY)
+
+
+def deciding_parties_for(record) -> frozenset:
+    """The parties with decision authority over a record of this type."""
+    return DECIDING_PARTIES.get(type_name_of(record), DEFAULT_DECIDING_PARTIES)
 
 
 def edge_for(status: str, event: WorkflowEvent) -> Edge | None:
