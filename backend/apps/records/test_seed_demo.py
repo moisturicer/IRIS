@@ -19,7 +19,7 @@ from io import StringIO
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from apps.accounts.models import User
 from apps.documents.models import RecordUpload, UploadSlot
@@ -37,12 +37,12 @@ from .management.commands.seed_demo import (
 )
 from .models import Record
 
-#: PBKDF2 is deliberately slow, and `seed_demo` hashes a password for every
-#: account on every run while these classes reseed per test. Left at the default
-#: this module alone accounted for minutes of the suite -- confirmed by
-#: interrupting a wedged run and landing in `django/utils/crypto.py`. Nothing
-#: here asserts anything about hashing, so a cheap hasher costs no coverage.
-FAST_HASHER = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+# PBKDF2 is deliberately slow, and `seed_demo` hashes a password for every
+# account on every run while these classes reseed per test. This module used to
+# carry its own `FAST_HASHER` and three `@override_settings` decorators for
+# that; IR-251 found the same cost across the whole suite and hoisted the swap
+# into `conftest.py::_use_fast_password_hashing`, so the local copies are gone
+# rather than left to say something the conftest already says.
 
 
 def seed(**kwargs):
@@ -56,7 +56,6 @@ def seed(**kwargs):
     call_command("seed_demo", stdout=StringIO(), **kwargs)
 
 
-@override_settings(PASSWORD_HASHERS=FAST_HASHER)
 class SeedDemoGuardTests(TestCase):
     """The refusal that keeps known-password accounts out of production."""
 
@@ -79,7 +78,6 @@ class SeedDemoGuardTests(TestCase):
         self.assertTrue(User.objects.filter(email=ADMIN_EMAIL).exists())
 
 
-@override_settings(PASSWORD_HASHERS=FAST_HASHER)
 class SeedDemoAccountTests(TestCase):
 
     def test_it_seeds_all_seven_accounts(self):
@@ -126,7 +124,6 @@ class SeedDemoAccountTests(TestCase):
         self.assertFalse(Record.objects.exists())
 
 
-@override_settings(PASSWORD_HASHERS=FAST_HASHER)
 class SeedDemoRecordTests(TestCase):
 
     #: Every state a reviewer or owner can be looking at. `pending_delete` is

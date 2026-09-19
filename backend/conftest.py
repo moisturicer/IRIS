@@ -34,6 +34,12 @@ def pytest_configure(config):
     and its tests are the only ones using Hypothesis, so an environment
     without it must still be able to collect and run everything else.
     """
+    # Before the Hypothesis work below, and deliberately not after it: that
+    # block returns early when Hypothesis is absent, and the hasher matters
+    # to the Django half of the suite whether or not Hypothesis is installed.
+    _use_fast_password_hashing()
+    _use_in_process_celery_broker()
+
     try:
         from testing.hypothesis_profiles import activate_profile
     except ImportError:
@@ -46,6 +52,110 @@ def pytest_configure(config):
         # this wrongly" error, so a typo reads as a one-line usage message
         # rather than an INTERNALERROR traceback.
         raise pytest.UsageError(str(exc)) from exc
+
+
+#: Every Django test that logs anyone in pays for a password hash, and PBKDF2
+#: is slow *on purpose* -- ~0.22s per call on a developer laptop, more on a
+#: throttled shared runner. `WorkflowCharacterisationBase.setUpTestData` alone
+#: builds six users, which is the 1.4-1.8s of *setup* that `--durations`
+#: attributes to the first test of each such class. Multiplied across the
+#: suite's classes this is the dominant cost: locally it takes apps/reviews
+#: plus the authorization matrix from 55s to 14s. How much of IR-251's
+#: 4h31m *CI* run it accounts for is not yet measured -- that number comes
+#: from the first green run on a runner, not from this laptop.
+#:
+#: `apps/records/test_seed_demo.py` already reached this conclusion for one
+#: module and fixed it there with `@override_settings`; this hoists the same
+#: decision to the whole suite rather than leaving it as a thing each module
+#: rediscovers.
+#:
+#: This is not weakening a gate. Nothing in the suite asserts which algorithm
+#: hashed a password -- `check_password` round-trips through whatever hasher
+#: is configured -- and the setting is a test-environment value that never
+#: reaches a deployment, where `config/settings/` keeps Django's default.
+FAST_PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+def _use_fast_password_hashing() -> None:
+    """Swap in the cheap hasher, if Django is importable.
+
+    Guarded like everything else here: the chunking domain's tests run in
+    environments with no Django at all, and must not be broken by a
+    performance tweak aimed at the Django-backed half of the suite.
+
+    `ImportError` only. A broader guard would also swallow the
+    `ImproperlyConfigured` that assigning to `settings` raises when
+    DJANGO_SETTINGS_MODULE or SECRET_KEY is wrong -- and pytest.ini is
+    explicit that booting Django eagerly at collection time is deliberate,
+    so that failure has to stay loud.
+
+    `reset_hashers` because assigning to `settings` does not fire the
+    `setting_changed` signal Django clears its hasher cache from. Nothing has
+    hashed anything this early, so the cache is empty either way; calling it
+    makes that correct by construction rather than by running order. It is a
+    signal receiver, so it takes the setting name as a keyword and ignores
+    any other -- passing it is not optional.
+    """
+    try:
+        from django.conf import settings
+        from django.contrib.auth.hashers import reset_hashers
+    except ImportError:
+        return
+
+    settings.PASSWORD_HASHERS = FAST_PASSWORD_HASHERS
+    reset_hashers(setting="PASSWORD_HASHERS")
+
+
+#: What `.delay()` publishes to during the test run. IR-251's measured cause of
+#: the 4h31m CI run: CI runs no Redis, so `CELERY_BROKER_URL` falls back to
+#: `redis://localhost:6379`, nothing listens there, and every `.delay()` blocks
+#: for ~20s retrying the result backend before raising. `send_email_async`
+#: catches that and sends synchronously, so the suite still passed -- it just
+#: paid ~20s per notification, and the workflow tests fire hundreds.
+#: Measured on the characterisation module, with the cheap hasher above: all 31
+#: tests in ~2 minutes with a reachable broker, 14 of 31 after 11 minutes without.
+#:
+#: Celery's in-process transport is the one `apps/ai/tests/test_celery_routing.py`
+#: already uses. A published task sits in memory and nothing consumes it, which
+#: is what every test except that one wants: none asserts that an email was
+#: delivered through the fallback (nothing reads `mail.outbox`), and tests that
+#: care about email patch `send_email_async` at the boundary. It also makes a
+#: run independent of whether the machine happens to have a Redis -- the
+#: backend container has one and CI does not, which is how the same suite took
+#: 20 minutes in one and hours in the other.
+TEST_CELERY_BROKER_URL = "memory://"
+TEST_CELERY_RESULT_BACKEND = "cache+memory://"
+
+
+def _use_in_process_celery_broker() -> None:
+    """Point Celery at its in-process transport, if Django is importable.
+
+    Set on `settings` because this project's Celery reads its configuration
+    from Django settings (`config/celery.py`, namespace ``CELERY``) and
+    ignores `app.conf.update` -- the trap IR-196 found. Nothing has been
+    dispatched this early, so there is no cached connection to drop.
+
+    **Asserted, never assumed.** If the app has already materialised its
+    configuration, the settings change would be silently ignored and the run
+    would crawl again; that has to fail the session, not slow it.
+    """
+    try:
+        from django.conf import settings
+        from config.celery import app as celery_app
+    except ImportError:
+        return
+
+    settings.CELERY_BROKER_URL = TEST_CELERY_BROKER_URL
+    settings.CELERY_RESULT_BACKEND = TEST_CELERY_RESULT_BACKEND
+    # Both, because the ~20s stall measured above is the *result backend*
+    # retrying, not the broker -- switching only one would still crawl.
+    actual = (celery_app.conf.broker_url, celery_app.conf.result_backend)
+    if actual != (TEST_CELERY_BROKER_URL, TEST_CELERY_RESULT_BACKEND):
+        raise pytest.UsageError(
+            "conftest could not point Celery at its in-process transport (it "
+            f"reads broker={actual[0]!r}, backend={actual[1]!r}); every .delay() "
+            "would block on an unreachable broker. See IR-251."
+        )
 
 
 def pytest_report_header(config):
