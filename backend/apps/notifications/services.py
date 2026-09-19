@@ -10,7 +10,6 @@ Design rules:
 """
 from django.conf import settings
 from core.enums import Office, PipelineStatus, RecordTypeName, ReviewDecision, ReviewStage, RoleName
-from core.permissions import get_role_name
 from core.utils import send_email_async
 from .models import Notification, NotificationType
 
@@ -494,10 +493,12 @@ def notify_proposal_completed(record, marked_by):
     """
     try:
         notif_type = _get_type("Record Approved")
+        # Keyed on the assignment, not the role: "your Adviser" is only true of
+        # the Adviser this record names.
         marked_by_label = (
             "your Adviser"
-            if get_role_name(marked_by) == RoleName.ADVISER
-            else "RDCO"
+            if record.adviser_id is not None and marked_by.pk == record.adviser_id
+            else RoleName.RDCO.label
         )
         message = (
             f'Your Proposal "{record.title}" has been marked as completed by {marked_by_label}. '
