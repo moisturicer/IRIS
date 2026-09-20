@@ -106,6 +106,69 @@ def embed_chunk_set(self, record_id: int, *, force: bool = False):
     }
 
 
+@shared_task(bind=True, max_retries=3)
+def index_record(self, record_id: int, *, force: bool = False):
+    """Both halves of one record's indexing, under one job (IR-282).
+
+    The backfill's unit of work. Summary and chunk vectors are separate
+    tasks for the day-to-day paths, because they are triggered by different
+    events; a corpus run is the one caller for which "this record" is the
+    unit, and giving it one ``EmbeddingJob`` per record is what lets an
+    operator answer "which records failed, and why" from a table rather than
+    from worker logs.
+
+    ``skip_existing`` is forced on for the summary and pending-only for the
+    chunks: a run that crashes at record 3,000 must not start from zero, and
+    re-embedding what a previous run already paid for is exactly the bill
+    this ticket exists to bound.
+    """
+    from apps.ai.indexing import embed_active_chunk_set, embed_record_summary
+
+    job = _claim_job(self, record_id)
+    try:
+        summary = embed_record_summary(
+            record_id, skip_existing=not force
+        )
+        chunks = embed_active_chunk_set(record_id, force=force)
+    except Exception as exc:
+        _fail_job(job, exc)
+        raise self.retry(exc=exc, countdown=60)
+
+    # A refusal on either half is a refusal for the record: half a record's
+    # vectors is the half-indexed state promotion exists to refuse.
+    refused = summary.refused or chunks.refused
+    _finish_job(
+        job,
+        _CombinedOutcome(
+            record_id=record_id,
+            refused=refused,
+            reason=summary.reason or chunks.reason,
+        ),
+    )
+    return {
+        "record_id": record_id,
+        "summary_embedded": summary.embedded,
+        "chunks_embedded": chunks.embedded,
+        "chunks_skipped": chunks.skipped,
+        "refused": refused,
+        "reason": summary.reason or chunks.reason,
+    }
+
+
+class _CombinedOutcome:
+    """The two halves' verdicts as one, for ``_finish_job``.
+
+    A tiny shim rather than a branch inside ``_finish_job``: that function
+    has one job — write a verdict onto a row — and teaching it about a second
+    shape is how it grows a third.
+    """
+
+    def __init__(self, record_id: int, refused: bool, reason: str) -> None:
+        self.record_id = record_id
+        self.refused = refused
+        self.reason = reason
+
+
 def _run_ingestion(self, extraction, force: bool) -> dict:
     """Chunk ``extraction`` and make the result the record's active chunk set.
 

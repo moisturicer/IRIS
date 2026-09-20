@@ -259,6 +259,7 @@ CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
+    "apps.ai.tasks.index_record": {"queue": "embedding"},
 }
 
 # ---- Static / Media -----------------------------------------------------
@@ -409,6 +410,28 @@ VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4"
 # which a migration ties to the active `EmbeddingSpace` row.
 VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-2")
 VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
+
+# ---- Embedding spend (IR-282) -------------------------------------------
+#
+# Indexing is metered per token, and `AI_CHUNK_MAX_TOKENS` counts whitespace
+# words rather than tokenizer tokens — about 44% under the real BPE count
+# (IR-243, deliberately not recalibrated ahead of IR-133's evidence). A
+# misconfigured ceiling therefore turns one corpus run into a large bill
+# quietly, which is the failure this pair of settings exists to bound.
+#
+# The ceiling is a refusal, not a warning: `backfill_embeddings` prints its
+# estimate and stops when the estimate exceeds this, and raising it is a
+# deliberate act by whoever is paying. 0 disables the guard.
+AI_EMBEDDING_TOKEN_CEILING = config(
+    "AI_EMBEDDING_TOKEN_CEILING", default=2_000_000, cast=int
+)
+# Approximate, and printed as approximate. Vendor pricing is not in this
+# repository's control, so this is a figure for deciding whether a run is
+# worth starting, never a quote. Voyage's contextualized-embedding list price
+# at the time of writing; check it before trusting a large number.
+AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
+    "AI_EMBEDDING_COST_PER_MILLION_TOKENS", default=0.18, cast=float
+)
 
 # AI_EMBEDDING_MODEL and AI_EMBEDDING_DIMENSIONS were removed by IR-280. They
 # named a second embedding model and dimension alongside the VOYAGE_EMBED_*
