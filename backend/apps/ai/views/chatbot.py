@@ -30,7 +30,7 @@ from rest_framework.views import APIView
 
 from apps.ai.answers.citations import NO_SOURCES, UNAVAILABLE
 from apps.ai.composition import composition_root
-from apps.ai.presentation import cited_record_ids, record_sources
+from apps.ai.presentation import citations, passage, record_sources
 
 MAX_QUESTION_LENGTH = 2000
 
@@ -56,10 +56,14 @@ NO_RESULTS_MESSAGE = (
     "different keywords, or browse Discover to see what is available."
 )
 
-DEGRADED_MESSAGE = (
-    "Search is running in fallback mode — these results came from keyword "
-    "matching rather than meaning, so weigh them accordingly."
-)
+#: No degradation *sentence* here, deliberately, and this is a reversal of a
+#: decision IR-283 made the other way. That version put the wording on the
+#: server so a client could not compose a second copy of it. Two surfaces then
+#: needed it phrased differently — "weigh this answer" in the chat, "weigh this
+#: summary" on a paper — which one server string cannot do without knowing
+#: which screen asked. So the contract is the *fact*, `degraded`, and the
+#: sentence belongs to whoever renders it, in one place per client
+#: (`components/PassageQuote.DegradedNotice`).
 
 
 class AIQueryThrottle(UserRateThrottle):
@@ -114,10 +118,7 @@ class ChatQueryView(APIView):
         # client composing its own sentence about how the backend retrieved
         # is a second wording of one fact, and the two drift.
         if mode == GENERATIVE_MODE:
-            body = {
-                "answer": answer.text,
-                "message": DEGRADED_MESSAGE if answer.degraded else None,
-            }
+            body = {"answer": answer.text, "message": None}
         elif mode == NO_RESULTS_MODE:
             body = {"answer": None, "message": NO_RESULTS_MESSAGE}
         else:
@@ -126,7 +127,10 @@ class ChatQueryView(APIView):
         return Response(
             {
                 **body,
-                "citations": cited_record_ids(answer.citations),
+                # A citation is an object: the record it belongs to, the page,
+                # and the quoted passage (IR-284). A bare record id asked a
+                # reader to find the sentence themselves.
+                "citations": citations(answer.citations),
                 # Every passage the model was shown, not only the cited ones:
                 # a reader who wants to check what IRIS read needs the list it
                 # read, and a vendor failure returns it with no answer at all.
@@ -145,11 +149,10 @@ class SemanticSearchView(APIView):
     Ranked retrieval without synthesis — the list behind an answer, from the
     same retriever, so what a reader browses is what an answer would cite.
 
-    **`top_k` bounds passages; `results` and `count` are records.** Several
-    passages can come from one paper, so `count` may now be smaller than
-    `top_k` for a query that used to return exactly `top_k` records. Said
-    here because it is a change in what an existing field means, not just in
-    what fills it — IR-284 puts the passages themselves on the wire.
+    **`results` and `count` are passages** (IR-284), where they used to be
+    records: several can come from one paper, and which passage matched is
+    the thing a reader is browsing for. `sources` carries the record cards
+    for those same passages, so nothing that had a card before loses one.
     """
 
     permission_classes = [IsAuthenticated]
@@ -164,13 +167,16 @@ class SemanticSearchView(APIView):
 
         limit = _parse_top_k(request.data.get("top_k"), 10)
         result = composition_root().retriever().retrieve(query, request.user, limit=limit)
-        results = record_sources(result.passages)
+        passages = [passage(p) for p in result.passages]
         return Response(
             {
-                "results": results,
-                "count": len(results),
+                "results": passages,
+                "count": len(passages),
+                # The cards for the records those passages came from, so a
+                # browsing reader sees whose work each quote is without a
+                # fetch per result.
+                "sources": record_sources(result.passages),
                 "degraded": result.degraded,
-                "message": DEGRADED_MESSAGE if result.degraded else None,
             }
         )
 

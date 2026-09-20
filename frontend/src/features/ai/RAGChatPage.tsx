@@ -24,24 +24,29 @@ import { ChatToolbar } from "./components/ChatToolbar";
 import { ConversationSidebar } from "./components/ConversationSidebar";
 import { SourceContextPanel } from "./components/SourceContextPanel";
 
-function newMessage(role: ChatMessage["role"], content: string, citations?: number[]): ChatMessage {
+function newMessage(
+  role: ChatMessage["role"],
+  content: string,
+  grounding: Pick<ChatMessage, "citations" | "sources" | "degraded"> = {},
+): ChatMessage {
   return {
     id:        crypto.randomUUID(),
     role,
     content,
-    citations,
+    ...grounding,
     createdAt: new Date().toISOString(),
   };
 }
 
-function latestCitationIds(messages: ChatMessage[]): number[] {
+/** The most recent reply that cited anything — what the sources panel shows. */
+function latestGrounded(messages: ChatMessage[]): ChatMessage | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (m.role === "assistant" && m.citations && m.citations.length > 0) {
-      return m.citations;
+      return m;
     }
   }
-  return [];
+  return null;
 }
 
 export default function RAGChatPage() {
@@ -57,8 +62,14 @@ export default function RAGChatPage() {
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
 
-  const citationIds = useMemo(() => latestCitationIds(messages), [messages]);
-  const sourcesAvailable = citationIds.length > 0;
+  // Read off the reply itself, so the panel cannot show one conversation's
+  // cards beside another's passages, and a reload restores both together
+  // (IR-284). The panel used to fetch a record per citation; the answer has
+  // already been told whose work each passage is.
+  const grounded = useMemo(() => latestGrounded(messages), [messages]);
+  const citations = grounded?.citations ?? [];
+  const sources = grounded?.sources ?? [];
+  const sourcesAvailable = citations.length > 0;
 
   const activeTitle =
     conversations.find((c) => c.id === activeId)?.title ?? "New chat";
@@ -189,19 +200,16 @@ export default function RAGChatPage() {
     setLoading(true);
     try {
       const { data } = await aiApi.ask(buildRagQuestion(nextMessages));
-      // ADR-008: a reader is told when an answer came the slow way. The
-      // wording is the server's — it arrives in `message` — so this renders
-      // the note rather than composing a second version of the same sentence
-      // that would drift from it.
-      const degradedNote =
-        data.degraded && data.answer && data.message
-          ? ["", "", `_${data.message}_`].join("\n")
-          : "";
       const body =
-        (data.answer ??
-          data.message ??
-          "No readable sources matched that question.") + degradedNote;
-      const assistantMsg = newMessage("assistant", body, data.citations);
+        data.answer ?? data.message ?? "No readable sources matched that question.";
+      // ADR-008: a reader is told when an answer came the slow way. Carried on
+      // the message rather than spliced into its markdown, so the bubble
+      // renders it as its own labelled note and a test can find it by name.
+      const assistantMsg = newMessage("assistant", body, {
+        citations: data.citations,
+        sources:   data.sources,
+        degraded:  data.degraded,
+      });
       const withReply = [...nextMessages, assistantMsg];
       setMessages(withReply);
       persist(activeId!, withReply, title);
@@ -271,7 +279,8 @@ export default function RAGChatPage() {
 
         <SourceContextPanel
           open={sourcesOpen}
-          citationIds={citationIds}
+          citations={citations}
+          sources={sources}
           onClose={() => setSourcesOpen(false)}
         />
       </div>

@@ -29,7 +29,6 @@ from apps.ai.providers.fakes import (
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import EmbeddingProvider, LLMProvider
 from apps.ai.resilience.circuit import CircuitOpen
-from apps.ai.views.chatbot import DEGRADED_MESSAGE
 from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
 from core.permissions import ROLE_STUDENT
@@ -199,7 +198,7 @@ class AskTests:
         assert body["mode"] == "generative"
         assert body["degraded"] is False
         assert body["answer"]
-        assert body["citations"] == [flood.pk]
+        assert [c["record_id"] for c in body["citations"]] == [flood.pk]
         assert [s["id"] for s in body["sources"]][0] == flood.pk
         assert body["sources"][0]["title"] == "Flood Prediction"
 
@@ -227,6 +226,99 @@ class AskTests:
     def test_an_anonymous_caller_is_refused(self):
         assert APIClient().post(reverse("ai-ask"), {"question": "x"},
                                 format="json").status_code in (401, 403)
+
+
+class PassagesOnTheWireTests:
+    """IR-284: a citation says which sentence, and which page.
+
+    The point of chunk-level retrieval from a reader's side. Asserted on the
+    response rather than on the domain object, because a citation that never
+    reaches the wire verifies nothing for anybody.
+    """
+
+    def test_a_citation_carries_its_record_page_and_quoted_passage(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client_for(reader), FLOOD_QUESTION).json()
+
+        citation, = body["citations"]
+        assert citation["marker"] == 1
+        assert citation["record_id"] == flood.pk
+        assert citation["record_title"] == "Flood Prediction"
+        assert citation["page"] == 4
+        assert citation["text"] == FLOOD_TEXT
+        # The trail the chunk carried, so a reader can see which section a
+        # quote came from without opening the paper.
+        assert citation["context_path"] == ["Flood Prediction", "Methods"]
+
+    def test_the_record_card_is_returned_alongside_the_passage(
+        self, embedder, space, client_for
+    ):
+        """So the interface renders its existing card without a second
+        request — which is what it does today, one fetch per citation."""
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client_for(reader), FLOOD_QUESTION).json()
+
+        source, = body["sources"]
+        assert source["id"] == flood.pk
+        assert source["title"] == "Flood Prediction"
+        assert source["abstract"]
+        assert source["authors"]
+
+    def test_search_returns_the_same_passage_shape(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = search(client_for(reader), FLOOD_QUESTION).json()
+
+        passage, = body["results"]
+        assert passage["record_id"] == flood.pk
+        assert passage["page"] == 4
+        assert passage["text"] == FLOOD_TEXT
+        assert passage["context_path"] == ["Flood Prediction", "Methods"]
+        assert body["count"] == 1
+        # Ranked retrieval carries the cards too, for the same reason the
+        # answer does.
+        assert [s["id"] for s in body["sources"]] == [flood.pk]
+
+    def test_a_passage_from_an_unreadable_record_is_never_on_the_wire(
+        self, embedder, space, client_for
+    ):
+        """Asserted here and not inherited from IR-283: the shape changed, and
+        a filter that was right about record ids can still be wrong about the
+        text those ids carry. This is the assertion that would catch a
+        citation quoting a draft it must never quote."""
+        author = make_user("author@cit.edu")
+        stranger = make_user("stranger@cit.edu")
+        make_record(title="Unpublished Flood Draft", text=FLOOD_TEXT, owner=author,
+                    status=PipelineStatus.DRAFT, embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            client = client_for(stranger)
+            answered = ask(client, FLOOD_QUESTION).json()
+            searched = search(client, FLOOD_QUESTION).json()
+
+        assert answered["citations"] == []
+        assert answered["sources"] == []
+        assert searched["results"] == []
+        assert searched["sources"] == []
+        # The text itself, not just the id: a payload that leaked the quote
+        # while withholding the record would still be a disclosure.
+        assert "rainfall gauge" not in str(answered)
+        assert "rainfall gauge" not in str(searched)
 
 
 # -- the security property ----------------------------------------------------
@@ -265,7 +357,8 @@ class VisibilityTests:
         with use_composition_root(root_with(embedder=embedder)):
             body = search(client_for(stranger), FLOOD_QUESTION).json()
 
-        assert [r["id"] for r in body["results"]] == [public.pk]
+        assert [r["record_id"] for r in body["results"]] == [public.pk]
+        assert [s["id"] for s in body["sources"]] == [public.pk]
 
     def test_a_refusal_is_indistinguishable_from_a_missing_record(
         self, embedder, space, client_for
@@ -320,14 +413,16 @@ class DegradationTests:
 
         assert answered["degraded"] is True
         assert answered["sources"], "full-text search still found the passage"
-        # IR-277 story 5: a reader is *told*, not just a flag a client may
-        # ignore. The answer was still written — the model was fine, only
-        # retrieval degraded — so the note has to ride alongside it.
+        # IR-277 story 5: a reader is *told*. What crosses the wire is the
+        # fact, not a sentence — the sentence is the client's, because "weigh
+        # this answer" and "weigh this summary" are different screens saying
+        # one thing (`components/PassageQuote.DegradedNotice`, asserted in
+        # `ChatMessageBubble.test.tsx`). The answer was still written: the
+        # model was fine, only retrieval degraded.
         assert answered["answer"]
-        assert answered["message"] == DEGRADED_MESSAGE
+        assert answered["mode"] == "generative"
         assert searched["degraded"] is True
-        assert searched["message"]
-        assert [r["title"] for r in searched["results"]] == ["Flood Prediction"]
+        assert [r["record_title"] for r in searched["results"]] == ["Flood Prediction"]
 
     def test_a_healthy_vendor_is_never_reported_as_degraded(
         self, embedder, space, client_for
@@ -340,7 +435,6 @@ class DegradationTests:
             body = search(client_for(reader), FLOOD_QUESTION).json()
 
         assert body["degraded"] is False
-        assert body["message"] is None
 
     def test_a_vendor_failure_never_fabricates_an_answer(
         self, embedder, space, client_for
