@@ -6,6 +6,8 @@ Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off
 
 **Revised 2026-09-20 (IR-281, IR-282) — recorded by an agent, awaiting a reviewer's acceptance.** Adds rule 4 below (chunks are embedded grouped by document, on the contextualized endpoint) and §Indexing operations (a spend ceiling and a promotion gate). Both record decisions that were taken while implementing IR-281 and IR-282 and that had no written basis; neither changes the vendor, the model, the store or the disclosure gate. Per CLAUDE.md §What AI does not decide, an agent may record these but may not accept them.
 
+**Revised 2026-09-21 — permits a development-only disclosure bypass (IR-317).** Adds §A development bypass below. The gate itself is unchanged; what is added is a narrow, loud, `DEBUG`-only way to stand beside it while [IR-250](https://citiris.atlassian.net/browse/IR-250) waits on decisions CIT-U has to make. Recorded by an agent and awaiting a reviewer's acceptance.
+
 **Revised 2026-09-20 — pins the reranker.** This ADR always said "Voyage rerank" without naming a model, and the deployed `.env` had drifted to `rerank-3` while the code default and every docstring referencing it said `rerank-2` — an undocumented choice contradicting a stale one, neither written down. Decided in a live operator session (manual end-to-end verification against a real dev corpus, this ADR's first): **`rerank-3`**, same price as `rerank-2` ($0.05/M tokens either way), so the choice was about not leaving code and environment disagreeing rather than about cost. The code default and `.env.example` are updated to match; nothing about the vendor, the embedding model, the store or the disclosure gate changes.
 
 **Extends [ADR-007](007-pgvector-vector-store.md)**, which decided the vector *store*. It does not supersede it — pgvector remains the store. This ADR decides the embedding and reranking *provider*, which ADR-007 left open and [ADR-006](006-minimum-rag-pipeline.md) described only as "a provider protocol."
@@ -112,6 +114,36 @@ Each tenant needs its own Voyage key, or the operator holds one and bills throug
 3. `VOYAGE_API_KEY` treated as a required production secret per CLAUDE.md's Environment and secrets rule — the application refuses to start without it rather than defaulting silently.
 
 [ADR-008](008-ai-degradation-to-fts.md)'s FTS fallback is the *only* fallback, for both a Voyage outage and a `DisclosurePolicy` refusal — the same mechanism, not two. **Search still works either way.**
+
+### A development bypass, added 2026-09-21 (IR-317)
+
+Requirement 1 above is working exactly as specified, and the consequence is that **nothing can be indexed at all**: `Record` carries no embargo field, an undetermined embargo is treated as an embargo, and so every record is refused. That is [IR-250](https://citiris.atlassian.net/browse/IR-250), and it cannot be closed by engineering — it turns on four questions CIT-U has to answer, with external lead time. Meanwhile the whole RAG feature set is being built and reviewed without anyone able to run it end to end outside a test harness.
+
+**This ADR permits a bypass for development, under conditions, and permits nothing else.**
+
+**What is explicitly not permitted: inventing a policy.** The shortcut this rules out is shipping a rule that merely sounds defensible — "published records are not embargoed" — because a plausible rule is *more* dangerous than a labelled bypass. It reads as a decision somebody made. Months on, nobody can separate CIT-U's actual policy from a placeholder added to unblock a sprint, and the placeholder has quietly become the policy. A switch named `BYPASS_FOR_DEVELOPMENT` can never be mistaken for one.
+
+**What is also not permitted: a schema change.** Adding `Record.embargoed_until` now looks like "add the missing fact," which is what this ADR would otherwise ask for, but a nullable column reads as `None` on every existing row and `None` means *known not embargoed*. That does not open the gate temporarily; it removes it permanently and silently, with nothing left to switch back. The field's shape is also IR-250's first open question. The bypass is therefore **runtime only**, so IR-250 later lands as one migration and a deliberate backfill.
+
+**The conditions, all four required.** The switch is not what makes this acceptable — these are:
+
+1. **It cannot run in production.** Set while `DEBUG=False`, the application raises `ImproperlyConfigured` and refuses to start. It takes the service down rather than quietly disabling a control, which is the same posture requirement 3 takes toward a missing `VOYAGE_API_KEY`.
+2. **It is loud while on** — a warning logged on every affected request, and a flag on `GET /api/v1/ai/status/` so the interface can say so and a demo screenshot labels itself.
+3. **It is off by default**, and both 1 and 2 are asserted by tests, so leaving it behind breaks the build rather than going unnoticed.
+4. **It points only at content already cleared to leave.** The dev corpus is public CIT-U papers deliberately loaded for the purpose. Pointing it at real unpublished student submissions is not permitted, which is why it must be removed **before [IR-278](https://citiris.atlassian.net/browse/IR-278) delivers a real corpus** — not merely before release.
+
+**Removal is IR-250.** When the embargo fact exists, the setting, its startup guard, the dev command and the status flag come out together.
+
+### One consequence of requirement 2 that just became live
+
+Requirement 2 records that Voyage's training opt-out **requires a payment method on file**, and that opting out is **not retroactive** — content sent before the toggle is flipped stays under the training license granted by ToS §3(iii).
+
+A payment method was added to the Voyage account on 2026-09-20. That removes the blocker on flipping the toggle, and it also means the question is now live rather than theoretical: **real CIT-U paper content was sent to Voyage on 2026-09-20** (records 29, 45, 54 and 55, during manual verification) — under a monkeypatched gate, before this section existed, and with the opt-out status not verified at the time.
+
+Two things follow, neither of which this ADR can settle by itself:
+
+* **The toggle should be confirmed flipped before the IR-317 bypass sends anything further.** A bypass that increases the volume of content going to a vendor while the training opt-out is unverified compounds exactly the exposure requirement 2 exists to bound.
+* **What was already sent cannot be un-sent.** That is a fact for a person to weigh, not an engineering task — it concerns three published CIT-U papers and one summary vector. It is recorded here rather than left in a terminal scrollback.
 
 ## Deployment Impact
 
