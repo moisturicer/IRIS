@@ -288,8 +288,16 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         GET /records/<id>/similar/ — related institutional works.
 
-        Reuses the Ask IRIS retrieval service, so "similar" means the same
-        ranking users get from search, over the same visibility predicate.
+        Ranks with `apps/ai/services/retrieval.search_records` — record-level
+        PostgreSQL FTS over `publicly_visible()`.
+
+        **That is no longer what Ask IRIS does.** IR-283 moved `/ai/ask/` and
+        `/ai/search/` onto chunk-level retrieval through `visible_to(user)`,
+        so this is now the last caller of the older, narrower path. It is
+        narrower rather than wider — it withholds records a reader may in fact
+        open, and leaks none — so it is drift rather than a breach. Moving it
+        onto the chunk retriever is IR-285's, which deletes the module this
+        imports.
         """
         from apps.ai.services.retrieval import search_records
 

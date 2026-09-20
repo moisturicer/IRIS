@@ -5,17 +5,36 @@ export interface SemanticSearchResult {
   authors:        string;          // comma-separated display string
   year:           number | null;
   classification: string | null;
-  /** PostgreSQL SearchRank. 0 when the substring fallback tier answered. */
+  /**
+   * The record's best passage score: cosine similarity, or the reranker's score when
+   * one ran, or a PostgreSQL SearchRank on the degraded path. Comparable within one
+   * response, not across them.
+   */
   score:          number;
 }
 
-/** Which synthesis path produced an answer — surfaced so the UI never implies more than ran. */
-export type AIAnswerMode = "generative" | "extractive" | "no_results" | "empty";
+/**
+ * What the ask endpoint actually did — surfaced so the UI never implies more than ran.
+ *
+ * `extractive` is gone as of IR-283. There is no longer a path that composes an
+ * answer out of the sources: when no model is reachable the answer is replaced
+ * by an explicit `unavailable` state and the sources are returned unsummarised,
+ * which is what ADR-008 asks for.
+ */
+export type AIAnswerMode = "generative" | "no_results" | "unavailable";
+
+/** The index answers are ranked against. Null before anything has been indexed. */
+export interface EmbeddingSpaceInfo {
+  id:          number;
+  model_id:    string;
+  dimensions:  number;
+  metric:      string;
+}
 
 export interface AIStatus {
-  retrieval:        string;
+  embedding_space:  EmbeddingSpaceInfo | null;
   generative:       boolean;
-  mode:             "generative" | "extractive";
+  /** Records with indexed passages that the asker may read. */
   indexed_records:  number;
 }
 
@@ -26,9 +45,11 @@ export interface AIAnswer {
   citations: number[];
   /** The retrieved records themselves, so the UI need not re-fetch each one. */
   sources:   SemanticSearchResult[];
-  /** Informational note (e.g. retrieval-only mode, or no matches). */
+  /** Informational note (e.g. no model reachable, or no matches). */
   message:   string | null;
   mode:      AIAnswerMode;
+  /** True when retrieval fell back to keyword matching because the vendor was out. */
+  degraded:  boolean;
 }
 
 export interface EmbeddingJobStatus {

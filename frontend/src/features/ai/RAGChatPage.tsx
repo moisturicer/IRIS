@@ -189,10 +189,18 @@ export default function RAGChatPage() {
     setLoading(true);
     try {
       const { data } = await aiApi.ask(buildRagQuestion(nextMessages));
+      // ADR-008: a reader is told when an answer came the slow way. The
+      // wording is the server's — it arrives in `message` — so this renders
+      // the note rather than composing a second version of the same sentence
+      // that would drift from it.
+      const degradedNote =
+        data.degraded && data.answer && data.message
+          ? ["", "", `_${data.message}_`].join("\n")
+          : "";
       const body =
-        data.answer ??
-        data.message ??
-        "No published record matched that question.";
+        (data.answer ??
+          data.message ??
+          "No readable sources matched that question.") + degradedNote;
       const assistantMsg = newMessage("assistant", body, data.citations);
       const withReply = [...nextMessages, assistantMsg];
       setMessages(withReply);
@@ -239,9 +247,9 @@ export default function RAGChatPage() {
             <div className="shrink-0 flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-800">
               <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
               <p>
-                <strong>Retrieval-only mode.</strong> IRIS ranks and quotes real records but no
-                language model is configured, so answers are not written prose. Set{" "}
-                <code className="font-mono">ANTHROPIC_API_KEY</code> to enable synthesis.
+                <strong>Retrieval-only mode.</strong> IRIS finds and ranks real passages, but no
+                answering model is configured, so it will return sources rather than a written
+                answer. Set <code className="font-mono">LLM_API_KEY</code> to enable synthesis.
               </p>
             </div>
           )}
