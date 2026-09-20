@@ -67,9 +67,34 @@ class EmbeddingOutcome:
     refused: bool = False
     reason: str = ""
 
+    #: True when only part of the document was sent, so the vectors were
+    #: contextualized against the changed passages rather than the whole
+    #: document. Carried on the outcome rather than left in a docstring
+    #: because the resulting vectors are indistinguishable from fully
+    #: contextualized ones, and a caller comparing retrieval quality across
+    #: a re-chunk needs to know which it is looking at.
+    partial_context: bool = False
+
     @property
     def spent_a_vendor_call(self) -> bool:
         return self.embedded > 0
+
+    def as_dict(self) -> dict:
+        """The shape a Celery task returns.
+
+        Here rather than built by hand in each task: two tasks assembling
+        the same six keys is two places to forget one, and a result dict
+        missing ``refused`` reads as a success.
+        """
+        return {
+            "record_id": self.record_id,
+            "space_id": self.space_id,
+            "embedded": self.embedded,
+            "skipped": self.skipped,
+            "refused": self.refused,
+            "reason": self.reason,
+            "partial_context": self.partial_context,
+        }
 
 
 def build_embedding_provider() -> EmbeddingProvider:
@@ -206,27 +231,37 @@ def embed_record_summary(
     return EmbeddingOutcome(record_id=record_id, space_id=space.id, embedded=1)
 
 
-def pending_chunks(record_id: int, space_id: int, *, force: bool = False) -> list:
-    """The active chunk set's chunks that have no vector in ``space_id`` yet.
+def active_chunks(record_id: int):
+    """A record's retrievable chunks: the active set, tombstones excluded.
 
-    Sequence order, because that is reading order and reading order is what
+    **The one definition of that phrase.** It was written out four times
+    across the indexing, planning and promotion code, and four copies of a
+    predicate is how a chunk ends up counted as owing by one of them and
+    finished by another — which, in a run that costs money per chunk, is a
+    bill and a half-indexed space rather than a wrong number.
+
+    Sequence order, because that is reading order, and reading order is what
     makes a contextualized embedding contextual — the model sees the chunks
     as a document, not as a bag.
+    """
+    from apps.ai.models.chunk import DocumentChunk
+
+    return DocumentChunk.objects.filter(
+        record_id=record_id,
+        chunk_set__is_active=True,
+        deleted_at__isnull=True,
+    ).order_by("sequence")
+
+
+def pending_chunks(record_id: int, space_id: int, *, force: bool = False) -> list:
+    """The active chunks that have no vector in ``space_id`` yet.
 
     A chunk whose text survived a re-chunk already carries its vector across
     (``DjangoChunkRepository._carry_vectors_over``), so "already has a row" is
     exactly the unchanged-text skip, with no second definition of unchanged to
     drift from the first.
     """
-    from apps.ai.models.chunk import ChunkSet, DocumentChunk
-
-    chunk_set = ChunkSet.objects.filter(record_id=record_id, is_active=True).first()
-    if chunk_set is None:
-        return []
-
-    chunks = DocumentChunk.objects.filter(
-        chunk_set=chunk_set, deleted_at__isnull=True
-    ).order_by("sequence")
+    chunks = active_chunks(record_id)
     if not force:
         chunks = chunks.exclude(embeddings__space_id=space_id)
     return list(chunks)
@@ -260,7 +295,7 @@ def embed_active_chunk_set(
     space = _checked_space(provider, space_id)
 
     chunks = pending_chunks(record_id, space.id, force=force)
-    total = _active_chunk_count(record_id)
+    total = active_chunks(record_id).count()
     if not chunks:
         # Nothing to pay for, so nothing to check a gate about and no reason
         # to load the record.
@@ -273,7 +308,7 @@ def embed_active_chunk_set(
             record_id=record_id, space_id=space.id, refused=True, reason=str(exc)
         )
 
-    vectors = provider.embed_document_chunks([group_texts(chunks)])[0]
+    vectors = provider.embed_document_chunks([chunk_texts(chunks)])[0]
     if len(vectors) != len(chunks):
         raise ValueError(
             f"The provider returned {len(vectors)} vectors for {len(chunks)} "
@@ -295,18 +330,8 @@ def embed_active_chunk_set(
         space_id=space.id,
         embedded=len(chunks),
         skipped=max(total - len(chunks), 0),
+        partial_context=len(chunks) < total,
     )
-
-
-def _active_chunk_count(record_id: int) -> int:
-    from apps.ai.models.chunk import ChunkSet, DocumentChunk
-
-    chunk_set = ChunkSet.objects.filter(record_id=record_id, is_active=True).first()
-    if chunk_set is None:
-        return 0
-    return DocumentChunk.objects.filter(
-        chunk_set=chunk_set, deleted_at__isnull=True
-    ).count()
 
 
 def estimate_pending_tokens(record_id: int, space_id: int) -> int:
@@ -324,10 +349,13 @@ def estimate_pending_tokens(record_id: int, space_id: int) -> int:
     )
 
 
-def group_texts(chunks: Sequence) -> list[str]:
-    """The texts a caller would send for ``chunks``, in order.
+def chunk_texts(chunks: Sequence) -> list[str]:
+    """What a caller sends to the vendor for ``chunks``, in order.
 
-    One line, but it names the decision — vectors come from ``text``, never
+    One line, but it names the decision — a vector comes from ``text``, never
     ``content`` — in a place a caller can reuse instead of rediscovering.
+    ``text`` is exactly what a vector was computed from and never changes;
+    ``content`` is what a citation shows a reader, and embedding that would
+    let the vector drift from the passage it indexes.
     """
     return [chunk.text for chunk in chunks]

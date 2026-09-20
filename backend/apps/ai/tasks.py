@@ -69,14 +69,7 @@ def embed_record(self, record_id: int, *, skip_existing: bool = False):
         raise self.retry(exc=exc, countdown=60)
 
     _finish_job(job, outcome)
-    return {
-        "record_id": outcome.record_id,
-        "space_id": outcome.space_id,
-        "embedded": outcome.embedded,
-        "skipped": outcome.skipped,
-        "refused": outcome.refused,
-        "reason": outcome.reason,
-    }
+    return outcome.as_dict()
 
 
 @shared_task(bind=True, max_retries=3)
@@ -96,14 +89,7 @@ def embed_chunk_set(self, record_id: int, *, force: bool = False):
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60)
 
-    return {
-        "record_id": outcome.record_id,
-        "space_id": outcome.space_id,
-        "embedded": outcome.embedded,
-        "skipped": outcome.skipped,
-        "refused": outcome.refused,
-        "reason": outcome.reason,
-    }
+    return outcome.as_dict()
 
 
 @shared_task(bind=True, max_retries=3)
@@ -122,7 +108,11 @@ def index_record(self, record_id: int, *, force: bool = False):
     re-embedding what a previous run already paid for is exactly the bill
     this ticket exists to bound.
     """
-    from apps.ai.indexing import embed_active_chunk_set, embed_record_summary
+    from apps.ai.indexing import (
+        EmbeddingOutcome,
+        embed_active_chunk_set,
+        embed_record_summary,
+    )
 
     job = _claim_job(self, record_id)
     try:
@@ -136,37 +126,23 @@ def index_record(self, record_id: int, *, force: bool = False):
 
     # A refusal on either half is a refusal for the record: half a record's
     # vectors is the half-indexed state promotion exists to refuse.
-    refused = summary.refused or chunks.refused
-    _finish_job(
-        job,
-        _CombinedOutcome(
-            record_id=record_id,
-            refused=refused,
-            reason=summary.reason or chunks.reason,
-        ),
+    combined = EmbeddingOutcome(
+        record_id=record_id,
+        space_id=chunks.space_id,
+        embedded=summary.embedded + chunks.embedded,
+        skipped=summary.skipped + chunks.skipped,
+        refused=summary.refused or chunks.refused,
+        reason=summary.reason or chunks.reason,
+        partial_context=chunks.partial_context,
     )
-    return {
-        "record_id": record_id,
+    _finish_job(job, combined)
+    return combined.as_dict() | {
+        # The split matters to an operator reading a failed run: a record
+        # whose summary embedded and whose chunks did not is a different
+        # problem from one that never started.
         "summary_embedded": summary.embedded,
         "chunks_embedded": chunks.embedded,
-        "chunks_skipped": chunks.skipped,
-        "refused": refused,
-        "reason": summary.reason or chunks.reason,
     }
-
-
-class _CombinedOutcome:
-    """The two halves' verdicts as one, for ``_finish_job``.
-
-    A tiny shim rather than a branch inside ``_finish_job``: that function
-    has one job — write a verdict onto a row — and teaching it about a second
-    shape is how it grows a third.
-    """
-
-    def __init__(self, record_id: int, refused: bool, reason: str) -> None:
-        self.record_id = record_id
-        self.refused = refused
-        self.reason = reason
 
 
 def _run_ingestion(self, extraction, force: bool) -> dict:

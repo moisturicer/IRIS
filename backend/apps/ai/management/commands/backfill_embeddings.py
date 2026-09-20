@@ -29,6 +29,7 @@ deletes them — that is a separate decision with a separate blast radius.
 """
 
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
 from apps.ai.backfill import (
     cost_per_million,
@@ -114,6 +115,7 @@ class Command(BaseCommand):
             space_id=space.id,
             space_model=space.model_id,
             cost_per_million=cost_per_million(),
+            include_summaries=options["space_id"] is None,
         )
         self._write_plan(plan)
 
@@ -162,6 +164,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  records considered   {len(plan.records)}")
         self.stdout.write(f"  records to embed     {len(plan.to_embed)}")
         self.stdout.write(f"  chunks to embed      {plan.chunk_count:,}")
+        self.stdout.write(f"  summaries to embed   {plan.summary_count}")
         self.stdout.write(
             f"  estimated tokens     {plan.estimated_tokens:,}  "
             f"(an upper bound, not a quote)"
@@ -223,9 +226,15 @@ class Command(BaseCommand):
         end and stays pending, so the next run picks it up.
         """
         from apps.ai.indexing import embed_active_chunk_set, embed_record_summary
+        from apps.ai.models import EmbeddingJob
 
         report = RunReport()
         for item in plan.to_embed:
+            # A job row per record, on the inline path as much as the queued
+            # one. Printing a failure to a terminal that is then closed is
+            # not a record of it, and IR-282 asks that a failed per-record
+            # job say why — which has to outlive the process that saw it.
+            job = EmbeddingJob.objects.create(record_id=item.record_id, status="running")
             try:
                 if space_id is None:
                     embed_record_summary(item.record_id, skip_existing=not force)
@@ -233,11 +242,23 @@ class Command(BaseCommand):
                     item.record_id, force=force, space_id=space_id
                 )
             except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+                job.status = "failed"
+                job.error = str(exc)
+                job.save(update_fields=["status", "error"])
                 report.record_failure(item.record_id, exc)
                 self.stdout.write(
                     self.style.ERROR(f"  record {item.record_id}: {exc}")
                 )
                 continue
+
+            if outcome.refused:
+                job.status = "failed"
+                job.error = outcome.reason
+                job.save(update_fields=["status", "error"])
+            else:
+                job.status = "done"
+                job.completed_at = timezone.now()
+                job.save(update_fields=["status", "completed_at"])
             report.record_outcome(outcome)
 
         self._write_report(report)
@@ -258,5 +279,6 @@ class Command(BaseCommand):
             for record_id, error in report.failed[:10]:
                 self.stdout.write(f"      record {record_id}: {error}")
             self.stdout.write(
-                "  Those records stay pending; re-running picks them up."
+                "  Those records stay pending; re-running picks them up, and "
+                "each carries an EmbeddingJob row saying why it failed."
             )

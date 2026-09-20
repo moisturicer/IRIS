@@ -24,6 +24,7 @@ from apps.ai.models import (
     EmbeddingSpace,
     EmbeddingSpaceState,
 )
+from apps.ai.models import EmbeddingJob, RecordEmbedding
 from apps.ai.models.chunk import ChunkEmbedding
 from apps.ai.promotion import PromotionRefused, promote, records_missing_vectors
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
@@ -227,6 +228,91 @@ class ResumeAndIdempotencyTests:
         assert not ChunkEmbedding.objects.filter(chunk__record=bad).exists()
 
 
+class SummaryBackfillTests:
+    """Stage 1 ranks records on `RecordEmbedding` before stage 2 ranks chunks
+    within them, so a record with complete chunks and no summary vector is
+    invisible to retrieval — and a plan keyed on pending chunks alone would
+    never walk it again."""
+
+    def test_a_record_whose_chunks_are_done_but_summary_is_missing_is_still_walked(
+        self, space
+    ):
+        record = _record(chunks=("alpha",))
+        embed_active_chunk_set(record.id, provider=_CountingEmbedder())
+        assert not RecordEmbedding.objects.filter(record=record).exists()
+
+        plan = plan_records(
+            [Record.objects.get(pk=record.id)],
+            space_id=space.id,
+            space_model=space.model_id,
+        )
+
+        assert [item.record_id for item in plan.to_embed] == [record.id]
+        assert plan.summary_count == 1
+
+        call_command("backfill_embeddings")
+        assert RecordEmbedding.objects.filter(record=record).exists()
+
+    def test_a_record_with_no_chunks_is_not_owed_a_summary(self, space):
+        """Otherwise every one of the 4,910 placeholders walks straight back
+        into the run the stub skip exists to keep them out of."""
+        record = Record.objects.create(title="Nothing uploaded")
+
+        plan = plan_records(
+            [record], space_id=space.id, space_model=space.model_id
+        )
+
+        assert plan.to_embed == ()
+        assert plan.summary_count == 0
+
+    def test_filling_a_pending_space_does_not_plan_summaries(self, space):
+        """`RecordEmbedding` has no space key, so a summary vector cannot
+        exist in two spaces at once."""
+        pending = EmbeddingSpace.objects.create(
+            model_id="voyage-context-4",
+            dimensions=VECTOR_COLUMN_DIMENSIONS,
+            state=EmbeddingSpaceState.PENDING,
+        )
+        _record(chunks=("alpha",))
+
+        plan = plan_records(
+            Record.objects.all(),
+            space_id=pending.id,
+            space_model=pending.model_id,
+            include_summaries=False,
+        )
+
+        assert plan.summary_count == 0
+
+
+class DurableFailureTests:
+    def test_an_inline_failure_is_written_down_not_only_printed(
+        self, space, monkeypatch
+    ):
+        """A terminal that is then closed is not a record of anything, and
+        IR-282 asks that a failed per-record job say why."""
+        bad = _record(title="Bad", chunks=("explode",))
+
+        monkeypatch.setattr(
+            "apps.ai.indexing.build_embedding_provider",
+            lambda: _CountingEmbedder(fail_on=("explode",)),
+        )
+        call_command("backfill_embeddings")
+
+        job = EmbeddingJob.objects.get(record_id=bad.id)
+        assert job.status == "failed"
+        assert "the vendor fell over" in job.error
+
+    def test_a_successful_record_closes_its_job(self, space):
+        record = _record(chunks=("alpha",))
+
+        call_command("backfill_embeddings")
+
+        job = EmbeddingJob.objects.get(record_id=record.id)
+        assert job.status == "done"
+        assert job.completed_at is not None
+
+
 class StubUploadTests:
     def test_a_record_whose_only_document_is_a_placeholder_is_named_as_such(self, space):
         """The 4,910 stubs are skipped by construction — they never extracted,
@@ -344,6 +430,28 @@ class PromotionTests:
 
         pending.refresh_from_db()
         assert pending.state == EmbeddingSpaceState.PENDING
+
+    def test_a_retired_space_cannot_be_promoted_back(self):
+        """`indexing._checked_space` already refuses to *write* to a retired
+        space; the two would otherwise disagree about the same row."""
+        retired = EmbeddingSpace.objects.create(
+            model_id="old-model",
+            dimensions=VECTOR_COLUMN_DIMENSIONS,
+            state=EmbeddingSpaceState.RETIRED,
+        )
+
+        with pytest.raises(PromotionRefused, match="retired"):
+            promote(retired)
+
+    def test_a_space_of_the_wrong_width_cannot_be_promoted(self):
+        wrong = EmbeddingSpace.objects.create(
+            model_id="voyage-context-4",
+            dimensions=512,
+            state=EmbeddingSpaceState.PENDING,
+        )
+
+        with pytest.raises(PromotionRefused, match="512 dimensions"):
+            promote(wrong)
 
     def test_a_retired_space_is_not_a_place_to_write_new_vectors(self, space):
         from django.core.exceptions import ImproperlyConfigured

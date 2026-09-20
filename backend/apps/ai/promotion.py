@@ -93,7 +93,29 @@ def promote(space) -> None:
     point at a space with ``on_delete=CASCADE``, so deleting one takes its
     vectors with it, and a rollback would then have nothing to roll back to.
     """
-    from apps.ai.models import EmbeddingSpace, EmbeddingSpaceState
+    from apps.ai.models import (
+        VECTOR_COLUMN_DIMENSIONS,
+        EmbeddingSpace,
+        EmbeddingSpaceState,
+    )
+
+    # Completeness is not the only thing that makes a space unfit to be
+    # live. A retired space is one the project has already decided against,
+    # and `indexing._checked_space` refuses to *write* to one — the two
+    # would otherwise disagree about the same row. A space whose width does
+    # not match the vector columns cannot hold a readable vector at all.
+    if space.state == EmbeddingSpaceState.RETIRED:
+        raise PromotionRefused(
+            f"Space {space.pk} is retired. Promoting one the project has "
+            f"already retired makes live what it decided against; create a "
+            f"new space instead."
+        )
+    if space.dimensions != VECTOR_COLUMN_DIMENSIONS:
+        raise PromotionRefused(
+            f"Space {space.pk} is {space.dimensions} dimensions but the "
+            f"vector columns hold {VECTOR_COLUMN_DIMENSIONS}. Queries against "
+            f"it would compare vectors of different widths."
+        )
 
     shortfalls = records_missing_vectors(space.id)
     if shortfalls:
