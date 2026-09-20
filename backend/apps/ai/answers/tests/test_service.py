@@ -4,6 +4,8 @@ Failure is injected through the ports, never by mocking a call sequence: what
 matters is what a reader ends up with, not which method ran in what order.
 """
 
+import logging
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -171,3 +173,95 @@ class VendorFailureTests:
 
         assert answer.degraded is True
         assert answer.is_grounded
+
+
+#: `apps` sets `propagate: False` in `config/settings/base.py`, so records
+#: never reach the root logger `caplog` attaches to by default. Setting the
+#: level alone does not fix it -- the handler has to go on this module's own
+#: logger, or every assertion below passes vacuously against an empty string.
+_SERVICE_LOGGER = "apps.ai.answers.service"
+
+
+@pytest.fixture
+def service_logs(caplog):
+    """`caplog`, actually wired to the logger under test."""
+    logger = logging.getLogger(_SERVICE_LOGGER)
+    logger.addHandler(caplog.handler)
+    caplog.set_level(logging.WARNING, logger=_SERVICE_LOGGER)
+    try:
+        yield caplog
+    finally:
+        logger.removeHandler(caplog.handler)
+
+
+class DriftTelemetryTests:
+    """The alarm for the *next* citation-format drift.
+
+    Two formats have now slipped past the parser, and both were found by a
+    person reading output by hand. The cost of that is an unknown number of
+    uncited answers between the drift and the day somebody notices. These
+    assert the log line exists, and -- more important -- that it stays quiet
+    when nothing is wrong, since an alarm that cries wolf is one that gets
+    muted and then ignored.
+    """
+
+    def test_an_answer_citing_nothing_with_unparsed_markers_warns(self, reader, service_logs):
+        record = make_record("Thesis")
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            # The shape a future drift takes: citation-like, unsupported.
+            _RecordingLLM("Sampling was weekly (1) and monthly <2>."),
+            permits=lambda r: True,
+        )
+
+        answer = service.answer("how often?", reader)
+
+        assert not answer.is_grounded
+        assert "may have drifted to an unsupported format" in service_logs.text
+        assert "(1)" in service_logs.text, "the unparsed shape is named, not just counted"
+
+    def test_a_declining_answer_does_not_warn(self, reader, service_logs):
+        """The one honest reason to cite nothing. The prompt explicitly asks
+        for this, so alerting on it would train whoever reads the logs to stop
+        reading them."""
+        record = make_record("Thesis")
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _RecordingLLM("The sources do not cover this question."),
+            permits=lambda r: True,
+        )
+
+        answer = service.answer("unrelated?", reader)
+
+        assert not answer.is_grounded
+        assert service_logs.text == ""
+
+    def test_a_properly_cited_answer_does_not_warn(self, reader, service_logs):
+        record = make_record("Thesis")
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _RecordingLLM("Sampling was weekly [1]."),
+            permits=lambda r: True,
+        )
+
+        answer = service.answer("how often?", reader)
+
+        assert answer.is_grounded
+        assert service_logs.text == ""
+
+    def test_an_answer_citing_nothing_with_no_markers_at_all_still_warns(
+        self, reader, service_logs
+    ):
+        """Quieter than the drift case -- no shape to name -- but still worth
+        saying: the model was handed sources, told to cite them, wrote an
+        answer, declined nothing, and cited nothing."""
+        record = make_record("Thesis")
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _RecordingLLM("Sampling happened regularly throughout the year."),
+            permits=lambda r: True,
+        )
+
+        service.answer("how often?", reader)
+
+        assert "no citation-shaped markers were found" in service_logs.text

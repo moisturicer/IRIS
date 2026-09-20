@@ -8,6 +8,7 @@ from apps.ai.answers.citations import (
     GroundedAnswer,
     build_prompt,
     parse_citations,
+    unresolved_marker_candidates,
 )
 from apps.ai.retrieval.ports import RetrievedChunk
 
@@ -235,3 +236,49 @@ class GroundedAnswerTests:
         able to tell before presenting it as evidence."""
         answer = GroundedAnswer(text="The sources do not cover this.", citations=())
         assert answer.is_grounded is False
+
+
+class UnresolvedMarkerDetectionTests:
+    """The loose net that makes the *next* format drift visible.
+
+    Not a resolver and not allowed to become one: it reports what tried to be
+    a citation and failed, so a log line can name the new shape instead of a
+    person finding it by reading transcripts, which is how the previous two
+    were caught.
+    """
+
+    def test_a_resolved_marker_is_not_reported_as_unresolved(self):
+        """The trap this function is written around: a resolved marker is
+        rewritten to canonical `[n]`, which the loose pattern matches happily.
+        Matching on spans of the raw answer rather than the cleaned text is
+        what stops every healthy answer becoming an alert."""
+        assert unresolved_marker_candidates("Yes [1] and also【2】.") == ()
+
+    def test_a_suffixed_marker_now_supported_is_not_reported(self):
+        assert unresolved_marker_candidates("TAKV spreads traffic【1†L1-L5】.") == ()
+
+    def test_an_unsupported_bracket_style_is_reported(self):
+        """The shape of a future drift: something citation-like that `_MARKER`
+        deliberately does not accept."""
+        assert unresolved_marker_candidates("Yes (1) and <2>.") == ("(1)", "<2>")
+
+    def test_a_marker_whose_suffix_exceeds_the_bound_is_reported(self):
+        """`_MARKER` bounds its suffix at 64 characters, so a longer one stops
+        being a citation -- and this is what makes that silent refusal loud."""
+        answer = f"Yes【1†{'x' * 200}】."
+        candidates = unresolved_marker_candidates(answer)
+        assert len(candidates) == 1 and candidates[0].startswith("【1†xxx")
+
+    def test_a_mismatched_bracket_pair_is_reported(self):
+        assert unresolved_marker_candidates("Yes [1】.") == ("[1】",)
+
+    def test_ordinary_prose_with_numbers_is_not_reported(self):
+        """False positives are affordable here but not free -- a detector that
+        fires on every year and every measurement is one nobody reads."""
+        prose = "Drying took (3 days) in 2026, at a cost of (2026) pesos, per Table 4."
+        assert unresolved_marker_candidates(prose) == ()
+
+    def test_the_leading_digit_limit_is_real(self):
+        """Stated in the docstring rather than discovered later: a marker that
+        does not lead with its number is invisible to this."""
+        assert unresolved_marker_candidates("Yes [ref:1].") == ()
