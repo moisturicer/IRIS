@@ -37,11 +37,30 @@ from apps.ai.retrieval.ports import RetrievedChunk
 #: model produces and which a reader would have to squint at to call a
 #: citation. Each branch captures the digits, so exactly one group is ever
 #: populated -- `keep` takes whichever that is.
+#:
+#: `_SUFFIX` tolerates trailing content between the number and the close --
+#: observed live, 2026-09-20: gpt-oss-120b sometimes appends an OpenAI-style
+#: file/line-range suffix to a lenticular marker, `【1†L1-L5】` rather than
+#: `【1】`. Against the pattern with no suffix allowance, every citation in an
+#: answer using that form resolved to nothing: zero citations, and the raw
+#: marker left sitting in the text a reader sees.
+#:
+#: **Every bracket character is excluded, opening as well as closing, and the
+#: length is bounded.** Excluding only the closing brackets is the obvious
+#: version and it is wrong: on an unclosed marker the suffix runs straight
+#: across the prose to the next close, so
+#: `A【1†L1-L5 and more prose 【2】` resolved to `A[1]` -- the model's own
+#: words deleted from what the reader sees, and the genuine `【2】` swallowed.
+#: Dropping a citation is this module's stated failure direction; eating a
+#: sentence is not. A real suffix is under ten characters (`†L13-L16`), so 64
+#: is generous even for a filename-bearing variant while keeping the damage
+#: from any pathological input bounded.
 _NUMBERS = r"\d+(?:\s*,\s*\d+)*"
+_SUFFIX = r"[^\[\]【】［］]{0,64}"
 _MARKER = re.compile(
-    rf"\[\s*({_NUMBERS})\s*\]"
-    rf"|【\s*({_NUMBERS})\s*】"
-    rf"|［\s*({_NUMBERS})\s*］"
+    rf"\[\s*({_NUMBERS})\s*{_SUFFIX}\]"
+    rf"|【\s*({_NUMBERS})\s*{_SUFFIX}】"
+    rf"|［\s*({_NUMBERS})\s*{_SUFFIX}］"
 )
 
 SYSTEM_PROMPT = (

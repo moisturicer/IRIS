@@ -141,6 +141,89 @@ class NonAsciiMarkerTests:
         assert text == "Yes [1】."
 
 
+class TrailingSuffixMarkerTests:
+    """gpt-oss-120b sometimes appends an OpenAI-style file/line-range suffix
+    to a lenticular marker -- `【1†L1-L5】` rather than `【1】`.
+
+    Observed live, 2026-09-20, in a manual end-to-end verification session
+    against a real corpus (MeshKV, record 54): every citation in an answer
+    using this form resolved to nothing -- `citations: []` on the wire -- with
+    the raw marker left sitting in the reader's text. The strings below are
+    the actual markers the model produced that run, not invented cases.
+    """
+
+    def test_a_marker_with_a_line_range_suffix_resolves(self):
+        text, citations = parse_citations(
+            "TAKV spreads traffic across the mesh【1†L1-L5】.", [chunk(1)]
+        )
+        assert [c.marker for c in citations] == [1]
+        assert "【" not in text and "[1]" in text
+
+    def test_several_suffixed_markers_resolve_in_order(self):
+        _, citations = parse_citations(
+            "MESHKV achieves a 1.35x speed-up【1†L13-L16】 over SHARED【2†L1-L3】.",
+            [chunk(1), chunk(2)],
+        )
+        assert [c.marker for c in citations] == [1, 2]
+
+    def test_the_ascii_bracket_form_with_a_suffix_also_resolves(self):
+        """Only the lenticular form has been observed carrying a suffix, but
+        nothing in the prompt tells the model which bracket style gets one --
+        tolerating it on all three keeps the alternatives symmetric rather
+        than encoding an assumption about which shape appears next."""
+        text, citations = parse_citations("Yes [1†L1-L4].", [chunk(1)])
+        assert [c.marker for c in citations] == [1]
+        assert "[1]" in text
+
+    def test_a_suffixed_marker_out_of_range_is_still_dropped(self):
+        text, citations = parse_citations("Yes【7†L1-L2】.", [chunk(1)])
+        assert citations == ()
+        assert "7" not in text
+
+    def test_existing_plain_markers_are_unaffected(self):
+        """The suffix is optional trailing content, not a new marker shape --
+        a marker with nothing after the number must parse exactly as before."""
+        text, citations = parse_citations("Drying took 3 days【1】.", [chunk(1)])
+        assert [c.marker for c in citations] == [1]
+        assert "【" not in text and "[1]" in text
+
+    def test_an_unclosed_marker_does_not_eat_the_sentence_after_it(self):
+        """The regression this suffix allowance nearly shipped.
+
+        With the suffix excluding only *closing* brackets, an unclosed `【`
+        ran across the prose to the next close: `A【1†L1-L5 and more prose
+        【2】` resolved to `A[1]`, deleting the model's own words and
+        swallowing the genuine second marker. Dropping a citation is this
+        module's failure direction; eating a sentence is not.
+        """
+        text, citations = parse_citations(
+            "A【1†L1-L5 and more prose 【2】 end", [chunk(1), chunk(2)]
+        )
+        assert "and more prose" in text, "the model's words must survive"
+        assert [c.marker for c in citations] == [2], "the closed marker resolves"
+
+    def test_a_suffix_cannot_span_a_bracket_of_any_style(self):
+        """A suffix stops at the next bracket character, opening or closing,
+        of any of the three styles -- so no marker's suffix can reach into
+        another marker and consume it.
+
+        The malformed `【1†see [` never closes and resolves to nothing. The
+        `[2]` sitting inside it is a well-formed marker in its own right, so
+        it does resolve -- which is the safe outcome: the reader keeps every
+        word, and the only thing cited is something that genuinely looks like
+        a citation.
+        """
+        text, citations = parse_citations("A【1†see [2]】 end", [chunk(1), chunk(2)])
+        assert [c.marker for c in citations] == [2]
+        assert "see" in text and "【1†" in text, "nothing is eaten"
+
+    def test_a_suffix_longer_than_the_bound_is_not_a_citation(self):
+        """The length bound keeps a pathological input from matching at all
+        rather than letting it consume an unbounded run of text."""
+        _, citations = parse_citations(f"A【1†{'x' * 200}】 end", [chunk(1)])
+        assert citations == ()
+
+
 class GroundedAnswerTests:
     def test_an_answer_with_citations_is_grounded(self):
         answer = GroundedAnswer(text="Yes [1].", citations=(object(),))
