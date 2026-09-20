@@ -258,6 +258,7 @@ CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
     "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
+    "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
 }
 
 # ---- Static / Media -----------------------------------------------------
@@ -428,6 +429,12 @@ DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:500
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.
 DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)
+# Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
+# path off the gateway — it posted to a route the gateway never registered, at
+# an endpoint returning no vector field — and Django now embeds in-process
+# through the `EmbeddingProvider` port. The setting stays because ADR-014
+# keeps the service for its streaming-chat mandate, which is still gated on
+# that ADR's preconditions plus ADR-017's ASGI deployment.
 AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:8001") # AI Gateway endpoint
 
 # ---- Chunking (ADR-013) --------------------------------------------------

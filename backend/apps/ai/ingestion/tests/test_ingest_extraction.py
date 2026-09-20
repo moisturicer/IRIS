@@ -312,6 +312,43 @@ def test_the_task_produces_an_active_chunk_set(space, upload, extraction):
     assert result.result["chunk_count"] == active.chunks.count()
 
 
+def test_a_chunking_run_queues_the_vectors_it_leaves_owing(
+    monkeypatch, space, upload, extraction
+):
+    """IR-281: an upload reaches chunk vectors with no manual step.
+
+    Queued rather than embedded inline — chunking runs on the `default`
+    queue and embedding is metered, so they carry separate budgets. Asserted
+    on the enqueue and not on the vectors, because what this task owes the
+    next stage is a message; what the next stage does with it is tested
+    where that stage lives.
+    """
+    queued = []
+    monkeypatch.setattr(
+        "apps.ai.tasks.embed_chunk_set.delay", lambda record_id: queued.append(record_id)
+    )
+
+    chunk_extraction.apply(args=[extraction.id])
+
+    assert queued == [upload.record_id]
+
+
+def test_a_re_run_that_writes_nothing_queues_no_embedding(
+    monkeypatch, space, upload, extraction
+):
+    """The duplicate path costs one indexed lookup; it must not also cost a
+    message that wakes a metered worker up to find nothing to do."""
+    chunk_extraction.apply(args=[extraction.id])
+
+    queued = []
+    monkeypatch.setattr(
+        "apps.ai.tasks.embed_chunk_set.delay", lambda record_id: queued.append(record_id)
+    )
+    chunk_extraction.apply(args=[extraction.id])
+
+    assert queued == []
+
+
 def test_the_task_uses_the_configured_defaults(settings, space, upload, extraction):
     """The token ceiling is a deployment decision, per IR-116's exit
     criterion — so it has to reach the pipeline from settings."""
