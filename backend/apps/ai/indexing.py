@@ -89,29 +89,51 @@ def build_embedding_provider() -> EmbeddingProvider:
     return VoyageEmbeddingProvider()
 
 
-def _checked_space(provider: EmbeddingProvider):
-    """The active ``EmbeddingSpace``, having checked everything that can be
-    checked for free.
+def _checked_space(provider: EmbeddingProvider, space_id: Optional[int] = None):
+    """The ``EmbeddingSpace`` to write into, having checked everything that
+    can be checked for free.
 
-    Two assertions, not one. ``assert_embedding_space_consistent`` compares
-    the space against the *schema* — what the vector columns can hold.  This
-    then compares the space against the *provider* — what the vendor is about
-    to be asked to emit. They are different mistakes: the first writes a
-    vector the column rejects, the second writes one it accepts and that means
-    something else, which is the kind that returns plausible rankings forever.
+    Three assertions, not one. ``assert_embedding_space_consistent`` compares
+    the *active* space against the schema — what the vector columns can hold.
+    The target space, when it is not the active one, is compared against the
+    same columns. Then the space is compared against the *provider* — what the
+    vendor is about to be asked to emit. They are different mistakes: the
+    first two write a vector the column rejects, the third writes one it
+    accepts and that means something else, which is the kind that returns
+    plausible rankings forever.
+
+    ``space_id`` names a space other than the active one, which is how
+    IR-282's backfill fills a **pending** space before promoting it. A
+    retired space is refused outright: writing new vectors into one is
+    indexing into a space nothing will ever read.
     """
     from apps.ai.models import (
         VECTOR_COLUMN_DIMENSIONS,
+        EmbeddingSpace,
+        EmbeddingSpaceState,
         assert_embedding_space_consistent,
         get_active_embedding_space,
     )
 
     assert_embedding_space_consistent(VECTOR_COLUMN_DIMENSIONS, context="indexing")
-    space = get_active_embedding_space()
+    if space_id is None:
+        space = get_active_embedding_space()
+    else:
+        space = EmbeddingSpace.objects.get(pk=space_id)
+        if space.state == EmbeddingSpaceState.RETIRED:
+            raise ImproperlyConfigured(
+                f"EmbeddingSpace {space_id} is retired. Indexing into a space "
+                f"no query path reads spends money for nothing."
+            )
+        if space.dimensions != VECTOR_COLUMN_DIMENSIONS:
+            raise ImproperlyConfigured(
+                f"EmbeddingSpace {space_id} is {space.dimensions} dimensions "
+                f"but the vector columns hold {VECTOR_COLUMN_DIMENSIONS}."
+            )
     if provider.dimensions != space.dimensions:
         raise ImproperlyConfigured(
             f"The embedding provider emits {provider.dimensions} dimensions "
-            f"but the active space {space.model_id!r} is {space.dimensions}. "
+            f"but space {space.pk} ({space.model_id!r}) is {space.dimensions}. "
             f"Refusing before the vendor call rather than after it."
         )
     return space
@@ -215,6 +237,7 @@ def embed_active_chunk_set(
     *,
     provider: Optional[EmbeddingProvider] = None,
     force: bool = False,
+    space_id: Optional[int] = None,
 ) -> EmbeddingOutcome:
     """Embed the chunks of ``record_id``'s active chunk set that lack a vector.
 
@@ -234,7 +257,7 @@ def embed_active_chunk_set(
     from apps.records.models import Record
 
     provider = provider or build_embedding_provider()
-    space = _checked_space(provider)
+    space = _checked_space(provider, space_id)
 
     chunks = pending_chunks(record_id, space.id, force=force)
     total = _active_chunk_count(record_id)
