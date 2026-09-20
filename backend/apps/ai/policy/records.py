@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Optional
 
-from .disclosure import DisclosureInputs, EmbargoUnknown
+from .disclosure import Decision, DisclosureInputs, EmbargoUnknown, may_disclose
 
 
 def inputs_for_record(record: Any, today: Optional[date] = None) -> DisclosureInputs:
@@ -38,3 +38,16 @@ def inputs_for_record(record: Any, today: Optional[date] = None) -> DisclosureIn
         consent_given=bool(record.dpa_accepted),
         today=today if today is not None else date.today(),
     )
+
+
+def decision_for_record(record: Any, today: Optional[date] = None) -> Decision:
+    """The gate's verdict on a record, as one call.
+
+    The two steps are separable and stay separable — that is what keeps the
+    policy testable without a database. But every caller that enforces the
+    gate wants both, and a caller assembling them itself is a caller that can
+    assemble them wrongly: passing a ``Record`` where inputs belong type-checks
+    at runtime right up to the point where ``is_ip`` is read off a dataclass
+    that has one.
+    """
+    return may_disclose(inputs_for_record(record, today))

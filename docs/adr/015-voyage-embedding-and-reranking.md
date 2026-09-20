@@ -134,6 +134,13 @@ Requirement 1 above is working exactly as specified, and the consequence is that
 
 **Removal is IR-250.** When the embargo fact exists, the setting, its startup guard, the dev command and the status flag come out together.
 
+#### Two divergences in the implementation, recorded rather than reconciled (2026-09-21)
+
+Both surfaced in review of IR-317 and are named here because CLAUDE.md §Source-of-truth hierarchy asks for the contradiction to be written down rather than smoothed over. Recorded by an agent; a reviewer decides whether to accept them or to change the code.
+
+1. **`index_with_disclosure_bypass --force` runs with `DEBUG` off.** Condition 1 above says the bypass cannot run in production. The *setting* honours that absolutely — Django refuses to start. The *command* does not: it follows `seed_demo` and `load_corpus`'s refuse-unless-`DEBUG`-unless-`--force` pattern, which IR-317's acceptance criteria asked for explicitly. The distinction being relied on is that a command is run deliberately by a person at a terminal, while a setting travels in an environment file and runs unattended — but that distinction is this note's, not condition 1's. If it is not accepted, `--force` should go.
+2. **The status flag reports the setting, not the command.** Condition 2 asks that the bypass be visible on `GET /api/v1/ai/status/`. It reports `AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT`, so a corpus indexed by the command on a deployment with the setting off is *not* self-labelling — the index was built without an embargo check and nothing in the API says so. Making it honest needs a durable fact about how a vector was produced, which is schema, and schema is what this bypass refuses to add. The command prints the gap in its own pre-send warning instead.
+
 ### One consequence of requirement 2 that just became live
 
 Requirement 2 records that Voyage's training opt-out **requires a payment method on file**, and that opting out is **not retroactive** — content sent before the toggle is flipped stays under the training license granted by ToS §3(iii).

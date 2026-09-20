@@ -69,6 +69,13 @@ export interface AIStatus {
   generative:       boolean;
   /** Records with indexed passages that the asker may read. */
   indexed_records:  number;
+  /**
+   * True while ADR-015's disclosure gate is bypassed for development
+   * (IR-317). Answers are being produced over content that no embargo check
+   * cleared, so the interface says so rather than letting a screenshot look
+   * like a shipped configuration. Removed with the bypass, by IR-250.
+   */
+  disclosure_bypass: boolean;
 }
 
 export interface AIAnswer {

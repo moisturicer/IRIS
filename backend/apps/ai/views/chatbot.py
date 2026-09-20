@@ -195,6 +195,7 @@ class AIStatusView(APIView):
 
         from apps.ai.models import get_active_embedding_space
         from apps.ai.models.chunk import ChunkEmbedding
+        from apps.ai.policy.bypass import bypass_enabled
         from apps.records.models import Record
 
         try:
@@ -236,5 +237,9 @@ class AIStatusView(APIView):
                 # path: a raw corpus total would tell an asker how many
                 # records exist that they cannot see.
                 "indexed_records": indexed_records,
+                # Reported so the interface can say the gate is off and a demo
+                # screenshot labels itself (IR-317, ADR-015 §A development
+                # bypass condition 2). Removed with the bypass, by IR-250.
+                "disclosure_bypass": bypass_enabled(),
             }
         )

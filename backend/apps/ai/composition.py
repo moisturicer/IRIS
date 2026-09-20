@@ -185,6 +185,17 @@ def composition_root() -> CompositionRoot:
     return _installed if _installed is not None else CompositionRoot()
 
 
+def composition_root_installed() -> bool:
+    """Whether something has replaced the default root.
+
+    Asked by anything that would install one *only if nobody else has* — the
+    development bypass (IR-317) does, so a process that reaches
+    ``AppConfig.ready()`` twice cannot reinstall a permissive root over a root
+    a caller deliberately set.
+    """
+    return _installed is not None
+
+
 def install_composition_root(root: Optional[CompositionRoot]) -> None:
     """Replace the root. ``None`` restores the default."""
     global _installed

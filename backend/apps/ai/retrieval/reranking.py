@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional, Sequence
 
-from apps.ai.policy import inputs_for_record, may_disclose
+from apps.ai.policy import decision_for_record
 from apps.ai.providers.noop import NoOpReranker
 from apps.ai.providers.ports import Reranker
 from apps.records.models import Record
@@ -38,7 +38,7 @@ def disclosure_permits(record: Record) -> bool:
     allowing path without patching a module or faking a dataclass, and how a
     caller with a different notion of disclosure supplies one.
     """
-    return may_disclose(inputs_for_record(record)).allowed
+    return decision_for_record(record).allowed
 
 
 class RerankingRetriever(Retriever):
