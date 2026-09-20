@@ -62,6 +62,36 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     your_office    = serializers.SerializerMethodField()
     your_office_label = serializers.SerializerMethodField()
     files          = serializers.SerializerMethodField()
+    # Derived from the routing tables, never stored (ADR-021 §4, IR-258).
+    workflow_state       = serializers.SerializerMethodField()
+    workflow_state_label = serializers.SerializerMethodField()
+    current_holders      = serializers.SerializerMethodField()
+    can_act              = serializers.SerializerMethodField()
+
+    def _workflow(self, obj):
+        """
+        The three workflow fields, computed once per record. `can_act` depends
+        on the viewer, so it comes from the request like `your_office` does.
+        """
+        cache = self.__dict__.setdefault("_workflow_cache", {})
+        if obj.pk not in cache:
+            from apps.reviews.tracker import workflow_fields
+
+            request = self.context.get("request")
+            cache[obj.pk] = workflow_fields(obj, getattr(request, "user", None))
+        return cache[obj.pk]
+
+    def get_workflow_state(self, obj):
+        return self._workflow(obj)["workflow_state"]
+
+    def get_workflow_state_label(self, obj):
+        return self._workflow(obj)["workflow_state_label"]
+
+    def get_current_holders(self, obj):
+        return self._workflow(obj)["current_holders"]
+
+    def get_can_act(self, obj):
+        return self._workflow(obj)["can_act"]
 
     def get_reviews(self, obj):
         from apps.reviews.models import Review
@@ -164,6 +194,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "your_office", "your_office_label",
+            "workflow_state", "workflow_state_label", "current_holders", "can_act",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

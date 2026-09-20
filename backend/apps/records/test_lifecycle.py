@@ -155,16 +155,31 @@ class TableStructureTests(SimpleTestCase):
                         lifecycle.edge_for(status, WorkflowEvent.APPROVE)
                     )
 
-    def test_every_gate_can_be_declined_and_rejected(self):
+    def test_every_gate_can_be_declined(self):
         """
-        The decline/reject pair is ADR-003's foundation: a decline invites a
-        resubmission, a rejection is terminal. A gate offering only one of them
-        would silently remove that choice from a reviewer.
+        A decline invites a resubmission, which is ADR-003's foundation. Every
+        gate, deciding or not, can ask for revision.
         """
         for status in STAGES:
-            for event in (WorkflowEvent.DECLINE, WorkflowEvent.REJECT):
-                with self.subTest(status=status, event=event):
-                    self.assertIsNotNone(lifecycle.edge_for(status, event))
+            with self.subTest(status=status):
+                self.assertIsNotNone(lifecycle.edge_for(status, WorkflowEvent.DECLINE))
+
+    def test_only_the_deciding_gates_can_reject(self):
+        """
+        **Rule change, IR-265 (ADR-021).** This replaced "every gate can be
+        declined and rejected". Intake and the specialist offices inform the
+        decision rather than make it, so they lost their REJECT edge. The
+        rejecting gates are stated literally, not read from the table, so an
+        edge added back fails here.
+        """
+        rejecting = {
+            status for status in STAGES
+            if lifecycle.edge_for(status, WorkflowEvent.REJECT) is not None
+        }
+        self.assertEqual(
+            rejecting,
+            {PipelineStatus.ADVISER_REVIEW, PipelineStatus.RDCO_REVIEW},
+        )
 
 
 class DerivedVocabularyTests(SimpleTestCase):

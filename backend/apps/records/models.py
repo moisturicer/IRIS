@@ -164,9 +164,9 @@ class Record(models.Model):
     # ADR-002's transition table rather than replacing it). The submitter
     # requests offices here; apps.reviews.services.approve_record() reads
     # these at rdco_intake to decide which RecordClearance rows to create,
-    # instead of a hardcoded set per record_type. requested_itso only takes
-    # effect for Project -- Thesis/Research never routes through ITSO,
-    # matching the structural distinction the type already encodes.
+    # instead of a hardcoded set per record_type. requested_itso takes effect
+    # for Thesis/Research as well as Project: ADR-021 §5 reversed ADR-018's
+    # Project-only rule for ITSO (IR-266).
     requested_itso           = models.BooleanField(default=False)
     requested_ierc           = models.BooleanField(default=False)
     requested_ktto           = models.BooleanField(default=False)

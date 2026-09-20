@@ -88,11 +88,18 @@ const record: RecordDetail = {
   your_office: "ierc",
   your_office_label: "IERC",
   files: [],
+  workflow_state: "in_review",
+  workflow_state_label: "In review",
+  current_holders: [],
+  can_act: [],
 };
+
+/** What the mocked detail endpoint returns; a test may park it at another stage. */
+let shownRecord: RecordDetail = record;
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
-    detail: vi.fn(() => Promise.resolve({ data: record })),
+    detail: vi.fn(() => Promise.resolve({ data: shownRecord })),
   },
 }));
 
@@ -128,6 +135,7 @@ function renderEvaluationScreen() {
 beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
+  shownRecord = record;
 });
 
 afterEach(() => {
@@ -262,5 +270,94 @@ describe("the reviewer's unsent decision", () => {
 
     expect(await screen.findByRole("link", { name: DOCUMENTS_LINK })).toBeInTheDocument();
     expect(commentBox()).toHaveValue("");
+  });
+});
+
+/**
+ * Who may reject (IR-265, ADR-021).
+ *
+ * Intake and the specialist offices inform the decision; they do not make it,
+ * so the API refuses a rejection from them. The form must not offer one.
+ * Rejection stays with RDCO at final review and the assigned Adviser.
+ */
+describe("the Reject option", () => {
+  const REJECT = /^Reject/;
+
+  /** The same record, parked where `overrides` says. */
+  function parkAt(overrides: Partial<RecordDetail>) {
+    shownRecord = { ...record, ...overrides };
+  }
+
+  async function renderDecisionForm() {
+    const view = renderEvaluationScreen();
+    await screen.findByRole("radio", { name: /Approve/ });
+    return view;
+  }
+
+  it.each([
+    ["an IERC reviewer at parallel review", {}],
+    [
+      "an ITSO reviewer at ITSO review",
+      { pipeline_status: "itso_review", your_office: "itso", your_office_label: "ITSO" },
+    ],
+    [
+      "RDCO at intake",
+      { pipeline_status: "rdco_intake", your_office: null, your_office_label: null },
+    ],
+  ] as const)("is not offered to %s", async (_who, overrides) => {
+    parkAt(overrides as Partial<RecordDetail>);
+    await renderDecisionForm();
+
+    expect(screen.queryByRole("radio", { name: REJECT })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Approve/ })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Request Revision/ })).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      "RDCO at final review",
+      { pipeline_status: "rdco_review", your_office: null, your_office_label: null },
+    ],
+    [
+      "the assigned Adviser on a Proposal",
+      {
+        pipeline_status: "adviser_review",
+        record_type: "Proposal",
+        record_type_name: "Proposal",
+        your_office: null,
+        your_office_label: null,
+      },
+    ],
+  ] as const)("is still offered to %s", async (_who, overrides) => {
+    parkAt(overrides as Partial<RecordDetail>);
+    await renderDecisionForm();
+
+    expect(screen.getByRole("radio", { name: REJECT })).toBeInTheDocument();
+  });
+
+  it("does not send a rejection restored from a draft where it is not offered", async () => {
+    // A draft saved before this change could hold "rejected". Submitting it
+    // would send a decision the form no longer shows. It falls back to
+    // Request Revision: still a negative finding, and never terminal.
+    const user = userEvent.setup();
+    writeReviewDraft(RECORD_ID, { status: "rejected", comment: "Consent is missing." });
+
+    await renderDecisionForm();
+
+    expect(screen.getByRole("radio", { name: /Request Revision/ })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: /Submit/i }));
+
+    await waitFor(() => {
+      expect(submitReview).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "declined", comment: "Consent is missing." }),
+      );
+    });
+  });
+
+  it("has no serious or critical accessibility violations where it is offered", async () => {
+    parkAt({ pipeline_status: "rdco_review", your_office: null, your_office_label: null });
+    const { container } = await renderDecisionForm();
+
+    await expectNoBlockingA11yViolations(container);
   });
 });

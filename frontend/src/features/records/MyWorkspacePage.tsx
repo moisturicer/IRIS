@@ -197,7 +197,7 @@ export default function MyWorkspacePage() {
             const at = currentStage(record);
             const atIndex = sequence.indexOf(at);
             const pending = pendingClearances(record);
-            const badges = metaBadges(record).filter((b) => b.tone !== "topic"); // topic already implied by title context here
+            const badges = metaBadges(record, { progress: true }).filter((b) => b.tone !== "topic"); // topic already implied by title context here
             const flagged = needsAuthorAction(record);
 
             return (
