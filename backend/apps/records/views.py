@@ -288,23 +288,26 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         GET /records/<id>/similar/ — related institutional works.
 
-        Ranks with `apps/ai/services/retrieval.search_records` — record-level
-        PostgreSQL FTS over `publicly_visible()`.
+        Ranks on **record-level vectors** through `visible_to(user)`
+        (ADR-029 §5, §7). It used to rank with record-level full-text search
+        filtered by `publicly_visible()`, and was the last caller of the
+        narrower second visibility rule — and of the module IR-285 deleted.
 
-        **That is no longer what Ask IRIS does.** IR-283 moved `/ai/ask/` and
-        `/ai/search/` onto chunk-level retrieval through `visible_to(user)`,
-        so this is now the last caller of the older, narrower path. It is
-        narrower rather than wider — it withholds records a reader may in fact
-        open, and leaks none — so it is drift rather than a breach. Moving it
-        onto the chunk retriever is IR-285's, which deletes the module this
-        imports.
+        **Empty until the corpus is indexed.** A record with no vector has no
+        neighbours, and today no record has one: the disclosure gate refuses
+        every record while `Record` carries no embargo field (IR-250). That is
+        a visible behaviour change from keyword matching, and it is the
+        intended one — a keyword fallback would hide "nothing is indexed"
+        behind plausible results.
         """
-        from apps.ai.services.retrieval import search_records
+        from apps.ai.presentation import record_card
+        from apps.ai.similarity import similar_records
 
         record = self.get_object()
-        seed = f"{record.title} {record.abstract or ''}".strip()
-        matches = search_records(seed, top_k=3, exclude_id=record.id)
-        return Response({"results": [s.as_dict() for s in matches]})
+        matches = similar_records(record, request.user)
+        return Response(
+            {"results": [record_card(m.record, m.score) for m in matches]}
+        )
 
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):
