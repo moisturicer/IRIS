@@ -185,7 +185,10 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: '18'
+          # 20, matching frontend/Dockerfile's build image (node:20-alpine).
+          # Not a preference: jsdom 29, which the Vitest suite runs under, needs
+          # Node >=20.19, and on 18 `npm ci` already warned EBADENGINE.
+          node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -194,6 +197,16 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        # IR-210's acceptance criterion -- "the test command runs in the
+        # existing frontend CI job and a failure blocks the PR" -- was never
+        # met: this job ran lint and build only, so no Vitest file (the
+        # accessible-name tests, the axe serious/critical gate) ever ran in CI
+        # and the job was green regardless. `npm test` is `vitest run`:
+        # non-interactive, exits non-zero on any failure, and prints how many
+        # tests ran, so the count is in the log rather than asserted.
+        run: npm test
 
       - name: Build
         # Runs `tsc && vite build`, so a type error fails the build. Intended.

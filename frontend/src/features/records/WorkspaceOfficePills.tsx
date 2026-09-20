@@ -6,12 +6,13 @@ const STATUS_DOT: Record<RecordClearance["status"], string> = {
   cleared: "bg-emerald-500",
   declined: "bg-amber-600",
   rejected: "bg-red-500",
+  not_cleared: "bg-red-500",
 };
 
 /**
  * Compact per-office status row for a workspace case card — the parallel-
  * review equivalent of a card-sized status line. Deliberately not the full
- * `ClearanceTrack` (built for the paper view's roomy right rail): a list of
+ * `ReviewRoutingTracker` (built for the paper view's roomy right rail): a list of
  * many cards needs one line per case, not a vertical track repeated N times.
  * Shares only the underlying data shape (`RecordClearance`), not the component.
  */

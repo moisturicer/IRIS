@@ -42,7 +42,7 @@ export const PIPELINE_STATUS = {
   DRAFT:          "draft",
   // Proposal pipeline
   ADVISER_REVIEW: "adviser_review",
-  APPROVED:       "approved",       // Proposal approved by adviser — visible as ongoing
+  APPROVED:       "approved",       // Proposal approved by adviser — research ongoing; not public (IR-264)
   // Thesis/Research and Project pipeline
   RDCO_INTAKE:      "rdco_intake",
   ITSO_REVIEW:      "itso_review",
@@ -53,7 +53,7 @@ export const PIPELINE_STATUS = {
   DECLINED:       "declined",       // sent back for revision; owner may resubmit
   REJECTED:       "rejected",       // outright rejection; no resubmission
   PENDING_DELETE: "pending_delete",
-  COMPLETED:      "completed",      // Proposal research finished — toggled by RDCO
+  COMPLETED:      "completed",      // Proposal research finished — marked by RDCO or the assigned Adviser
 } as const;
 
 export type PipelineStatus = (typeof PIPELINE_STATUS)[keyof typeof PIPELINE_STATUS];
