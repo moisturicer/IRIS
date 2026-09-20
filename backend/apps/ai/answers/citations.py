@@ -63,11 +63,22 @@ _MARKER = re.compile(
     rf"|［\s*({_NUMBERS})\s*{_SUFFIX}］"
 )
 
+#: **This instruction is noise reduction, not enforcement.** It already said
+#: "cite as [1], [2]" when the model emitted `【1】` (IR-131), and again when it
+#: emitted `【1†L1-L5】` (2026-09-20). A prompt is a nudge; the model's trained
+#: habits win often enough that the parser below, and the telemetry in
+#: `answers/service.py`, are what actually hold the line. Tightening the
+#: wording here is worth a little -- it costs nothing and may lower the rate --
+#: but it is never grounds for narrowing `_MARKER` back down.
 SYSTEM_PROMPT = (
     "You are IRIS, the research assistant for Cebu Institute of Technology - "
     "University.\n"
     "Answer ONLY from the numbered sources below. Cite them inline as [1], [2], "
     "matching the numbers given.\n"
+    "Write a citation as a square bracket, the source number, and a closing "
+    "square bracket, with nothing else inside: [1] or [2]. Do not add page or "
+    "line references, file names, or any other characters inside the brackets, "
+    "and do not use any other bracket style.\n"
     "If the sources do not contain the answer, say so plainly instead of "
     "guessing.\n"
     "Never invent a title, author, finding or number. Be concise and factual."
@@ -212,3 +223,61 @@ def parse_citations(
 
     resolved.sort(key=lambda c: c.marker)
     return cleaned, tuple(resolved)
+
+
+#: A **deliberately loose** net for things that look like a citation attempt.
+#:
+#: This is not a second resolver and must never become one. `_MARKER` decides
+#: what is a citation; this decides what *tried* to be one and failed, so a
+#: format the model drifts to next is visible in a log line instead of waiting
+#: for someone to read a transcript by hand -- which is how both previous
+#: drifts were actually caught.
+#:
+#: Wider than `_MARKER` on purpose: any common opening bracket, a small number,
+#: optionally a separator and a run of anything, any common closing bracket.
+#: Mismatched pairs match here and not there, which is the point.
+#:
+#: **Two limits, stated rather than discovered.** The number must lead, so
+#: `[ref:1]` is invisible to this; and a bare parenthesised number `(1)` will
+#: match, so prose can trip it. Both are tolerable because this never fires on
+#: its own -- `answers/service.py` only consults it once a genuine anomaly is
+#: already established, where a false positive costs a noisy log line and a
+#: false negative costs nothing that was not already lost.
+#: Two details learned by getting them wrong first, both worth keeping:
+#:
+#: The run after the separator excludes **opening** brackets as well as
+#: closing ones. With only closers excluded, `Yes (1) and <2>.` matched once,
+#: as `(1) and <2>` -- one marker's suffix reaching across the prose to
+#: swallow the next, which is the same mistake `_SUFFIX` above was corrected
+#: for. A suffix must not be able to reach past where the next marker starts.
+#:
+#: The bound is far looser than `_SUFFIX`'s 64 **on purpose**. A marker whose
+#: suffix is too long for `_MARKER` is precisely a case this needs to report,
+#: so a bound at or below the strict one would go blind exactly where it is
+#: most needed.
+_POSSIBLE_MARKER = re.compile(
+    r"[\[\(【［<]\s*\d{1,3}(?:[^\s\w][^\[\]\(\)【】［］<>\n]{0,400})?[\]\)】］>]"
+)
+
+
+def unresolved_marker_candidates(answer: str) -> tuple[str, ...]:
+    """Citation-shaped substrings of ``answer`` that ``_MARKER`` did not match.
+
+    Pure, like everything else here: it reports, it does not log and it does
+    not decide anything. The caller owns what to do about a non-empty result.
+
+    Overlap with a real match is computed by span rather than by re-matching
+    the cleaned text, because a resolved marker is rewritten to canonical
+    ``[n]`` -- which this pattern would happily match again and report as a
+    failure, turning every healthy answer into an alert.
+    """
+    resolved_spans = [m.span() for m in _MARKER.finditer(answer)]
+
+    def overlaps_a_resolved_marker(start: int, end: int) -> bool:
+        return any(start < r_end and r_start < end for r_start, r_end in resolved_spans)
+
+    return tuple(
+        m.group(0)
+        for m in _POSSIBLE_MARKER.finditer(answer)
+        if not overlaps_a_resolved_marker(*m.span())
+    )

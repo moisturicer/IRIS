@@ -31,6 +31,7 @@ from .citations import (
     GroundedAnswer,
     build_prompt,
     parse_citations,
+    unresolved_marker_candidates,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,9 +116,51 @@ class GroundedAnswerService:
             )
 
         text, citations = parse_citations(raw, sources)
+        _warn_if_citations_went_missing(raw, text, citations)
         return GroundedAnswer(
             text=text,
             citations=citations,
             degraded=degraded,
             sources=tuple(sources),
+        )
+
+
+def _warn_if_citations_went_missing(raw: str, text: str, citations: Sequence) -> None:
+    """Say something when an answer that should have cited did not.
+
+    **Why this exists.** Twice now the model has drifted to a marker format the
+    parser did not recognise -- `【1】`, then `【1†L1-L5】` -- and both times the
+    symptom was identical and silent: a fluent answer, zero citations, the raw
+    marker sitting in the reader's text, and nothing anywhere saying so. Both
+    were found by a person reading a transcript by hand. There will be a third
+    format; this is so it costs a log line rather than another afternoon.
+
+    **The trigger is the unambiguous half.** The model was handed numbered
+    sources and told to cite them, it wrote a real answer, and not one citation
+    resolved. The one honest reason for that is the answer saying the sources
+    do not cover the question, which the prompt explicitly asks for and
+    `NO_ANSWER_HINT` already names -- so that case is excluded rather than
+    alerted on.
+
+    **The candidates are only the diagnostic half**, consulted after the
+    anomaly is already established. `unresolved_marker_candidates` is
+    deliberately loose and will sometimes point at ordinary prose; that is
+    affordable here precisely because it never decides anything on its own, and
+    when it is right it hands over the exact new format to support.
+    """
+    if citations or NO_ANSWER_HINT in text.lower():
+        return
+
+    candidates = unresolved_marker_candidates(raw)
+    if candidates:
+        logger.warning(
+            "answer cited nothing, but %d citation-shaped marker(s) did not "
+            "parse -- the model may have drifted to an unsupported format: %s",
+            len(candidates),
+            list(candidates[:5]),
+        )
+    else:
+        logger.warning(
+            "answer cited nothing and no citation-shaped markers were found, "
+            "though sources were supplied and the answer does not decline"
         )
