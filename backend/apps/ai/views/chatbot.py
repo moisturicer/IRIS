@@ -1,14 +1,65 @@
-"""Ask IRIS endpoints — grounded Q&A and ranked retrieval over the record corpus."""
+"""Ask IRIS endpoints — grounded Q&A and ranked retrieval over the chunk corpus.
+
+**The switch-over (IR-283).** These three endpoints used to rank whole records
+by PostgreSQL full-text search over `Record.search_vector` and answer from
+titles and abstracts. They now answer from **passages** — spans of a record's
+own text — through the stack `apps.ai.composition` assembles.
+
+The change a reader notices is that an answer can come from a methodology
+section no abstract mentions. The change that matters more is invisible: the
+old path filtered with `publicly_visible()`, a second and narrower visibility
+rule than the `visible_to(user)` predicate the rest of IRIS applies. **On
+these three endpoints** there is now one predicate, applied inside retrieval
+before anything is scored.
+
+Said precisely, because it is not yet true repo-wide: `RecordViewSet.similar`
+still ranks through `apps/ai/services/retrieval.search_records`, which is the
+`publicly_visible()` path. It is narrower rather than wider, so it withholds
+rather than leaks — but it is the second rule, and it goes when IR-285 deletes
+that module.
+
+The views hold no wiring. They parse a request, ask the composition root for a
+retriever or an answer service, and shape the reply — which is what makes the
+whole path drivable from a test with deterministic fakes.
+"""
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
-from apps.ai.services.rag_pipeline import DEFAULT_TOP_K, RAGPipelineService
-from apps.ai.services.retrieval import MAX_TOP_K, search_records
+from apps.ai.answers.citations import NO_SOURCES, UNAVAILABLE
+from apps.ai.composition import composition_root
+from apps.ai.presentation import cited_record_ids, record_sources
 
 MAX_QUESTION_LENGTH = 2000
+
+#: How many passages ground an answer, and the ceiling on any `top_k`. The
+#: ceiling is a cost control as much as a sanity one: every passage above it
+#: is prompt the vendor is paid for and a reader does not read.
+DEFAULT_TOP_K = 5
+MAX_TOP_K = 20
+
+#: What the wire calls each answer state. The API's own names, mapped from the
+#: domain's rather than shared with them: `GroundedAnswer.state` is what the
+#: service decided, and this is what a client has been told to expect.
+GENERATIVE_MODE = "generative"
+NO_RESULTS_MODE = "no_results"
+UNAVAILABLE_MODE = "unavailable"
+_WIRE_MODE = {
+    NO_SOURCES: NO_RESULTS_MODE,
+    UNAVAILABLE: UNAVAILABLE_MODE,
+}
+
+NO_RESULTS_MESSAGE = (
+    "No readable sources in the CIT-U repository matched that question. Try "
+    "different keywords, or browse Discover to see what is available."
+)
+
+DEGRADED_MESSAGE = (
+    "Search is running in fallback mode — these results came from keyword "
+    "matching rather than meaning, so weigh them accordingly."
+)
 
 
 class AIQueryThrottle(UserRateThrottle):
@@ -29,7 +80,8 @@ class ChatQueryView(APIView):
     POST /api/v1/ai/ask/
     Body: {"question": str, "top_k": int?}
 
-    Returns an answer grounded in readable records, with the record ids it used.
+    Returns an answer grounded in passages the asker is permitted to read,
+    with the records those passages came from.
     """
 
     permission_classes = [IsAuthenticated]
@@ -47,10 +99,42 @@ class ChatQueryView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result = RAGPipelineService().answer(
-            question, top_k=_parse_top_k(request.data.get("top_k"))
+        service = composition_root().answer_service(
+            max_sources=_parse_top_k(request.data.get("top_k"))
         )
-        return Response(result)
+        answer = service.answer(question, request.user)
+        mode = _WIRE_MODE.get(answer.state, GENERATIVE_MODE)
+
+        # `answer` is a written answer or it is null. The two non-answers —
+        # nothing found, and no model reachable — say so in `message`, so a
+        # client rendering `answer` can never present an apology as a finding.
+        #
+        # `message` also carries the degradation note when an answer *was*
+        # written from fallback results. Here rather than in the client: a
+        # client composing its own sentence about how the backend retrieved
+        # is a second wording of one fact, and the two drift.
+        if mode == GENERATIVE_MODE:
+            body = {
+                "answer": answer.text,
+                "message": DEGRADED_MESSAGE if answer.degraded else None,
+            }
+        elif mode == NO_RESULTS_MODE:
+            body = {"answer": None, "message": NO_RESULTS_MESSAGE}
+        else:
+            body = {"answer": None, "message": answer.text}
+
+        return Response(
+            {
+                **body,
+                "citations": cited_record_ids(answer.citations),
+                # Every passage the model was shown, not only the cited ones:
+                # a reader who wants to check what IRIS read needs the list it
+                # read, and a vendor failure returns it with no answer at all.
+                "sources": record_sources(answer.sources),
+                "mode": mode,
+                "degraded": answer.degraded,
+            }
+        )
 
 
 class SemanticSearchView(APIView):
@@ -58,7 +142,14 @@ class SemanticSearchView(APIView):
     POST /api/v1/ai/search/
     Body: {"query": str, "top_k": int?}
 
-    Ranked retrieval without synthesis — the list behind an answer.
+    Ranked retrieval without synthesis — the list behind an answer, from the
+    same retriever, so what a reader browses is what an answer would cite.
+
+    **`top_k` bounds passages; `results` and `count` are records.** Several
+    passages can come from one paper, so `count` may now be smaller than
+    `top_k` for a query that used to return exactly `top_k` records. Said
+    here because it is a change in what an existing field means, not just in
+    what fills it — IR-284 puts the passages themselves on the wire.
     """
 
     permission_classes = [IsAuthenticated]
@@ -71,29 +162,76 @@ class SemanticSearchView(APIView):
                 {"detail": "query is required."}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        sources = search_records(query, top_k=_parse_top_k(request.data.get("top_k"), 10))
-        return Response({"results": [s.as_dict() for s in sources], "count": len(sources)})
+        limit = _parse_top_k(request.data.get("top_k"), 10)
+        result = composition_root().retriever().retrieve(query, request.user, limit=limit)
+        results = record_sources(result.passages)
+        return Response(
+            {
+                "results": results,
+                "count": len(results),
+                "degraded": result.degraded,
+                "message": DEGRADED_MESSAGE if result.degraded else None,
+            }
+        )
 
 
 class AIStatusView(APIView):
     """
     GET /api/v1/ai/status/
-    Lets the UI tell the user which mode answers will come back in, rather than
-    silently degrading.
+
+    What will actually happen if you ask something: which index answers are
+    ranked against, and whether a model will write one. It used to report a
+    hardcoded `"postgres_fts"`, which stayed true by accident and would have
+    stayed printed after it stopped being true.
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from apps.ai.services.llm_generator import LLMGenerator
+        from django.core.exceptions import ImproperlyConfigured
+
+        from apps.ai.models import get_active_embedding_space
+        from apps.ai.models.chunk import ChunkEmbedding
         from apps.records.models import Record
 
-        generator = LLMGenerator()
+        try:
+            space = get_active_embedding_space()
+        except ImproperlyConfigured:
+            # Not an error to report on: a deployment that has not indexed
+            # yet has no active space, and saying so is this endpoint's job.
+            space = None
+
+        indexed_records = 0
+        if space is not None:
+            visible = Record.objects.visible_to(request.user).values("pk")
+            indexed_records = (
+                ChunkEmbedding.objects.filter(
+                    space=space,
+                    chunk__record__in=visible,
+                    chunk__chunk_set__is_active=True,
+                    chunk__deleted_at__isnull=True,
+                )
+                .values("chunk__record_id")
+                .distinct()
+                .count()
+            )
+
         return Response(
             {
-                "retrieval": "postgres_fts",
-                "generative": generator.is_configured(),
-                "mode": "generative" if generator.is_configured() else "extractive",
-                "indexed_records": Record.objects.publicly_visible().count(),
+                "embedding_space": (
+                    None
+                    if space is None
+                    else {
+                        "id": space.pk,
+                        "model_id": space.model_id,
+                        "dimensions": space.dimensions,
+                        "metric": space.metric,
+                    }
+                ),
+                "generative": composition_root().generation_configured(),
+                # Counted through `visible_to`, like everything else on this
+                # path: a raw corpus total would tell an asker how many
+                # records exist that they cannot see.
+                "indexed_records": indexed_records,
             }
         )

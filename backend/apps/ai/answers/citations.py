@@ -66,11 +66,33 @@ class Citation:
     source_page: int | None
 
 
+#: What produced this answer. Strings rather than an enum for the reason
+#: `apps/ai/retrieval/ports.py` gives for its retrieval modes: this crosses
+#: into an API response and a log line, where a name is what is wanted.
+#:
+#: The distinction the wire needs and the text cannot carry. A caller must be
+#: able to tell "a model wrote this" from "no model was reachable" and from
+#: "nothing was found", and comparing the text against a constant to find out
+#: is a coupling that breaks the first time the wording is improved.
+GENERATED = "generated"
+NO_SOURCES = "no_sources"
+UNAVAILABLE = "unavailable"
+
+
 @dataclass(frozen=True)
 class GroundedAnswer:
     text: str
     citations: tuple[Citation, ...]
     degraded: bool = False
+    state: str = GENERATED
+
+    #: The passages the answer was grounded in -- every one that went into
+    #: the prompt, not only the ones the model cited. Carried on the answer
+    #: because ADR-008 requires that a vendor failure still returns sources:
+    #: retrieval worked, so a reader gets passages to read themselves rather
+    #: than a sentence nobody wrote. An answer that dropped them would leave
+    #: the caller nothing to show.
+    sources: tuple[RetrievedChunk, ...] = ()
 
     @property
     def is_grounded(self) -> bool:

@@ -24,7 +24,14 @@ from apps.ai.providers.ports import LLMProvider
 from apps.ai.retrieval.ports import RetrievedChunk, Retriever
 from apps.records.models import Record
 
-from .citations import SYSTEM_PROMPT, GroundedAnswer, build_prompt, parse_citations
+from .citations import (
+    NO_SOURCES,
+    SYSTEM_PROMPT,
+    UNAVAILABLE,
+    GroundedAnswer,
+    build_prompt,
+    parse_citations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +94,7 @@ class GroundedAnswerService:
                 text="No readable sources were found for this question.",
                 citations=(),
                 degraded=degraded,
+                state=NO_SOURCES,
             )
 
         try:
@@ -95,7 +103,21 @@ class GroundedAnswerService:
             )
         except LLMUnavailable as exc:
             logger.warning("answer generation unavailable: %s", exc)
-            return GroundedAnswer(text=UNAVAILABLE_TEXT, citations=(), degraded=True)
+            # Degraded whatever retrieval did: the reader is getting sources
+            # instead of an answer, which is exactly what the flag exists to
+            # say. The sources travel with it -- retrieval worked.
+            return GroundedAnswer(
+                text=UNAVAILABLE_TEXT,
+                citations=(),
+                degraded=True,
+                state=UNAVAILABLE,
+                sources=tuple(sources),
+            )
 
         text, citations = parse_citations(raw, sources)
-        return GroundedAnswer(text=text, citations=citations, degraded=degraded)
+        return GroundedAnswer(
+            text=text,
+            citations=citations,
+            degraded=degraded,
+            sources=tuple(sources),
+        )

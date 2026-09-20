@@ -35,6 +35,20 @@ class LLMUnavailable(RuntimeError):
     """
 
 
+def is_configured() -> bool:
+    """Whether this adapter has what it needs to reach a vendor.
+
+    Here rather than on ``LLMProvider``: the port transports a prompt and
+    nothing else, and asking every implementation "are you configured?" would
+    oblige a fake to answer a question about a vendor account it does not
+    have. Here rather than read off ``settings`` by a caller, because *which*
+    setting configures this adapter is the adapter's own knowledge — and a
+    caller holding a second copy of it is how a status endpoint ends up
+    reporting "generative" against a key the adapter never reads.
+    """
+    return bool(getattr(settings, "LLM_API_KEY", ""))
+
+
 class OpenAICompatibleAdapter:
     """`LLMProvider` over any OpenAI-compatible chat-completions endpoint."""
 

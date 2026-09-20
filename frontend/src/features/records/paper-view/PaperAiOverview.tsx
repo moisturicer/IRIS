@@ -13,12 +13,10 @@ import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcon
  * Nothing here is invented locally: whatever the pipeline could not produce is
  * reported as unavailable rather than filled in.
  *
- * Only the pipeline's `generative` mode produces an overview. Its `extractive`
- * mode assembles an answer by quoting whatever ranked highest across the whole
- * corpus, which for a single record routinely leads with a *different* paper —
- * so this renders an explicit "AI summary unavailable" state instead. That is
- * also what ADR-008 asks for: when no model ran, the answer is replaced by a
- * visible unavailable state rather than a composed one.
+ * Only the `generative` mode produces an overview. When no model is reachable
+ * the endpoint answers `unavailable` and returns the passages unsummarised, so
+ * this renders an explicit "AI summary unavailable" state rather than composing
+ * one locally — what ADR-008 asks for.
  *
  * The generative branch is live and will render as soon as a provider is
  * configured — that choice is the team's open decision D-4, not this file's.
@@ -49,10 +47,9 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   }, [load]);
 
   const mode = answer?.mode;
-  // Only a generative answer is an overview. The extractive path composes a
-  // quoting answer ranked over the whole corpus, so for a single record it can
-  // lead with a *different* paper — useless here, and ADR-008 requires the
-  // answer to be replaced by an explicit unavailable state when no model ran.
+  // Only a generative answer is an overview: ADR-008 requires the answer to be
+  // replaced by an explicit unavailable state when no model ran, rather than by
+  // something assembled here out of the passages.
   const hasOverview = mode === "generative" && Boolean(answer?.answer);
 
   return (
@@ -101,7 +98,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
         </div>
       )}
 
-      {!loading && !failed && !hasOverview && mode === "extractive" && (
+      {!loading && !failed && !hasOverview && mode === "unavailable" && (
         <div className="flex items-start gap-3">
           <i className="fas fa-microchip text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
@@ -109,15 +106,15 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
               AI summary unavailable
             </p>
             <p className="text-[12px] text-stone-500 mt-0.5 leading-relaxed">
-              No language model is configured, so IRIS cannot summarise this paper. Retrieval
-              still works — see Related Institutional Works below, or ask a question in Paper
-              Chat.
+              The answering model could not be reached, so IRIS is not summarising this paper.
+              Retrieval still works — see Related Institutional Works below, or ask a question in
+              Paper Chat.
             </p>
           </div>
         </div>
       )}
 
-      {!loading && !failed && !hasOverview && mode !== "extractive" && (
+      {!loading && !failed && !hasOverview && mode !== "unavailable" && (
         <div className="flex items-start gap-3">
           <i className="fas fa-circle-info text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">

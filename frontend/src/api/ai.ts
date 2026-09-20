@@ -4,6 +4,9 @@ import type { SemanticSearchResult, AIAnswer, AIStatus } from "@/types/ai";
 interface SemanticSearchResponse {
   results: SemanticSearchResult[];
   count:   number;
+  /** True when the vendor was out and these came from keyword matching. */
+  degraded: boolean;
+  message:  string | null;
 }
 
 export const aiApi = {
