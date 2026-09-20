@@ -1,6 +1,6 @@
-"""Turning retrieved passages into the shape the API already serves (IR-283).
+"""The shapes the AI surface puts on the wire (IR-283, IR-284, IR-285).
 
-Two shapes reach a reader, and they are not alternatives (IR-283, IR-284):
+Two of them reach a reader, and they are not alternatives:
 
 * a **Passage** -- a quoted span of a record's text with the page it sits on,
   which is what lets a reader check a claim without reading the paper;
@@ -11,6 +11,12 @@ Both, because each answers a question the other cannot. A card alone sends a
 reader hunting through a PDF for the sentence; a passage alone gives them a
 quote with no idea whose work it is. Keeping them in one response is also what
 spares the interface a fetch per citation, which is what it does today.
+
+The card also serves a path with no passages in it at all —
+``GET /records/<id>/similar/``, which ranks whole records (IR-285). That is
+why ``record_card`` is a function of its own rather than a loop body inside
+``record_sources``: two builders for one card is how one of them quietly stops
+sending ``authors`` and only one screen notices.
 
 **The record lookup is keyed on ids retrieval already permitted.** It does not
 re-derive visibility and must not: `TwoStageRetriever` narrowed the candidate
@@ -118,21 +124,29 @@ def record_sources(passages: Sequence[RetrievedChunk]) -> list[dict]:
         record = records.get(record_id)
         if record is None:
             continue
-        cards.append(
-            {
-                "id": record.id,
-                "title": record.title,
-                "abstract": (record.abstract or "").strip(),
-                "authors": ", ".join(a.name for a in record.authors.all())
-                or "Institutional Author",
-                "year": record.year_accomplished,
-                "classification": (
-                    record.classification.name if record.classification_id else None
-                ),
-                "score": round(float(best_score.get(record_id, 0.0)), 4),
-            }
-        )
+        cards.append(record_card(record, best_score.get(record_id, 0.0)))
     return cards
+
+
+def record_card(record: Record, score: float) -> dict:
+    """One record, in the shape the interface renders beside an answer.
+
+    Shared by the answer path and by related works (`apps/ai/similarity.py`),
+    because they render the same card: two builders would let one of them
+    quietly stop sending `authors` and only one screen would notice.
+    """
+    return {
+        "id": record.id,
+        "title": record.title,
+        "abstract": (record.abstract or "").strip(),
+        "authors": ", ".join(a.name for a in record.authors.all())
+        or "Institutional Author",
+        "year": record.year_accomplished,
+        "classification": (
+            record.classification.name if record.classification_id else None
+        ),
+        "score": round(float(score), 4),
+    }
 
 
 def citations(resolved: Iterable[Citation]) -> list[dict]:

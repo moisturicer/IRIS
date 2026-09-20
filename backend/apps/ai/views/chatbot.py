@@ -8,15 +8,12 @@ own text — through the stack `apps.ai.composition` assembles.
 The change a reader notices is that an answer can come from a methodology
 section no abstract mentions. The change that matters more is invisible: the
 old path filtered with `publicly_visible()`, a second and narrower visibility
-rule than the `visible_to(user)` predicate the rest of IRIS applies. **On
-these three endpoints** there is now one predicate, applied inside retrieval
-before anything is scored.
-
-Said precisely, because it is not yet true repo-wide: `RecordViewSet.similar`
-still ranks through `apps/ai/services/retrieval.search_records`, which is the
-`publicly_visible()` path. It is narrower rather than wider, so it withholds
-rather than leaks — but it is the second rule, and it goes when IR-285 deletes
-that module.
+rule than the `visible_to(user)` predicate the rest of IRIS applies. There is
+now one predicate, applied inside retrieval before anything is scored — and
+since IR-285 deleted the record-level stack and moved `RecordViewSet.similar`
+onto record vectors, that is true of every retrieval path rather than only of
+these three endpoints. `apps/ai/tests/test_one_retrieval_stack.py` fails if
+the second rule comes back.
 
 The views hold no wiring. They parse a request, ask the composition root for a
 retriever or an answer service, and shape the reply — which is what makes the

@@ -197,7 +197,11 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Similar papers — same retrieval, and the same visibility predicate, as Ask IRIS
+// Similar papers — record-vector similarity (ADR-029 §5), through the same
+// `visible_to` predicate as Ask IRIS. The *predicate* is shared; the retrieval
+// is not — Ask IRIS ranks passages, this ranks whole records on their
+// title-and-abstract vector, so it answers "broadly about the same thing?"
+// and will miss two papers sharing a method described mid-document.
 // ---------------------------------------------------------------------------
 
 function SimilarPapers({ recordId }: { recordId: number }) {
@@ -236,7 +240,24 @@ function SimilarPapers({ recordId }: { recordId: number }) {
     );
   }
 
-  if (items.length === 0) return null;
+  // Empty is the common case today and says nothing by itself: a record with
+  // no vector has no neighbours, and the disclosure gate (IR-250) means no
+  // record has one yet. Rendering nothing at all left a reader to conclude
+  // this paper is unrelated to everything in the repository, which is a
+  // stronger claim than IRIS can make.
+  if (items.length === 0) {
+    return (
+      <section>
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-3">
+          Related Institutional Works
+        </h2>
+        <p className="text-[12px] text-stone-500">
+          No related works found. Similarity is computed from indexed records, and indexing
+          has not run for this repository yet.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section>

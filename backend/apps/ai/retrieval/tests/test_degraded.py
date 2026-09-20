@@ -87,9 +87,9 @@ class FullTextFallbackTests:
 
     def test_it_applies_the_same_visibility_predicate_as_the_vector_path(self, reader):
         """The answer must not depend on whether the vendor happened to be up.
-        `apps/ai/services/retrieval.py` filters on `publicly_visible()`, which
-        is a different, narrower rule -- reusing it here would put a second
-        visibility definition on the retrieval path."""
+        The record-level module this guarded against filtered on
+        `publicly_visible()`, a different and narrower rule; IR-285 deleted it,
+        and this keeps asserting the property that made deleting it safe."""
         from apps.accounts.models import Role
 
         role = Role.objects.get_or_create(name=ROLE_STUDENT)[0]

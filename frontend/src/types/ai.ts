@@ -37,9 +37,11 @@ export interface SemanticSearchResult {
   year:           number | null;
   classification: string | null;
   /**
-   * The record's best passage score: cosine similarity, or the reranker's score when
-   * one ran, or a PostgreSQL SearchRank on the degraded path. Comparable within one
-   * response, not across them.
+   * How well this record matched, on whichever path produced it: the best of its
+   * passages' scores from an answer or a search, or the record's own cosine
+   * similarity from related works. Cosine similarity is signed — 1 is the same
+   * direction, 0 unrelated, negative opposed. Comparable within one response,
+   * not across them.
    */
   score:          number;
 }

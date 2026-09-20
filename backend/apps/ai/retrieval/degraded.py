@@ -5,12 +5,12 @@ the system used before vectors existed. This wires it to the circuit breaker so
 a Voyage outage degrades search instead of taking the feature down.
 
 **The degraded path uses the same visibility predicate as the healthy one.**
-`apps/ai/services/retrieval.py` also does FTS, but at record level and through
-`publicly_visible()` -- a *different*, narrower predicate. Reusing it here would
-mean the answer a reader gets depends on whether the vendor happened to be up,
-and would put a second visibility rule on the retrieval path. ADR-014 rejected
-exactly that for exactly that reason, so the fallback searches chunks through
-`visible_to(user)` like everything else.
+There used to be a second record-level FTS module filtered by
+`publicly_visible()` -- a *different*, narrower predicate -- and reusing it
+here would have meant the answer a reader gets depends on whether the vendor
+happened to be up. ADR-014 rejected that, so this fallback searches chunks
+through `visible_to(user)` like everything else. IR-285 then deleted the other
+module outright, so the choice is no longer available to make wrongly.
 
 **The indication reaches the caller as data, in the result itself.** It used
 to ride on a `list` subclass so that a caller could iterate unchanged; that
