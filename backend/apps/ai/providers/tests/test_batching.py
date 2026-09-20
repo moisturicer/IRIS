@@ -2,7 +2,11 @@
 
 import pytest
 
-from apps.ai.providers.batching import batch_by_token_budget, estimate_tokens
+from apps.ai.providers.batching import (
+    batch_by_token_budget,
+    batch_documents_by_token_budget,
+    estimate_tokens,
+)
 
 
 class EstimateTests:
@@ -56,3 +60,41 @@ class BatchingTests:
     def test_a_non_positive_budget_is_rejected_rather_than_looping_forever(self):
         with pytest.raises(ValueError):
             batch_by_token_budget(["alpha"], budget=0)
+
+
+class DocumentBatchingTests:
+    """IR-281. The contextualized endpoint takes documents, so the batching
+    unit is the document — and the one invariant that matters is that a
+    document is never split, because half a document's chunks in view is not
+    the context the model was chosen for and the vectors look fine either
+    way."""
+
+    def test_documents_that_fit_share_one_request(self):
+        documents = [["a1", "a2"], ["b1"]]
+        assert batch_documents_by_token_budget(documents, budget=10_000) == [documents]
+
+    def test_a_document_is_never_split_even_when_it_exceeds_the_budget(self):
+        oversized = [" ".join(["word"] * 5000), " ".join(["word"] * 5000)]
+        batches = batch_documents_by_token_budget([oversized], budget=100)
+        assert batches == [[oversized]]
+
+    def test_a_document_too_large_to_share_gets_its_own_request(self):
+        big = [" ".join(["word"] * 5000)]
+        batches = batch_documents_by_token_budget([["small"], big, ["also small"]], budget=100)
+        assert [len(batch) for batch in batches] == [1, 1, 1]
+
+    def test_order_is_preserved_at_both_levels(self):
+        documents = [[f"doc {d} chunk {c}" for c in range(3)] for d in range(20)]
+        flattened = [
+            document
+            for batch in batch_documents_by_token_budget(documents, budget=40)
+            for document in batch
+        ]
+        assert flattened == documents
+
+    def test_no_documents_means_no_batches(self):
+        assert batch_documents_by_token_budget([], budget=100) == []
+
+    def test_a_non_positive_budget_is_rejected(self):
+        with pytest.raises(ValueError):
+            batch_documents_by_token_budget([["alpha"]], budget=0)

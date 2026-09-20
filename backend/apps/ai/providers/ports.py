@@ -41,7 +41,36 @@ class EmbeddingProvider(ABC):
 
     @abstractmethod
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
-        """Embed corpus text. One vector per input, in the same order."""
+        """Embed corpus text. One vector per input, in the same order.
+
+        Each text stands alone, with nothing else in view. That is the right
+        contract for a record's title-and-abstract summary, which *is* the
+        whole document; it is the wrong one for a chunk, which is why
+        ``embed_document_chunks`` exists beside it.
+        """
+
+    @abstractmethod
+    def embed_document_chunks(
+        self, documents: Sequence[Sequence[str]]
+    ) -> list[list[list[float]]]:
+        """Embed chunks **grouped by the document they came from**.
+
+        One inner sequence per document, holding that document's chunks in
+        reading order; the result mirrors that shape exactly — one list of
+        vectors per document, one vector per chunk, in the same order.
+
+        The grouping is the contract, not an optimisation. ``voyage-context-4``
+        is a *contextualized* chunk embedder (ADR-015): a chunk is embedded
+        with its siblings visible to the model, so a passage reading "this
+        approach reduced error by 12%" carries what approach it means. Flatten
+        the grouping and the vector loses exactly the property the model was
+        chosen for — and nothing downstream can detect the loss, because a
+        context-free vector is a perfectly well-formed vector.
+
+        Separate from ``embed_documents`` for the same reason that method is
+        separate from ``embed_query``: a caller that can pass the wrong shape
+        eventually does, and the mistake is invisible in the output.
+        """
 
     @abstractmethod
     def embed_query(self, text: str) -> list[float]:

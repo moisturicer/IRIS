@@ -78,6 +78,23 @@ class DeterministicEmbeddingProvider(EmbeddingProvider):
             _feature_vector(t, self._dimensions, _MARKER_WEIGHT) for t in texts
         ]
 
+    def embed_document_chunks(
+        self, documents: Sequence[Sequence[str]]
+    ) -> list[list[list[float]]]:
+        """Contextualized in shape, not in effect.
+
+        A chunk's vector here depends on its own text alone, because a
+        hashed bag of words has nowhere to put a document's context. That is
+        the one place this fake is *not* a behavioural substitute for Voyage,
+        and it is stated rather than hidden: a test asserting that context
+        changes a vector cannot be written against this, and a test asserting
+        the grouping reaches the wire belongs in the adapter's own suite.
+
+        The shape it does reproduce faithfully — one list per document, in
+        order — is what every caller downstream actually depends on.
+        """
+        return [self.embed_documents(document) for document in documents]
+
     def embed_query(self, text: str) -> list[float]:
         return _feature_vector(text, self._dimensions, -_MARKER_WEIGHT)
 

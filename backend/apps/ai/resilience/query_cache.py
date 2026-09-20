@@ -69,6 +69,14 @@ class CachingEmbeddingProvider(EmbeddingProvider):
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return self._inner.embed_documents(texts)
 
+    def embed_document_chunks(
+        self, documents: Sequence[Sequence[str]]
+    ) -> list[list[list[float]]]:
+        # Passed straight through for the reason in the module docstring:
+        # corpus text is embedded once at ingestion and never re-requested,
+        # so caching it would spend memory to serve nobody.
+        return self._inner.embed_document_chunks(documents)
+
     def embed_query(self, text: str) -> list[float]:
         key = query_cache_key(text, self._space_id)
 
