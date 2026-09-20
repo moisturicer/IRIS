@@ -50,9 +50,9 @@ NO_ANSWER_HINT = "the sources do not"
 
 
 def _default_permits(record: Record) -> bool:
-    from apps.ai.policy import inputs_for_record, may_disclose
+    from apps.ai.policy import decision_for_record
 
-    return may_disclose(inputs_for_record(record)).allowed
+    return decision_for_record(record).allowed
 
 
 class GroundedAnswerService:

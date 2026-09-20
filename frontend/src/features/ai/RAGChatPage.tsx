@@ -251,6 +251,20 @@ export default function RAGChatPage() {
             onNewChat={handleNewChat}
           />
 
+          {status?.disclosure_bypass && (
+            <div
+              role="status"
+              className="shrink-0 flex items-start gap-2 px-4 py-2 bg-rose-50 border-b border-rose-200 text-[11px] text-rose-900"
+            >
+              <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
+              <p>
+                <strong>Development mode: disclosure gate bypassed.</strong> Answers are drawn
+                from content that no embargo check cleared, so this is not how a deployment
+                behaves. Development only.
+              </p>
+            </div>
+          )}
+
           {status && !status.generative && (
             <div className="shrink-0 flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-800">
               <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />

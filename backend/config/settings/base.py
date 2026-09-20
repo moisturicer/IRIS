@@ -411,6 +411,24 @@ VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4"
 VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-3")
 VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 
+# ---- The development disclosure bypass (IR-317, ADR-015) -----------------
+#
+# Stands beside ADR-015's disclosure gate — it does not replace it and it
+# encodes no policy. The gate refuses every record because `Record` carries no
+# embargo field (IR-250), so with this off nothing can be indexed and Ask IRIS
+# answers "no readable sources" to every question; turning it on is how the
+# feature is clicked through in a browser while CIT-U decides what an embargo
+# is. Deliberately named for what it is: a rule that merely sounds defensible
+# ("published records are not embargoed") would read as somebody's decision,
+# and this cannot.
+#
+# `apps.ai.policy.bypass` raises `ImproperlyConfigured` at startup when this is
+# set while DEBUG is off, so it takes the service down rather than quietly
+# disabling a control. IR-250 deletes it.
+AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
+    "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", default=False, cast=bool
+)
+
 # ---- Embedding spend (IR-282) -------------------------------------------
 #
 # Indexing is metered per token, and `AI_CHUNK_MAX_TOKENS` counts whitespace
