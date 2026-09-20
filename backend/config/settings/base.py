@@ -408,7 +408,7 @@ VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4"
 # `VOYAGE_EMBED_DIMENSIONS=512` would have produced 512-vectors for a 1024
 # column. The adapter now takes it from `apps.ai.models.VECTOR_COLUMN_DIMENSIONS`,
 # which a migration ties to the active `EmbeddingSpace` row.
-VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-2")
+VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-3")
 VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 
 # ---- Embedding spend (IR-282) -------------------------------------------
@@ -429,8 +429,14 @@ AI_EMBEDDING_TOKEN_CEILING = config(
 # repository's control, so this is a figure for deciding whether a run is
 # worth starting, never a quote. Voyage's contextualized-embedding list price
 # at the time of writing; check it before trusting a large number.
+#
+# Corrected 2026-09-20: was 0.18, verified against Voyage's published pricing
+# page during a live cost-verification session -- voyage-context-4 lists at
+# 0.12/M tokens, not 0.18. The stale figure had been overstating every dry-run
+# estimate by 50%, in the direction of caution rather than the dangerous one,
+# but a pre-flight number that is wrong on the safe side is still wrong.
 AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
-    "AI_EMBEDDING_COST_PER_MILLION_TOKENS", default=0.18, cast=float
+    "AI_EMBEDDING_COST_PER_MILLION_TOKENS", default=0.12, cast=float
 )
 
 # AI_EMBEDDING_MODEL and AI_EMBEDDING_DIMENSIONS were removed by IR-280. They

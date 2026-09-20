@@ -6,6 +6,8 @@ Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off
 
 **Revised 2026-09-20 (IR-281, IR-282) — recorded by an agent, awaiting a reviewer's acceptance.** Adds rule 4 below (chunks are embedded grouped by document, on the contextualized endpoint) and §Indexing operations (a spend ceiling and a promotion gate). Both record decisions that were taken while implementing IR-281 and IR-282 and that had no written basis; neither changes the vendor, the model, the store or the disclosure gate. Per CLAUDE.md §What AI does not decide, an agent may record these but may not accept them.
 
+**Revised 2026-09-20 — pins the reranker.** This ADR always said "Voyage rerank" without naming a model, and the deployed `.env` had drifted to `rerank-3` while the code default and every docstring referencing it said `rerank-2` — an undocumented choice contradicting a stale one, neither written down. Decided in a live operator session (manual end-to-end verification against a real dev corpus, this ADR's first): **`rerank-3`**, same price as `rerank-2` ($0.05/M tokens either way), so the choice was about not leaving code and environment disagreeing rather than about cost. The code default and `.env.example` are updated to match; nothing about the vendor, the embedding model, the store or the disclosure gate changes.
+
 **Extends [ADR-007](007-pgvector-vector-store.md)**, which decided the vector *store*. It does not supersede it — pgvector remains the store. This ADR decides the embedding and reranking *provider*, which ADR-007 left open and [ADR-006](006-minimum-rag-pipeline.md) described only as "a provider protocol."
 
 ## Context
@@ -21,7 +23,7 @@ The concrete blockers today: `apps/ai/models/embedding.py` uses `VectorField(dim
 | Stage | Choice |
 |---|---|
 | Embedding | Voyage `voyage-context-4`, 1024 dimensions (default), `input_type` document/query |
-| Reranking | Voyage rerank, over the top ~100 recalled chunks |
+| Reranking | Voyage `rerank-3`, over the top ~100 recalled chunks |
 | Store | **pgvector, unchanged** (ADR-007) |
 | Content a `DisclosurePolicy` refuses | **Not sent to Voyage, not AI-processed.** Degrades to ADR-008's FTS path — the same behavior as a Voyage outage. No local model. |
 

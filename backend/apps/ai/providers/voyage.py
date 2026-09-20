@@ -187,12 +187,12 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
 
 
 class VoyageReranker(Reranker):
-    """`rerank-2` by default (ADR-015). Reads text, never a vector."""
+    """`rerank-3` by default (ADR-015, pinned 2026-09-20). Reads text, never a vector."""
 
     def __init__(
         self, model: Optional[str] = None, transport: Optional[Transport] = None
     ) -> None:
-        self._model = model or getattr(settings, "VOYAGE_RERANK_MODEL", "rerank-2")
+        self._model = model or getattr(settings, "VOYAGE_RERANK_MODEL", "rerank-3")
         self._post = transport or _post
 
     def rerank(
