@@ -47,11 +47,17 @@ class RecordPlan:
     pending_chunks: int
     total_chunks: int
     estimated_tokens: int
+    #: Stage 1 of ADR-013's retrieval ranks *records* on `RecordEmbedding`
+    #: before stage 2 ranks chunks within them, so a record whose chunks are
+    #: all embedded but whose summary vector is missing is invisible to
+    #: retrieval however complete its chunks are. Planning on pending chunks
+    #: alone would never walk such a record again.
+    needs_summary: bool = False
     reason: str = ""
 
     @property
     def has_work(self) -> bool:
-        return self.pending_chunks > 0
+        return self.pending_chunks > 0 or self.needs_summary
 
 
 @dataclass(frozen=True)
@@ -81,6 +87,10 @@ class BackfillPlan:
     @property
     def chunk_count(self) -> int:
         return sum(plan.pending_chunks for plan in self.to_embed)
+
+    @property
+    def summary_count(self) -> int:
+        return sum(1 for plan in self.to_embed if plan.needs_summary)
 
     @property
     def estimated_tokens(self) -> int:
@@ -134,6 +144,7 @@ def plan_records(
     space_id: int,
     space_model: str = "",
     cost_per_million: float = 0.0,
+    include_summaries: bool = True,
 ) -> BackfillPlan:
     """Cost every record in ``records`` against the embedding space ``space_id``.
 
@@ -142,20 +153,47 @@ def plan_records(
     plan cannot disagree with what the run will do. A backfill is an
     occasional operator command, and a plan that is fast but lies about the
     bill is the wrong trade.
+
+    ``include_summaries`` is off when filling a **pending** space, because
+    that mode writes chunk vectors only — ``RecordEmbedding`` is one row per
+    record with no space key, so a summary vector cannot exist in two spaces
+    at once.
     """
-    from apps.ai.indexing import estimate_pending_tokens, pending_chunks
+    from apps.ai.indexing import active_chunks, estimate_pending_tokens, pending_chunks
+    from apps.ai.models import RecordEmbedding
 
     plans: list[RecordPlan] = []
     stub_records = 0
+    # One query for the whole run rather than one per record: this is the
+    # only part of the plan that can be answered in bulk without the answer
+    # drifting from what the run will do.
+    summarised = (
+        set(
+            RecordEmbedding.objects.filter(model_name=space_model).values_list(
+                "record_id", flat=True
+            )
+        )
+        if include_summaries and space_model
+        else set()
+    )
 
     for record in records:
         chunks = pending_chunks(record.id, space_id)
-        total = record.document_chunks.filter(
-            chunk_set__is_active=True, deleted_at__isnull=True
-        ).count()
+        total = active_chunks(record.id).count()
+        # Gated on the record having chunks at all. A record with no active
+        # chunk set is not in the corpus — the 4,910 placeholders among
+        # them least of all — and owing it a summary vector would walk every
+        # one of them straight back into the run this skip exists to keep
+        # them out of.
+        needs_summary = (
+            include_summaries
+            and bool(space_model)
+            and total > 0
+            and record.id not in summarised
+        )
 
         reason = ""
-        if not chunks:
+        if not chunks and not needs_summary:
             if total:
                 reason = "already embedded in this space"
             elif record_has_only_stub_documents(record):
@@ -173,6 +211,7 @@ def plan_records(
                 estimated_tokens=(
                     estimate_pending_tokens(record.id, space_id) if chunks else 0
                 ),
+                needs_summary=needs_summary,
                 reason=reason,
             )
         )
