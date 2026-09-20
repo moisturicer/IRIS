@@ -4,6 +4,8 @@
 
 Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off precondition (see §Security Impact); adopted `voyage-context-4` as the embedding model; removed the local Ollama fallback this ADR had introduced, which contradicted [ADR-008](008-ai-degradation-to-fts.md)'s already-accepted rejection of a local model. There is no local lane. A `DisclosurePolicy` refusal means that content is not sent to Voyage and is not AI-processed at all — it degrades to the same FTS path ADR-008 already specifies for a vendor outage. **Revised again 2026-09-04:** "vendor no-training terms confirmed in writing" is replaced with the verified, actual mechanism — an opt-out toggle, not a default, not a written confirmation (see §Security Impact).
 
+**Revised 2026-09-20 (IR-281, IR-282) — recorded by an agent, awaiting a reviewer's acceptance.** Adds rule 4 below (chunks are embedded grouped by document, on the contextualized endpoint) and §Indexing operations (a spend ceiling and a promotion gate). Both record decisions that were taken while implementing IR-281 and IR-282 and that had no written basis; neither changes the vendor, the model, the store or the disclosure gate. Per CLAUDE.md §What AI does not decide, an agent may record these but may not accept them.
+
 **Extends [ADR-007](007-pgvector-vector-store.md)**, which decided the vector *store*. It does not supersede it — pgvector remains the store. This ADR decides the embedding and reranking *provider*, which ADR-007 left open and [ADR-006](006-minimum-rag-pipeline.md) described only as "a provider protocol."
 
 ## Context
@@ -35,7 +37,29 @@ Three rules the implementation must satisfy:
 2. **One switch.** The dead `AI_EMBEDDING_PROVIDER` setting is deleted; the active `EmbeddingSpace` is the single source of truth, read by both the indexing and the query path, with a startup assertion that they agree.
 3. **Document and query embedding are separate methods**, not a flag — `embed_documents()` and `embed_query()`. Voyage models are asymmetric and mixing the input types degrades retrieval measurably. A boolean makes the wrong call possible; two methods make it impossible.
 
+4. **Chunks are embedded grouped by the document they came from, on the contextualized endpoint** (added 2026-09-20, IR-281). `voyage-context-4` is served from `POST /v1/contextualizedembeddings`, whose payload is a list of *documents*, each a list of that document's chunks. The flat `/v1/embeddings` endpoint serves the standard models; sending a contextualized model's traffic there is accepted by the API and **silently discards the sibling-chunk context that is the entire reason this ADR chose the model** — a passage reading "this approach reduced error by 12%" stops meaning anything once retrieved alone. The port therefore grows a third method, `embed_document_chunks(documents)`, taking and returning the grouping; `embed_documents` and `embed_query` route through the same endpoint with each text as its own one-chunk document, so there is one wire format rather than two to keep in step.
+
+   **Two consequences that follow from the grouping being load-bearing.** Batch assembly's unit becomes the *document*: a document is never split across two requests, because half a document's chunks in view is not the context the model was chosen for. And a document larger than the whole token budget is sent alone and whole, letting the vendor reject it and say so, rather than being quietly split.
+
+   **Why this is a rule and not an implementation detail.** Nothing downstream can detect the mistake. A chunk embedded without its siblings produces a well-formed vector of the right width in the right space; it simply means less than it should, and the only symptom is retrieval that is worse than it ought to be for reasons no test would attribute to the endpoint. That is the same class of failure as rule 3's asymmetry and is guarded the same way — by making the wrong call hard to express rather than by remembering not to make it.
+
 **The invariant, stated once:** within one `EmbeddingSpace`, the same model embeds documents and queries. Always. Comparing vectors across two models does not error — it returns rows, ranked plausibly, and wrong. Reranking is the exception and composes freely, because a reranker reads text and never touches a vector.
+
+## Indexing operations: a spend ceiling and a promotion gate
+
+*Added 2026-09-20 (IR-282). §Consequences already named the risk — "the free tier is a trial tier with rate limits, not a production allowance" — without saying what enforces it. This is what.*
+
+**A corpus run states its cost before it spends anything, and a ceiling refuses.** `backfill_embeddings` prints the records, chunks and estimated tokens it would send, and stops when the estimate exceeds `AI_EMBEDDING_TOKEN_CEILING`. The estimate is deliberately an **upper bound, not a quote**: it reuses the same estimator batch assembly uses, so the number an operator is shown and the number the run batches against cannot drift apart, and both overcount — an overcount costs one extra request, an undercount costs money.
+
+This is a refusal rather than a warning because the risk is live, not theoretical. `AI_CHUNK_MAX_TOKENS` counts whitespace **words**, not tokenizer tokens, and is about 44% under the real BPE count (IR-243, which deliberately left the number alone pending IR-133's evidence). A ceiling that only warned would be read past exactly once.
+
+**Resume and skip are properties of the query, not of a checkpoint.** What a run embeds is "active chunks with no vector in this space", recomputed every time. So a crash at record 3,000 resumes at record 3,000, and a finished corpus re-runs for one query per record and no vendor call — without any bookkeeping that could itself be lost in the crash that made it necessary. "Already has a vector in this space" *is* the unchanged-text skip, because a chunk whose text survives a re-chunk carries its vector across (ADR-013); there is deliberately no second definition of "unchanged" to disagree with the first.
+
+**Promotion is a separate, refusable command, and nothing promotes automatically.** An `EmbeddingSpace` may not become `active` while any active chunk lacks a vector in it. A half-indexed space is worse than an empty one: it answers confidently from the half it holds, and a chunk with no vector does not rank low — it is not there, invisibly, to the reader and to the ranking alike. The refusal names which records are short and by how much, because "4,910 chunks short" is not something an operator can act on.
+
+Promotion also refuses a **retired** space and a space whose width disagrees with the vector columns, so that what may be promoted and what may be written to cannot disagree about the same row.
+
+**Recorded limitation.** A pending space can be filled with *chunk* vectors only. `RecordEmbedding` is one row per record with no space key, so a summary vector cannot exist in two spaces at once, and writing one while filling a pending space would overwrite the live space's. Making record-level vectors space-keyed is schema work that has not been done, and it is a precondition for the first real model change — at which point stage 1 of ADR-013's retrieval would otherwise have to be re-indexed in place, live.
 
 ## Alternatives Considered
 

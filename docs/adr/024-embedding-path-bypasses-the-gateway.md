@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-09-17.
+**Accepted** — 2026-09-17. **Implemented 2026-09-20 by IR-281** — see §Implementation below. That note is recorded by an agent and awaits a reviewer's acceptance; it reports what was built and changes none of the decision above.
 
 **Narrows [ADR-014](014-ai-gateway-as-a-service.md); does not supersede it.** ADR-014's adoption of the gateway stands, along with all six preconditions (its five, plus [ADR-017](017-asgi-deployment-for-gateway-streaming.md)'s ASGI requirement). This ADR removes one workload from it.
 
@@ -56,6 +56,24 @@ Three independent failures, none of which is the one the project believed it had
 The decisive fact is precondition 4. A component that may not read the database can only ever be a proxy for the vendor call on this path, and a proxy that adds a hop, a container dependency and a 404 is worse than the call it wraps.
 
 The second reason is evidential: three independent breakages went unnoticed because nothing on this path has ever produced a vector. Removing the hop removes the place the failures hid.
+
+## Implementation
+
+*Added 2026-09-20 (IR-281). This ADR was accepted three days before anything implemented it; this records what landed, so the next reader does not have to diff the tree to find out whether an accepted decision is real.*
+
+Each consequence below is the one this ADR predicted, with what actually happened:
+
+| This ADR said | What landed |
+|---|---|
+| "`tasks.embed_record` is rewritten against the port" | Done. It calls `apps.ai.indexing.embed_record_summary`, which goes through `EmbeddingProvider`. No `httpx` call, no gateway URL |
+| "the chunk-embedding task is written against the same port from the start" | Done — `ai.tasks.embed_chunk_set`, and `index_record` for the corpus backfill. `apps/ai/indexing.py` is the seam all three share |
+| "Indexing no longer depends on the `ai-gateway` container being up" | Done, and **asserted rather than trusted**: `apps/ai/tests/test_indexing_does_not_use_the_gateway.py` walks every module under `apps/ai/` and fails if any reads `AI_GATEWAY_URL`. The way this regresses is one `import httpx` in a task nobody looks at again, which is precisely how the three breakages below went unnoticed |
+| "The gateway's `/embed` endpoint becomes dead code on the Django side" | Confirmed. Left in place, as this ADR directed; nothing calls it |
+| "`AI_GATEWAY_URL` is no longer required by the Celery workers" | Confirmed. The setting remains in `config/settings/base.py` for ADR-014's streaming-chat mandate and is read by nothing |
+
+**One thing this ADR did not anticipate.** It framed the gateway hop as a pure text-in, vector-out proxy, which is true of the *transport* — but it is also where an outbound call to a commercial vendor would have been made, and [ADR-015](015-voyage-embedding-and-reranking.md) §Security Impact puts a `DisclosurePolicy` gate in front of every one of those. Moving the call in-process moves the gate's enforcement point with it, so `apps/ai/indexing.py` applies it before either kind of vector is computed.
+
+The consequence is worth stating plainly: **the gate refuses every record today**, because `Record` carries no embargo field and an undetermined embargo is treated as an embargo (IR-250). That is the correct failure direction for a gate whose purpose is to stop content leaving, and it means this ADR's path is complete and correct while indexing a real corpus still waits on IR-250. Nothing in the implementation works around it — the way past a fail-closed gate is to supply the missing fact, not to make the gate optional.
 
 ## Consequences
 
