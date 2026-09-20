@@ -57,13 +57,28 @@ SYSTEM_PROMPT = (
 
 @dataclass(frozen=True)
 class Citation:
-    """One resolved citation: what the marker pointed at."""
+    """One resolved citation: what the marker pointed at.
+
+    Carries the **quoted text** as well as the ids (IR-284). A citation whose
+    whole content is a record id asks a reader to go and find the sentence
+    themselves in a fifty-page PDF, which is the verifiability chunk-level
+    retrieval was built for and did not deliver. The text is already in hand
+    here -- it is the chunk that was put in the prompt -- so resolving it
+    later would be a second query and a second chance to resolve it wrongly.
+
+    ``text`` is the chunk's ``content``, never its ``text``: ``content`` is
+    the reader-facing form, and ``text`` is what the vector was computed from.
+    Quoting the latter would show a reader a normalized string that is not
+    quite what the paper says.
+    """
 
     marker: int
     chunk_id: int
     record_id: int
     record_title: str
     source_page: int | None
+    text: str
+    context_path: tuple[str, ...]
 
 
 #: What produced this answer. Strings rather than an enum for the reason
@@ -162,6 +177,8 @@ def parse_citations(
                     record_id=chunk.record_id,
                     record_title=chunk.record_title,
                     source_page=chunk.source_page,
+                    text=chunk.content,
+                    context_path=tuple(chunk.context_path or ()),
                 )
             )
         if not valid:

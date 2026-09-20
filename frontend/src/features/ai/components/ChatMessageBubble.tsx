@@ -1,10 +1,45 @@
-import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { ChatMessage } from "@/types/chat";
+import type { Citation } from "@/types/ai";
 import { AskIrisMark, GroundedCitationIcon } from "./AskIrisIcons";
+import { DegradedNotice, OpenPassageLink, PassageQuote } from "./PassageQuote";
 import "highlight.js/styles/github.min.css";
+
+/**
+ * One citation: the quote, the page, and a way to go and read it.
+ *
+ * The quote is the point (IR-284). A chip reading "Record #7" asked a reader
+ * to go and find the supporting sentence themselves in a fifty-page PDF,
+ * which is the verifiability chunk-level retrieval was built for and did not
+ * deliver.
+ *
+ * The link carries `?page=` so the record view can open the paper *at* that
+ * page rather than at its first. A passage whose page could not be recovered
+ * during extraction links to the record without one, rather than guessing a
+ * page number, which would send a reader to the wrong place confidently.
+ */
+function PassageCitation({ citation }: { citation: Citation }) {
+  const section = citation.context_path?.[citation.context_path.length - 1];
+
+  return (
+    <div className="rounded-lg bg-[#6B0F12]/[0.04] border border-[#6B0F12]/10 px-2.5 py-2">
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        <span className="text-[10px] font-bold text-[#6B0F12]">[{citation.marker}]</span>
+        <span className="text-[11px] font-semibold text-stone-700 min-w-0 truncate">
+          {citation.record_title}
+        </span>
+        {section && (
+          <span className="text-[10px] text-stone-500 truncate">· {section}</span>
+        )}
+      </div>
+
+      <PassageQuote text={citation.text} className="mt-1" />
+      <OpenPassageLink citation={citation} className="mt-1.5" />
+    </div>
+  );
+}
 
 interface ChatMessageBubbleProps {
   message:      ChatMessage;
@@ -41,22 +76,22 @@ export function ChatMessageBubble({ message, showSources = true }: ChatMessageBu
           </div>
         )}
 
+        {!isUser && message.degraded && <DegradedNotice subject="answer" />}
+
         {!isUser && showSources && message.citations && message.citations.length > 0 && (
-          <div className="mt-3 pt-2 border-t border-gray-100 flex flex-wrap gap-1.5">
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-stone-400 uppercase tracking-wide w-full">
+          <div className="mt-3 pt-2 border-t border-gray-100 space-y-2">
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-stone-400 uppercase tracking-wide">
               <GroundedCitationIcon className="w-3.5 h-3.5" />
-              Grounded in {message.citations.length} record
+              Grounded in {message.citations.length} passage
               {message.citations.length === 1 ? "" : "s"}
             </span>
-            {message.citations.map((id) => (
-              <Link
-                key={id}
-                to={`/records/${id}`}
-                className="text-[11px] font-medium text-[#6B0F12] hover:underline px-2 py-0.5 bg-[#6B0F12]/5 rounded"
-              >
-                Record #{id}
-              </Link>
-            ))}
+            <ol className="space-y-2 list-none pl-0">
+              {message.citations.map((citation) => (
+                <li key={`${citation.chunk_id}-${citation.marker}`}>
+                  <PassageCitation citation={citation} />
+                </li>
+              ))}
+            </ol>
           </div>
         )}
       </div>

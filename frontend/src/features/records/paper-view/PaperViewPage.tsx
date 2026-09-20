@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
+import { citedPage, paperHrefAtPage } from "@/lib/citedPage";
 import type { RecordDetail, IpType, RecordReview } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
@@ -306,6 +307,7 @@ function initials(name: string): string {
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
 
   const chat = usePaperChat();
@@ -406,6 +408,13 @@ export default function PaperViewPage() {
   // one; otherwise fall back to the first attachment. The Documents rail covers
   // the rest, so this button is only ever "the paper".
   const paperUrl = record.abstract_file ?? record.files[0]?.url ?? null;
+
+  // A citation links here with `?page=` (IR-284), so acting on it lands on the
+  // page that supports the claim rather than on the paper's first. The rules
+  // for reading and using that number live in `lib/citedPage`, where they are
+  // testable without standing up this screen.
+  const openAtPage = citedPage(searchParams.get("page"));
+  const paperHref = paperHrefAtPage(paperUrl, openAtPage);
 
   return (
     <div
@@ -555,15 +564,15 @@ export default function PaperViewPage() {
 
             {/* Action row */}
             <div className="flex items-center gap-2 flex-wrap pb-6 border-b border-stone-200">
-              {paperUrl ? (
+              {paperHref ? (
                 <a
-                  href={paperUrl}
+                  href={paperHref}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-light transition-colors"
                 >
                   <i className="fas fa-book-open text-[12px]" aria-hidden />
-                  View Paper
+                  {openAtPage != null ? `View Paper at page ${openAtPage}` : "View Paper"}
                 </a>
               ) : (
                 <span
