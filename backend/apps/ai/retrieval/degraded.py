@@ -42,13 +42,24 @@ class FullTextRetriever(Retriever):
     `Record.search_vector` is maintained for records, chunks have no equivalent
     column, and adding one is a migration and an index this path does not
     justify -- it runs only while the vendor is down.
+
+    ``record``, like `TwoStageRetriever`'s, narrows the search to one Record
+    (IR-298) -- constructed by the composition root, not threaded through
+    `retrieve`, so a degraded Paper Chat answer keeps its scope instead of
+    quietly widening because the vendor happened to be down.
     """
+
+    def __init__(self, record: Optional[Record] = None) -> None:
+        self._record = record
 
     def retrieve(self, question: str, user, limit: int = 20):
         if not question.strip():
             return RetrievalResult(degraded=True, mode=FULL_TEXT)
 
-        visible = Record.objects.visible_to(user).values("pk")
+        visible = Record.objects.visible_to(user)
+        if self._record is not None:
+            visible = visible.filter(pk=self._record.pk)
+        visible = visible.values("pk")
         query = SearchQuery(question, config="english")
         vector = SearchVector("content", config="english")
 

@@ -50,10 +50,20 @@ class TwoStageRetriever(Retriever):
         embedder: EmbeddingProvider,
         record_candidates: int = DEFAULT_RECORD_CANDIDATES,
         space: Optional[EmbeddingSpace] = None,
+        record: Optional[Record] = None,
     ) -> None:
+        """``record`` narrows stage 1 to one Record, constructor-time (IR-298).
+
+        A constructor argument rather than a parameter on `retrieve`, so the
+        `Retriever` port stays exactly what every implementation already
+        satisfies (ADR-026 §7 / IR-294 story 31) — the composition root builds
+        a differently-scoped retriever per request instead of widening the
+        interface every caller shares.
+        """
         self._embedder = embedder
         self._record_candidates = record_candidates
         self._space = space
+        self._record = record
 
     def _active_space(self) -> Optional[EmbeddingSpace]:
         if self._space is not None:
@@ -71,7 +81,14 @@ class TwoStageRetriever(Retriever):
         query_vector = self._embedder.embed_query(question)
 
         # -- Stage 1: candidate records, visibility-filtered before scoring --
-        visible_records = Record.objects.visible_to(user).values("pk")
+        visible_records = Record.objects.visible_to(user)
+        if self._record is not None:
+            # Scoped to one Record (IR-298): still through `visible_to`, not
+            # instead of it -- a Conversation's Record may have stopped being
+            # readable since it was scoped, and this is the same fail-closed
+            # check every other retrieval path applies.
+            visible_records = visible_records.filter(pk=self._record.pk)
+        visible_records = visible_records.values("pk")
         candidate_ids = list(
             RecordEmbedding.objects.filter(record__in=visible_records)
             .order_by(CosineDistance("embedding", query_vector))

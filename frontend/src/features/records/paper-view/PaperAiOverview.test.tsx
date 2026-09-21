@@ -31,12 +31,15 @@ const citation: Citation = {
 
 function answer(overrides: Partial<AIAnswer> = {}): AIAnswer {
   return {
-    answer:    "The work trains a convolutional network on gauge data [1].",
-    citations: [citation],
-    sources:   [],
-    message:   null,
-    mode:      "generative",
-    degraded:  false,
+    answer:             "The work trains a convolutional network on gauge data [1].",
+    citations:          [citation],
+    sources:            [],
+    message:            null,
+    mode:               "generative",
+    degraded:           false,
+    conversation_id:    null,
+    resolved_question:  null,
+    widened:            false,
     ...overrides,
   };
 }

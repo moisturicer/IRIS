@@ -1,21 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
-import type { SemanticSearchResult } from "@/types/ai";
+import type { ChatMessage } from "@/types/chat";
+import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import { AskIrisEmblem, AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcons";
+import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
 import { cn } from "@/lib/utils";
 
 export type DockMode = "left" | "right" | "floating";
 
 const DOCK_KEY = "iris_paper_chat_dock";
-
-interface Turn {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  sources?: SemanticSearchResult[];
-}
 
 function readDock(): DockMode {
   try {
@@ -74,11 +68,14 @@ interface PaperChatPanelProps {
 }
 
 /**
- * Paper Chat — Ask IRIS scoped to the record being viewed.
+ * Paper Chat — a Conversation scoped to the record being viewed (IR-298).
  *
- * Questions are prefixed with the record's title so retrieval is anchored on
- * this paper. Answers come from the same grounded endpoint as Ask IRIS, so a
- * cited record is always one the reader can open.
+ * Same model, same API as Ask IRIS (ADR-019): opening the panel finds or
+ * starts the Conversation for this Record, and history persists across a
+ * panel close, a reload, and another device. Retrieval is filtered to this
+ * Record's own passages by default — the backend consults the Conversation's
+ * `record`, not a title glued onto the question — until the reader turns on
+ * "All papers" for a question that needs one.
  */
 export function PaperChatPanel({
   record,
@@ -89,40 +86,63 @@ export function PaperChatPanel({
 }: PaperChatPanelProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [widen, setWiden] = useState(false);
+  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Find or start the Conversation for this Record. Re-runs if the reader
+  // navigates to a different paper while the panel stays open.
+  useEffect(() => {
+    let cancelled = false;
+    setReady(false);
+    setWiden(false);
+
+    (async () => {
+      try {
+        const { data: existing } = await aiApi.conversations.list({ record: record.id });
+        const conversation = existing[0]
+          ? (await aiApi.conversations.get(existing[0].id)).data
+          : (await aiApi.conversations.create({ record: record.id })).data;
+        if (cancelled) return;
+        setConversationId(conversation.id);
+        setMessages(conversation.turns.flatMap(turnToMessages));
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [record.id]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [turns, busy]);
+  }, [messages, busy]);
 
   const send = async () => {
     const question = input.trim();
-    if (!question || busy) return;
+    if (!question || busy || !conversationId) return;
 
     setInput("");
-    setTurns((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: question }]);
+    setMessages((prev) => [...prev, newChatMessage("user", question)]);
     setBusy(true);
     try {
-      const { data } = await aiApi.ask(`${record.title}. ${question}`);
-      setTurns((prev) => [
+      const { data } = await aiApi.ask(question, { conversationId, widen });
+      setMessages((prev) => [
         ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: data.answer ?? data.message ?? "No matching record found.",
-          sources: data.sources,
-        },
+        newChatMessage("assistant", data.answer ?? data.message ?? "No matching record found.", {
+          citations: data.citations,
+          sources:   data.sources,
+          degraded:  data.degraded,
+          widened:   data.widened,
+        }),
       ]);
     } catch {
-      setTurns((prev) => [
+      setMessages((prev) => [
         ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "IRIS could not answer right now.",
-        },
+        newChatMessage("assistant", "IRIS could not answer right now."),
       ]);
     } finally {
       setBusy(false);
@@ -201,7 +221,7 @@ export function PaperChatPanel({
 
       {/* Transcript */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#FBFCFD]">
-        {turns.length === 0 && (
+        {ready && messages.length === 0 && (
           <div className="text-center py-8 px-4">
             <AskIrisEmblem className="w-10 h-10 mx-auto mb-3" />
             <p className="text-[12px] text-stone-500 leading-relaxed">
@@ -211,45 +231,9 @@ export function PaperChatPanel({
           </div>
         )}
 
-        {turns.map((turn) =>
-          turn.role === "user" ? (
-            <div key={turn.id} className="flex justify-end">
-              <p className="max-w-[85%] bg-brand text-white rounded-2xl rounded-br-sm px-3 py-2 text-[12px] leading-relaxed">
-                {turn.content}
-              </p>
-            </div>
-          ) : (
-            <div
-              key={turn.id}
-              className="bg-white border border-stone-200 rounded-2xl rounded-bl-sm px-3 py-2.5"
-            >
-              <p className="text-[12px] text-stone-700 whitespace-pre-wrap leading-relaxed">
-                {turn.content}
-              </p>
-              {turn.sources && turn.sources.length > 0 && (
-                <div className="mt-2.5 pt-2 border-t border-stone-100">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-stone-400 mb-1.5">
-                    Referenced source{turn.sources.length === 1 ? "" : "s"}
-                  </p>
-                  {turn.sources.slice(0, 3).map((s) => (
-                    <Link
-                      key={s.id}
-                      to={`/records/${s.id}`}
-                      className="block bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 mb-1.5 hover:border-brand/30 transition-colors"
-                    >
-                      <span className="block text-[11px] font-semibold text-stone-800 truncate">
-                        {s.title}
-                      </span>
-                      <span className="text-[10px] text-stone-400">
-                        Record #{s.id} · View Paper →
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          ),
-        )}
+        {messages.map((m) => (
+          <ChatMessageBubble key={m.id} message={m} />
+        ))}
 
         {busy && (
           <div className="flex items-center gap-2 text-[12px] text-stone-400">
@@ -277,14 +261,28 @@ export function PaperChatPanel({
           className="w-full resize-none bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-[12px] text-stone-800 placeholder-stone-400 outline-none focus:bg-white focus:border-brand/40 transition-colors"
         />
         <div className="flex items-center justify-between mt-2">
-          <span className="flex items-center gap-1.5 text-[10px] text-stone-400">
-            <i className="fas fa-file-lines text-[9px]" aria-hidden />
-            Referencing this paper
-          </span>
+          {/* The scope control (IR-298, ADR-026 §9): visible, and it is the
+              only thing that ever widens retrieval past this paper. Resets
+              to "this paper" whenever the panel switches to a different one. */}
+          <button
+            type="button"
+            onClick={() => setWiden((v) => !v)}
+            aria-pressed={widen}
+            title={widen ? "Searching every paper — click to search only this one" : "Searching only this paper — click to search every paper"}
+            className={cn(
+              "flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full border transition-colors",
+              widen
+                ? "bg-brand/10 text-brand border-brand/30"
+                : "text-stone-400 border-stone-200 hover:text-stone-600",
+            )}
+          >
+            <i className="fas fa-layer-group text-[9px]" aria-hidden />
+            {widen ? "All papers" : "This paper"}
+          </button>
           <button
             type="button"
             onClick={send}
-            disabled={!input.trim() || busy}
+            disabled={!input.trim() || busy || !conversationId}
             aria-label="Send"
             className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors"
           >

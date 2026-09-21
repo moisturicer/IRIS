@@ -162,6 +162,64 @@ class RankingTests:
         assert len(record_ids) <= 2
 
 
+class RecordScopingTests:
+    """A retriever constructed with `record=` never leaves it (IR-298)."""
+
+    def test_a_record_scoped_retriever_returns_only_that_records_chunks(
+        self, embedder, space, reader
+    ):
+        target = published_record("Target Thesis", reader, embedder)
+        add_chunks(target, space, embedder, ["weekly pond sampling procedure"])
+        other = published_record("Other Thesis", reader, embedder)
+        add_chunks(other, space, embedder, ["weekly pond sampling procedure too"])
+
+        found = TwoStageRetriever(embedder, record=target).retrieve(
+            "pond sampling", reader
+        )
+
+        assert {p.record_id for p in found.passages} == {target.pk}
+
+    def test_scoping_to_a_record_the_caller_cannot_read_returns_nothing(
+        self, embedder, space, reader
+    ):
+        """The scope is applied through `visible_to`, not instead of it --
+        the same fail-closed check every other retrieval path makes."""
+        from apps.accounts.models import Role
+
+        role = Role.objects.get_or_create(name=ROLE_STUDENT)[0]
+        owner = User.objects.create_user(
+            email="owner@cit.edu", password="x", role=role, is_verified=True
+        )
+        hidden = Record.objects.create(
+            title="Hidden Draft", pipeline_status=PipelineStatus.DRAFT
+        )
+        RecordOwner.objects.create(record=hidden, user=owner, is_primary=True)
+        RecordEmbedding.objects.create(
+            record=hidden,
+            embedding=embedder.embed_documents(["Hidden Draft"])[0],
+            model_name="fake-test",
+        )
+        add_chunks(hidden, space, embedder, ["a secret finding"])
+
+        found = TwoStageRetriever(embedder, record=hidden).retrieve(
+            "finding", reader
+        )
+
+        assert found.passages == ()
+
+    def test_an_unscoped_retriever_reaches_every_readable_record(
+        self, embedder, space, reader
+    ):
+        first = published_record("First Thesis", reader, embedder)
+        add_chunks(first, space, embedder, ["weekly pond sampling procedure"])
+        second = published_record("Second Thesis", reader, embedder)
+        add_chunks(second, space, embedder, ["weekly pond sampling procedure too"])
+
+        found = TwoStageRetriever(embedder).retrieve("pond sampling", reader)
+
+        assert {p.record_id for p in found.passages} == {first.pk, second.pk}
+
+
 class ResultShapeTests:
     def test_a_result_carries_what_a_citation_needs(self, embedder, space, reader):
         record = published_record("Tilapia Feed Study", reader, embedder)

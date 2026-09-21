@@ -124,6 +124,16 @@ class FullTextFallbackTests:
         make_record("Thesis", reader, ["weekly pond sampling"])
         assert FullTextRetriever().retrieve("   ", reader).passages == ()
 
+    def test_a_record_scoped_fallback_never_leaves_that_record(self, reader):
+        """A Paper Chat answer must stay scoped even when the vendor is down
+        (IR-298) -- the degraded path is not a way to widen by accident."""
+        target = make_record("Target Thesis", reader, ["weekly pond sampling"])
+        make_record("Other Thesis", reader, ["weekly pond sampling too"])
+
+        found = FullTextRetriever(record=target).retrieve("sampling", reader)
+
+        assert {p.record_id for p in found.passages} == {target.pk}
+
 
 class DegradationTests:
     def test_an_open_circuit_degrades_rather_than_raising(self, reader):

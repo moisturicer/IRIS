@@ -99,6 +99,34 @@ describe("a cited answer", () => {
     expect(screen.queryByRole("blockquote")).toBeNull();
   });
 
+  it("renders a replayed citation as a bare link when there is no quote to show", () => {
+    // A reopened Conversation's stored citation is a pointer only -- record,
+    // chunk, page -- until IR-299 re-resolves the quote (IR-298).
+    renderScreen(
+      <ChatMessageBubble
+        message={assistantMessage({
+          citations: [{ marker: 1, record_id: 7, chunk_id: 11, page: 4 }],
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("blockquote")).toBeNull();
+    const link = screen.getByRole("link", { name: /Open the source at page 4/i });
+    expect(link.getAttribute("href")).toBe("/records/7?page=4");
+  });
+
+  it("says when the answer left the paper being read", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage({ widened: true })} />);
+
+    expect(screen.getByText(/Searched all papers/i)).toBeTruthy();
+  });
+
+  it("says nothing about scope when the answer was not widened", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage()} />);
+
+    expect(screen.queryByText(/Searched all papers/i)).toBeNull();
+  });
+
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(
       <ChatMessageBubble message={assistantMessage({ degraded: true })} />,

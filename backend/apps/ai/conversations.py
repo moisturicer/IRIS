@@ -29,6 +29,7 @@ def record_turn(
     question: str,
     answer: GroundedAnswer,
     resolved_question: Optional[str] = None,
+    widened: bool = False,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -43,6 +44,12 @@ def record_turn(
     ``resolved_question`` is ``None`` unless resolution ran and produced a
     standalone question (IR-296) — stored blank in every other case, which is
     the same fallback retrieval already took for that Turn.
+
+    ``widened`` is true only when this Turn's Conversation is scoped to a
+    Record and the caller asked to search all papers instead (IR-298). It is
+    the caller's decision to record, not something re-derived from citations:
+    a widened question that still matched nothing outside its own paper must
+    still say it was widened.
     """
     turn = Turn.objects.create(
         conversation=conversation,
@@ -51,6 +58,7 @@ def record_turn(
         answer=answer.text or "",
         state=answer.state,
         degraded=answer.degraded,
+        widened=widened,
     )
     TurnCitation.objects.bulk_create(
         TurnCitation(
@@ -94,6 +102,7 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
             "resolved_question": turn.resolved_question or None,
             "state": answer_mode(turn.state),
             "degraded": turn.degraded,
+            "widened": turn.widened,
             "created_at": turn.created_at,
             "citations": [
                 {
