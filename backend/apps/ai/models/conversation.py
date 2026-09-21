@@ -66,12 +66,20 @@ class Turn(models.Model):
     results, or the model was unreachable — stored rather than re-derived,
     because "no answer was written" and "the answer was empty" are different
     facts and a reopened transcript must not present the second as the first.
+
+    `resolved_question` is blank unless resolution actually ran and changed
+    something (IR-296, ADR-026) — skipped on the first Turn, skipped when the
+    question carries no back-reference, and left blank on a failed model call,
+    all three of which retrieve on `question` as written. Stored rather than
+    re-derived because a wrong resolution silently changed what was asked, so
+    it must be inspectable on replay rather than mysterious.
     """
 
     conversation = models.ForeignKey(
         Conversation, on_delete=models.CASCADE, related_name="turns"
     )
     question = models.TextField()
+    resolved_question = models.TextField(blank=True)
     answer = models.TextField(blank=True)
     state = models.CharField(max_length=20)
     degraded = models.BooleanField(default=False)
