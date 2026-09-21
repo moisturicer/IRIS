@@ -9,172 +9,34 @@ Driven with the deterministic provider fakes, injected through the composition
 root. No vendor account, no network — which is the point: these include the
 security assertions, and a security test that only runs where a paid API key
 is configured is a security test that does not run.
+
+The corpus builders live in `corpus.py` and the fixtures in `conftest.py`, so
+the conversation suite drives the same ones (IR-295).
 """
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.ai.composition import CompositionRoot, use_composition_root
-from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
-from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
-from apps.ai.models.embedding import RecordEmbedding
-from apps.ai.models.embedding_space import EmbeddingSpace
-from apps.ai.providers.fakes import (
-    DeterministicEmbeddingProvider,
-    ScriptedLLM,
-    ScriptedReranker,
-)
-from apps.ai.providers.openai_compatible import LLMUnavailable
-from apps.ai.providers.ports import EmbeddingProvider, LLMProvider
-from apps.ai.resilience.circuit import CircuitOpen
-from apps.records.models import Record, RecordOwner
+from apps.ai.composition import use_composition_root
+from apps.ai.providers.fakes import ScriptedLLM
 from core.enums import PipelineStatus
-from core.permissions import ROLE_STUDENT
+
+from .corpus import (
+    DIMENSIONS,
+    FLOOD_QUESTION,
+    FLOOD_TEXT,
+    POND_TEXT,
+    _BrokenEmbedder,
+    _BrokenLLM,
+    ask,
+    make_record,
+    make_user,
+    root_with,
+    search,
+)
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
-
-User = get_user_model()
-
-DIMENSIONS = VECTOR_COLUMN_DIMENSIONS
-
-FLOOD_TEXT = (
-    "we trained a convolutional neural network on rainfall gauge data to "
-    "predict flooding in the Mananga catchment"
-)
-POND_TEXT = "sampling procedure for tilapia ponds stocked in brackish water"
-
-FLOOD_QUESTION = "neural network rainfall flooding catchment"
-
-
-# -- the corpus ---------------------------------------------------------------
-
-
-@pytest.fixture
-def space(db):
-    """The one active space. A test may not create a second — the database
-    constraint forbids it, and so does the property it exists to protect."""
-    existing = EmbeddingSpace.objects.filter(state="active").first()
-    if existing is not None:
-        return existing
-    return EmbeddingSpace.objects.create(
-        model_id="fake-test", dimensions=DIMENSIONS, metric="cosine", state="active"
-    )
-
-
-@pytest.fixture
-def embedder():
-    return DeterministicEmbeddingProvider(dimensions=DIMENSIONS)
-
-
-def make_user(email, role_name=ROLE_STUDENT):
-    from apps.accounts.models import Role
-
-    role = Role.objects.get_or_create(name=role_name)[0] if role_name else None
-    return User.objects.create_user(
-        email=email, password="x", role=role, is_verified=True
-    )
-
-
-def make_record(*, title, text, embedder, space, status=PipelineStatus.PUBLISHED,
-                owner=None):
-    """A record with one active chunk set, one chunk, and both vectors.
-
-    Both, because retrieval is two-stage: the record vector is what stage 1
-    ranks a record on, and without it the record is not a candidate and its
-    chunks are never reached.
-    """
-    record = Record.objects.create(
-        title=title, abstract=f"An abstract for {title}.", pipeline_status=status
-    )
-    if owner is not None:
-        RecordOwner.objects.create(record=record, user=owner, is_primary=True)
-
-    RecordEmbedding.objects.create(
-        record=record,
-        embedding=embedder.embed_documents([f"{title}. {text}"])[0],
-        model_name="fake-test",
-    )
-    chunk_set = ChunkSet.objects.create(
-        record=record, extraction_hash=f"e{title}", strategy_id="s",
-        options={}, content_hash=f"c{title}", is_active=True,
-    )
-    chunk = DocumentChunk.objects.create(
-        chunk_set=chunk_set, record=record, sequence=0, max_sequence=0,
-        text=text, content=text, context_path=[title, "Methods"],
-        token_count=len(text.split()), text_hash=f"t{record.pk}",
-        source_page=4, element_kinds=["paragraph"], bboxes=[],
-    )
-    ChunkEmbedding.objects.create(
-        chunk=chunk, space=space, embedding=embedder.embed_documents([text])[0]
-    )
-    return record
-
-
-# -- the composition root, with fakes in it -----------------------------------
-
-
-class _BrokenEmbedder(EmbeddingProvider):
-    """A vendor that is down, not a vendor that is wrong.
-
-    Raises `CircuitOpen`, which is what the breaker in front of a real adapter
-    raises once it has given up — the case ADR-008 says must degrade rather
-    than fail.
-    """
-
-    @property
-    def dimensions(self):
-        return DIMENSIONS
-
-    def embed_documents(self, texts):
-        raise CircuitOpen("vendor down")
-
-    def embed_document_chunks(self, documents):
-        raise CircuitOpen("vendor down")
-
-    def embed_query(self, text):
-        raise CircuitOpen("vendor down")
-
-
-class _BrokenLLM(LLMProvider):
-    def generate(self, system, user):
-        raise LLMUnavailable("429 rate limited")
-
-
-def root_with(embedder=None, llm=None):
-    """A root whose vendors are fakes and whose disclosure gate allows.
-
-    The gate is opened deliberately and explicitly. `Record` carries no
-    embargo field yet (IR-250), so the real predicate refuses everything, and
-    a test running under it would pass while asserting nothing — every
-    assertion about what comes back would be satisfied by an empty list. The
-    gate's own refusing behaviour is asserted in `apps/ai/policy/tests/`.
-    """
-    return CompositionRoot(
-        embedder=embedder,
-        reranker=ScriptedReranker(),
-        llm=llm or ScriptedLLM(),
-        permits=lambda record: True,
-    )
-
-
-@pytest.fixture
-def client_for():
-    def _client(user):
-        client = APIClient()
-        client.force_authenticate(user=user)
-        return client
-
-    return _client
-
-
-def ask(client, question, **body):
-    return client.post(reverse("ai-ask"), {"question": question, **body}, format="json")
-
-
-def search(client, query, **body):
-    return client.post(reverse("ai-search"), {"query": query, **body}, format="json")
 
 
 # -- answering from inside the papers -----------------------------------------

@@ -32,6 +32,16 @@ Both UI surfaces read and write through the same `Conversation`/`ChatMessage` mo
 
 Alongside unification, this ADR reverses ADR-001/013's specific exclusion of conversational memory: `POST /api/v1/ai/ask/` gains an optional `conversation_id`, the backend loads and extends the real message history (not a reconstructed text blob) for both retrieval and LLM synthesis, and citations are stored as live references (record id only, re-checked against `Record.objects.publicly_visible()` on every read) rather than frozen snapshots — so a citation in old history can never point at a record the reader can no longer see, matching the same guarantee ADR-013 §Security Impact already requires of live retrieval.
 
+### Two divergences in the implementation, recorded rather than reconciled (2026-09-21)
+
+Both surfaced building IR-295 (part A) and are named here because CLAUDE.md §Source-of-truth hierarchy asks for the contradiction to be written down rather than smoothed over. Recorded by an agent; a reviewer decides whether to accept them or to change the code.
+
+1. **The second model is `Turn`, not `ChatMessage`.** §Decision above names a `ChatMessage` — one row per utterance. The code ships `Turn`, holding a question and the answer it produced together, plus `TurnCitation`. IR-294 and IR-295 both call the unit a Turn and define it that way, and pairing the two in the schema removes the possibility of a question with no answer without a constraint to enforce it. The cost is that this ADR's model name no longer matches the tree.
+
+2. **Citations are re-checked against `visible_to(user)`, not `publicly_visible()`.** §Decision and §Security Impact both name `publicly_visible()`, which was the right predicate when this ADR was written. It is not any more: IR-283 and IR-285 collapsed IRIS onto one visibility predicate, `Record.objects.visible_to(user)`, and `apps/ai/tests/test_one_retrieval_stack.py` now fails if the second rule reappears on a retrieval path. So **the ADR is the stale side here**, and the code is right under CLAUDE.md §Security's one-predicate rule. A reviewer accepting this should amend §Decision and §Security Impact to say `visible_to(user)`.
+
+**One amendment to §Decision that IR-294 makes deliberately, not a divergence.** §Decision says a stored citation keeps "record id only". IR-294 §A stored citation is a pointer widens that to record id, chunk id and page — still never the passage text — preserving the intent (a stored message must never hold enough to reconstruct content from a Record that has since become restricted) while letting history show the same quote a fresh answer does. IR-295 stores those pointers; **re-resolving them into quotes is IR-299**, and until then a pointer into a Record the reader can no longer see is dropped from the response rather than rendered.
+
 ## Alternatives Considered
 
 **Persist Ask IRIS only, leave Paper Chat as-is.** Rejected. It ships the illusion that Paper Chat has been fixed when it hasn't — a user who asks a follow-up in Paper Chat still loses it on panel close, while the same action in Ask IRIS now survives. Two different reliability guarantees for what looks, to a user, like the same feature.
