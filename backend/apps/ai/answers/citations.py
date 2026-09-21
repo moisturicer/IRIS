@@ -17,9 +17,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
+from apps.ai.resolution import turn_qa_lines
 from apps.ai.retrieval.ports import RetrievedChunk
+
+if TYPE_CHECKING:
+    from apps.ai.models import Turn
 
 #: Inline markers: [1], [2]. Also matches [1, 2] and [1][2], which models
 #: produce whether or not the prompt asks for them.
@@ -139,6 +143,11 @@ class GroundedAnswer:
     #: the caller nothing to show.
     sources: tuple[RetrievedChunk, ...] = ()
 
+    #: The vector used to search the corpus, and its space (IR-297) -- so
+    #: `record_turn` can store it as the Turn's memory vector at no extra cost.
+    query_vector: Optional[Sequence[float]] = None
+    embedding_space_id: Optional[int] = None
+
     @property
     def is_grounded(self) -> bool:
         """Whether the answer actually cited anything.
@@ -151,8 +160,18 @@ class GroundedAnswer:
         return bool(self.citations)
 
 
-def build_prompt(question: str, chunks: Sequence[RetrievedChunk]) -> str:
-    """The user turn: the question, then the numbered sources.
+def build_prompt(
+    question: str,
+    chunks: Sequence[RetrievedChunk],
+    history: Sequence["Turn"] = (),
+    recalled: Sequence["Turn"] = (),
+) -> str:
+    """The user turn: the conversation so far, the question, then the
+    numbered sources.
+
+    ``history`` is the Conversation's recent Turns, verbatim. ``recalled``
+    is what memory found further back (IR-297) -- included in full, never
+    summarised.
 
     Numbered from 1 in the order given, deterministically, because the model is
     told to cite by those numbers and parsing maps them straight back by index.
@@ -163,7 +182,19 @@ def build_prompt(question: str, chunks: Sequence[RetrievedChunk]) -> str:
     passage came from -- the same trail that disambiguates two theses with an
     identically titled section (IR-112).
     """
-    lines = [f"Question: {question}", "", "Sources:"]
+    lines: list[str] = []
+    if history or recalled:
+        lines.append("Conversation so far:")
+        lines.extend(turn_qa_lines(history))
+        if recalled:
+            lines.append("")
+            lines.append("Relevant earlier in this conversation:")
+            lines.extend(turn_qa_lines(recalled))
+        lines.append("")
+
+    lines.append(f"Question: {question}")
+    lines.append("")
+    lines.append("Sources:")
     for number, chunk in enumerate(chunks, start=1):
         trail = " > ".join(chunk.context_path) if chunk.context_path else chunk.record_title
         lines.append(f"[{number}] {trail}")

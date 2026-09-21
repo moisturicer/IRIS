@@ -15,7 +15,7 @@ from typing import Optional
 from django.db import transaction
 
 from apps.ai.answers.citations import GroundedAnswer
-from apps.ai.models import Conversation, Turn, TurnCitation
+from apps.ai.models import Conversation, Turn, TurnCitation, TurnEmbedding
 from apps.ai.presentation import answer_body, answer_mode
 from apps.records.models import Record
 
@@ -62,6 +62,15 @@ def record_turn(
         )
         for citation in answer.citations
     )
+
+    # The vector already computed to search the corpus (IR-297) -- no
+    # second embedding call. `None` on a degraded, full-text answer.
+    if answer.query_vector is not None and answer.embedding_space_id is not None:
+        TurnEmbedding.objects.create(
+            turn=turn,
+            space_id=answer.embedding_space_id,
+            embedding=answer.query_vector,
+        )
 
     fields = ["updated_at"]
     if not conversation.title:
