@@ -159,6 +159,17 @@ docker compose down                # add -v to drop volumes
 
 **`ai-gateway` now has a real build context (`./ai`)** and builds, given `./ai/.env` (gitignored, absent in CI and on a fresh checkout) — but it crashes at runtime: `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`. [ADR-014](../adr/014-ai-gateway-as-a-service.md) supersedes ADR-010/012's earlier rejection and adopts the gateway as a service under five preconditions, none yet met — this is what's tracked in IR-58, not a missing file to bolt on. Do not deploy it.
 
+### Migrations
+
+**Every backend-image container migrates itself on boot** — `backend`, and all four Celery services (`celery-default`/`celery-extraction`/`celery-embedding`/`celery-beat`), in both `docker-compose.yml` and `docker-compose.prod.yml` (ADR-023, IR-318). `backend/entrypoint.sh` runs `python manage.py migrate --noinput` before handing off to whatever command Compose passes it (`runserver`, `gunicorn`, or a Celery worker/beat process), and `backend/Dockerfile` wires it in as the image's `ENTRYPOINT`. There is no separate manual step:
+
+```bash
+docker compose up --build          # every backend-image container migrates itself before it serves or consumes
+docker compose logs backend        # migrate output appears first, before the runserver/gunicorn banner
+```
+
+You should only ever need `docker compose exec backend python manage.py migrate` by hand to diagnose a container that failed to come up — not as a routine step. If a container keeps restarting right after boot, check `docker compose logs <service>` for a migration failure before assuming the task itself is broken.
+
 ### Celery
 
 Workers consume the `default`, `extraction` and `embedding` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding` services). `config/settings/base.py` sets `CELERY_TASK_ROUTES` (`extract_pdf_text` → `extraction`, `embed_record` → `embedding`) and `CELERY_TASK_DEFAULT_QUEUE = "default"` for everything else, including `chunk_record_document` (IR-164) — so publishers and consumers agree on queue names. Verified against the real docker-compose stack, not just the config: a task dispatched over the real Redis broker was consumed and completed by the real `celery-default` and `celery-extraction` containers.
