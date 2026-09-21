@@ -33,7 +33,7 @@ from apps.ai.models import (
     EmbeddingSpaceState,
     RecordEmbedding,
 )
-from apps.ai.models.chunk import ChunkEmbedding, DocumentChunk
+from apps.ai.models.chunk import ChunkEmbedding
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.repositories import DjangoChunkRepository
 from apps.records.models import Record
