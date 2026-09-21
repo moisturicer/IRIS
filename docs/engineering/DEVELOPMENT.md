@@ -161,7 +161,7 @@ docker compose down                # add -v to drop volumes
 
 ### Migrations
 
-**Every backend-image container migrates itself on boot** — `backend`, and all four Celery services (`celery-default`/`celery-extraction`/`celery-embedding`/`celery-beat`), in both `docker-compose.yml` and `docker-compose.prod.yml` (ADR-030, IR-318). `backend/entrypoint.sh` runs `python manage.py migrate --noinput` before handing off to whatever command Compose passes it (`runserver`, `gunicorn`, or a Celery worker/beat process), and `backend/Dockerfile` wires it in as the image's `ENTRYPOINT`. There is no separate manual step:
+**Every backend-image container migrates itself on boot** — `backend`, and all four Celery services (`celery-default`/`celery-extraction`/`celery-embedding`/`celery-beat`), in both `docker-compose.yml` and `docker-compose.prod.yml` (ADR-023, IR-318). `backend/entrypoint.sh` runs `python manage.py migrate --noinput` before handing off to whatever command Compose passes it (`runserver`, `gunicorn`, or a Celery worker/beat process), and `backend/Dockerfile` wires it in as the image's `ENTRYPOINT`. There is no separate manual step:
 
 ```bash
 docker compose up --build          # every backend-image container migrates itself before it serves or consumes

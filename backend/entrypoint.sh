@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# IR-318 / ADR-030: every backend-image container -- Django and each Celery
+# IR-318 / ADR-023: every backend-image container -- Django and each Celery
 # process alike, since a worker touches the same tables -- migrates before
 # it starts serving requests or consuming tasks. `set -e` means a failed
 # migrate stops the container instead of it serving against a stale schema.
