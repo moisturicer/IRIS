@@ -74,9 +74,10 @@ class EmbeddingRequestTests:
     def test_a_large_input_is_split_across_requests_by_token_budget(self):
         transport = _RecordingTransport()
         provider = VoyageEmbeddingProvider(dimensions=4, transport=transport)
-        # Each text is ~14k estimated tokens, so three cannot share one
-        # 32k-token request.
-        texts = [" ".join(["word"] * 10_000) for _ in range(3)]
+        # Each text is ~20k tokens, so three cannot share one 32k-token
+        # request. Counted with the real tokenizer since IR-287, so the size
+        # here is what Voyage would actually charge rather than an estimate.
+        texts = [" ".join(["clearance-aware"] * 10_000) for _ in range(3)]
 
         vectors = provider.embed_documents(texts)
 

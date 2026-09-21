@@ -48,7 +48,7 @@ from ..text_splitting import (
     grapheme_safe_split,
     split_into_clauses,
     split_into_sentences,
-    split_into_word_groups,
+    split_into_token_groups,
 )
 from ..tokens import count_tokens
 from ..values import Chunk, ChunkingOptions, ChunkSet
@@ -278,16 +278,14 @@ def _pack_table(elements: list[DocumentElement], max_tokens: int) -> list[list[P
 
     windows: list[list[Piece]] = []
     current_rows: list[Piece] = []
-    current_tokens = header_tokens
 
     def flush() -> None:
-        nonlocal current_rows, current_tokens
+        nonlocal current_rows
         if current_rows:
             windows.append(header_pieces + current_rows)
-        current_rows, current_tokens = [], header_tokens
+        current_rows = []
 
     for row in rows:
-        row_tokens = count_tokens(row.text)
         fits_with_header = _fits(f"{header_text} {row.text}".strip(), max_tokens)
 
         if not fits_with_header:
@@ -297,10 +295,17 @@ def _pack_table(elements: list[DocumentElement], max_tokens: int) -> list[list[P
                 windows.append(header_pieces + [(fragment, row)])
             continue
 
-        if current_rows and current_tokens + row_tokens > max_tokens:
+        # Counted as the window will be assembled rather than summed per row,
+        # for the reason `pack_pieces` gives: token counts do not add across
+        # a join (IR-287).
+        candidate = " ".join(
+            [header_text] * bool(header_text)
+            + [t for t, _ in current_rows]
+            + [row.text]
+        ).strip()
+        if current_rows and count_tokens(candidate) > max_tokens:
             flush()
         current_rows.append((row.text, row))
-        current_tokens += row_tokens
 
     flush()
     return windows
@@ -333,7 +338,7 @@ def _hard_split_text(text: str, max_tokens: int) -> list[str]:
     if len(clauses) > 1:
         return [p for c in clauses for p in _hard_split_text(c, max_tokens)]
 
-    groups = split_into_word_groups(text, max_words=max(1, max_tokens))
+    groups = split_into_token_groups(text, max_tokens)
     if len(groups) > 1:
         return [p for g in groups for p in _hard_split_text(g, max_tokens)]
 
@@ -341,8 +346,14 @@ def _hard_split_text(text: str, max_tokens: int) -> list[str]:
     if len(words) > 1:
         return [p for w in words for p in _hard_split_text(w, max_tokens)]
 
-    # A single word that still does not fit: the true last resort.
-    return list(grapheme_safe_split(text, max_chars=_HARD_SPLIT_CHAR_THRESHOLD))
+    # A single word that still does not fit: the true last resort. The char
+    # budget is capped by the token ceiling as well as by the threshold,
+    # because a token is never shorter than one character -- so a piece of at
+    # most ``max_tokens`` characters can never cost more than ``max_tokens``
+    # tokens. Before IR-287 the cap was unnecessary: a word counted as one
+    # "token" whatever its length, so the ceiling could not be breached here.
+    budget = max(1, min(_HARD_SPLIT_CHAR_THRESHOLD, max_tokens))
+    return list(grapheme_safe_split(text, max_chars=budget))
 
 
 # --------------------------------------------------------------------------

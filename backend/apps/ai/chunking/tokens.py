@@ -1,35 +1,88 @@
-"""Token counting.
+"""Token counting — the real ``voyage-context-4`` tokenizer (IR-287).
 
-Deliberately a whitespace estimator rather than a model tokenizer. Two
-reasons: the count must be *deterministic across processes and versions* for
-the tests that matter, and no vendor tokenizer is a dependency of the domain.
+**The unit is a token and "700" means 700 tokens.** It did not always. Until
+IR-287 this module counted whitespace-delimited *words* and called them
+tokens, so ``AI_CHUNK_MAX_TOKENS=512`` produced chunks of roughly 700 real
+BPE tokens -- about 44% more than the number read as (IR-243). That gap was
+invisible to every caller and was about to get worse: once formulas are OCR'd
+to LaTeX (ADR-025), a 512-*word* chunk of prose and a 512-*word* chunk of
+LaTeX hold wildly different amounts of real content, and word counting cannot
+see the difference.
 
-When a real tokenizer arrives it replaces this function. That is safe because
-``token_count`` is excluded from the chunk-set hash precisely so a tokenizer
-upgrade does not mark the whole corpus stale.
+This module now counts with the tokenizer the embedding model itself uses,
+and the ceiling was raised to 700 in the same change so that **chunk
+boundaries on ordinary prose did not move**. IR-287 changed the unit, not the
+size: switching the counter while leaving the ceiling at 512 would have
+shrunk every chunk by roughly 30%, which is choosing a new chunk size by
+implication -- exactly what IR-243 refused to do without retrieval evidence.
+Tuning the number against IR-133's recall@10 evidence is still open, and when
+someone does it the number will mean what it says.
 
-**The unit is words, and "512" does not mean 512 tokens (IR-243).** Measured
-on a real 47-page submission: an IRIS chunk at the ceiling holds 511 words,
-while docling-core's ``HybridChunker(max_tokens=512)`` -- a real BPE
-tokenizer, same source PDF, same conversion -- caps at 355 words for the same
-nominal budget. ``AI_CHUNK_MAX_TOKENS=512`` therefore produces chunks roughly
-44% larger in real embedding-tokenizer terms than the number suggests; the
-rough equivalent of the Docling default is nearer 360 words.
+Pinning
+-------
+``voyage-context-4`` is a Qwen2 BPE tokenizer with a 151,665-token vocabulary.
+The vocabulary is **vendored**, not downloaded: ``tokenizer/voyage-context-4.json``
+is a byte-for-byte copy of ``tokenizer.json`` from the model repository at
+revision ``8ca9460``, and :data:`TOKENIZER_SHA256` pins its content. A test
+asserts that hash, so replacing the file is a deliberate act with a visible
+diff rather than a silent re-chunking of the corpus.
 
-Nothing overflows -- ``voyage-context-4`` has ample context -- so IR-243
-**deliberately did not recalibrate the default**. What the right ceiling is
-for theses is a retrieval-quality question, and IR-133's recall@10 harness is
-what can answer it; picking a number now would substitute taste for the
-measurement the eval set exists to provide, and would re-chunk and re-embed
-the whole corpus on a guess. The number stays 512 words until there is
-evidence, and this paragraph exists so nobody reads it as 512 tokens in the
-meantime.
+``tokenizers`` (Hugging Face's runtime) is pinned in ``requirements/base.txt``.
+The domain still carries **no vendor SDK**: ``tokenizers`` is a general BPE
+engine and the JSON is published data, not ``voyageai``. What the old
+docstring defended -- determinism across processes and versions -- is
+preserved by pinning both halves, and is stronger than before: a whitespace
+count agreed with nothing, while this count agrees with what Voyage bills and
+what the context window measures.
+
+The one purity cost is honest: the first call reads a file from disk. It is
+read once per process, from a path next to this module, and never over a
+network.
 """
 
+from functools import lru_cache
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-def count_tokens(text: str) -> int:
-    """Count tokens in ``text``.
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from tokenizers import Tokenizer
 
-    Whitespace-delimited words. Empty and whitespace-only strings count zero.
+#: The vendored vocabulary. Lives beside this module so that "the tokenizer
+#: the chunker uses" is answerable by looking, not by tracing a setting.
+TOKENIZER_PATH = Path(__file__).parent / "tokenizer" / "voyage-context-4.json"
+
+#: Content pin for :data:`TOKENIZER_PATH` -- HuggingFace ``voyageai/voyage-context-4``
+#: at revision ``8ca946072a18e398cd61f2ad0243b56d0350b1db``.
+TOKENIZER_SHA256 = "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+
+#: Name of the model whose tokenizer this is, for anything that reports it.
+TOKENIZER_ID = "voyage-context-4"
+
+
+@lru_cache(maxsize=1)
+def get_tokenizer() -> "Tokenizer":
+    """The loaded tokenizer, once per process.
+
+    Imported lazily so that importing the chunking domain -- which several
+    pure tests and ``manage.py`` do -- does not pay a 7 MB vocabulary load.
     """
-    return len(text.split())
+    from tokenizers import Tokenizer
+
+    return Tokenizer.from_file(str(TOKENIZER_PATH))
+
+
+@lru_cache(maxsize=2048)
+def count_tokens(text: str) -> int:
+    """Count ``text`` in ``voyage-context-4`` tokens.
+
+    Special tokens are excluded: this counts the text's own cost, which is
+    what a chunk ceiling and a batch budget are both about.
+
+    Memoized because the cascade is deliberately repetitive -- ``_fits``
+    asks about a string and then the emitting stage counts the same string
+    again, and the merge passes re-count growing prefixes. The cache is
+    correct for any size because this is a pure function of ``text``.
+    """
+    if not text.strip():
+        return 0
+    return len(get_tokenizer().encode(text, add_special_tokens=False).ids)

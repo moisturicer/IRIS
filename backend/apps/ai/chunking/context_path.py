@@ -205,8 +205,28 @@ def _truncate_middle(path: tuple[str, ...], max_tokens: int) -> tuple[str, ...]:
     if count_tokens(_PATH_SEPARATOR.join(candidate)) <= max_tokens:
         return candidate
 
-    words = title.split()
-    return (" ".join(words[: max(max_tokens, 1)]),)
+    return (_truncate_to_budget(title, max_tokens),)
+
+
+def _truncate_to_budget(text: str, max_tokens: int) -> str:
+    """Keep the longest leading run of whole words that fits ``max_tokens``.
+
+    Word-counted truncation would only be a budget under the old word-as-token
+    unit (IR-287); against a real tokenizer it can still overrun, and this
+    function is the place the "never exceeds the budget" guarantee bottoms
+    out. At least one word is always kept -- an empty context path loses the
+    chunk's provenance entirely, which is worse than one word over.
+    """
+    words = text.split()
+    if not words:
+        return text
+    kept = [words[0]]
+    for word in words[1:]:
+        candidate = kept + [word]
+        if count_tokens(" ".join(candidate)) > max(max_tokens, 1):
+            break
+        kept = candidate
+    return " ".join(kept)
 
 
 class ContextPathChunker:

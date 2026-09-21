@@ -154,13 +154,19 @@ def test_context_path_participates_in_the_content_hash():
 
 
 def test_truncate_middle_keeps_title_and_nearest_section():
+    """12 was 6 before IR-287, when the budget was counted in words.
+
+    The path is the same, the intent is the same -- a budget that the full
+    four-segment path overruns and the title-plus-nearest pair fits -- and
+    the number moved because the unit did.
+    """
     path = ("Thesis Title", "1 Chapter One", "1.1 Section", "1.1.2 Subsection")
-    truncated = _truncate_middle(path, max_tokens=6)
+    truncated = _truncate_middle(path, max_tokens=12)
 
     assert truncated[0] == "Thesis Title"
     assert truncated[-1] == "1.1.2 Subsection"
     assert "1 Chapter One" not in truncated
-    assert count_tokens(" > ".join(truncated)) <= 6
+    assert count_tokens(" > ".join(truncated)) <= 12
 
 
 def test_truncate_middle_is_a_noop_when_the_path_already_fits():

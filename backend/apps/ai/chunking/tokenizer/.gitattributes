@@ -1,0 +1,4 @@
+# The vocabulary is pinned by SHA-256 in ../tokens.py, so git must not
+# normalize its line endings: a CRLF checkout on Windows would change the
+# bytes, break the pin, and re-tokenize the whole corpus (IR-287).
+voyage-context-4.json -text

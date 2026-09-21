@@ -16,6 +16,7 @@ from ..hashing import chunkset_hash
 from ..packing import Piece, pack_pieces
 from ..regions import regions_for
 from ..registry import register_chunker
+from ..text_splitting import grapheme_safe_split, split_into_token_groups
 from ..tokens import count_tokens
 from ..values import Chunk, ChunkingOptions, ChunkSet
 
@@ -53,14 +54,17 @@ class FixedWindowChunker:
         """
         pieces: list[Piece] = []
         for element in document.elements:
-            words = element.text.split()
-            if not words:
-                continue
-            if len(words) <= max_tokens:
-                pieces.append((" ".join(words), element))
-                continue
-            for start in range(0, len(words), max_tokens):
-                pieces.append((" ".join(words[start : start + max_tokens]), element))
+            for group in split_into_token_groups(element.text, max_tokens):
+                if count_tokens(group) <= max_tokens:
+                    pieces.append((group, element))
+                    continue
+                # A single word costing more than the whole ceiling. Before
+                # IR-287 this could not happen -- a word was one "token"
+                # however long it was -- so the word-count split above was
+                # enough. A token is never shorter than one character, so a
+                # piece capped at ``max_tokens`` characters always fits.
+                for fragment in grapheme_safe_split(group, max_chars=max(1, max_tokens)):
+                    pieces.append((fragment, element))
         return pieces
 
     def _to_chunks(
