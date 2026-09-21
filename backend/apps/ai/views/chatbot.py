@@ -19,16 +19,30 @@ The views hold no wiring. They parse a request, ask the composition root for a
 retriever or an answer service, and shape the reply — which is what makes the
 whole path drivable from a test with deterministic fakes.
 """
+from django.http import Http404
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
-from apps.ai.answers.citations import NO_SOURCES, UNAVAILABLE
 from apps.ai.composition import composition_root
-from apps.ai.presentation import citations, passage, record_sources
+from apps.ai.conversations import record_turn
+from apps.ai.models import Conversation
+from apps.ai.presentation import (
+    answer_body,
+    answer_mode,
+    citations,
+    passage,
+    record_sources,
+)
 
+#: A plain abuse guard, and since IR-295 nothing more than that. It used to be
+#: load-bearing by accident: the frontend glued the whole transcript into the
+#: question, so a conversation died at roughly six turns when the transcript
+#: crossed this line. History now travels as a conversation id, so a question
+#: is a question again and 2,000 characters is a generous bound on one.
 MAX_QUESTION_LENGTH = 2000
 
 #: How many passages ground an answer, and the ceiling on any `top_k`. The
@@ -37,21 +51,10 @@ MAX_QUESTION_LENGTH = 2000
 DEFAULT_TOP_K = 5
 MAX_TOP_K = 20
 
-#: What the wire calls each answer state. The API's own names, mapped from the
-#: domain's rather than shared with them: `GroundedAnswer.state` is what the
-#: service decided, and this is what a client has been told to expect.
-GENERATIVE_MODE = "generative"
-NO_RESULTS_MODE = "no_results"
-UNAVAILABLE_MODE = "unavailable"
-_WIRE_MODE = {
-    NO_SOURCES: NO_RESULTS_MODE,
-    UNAVAILABLE: UNAVAILABLE_MODE,
-}
-
-NO_RESULTS_MESSAGE = (
-    "No readable sources in the CIT-U repository matched that question. Try "
-    "different keywords, or browse Discover to see what is available."
-)
+#: The answer states and the `answer`/`message` pair each one puts on the wire
+#: live in `apps/ai/presentation.py` (IR-295). They moved because a stored Turn
+#: is replayed into the same shape, and two copies of that mapping is how a
+#: reopened transcript starts presenting "no model was reachable" as an answer.
 
 #: No degradation *sentence* here, deliberately, and this is a reversal of a
 #: decision IR-283 made the other way. That version put the wording on the
@@ -76,19 +79,47 @@ def _parse_top_k(raw, default: int = DEFAULT_TOP_K) -> int:
         return default
 
 
+def _conversation_for(request):
+    """The Conversation this question belongs to, or ``None`` for a one-off.
+
+    Looked up inside the caller's own conversations, so somebody else's id is
+    a 404 identical to an id that never existed — a refusal that confirmed a
+    transcript exists would leak the one thing this model is private for. A
+    malformed id takes the same exit rather than a 500.
+    """
+    raw = request.data.get("conversation_id")
+    if raw in (None, ""):
+        return None
+    try:
+        pk = int(raw)
+    except (TypeError, ValueError):
+        raise Http404
+    try:
+        return Conversation.objects.get(pk=pk, user=request.user)
+    except Conversation.DoesNotExist:
+        raise Http404
+
+
 class ChatQueryView(APIView):
     """
     POST /api/v1/ai/ask/
-    Body: {"question": str, "top_k": int?}
+    Body: {"question": str, "top_k": int?, "conversation_id": int?}
 
     Returns an answer grounded in passages the asker is permitted to read,
     with the records those passages came from.
+
+    ``conversation_id`` is optional and appends the question and its answer
+    to that Conversation as a Turn (IR-295). Omitting it answers exactly as
+    before and stores nothing: a one-off question needs no Conversation.
+    Nothing here reads the history yet — resolving a follow-up against it is
+    IR-296, and scoping retrieval to a Conversation's Record is IR-298.
     """
 
     permission_classes = [IsAuthenticated]
     throttle_classes = [AIQueryThrottle]
 
     def post(self, request):
+        conversation = _conversation_for(request)
         question = (request.data.get("question") or "").strip()
         if not question:
             return Response(
@@ -104,26 +135,15 @@ class ChatQueryView(APIView):
             max_sources=_parse_top_k(request.data.get("top_k"))
         )
         answer = service.answer(question, request.user)
-        mode = _WIRE_MODE.get(answer.state, GENERATIVE_MODE)
+        mode = answer_mode(answer.state)
 
-        # `answer` is a written answer or it is null. The two non-answers —
-        # nothing found, and no model reachable — say so in `message`, so a
-        # client rendering `answer` can never present an apology as a finding.
-        #
-        # `message` also carries the degradation note when an answer *was*
-        # written from fallback results. Here rather than in the client: a
-        # client composing its own sentence about how the backend retrieved
-        # is a second wording of one fact, and the two drift.
-        if mode == GENERATIVE_MODE:
-            body = {"answer": answer.text, "message": None}
-        elif mode == NO_RESULTS_MODE:
-            body = {"answer": None, "message": NO_RESULTS_MESSAGE}
-        else:
-            body = {"answer": None, "message": answer.text}
+        if conversation is not None:
+            record_turn(conversation, question, answer)
 
         return Response(
             {
-                **body,
+                **answer_body(mode, answer.text),
+                "conversation_id": None if conversation is None else conversation.pk,
                 # A citation is an object: the record it belongs to, the page,
                 # and the quoted passage (IR-284). A bare record id asked a
                 # reader to find the sentence themselves.

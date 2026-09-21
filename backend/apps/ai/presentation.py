@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from typing import Iterable, Sequence
 
-from apps.ai.answers.citations import Citation
+from apps.ai.answers.citations import NO_SOURCES, UNAVAILABLE, Citation
 from apps.ai.retrieval.ports import RetrievedChunk
 from apps.records.models import Record
 
@@ -163,3 +163,51 @@ def citations(resolved: Iterable[Citation]) -> list[dict]:
     flattening IR-284 exists to undo.
     """
     return [citation(item) for item in resolved]
+
+
+# -- how an answer came out ----------------------------------------------------
+#
+# Moved here from `views/chatbot.py` by IR-295, because a Conversation replays
+# stored Turns and has to reach exactly the same `answer`/`message`/`mode`
+# shape a live ask produced. Two copies of that mapping is how a reopened
+# transcript starts presenting "no model was reachable" as an answer.
+
+#: What the wire calls each answer state. The API's own names, mapped from the
+#: domain's rather than shared with them: `GroundedAnswer.state` is what the
+#: service decided, and this is what a client has been told to expect.
+GENERATIVE_MODE = "generative"
+NO_RESULTS_MODE = "no_results"
+UNAVAILABLE_MODE = "unavailable"
+
+_WIRE_MODE = {
+    NO_SOURCES: NO_RESULTS_MODE,
+    UNAVAILABLE: UNAVAILABLE_MODE,
+}
+
+NO_RESULTS_MESSAGE = (
+    "No readable sources in the CIT-U repository matched that question. Try "
+    "different keywords, or browse Discover to see what is available."
+)
+
+
+def answer_mode(state: str) -> str:
+    return _WIRE_MODE.get(state, GENERATIVE_MODE)
+
+
+def answer_body(mode: str, text: str) -> dict:
+    """The ``answer``/``message`` pair for one answer state.
+
+    ``answer`` is a written answer or it is null. The two non-answers --
+    nothing found, and no model reachable -- say so in ``message``, so a
+    client rendering ``answer`` can never present an apology as a finding.
+
+    ``text`` is whatever the service produced: the answer in the generative
+    case, and the explanation in the unavailable one. The no-results wording
+    is this layer's, not the service's, because it points a reader at Discover
+    and the domain has no business knowing that screen exists.
+    """
+    if mode == GENERATIVE_MODE:
+        return {"answer": text, "message": None}
+    if mode == NO_RESULTS_MODE:
+        return {"answer": None, "message": NO_RESULTS_MESSAGE}
+    return {"answer": None, "message": text}
