@@ -1,7 +1,114 @@
+"""Conversations and the Turns they hold (IR-295, ADR-019).
+
+Three tables replacing two field-less `pass` classes from migration 0001.
+One Conversation model serves both chat surfaces (ADR-019); the divergences
+from that ADR - `Turn` rather than `ChatMessage`, and `visible_to(user)`
+rather than `publicly_visible()` - are recorded in ADR-019 itself.
+
+A `TurnCitation` is a pointer: record, chunk, page, and no passage text.
+Text frozen into a transcript outlives the permission that allowed it.
+`chunk` is nullable because re-chunking replaces a record's chunk set.
+
+No retention field and no expiry - a Conversation lives until its owner
+deletes it (IR-294 Privacy).
+"""
+from django.conf import settings
 from django.db import models
 
-class Conversation(models.Model):
-    pass
 
-class ChatMessage(models.Model):
-    pass
+class ConversationManager(models.Manager):
+    def owned_by(self, user):
+        """Every conversation query starts here - the whole privacy rule."""
+        return (
+            self.select_related("record")
+            .filter(user=user)
+            .annotate(turn_count=models.Count("turns"))
+        )
+
+
+class Conversation(models.Model):
+    """One person's line of enquiry, optionally about one Record.
+
+    `record` is what makes it a Paper Chat conversation, and it cascades:
+    nothing about a withdrawn paper outlives the paper.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="ai_conversations",
+    )
+    record = models.ForeignKey(
+        "records.Record",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="ai_conversations",
+    )
+    title = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = ConversationManager()
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        indexes = [models.Index(fields=["user", "-updated_at"])]
+
+    def __str__(self) -> str:
+        return f"Conversation({self.pk}, user={self.user_id}, record={self.record_id})"
+
+
+class Turn(models.Model):
+    """One question and the answer it produced.
+
+    `state` is the wire's name for how the answer came out — generative, no
+    results, or the model was unreachable — stored rather than re-derived,
+    because "no answer was written" and "the answer was empty" are different
+    facts and a reopened transcript must not present the second as the first.
+    """
+
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="turns"
+    )
+    question = models.TextField()
+    answer = models.TextField(blank=True)
+    state = models.CharField(max_length=20)
+    degraded = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        indexes = [models.Index(fields=["conversation", "id"])]
+
+    def __str__(self) -> str:
+        return f"Turn({self.pk}, conversation={self.conversation_id})"
+
+
+class TurnCitation(models.Model):
+    """Where one citation in a stored answer pointed. No text, deliberately.
+
+    `marker` is the number the answer text cites by.
+    """
+
+    turn = models.ForeignKey(
+        Turn, on_delete=models.CASCADE, related_name="citations"
+    )
+    marker = models.PositiveSmallIntegerField()
+    record = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="+"
+    )
+    chunk = models.ForeignKey(
+        "ai.DocumentChunk",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    page = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["marker", "id"]
+
+    def __str__(self) -> str:
+        return f"TurnCitation(turn={self.turn_id}, marker={self.marker})"

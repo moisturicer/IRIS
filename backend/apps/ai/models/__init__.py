@@ -1,4 +1,4 @@
-from .conversation import Conversation, ChatMessage
+from .conversation import Conversation, Turn, TurnCitation
 from .summary import DocumentSummary
 from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, EmbeddingJob
@@ -14,7 +14,8 @@ from .ingestion_job import IngestionJob
 
 __all__ = [
     "Conversation",
-    "ChatMessage",
+    "Turn",
+    "TurnCitation",
     "DocumentSummary",
     "DocumentMetadata",
     "RecordEmbedding",
