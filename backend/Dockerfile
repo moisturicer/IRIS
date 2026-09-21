@@ -43,6 +43,8 @@ COPY --from=builder /install /usr/local
 # Copy application code
 COPY . .
 
+RUN chmod +x entrypoint.sh
+
 # Create a non-root user and change ownership of the app directory.
 # media/ is explicitly created (not just left to Django's first FileField
 # save) because docker-compose.yml mounts it as a *named volume*
@@ -87,6 +89,13 @@ RUN SECRET_KEY=build-time-only \
     python manage.py collectstatic --noinput
 
 EXPOSE 8000
+
+# Runs `migrate` before handing off to whatever command the caller passes
+# (gunicorn, runserver, or a Celery worker/beat) -- see entrypoint.sh and
+# ADR-023 (IR-318). Previously unwired: this file existed but nothing in
+# the image ever invoked it, so a container could boot and serve against
+# whatever schema the volume already had.
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Production entry point -- gunicorn
 # ASGI, per ADR-017 (IR-156). Django calls the AI gateway over HTTP;

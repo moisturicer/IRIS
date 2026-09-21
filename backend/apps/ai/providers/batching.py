@@ -8,25 +8,26 @@ belong in a single request, and two full-page passages do not.
 
 from __future__ import annotations
 
-import math
 from typing import Callable, Sequence
 
-#: Words-to-tokens multiplier. Measured rather than guessed: an IRIS chunk at
-#: the 512-word ceiling is roughly 700 real BPE tokens (IR-243), so ~1.37.
-#: Rounded up, because this guards a ceiling -- undercounting sails past the
-#: vendor limit and 400s, while overcounting costs one extra request.
-_TOKENS_PER_WORD = 1.4
+from apps.ai.chunking.tokens import count_tokens
 
 
 def estimate_tokens(text: str) -> int:
-    """A deliberately conservative token estimate.
+    """What Voyage will charge this text against the request's token budget.
 
-    Not a tokenizer: the pure domain carries no vendor tokenizer dependency
-    (see `apps.ai.chunking.tokens`), and for a budget check an upper bound is
-    worth more than an exact count.
+    **The same count the chunker uses** (IR-287): one tokenizer, one
+    definition of a token, so a chunk built to fit a ceiling is batched
+    against the vendor limit by the same arithmetic. This used to multiply
+    the word count by a measured 1.4 because the domain carried no tokenizer;
+    it carries the real one now, and an estimate that disagreed with the
+    chunker was a second source of truth waiting to drift.
+
+    Exact rather than padded. The budget below the vendor cap is where
+    headroom belongs -- padding here would hide how much of the cap a batch
+    actually uses.
     """
-    words = len(text.split())
-    return math.ceil(words * _TOKENS_PER_WORD) if words else 0
+    return count_tokens(text)
 
 
 def batch_by_token_budget(
