@@ -2,12 +2,36 @@ import type { ChatMessage, Conversation } from "@/types/chat";
 
 const STORAGE_KEY = "iris_rag_conversations";
 
+/**
+ * Drop citations saved under the pre-IR-284 shape.
+ *
+ * Conversations persisted before citations became Passages hold `number[]` —
+ * bare record ids. Nothing can recover a quote or a page from an id, so they
+ * are dropped rather than half-rendered: a citation chip with no text and no
+ * page is worse than no chip, because it looks like evidence.
+ *
+ * The reply itself is kept. What a reader asked and what IRIS answered is
+ * still theirs to read back; only the citation strip is poorer for it, and
+ * only for replies from before the change.
+ */
+function withReadableCitations(message: ChatMessage): ChatMessage {
+  const citations = message.citations;
+  if (!Array.isArray(citations) || citations.every((c) => typeof c === "object" && c !== null)) {
+    return message;
+  }
+  return { ...message, citations: citations.filter((c) => typeof c === "object" && c !== null) };
+}
+
 function readAll(): Conversation[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Conversation[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((c) => ({
+      ...c,
+      messages: Array.isArray(c.messages) ? c.messages.map(withReadableCitations) : [],
+    }));
   } catch {
     return [];
   }

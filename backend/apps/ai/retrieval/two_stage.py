@@ -32,7 +32,7 @@ from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.providers.ports import EmbeddingProvider
 from apps.records.models import Record
 
-from .ports import RetrievedChunk, Retriever
+from .ports import VECTOR, RetrievalResult, RetrievedChunk, Retriever
 
 #: Stage 1 keeps this many records. ADR-013's sizing: a few dozen records is
 #: roughly a thousand chunks, which is a cheap stage-2 search.
@@ -66,7 +66,7 @@ class TwoStageRetriever(Retriever):
             # No active space means nothing was ever indexed under one. Return
             # nothing rather than guessing a space: comparing vectors across
             # spaces returns rows, ranked plausibly, and wrong.
-            return []
+            return RetrievalResult(mode=VECTOR)
 
         query_vector = self._embedder.embed_query(question)
 
@@ -78,7 +78,7 @@ class TwoStageRetriever(Retriever):
             .values_list("record_id", flat=True)[: self._record_candidates]
         )
         if not candidate_ids:
-            return []
+            return RetrievalResult(mode=VECTOR, embedding_space_id=space.pk)
 
         # -- Stage 2: chunks within those records only --
         distance = CosineDistance("embedding", query_vector)
@@ -96,18 +96,22 @@ class TwoStageRetriever(Retriever):
             .order_by("distance")[:limit]
         )
 
-        return [
-            RetrievedChunk(
-                chunk_id=row.chunk_id,
-                record_id=row.chunk.record_id,
-                record_title=row.chunk.record.title,
-                content=row.chunk.content,
-                context_path=tuple(row.chunk.context_path or ()),
-                source_page=row.chunk.source_page,
-                # Cosine distance runs 0 (identical) to 2; similarity is the
-                # complement, so a larger score is a better match whichever
-                # metric a future space uses.
-                score=1.0 - float(row.distance),
-            )
-            for row in rows
-        ]
+        return RetrievalResult(
+            passages=tuple(
+                RetrievedChunk(
+                    chunk_id=row.chunk_id,
+                    record_id=row.chunk.record_id,
+                    record_title=row.chunk.record.title,
+                    content=row.chunk.content,
+                    context_path=tuple(row.chunk.context_path or ()),
+                    source_page=row.chunk.source_page,
+                    # Cosine distance runs 0 (identical) to 2; similarity is
+                    # the complement, so a larger score is a better match
+                    # whichever metric a future space uses.
+                    score=1.0 - float(row.distance),
+                )
+                for row in rows
+            ),
+            mode=VECTOR,
+            embedding_space_id=space.pk,
+        )

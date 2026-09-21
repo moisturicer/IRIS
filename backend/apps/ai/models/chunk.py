@@ -14,10 +14,11 @@ required foreign key among them) that only make sense given a real row to
 have created it from.
 """
 
-from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from pgvector.django import HnswIndex, VectorField
+
+from .embedding_space import VECTOR_COLUMN_DIMENSIONS
 
 
 class ChunkSet(models.Model):
@@ -118,7 +119,7 @@ class ChunkEmbedding(models.Model):
     space = models.ForeignKey(
         "ai.EmbeddingSpace", on_delete=models.CASCADE, related_name="chunk_embeddings"
     )
-    embedding = VectorField(dimensions=settings.AI_EMBEDDING_DIMENSIONS)
+    embedding = VectorField(dimensions=VECTOR_COLUMN_DIMENSIONS)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

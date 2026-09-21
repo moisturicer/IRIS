@@ -24,24 +24,29 @@ import { ChatToolbar } from "./components/ChatToolbar";
 import { ConversationSidebar } from "./components/ConversationSidebar";
 import { SourceContextPanel } from "./components/SourceContextPanel";
 
-function newMessage(role: ChatMessage["role"], content: string, citations?: number[]): ChatMessage {
+function newMessage(
+  role: ChatMessage["role"],
+  content: string,
+  grounding: Pick<ChatMessage, "citations" | "sources" | "degraded"> = {},
+): ChatMessage {
   return {
     id:        crypto.randomUUID(),
     role,
     content,
-    citations,
+    ...grounding,
     createdAt: new Date().toISOString(),
   };
 }
 
-function latestCitationIds(messages: ChatMessage[]): number[] {
+/** The most recent reply that cited anything — what the sources panel shows. */
+function latestGrounded(messages: ChatMessage[]): ChatMessage | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (m.role === "assistant" && m.citations && m.citations.length > 0) {
-      return m.citations;
+      return m;
     }
   }
-  return [];
+  return null;
 }
 
 export default function RAGChatPage() {
@@ -57,8 +62,14 @@ export default function RAGChatPage() {
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
 
-  const citationIds = useMemo(() => latestCitationIds(messages), [messages]);
-  const sourcesAvailable = citationIds.length > 0;
+  // Read off the reply itself, so the panel cannot show one conversation's
+  // cards beside another's passages, and a reload restores both together
+  // (IR-284). The panel used to fetch a record per citation; the answer has
+  // already been told whose work each passage is.
+  const grounded = useMemo(() => latestGrounded(messages), [messages]);
+  const citations = grounded?.citations ?? [];
+  const sources = grounded?.sources ?? [];
+  const sourcesAvailable = citations.length > 0;
 
   const activeTitle =
     conversations.find((c) => c.id === activeId)?.title ?? "New chat";
@@ -190,10 +201,15 @@ export default function RAGChatPage() {
     try {
       const { data } = await aiApi.ask(buildRagQuestion(nextMessages));
       const body =
-        data.answer ??
-        data.message ??
-        "No published record matched that question.";
-      const assistantMsg = newMessage("assistant", body, data.citations);
+        data.answer ?? data.message ?? "No readable sources matched that question.";
+      // ADR-008: a reader is told when an answer came the slow way. Carried on
+      // the message rather than spliced into its markdown, so the bubble
+      // renders it as its own labelled note and a test can find it by name.
+      const assistantMsg = newMessage("assistant", body, {
+        citations: data.citations,
+        sources:   data.sources,
+        degraded:  data.degraded,
+      });
       const withReply = [...nextMessages, assistantMsg];
       setMessages(withReply);
       persist(activeId!, withReply, title);
@@ -235,13 +251,27 @@ export default function RAGChatPage() {
             onNewChat={handleNewChat}
           />
 
+          {status?.disclosure_bypass && (
+            <div
+              role="status"
+              className="shrink-0 flex items-start gap-2 px-4 py-2 bg-rose-50 border-b border-rose-200 text-[11px] text-rose-900"
+            >
+              <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
+              <p>
+                <strong>Development mode: disclosure gate bypassed.</strong> Answers are drawn
+                from content that no embargo check cleared, so this is not how a deployment
+                behaves. Development only.
+              </p>
+            </div>
+          )}
+
           {status && !status.generative && (
             <div className="shrink-0 flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[11px] text-amber-800">
               <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
               <p>
-                <strong>Retrieval-only mode.</strong> IRIS ranks and quotes real records but no
-                language model is configured, so answers are not written prose. Set{" "}
-                <code className="font-mono">ANTHROPIC_API_KEY</code> to enable synthesis.
+                <strong>Retrieval-only mode.</strong> IRIS finds and ranks real passages, but no
+                answering model is configured, so it will return sources rather than a written
+                answer. Set <code className="font-mono">LLM_API_KEY</code> to enable synthesis.
               </p>
             </div>
           )}
@@ -263,7 +293,8 @@ export default function RAGChatPage() {
 
         <SourceContextPanel
           open={sourcesOpen}
-          citationIds={citationIds}
+          citations={citations}
+          sources={sources}
           onClose={() => setSourcesOpen(false)}
         />
       </div>

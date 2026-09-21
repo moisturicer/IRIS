@@ -46,7 +46,7 @@ Three facts, each verified against the working tree:
 |---|---|
 | PDF text lands in one `TextField` per upload and stops there | [`backend/apps/documents/models.py:86`](../backend/apps/documents/models.py#L86) — `extracted_text = models.TextField(blank=True)`. **Fixed 2026-09-04 (IR-107, then IR-116):** extraction stores `structure`, and `ai.tasks.chunk_record_document` now reads it into an active chunk set. Retrieval over those chunks is IR-108 |
 | The only embedding in the system is over the abstract | [`backend/apps/ai/tasks.py:19`](../backend/apps/ai/tasks.py#L19) — `text = f"{record.title}. {record.abstract}"` |
-| The chunker is a stub | [`backend/apps/ai/services/text_chunker.py`](../backend/apps/ai/services/text_chunker.py) — `class TextChunkerService: pass` |
+| The chunker is a stub | `backend/apps/ai/services/text_chunker.py` — `class TextChunkerService: pass`. **Deleted 2026-09-20 (IR-285)**, unreferenced and superseded by `apps/ai/chunking/`; the link is removed rather than left to 404 |
 
 So the "RAG pipeline" currently retrieves over **title-plus-abstract strings**, one vector per record. A user asking "what methodology did the 2024 aquaculture theses use?" is searching a corpus in which no methodology section has ever been indexed. The answer will be fluent and it will be built from abstracts.
 

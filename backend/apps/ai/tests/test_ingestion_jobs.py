@@ -6,12 +6,11 @@ transition table applied to a stored state.
 """
 
 import pytest
-from django.conf import settings
 from django.db import IntegrityError
 
 from apps.ai.ingestion import IllegalTransition, IngestionState, ingestion_job_key
 from apps.ai.ingestion.jobs import claim_ingestion_job, complete_ingestion_job
-from apps.ai.models import EmbeddingSpace, EmbeddingSpaceState, IngestionJob
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS, EmbeddingSpace, EmbeddingSpaceState, IngestionJob
 from apps.records.models import Record
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
@@ -26,7 +25,7 @@ def _no_seeded_active_space():
 def space():
     return EmbeddingSpace.objects.create(
         model_id="voyage-context-4",
-        dimensions=settings.AI_EMBEDDING_DIMENSIONS,
+        dimensions=VECTOR_COLUMN_DIMENSIONS,
         state=EmbeddingSpaceState.ACTIVE,
     )
 

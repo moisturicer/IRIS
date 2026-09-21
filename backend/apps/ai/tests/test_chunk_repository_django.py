@@ -7,10 +7,9 @@ not reachable.
 """
 
 import pytest
-from django.conf import settings
 
 from apps.ai.chunking import Chunk, ChunkingOptions, ChunkSet, chunkset_hash
-from apps.ai.models import EmbeddingSpace, EmbeddingSpaceState
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS, EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet as ChunkSetModel, DocumentChunk
 from apps.ai.repositories import DjangoChunkRepository
 from apps.records.models import Record
@@ -58,12 +57,12 @@ def test_deleting_a_record_cascades_to_chunk_embeddings():
     )
     space = EmbeddingSpace.objects.create(
         model_id="voyage-context-4",
-        dimensions=settings.AI_EMBEDDING_DIMENSIONS,
+        dimensions=VECTOR_COLUMN_DIMENSIONS,
         state=EmbeddingSpaceState.ACTIVE,
     )
     chunk = DocumentChunk.objects.get(chunk_set_id=persisted.id)
     embedding = ChunkEmbedding.objects.create(
-        chunk=chunk, space=space, embedding=[0.0] * settings.AI_EMBEDDING_DIMENSIONS
+        chunk=chunk, space=space, embedding=[0.0] * VECTOR_COLUMN_DIMENSIONS
     )
 
     record.delete()
@@ -84,12 +83,12 @@ def test_superseding_a_chunk_set_retains_it_and_its_embeddings():
 
     space = EmbeddingSpace.objects.create(
         model_id="voyage-context-4",
-        dimensions=settings.AI_EMBEDDING_DIMENSIONS,
+        dimensions=VECTOR_COLUMN_DIMENSIONS,
         state=EmbeddingSpaceState.ACTIVE,
     )
     old_chunk = DocumentChunk.objects.get(chunk_set_id=first.id)
     old_embedding = ChunkEmbedding.objects.create(
-        chunk=old_chunk, space=space, embedding=[0.0] * settings.AI_EMBEDDING_DIMENSIONS
+        chunk=old_chunk, space=space, embedding=[0.0] * VECTOR_COLUMN_DIMENSIONS
     )
 
     other_chunks = (Chunk(text="y", content="y", context_path=(), sequence=0, token_count=1),)

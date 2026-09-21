@@ -4,7 +4,10 @@ Before this model existed, the embedding dimension was declared in two
 places that could silently disagree: ``settings.AI_EMBEDDING_DIMENSIONS``
 (read by the model) and a literal ``1536`` hardcoded in migration 0002. A
 mismatch there does not raise — it returns rows, ranked plausibly, and
-wrong.
+wrong. IR-280 finished the job: that settings family is deleted, both
+vector columns are 1024, and the one number the schema still has to name
+lives here as ``VECTOR_COLUMN_DIMENSIONS``, tied to the active space by a
+migration and a test.
 
 ADR-015 calls the hardcoded dimension a one-way door: retrofitting this
 model after real vectors exist is exactly the destructive migration this
@@ -16,6 +19,24 @@ the model id and dimension.
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
+
+#: The width of every vector column in the schema.
+#:
+#: A column width is a *schema* fact: changing it changes the database, so it
+#: cannot follow an environment variable, and before IR-280 pretending that it
+#: could is what let three declarations of one number drift apart —
+#: ``vector(1536)`` frozen in two migrations, ``AI_EMBEDDING_DIMENSIONS``
+#: defaulting to 1536, and ``VOYAGE_EMBED_DIMENSIONS`` at the 1024 that
+#: ``voyage-context-4`` actually emits. 1536 is not one of the dimensions that
+#: model offers, so every write of a real vector would have failed.
+#:
+#: This constant is the schema's mirror of the active ``EmbeddingSpace``, not a
+#: second opinion about it: the space row remains the source of truth for what
+#: produced a vector, the migration that re-dimensions a column derives the
+#: width *from* that row, and `test_vector_dimensions.py` fails the build if
+#: the column, this constant and the active space ever disagree. Changing it
+#: without a migration is therefore a failing test, not a silent mismatch.
+VECTOR_COLUMN_DIMENSIONS = 1024
 
 
 class EmbeddingSpaceState(models.TextChoices):
