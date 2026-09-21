@@ -18,7 +18,9 @@ prefixing is orthogonal to how a document is split: it applies unchanged to
 the fixed-window baseline (IR-110) and the structural cascade (IR-111), and
 to whatever strategy is registered after them.
 
-Pure: no Django, no I/O, no clock, no randomness.
+Pure except for one read: counting a token means loading the vendored
+``voyage-context-4`` vocabulary once per process (see ``tokens``). No Django,
+no database, no network, no clock, no randomness.
 """
 
 import re
