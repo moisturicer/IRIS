@@ -1,8 +1,10 @@
-# ADR-030: Compose containers migrate on boot, unconditionally
+# ADR-023: Compose containers migrate on boot, unconditionally
 
 ## Status
 
 Accepted — 2026-09-21. Decision made by the project lead (per CLAUDE.md's "What AI does not decide"), recorded here from that decision.
+
+**Numbering note:** this repo's `docs/adr/` tree tops out at 022 on `main` as of this branch's cut. If a higher-numbered ADR from an unmerged branch reaches `main` first and collides with 023, this should be renumbered on merge, per the ADR-018 precedent recorded in `docs/adr/README.md`.
 
 ## Context
 
