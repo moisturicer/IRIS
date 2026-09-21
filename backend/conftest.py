@@ -38,6 +38,7 @@ def pytest_configure(config):
     # block returns early when Hypothesis is absent, and the hasher matters
     # to the Django half of the suite whether or not Hypothesis is installed.
     _use_fast_password_hashing()
+    _use_in_process_celery_broker()
 
     try:
         from testing.hypothesis_profiles import activate_profile
@@ -103,6 +104,80 @@ def _use_fast_password_hashing() -> None:
 
     settings.PASSWORD_HASHERS = FAST_PASSWORD_HASHERS
     reset_hashers(setting="PASSWORD_HASHERS")
+
+
+#: What `.delay()` publishes to during the test run. IR-251's measured cause of
+#: the 4h31m CI run: CI runs no Redis, so `CELERY_BROKER_URL` falls back to
+#: `redis://localhost:6379`, nothing listens there, and every `.delay()` blocks
+#: for ~20s retrying the result backend before raising. `send_email_async`
+#: catches that and sends synchronously, so the suite still passed -- it just
+#: paid ~20s per notification, and the workflow tests fire hundreds.
+#: Measured on the characterisation module, with the cheap hasher above: all 31
+#: tests in ~2 minutes with a reachable broker, 14 of 31 after 11 minutes without.
+#:
+#: Celery's in-process transport is the one `apps/ai/tests/test_celery_routing.py`
+#: already uses. A published task sits in memory and nothing consumes it, which
+#: is what every test except that one wants: none asserts that an email was
+#: delivered through the fallback (nothing reads `mail.outbox`), and tests that
+#: care about email patch `send_email_async` at the boundary. It also makes a
+#: run independent of whether the machine happens to have a Redis -- the
+#: backend container has one and CI does not, which is how the same suite took
+#: 20 minutes in one and hours in the other.
+TEST_CELERY_BROKER_URL = "memory://"
+TEST_CELERY_RESULT_BACKEND = "cache+memory://"
+
+
+def _use_in_process_celery_broker() -> None:
+    """Point Celery at its in-process transport, if Django is importable.
+
+    Set through the **environment**, not `settings`: Celery reads
+    ``CELERY_BROKER_URL`` and ``CELERY_RESULT_BACKEND`` from `os.environ`
+    *before* anything configured (`celery.app.utils.Settings.broker_url` is
+    ``os.environ.get('CELERY_BROKER_URL') or ...``). CI sets neither; the
+    backend container sets both to its real Redis, so a settings-only switch
+    worked in one and was silently ignored in the other.
+
+    **Why the check inspects built objects, not configuration.** Once the
+    environment is written, reading `conf.broker_url` back can only return what
+    was just written -- the first version of this check compared exactly that,
+    and could never fail (found in review of #89/#90). What can still go wrong
+    is Celery having *already built* a Redis backend or connection before this
+    ran, and caching it: then the configuration says memory while `.delay()`
+    still blocks on Redis. So the check asks the app what it actually built.
+
+    Side effect, stated rather than hidden: `os.environ` stays set for the
+    session, so a test's `override_settings(CELERY_BROKER_URL=...)` no longer
+    changes the broker. `apps/ai/tests/test_celery_routing.py` relies on that
+    override to prove the IR-196 fix; flagged on IR-199 for its owner.
+    """
+    try:
+        from config.celery import app as celery_app
+    except ImportError:
+        return
+
+    os.environ["CELERY_BROKER_URL"] = TEST_CELERY_BROKER_URL
+    os.environ["CELERY_RESULT_BACKEND"] = TEST_CELERY_RESULT_BACKEND
+    _assert_celery_runs_in_process(celery_app)
+
+
+def _assert_celery_runs_in_process(celery_app) -> None:
+    """Fail the session unless Celery really built in-process objects.
+
+    Both halves, because the ~20s stall measured above is the *result
+    backend* retrying, not the broker -- switching only one would still crawl.
+    """
+    from celery.backends.cache import CacheBackend
+
+    backend = celery_app.backend
+    with celery_app.connection_for_write() as connection:
+        transport = connection.transport.driver_type
+
+    if not isinstance(backend, CacheBackend) or transport != "memory":
+        raise pytest.UsageError(
+            "conftest could not point Celery at its in-process transport (it "
+            f"built backend={type(backend).__name__}, transport={transport!r}); "
+            "every .delay() would block on an unreachable broker. See IR-251."
+        )
 
 
 def pytest_report_header(config):

@@ -364,7 +364,7 @@ The floor is full-text search over records, and it works today.
 
 ### Open, and genuinely undecided
 
-- **`max_tokens` for theses.** 512 is an inherited prior, not a measurement. Measure on the eval set.
+- **`max_tokens` for theses.** 700 real `voyage-context-4` tokens (IR-287) — the measured equivalent of the 512 *words* it replaced, not a retrieval measurement. Measure on the eval set.
 - **Does Docling's `prov` survive scanned submissions?** One hour of work to find out, and it gates phase 4.
 - **SRS contradictions.** The service table lists no FastAPI gateway; Docling is SRS-specified but deferred. Both need amendments.
 

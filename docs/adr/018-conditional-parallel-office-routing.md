@@ -51,6 +51,8 @@ the submitter and confirmed by RDCO — not fixed by `record_type` alone.** The 
 exactly as ADR-002 and ADR-003 already describe: RDCO always does intake and final sign-off for
 Thesis/Research and Project; the Adviser is the sole reviewer for Proposal. ITSO remains
 structurally Project-only — Thesis/Research never enters `itso_review`, requested or not.
+**Superseded by [ADR-021](021-reviewer-directed-routing.md) §5, implemented in IR-266
+(2026-09-19): ITSO is open to Thesis/Research too, and `is_ip` pre-checks it for both types.**
 
 Mechanically:
 

@@ -450,21 +450,21 @@ AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:800
 # from the registry, because a settings module must not import an app
 # package to check itself against it.
 AI_CHUNK_STRATEGY      = config("AI_CHUNK_STRATEGY", default="")
-# NOTE THE UNIT: whitespace-delimited *words*, not tokenizer tokens
-# (apps.ai.chunking.tokens.count_tokens). Measured against docling-core's
-# HybridChunker on the same PDF, 512 words is ~44% more real BPE tokens than
-# "512" suggests -- the equivalent of that reference default is nearer 360.
-# Nothing overflows (voyage-context-4 has the context for it), so IR-243
-# deliberately left the number alone: what the right ceiling is for theses is
-# a retrieval-quality question for IR-133's recall@10 harness, not a guess.
-AI_CHUNK_MAX_TOKENS    = config("AI_CHUNK_MAX_TOKENS", default=512, cast=int)
+# THE UNIT IS REAL voyage-context-4 TOKENS (IR-287). It used to be
+# whitespace-delimited words, and 512 of those measured ~700 real BPE tokens
+# (IR-243) -- so the ceiling moved to 700 in the same change that made the
+# counter honest, and chunk boundaries on ordinary prose did not move. The
+# size is still an open question for IR-133's recall@10 harness; what changed
+# is that the number now means what it says.
+AI_CHUNK_MAX_TOKENS    = config("AI_CHUNK_MAX_TOKENS", default=700, cast=int)
 # Blank means "derive from max_tokens" — see ChunkingOptions.effective_min_tokens,
 # which explains why a fixed default would be a footgun.
 AI_CHUNK_MIN_TOKENS    = config(
     "AI_CHUNK_MIN_TOKENS", default="", cast=lambda v: int(v) if str(v).strip() else None
 )
+# 64 real tokens, the equivalent of the 48 words this was before IR-287.
 AI_CHUNK_CONTEXT_PATH_MAX_TOKENS = config(
-    "AI_CHUNK_CONTEXT_PATH_MAX_TOKENS", default=48, cast=int
+    "AI_CHUNK_CONTEXT_PATH_MAX_TOKENS", default=64, cast=int
 )
 # A bibliography is 10-20% of a thesis by tokens and retrieves uniformly
 # badly, so it is excluded here and kept in extracted_text for full-text

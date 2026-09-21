@@ -147,8 +147,18 @@ export function ipTypeLabel(ipType: IpType): string {
 /**
  * Metadata badges for a card, in reading order. Derived only from fields the
  * list serializer actually returns — no invented citation or file counts.
+ *
+ * `progress` adds the "Research Ongoing" badge for an approved Proposal. Off by
+ * default, because the catalogue views (Discover, My Library) must not show
+ * it: since IR-264 (ADR-021 §13) an approved Proposal is not public, so the
+ * catalogue presenting one as ongoing research would describe something it is
+ * not supposed to contain. My Workspace, where an owner tracks their own
+ * Proposal, opts in.
  */
-export function metaBadges(record: RecordListItem): MetaBadge[] {
+export function metaBadges(
+  record: RecordListItem,
+  { progress = false }: { progress?: boolean } = {},
+): MetaBadge[] {
   const badges: MetaBadge[] = [];
 
   if (record.classification_name) {
@@ -159,13 +169,11 @@ export function metaBadges(record: RecordListItem): MetaBadge[] {
     badges.push({ label: record.record_type_name, tone: "type" });
   }
 
-  // A Proposal enters `approved` when its adviser signs off, and is publicly
-  // browsable from that moment while the research itself is still underway --
-  // SRS §Proposal flow: "approves → approved (visible as ongoing)". Without
-  // this badge nothing on the card distinguishes in-progress work from a
-  // finished, reviewed output, which is what "visible as ongoing" asks for.
-  // Only the ongoing case is marked; no badge means the work is finished.
-  if (record.pipeline_status === "approved") {
+  // A Proposal enters `approved` when its adviser signs off, while the research
+  // itself is still underway. Without this badge nothing on the owner's card
+  // distinguishes in-progress work from a finished one. Only the ongoing case
+  // is marked; no badge means the work is finished.
+  if (progress && record.pipeline_status === "approved") {
     badges.push({ label: "Research Ongoing", tone: "ongoing" });
   }
 

@@ -16,15 +16,12 @@ pgvector>=0.3
 # Extraction is one on-premise service (ADR-016): Docling-serve over HTTP. The
 # extractor libraries the prototype chain imported — unstructured, pymupdf,
 # pytesseract — were never declared here and are gone with it.
-#
-# `openai` was declared here too, for "GPT-4.1-mini inference + text-embedding-3-small
-# embeddings". Both halves are superseded and nothing under backend/ ever imported
-# the package: ADR-021 made inference an OpenAI-*compatible* HTTP call
-# (LLM_BASE_URL / LLM_API_KEY / LLM_MODEL, Groq by default) rather than an SDK call;
-# ADR-015 made Voyage the only embedding provider; ADR-024 took embedding off the
-# gateway entirely. The SDK remains a real dependency of the gateway and stays
-# declared in ai/requirements.txt, which is where it is actually imported.
-# Removed 2026-09-17.
+
+# openai: the client for every OpenAI-compatible vendor (Groq, OpenRouter, etc.),
+# not only OpenAI — apps/ai/providers/openai_compatible.py imports it directly
+# (ADR-021). A 2026-09-17 removal claimed nothing under backend/ imported it;
+# that was false and broke the configured-LLM test path. Restored.
+openai>=1.30
 
 # httpx: Docling-serve extraction (ADR-016), Voyage embedding and reranking
 # (ADR-015), and the OpenAI-compatible inference call (ADR-021). It no longer
@@ -32,6 +29,18 @@ pgvector>=0.3
 # else in Django called it.
 httpx>=0.27.0
 
+# IR-287: the chunker counts real voyage-context-4 tokens. This is HuggingFace's
+# BPE engine, not a vendor SDK — the vocabulary itself is vendored at
+# apps/ai/chunking/tokenizer/voyage-context-4.json and pinned by SHA-256, so
+# nothing is downloaded at build or run time.
+#
+# Exactly pinned, alone in this file, and deliberately: the argument for
+# replacing the old whitespace counter was that a real tokenizer is
+# *deterministic across processes and versions*, and a range does not deliver
+# that — any release free to change a count is free to re-chunk and re-embed
+# the whole corpus. Both halves are pinned or neither claim holds. Moving it
+# is a deliberate act with a diff, and re-chunking is its cost.
+tokenizers==0.22.2
 pyexcel-xls>=0.7
 pyexcel-xlsx>=0.6
 openpyxl>=3.1                  # FR-M2-04: styled .xlsx template download

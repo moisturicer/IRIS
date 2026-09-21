@@ -62,9 +62,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.enums import (
-    PUBLICLY_VISIBLE_STATUSES,
+    DELETE_REVIEW_STATUSES,
     ClearanceStatus,
     Office,
+    Party,
     PipelineStatus,
     RecordTypeName,
     ReviewDecision,
@@ -282,11 +283,10 @@ TRANSITIONS: dict[tuple, Edge] = {
         gate_role=RoleName.RDCO,
         to=PipelineStatus.DECLINED,
     ),
-    (PipelineStatus.RDCO_INTAKE, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        gate_role=RoleName.RDCO,
-        to=PipelineStatus.REJECTED,
-    ),
+    # No REJECT edge at intake, nor at either clearance stage below (IR-265).
+    # ADR-021: intake and the specialist offices inform the decision; they do
+    # not make it. Rejection is kept only where the decision is made -- the
+    # assigned Adviser on a Proposal and RDCO at final review.
     # --- RDCO final review ---
     (PipelineStatus.RDCO_REVIEW, WorkflowEvent.APPROVE): Edge(
         decision=ReviewDecision.APPROVED,
@@ -313,10 +313,6 @@ TRANSITIONS: dict[tuple, Edge] = {
         decision=ReviewDecision.DECLINED,
         to=PipelineStatus.DECLINED,
     ),
-    (PipelineStatus.ITSO_REVIEW, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        to=PipelineStatus.REJECTED,
-    ),
     (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.APPROVE): Edge(
         decision=ReviewDecision.APPROVED,
         resolver="after_clearance",
@@ -324,10 +320,6 @@ TRANSITIONS: dict[tuple, Edge] = {
     (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.DECLINE): Edge(
         decision=ReviewDecision.DECLINED,
         to=PipelineStatus.DECLINED,
-    ),
-    (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        to=PipelineStatus.REJECTED,
     ),
     # --- Resubmission out of `declined`. Where it lands depends on whether the
     # --- decline came from a clearance office or a sequential gate -- which is
@@ -349,7 +341,10 @@ TRANSITIONS: dict[tuple, Edge] = {
         decision=ReviewDecision.APPROVED,
         resolver="first_status",
     ),
-    # RDCO marks an approved Proposal finished. Only Proposals reach `approved`
+    # RDCO -- or, since IR-267 (ADR-021 §3), the Proposal's assigned Adviser --
+    # marks an approved Proposal finished. `gate_role` holds one role and is
+    # documentation only; the view's permission and queryset decide who may
+    # act, as the module docstring explains. Only Proposals reach `approved`
     # -- approve_record sends every other type to `published` -- so keying on
     # the status is sufficient; the view keeps an explicit record-type check as
     # a defensive precondition rather than as routing.
@@ -368,11 +363,12 @@ TRANSITIONS: dict[tuple, Edge] = {
     ),
 }
 
-# Deleting a publicly visible record raises a delete request for review rather
-# than removing it; anything not yet public is soft-deleted outright. Generated
-# rather than typed out so the two sets cannot drift from
-# PUBLICLY_VISIBLE_STATUSES, which is what `perform_destroy` branches on.
-for _status in PUBLICLY_VISIBLE_STATUSES:
+# Deleting accepted work raises a delete request for review rather than removing
+# it; anything not yet accepted is soft-deleted outright. Generated rather than
+# typed out so the two sets cannot drift from DELETE_REVIEW_STATUSES, which is
+# what `perform_destroy` branches on. (It branched on PUBLICLY_VISIBLE_STATUSES
+# until IR-264 narrowed that to published only; see core.enums.)
+for _status in DELETE_REVIEW_STATUSES:
     TRANSITIONS[(_status, WorkflowEvent.REQUEST_DELETE)] = Edge(
         decision=ReviewDecision.APPROVED,
         to=PipelineStatus.PENDING_DELETE,
@@ -507,16 +503,16 @@ def _resolve_enter_clearance_stage(record, **_) -> str:
     Create the requested offices' clearance rows and say where the record lands.
 
     ADR-018: the office set is data on the record, not a function of its type.
-    `requested_itso` takes effect for Project only — Thesis/Research has no ITSO
-    stage at all. A record requesting nothing goes straight to `rdco_review`,
-    because a clearance stage with no office attached would auto-clear, which is
-    worse than skipping it.
+    That now holds for ITSO too: ADR-021 §5 reversed ADR-018's Project-only rule
+    (IR-266), so a Thesis/Research requesting ITSO takes the Project's route. A
+    record requesting nothing goes straight to `rdco_review`, because a clearance
+    stage with no office attached would auto-clear, which is worse than skipping
+    it.
     """
     from apps.reviews.models import RecordClearance
 
-    type_name = record.record_type.name if record.record_type else ""
     offices: list = []
-    if type_name == RecordTypeName.PROJECT and record.requested_itso:
+    if record.requested_itso:
         offices.append(Office.ITSO)
     if record.requested_ierc:
         offices.append(Office.IERC)
@@ -744,10 +740,51 @@ def first_status_for(record) -> str:
     )
 
 
+#: Where each record type enters, and who may decide it (ADR-021 §3, §9).
+#: Declared here because §9 puts them beside the table; IR-258's tracker is
+#: their first reader, and IR-260 makes submission and decisions read them
+#: too. Keyed by `RecordTypeName`; a type not listed takes the
+#: Thesis/Research route, as `first_status_for` already does.
+ENTRY_PARTY = {RecordTypeName.PROPOSAL: Party.ADVISER}
+DEFAULT_ENTRY_PARTY = Party.INTAKE
+DECIDING_PARTIES = {RecordTypeName.PROPOSAL: frozenset({Party.ADVISER, Party.RDCO})}
+DEFAULT_DECIDING_PARTIES = frozenset({Party.RDCO})
+
+
+def type_name_of(record) -> str:
+    return record.record_type.name if record.record_type else ""
+
+
+def entry_party_for(record) -> str:
+    """The party a record of this type is submitted to."""
+    return ENTRY_PARTY.get(type_name_of(record), DEFAULT_ENTRY_PARTY)
+
+
+def deciding_parties_for(record) -> frozenset:
+    """The parties with decision authority over a record of this type."""
+    return DECIDING_PARTIES.get(type_name_of(record), DEFAULT_DECIDING_PARTIES)
+
+
 def edge_for(status: str, event: WorkflowEvent) -> Edge | None:
     """The declared edge, or None when the transition is not legal."""
     _, transitions = load_table()
     return transitions.get((status, event))
+
+
+def require_edge(record, event: WorkflowEvent) -> Edge:
+    """
+    The declared edge from the record's current status, or a refusal.
+
+    `apply()` calls this, and so may a caller that must refuse *before* it
+    writes anything of its own (IR-265) -- one legality check, one message.
+    """
+    edge = edge_for(record.pipeline_status, event)
+    if edge is None:
+        raise InvalidPipelineTransition(
+            f"'{event.value}' is not a legal transition from "
+            f"'{record.pipeline_status}'."
+        )
+    return edge
 
 
 # ---------------------------------------------------------------------------
@@ -763,9 +800,17 @@ def apply(
     office=None,
     declining_stage=None,
     restore_to=None,
+    review=None,
 ) -> str:
     """
     Resolve and persist the record's next `pipeline_status`. Returns it.
+
+    **Also writes the shadow routing rows** (IR-257): who holds the record, who
+    sent it where, and what revision is outstanding. They land in this same
+    transaction, after the status, so they can never describe a move that did
+    not happen. `review` is the `Review` the caller wrote for this transition,
+    if any; it is linked to the assignment it was made under. See
+    `apps.reviews.shadow`.
 
     **Atomic from the first commit** (ADR-002's Decision, and its Security
     Impact: this closes the partial-application defect where a record could
@@ -781,12 +826,16 @@ def apply(
     `reviews.services`, which is also what honours IR-136's "do not rebuild the
     eleven transitions" instruction.
     """
-    edge = edge_for(record.pipeline_status, event)
-    if edge is None:
-        raise InvalidPipelineTransition(
-            f"'{event.value}' is not a legal transition from "
-            f"'{record.pipeline_status}'."
-        )
+    from apps.reviews import shadow
+
+    edge = require_edge(record, event)
+    # Who acted, read before the move: a reviewer acts as the party of the
+    # stage the record was *at*. Anything else was the submitter or the system.
+    acting_party = (
+        shadow.party_for_stage(review_stage_for(record.pipeline_status, office))
+        if event in REVIEW_EVENTS
+        else None
+    )
 
     if edge.to is not None:
         destination = edge.to
@@ -807,4 +856,6 @@ def apply(
     if destination != record.pipeline_status:
         record.pipeline_status = destination
         record.save(update_fields=["pipeline_status", "updated_at"])
+
+    shadow.sync(record, event, actor, acting_party=acting_party, review=review)
     return destination
