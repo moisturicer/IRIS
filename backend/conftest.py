@@ -39,6 +39,7 @@ def pytest_configure(config):
     # to the Django half of the suite whether or not Hypothesis is installed.
     _use_fast_password_hashing()
     _use_in_process_celery_broker()
+    _use_local_memory_cache()
 
     try:
         from testing.hypothesis_profiles import activate_profile
@@ -178,6 +179,27 @@ def _assert_celery_runs_in_process(celery_app) -> None:
             f"built backend={type(backend).__name__}, transport={transport!r}); "
             "every .delay() would block on an unreachable broker. See IR-251."
         )
+
+
+def _use_local_memory_cache() -> None:
+    """Swap Django's `"default"` cache to LocMemCache, if Django is importable.
+
+    IR-132 gave `CACHES["default"]` a real Redis backend; CI provisions no
+    Redis (see `_use_in_process_celery_broker` above), and DRF's
+    `AnonRateThrottle`/`UserRateThrottle` read that same cache on every
+    request, so any authenticated API test fails there with
+    `redis.exceptions.ConnectionError`.
+    """
+    try:
+        from django.conf import settings
+        from django.test.signals import clear_cache_handlers
+    except ImportError:
+        return
+
+    settings.CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }
+    clear_cache_handlers(setting="CACHES")
 
 
 def pytest_report_header(config):
