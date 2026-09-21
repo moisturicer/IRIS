@@ -383,6 +383,26 @@ LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
 # higher temperature buys variety nobody asked for and invites invention.
 LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
 
+# ---- Question resolution (IR-296, ADR-026 Decisions 1 and 8) -------------
+#
+# "what about its limitations?" has no subject on its own -- retrieval finds
+# every paper's future-work section. When a Conversation has history, this
+# configures the model that rewrites the question into one that stands alone,
+# before retrieval runs. Separate from LLM_MODEL because rewriting is an easy
+# task and does not need the model that writes answers; shares LLM_BASE_URL
+# and LLM_API_KEY, since it is the same vendor account and ADR-021's
+# one-adapter shape only needs a second model string.
+#
+# Independently switchable, so retrieval quality with and without it is
+# measurable under ADR-023 -- the point of putting each enhancement technique
+# behind its own switch rather than shipping it as an unconditional change.
+AI_QUESTION_RESOLUTION_ENABLED = config(
+    "AI_QUESTION_RESOLUTION_ENABLED", default=True, cast=bool
+)
+LLM_RESOLUTION_MODEL = config(
+    "LLM_RESOLUTION_MODEL", default="llama-3.1-8b-instant"
+)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in

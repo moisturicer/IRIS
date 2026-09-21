@@ -112,7 +112,7 @@ class _BrokenLLM(LLMProvider):
         raise LLMUnavailable("429 rate limited")
 
 
-def root_with(embedder=None, llm=None):
+def root_with(embedder=None, llm=None, resolver=None):
     """A root whose vendors are fakes and whose disclosure gate allows.
 
     The gate is opened deliberately and explicitly. `Record` carries no
@@ -120,11 +120,19 @@ def root_with(embedder=None, llm=None):
     a test running under it would pass while asserting nothing — every
     assertion about what comes back would be satisfied by an empty list. The
     gate's own refusing behaviour is asserted in `apps/ai/policy/tests/`.
+
+    `resolver` defaults to `None`, which is *not* "no resolution" — it falls
+    through to `CompositionRoot`'s own settings-driven default, exactly as an
+    unconfigured deployment would. No test here relies on that path actually
+    calling a model: every question in this corpus is pronoun-free, so
+    `has_back_reference` skips it regardless of what `resolver()` returns.
+    Tests exercising resolution itself pass one explicitly (IR-296).
     """
     return CompositionRoot(
         embedder=embedder,
         reranker=ScriptedReranker(),
         llm=llm or ScriptedLLM(),
+        resolver=resolver,
         permits=lambda record: True,
     )
 
