@@ -31,7 +31,15 @@ _BASE_URL = "https://api.voyageai.com/v1"
 #: 32,000 without. The conservative figure is used because auto-chunking is
 #: not requested -- IRIS does its own chunking and does not want the vendor
 #: silently re-splitting a passage whose regions are already persisted.
-_EMBED_TOKEN_BUDGET = 32_000
+#:
+#: Held ~3% below the cap rather than at it (IR-287). The headroom used to be
+#: hidden in the estimator, which rounded a word count up by 1.4; the
+#: estimator now counts exactly, with ``add_special_tokens=False``, so it
+#: reports the text's own cost and not whatever wrapping Voyage adds around
+#: it. Sitting exactly on the cap with an exact count leaves nothing for that
+#: difference, and the failure mode is a 400 on a full batch.
+_VENDOR_TOKEN_CAP = 32_000
+_EMBED_TOKEN_BUDGET = 31_000
 
 #: Voyage's asymmetric input types. The whole reason `embed_documents` and
 #: `embed_query` are separate methods (ADR-015 rule 3).

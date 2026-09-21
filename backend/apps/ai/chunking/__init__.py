@@ -4,10 +4,19 @@ The chunk, not the record, is the unit of retrieval (ADR-013). This package
 turns a normalized document into a ``ChunkSet``.
 
 It is **pure**: no Django, no database, no network, no clock, no randomness,
-and no vendor import. That is deliberate and load-bearing — it makes the most
+and no vendor SDK. That is deliberate and load-bearing — it makes the most
 novel part of the RAG work the part that needs the least infrastructure to
 develop, and it means the entire component is testable with a fixture and an
 assertion.
+
+**One deviation, and it is the whole package's only one (IR-287):** counting
+a token loads a vocabulary file from disk, once per process, through
+HuggingFace's ``tokenizers``. ``tokens`` explains why that is the smaller
+evil than a whitespace counter that called words tokens, and what is pinned
+so the count stays deterministic. It is a local read of a file that ships
+beside this package -- not a network call, not a vendor client, and not
+configuration. Every module below that says "pure" means pure apart from
+this, because every one of them counts.
 
 Chunking runs in the Celery worker at ingestion, off the request path.
 """
