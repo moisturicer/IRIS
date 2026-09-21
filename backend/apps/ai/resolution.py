@@ -5,10 +5,15 @@ every paper's future-work section. When a Conversation has history, a small
 model call rewrites the question into one that stands alone, and retrieval
 runs on the rewrite, not on what was typed.
 
-A module, not a port (ADR-026 Testing Decisions): resolution has one
-implementation, and it is fully exercisable through HTTP with a fake model
-beneath it -- exactly what a hypothetical second implementation would be
-buying nothing for.
+A module, not a port (IR-294 Testing Decisions: "No new seams. Resolution
+is a module, not a port: one implementation is a hypothetical seam..."):
+resolution has one implementation, and it is fully exercisable through HTTP
+with a fake model beneath it -- exactly what a hypothetical second
+implementation would be buying nothing for. It still composes around the
+retriever the way ADR-026 Decision 5 asks of every enhancement technique --
+a swappable collaborator on `CompositionRoot`, switched off independently of
+the others -- without being a second `Reranker`-shaped ABC no second adapter
+would ever implement.
 
 **Two guards keep most Turns free of this cost** (ADR-026 Decision 8):
 ``has_back_reference`` decides without a model call whether resolution could

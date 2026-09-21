@@ -65,6 +65,22 @@ class BackReferenceTests:
     def test_a_self_contained_question_has_no_back_reference(self, question):
         assert not has_back_reference(question)
 
+    def test_a_missed_back_reference_is_a_soft_failure_not_an_error(self):
+        """The word list is deliberately short and deliberately loose (see
+        the module docstring) — "here" is a genuine referring word it does
+        not cover. Missing it is exactly the soft failure the spec asks for:
+        `resolve` still returns cleanly, with no call made and no exception,
+        which is indistinguishable from an ordinary self-contained question."""
+        question = "does the same limitation apply here"
+        assert not has_back_reference(question)
+
+        llm = ScriptedLLM()
+        resolver = QuestionResolver(llm=llm, cache={})
+        turns = [_Turn(pk=1, question="What does the paper find?", answer="X.")]
+
+        assert resolver.resolve(question, turns) is None
+        assert llm.calls == []
+
 
 class PromptTests:
     def test_the_prompt_carries_the_conversation_and_the_follow_up(self):
