@@ -1,5 +1,12 @@
-/** Local chat session types (FR-M3-01 — persisted in browser until backend conversations exist). */
-import type { Citation, SemanticSearchResult } from "./ai";
+/**
+ * Chat-screen message shape, shared by Ask IRIS and Paper Chat (IR-298).
+ *
+ * A thin view over the backend's Conversation/Turn wire shapes
+ * (`types/ai.ts`) rather than a second source of truth: a live answer maps
+ * straight onto one of these, and so does a replayed Turn, which is what
+ * lets both surfaces render through the same `ChatMessageBubble`.
+ */
+import type { ChatCitation, SemanticSearchResult } from "./ai";
 
 export type ChatRole = "user" | "assistant";
 
@@ -8,11 +15,11 @@ export interface ChatMessage {
   role:       ChatRole;
   content:    string;
   /**
-   * The Passages this reply cited (IR-284). Previously record ids; a
-   * conversation saved under that shape is normalised away on read rather
-   * than migrated, since nothing can recover a quote from an id.
+   * The Passages this reply cited (IR-284). A live answer's citations carry
+   * the quote and the record's title; a replayed Turn's carry only the
+   * pointer (record, chunk, page) until IR-299 re-resolves the text.
    */
-  citations?: Citation[];
+  citations?: ChatCitation[];
   /**
    * The Record cards for those Passages, as the answer returned them.
    *
@@ -24,13 +31,11 @@ export interface ChatMessage {
   sources?:   SemanticSearchResult[];
   /** True when retrieval fell back to keyword matching for this reply. */
   degraded?:  boolean;
+  /**
+   * True when this reply left its Conversation's Record scope because the
+   * reader asked to search all papers (IR-298, ADR-026 §9). Undefined for a
+   * user message, and for an assistant message in an unscoped Conversation.
+   */
+  widened?:   boolean;
   createdAt:  string;
-}
-
-export interface Conversation {
-  id:         string;
-  title:      string;
-  messages:   ChatMessage[];
-  createdAt:  string;
-  updatedAt:  string;
 }

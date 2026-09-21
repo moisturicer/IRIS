@@ -41,7 +41,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
     try {
       const { data } = await aiApi.ask(
         `${record.title}. Summarise the research objectives, methodology and key findings of this work.`,
-        3,
+        { topK: 3 },
       );
       setAnswer(data);
     } catch {

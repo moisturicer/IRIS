@@ -51,11 +51,16 @@ export function citationHref(citation: Pick<Citation, "record_id" | "page">): st
  * The record's name is in the link text rather than only beside it, so the
  * accessible name of every citation link is distinct — "Open" repeated eight
  * times tells a screen-reader user nothing about which source is which.
+ *
+ * `citation.record_title` is optional because a replayed citation (IR-298)
+ * is a stored pointer with no title of its own — a caller in that position
+ * always supplies `title` explicitly, and the fallback below only exists so
+ * this never renders "Open undefined" if one somehow does not.
  */
 export function openCitationLabel(
-  citation: Pick<Citation, "page" | "record_title">,
+  citation: Pick<Citation, "page"> & Partial<Pick<Citation, "record_title">>,
   title?: string,
 ): string {
-  const name = title ?? citation.record_title;
+  const name = title ?? citation.record_title ?? "the source";
   return citation.page != null ? `Open ${name} at page ${citation.page}` : `Open ${name}`;
 }

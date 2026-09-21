@@ -2,10 +2,16 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { ChatMessage } from "@/types/chat";
-import type { Citation } from "@/types/ai";
+import type { ChatCitation, Citation } from "@/types/ai";
 import { AskIrisMark, GroundedCitationIcon } from "./AskIrisIcons";
-import { DegradedNotice, OpenPassageLink, PassageQuote } from "./PassageQuote";
+import { DegradedNotice, OpenPassageLink, PassageQuote, ScopeNotice } from "./PassageQuote";
 import "highlight.js/styles/github.min.css";
+
+/** Whether `citation` carries the quote and title a live answer has, rather
+ * than only the pointer a replayed Turn has until IR-299 re-resolves them. */
+function hasQuote(citation: ChatCitation): citation is Citation {
+  return "text" in citation;
+}
 
 /**
  * One citation: the quote, the page, and a way to go and read it.
@@ -19,8 +25,26 @@ import "highlight.js/styles/github.min.css";
  * page rather than at its first. A passage whose page could not be recovered
  * during extraction links to the record without one, rather than guessing a
  * page number, which would send a reader to the wrong place confidently.
+ *
+ * A **replayed** citation (from a reopened Conversation, IR-298) carries the
+ * record id and page but not the quote or the record's title — a stored
+ * citation is a pointer, never text, so there is nothing to quote until
+ * IR-299 re-resolves it at read time. That case renders the pointer alone:
+ * no blockquote, no invented title.
  */
-function PassageCitation({ citation }: { citation: Citation }) {
+function PassageCitation({ citation }: { citation: ChatCitation }) {
+  if (!hasQuote(citation)) {
+    return (
+      <div className="rounded-lg bg-[#6B0F12]/[0.04] border border-[#6B0F12]/10 px-2.5 py-2">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-[10px] font-bold text-[#6B0F12]">[{citation.marker}]</span>
+          <span className="text-[11px] font-semibold text-stone-700">Source</span>
+        </div>
+        <OpenPassageLink citation={citation} title="the source" className="mt-1.5" />
+      </div>
+    );
+  }
+
   const section = citation.context_path?.[citation.context_path.length - 1];
 
   return (
@@ -77,6 +101,7 @@ export function ChatMessageBubble({ message, showSources = true }: ChatMessageBu
         )}
 
         {!isUser && message.degraded && <DegradedNotice subject="answer" />}
+        {!isUser && message.widened && <ScopeNotice />}
 
         {!isUser && showSources && message.citations && message.citations.length > 0 && (
           <div className="mt-3 pt-2 border-t border-gray-100 space-y-2">
