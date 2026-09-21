@@ -40,12 +40,15 @@ from core.enums import (
     IPType,
     Office,
     PipelineStatus,
+    DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
     RecordTypeName,
     RequestStatus,
     ReviewDecision,
     ReviewStage,
     RoleName,
+    TrackerPartyState,
+    WorkflowState,
 )
 
 APPS_DIR = Path(settings.BASE_DIR) / "apps"
@@ -67,6 +70,10 @@ GOVERNED_ENUMS = (
     # `reviews/serializers.py`, and a key is wire format, not a stored value.
     # Its `"withdrawn"` is still governed, through `AssignmentState`.
     AssignmentState,
+    # IR-258: the derived tracker vocabulary. Never stored, but the frontend
+    # branches on these values, so a hand-typed copy is the same drift risk.
+    WorkflowState,
+    TrackerPartyState,
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
@@ -303,7 +310,22 @@ class EnumsMatchTheDatabaseTests(TestCase):
         of the pipeline vocabulary -- a typo here silently empties Discover.
         """
         self.assertTrue(set(PUBLICLY_VISIBLE_STATUSES) <= {s.value for s in PipelineStatus})
-        self.assertEqual(len(PUBLICLY_VISIBLE_STATUSES), 3)
+        # Rule change, IR-264 (ADR-021 §13): 3 -> 1. Published only; approved and
+        # completed Proposals left the public catalogue. Changed deliberately --
+        # a Proposal status creeping back in here would put it in Discover and
+        # Ask IRIS again.
+        self.assertEqual(tuple(PUBLICLY_VISIBLE_STATUSES), (PipelineStatus.PUBLISHED,))
+
+    def test_delete_review_statuses_still_cover_accepted_proposals(self):
+        """
+        IR-264 decoupled deletion from visibility. If this set ever shrank back
+        to the public one, an owner could soft-delete an approved or completed
+        Proposal with no RDCO review.
+        """
+        self.assertEqual(
+            set(DELETE_REVIEW_STATUSES),
+            {PipelineStatus.PUBLISHED, PipelineStatus.APPROVED, PipelineStatus.COMPLETED},
+        )
 
     def test_seeded_role_names_exist(self):
         """`RoleName` claims to mirror rows migration accounts/0003 seeds."""

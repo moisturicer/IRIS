@@ -453,11 +453,20 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def _scenario_rejected(self, users):
+        """Rejected by RDCO at final review.
+
+        This was "Rejected at intake" until IR-265: under ADR-021 intake
+        informs the decision and can no longer reject, so the demo rejects
+        where the decision is actually made. No office is requested, so intake
+        approval goes straight to final review.
+        """
         record = self._make(
-            "Rejected at intake", RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT]
+            "Rejected at final review", RecordTypeName.THESIS_RESEARCH,
+            users[RoleName.STUDENT],
         )
         if record:
             self._submit(record, users[RoleName.STUDENT])
+            approve_record(record, users[RoleName.RDCO], "No office review requested.")
             reject_record(
                 record, users[RoleName.RDCO],
                 "Out of scope for institutional disclosure.",

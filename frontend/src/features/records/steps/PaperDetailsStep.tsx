@@ -24,6 +24,7 @@ import { useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/Input";
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
+import { routeForTypeName } from "@/lib/submissionRoutes";
 import type { User } from "@/types/auth";
 import type { RecordType, Classification, PSCEDClassification } from "@/types/records";
 import type { RecordFormValues } from "../recordFormSchema";
@@ -50,8 +51,7 @@ export function PaperDetailsStep() {
 
   const selectedTypeName = recordTypes.find((rt) => String(rt.id) === selectedTypeId)?.name;
   const isProposal       = selectedTypeName === "Proposal";
-  const isProject        = selectedTypeName === "Project";
-  const hasOfficeRouting = selectedTypeName === "Thesis / Research" || isProject;
+  const hasOfficeRouting = routeForTypeName(selectedTypeName)?.hasConditionalOffices ?? false;
 
   // Suggestion signals -> office requests. Mapped from each office's own
   // SRS-defined scope: ITSO does technical/patentability review, KTTO does
@@ -64,9 +64,11 @@ export function PaperDetailsStep() {
   // Each effect only re-fires when its own signal changes, so a student's
   // manual override of an office checkbox survives unrelated edits -- it's
   // only re-suggested if the specific flag it came from changes again.
+  // ITSO is offered to Thesis/Research as well as Project since IR-266
+  // (ADR-021 §5 reversed ADR-018's Project-only rule).
   useEffect(() => {
-    if (isProject) setValue("requested_itso", Boolean(isIp));
-  }, [isIp, isProject, setValue]);
+    if (hasOfficeRouting) setValue("requested_itso", Boolean(isIp));
+  }, [isIp, hasOfficeRouting, setValue]);
 
   useEffect(() => {
     setValue("requested_ktto", Boolean(forCommercialization));
@@ -335,8 +337,8 @@ export function PaperDetailsStep() {
         </label>
       </fieldset>
 
-      {/* Office routing (ADR-018) — Proposal has no parallel
-          offices at all; ITSO only applies to Project (see submissionRoutes). */}
+      {/* Office routing (ADR-018) — Proposal has no parallel offices at all.
+          Thesis/Research and Project are offered the same three (IR-266). */}
       {hasOfficeRouting && (
         <fieldset className="border border-gray-200 rounded-xl p-4">
           <legend className="px-1 text-[13px] font-medium text-gray-700">
@@ -347,14 +349,12 @@ export function PaperDetailsStep() {
             confirms this once your disclosure reaches intake.
           </p>
           <div className="flex flex-col gap-2.5">
-            {isProject && (
-              <label className="flex items-center gap-2.5 text-[13px] text-gray-700 cursor-pointer">
-                <input type="checkbox" {...register("requested_itso")} className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand" />
-                <span>
-                  <span className="font-medium">ITSO</span> — technical review and patentability assessment
-                </span>
-              </label>
-            )}
+            <label className="flex items-center gap-2.5 text-[13px] text-gray-700 cursor-pointer">
+              <input type="checkbox" {...register("requested_itso")} className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand" />
+              <span>
+                <span className="font-medium">ITSO</span> — technical review and patentability assessment
+              </span>
+            </label>
             <label className="flex items-center gap-2.5 text-[13px] text-gray-700 cursor-pointer">
               <input type="checkbox" {...register("requested_ktto")} className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand" />
               <span>

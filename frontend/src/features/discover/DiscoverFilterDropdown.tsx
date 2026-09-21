@@ -99,6 +99,9 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
       {open && (
         <div
           role="listbox"
+          // A listbox needs its own accessible name (axe: aria-input-field-name).
+          // Found by IR-264's Discover test, the first to open one.
+          aria-label={label}
           className="absolute left-0 top-full mt-1.5 w-60 max-h-64 overflow-y-auto bg-white rounded-lg shadow-card-md border border-slate-200 py-1.5 z-50"
         >
           {loading ? (

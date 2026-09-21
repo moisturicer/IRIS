@@ -119,13 +119,14 @@ class ReviewViewSet(viewsets.GenericViewSet):
         Routing:
           • Sequential stages (adviser_review, rdco_intake, rdco_review):
               approved  → advance to next stage (rdco_intake also creates office clearances)
-              declined  → terminal; record enters 'declined'; owner must submit a new record
-              rejected  → terminal; record enters 'rejected'
+              declined  → record enters 'declined'; the owner may resubmit
+              rejected  → terminal; record enters 'rejected'. adviser_review and
+                          rdco_review only -- refused with 400 at rdco_intake (IR-265)
           • Clearance stages (itso_review, parallel_review):
               Routes to submit_clearance; office determined from user's role.
               approved  → clears office; advances pipeline when all offices are cleared.
-              declined  → terminal (same as above).
-              rejected  → terminal (same as above).
+              declined  → record enters 'declined' (same as above).
+              rejected  → refused with 400; an office cannot reject (IR-265).
         """
         serializer = ReviewWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

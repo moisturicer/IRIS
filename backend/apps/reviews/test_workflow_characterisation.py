@@ -242,6 +242,11 @@ class SequentialReviewTests(WorkflowCharacterisationBase):
         The distinction ADR-003 rests on: `declined` invites a resubmission,
         `rejected` does not. Both are pinned in one test so the pair cannot drift
         apart unnoticed.
+
+        **Rule change, IR-265 (ADR-021).** This pair was walked at
+        `rdco_intake`, which can no longer reject. It is walked at RDCO final
+        review now, the gate that still offers both. Intake's refusal is pinned
+        in `test_reject_authority.py`.
         """
         cases = [
             (ReviewDecision.DECLINED, PipelineStatus.DECLINED),
@@ -251,25 +256,28 @@ class SequentialReviewTests(WorkflowCharacterisationBase):
             with self.subTest(decision=decision):
                 record = self.make_record(
                     RecordTypeName.THESIS_RESEARCH,
-                    pipeline_status=PipelineStatus.RDCO_INTAKE,
+                    pipeline_status=PipelineStatus.RDCO_REVIEW,
                 )
                 response = self.review(record, self.rdco, decision, comment="Needs work.")
                 self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
                 self.assertEqual(self.status_of(record), expected)
 
                 review = Review.objects.get(record=record)
-                self.assertEqual(review.stage, ReviewStage.RDCO_INTAKE)
+                self.assertEqual(review.stage, ReviewStage.RDCO)
                 self.assertEqual(review.status, decision)
 
-    def test_rejection_is_characterised_at_all_three_sequential_gates(self):
+    def test_rejection_is_characterised_at_both_deciding_gates(self):
         """
         `reject_record` had no test calling it anywhere before IR-197. Walked at
-        every sequential stage because the terminal path is the one nobody exercises
-        by hand.
+        every sequential stage that can reject, because the terminal path is the
+        one nobody exercises by hand.
+
+        **Rule change, IR-265 (ADR-021).** This was "all three sequential
+        gates". `rdco_intake` can no longer reject, so its case moved to
+        `test_reject_authority.py` as a refusal.
         """
         cases = [
             (RecordTypeName.PROPOSAL, PipelineStatus.ADVISER_REVIEW, self.adviser, ReviewStage.ADVISER),
-            (RecordTypeName.THESIS_RESEARCH, PipelineStatus.RDCO_INTAKE, self.rdco, ReviewStage.RDCO_INTAKE),
             (RecordTypeName.THESIS_RESEARCH, PipelineStatus.RDCO_REVIEW, self.rdco, ReviewStage.RDCO),
         ]
         for type_name, stage, actor, expected_stage in cases:
@@ -311,16 +319,26 @@ class ClearanceRoutingTests(WorkflowCharacterisationBase):
         self.assertEqual(self.status_of(record), PipelineStatus.RDCO_REVIEW)
         self.assertEqual(self.clearances(record), {})
 
-    def test_itso_is_structurally_project_only(self):
-        """A Thesis/Research record requesting ITSO does not get an ITSO clearance."""
+    def test_a_thesis_requesting_itso_enters_the_itso_stage_first(self):
+        """
+        Rule change, IR-266 (ADR-021 §5): ITSO is no longer Project-only.
+
+        This was `test_itso_is_structurally_project_only`, which pinned ADR-018's
+        rule that a Thesis/Research request for ITSO is ignored. That rule was
+        reversed, so the characterisation is updated deliberately: a thesis now
+        takes exactly the Project's route below.
+        """
         record = self.make_record(
             RecordTypeName.THESIS_RESEARCH,
             pipeline_status=PipelineStatus.RDCO_INTAKE,
             requested_itso=True, requested_ktto=True,
         )
         self.review(record, self.rdco, ReviewDecision.APPROVED)
-        self.assertNotIn(Office.ITSO, self.clearances(record))
-        self.assertEqual(self.status_of(record), PipelineStatus.PARALLEL_REVIEW)
+        self.assertEqual(
+            self.clearances(record),
+            {Office.ITSO: ClearanceStatus.PENDING, Office.KTTO: ClearanceStatus.PENDING},
+        )
+        self.assertEqual(self.status_of(record), PipelineStatus.ITSO_REVIEW)
 
     def test_a_project_requesting_itso_enters_the_itso_stage_first(self):
         record = self.make_record(

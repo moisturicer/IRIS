@@ -15,6 +15,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 import jwt
 
 from core.enums import (
+    DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
     IPType,
     PipelineStatus,
@@ -24,7 +25,15 @@ from core.enums import (
     RoleName,
 )
 from . import lifecycle
-from core.permissions import IsOwnerOrStaff, IsStaff, IsRDCO, IsAdmin, IsAuthor
+from core.permissions import (
+    IsAdmin,
+    IsAdviser,
+    IsAuthor,
+    IsOwnerOrStaff,
+    IsRDCO,
+    IsStaff,
+    get_role_name,
+)
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
@@ -82,6 +91,20 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser"
         ).prefetch_related("owners__user", "authors")
 
+        if (
+            self.action == "complete"
+            and get_role_name(self.request.user) == RoleName.ADVISER
+        ):
+            # An Adviser completes only the Proposal they advise (ADR-021 §3,
+            # IR-267). The role gate in get_permissions() admits every Adviser;
+            # narrowing here, rather than refusing in a permission class, makes
+            # an unassigned Adviser's refusal the same 404 as a missing record.
+            # Since IR-264 visible_to() already hides an approved Proposal from
+            # most unassigned Advisers; this narrowing still matters for one who
+            # can read it on other grounds -- an Adviser can author records, so
+            # may *own* a Proposal someone else advises.
+            qs = qs.filter(adviser=self.request.user)
+
         if self.action == "list":
             # Discover is a public catalogue, not an authorization boundary, so
             # it narrows further. visible_to() is wider than the catalogue --
@@ -120,7 +143,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         if self.action in ("update", "partial_update", "destroy", "submit"):
             return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "complete":
-            return [IsAuthenticated(), IsRDCO()]
+            # RDCO or the *assigned* Adviser (IR-267). The assignment is
+            # per-record, so get_queryset() narrows an Adviser to their own
+            # records; this gate only turns away roles that can never complete.
+            return [IsAuthenticated(), (IsRDCO | IsAdviser)()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -179,8 +205,9 @@ class RecordViewSet(viewsets.ModelViewSet):
         transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
 
     def perform_destroy(self, instance):
-        # Publicly visible records go through delete request flow
-        if instance.pipeline_status in PUBLICLY_VISIBLE_STATUSES:
+        # Accepted work goes through the delete request flow (RDCO review);
+        # DELETE_REVIEW_STATUSES, not the public set -- see core.enums (IR-264).
+        if instance.pipeline_status in DELETE_REVIEW_STATUSES:
             DeleteRequest.objects.create(
                 record=instance,
                 requested_by=self.request.user,
@@ -298,6 +325,18 @@ class RecordViewSet(viewsets.ModelViewSet):
         matches = search_records(seed, top_k=3, exclude_id=record.id)
         return Response({"results": [s.as_dict() for s in matches]})
 
+    @action(detail=True, methods=["get"])
+    def tracker(self, request, pk=None):
+        """
+        GET /records/<id>/tracker/ -- the Review & Routing Tracker (IR-258).
+
+        ADR-021 §14. `get_object()` looks the record up in `visible_to()`, so a
+        viewer without access gets the same 404 as a missing record (IR-153).
+        """
+        from apps.reviews.tracker import tracker_payload
+
+        return Response(tracker_payload(self.get_object(), request.user))
+
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):
         """POST /records/<id>/increment_access/"""
@@ -380,9 +419,10 @@ class RecordViewSet(viewsets.ModelViewSet):
     def complete(self, request, pk=None):
         """
         POST /records/<id>/complete/
-        RDCO marks an approved Proposal as completed (research finished).
-        The record remains publicly visible.
-        Permission enforced by get_permissions() → IsRDCO.
+        RDCO or the Proposal's assigned Adviser marks an approved Proposal as
+        completed (research finished; ADR-021 §3). The record remains publicly
+        visible. Permission: get_permissions() admits RDCO and Advisers, and
+        get_queryset() narrows an Adviser to the records they advise.
         """
         from apps.notifications.services import notify_proposal_completed
 
