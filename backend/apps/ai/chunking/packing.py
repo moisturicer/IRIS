@@ -22,18 +22,26 @@ def pack_pieces(pieces: list[Piece], max_tokens: int) -> list[list[Piece]]:
     exceeds ``max_tokens``, it is placed alone in its own (oversized) window
     rather than dropped or truncated. Splitting an oversized piece is the
     job of the stage that hands pieces to this function.
+
+    The window is counted **as its caller will assemble it**, not as the sum
+    of its pieces (IR-287). Token counts are not additive across a join: with
+    a real tokenizer, joining two pieces can cost more than counting them
+    apart, because the separator and the characters either side of it may
+    merge differently. Summing was exact while a token was a whitespace word
+    and became an undercount the moment it was not -- and an undercount here
+    breaches the one guarantee this function exists to make.
     """
     windows: list[list[Piece]] = []
     current: list[Piece] = []
-    current_tokens = 0
+    current_text = ""
 
     for text, element in pieces:
-        tokens = count_tokens(text)
-        if current and current_tokens + tokens > max_tokens:
+        candidate = f"{current_text} {text}".strip() if current else text
+        if current and count_tokens(candidate) > max_tokens:
             windows.append(current)
-            current, current_tokens = [], 0
+            current, candidate = [], text
         current.append((text, element))
-        current_tokens += tokens
+        current_text = candidate
 
     if current:
         windows.append(current)

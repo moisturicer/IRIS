@@ -9,6 +9,12 @@ celery[redis]>=5.3
 redis>=5.0
 openai>=1.30                   # FR-M4-02: GPT-4.1-mini LLM inference + FR-M3-03: third-party embeddings (text-embedding-3-small)
 pgvector>=0.3                  # FR-M3-03: vector storage in PostgreSQL (VectorField + HNSW index)
+# IR-287: the chunker counts real voyage-context-4 tokens. This is HuggingFace's
+# BPE engine, not a vendor SDK — the vocabulary itself is vendored at
+# apps/ai/chunking/tokenizer/voyage-context-4.json and pinned by SHA-256, so
+# nothing is downloaded at build or run time. Capped below 0.23 because a
+# tokenizers major bump can change output, and that re-chunks the corpus.
+tokenizers>=0.21,<0.23
 # Docling-serve (FR-M3-01, ADR-016) is called over HTTP with httpx, declared
 # below and already used for the ai-gateway call. The extractor libraries the
 # prototype chain imported (unstructured, pymupdf, pytesseract) were never

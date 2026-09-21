@@ -46,13 +46,17 @@ class ChunkingOptions:
     Defaults are a starting prior, not a decision. The right ``max_tokens``
     for this corpus is settled by reading real chunks and by the retrieval
     eval set, not chosen here.
+
+    Every ``*_tokens`` field is counted in real ``voyage-context-4`` tokens
+    (IR-287). The 700/64 defaults are the measured equivalents of the 512/48
+    *words* they replaced, so the unit changed and the chunk size did not.
     """
 
     strategy: str = DEFAULT_STRATEGY
-    max_tokens: int = 512
+    max_tokens: int = 700
     min_tokens: int | None = None
     overlap_tokens: int = 0
-    context_path_max_tokens: int = 48
+    context_path_max_tokens: int = 64
     merge_short_siblings: bool = True
     repeat_table_header: bool = True
     exclude_sections: tuple[str, ...] = ()
@@ -77,7 +81,10 @@ class ChunkingOptions:
         """
         if self.min_tokens is not None:
             return self.min_tokens
-        return max(1, min(64, self.max_tokens // 8))
+        # The cap is 88 rather than 64 because it is now real tokens: 64
+        # words measured ~88 of them, and IR-287 moved the unit without
+        # moving where the floor actually falls.
+        return max(1, min(88, self.max_tokens // 8))
 
 
 @dataclass(frozen=True)

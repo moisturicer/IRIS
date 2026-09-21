@@ -14,6 +14,8 @@ its base character — does not need full UAX #29 segmentation to guarantee.
 import re
 import unicodedata
 
+from .tokens import count_tokens
+
 # A sentence ends at `.`, `!` or `?` followed by whitespace (or end of
 # string). The terminator stays attached to the sentence it closes.
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
@@ -46,21 +48,39 @@ def split_into_clauses(text: str) -> list[str]:
     return [c for c in _CLAUSE_BOUNDARY.split(text) if c]
 
 
-def split_into_word_groups(text: str, max_words: int) -> list[str]:
-    """Split ``text`` into groups of at most ``max_words`` whitespace-words.
+def split_into_token_groups(text: str, max_tokens: int) -> list[str]:
+    """Split ``text`` into whitespace-word runs of at most ``max_tokens`` tokens.
 
     This is the guarantee of last resort at the word level: grouping on
     whitespace can never land inside a grapheme cluster, because a cluster
     never contains whitespace.
+
+    The budget is counted, not estimated from the word count (IR-287). A
+    fixed words-per-group rule was correct only while a "token" *was* a word;
+    with a real tokenizer it under-fills prose and, worse, over-fills
+    token-dense text such as LaTeX -- and an over-full group does not fit,
+    so the cascade would fall straight through to splitting word by word.
+
+    A single word larger than the whole budget is returned alone rather than
+    cut; severing it is the grapheme stage's job, not this one's.
     """
     words = text.split()
     if not words:
         return []
-    max_words = max(1, max_words)
-    return [
-        " ".join(words[start : start + max_words])
-        for start in range(0, len(words), max_words)
-    ]
+    max_tokens = max(1, max_tokens)
+
+    groups: list[str] = []
+    current: list[str] = []
+    for word in words:
+        candidate = current + [word]
+        if current and count_tokens(" ".join(candidate)) > max_tokens:
+            groups.append(" ".join(current))
+            current = [word]
+        else:
+            current = candidate
+    if current:
+        groups.append(" ".join(current))
+    return groups
 
 
 def grapheme_safe_split(text: str, max_chars: int) -> tuple[str, ...]:

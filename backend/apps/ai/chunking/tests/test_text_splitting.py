@@ -11,8 +11,9 @@ from apps.ai.chunking.text_splitting import (
     grapheme_safe_split,
     split_into_clauses,
     split_into_sentences,
-    split_into_word_groups,
+    split_into_token_groups,
 )
+from apps.ai.chunking.tokens import count_tokens
 
 # --------------------------------------------------------------------------
 # Sentence splitting
@@ -63,31 +64,56 @@ def test_clause_splitting_loses_no_content():
 
 
 # --------------------------------------------------------------------------
-# Word-group splitting (the word-boundary guarantee)
+# Token-group splitting (the word-boundary guarantee, on a token budget)
 # --------------------------------------------------------------------------
 
 
-def test_splits_into_groups_of_at_most_max_words():
-    words = ["w" + str(i) for i in range(25)]
-    text = " ".join(words)
+def test_no_group_exceeds_the_token_budget():
+    """The guarantee, stated in the unit it is now counted in (IR-287)."""
+    text = " ".join("institutional disclosure clearance workflow".split() * 40)
 
-    groups = split_into_word_groups(text, max_words=10)
+    groups = split_into_token_groups(text, max_tokens=30)
 
-    assert [g.split() for g in groups] == [
-        words[0:10],
-        words[10:20],
-        words[20:25],
-    ]
+    assert len(groups) > 1
+    assert all(count_tokens(g) <= 30 for g in groups)
 
 
-def test_word_group_splitting_loses_no_content():
+def test_groups_are_filled_greedily_rather_than_cut_at_a_word_count():
+    """A fixed words-per-group rule under-fills prose and over-fills dense
+    text; the budget is counted, so neither happens."""
+    text = " ".join(f"w{i}" for i in range(60))
+
+    groups = split_into_token_groups(text, max_tokens=20)
+
+    assert all(count_tokens(g) <= 20 for g in groups)
+    # Greedy means every group but the last is full enough that one more word
+    # would have overflowed it.
+    for group, following in zip(groups, groups[1:]):
+        overfilled = group + " " + following.split()[0]
+        assert count_tokens(overfilled) > 20
+
+
+def test_token_group_splitting_loses_no_content():
     text = "one two three four five six seven"
-    groups = split_into_word_groups(text, max_words=3)
+    groups = split_into_token_groups(text, max_tokens=3)
     assert " ".join(groups) == text
 
 
-def test_word_group_of_a_single_word_returns_that_word():
-    assert split_into_word_groups("solitary", max_words=5) == ["solitary"]
+def test_a_group_never_splits_a_word():
+    text = "antidisestablishmentarianism institutionalisation"
+    groups = split_into_token_groups(text, max_tokens=2)
+    assert all(g in text.split() for g in groups)
+
+
+def test_token_group_of_a_single_word_returns_that_word():
+    assert split_into_token_groups("solitary", max_tokens=5) == ["solitary"]
+
+
+def test_a_word_larger_than_the_whole_budget_is_returned_alone():
+    """Severing it is the grapheme stage's job, not this one's."""
+    assert split_into_token_groups("antidisestablishmentarianism", max_tokens=1) == [
+        "antidisestablishmentarianism"
+    ]
 
 
 # --------------------------------------------------------------------------
