@@ -78,7 +78,9 @@ class TwoStageRetriever(Retriever):
             .values_list("record_id", flat=True)[: self._record_candidates]
         )
         if not candidate_ids:
-            return RetrievalResult(mode=VECTOR, embedding_space_id=space.pk)
+            return RetrievalResult(
+                mode=VECTOR, embedding_space_id=space.pk, query_vector=query_vector
+            )
 
         # -- Stage 2: chunks within those records only --
         distance = CosineDistance("embedding", query_vector)
@@ -114,4 +116,5 @@ class TwoStageRetriever(Retriever):
             ),
             mode=VECTOR,
             embedding_space_id=space.pk,
+            query_vector=query_vector,
         )

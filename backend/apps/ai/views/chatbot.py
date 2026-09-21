@@ -102,12 +102,9 @@ def _conversation_for(request):
 
 
 def _recent_turns(conversation: Conversation) -> list:
-    """The Conversation's most recent Turns, oldest first.
-
-    Bounded at the source rather than sliced after loading: a long
-    conversation must not pull every Turn it ever had just to resolve one
-    follow-up (IR-296). What resolution sees as history today; the answering
-    prompt does not consult this yet.
+    """The Conversation's most recent Turns, oldest first, bounded at the
+    source. Serves both resolution (IR-296) and the answering prompt
+    (IR-297); older Turns are memory's job, not this function's.
     """
     return list(
         conversation.turns.order_by("-id")[: resolution.MAX_HISTORY_TURNS]
@@ -135,6 +132,10 @@ class ChatQueryView(APIView):
     back-reference, and a failed resolution falls back to the raw question
     rather than erroring. Scoping retrieval to a Conversation's Record is
     IR-298.
+
+    **Recent Turns go into the answering prompt verbatim; older ones are
+    found by memory recall, never summarised** (IR-297). The search vector
+    is stored on the new Turn as its own memory vector, at no extra cost.
     """
 
     permission_classes = [IsAuthenticated]
@@ -153,19 +154,21 @@ class ChatQueryView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        history = _recent_turns(conversation) if conversation is not None else []
+
         resolved_question = None
         if conversation is not None:
             resolver = composition_root().resolver()
             if resolver is not None:
-                resolved_question = resolver.resolve(
-                    question, _recent_turns(conversation)
-                )
+                resolved_question = resolver.resolve(question, history)
         effective_question = resolved_question or question
 
         service = composition_root().answer_service(
             max_sources=_parse_top_k(request.data.get("top_k"))
         )
-        answer = service.answer(effective_question, request.user)
+        answer = service.answer(
+            effective_question, request.user, conversation=conversation, history=history
+        )
         mode = answer_mode(answer.state)
 
         if conversation is not None:
