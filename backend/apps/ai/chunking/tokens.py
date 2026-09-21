@@ -78,10 +78,17 @@ def count_tokens(text: str) -> int:
     Special tokens are excluded: this counts the text's own cost, which is
     what a chunk ceiling and a batch budget are both about.
 
-    Memoized because the cascade is deliberately repetitive -- ``_fits``
-    asks about a string and then the emitting stage counts the same string
-    again, and the merge passes re-count growing prefixes. The cache is
-    correct for any size because this is a pure function of ``text``.
+    Memoized for one specific repetition and no other: the cascade asks
+    ``_fits`` about a string and then the emitting stage counts that same
+    string again. It does **not** absorb the packing loops, which count a
+    *growing* candidate and so miss on every iteration by construction --
+    that cost is real and ``text_splitting.split_into_token_groups``
+    measures it.
+
+    The cache is sound because this is a pure function of ``text``. It is
+    keyed on the text alone, so it would go stale if a process swapped
+    tokenizers mid-run; nothing does, and the tests that vary the counter
+    replace this function rather than the vocabulary under it.
     """
     if not text.strip():
         return 0

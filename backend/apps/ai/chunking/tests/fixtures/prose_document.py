@@ -8,9 +8,22 @@ ordinary prose** exactly where they were. Token-dense material is where the
 two units diverge, so demonstrating the promise needs material where they do
 not.
 
-The paragraphs vary in length on purpose -- some short enough to reach the
-merge floor, several long enough that a section must be split -- so the test
-exercises packing, the floor and the ceiling rather than one of them.
+The paragraphs vary in length on purpose, and section 6 is deliberately
+longer than either ceiling, so that the boundary comparison exercises the
+**ceiling** and not only the section structure. Without a section the ceiling
+must cut, a before/after comparison passes for reasons that have nothing to
+do with the number being changed; ``test_the_ceiling_binds_on_this_fixture``
+guards that and will fail first if this document is ever shortened.
+
+Measured density: 2,145 words, 2,418 ``voyage-context-4`` tokens -- a ratio
+of **1.13**. That is lower than the ~1.37 of the real Docling-extracted
+submission the shipped 700 ceiling is calibrated on, because Docling output
+carries numbering, citations, captions and tables that flowing prose does
+not. The consequence is spelled out in the test module's docstring: this
+fixture can demonstrate the *mechanism* at its own equivalent ceiling, and
+can bound how far the shipped ceiling sits from it, but it cannot stand in
+for a real submission. Nothing here should be tuned to make 700 come out
+right -- that would be manufacturing the evidence the ticket wants.
 """
 
 from apps.ai.chunking.document import (
@@ -182,7 +195,82 @@ _SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ),
     ),
     (
-        "6 Conclusion",
+        # Deliberately long enough that the ceiling, not the section
+        # boundary, decides where this section is cut. Every other section
+        # here fits whole under both the old and the new ceiling, so without
+        # this one the boundary comparison would never exercise the ceiling
+        # at all and would pass for reasons that have nothing to do with it.
+        "6 Discussion",
+        (
+            "The result invites an obvious objection, which is that the reduction "
+            "in review count is an accounting artefact: if the same document is "
+            "seen by fewer people, the institution has simply chosen to look at it "
+            "less carefully, and any reduction in effort is a reduction in "
+            "scrutiny rather than a reduction in waste. The objection deserves a "
+            "direct answer. What the system removes is not a review but a "
+            "repetition of a review, and the two are distinguishable in the "
+            "record because a preserved clearance names the version it was issued "
+            "against. Every section of every approved submission was read and "
+            "cleared by every office whose mandate covers it, at a version of the "
+            "document that office had before it. No office cleared anything it had "
+            "not seen. What changed is that an office is no longer asked to clear "
+            "again what it has already cleared and what nobody has since altered.",
+            "A second objection is more serious and the study cannot fully dismiss "
+            "it. The declaration mechanism asks a reviewing office to say, at the "
+            "moment it clears a submission, which sections its clearance rests on. "
+            "That declaration is made under time pressure, by a reviewer whose "
+            "training is in the substance of the review rather than in dependency "
+            "analysis, and it is made prospectively, before anyone knows what the "
+            "revision will change. There is every reason to expect it to be "
+            "imperfect. The design's answer is to make its imperfection "
+            "asymmetric: a reviewer who declares too many sections causes a "
+            "clearance to be invalidated that might have survived, which costs a "
+            "repeated review of the kind the old process imposed on everyone "
+            "unconditionally, while a reviewer who declares too few causes a "
+            "clearance to survive a change it should not have survived, which is a "
+            "governance failure. Reviewers were trained to over-declare when "
+            "uncertain, and the audit log shows they did.",
+            "It is worth dwelling on why the alternative was rejected. An "
+            "automated dependency analysis, inferring from the text of the "
+            "revision which clearances it could have affected, would remove the "
+            "reviewer's burden and would almost certainly be more consistent than "
+            "a human declaration. It would also be wrong in ways nobody could "
+            "predict or audit, and it would be wrong silently. A clearance is a "
+            "professional judgement with a person's name attached, and the "
+            "question of what that judgement rested on belongs to the person who "
+            "made it. Delegating it to a text-similarity measure would make the "
+            "system's central claim, which is that no office clears anything it "
+            "has not seen, depend on the behaviour of a model that nobody in the "
+            "review chain can inspect. The conservative, coarse, human declaration "
+            "is worse on every axis except the one that matters.",
+            "The scheduling finding deserves more attention than its size "
+            "suggests. Median time to approval fell by much less than review count "
+            "did, which means that after the redundant reviews were removed, most "
+            "of the remaining delay was submissions sitting in a queue rather than "
+            "reviewers working on them. An institution reading this result as a "
+            "reason to hire more reviewers would be reading it backwards. The "
+            "reviewers are not the constraint; the weekly review cycle is, and a "
+            "submission that arrives the day after a committee meets waits six "
+            "days before anyone looks at it regardless of how much capacity that "
+            "committee has. The cheapest remaining improvement is almost certainly "
+            "to let an office clear a resubmission that touches only its own "
+            "declared sections outside the regular cycle, since such a review is "
+            "by construction narrow and the reviewer has already read the rest.",
+            "Finally, a note on transferability. The mechanism described here is "
+            "not specific to intellectual property disclosure, to universities, or "
+            "to the Philippines. It applies wherever several independent "
+            "authorities must each approve one artefact, where any of them may "
+            "require changes, and where the artefact is divisible into parts that "
+            "the authorities care about differently. Grant applications, building "
+            "permits, clinical trial protocols and export licences all have that "
+            "shape. What is specific to this setting is the size of the benefit, "
+            "which depends on how many authorities are involved and on how often "
+            "revisions are required. An institution with one reviewing office "
+            "would see nothing at all, and should not build this.",
+        ),
+    ),
+    (
+        "7 Conclusion",
         (
             "Clearance-aware resubmission is a small change to how review state is "
             "represented and a large change to how much work a review process "

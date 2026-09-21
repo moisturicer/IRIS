@@ -181,7 +181,7 @@ A `ChunkSet` exists so that "the chunks of this document" is a single value you 
 class ChunkingOptions:
     strategy: str = "structural-markdown"   # or "hierarchical", "fixed-window"
     max_tokens: int = 700         # real voyage-context-4 tokens (IR-287)
-    min_tokens: int = 88          # below this, merge with a neighbour
+    min_tokens: int | None = None  # None derives it: min(88, max_tokens // 8)
     overlap_tokens: int = 0       # structural chunking rarely needs overlap
     context_path_max_tokens: int = 64
     merge_short_siblings: bool = True

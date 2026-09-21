@@ -12,9 +12,15 @@ pgvector>=0.3                  # FR-M3-03: vector storage in PostgreSQL (VectorF
 # IR-287: the chunker counts real voyage-context-4 tokens. This is HuggingFace's
 # BPE engine, not a vendor SDK — the vocabulary itself is vendored at
 # apps/ai/chunking/tokenizer/voyage-context-4.json and pinned by SHA-256, so
-# nothing is downloaded at build or run time. Capped below 0.23 because a
-# tokenizers major bump can change output, and that re-chunks the corpus.
-tokenizers>=0.21,<0.23
+# nothing is downloaded at build or run time.
+#
+# Exactly pinned, alone in this file, and deliberately: the argument for
+# replacing the old whitespace counter was that a real tokenizer is
+# *deterministic across processes and versions*, and a range does not deliver
+# that — any release free to change a count is free to re-chunk and re-embed
+# the whole corpus. Both halves are pinned or neither claim holds. Moving it
+# is a deliberate act with a diff, and re-chunking is its cost.
+tokenizers==0.22.2
 # Docling-serve (FR-M3-01, ADR-016) is called over HTTP with httpx, declared
 # below and already used for the ai-gateway call. The extractor libraries the
 # prototype chain imported (unstructured, pymupdf, pytesseract) were never

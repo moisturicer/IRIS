@@ -41,7 +41,7 @@ from ..document import (
     NormalizedDocument,
 )
 from ..hashing import chunkset_hash
-from ..packing import Piece, pack_pieces
+from ..packing import Piece, assembled_fits, pack_pieces
 from ..regions import dedupe_regions, regions_for
 from ..registry import register_chunker
 from ..text_splitting import (
@@ -295,15 +295,10 @@ def _pack_table(elements: list[DocumentElement], max_tokens: int) -> list[list[P
                 windows.append(header_pieces + [(fragment, row)])
             continue
 
-        # Counted as the window will be assembled rather than summed per row,
-        # for the reason `pack_pieces` gives: token counts do not add across
-        # a join (IR-287).
-        candidate = " ".join(
-            [header_text] * bool(header_text)
-            + [t for t, _ in current_rows]
-            + [row.text]
-        ).strip()
-        if current_rows and count_tokens(candidate) > max_tokens:
+        # Counted as the window will be assembled rather than summed per row
+        # (IR-287) -- `assembled_fits` holds the rule and the reason.
+        window = [header_text, *(t for t, _ in current_rows), row.text]
+        if current_rows and not assembled_fits(window, max_tokens):
             flush()
         current_rows.append((row.text, row))
 

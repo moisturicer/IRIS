@@ -83,7 +83,9 @@ class ChunkingOptions:
             return self.min_tokens
         # The cap is 88 rather than 64 because it is now real tokens: 64
         # words measured ~88 of them, and IR-287 moved the unit without
-        # moving where the floor actually falls.
+        # moving where the floor actually falls. Note it no longer binds at
+        # the shipped ceiling -- 700 // 8 is 87 -- so it is there for small
+        # windows, which is the footgun this property exists to defuse.
         return max(1, min(88, self.max_tokens // 8))
 
 
