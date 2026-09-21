@@ -288,6 +288,8 @@ services:
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
