@@ -80,10 +80,10 @@ Verified against the working tree on 2026-09-02. This table is the reason the re
 | 1 · Upload | **works** | `apps/documents` — but no ownership check on six endpoints |
 | 2 · Extract | **broken** | `documents/tasks.py` imports `unstructured`, `fitz`, `pytesseract` — **none are in `requirements/base.txt`**. Extraction raises, retries three times, dies |
 | 3 · Normalize | missing | no code |
-| 4 · Chunk | missing | `apps/ai/services/text_chunker.py` is `class TextChunkerService: pass` |
+| 4 · Chunk | missing **at the time of this audit** | `apps/ai/services/text_chunker.py` was `class TextChunkerService: pass`. Superseded by `apps/ai/chunking/` (IR-89) and the stub **deleted by IR-285** |
 | 5 · Embed | **partial, wrong unit** | `apps/ai/tasks.py:19` embeds `f"{record.title}. {record.abstract}"` — abstracts only, never document text |
 | 6 · Index | **schema ready** | `apps/ai/models/embedding.py` has a real `VectorField` + HNSW `vector_cosine_ops`, migrations `0001`/`0002` exist |
-| 7–13 · Query path | missing | no retrieval code anywhere; `ai/services/` holds only `__init__.py` |
+| 7–13 · Query path | missing **at the time of this audit** | no retrieval code anywhere. Now `apps/ai/retrieval/`, `answers/` and `composition.py` (IR-129 to IR-284); `apps/ai/services/` was deleted entirely by IR-285 |
 | 14 · Citation highlight | missing | requires §11 of the chunker document |
 | **AI gateway** | **cannot start** | `ai/api/chat.py` imports `ai.services.chat_service`, which does not exist |
 | **Full-text search** | **works** | `Record.search_vector`, GIN-indexed, weighted title-A/abstract-B. The only functioning retrieval in the system |

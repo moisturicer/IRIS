@@ -11,7 +11,7 @@ from .disclosure import (
     Reason,
     may_disclose,
 )
-from .records import inputs_for_record
+from .records import decision_for_record, inputs_for_record
 
 __all__ = [
     "Decision",
@@ -19,5 +19,6 @@ __all__ = [
     "EmbargoUnknown",
     "Reason",
     "may_disclose",
+    "decision_for_record",
     "inputs_for_record",
 ]

@@ -20,6 +20,10 @@ _NEUTRAL_SCORE = 1.0
 
 
 class NoOpReranker(Reranker):
+    #: Nothing leaves the deployment, so the disclosure gate has nothing
+    #: to protect here.
+    transmits_externally = False
+
     def rerank(
         self, query: str, candidates: Sequence[str]
     ) -> list[RerankedCandidate]:

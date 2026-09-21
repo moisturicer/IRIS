@@ -26,18 +26,40 @@ pytestmark = pytest.mark.django_required
 
 
 class _RecordingTransport:
-    """A stand-in wire that remembers what it was asked to send."""
+    """A stand-in wire that remembers what it was asked to send.
 
-    def __init__(self, dimensions=4, short_by=0):
+    It answers the *contextualized* embedding shape, because that is the only
+    embedding endpoint the adapter calls (IR-281): a list of document groups,
+    each holding one vector per chunk of that document.
+
+    ``short_by`` drops that many vectors from every group, and ``drop_groups``
+    drops whole groups off the end — two different vendor lies, and the
+    adapter has to catch both, since one misaligns chunks within a document
+    and the other misaligns documents against each other.
+    """
+
+    def __init__(self, dimensions=4, short_by=0, drop_groups=0):
         self.calls = []
         self.dimensions = dimensions
         self.short_by = short_by
+        self.drop_groups = drop_groups
 
     def __call__(self, path, payload):
         self.calls.append((path, payload))
-        if path == "/embeddings":
-            count = len(payload["input"]) - self.short_by
-            return {"data": [{"embedding": [0.1] * self.dimensions} for _ in range(count)]}
+        if path == "/contextualizedembeddings":
+            groups = [
+                {
+                    "index": i,
+                    "data": [
+                        {"embedding": [0.1] * self.dimensions, "index": j}
+                        for j in range(max(len(document) - self.short_by, 0))
+                    ],
+                }
+                for i, document in enumerate(payload["inputs"])
+            ]
+            if self.drop_groups:
+                groups = groups[: len(groups) - self.drop_groups]
+            return {"data": groups}
         docs = payload["documents"]
         return {
             "data": [
@@ -95,6 +117,119 @@ class EmbeddingRequestTests:
             provider.embed_documents(["alpha", "beta"])
 
 
+class ContextualizedEmbeddingTests:
+    """IR-281. `voyage-context-4` is a contextualized chunk embedder, and the
+    only thing that makes it one is that a document's chunks travel together
+    to the contextualized endpoint. None of that is observable in the vectors
+    it returns, so it has to be asserted on the wire."""
+
+    def test_every_embedding_call_goes_to_the_contextualized_endpoint(self):
+        transport = _RecordingTransport()
+        provider = VoyageEmbeddingProvider(dimensions=4, transport=transport)
+
+        provider.embed_documents(["alpha"])
+        provider.embed_query("alpha")
+        provider.embed_document_chunks([["alpha", "beta"]])
+
+        assert {path for path, _ in transport.calls} == {"/contextualizedembeddings"}
+
+    def test_a_documents_chunks_are_sent_as_one_group_in_reading_order(self):
+        transport = _RecordingTransport()
+        provider = VoyageEmbeddingProvider(dimensions=4, transport=transport)
+
+        provider.embed_document_chunks([["first", "second", "third"]])
+
+        _, payload = transport.calls[0]
+        assert payload["inputs"] == [["first", "second", "third"]]
+
+    def test_two_documents_stay_two_groups_rather_than_one_flat_list(self):
+        """Flattening would embed one thesis's chunks in another's context,
+        which is worse than no context: the vector would be wrong rather
+        than merely thin, and nothing downstream could tell."""
+        transport = _RecordingTransport()
+        provider = VoyageEmbeddingProvider(dimensions=4, transport=transport)
+
+        provider.embed_document_chunks([["a1", "a2"], ["b1"]])
+
+        _, payload = transport.calls[0]
+        assert payload["inputs"] == [["a1", "a2"], ["b1"]]
+
+    def test_the_result_mirrors_the_grouping_it_was_given(self):
+        provider = VoyageEmbeddingProvider(
+            dimensions=4, transport=_RecordingTransport()
+        )
+        result = provider.embed_document_chunks([["a1", "a2", "a3"], ["b1"]])
+
+        assert [len(group) for group in result] == [3, 1]
+        assert all(len(v) == 4 for group in result for v in group)
+
+    def test_documents_are_sent_as_documents_not_as_queries(self):
+        transport = _RecordingTransport()
+        VoyageEmbeddingProvider(dimensions=4, transport=transport).embed_document_chunks(
+            [["alpha"]]
+        )
+        assert transport.calls[0][1]["input_type"] == "document"
+
+    def test_a_standalone_text_is_its_own_single_chunk_document(self):
+        """A record summary has no siblings. Bundling several records into
+        one group to save a request would contextualize each against text it
+        has nothing to do with."""
+        transport = _RecordingTransport()
+        VoyageEmbeddingProvider(dimensions=4, transport=transport).embed_documents(
+            ["alpha", "beta"]
+        )
+        assert transport.calls[0][1]["inputs"] == [["alpha"], ["beta"]]
+
+    def test_embedding_no_documents_makes_no_request(self):
+        transport = _RecordingTransport()
+        provider = VoyageEmbeddingProvider(dimensions=4, transport=transport)
+        assert provider.embed_document_chunks([]) == []
+        assert transport.calls == []
+
+    def test_a_document_is_never_split_across_two_requests(self):
+        """Splitting one is the one thing the batching rule may not do: half a
+        document's chunks in view is not the context the model was chosen
+        for, and the resulting vectors look entirely normal."""
+        transport = _RecordingTransport()
+        provider = VoyageEmbeddingProvider(dimensions=4, transport=transport)
+        # Each chunk is ~14k estimated tokens, so two documents of two chunks
+        # cannot share one 32k-token request.
+        document = [" ".join(["word"] * 10_000) for _ in range(2)]
+
+        result = provider.embed_document_chunks([document, list(document)])
+
+        assert len(transport.calls) == 2, "the two documents shared a request"
+        for _, payload in transport.calls:
+            assert len(payload["inputs"]) == 1
+            assert len(payload["inputs"][0]) == 2, "a document was split"
+        assert [len(group) for group in result] == [2, 2]
+
+    def test_a_short_group_raises_rather_than_misaligning_chunks(self):
+        provider = VoyageEmbeddingProvider(
+            dimensions=4, transport=_RecordingTransport(short_by=1)
+        )
+        with pytest.raises(VoyageError, match="positionally"):
+            provider.embed_document_chunks([["alpha", "beta"]])
+
+    def test_a_missing_document_group_raises_rather_than_shifting_documents(self):
+        """One group short and every later document's vectors belong to the
+        wrong record — a mislabelling no later stage can detect."""
+        provider = VoyageEmbeddingProvider(
+            dimensions=4, transport=_RecordingTransport(drop_groups=1)
+        )
+        with pytest.raises(VoyageError, match="document groups"):
+            provider.embed_document_chunks([["a1"], ["b1"]])
+
+    def test_an_empty_document_among_real_ones_raises(self):
+        """The endpoint returns no group for it, so accepting one would shift
+        every later document's vectors by one."""
+        provider = VoyageEmbeddingProvider(
+            dimensions=4, transport=_RecordingTransport()
+        )
+        with pytest.raises(VoyageError, match="no chunks"):
+            provider.embed_document_chunks([["a1"], []])
+
+
 class RerankRequestTests:
     def test_every_candidate_comes_back_with_its_original_index(self):
         reranker = VoyageReranker(transport=_RecordingTransport())
@@ -128,3 +263,18 @@ class MissingKeyTests:
         settings.VOYAGE_API_KEY = ""
         with pytest.raises(VoyageError, match="VOYAGE_API_KEY"):
             VoyageEmbeddingProvider().embed_documents(["alpha"])
+
+
+class OutputDimensionTests:
+    def test_the_adapter_asks_for_exactly_what_the_vector_columns_hold(self):
+        """IR-280. The dimension Voyage is asked to emit and the width of the
+        column the vector lands in are one number. When they were two settings
+        they could disagree, and a 512-vector against a 1024 column is the
+        silent-drift bug this ticket closed everywhere else."""
+        from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+
+        transport = _RecordingTransport(dimensions=VECTOR_COLUMN_DIMENSIONS)
+        VoyageEmbeddingProvider(transport=transport).embed_documents(["alpha"])
+
+        _, payload = transport.calls[0]
+        assert payload["output_dimension"] == VECTOR_COLUMN_DIMENSIONS

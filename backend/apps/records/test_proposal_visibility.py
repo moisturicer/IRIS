@@ -20,12 +20,36 @@ would let an owner soft-delete an approved Proposal with no review; they branch
 on `DELETE_REVIEW_STATUSES` instead, so deletion behaves exactly as before.
 
 **Seam: the API** -- the records, Ask IRIS and dashboard endpoints.
+
+**Fixtures carry real chunks and vectors (added when this test met IR-283's
+chunk-based retrieval on merge).** Ask IRIS answers from indexed chunks now,
+not from a record's title and abstract by full-text search, so a record with
+no chunk set is invisible to every retrieval path regardless of who may read
+it -- that would make the assertions below true for the wrong reason. Every
+fixture, **including both Proposals**, gets a record vector and one chunk
+with its own vector, so what is actually being tested is the *visibility*
+predicate keeping a chunked, embedded Proposal out -- not merely that an
+unindexed one was never a candidate. The disclosure gate is opened for these
+requests (`root_with`, below): `Record` carries no embargo field yet
+(IR-250), so the real gate refuses every record and these tests would pass
+vacuously against an empty response otherwise. The gate's own refusal is
+exercised in `apps/ai/policy/tests/`.
 """
 
 from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.ai.composition import CompositionRoot, use_composition_root
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
+from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.models.embedding_space import EmbeddingSpace
+from apps.ai.providers.fakes import (
+    DeterministicEmbeddingProvider,
+    ScriptedLLM,
+    ScriptedReranker,
+)
 from apps.accounts.models import Role, User
 from apps.records.models import DeleteRequest, Record, RecordOwner, RecordType
 from core.enums import PipelineStatus, RecordTypeName, RoleName
@@ -39,6 +63,18 @@ DASHBOARD_STATS = "/api/v1/dashboard/stats/"
 #: A word only these fixtures use, so Ask IRIS retrieval matches all three and
 #: nothing seeded, and a result's absence is about visibility, not ranking.
 MARKER = "Zyphorin"
+
+
+def root_with(embedder):
+    """A composition root whose vendors are fakes and whose disclosure gate
+    allows -- see the module docstring's note on why the gate is opened.
+    """
+    return CompositionRoot(
+        embedder=embedder,
+        reranker=ScriptedReranker(),
+        llm=ScriptedLLM(),
+        permits=lambda record: True,
+    )
 
 
 def _user(email, role_name):
@@ -61,6 +97,16 @@ class ProposalVisibilityTests(APITestCase):
         cls.itso = _user("vis-itso@cit.edu", RoleName.ITSO)
         cls.rdco = _user("vis-rdco@cit.edu", RoleName.RDCO)
 
+        cls.embedder = DeterministicEmbeddingProvider(dimensions=VECTOR_COLUMN_DIMENSIONS)
+        cls.space = EmbeddingSpace.objects.filter(state="active").first()
+        if cls.space is None:
+            cls.space = EmbeddingSpace.objects.create(
+                model_id="fake-test",
+                dimensions=VECTOR_COLUMN_DIMENSIONS,
+                metric="cosine",
+                state="active",
+            )
+
         cls.approved_proposal = cls.make_record(
             RecordTypeName.PROPOSAL, PipelineStatus.APPROVED, "approved proposal"
         )
@@ -74,15 +120,41 @@ class ProposalVisibilityTests(APITestCase):
 
     @classmethod
     def make_record(cls, type_name, pipeline_status, label):
+        """A record IRIS can actually retrieve from (IR-283): a record
+        vector for stage 1, and one chunk with its own vector for stage 2.
+        Every fixture is indexed identically -- Proposals included -- so the
+        Ask IRIS tests below prove the visibility predicate keeps a Proposal
+        out, rather than merely observing that an unindexed one was never a
+        candidate."""
+        text = f"{MARKER} sensor networks for upland farms, {label}."
         record = Record.objects.create(
             title=f"{MARKER} {label}",
-            abstract=f"{MARKER} sensor networks for upland farms, {label}.",
+            abstract=text,
             record_type=RecordType.objects.get(name=type_name),
             added_by=cls.owner,
             adviser=cls.adviser,
             pipeline_status=pipeline_status,
         )
         RecordOwner.objects.create(record=record, user=cls.owner, is_primary=True)
+
+        RecordEmbedding.objects.create(
+            record=record,
+            embedding=cls.embedder.embed_documents([f"{record.title}. {text}"])[0],
+            model_name=cls.space.model_id,
+        )
+        chunk_set = ChunkSet.objects.create(
+            record=record, extraction_hash=f"e{record.pk}", strategy_id="s",
+            options={}, content_hash=f"c{record.pk}", is_active=True,
+        )
+        chunk = DocumentChunk.objects.create(
+            chunk_set=chunk_set, record=record, sequence=0, max_sequence=0,
+            text=text, content=text, context_path=[record.title],
+            token_count=len(text.split()), text_hash=f"t{record.pk}",
+            source_page=1, element_kinds=["paragraph"], bboxes=[],
+        )
+        ChunkEmbedding.objects.create(
+            chunk=chunk, space=cls.space, embedding=cls.embedder.embed_documents([text])[0]
+        )
         return record
 
     def setUp(self):
@@ -151,33 +223,60 @@ class ProposalVisibilityTests(APITestCase):
 
     def test_ask_iris_search_never_returns_a_proposal(self):
         self.as_user(self.stranger)
-        response = self.client.post(AI_SEARCH, {"query": MARKER, "top_k": 20}, format="json")
+        with use_composition_root(root_with(self.embedder)):
+            response = self.client.post(
+                AI_SEARCH, {"query": MARKER, "top_k": 20}, format="json"
+            )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
-        returned = {row["id"] for row in response.data["results"]}
+        # `results` is passages, not records (IR-284): several can come from
+        # one paper, so this reads the record each passage belongs to.
+        returned = {row["record_id"] for row in response.data["results"]}
         self.assertIn(self.published_thesis.pk, returned)
         self.assertNotIn(self.approved_proposal.pk, returned)
         self.assertNotIn(self.completed_proposal.pk, returned)
 
-    def test_ask_iris_ask_never_cites_a_proposal(self):
-        # Even for the owner: retrieval reads the public catalogue, so an answer
-        # never cites a record a *different* reader of the answer could not open.
-        for label, user in (("stranger", self.stranger), ("owner", self.owner)):
-            with self.subTest(user=label):
-                cache.clear()
-                self.as_user(user)
-                response = self.client.post(
-                    AI_ASK, {"question": f"What is known about {MARKER}?", "top_k": 20},
-                    format="json",
-                )
-                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+    def test_ask_iris_ask_never_cites_a_proposal_to_a_stranger(self):
+        # A stranger owns neither Proposal and neither is published, so under
+        # `visible_to(user)` -- the one predicate retrieval now applies
+        # (IR-283/285) -- both are simply not candidates.
+        cache.clear()
+        self.as_user(self.stranger)
+        with use_composition_root(root_with(self.embedder)):
+            response = self.client.post(
+                AI_ASK, {"question": f"What is known about {MARKER}?", "top_k": 20},
+                format="json",
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
-                cited = set(response.data["citations"])
-                sourced = {s["id"] for s in response.data["sources"]}
-                self.assertIn(self.published_thesis.pk, cited)
-                for proposal in self.proposals:
-                    self.assertNotIn(proposal.pk, cited)
-                    self.assertNotIn(proposal.pk, sourced)
+        # A citation is an object carrying the record it belongs to, the
+        # page, and the quote (IR-284) -- not a bare id.
+        cited = {c["record_id"] for c in response.data["citations"]}
+        sourced = {s["id"] for s in response.data["sources"]}
+        self.assertIn(self.published_thesis.pk, cited)
+        for proposal in self.proposals:
+            self.assertNotIn(proposal.pk, cited)
+            self.assertNotIn(proposal.pk, sourced)
+
+    def test_ask_iris_still_answers_the_owner_from_their_own_proposal(self):
+        # Not the mirror of the stranger case above. `test_an_owner_receives_
+        # their_own_draft` (apps/ai/retrieval/tests/test_visibility.py) is an
+        # established security property: retrieval is `visible_to(user)`
+        # everywhere (CLAUDE.md's "one predicate used everywhere, including
+        # RAG retrieval"), and an owner's own Proposal is visible to them by
+        # that same rule. IR-264 narrowed who else can find a Proposal, not
+        # what its owner can. This only pins that the owner's own question
+        # still gets an answer at all -- which record it draws on is theirs
+        # to have retrievable, not this test's concern.
+        cache.clear()
+        self.as_user(self.owner)
+        with use_composition_root(root_with(self.embedder)):
+            response = self.client.post(
+                AI_ASK, {"question": f"What is known about {MARKER}?", "top_k": 20},
+                format="json",
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data["citations"], "the owner's own question found nothing")
 
     def test_similar_records_never_suggest_a_proposal(self):
         # The paper view's "similar" list reuses Ask IRIS retrieval. Every

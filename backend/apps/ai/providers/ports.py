@@ -41,7 +41,36 @@ class EmbeddingProvider(ABC):
 
     @abstractmethod
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
-        """Embed corpus text. One vector per input, in the same order."""
+        """Embed corpus text. One vector per input, in the same order.
+
+        Each text stands alone, with nothing else in view. That is the right
+        contract for a record's title-and-abstract summary, which *is* the
+        whole document; it is the wrong one for a chunk, which is why
+        ``embed_document_chunks`` exists beside it.
+        """
+
+    @abstractmethod
+    def embed_document_chunks(
+        self, documents: Sequence[Sequence[str]]
+    ) -> list[list[list[float]]]:
+        """Embed chunks **grouped by the document they came from**.
+
+        One inner sequence per document, holding that document's chunks in
+        reading order; the result mirrors that shape exactly — one list of
+        vectors per document, one vector per chunk, in the same order.
+
+        The grouping is the contract, not an optimisation. ``voyage-context-4``
+        is a *contextualized* chunk embedder (ADR-015): a chunk is embedded
+        with its siblings visible to the model, so a passage reading "this
+        approach reduced error by 12%" carries what approach it means. Flatten
+        the grouping and the vector loses exactly the property the model was
+        chosen for — and nothing downstream can detect the loss, because a
+        context-free vector is a perfectly well-formed vector.
+
+        Separate from ``embed_documents`` for the same reason that method is
+        separate from ``embed_query``: a caller that can pass the wrong shape
+        eventually does, and the mistake is invisible in the output.
+        """
 
     @abstractmethod
     def embed_query(self, text: str) -> list[float]:
@@ -70,6 +99,16 @@ class Reranker(ABC):
     with any embedding space and why turning one on requires no re-indexing.
     """
 
+    #: Whether reranking sends candidate text outside the deployment.
+    #:
+    #: The disclosure gate (IR-127) exists to stop record content reaching a
+    #: commercial vendor. A reranker that makes no outbound call transmits
+    #: nothing, so withholding candidates from it protects nobody and costs
+    #: recall. Declared on the port rather than inferred from the class name,
+    #: because the caller has to branch on it and guessing is how a real
+    #: transmission ends up ungated.
+    transmits_externally: bool = True
+
     @abstractmethod
     def rerank(
         self, query: str, candidates: Sequence[str]
@@ -79,4 +118,29 @@ class Reranker(ABC):
         Every candidate, not the top few: trimming is the caller's decision
         and it needs the scores to make it. Implementations must not drop,
         duplicate or rewrite a candidate.
+        """
+
+
+class LLMProvider(ABC):
+    """Text in, text out.
+
+    Deliberately smaller than the gateway's version of this port, which takes
+    ``(prompt, context)``. Two loosely-typed strings invite a caller to shove
+    retrieved passages into ``context`` and hope the adapter formats them; here
+    the *caller* assembles the prompt (see `apps/ai/answers/`) and this port
+    only transports it. Prompt assembly is the part with citation numbering in
+    it, and it belongs in the domain where it can be tested without a vendor.
+
+    One method, and no streaming: ADR-017's streaming work is gateway-side and
+    gated on an ASGI deployment IRIS does not yet run.
+    """
+
+    @abstractmethod
+    def generate(self, system: str, user: str) -> str:
+        """Answer ``user`` under the instructions in ``system``.
+
+        Separate arguments rather than one concatenated prompt: folding the
+        instructions into the user turn makes them look like something the
+        asker said, which is how a prompt injection sitting in an uploaded
+        document ends up outranking the system prompt.
         """

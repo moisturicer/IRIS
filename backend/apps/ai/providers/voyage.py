@@ -22,7 +22,7 @@ from typing import Any, Callable, Optional, Sequence
 import httpx
 from django.conf import settings
 
-from .batching import batch_by_token_budget, estimate_tokens
+from .batching import batch_documents_by_token_budget, estimate_tokens
 from .ports import EmbeddingProvider, RerankedCandidate, Reranker
 
 _BASE_URL = "https://api.voyageai.com/v1"
@@ -40,6 +40,15 @@ _BASE_URL = "https://api.voyageai.com/v1"
 #: difference, and the failure mode is a 400 on a full batch.
 _VENDOR_TOKEN_CAP = 32_000
 _EMBED_TOKEN_BUDGET = 31_000
+
+#: `voyage-context-4` is served from the *contextualized* endpoint, not the
+#: flat `/embeddings` one (IR-281). Every embedding call this adapter makes
+#: goes here, including the single-text ones: the flat endpoint serves the
+#: standard models, and sending a contextualized model's traffic to it
+#: discards the sibling-chunk context that is the entire reason ADR-015 chose
+#: this model. One path also means one place where the request shape, the
+#: batching rule and the short-response guard live.
+_CONTEXTUALIZED_PATH = "/contextualizedembeddings"
 
 #: Voyage's asymmetric input types. The whole reason `embed_documents` and
 #: `embed_query` are separate methods (ADR-015 rule 3).
@@ -99,49 +108,99 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
         transport: Optional[Transport] = None,
     ) -> None:
         self._model = model or getattr(settings, "VOYAGE_EMBED_MODEL", "voyage-context-4")
-        self._dimensions = dimensions or getattr(settings, "VOYAGE_EMBED_DIMENSIONS", 1024)
+        # Not a setting of its own (IR-280). What this asks Voyage to emit
+        # and what the vector columns can hold are the same number, and the
+        # moment they are two settings they can disagree — `VOYAGE_EMBED_
+        # DIMENSIONS=512` would have produced 512-vectors for a 1024 column,
+        # which is the bug class this ticket exists to close, one hop along.
+        # Explicit `dimensions` stays, because a test embedding at 4 is how
+        # the request shaping is asserted without an account.
+        from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+
+        self._dimensions = dimensions or VECTOR_COLUMN_DIMENSIONS
         self._post = transport or _post
 
     @property
     def dimensions(self) -> int:
         return self._dimensions
 
-    def _embed(self, texts: Sequence[str], input_type: str) -> list[list[float]]:
-        vectors: list[list[float]] = []
-        for batch in batch_by_token_budget(texts, _EMBED_TOKEN_BUDGET, estimate_tokens):
+    def _embed_grouped(
+        self, documents: Sequence[Sequence[str]], input_type: str
+    ) -> list[list[list[float]]]:
+        """One request shape for every embedding call this adapter makes.
+
+        ``inputs`` is a list of documents, each a list of that document's
+        chunks — the contextualized endpoint's own shape. A caller with
+        standalone texts passes each as a one-chunk document, which is what
+        makes ``embed_documents`` and ``embed_query`` thin wrappers rather
+        than a second wire format to keep in step with this one.
+        """
+        grouped = [list(document) for document in documents]
+        vectors: list[list[list[float]]] = []
+        for batch in batch_documents_by_token_budget(
+            grouped, _EMBED_TOKEN_BUDGET, estimate_tokens
+        ):
             payload = {
                 "model": self._model,
-                "input": list(batch),
+                "inputs": batch,
                 "input_type": input_type,
                 "output_dimension": self._dimensions,
             }
-            body = self._post("/embeddings", payload)
+            body = self._post(_CONTEXTUALIZED_PATH, payload)
             data = body.get("data") or []
             if len(data) != len(batch):
                 raise VoyageError(
-                    f"Voyage returned {len(data)} vectors for {len(batch)} inputs. "
-                    "Vectors are matched to inputs positionally, so a short "
-                    "response would attach the wrong vector to the wrong chunk."
+                    f"Voyage returned {len(data)} document groups for "
+                    f"{len(batch)} inputs. Groups are matched to documents "
+                    "positionally, so a short response would attach one "
+                    "document's vectors to another."
                 )
-            vectors.extend(item["embedding"] for item in data)
+            for group, document in zip(data, batch):
+                items = group.get("data") or []
+                if len(items) != len(document):
+                    raise VoyageError(
+                        f"Voyage returned {len(items)} vectors for a document "
+                        f"of {len(document)} chunks. Vectors are matched to "
+                        "chunks positionally, so a short response would attach "
+                        "the wrong vector to the wrong chunk."
+                    )
+                vectors.append([item["embedding"] for item in items])
         return vectors
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
             return []          # no empty request to a metered API
-        return self._embed(list(texts), _DOCUMENT)
+        # Each text is its own single-chunk document: it has no siblings, and
+        # inventing some by bundling unrelated records into one group would
+        # contextualize each vector against text it has nothing to do with.
+        grouped = self._embed_grouped([[text] for text in texts], _DOCUMENT)
+        return [vectors[0] for vectors in grouped]
+
+    def embed_document_chunks(
+        self, documents: Sequence[Sequence[str]]
+    ) -> list[list[list[float]]]:
+        non_empty = [list(document) for document in documents]
+        if not non_empty or not any(non_empty):
+            return [[] for _ in non_empty]
+        if not all(non_empty):
+            raise VoyageError(
+                "A document with no chunks was passed to embed_document_chunks. "
+                "The endpoint would return no group for it, and the result "
+                "would silently shift every later document's vectors by one."
+            )
+        return self._embed_grouped(non_empty, _DOCUMENT)
 
     def embed_query(self, text: str) -> list[float]:
-        return self._embed([text], _QUERY)[0]
+        return self._embed_grouped([[text]], _QUERY)[0][0]
 
 
 class VoyageReranker(Reranker):
-    """`rerank-2` by default (ADR-015). Reads text, never a vector."""
+    """`rerank-3` by default (ADR-015, pinned 2026-09-20). Reads text, never a vector."""
 
     def __init__(
         self, model: Optional[str] = None, transport: Optional[Transport] = None
     ) -> None:
-        self._model = model or getattr(settings, "VOYAGE_RERANK_MODEL", "rerank-2")
+        self._model = model or getattr(settings, "VOYAGE_RERANK_MODEL", "rerank-3")
         self._post = transport or _post
 
     def rerank(

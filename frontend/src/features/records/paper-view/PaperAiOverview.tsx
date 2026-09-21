@@ -4,6 +4,11 @@ import { aiApi } from "@/api/ai";
 import type { AIAnswer } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcons";
+import {
+  DegradedNotice,
+  OpenPassageLink,
+  PassageQuote,
+} from "@/features/ai/components/PassageQuote";
 
 /**
  * AI Overview — a grounded summary of the record being viewed.
@@ -13,12 +18,14 @@ import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcon
  * Nothing here is invented locally: whatever the pipeline could not produce is
  * reported as unavailable rather than filled in.
  *
- * Only the pipeline's `generative` mode produces an overview. Its `extractive`
- * mode assembles an answer by quoting whatever ranked highest across the whole
- * corpus, which for a single record routinely leads with a *different* paper —
- * so this renders an explicit "AI summary unavailable" state instead. That is
- * also what ADR-008 asks for: when no model ran, the answer is replaced by a
- * visible unavailable state rather than a composed one.
+ * Each claim is backed by a **Passage** — the quoted text and the page it sits
+ * on (IR-284) — so a reader can check the summary against the paper rather
+ * than taking it on trust.
+ *
+ * Only the `generative` mode produces an overview. When no model is reachable
+ * the endpoint answers `unavailable` and returns the passages unsummarised, so
+ * this renders an explicit "AI summary unavailable" state rather than composing
+ * one locally — what ADR-008 asks for.
  *
  * The generative branch is live and will render as soon as a provider is
  * configured — that choice is the team's open decision D-4, not this file's.
@@ -49,10 +56,9 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   }, [load]);
 
   const mode = answer?.mode;
-  // Only a generative answer is an overview. The extractive path composes a
-  // quoting answer ranked over the whole corpus, so for a single record it can
-  // lead with a *different* paper — useless here, and ADR-008 requires the
-  // answer to be replaced by an explicit unavailable state when no model ran.
+  // Only a generative answer is an overview: ADR-008 requires the answer to be
+  // replaced by an explicit unavailable state when no model ran, rather than by
+  // something assembled here out of the passages.
   const hasOverview = mode === "generative" && Boolean(answer?.answer);
 
   return (
@@ -101,7 +107,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
         </div>
       )}
 
-      {!loading && !failed && !hasOverview && mode === "extractive" && (
+      {!loading && !failed && !hasOverview && mode === "unavailable" && (
         <div className="flex items-start gap-3">
           <i className="fas fa-microchip text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
@@ -109,15 +115,15 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
               AI summary unavailable
             </p>
             <p className="text-[12px] text-stone-500 mt-0.5 leading-relaxed">
-              No language model is configured, so IRIS cannot summarise this paper. Retrieval
-              still works — see Related Institutional Works below, or ask a question in Paper
-              Chat.
+              The answering model could not be reached, so IRIS is not summarising this paper.
+              Retrieval still works — see Related Institutional Works below, or ask a question in
+              Paper Chat.
             </p>
           </div>
         </div>
       )}
 
-      {!loading && !failed && !hasOverview && mode !== "extractive" && (
+      {!loading && !failed && !hasOverview && mode !== "unavailable" && (
         <div className="flex items-start gap-3">
           <i className="fas fa-circle-info text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
@@ -136,23 +142,42 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
             {answer?.answer}
           </p>
 
-          {answer && answer.sources.length > 0 && (
+          {answer?.degraded && <DegradedNotice subject="summary" />}
+
+          {answer && (answer.citations.length > 0 || answer.sources.length > 0) && (
             <div className="mt-3 pt-3 border-t border-stone-100">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-2">
                 Grounded in
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {answer.sources.map((s) => (
-                  <Link
-                    key={s.id}
-                    to={`/records/${s.id}`}
-                    className="max-w-full inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200 text-[11px] font-semibold text-stone-700 hover:border-brand/30 transition-colors"
+              <ul className="space-y-2 list-none pl-0">
+                {answer.citations.map((citation) => (
+                  <li
+                    key={`${citation.chunk_id}-${citation.marker}`}
+                    className="rounded-lg border border-stone-200 bg-stone-50/60 px-2.5 py-2"
                   >
-                    <i className="fas fa-file-lines text-[9px] text-stone-400" aria-hidden />
-                    <span className="truncate">{s.title}</span>
-                  </Link>
+                    <PassageQuote text={citation.text} />
+                    <OpenPassageLink citation={citation} className="mt-1.5" />
+                  </li>
                 ))}
-              </div>
+              </ul>
+
+              {/* A model that cited nothing still read something. Naming the
+                  records keeps that answer from looking ungrounded, which is
+                  what this block showed before passages existed. */}
+              {answer.citations.length === 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {answer.sources.map((s) => (
+                    <Link
+                      key={s.id}
+                      to={`/records/${s.id}`}
+                      className="max-w-full inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200 text-[11px] font-semibold text-stone-700 hover:border-brand/30 transition-colors"
+                    >
+                      <i className="fas fa-file-lines text-[9px] text-stone-400" aria-hidden />
+                      <span className="truncate">{s.title}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </>

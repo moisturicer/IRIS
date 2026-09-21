@@ -68,6 +68,19 @@ class EmbeddingProviderContractTests:
         assert hasattr(embedder, "embed_documents")
         assert hasattr(embedder, "embed_query")
 
+    def test_grouped_chunks_come_back_grouped_the_same_way(self, embedder):
+        """IR-281. Callers zip the returned vectors against the chunk rows
+        they sent, per document — so the shape is the contract, and a
+        provider that flattened or reordered would misattribute every vector
+        without raising anything."""
+        result = embedder.embed_document_chunks([["a1", "a2", "a3"], ["b1"]])
+
+        assert [len(group) for group in result] == [3, 1]
+        assert {len(v) for group in result for v in group} == {embedder.dimensions}
+
+    def test_grouping_nothing_calls_nothing_and_returns_nothing(self, embedder):
+        assert embedder.embed_document_chunks([]) == []
+
 
 class RerankerContractTests:
     def test_reranking_returns_every_candidate_it_was_given(self, reranker):

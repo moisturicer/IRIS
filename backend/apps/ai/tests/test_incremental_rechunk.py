@@ -9,12 +9,11 @@ that cheapness is not bought by letting retrieval observe a partial state.
 import threading
 
 import pytest
-from django.conf import settings
 from django.db import IntegrityError, connection
 from django.test.utils import CaptureQueriesContext
 
 from apps.ai.chunking import Chunk, ChunkingOptions, ChunkSet, chunk_text_hash, chunkset_hash
-from apps.ai.models import EmbeddingSpace, EmbeddingSpaceState
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS, EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet as ChunkSetModel, DocumentChunk
 from apps.ai.repositories import DjangoChunkRepository
 from apps.records.models import Record
@@ -34,7 +33,7 @@ def _no_seeded_active_space():
 def space():
     return EmbeddingSpace.objects.create(
         model_id="voyage-context-4",
-        dimensions=settings.AI_EMBEDDING_DIMENSIONS,
+        dimensions=VECTOR_COLUMN_DIMENSIONS,
         state=EmbeddingSpaceState.ACTIVE,
     )
 
@@ -65,7 +64,7 @@ def _embed_all(chunk_set_id: int, space: EmbeddingSpace) -> None:
     for i, chunk in enumerate(
         DocumentChunk.objects.filter(chunk_set_id=chunk_set_id).order_by("sequence")
     ):
-        vector = [0.0] * settings.AI_EMBEDDING_DIMENSIONS
+        vector = [0.0] * VECTOR_COLUMN_DIMENSIONS
         vector[0] = float(i + 1)
         ChunkEmbedding.objects.create(chunk=chunk, space=space, embedding=vector)
 

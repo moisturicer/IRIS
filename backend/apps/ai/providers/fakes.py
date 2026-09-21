@@ -16,7 +16,7 @@ import hashlib
 import math
 from typing import Sequence
 
-from .ports import EmbeddingProvider, RerankedCandidate, Reranker
+from .ports import EmbeddingProvider, LLMProvider, RerankedCandidate, Reranker
 
 
 #: Reserved dimension carrying the document/query marker. Reproducing
@@ -78,11 +78,31 @@ class DeterministicEmbeddingProvider(EmbeddingProvider):
             _feature_vector(t, self._dimensions, _MARKER_WEIGHT) for t in texts
         ]
 
+    def embed_document_chunks(
+        self, documents: Sequence[Sequence[str]]
+    ) -> list[list[list[float]]]:
+        """Contextualized in shape, not in effect.
+
+        A chunk's vector here depends on its own text alone, because a
+        hashed bag of words has nowhere to put a document's context. That is
+        the one place this fake is *not* a behavioural substitute for Voyage,
+        and it is stated rather than hidden: a test asserting that context
+        changes a vector cannot be written against this, and a test asserting
+        the grouping reaches the wire belongs in the adapter's own suite.
+
+        The shape it does reproduce faithfully — one list per document, in
+        order — is what every caller downstream actually depends on.
+        """
+        return [self.embed_documents(document) for document in documents]
+
     def embed_query(self, text: str) -> list[float]:
         return _feature_vector(text, self._dimensions, -_MARKER_WEIGHT)
 
 
 class ScriptedReranker(Reranker):
+    #: A test double makes no outbound call.
+    transmits_externally = False
+
     """Scores by word overlap with the query.
 
     A fixed, explainable rule rather than a random one: a test can predict
@@ -106,3 +126,20 @@ class ScriptedReranker(Reranker):
         # Stable on ties: equal scores keep input order, so the output is
         # deterministic rather than dependent on sort implementation.
         return sorted(scored, key=lambda c: (-c.score, c.index))
+
+
+class ScriptedLLM(LLMProvider):
+    """A deterministic stand-in for an inference vendor.
+
+    Echoes a citation marker back so the citation-parsing tests in
+    `apps/ai/answers/` have something realistic to parse, and so the whole
+    answer path is exercisable with no key and no network.
+    """
+
+    def __init__(self, reply: str = "Based on the sources, yes [1]."):
+        self._reply = reply
+        self.calls: list[tuple[str, str]] = []
+
+    def generate(self, system: str, user: str) -> str:
+        self.calls.append((system, user))
+        return self._reply

@@ -1,0 +1,3 @@
+# Runs inside a Linux container via its shebang -- a CRLF checkout (Windows
+# core.autocrlf=true) breaks it with "no such file or directory" (IR-318).
+backend/entrypoint.sh text eol=lf

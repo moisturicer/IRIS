@@ -66,7 +66,9 @@ Every active ticket carries `s2-active` and one or more `area-*` labels covering
 
 **Simplified 2026-09-03** (verified against all 57 live issues, view `evidence`). Dropped seven values that were never applied to a real issue and had no other purpose in this doc set: `superseded` `duplicate` `merged` `deferred` `historical` (the "Legacy class" group folded `delivered` — its one real member — into Lifecycle) `post-mvp` `post-semester`. [`docs/jira-sync/00-reconciliation-plan.md`](../jira-sync/00-reconciliation-plan.md) §2's own rule was "a card exists only for work that will be pulled this semester; deferred work gets no card" — so these disposition labels were never actually the mechanism, omission was. `not-ready` and `do-not-build` stay despite zero current uses: both are mapping targets for triage roles in [`triage-labels.md`](triage-labels.md) and `not-ready` is the Not Ready state marker above — they're reserved, not dead.
 
-**`thesis-critical` items are protected from scope cuts.** If capacity slips, cut from RAG and supporting frontend work first — never from the workflow contribution or its measurement.
+**`thesis-critical` items are protected from scope cuts.** If capacity slips, cut **supporting frontend work** first — never the workflow contribution, its measurement, or RAG.
+
+> **Corrected 2026-09-17.** This line previously read "cut from RAG and supporting frontend work first". That contradicted [ADR-013](../adr/013-chunk-level-rag-pipeline.md), whose 2026-09-04 amendment reclassified RAG as thesis-critical on the instruction of the project lead, and contradicted `CLAUDE.md`'s Scope rule. The ADR is the authority and this file is corrected to match.
 
 Priority maps to the Jira field: **P0 → `Highest` · P1 → `High` · P2 → `Medium` · P3 → `Low`.**
 

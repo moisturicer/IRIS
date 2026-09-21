@@ -12,9 +12,9 @@ test that does not run.
 """
 
 import pytest
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace
@@ -28,9 +28,9 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 User = get_user_model()
 
-#: The vector columns are declared at `AI_EMBEDDING_DIMENSIONS`, so test
+#: The vector columns are declared at `VECTOR_COLUMN_DIMENSIONS`, so test
 #: vectors have to be that wide whatever the fake would rather produce.
-DIMENSIONS = settings.AI_EMBEDDING_DIMENSIONS
+DIMENSIONS = VECTOR_COLUMN_DIMENSIONS
 
 
 @pytest.fixture
@@ -105,7 +105,7 @@ class VisibilityTests:
                     owner=author, embedder=embedder, space=space)
         stranger = make_user("stranger@cit.edu", ROLE_STUDENT)
 
-        assert retriever.retrieve("sampling procedure", stranger) == []
+        assert retriever.retrieve("sampling procedure", stranger).passages == ()
 
     def test_an_owner_receives_their_own_draft(self, retriever, embedder, space):
         author = make_user("author@cit.edu", ROLE_STUDENT)
@@ -113,7 +113,7 @@ class VisibilityTests:
                     owner=author, embedder=embedder, space=space)
 
         results = retriever.retrieve("sampling procedure", author)
-        assert [r.record_title for r in results] == ["My Draft"]
+        assert [p.record_title for p in results.passages] == ["My Draft"]
 
     def test_office_staff_receive_everything(self, retriever, embedder, space):
         author = make_user("author@cit.edu", ROLE_STUDENT)
@@ -121,7 +121,7 @@ class VisibilityTests:
                     owner=author, embedder=embedder, space=space)
         ktto = make_user("ktto@cit.edu", ROLE_KTTO)
 
-        assert len(retriever.retrieve("sampling procedure", ktto)) == 1
+        assert len(retriever.retrieve("sampling procedure", ktto).passages) == 1
 
     def test_the_assigned_adviser_receives_the_record_they_advise(
         self, retriever, embedder, space
@@ -132,8 +132,8 @@ class VisibilityTests:
         make_record(title="Advised Draft", status=PipelineStatus.DRAFT, owner=author,
                     adviser=adviser, embedder=embedder, space=space)
 
-        assert len(retriever.retrieve("sampling procedure", adviser)) == 1
-        assert retriever.retrieve("sampling procedure", other_adviser) == [], (
+        assert len(retriever.retrieve("sampling procedure", adviser).passages) == 1
+        assert retriever.retrieve("sampling procedure", other_adviser).passages == (), (
             "the adviser role alone must grant nothing -- the grant is the FK"
         )
 
@@ -145,7 +145,7 @@ class VisibilityTests:
                     owner=author, embedder=embedder, space=space)
         reader = make_user("reader@cit.edu", ROLE_STUDENT)
 
-        assert len(retriever.retrieve("sampling procedure", reader)) == 1
+        assert len(retriever.retrieve("sampling procedure", reader).passages) == 1
 
     def test_an_anonymous_user_receives_nothing(self, retriever, embedder, space):
         from django.contrib.auth.models import AnonymousUser
@@ -154,7 +154,7 @@ class VisibilityTests:
         make_record(title="Published Work", status=PipelineStatus.PUBLISHED,
                     owner=author, embedder=embedder, space=space)
 
-        assert retriever.retrieve("sampling procedure", AnonymousUser()) == []
+        assert retriever.retrieve("sampling procedure", AnonymousUser()).passages == ()
 
     def test_a_readable_record_does_not_leak_its_neighbours(
         self, retriever, embedder, space
@@ -168,5 +168,8 @@ class VisibilityTests:
         make_record(title="Private One", status=PipelineStatus.DRAFT,
                     owner=author, embedder=embedder, space=space)
 
-        titles = [r.record_title for r in retriever.retrieve("sampling", stranger)]
+        titles = [
+            p.record_title
+            for p in retriever.retrieve("sampling", stranger).passages
+        ]
         assert titles == ["Public One"]

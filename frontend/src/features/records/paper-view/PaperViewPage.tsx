@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
+import { citedPage, paperHrefAtPage } from "@/lib/citedPage";
 import type { RecordDetail, IpType, RecordReview } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
@@ -196,7 +197,11 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Similar papers — same retrieval, and the same visibility predicate, as Ask IRIS
+// Similar papers — record-vector similarity (ADR-029 §5), through the same
+// `visible_to` predicate as Ask IRIS. The *predicate* is shared; the retrieval
+// is not — Ask IRIS ranks passages, this ranks whole records on their
+// title-and-abstract vector, so it answers "broadly about the same thing?"
+// and will miss two papers sharing a method described mid-document.
 // ---------------------------------------------------------------------------
 
 function SimilarPapers({ recordId }: { recordId: number }) {
@@ -235,7 +240,24 @@ function SimilarPapers({ recordId }: { recordId: number }) {
     );
   }
 
-  if (items.length === 0) return null;
+  // Empty is the common case today and says nothing by itself: a record with
+  // no vector has no neighbours, and the disclosure gate (IR-250) means no
+  // record has one yet. Rendering nothing at all left a reader to conclude
+  // this paper is unrelated to everything in the repository, which is a
+  // stronger claim than IRIS can make.
+  if (items.length === 0) {
+    return (
+      <section>
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-3">
+          Related Institutional Works
+        </h2>
+        <p className="text-[12px] text-stone-500">
+          No related works found. Similarity is computed from indexed records, and indexing
+          has not run for this repository yet.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section>
@@ -306,6 +328,7 @@ function initials(name: string): string {
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
 
   const chat = usePaperChat();
@@ -410,6 +433,13 @@ export default function PaperViewPage() {
   // one; otherwise fall back to the first attachment. The Documents rail covers
   // the rest, so this button is only ever "the paper".
   const paperUrl = record.abstract_file ?? record.files[0]?.url ?? null;
+
+  // A citation links here with `?page=` (IR-284), so acting on it lands on the
+  // page that supports the claim rather than on the paper's first. The rules
+  // for reading and using that number live in `lib/citedPage`, where they are
+  // testable without standing up this screen.
+  const openAtPage = citedPage(searchParams.get("page"));
+  const paperHref = paperHrefAtPage(paperUrl, openAtPage);
 
   return (
     <div
@@ -559,15 +589,15 @@ export default function PaperViewPage() {
 
             {/* Action row */}
             <div className="flex items-center gap-2 flex-wrap pb-6 border-b border-stone-200">
-              {paperUrl ? (
+              {paperHref ? (
                 <a
-                  href={paperUrl}
+                  href={paperHref}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-light transition-colors"
                 >
                   <i className="fas fa-book-open text-[12px]" aria-hidden />
-                  View Paper
+                  {openAtPage != null ? `View Paper at page ${openAtPage}` : "View Paper"}
                 </a>
               ) : (
                 <span

@@ -383,3 +383,87 @@ def test_a_document_with_no_numbering_at_all_is_unchanged():
 
     beta = [c for c in result.chunks if "beta" in c.content][0]
     assert beta.context_path == ("Essay", "Method")
+
+
+# ---------------------------------------------------------------------------
+# Roman-numeral and lettered outlines (IR-314)
+# ---------------------------------------------------------------------------
+
+
+def test_a_scientific_papers_outline_nests_instead_of_flattening():
+    """Record 36's shape: roman sections, lettered subsections, unnumbered
+    sub-subsections. Before IR-314 none of those numbering styles was
+    recognised, so every chunk in the paper had a depth-2 path and
+    "Self-consistency loop" sat beside the algorithm it is part of.
+    """
+    document = doc(
+        DocumentElement(kind=HEADING, text="I. INTRODUCTION", level=1),
+        DocumentElement(kind=PARAGRAPH, text="the opening"),
+        DocumentElement(kind=HEADING, text="E. The GenAIMMD algorithm", level=1),
+        DocumentElement(kind=PARAGRAPH, text="the algorithm itself"),
+        DocumentElement(kind=HEADING, text="Self-consistency loop", level=1),
+        DocumentElement(kind=PARAGRAPH, text="the loop converges"),
+        title="GenAIMMD",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    loop = [c for c in result.chunks if "the loop converges" in c.content][0]
+    assert loop.context_path == (
+        "GenAIMMD",
+        "I. INTRODUCTION",
+        "E. The GenAIMMD algorithm",
+        "Self-consistency loop",
+    )
+
+
+def test_a_lettered_subsection_does_not_evict_its_roman_section():
+    document = doc(
+        DocumentElement(kind=HEADING, text="II. METHOD", level=1),
+        DocumentElement(kind=HEADING, text="A. Transition Path Sampling", level=1),
+        DocumentElement(kind=PARAGRAPH, text="sampling paths"),
+        DocumentElement(kind=HEADING, text="B. AIMMD", level=1),
+        DocumentElement(kind=PARAGRAPH, text="machine learned committors"),
+        title="GenAIMMD",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    aimmd = [c for c in result.chunks if "committors" in c.content][0]
+    assert aimmd.context_path == ("GenAIMMD", "II. METHOD", "B. AIMMD")
+    assert "A. Transition Path Sampling" not in aimmd.context_path
+
+
+def test_a_roman_numeral_section_replaces_the_previous_one():
+    document = doc(
+        DocumentElement(kind=HEADING, text="I. INTRODUCTION", level=1),
+        DocumentElement(kind=HEADING, text="A. Scope", level=1),
+        DocumentElement(kind=PARAGRAPH, text="the scope"),
+        DocumentElement(kind=HEADING, text="II. METHOD", level=1),
+        DocumentElement(kind=PARAGRAPH, text="the method"),
+        title="GenAIMMD",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    method = [c for c in result.chunks if "the method" in c.content][0]
+    assert method.context_path == ("GenAIMMD", "II. METHOD")
+
+
+def test_an_ambiguous_letter_in_a_run_stays_a_subsection():
+    """`C.` and `D.` are valid roman numerals. Read as sections they would
+    evict the section they belong to, which is exactly the flattening this
+    ticket exists to remove."""
+    document = doc(
+        DocumentElement(kind=HEADING, text="II. METHOD", level=1),
+        DocumentElement(kind=HEADING, text="A. Sampling", level=1),
+        DocumentElement(kind=HEADING, text="B. AIMMD", level=1),
+        DocumentElement(kind=HEADING, text="C. Committors", level=1),
+        DocumentElement(kind=PARAGRAPH, text="the committor function"),
+        title="GenAIMMD",
+    )
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=12)
+    result = build_context_path_chunker(options).chunk(document, options)
+
+    committors = [c for c in result.chunks if "committor function" in c.content][0]
+    assert committors.context_path == ("GenAIMMD", "II. METHOD", "C. Committors")

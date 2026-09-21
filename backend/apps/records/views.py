@@ -315,15 +315,26 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         GET /records/<id>/similar/ — related institutional works.
 
-        Reuses the Ask IRIS retrieval service, so "similar" means the same
-        ranking users get from search, over the same visibility predicate.
+        Ranks on **record-level vectors** through `visible_to(user)`
+        (ADR-029 §5, §7). It used to rank with record-level full-text search
+        filtered by `publicly_visible()`, and was the last caller of the
+        narrower second visibility rule — and of the module IR-285 deleted.
+
+        **Empty until the corpus is indexed.** A record with no vector has no
+        neighbours, and today no record has one: the disclosure gate refuses
+        every record while `Record` carries no embargo field (IR-250). That is
+        a visible behaviour change from keyword matching, and it is the
+        intended one — a keyword fallback would hide "nothing is indexed"
+        behind plausible results.
         """
-        from apps.ai.services.retrieval import search_records
+        from apps.ai.presentation import record_card
+        from apps.ai.similarity import similar_records
 
         record = self.get_object()
-        seed = f"{record.title} {record.abstract or ''}".strip()
-        matches = search_records(seed, top_k=3, exclude_id=record.id)
-        return Response({"results": [s.as_dict() for s in matches]})
+        matches = similar_records(record, request.user)
+        return Response(
+            {"results": [record_card(m.record, m.score) for m in matches]}
+        )
 
     @action(detail=True, methods=["get"])
     def tracker(self, request, pk=None):

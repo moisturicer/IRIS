@@ -23,3 +23,39 @@ _Avoid_: Summary alone (ambiguous next to Abstract), DocumentSummary (the intern
 **Abstract**:
 The author-submitted summary of a Record, provided at submission time. Existed before AI Summary; not generated, not cached, not related to the chunk pipeline.
 _Avoid_: Summary alone.
+
+**Embedding Space**:
+The named combination of embedding model, vector dimension and distance metric that a stored vector belongs to. Exactly one Space is active at a time; vectors from different Spaces are never comparable, so a Space is what makes a stored vector meaningful rather than just a list of numbers. Changing embedding model means introducing a new Space and re-indexing into it, not editing vectors in place.
+_Avoid_: Model, dimensions, or index used alone to mean this (each names one attribute of a Space, not the Space); vector store (the storage, not the identity of what is stored).
+
+**Passage**:
+A quoted span of a Record's text that an Ask IRIS answer is grounded in, carrying the page it came from so a reader can go and check it. The reader-facing counterpart of a chunk: a chunk is how IRIS divides a document for retrieval, a Passage is what a citation shows a person.
+_Avoid_: Chunk (the internal retrieval unit — correct in code, wrong in UI copy and specs aimed at a reader), snippet, excerpt, source (a Passage cites a source; it is not itself the source).
+
+**Figure**:
+A picture inside a Record's document — a chart, diagram, schematic or photograph — identified by the page and the rectangle it occupies rather than by any text it contains. Distinct from its **caption**, which is the text labelling it and is read as ordinary prose, and from a [[Passage]], which is quoted text a reader can check. A Figure is shown to a reader; it is not quoted, and IRIS makes no claim about what it depicts.
+_Avoid_: Image (the rendering of a Figure, not the Figure itself), picture (the extractor's word), diagram or chart (kinds of Figure, not synonyms for it), figure caption used to mean the Figure.
+
+**Turn**:
+One exchange in a [[Conversation]] — a question and the answer it produced, kept together. The unit IRIS remembers: a Turn is what gets stored, searched when an older part of the conversation becomes relevant again, and returned whole when it does. A question without its answer is half a Turn, not a Turn.
+_Avoid_: Message (one half of a Turn — correct for the stored row, wrong for the thing being recalled), exchange, round, prompt.
+
+**Resolved question**:
+The self-contained question IRIS actually searches with, worked out from what the reader typed plus the earlier Turns of the Conversation. "What about its limitations?" resolves to "What are the limitations of *[paper]*?". Distinct from what the reader typed, and shown to them — a Resolved question that gets the subject wrong changes what was asked, so it is never hidden.
+_Avoid_: Rewrite or rewritten query (names the mechanism, not the thing), expanded query (a different technique — expansion adds phrasings, resolution supplies a missing subject), the question (ambiguous once the two differ).
+
+**Area**:
+A named subject grouping that Records belong to, and the unit a question about the collection aggregates over. Today an Area is a Classification or PSCED category — assigned by a person at submission, so it has a name someone chose and siblings to be compared against. An Area is always named: a grouping nobody can name is not yet an Area, which is what makes a claim about one checkable.
+_Avoid_: Topic, cluster, field, domain, category used alone (each is either vaguer than an Area or names one particular way of arriving at one).
+
+**Research landscape**:
+The shape of the corpus across Areas — which are well covered, which are sparse next to their siblings, which are growing. What a reader is asking about with "what is trending?" or "where are the gaps?", as opposed to asking about the contents of any one Record. A landscape claim is always relative to what the asker is permitted to see, so two people can correctly be shown different landscapes.
+_Avoid_: Trends or gaps alone (each is one question asked of a landscape, not the landscape), overview, analytics, the corpus (the Records themselves, not their shape).
+
+**Collaboration opt-in**:
+A Record owner's explicit, separate permission for their Proposal to be surfaced to another researcher working in a similar area. Its own decision, deliberately not the Data Privacy Act acceptance a submission already carries — accepting terms for how data is processed is a different act from agreeing that strangers may be told your unsubmitted work exists, and someone may reasonably say yes to one and no to the other. An opt-in permits an introduction; it never makes a Record readable.
+_Avoid_: Consent alone (ambiguous next to the DPA acceptance the disclosure gate reads), DPA consent, sharing, visibility (an opt-in changes neither).
+
+**Novelty check**:
+Comparing a newly submitted Proposal against work the institution has already completed, to tell a proposer that something close to their idea has been done here before. Distinct from collaboration matching, which compares one Proposal against other Proposals: a Novelty check looks only at finished work that is already in the public catalogue, so it discloses nothing and needs no [[Collaboration opt-in]].
+_Avoid_: Duplicate detection (that is about two Proposals overlapping with each other), plagiarism check (a different question about finished work, deliberately out of scope), similarity search.

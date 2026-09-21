@@ -220,6 +220,13 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # ---- Celery -------------------------------------------------------------
 
+# Both Compose files have set REDIS_URL on every backend service since the
+# stack was written, and until IR-132 nothing in Django read it -- the same
+# shape as the EXTRACTION_TIMEOUT the compose comments record as declared and
+# unread. The rate limiter needs a raw client (atomic INCR plus an expiry,
+# which django.core.cache cannot express), so it is a real setting now.
+REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
+
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -251,6 +258,8 @@ CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
     "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
+    "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
+    "apps.ai.tasks.index_record": {"queue": "embedding"},
 }
 
 # ---- Static / Media -----------------------------------------------------
@@ -321,6 +330,59 @@ LOGGING = {
 
 # ---- AI -----------------------------------------------------------------
 
+# ---- Cache (IR-132) ------------------------------------------------------
+#
+# Absent until now: Celery and Redis were configured, but Django itself had no
+# CACHES at all, so `django.core.cache` fell back to the local-memory backend
+# -- per process. That is the same defect the rate limiter is built to avoid:
+# correct with one process, wrong with four.
+#
+# Django 5 ships a Redis backend, so this needs no extra dependency. The same
+# Redis as Celery, on a different database number, so flushing a queue cannot
+# take the query-embedding cache with it.
+REDIS_CACHE_URL = config("REDIS_CACHE_URL", default="redis://localhost:6379/1")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_CACHE_URL,
+        "KEY_PREFIX": "iris",
+        # A query embedding is valid for as long as the embedding space is,
+        # which is far longer than a day -- but an unbounded cache is a slow
+        # memory leak, and the space id is in the key, so an expired entry is
+        # recomputed rather than wrong.
+        "TIMEOUT": config("CACHE_TIMEOUT_SECONDS", default=86_400, cast=int),
+    }
+}
+
+# The vendor account's per-minute token budget, divided between the ingestion
+# and query lanes by `apps.ai.resilience.rate_limit`. The query lane is given
+# the larger share because a person is waiting on it (ADR-015).
+AI_RATE_LIMIT_TOKENS_PER_MINUTE = config(
+    "AI_RATE_LIMIT_TOKENS_PER_MINUTE", default=1_000_000, cast=int
+)
+
+# ---- Inference provider (ADR-021) ---------------------------------------
+#
+# Groq in development, OpenRouter in production, and the switch is these three
+# values -- no second adapter. Every vendor worth using here speaks the OpenAI
+# chat-completions format, so `OpenAICompatibleAdapter` covers Groq,
+# OpenRouter, OpenAI, Together, vLLM and Ollama alike.
+#
+# Anthropic is deliberately absent: it was chosen in an import statement rather
+# than a decision record, was never declared as a dependency, and silently
+# degraded every environment to extractive answers. ADR-021 supersedes it.
+#
+# No default key and no local fallback -- the adapter raises rather than
+# degrading to a mock, which is the failure ADR-021 records the previous
+# provider factory for.
+LLM_BASE_URL  = config("LLM_BASE_URL", default="https://api.groq.com/openai/v1")
+LLM_API_KEY   = config("LLM_API_KEY", default="")
+LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
+# Grounded answering is extraction from supplied sources, not composition. A
+# higher temperature buys variety nobody asked for and invites invention.
+LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in
@@ -340,19 +402,86 @@ LOGGING = {
 # lane on, not with the adapter.
 VOYAGE_API_KEY         = config("VOYAGE_API_KEY", default="")
 VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4")
-VOYAGE_EMBED_DIMENSIONS= config("VOYAGE_EMBED_DIMENSIONS", default=1024, cast=int)
-VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-2")
+# VOYAGE_EMBED_DIMENSIONS was removed by IR-280. The dimension Voyage is asked
+# to emit and the width of the column that stores it are one number, and two
+# settings for one number is the drift this ticket closed everywhere else:
+# `VOYAGE_EMBED_DIMENSIONS=512` would have produced 512-vectors for a 1024
+# column. The adapter now takes it from `apps.ai.models.VECTOR_COLUMN_DIMENSIONS`,
+# which a migration ties to the active `EmbeddingSpace` row.
+VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-3")
 VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 
-AI_EMBEDDING_MODEL     = config("AI_EMBEDDING_MODEL", default="text-embedding-3-small")
-AI_EMBEDDING_DIMENSIONS= config("AI_EMBEDDING_DIMENSIONS", default=1536, cast=int)
+# ---- The development disclosure bypass (IR-317, ADR-015) -----------------
+#
+# Stands beside ADR-015's disclosure gate — it does not replace it and it
+# encodes no policy. The gate refuses every record because `Record` carries no
+# embargo field (IR-250), so with this off nothing can be indexed and Ask IRIS
+# answers "no readable sources" to every question; turning it on is how the
+# feature is clicked through in a browser while CIT-U decides what an embargo
+# is. Deliberately named for what it is: a rule that merely sounds defensible
+# ("published records are not embargoed") would read as somebody's decision,
+# and this cannot.
+#
+# `apps.ai.policy.bypass` raises `ImproperlyConfigured` at startup when this is
+# set while DEBUG is off, so it takes the service down rather than quietly
+# disabling a control. IR-250 deletes it.
+AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
+    "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", default=False, cast=bool
+)
+
+# ---- Embedding spend (IR-282) -------------------------------------------
+#
+# Indexing is metered per token, and `AI_CHUNK_MAX_TOKENS` counts whitespace
+# words rather than tokenizer tokens — about 44% under the real BPE count
+# (IR-243, deliberately not recalibrated ahead of IR-133's evidence). A
+# misconfigured ceiling therefore turns one corpus run into a large bill
+# quietly, which is the failure this pair of settings exists to bound.
+#
+# The ceiling is a refusal, not a warning: `backfill_embeddings` prints its
+# estimate and stops when the estimate exceeds this, and raising it is a
+# deliberate act by whoever is paying. 0 disables the guard.
+AI_EMBEDDING_TOKEN_CEILING = config(
+    "AI_EMBEDDING_TOKEN_CEILING", default=2_000_000, cast=int
+)
+# Approximate, and printed as approximate. Vendor pricing is not in this
+# repository's control, so this is a figure for deciding whether a run is
+# worth starting, never a quote. Voyage's contextualized-embedding list price
+# at the time of writing; check it before trusting a large number.
+#
+# Corrected 2026-09-20: was 0.18, verified against Voyage's published pricing
+# page during a live cost-verification session -- voyage-context-4 lists at
+# 0.12/M tokens, not 0.18. The stale figure had been overstating every dry-run
+# estimate by 50%, in the direction of caution rather than the dangerous one,
+# but a pre-flight number that is wrong on the safe side is still wrong.
+AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
+    "AI_EMBEDDING_COST_PER_MILLION_TOKENS", default=0.12, cast=float
+)
+
+# AI_EMBEDDING_MODEL and AI_EMBEDDING_DIMENSIONS were removed by IR-280. They
+# named a second embedding model and dimension alongside the VOYAGE_EMBED_*
+# family above, and the three declarations disagreed: 1536 here, 1024 there,
+# and `all-MiniLM-L6-v2` in .env.example. `voyage-context-4` emits 2048, 1024,
+# 512 or 256 and never 1536, so the vector columns those settings sized could
+# not have held a real vector. What produced a vector is now the active
+# `EmbeddingSpace` row (ADR-015); what the columns are wide enough for is
+# `apps.ai.models.VECTOR_COLUMN_DIMENSIONS`, which a migration and a test tie
+# to that row.
 OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
-ANTHROPIC_API_KEY      = config("ANTHROPIC_API_KEY", default="")       # Ask IRIS synthesis; unset -> retrieval-only mode
-AI_LLM_MODEL           = config("AI_LLM_MODEL", default="claude-sonnet-5")
+# ANTHROPIC_API_KEY and AI_LLM_MODEL were removed by ADR-021. Anthropic is not
+# used, and a setting nothing reads is the defect this codebase keeps finding
+# (REDIS_URL in IR-132, EXTRACTION_TIMEOUT in the compose comments). The
+# inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
+# above.
 DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.
 DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)
+# Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
+# path off the gateway — it posted to a route the gateway never registered, at
+# an endpoint returning no vector field — and Django now embeds in-process
+# through the `EmbeddingProvider` port. The setting stays because ADR-014
+# keeps the service for its streaming-chat mandate, which is still gated on
+# that ADR's preconditions plus ADR-017's ASGI deployment.
 AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:8001") # AI Gateway endpoint
 
 # ---- Chunking (ADR-013) --------------------------------------------------

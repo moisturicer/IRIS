@@ -1,6 +1,6 @@
 # 04 — Workflow
 
-**Thesis-critical.** These six tasks build, protect and measure the contribution in [ADR-003](../adr/003-clearance-aware-resubmission.md). If capacity slips, cut from `06-rag.md` and `03-frontend.md` before touching `W-01`, `W-02`, `W-03` or `W-04`.
+**Thesis-critical.** These six tasks build, protect and measure the contribution in [ADR-003](../adr/003-clearance-aware-resubmission.md). If capacity slips, cut from `03-frontend.md` before touching `W-01`, `W-02`, `W-03` or `W-04`. **`06-rag.md` is no longer a cut target** — RAG is thesis-critical too as of [ADR-013](../adr/013-chunk-level-rag-pipeline.md)'s 2026-09-04 amendment (corrected 2026-09-17).
 
 ---
 

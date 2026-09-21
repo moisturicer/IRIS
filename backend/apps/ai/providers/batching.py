@@ -64,3 +64,43 @@ def batch_by_token_budget(
     if current:
         batches.append(current)
     return batches
+
+
+def batch_documents_by_token_budget(
+    documents: Sequence[Sequence[str]],
+    budget: int,
+    estimate: Callable[[str], int] = estimate_tokens,
+) -> list[list[list[str]]]:
+    """Group whole *documents* into requests whose estimated tokens stay
+    under ``budget``.
+
+    The unit is the document, not the chunk: contextualized embedding is only
+    contextualized because a document's chunks travel together, so splitting
+    one across two requests would silently produce vectors computed against
+    half the context. A document larger than the whole budget is therefore
+    sent **alone and whole**, on the same reasoning as an oversized single
+    text next door — let the vendor reject it and say so, rather than quietly
+    changing what the vectors mean.
+
+    Order is preserved at both levels, because the caller matches vectors back
+    to chunks positionally.
+    """
+    if budget <= 0:
+        raise ValueError(f"budget must be positive, got {budget}")
+
+    batches: list[list[list[str]]] = []
+    current: list[list[str]] = []
+    running = 0
+
+    for document in documents:
+        chunks = list(document)
+        cost = sum(estimate(text) for text in chunks)
+        if current and running + cost > budget:
+            batches.append(current)
+            current, running = [], 0
+        current.append(chunks)
+        running += cost
+
+    if current:
+        batches.append(current)
+    return batches

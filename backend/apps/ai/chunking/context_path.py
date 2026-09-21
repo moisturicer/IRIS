@@ -23,26 +23,24 @@ Pure except for one read: counting a token means loading the vendored
 no database, no network, no clock, no randomness.
 """
 
-import re
 from dataclasses import replace
+from typing import Optional
 
 from .document import HEADING, NormalizedDocument
 from .hashing import chunkset_hash
+from .numbering import outline_depths
 from .ports import Chunker
 from .registry import build_chunker
 from .tokens import count_tokens
 from .values import Chunk, ChunkingOptions, ChunkSet
 
-#: A section number opening a heading. Mirrors the pattern the extraction
-#: mapping uses to derive depth (IR-242), kept in step with it by shape
-#: rather than shared, because the domain must not import an adapter.
-_SECTION_NUMBER = re.compile(r"^\d+(?:\.\d+)*\.?\s+\S")
-
 _TRUNCATION_MARKER = "..."
 _PATH_SEPARATOR = " > "
 
 
-def _words_with_paths(document: NormalizedDocument) -> list[tuple[str, tuple[str, ...]]]:
+def _words_with_paths(
+    document: NormalizedDocument,
+) -> list[tuple[str, tuple[str, ...], bool]]:
     """Every word of the document, in order, paired with the heading trail
     active at that word.
 
@@ -51,39 +49,56 @@ def _words_with_paths(document: NormalizedDocument) -> list[tuple[str, tuple[str
     nesting a numbered thesis outline produces. Every word up to the next
     heading inherits the path built so far, with the document title always
     first, so a word with no enclosing heading yet still gets a valid path.
+
+    The depths the headings' own numbering claims are read in one pass up
+    front (IR-314), because an ambiguous single letter can only be resolved
+    against the sequence it sits in — see `numbering.py`.
     """
+    elements = [element for element in document.elements if element.text.split()]
+    heading_positions = [
+        position
+        for position, element in enumerate(elements)
+        if element.kind == HEADING
+    ]
+    # Keyed by position rather than zipped alongside, so the depths cannot
+    # drift out of step with the headings they were derived from.
+    claimed_depths = dict(
+        zip(
+            heading_positions,
+            outline_depths([elements[p].text for p in heading_positions]),
+        )
+    )
+
     words_with_paths: list[tuple[str, tuple[str, ...], bool]] = []
     # (level, text, numbered) — `numbered` is what lets an unnumbered heading
     # be placed relative to the outline rather than on top of it.
     stack: list[tuple[int, str, bool]] = []
 
-    for element in document.elements:
-        words = element.text.split()
-        if not words:
-            continue
+    for position, element in enumerate(elements):
         is_heading = element.kind == HEADING
         if is_heading:
-            level = _effective_level(element, stack)
+            depth = claimed_depths[position]
+            level = _effective_level(element, stack, depth)
             stack = [entry for entry in stack if entry[0] < level]
-            stack.append((level, element.text.strip(), _is_numbered(element.text)))
+            stack.append((level, element.text.strip(), depth is not None))
         path = (document.title,) + tuple(text for _, text, _ in stack)
-        words_with_paths.extend((word, path, is_heading) for word in words)
+        words_with_paths.extend(
+            (word, path, is_heading) for word in element.text.split()
+        )
 
     return words_with_paths
 
 
-def _is_numbered(text: str) -> bool:
-    """Whether a heading opens with a section number — `3`, `3.2`, `2.1.1`."""
-    return _SECTION_NUMBER.match(text.strip()) is not None
-
-
 def _effective_level(
-    element, stack: list[tuple[int, str, bool]]
+    element, stack: list[tuple[int, str, bool]], claimed_depth: Optional[int]
 ) -> int:
     """The level at which a heading should sit in the outline.
 
-    A numbered heading keeps the level it was given: IR-242 already derives
-    that from its own numbering, and the numbering is the outline.
+    A **numbered** heading sits at the depth its own numbering claims, as a
+    floor rather than a ceiling: a heading the extractor has genuinely
+    resolved as deeper keeps that. The numbering is the outline — Docling
+    reports level 1 for every heading it finds (IR-242), so without this a
+    document collapses to a depth-1 trail.
 
     An **unnumbered** heading is placed one level *below* the deepest numbered
     entry currently open, rather than at whatever level the extractor guessed
@@ -101,13 +116,16 @@ def _effective_level(
     from the heading alone. The exchange is deliberate: it costs a wrong parent
     on a handful of trailing sections and buys a correct parent for the 61,
     and in both cases the heading itself is still the nearest entry in its own
-    trail. Telling them apart needs the document's numbering *sequence*, which
-    is the same document-level context IR-242's recorded false positive wants;
-    when that lands, this rule should be revisited with it.
+    trail. Telling them apart needs the document's numbering *sequence*.
+    IR-314 now reads that sequence — `numbering.py` uses it to resolve a
+    letter that is also a roman numeral — but it reads it only to classify
+    each heading, not to judge whether an unnumbered one is really a peer of
+    the sections around it. That judgement is still open, and this rule
+    should be revisited when it is made.
     """
     declared = element.level if element.level is not None else 1
-    if _is_numbered(element.text):
-        return declared
+    if claimed_depth is not None:
+        return max(declared, claimed_depth)
 
     deepest_numbered = max(
         (level for level, _, numbered in stack if numbered), default=0
