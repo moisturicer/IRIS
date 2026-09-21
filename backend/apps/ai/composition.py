@@ -45,7 +45,7 @@ form; saying so beats implying this is already the resilient path.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from apps.ai.answers.service import GroundedAnswerService
 from apps.ai.providers.ports import EmbeddingProvider, LLMProvider, Reranker
@@ -56,6 +56,9 @@ from apps.ai.retrieval.two_stage import TwoStageRetriever
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.resilience.rate_limit import RateLimited
 from apps.records.models import Record
+
+if TYPE_CHECKING:
+    from apps.ai.resolution import QuestionResolver
 
 
 def _vendor_failures() -> tuple[type[BaseException], ...]:
@@ -91,12 +94,14 @@ class CompositionRoot:
         embedder: Optional[EmbeddingProvider] = None,
         reranker: Optional[Reranker] = None,
         llm: Optional[LLMProvider] = None,
+        resolver: Optional["QuestionResolver"] = None,
         permits: Callable[[Record], bool] = disclosure_permits,
         policy_enabled: bool = True,
     ) -> None:
         self._embedder = embedder
         self._reranker = reranker
         self._llm = llm
+        self._resolver = resolver
         self._permits = permits
         self._policy_enabled = policy_enabled
 
@@ -126,6 +131,40 @@ class CompositionRoot:
 
             self._llm = OpenAICompatibleAdapter()
         return self._llm
+
+    def resolver(self) -> Optional["QuestionResolver"]:
+        """The follow-up rewriter, or ``None`` when resolution is switched off.
+
+        Independently switchable (ADR-026 Decision 8, IR-296) behind
+        ``AI_QUESTION_RESOLUTION_ENABLED`` -- a caller treats ``None`` as
+        "skip resolution entirely", which is what makes retrieval quality
+        with and without it measurable under ADR-023. An injected resolver
+        (a test's ``QuestionResolver`` over a ``ScriptedLLM``) is used
+        verbatim and bypasses the setting, the same shape every other vendor
+        seam on this root uses.
+
+        Built with the default Django cache rather than deferred like the
+        query-vector cache: resolution caching needs no ``EmbeddingSpace``
+        id, so there is no equivalent reason to leave it unwired.
+        """
+        if self._resolver is None:
+            from django.conf import settings
+
+            if not getattr(settings, "AI_QUESTION_RESOLUTION_ENABLED", True):
+                return None
+
+            from django.core.cache import cache
+
+            from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
+            from apps.ai.resolution import QuestionResolver
+
+            self._resolver = QuestionResolver(
+                llm=OpenAICompatibleAdapter(
+                    model=getattr(settings, "LLM_RESOLUTION_MODEL", None) or None
+                ),
+                cache=cache,
+            )
+        return self._resolver
 
     def generation_configured(self) -> bool:
         """Whether a model would actually answer, without calling one.

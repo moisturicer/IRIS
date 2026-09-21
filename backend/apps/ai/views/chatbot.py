@@ -27,6 +27,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+from apps.ai import resolution
 from apps.ai.composition import composition_root
 from apps.ai.conversations import record_turn
 from apps.ai.models import Conversation
@@ -100,6 +101,19 @@ def _conversation_for(request):
         raise Http404
 
 
+def _recent_turns(conversation: Conversation) -> list:
+    """The Conversation's most recent Turns, oldest first.
+
+    Bounded at the source rather than sliced after loading: a long
+    conversation must not pull every Turn it ever had just to resolve one
+    follow-up (IR-296). What resolution sees as history today; the answering
+    prompt does not consult this yet.
+    """
+    return list(
+        conversation.turns.order_by("-id")[: resolution.MAX_HISTORY_TURNS]
+    )[::-1]
+
+
 class ChatQueryView(APIView):
     """
     POST /api/v1/ai/ask/
@@ -111,8 +125,16 @@ class ChatQueryView(APIView):
     ``conversation_id`` is optional and appends the question and its answer
     to that Conversation as a Turn (IR-295). Omitting it answers exactly as
     before and stores nothing: a one-off question needs no Conversation.
-    Nothing here reads the history yet — resolving a follow-up against it is
-    IR-296, and scoping retrieval to a Conversation's Record is IR-298.
+
+    **When the Conversation has history, the question is resolved into a
+    standalone one before retrieval runs** (IR-296, ADR-026) — "what about
+    its limitations?" becomes a question that names the paper. Retrieval and
+    synthesis both see the resolved question; the raw one is what gets
+    stored as ``question`` and shown back unchanged. Resolution is skipped
+    outright — no model call — on the first Turn and on a question with no
+    back-reference, and a failed resolution falls back to the raw question
+    rather than erroring. Scoping retrieval to a Conversation's Record is
+    IR-298.
     """
 
     permission_classes = [IsAuthenticated]
@@ -131,19 +153,32 @@ class ChatQueryView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        resolved_question = None
+        if conversation is not None:
+            resolver = composition_root().resolver()
+            if resolver is not None:
+                resolved_question = resolver.resolve(
+                    question, _recent_turns(conversation)
+                )
+        effective_question = resolved_question or question
+
         service = composition_root().answer_service(
             max_sources=_parse_top_k(request.data.get("top_k"))
         )
-        answer = service.answer(question, request.user)
+        answer = service.answer(effective_question, request.user)
         mode = answer_mode(answer.state)
 
         if conversation is not None:
-            record_turn(conversation, question, answer)
+            record_turn(conversation, question, answer, resolved_question)
 
         return Response(
             {
                 **answer_body(mode, answer.text),
                 "conversation_id": None if conversation is None else conversation.pk,
+                # What retrieval actually searched with, shown so a reader
+                # can see when IRIS guessed wrong (IR-296). Null whenever
+                # resolution did not run or changed nothing.
+                "resolved_question": resolved_question,
                 # A citation is an object: the record it belongs to, the page,
                 # and the quoted passage (IR-284). A bare record id asked a
                 # reader to find the sentence themselves.

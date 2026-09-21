@@ -10,6 +10,8 @@ quote; dropping is the fail-closed version of the same rule.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 from django.db import transaction
 
 from apps.ai.answers.citations import GroundedAnswer
@@ -23,7 +25,10 @@ TITLE_LENGTH = 200
 
 @transaction.atomic
 def record_turn(
-    conversation: Conversation, question: str, answer: GroundedAnswer
+    conversation: Conversation,
+    question: str,
+    answer: GroundedAnswer,
+    resolved_question: Optional[str] = None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -34,10 +39,15 @@ def record_turn(
     The stored ``state`` is the **domain** one, not the wire's name for it.
     Persisting the wire string would mean renaming an API constant silently
     reinterprets rows written years earlier.
+
+    ``resolved_question`` is ``None`` unless resolution ran and produced a
+    standalone question (IR-296) — stored blank in every other case, which is
+    the same fallback retrieval already took for that Turn.
     """
     turn = Turn.objects.create(
         conversation=conversation,
         question=question,
+        resolved_question=resolved_question or "",
         answer=answer.text or "",
         state=answer.state,
         degraded=answer.degraded,
@@ -81,6 +91,7 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
             **answer_body(answer_mode(turn.state), turn.answer),
             "id": turn.pk,
             "question": turn.question,
+            "resolved_question": turn.resolved_question or None,
             "state": answer_mode(turn.state),
             "degraded": turn.degraded,
             "created_at": turn.created_at,
