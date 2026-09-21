@@ -13,11 +13,18 @@ class EstimateTests:
     def test_an_empty_string_costs_nothing(self):
         assert estimate_tokens("") == 0
 
-    def test_the_estimate_never_undercounts_words(self):
-        """It is a ceiling check. Undercounting is how a batch sails past the
-        vendor limit and 400s; overcounting only costs an extra request."""
-        text = "alpha beta gamma delta"
-        assert estimate_tokens(text) >= len(text.split())
+    def test_it_is_the_tokenizer_the_chunker_counts_with(self):
+        """One definition of a token (IR-287).
+
+        This was a words-times-1.4 approximation while the domain carried no
+        tokenizer. It carries the real one now, and an estimate that could
+        disagree with the chunker was a second source of truth waiting to
+        drift -- in the direction that sails past the vendor limit and 400s.
+        """
+        from apps.ai.chunking.tokens import count_tokens
+
+        text = "Clearance-aware resubmission preserves non-invalidated clearances."
+        assert estimate_tokens(text) == count_tokens(text)
 
 
 class BatchingTests:

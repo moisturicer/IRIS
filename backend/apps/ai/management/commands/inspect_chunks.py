@@ -10,6 +10,10 @@ and bibliography actually chunk to.
 It only reads. Re-chunking with a different ceiling is a configuration
 change (``AI_CHUNK_MAX_TOKENS``) followed by re-running the ingestion task
 with ``force=True``, which is the same path production takes.
+
+The token counts printed below are real ``voyage-context-4`` tokens as of
+IR-287. They were whitespace word counts before it, so a distribution read
+from an older run is not comparable to one read from this command today.
 """
 
 import json

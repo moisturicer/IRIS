@@ -180,10 +180,10 @@ A `ChunkSet` exists so that "the chunks of this document" is a single value you 
 @dataclass(frozen=True)
 class ChunkingOptions:
     strategy: str = "structural-markdown"   # or "hierarchical", "fixed-window"
-    max_tokens: int = 512
-    min_tokens: int = 64          # below this, merge with a neighbour
+    max_tokens: int = 700         # real voyage-context-4 tokens (IR-287)
+    min_tokens: int | None = None  # None derives it: min(88, max_tokens // 8)
     overlap_tokens: int = 0       # structural chunking rarely needs overlap
-    context_path_max_tokens: int = 48
+    context_path_max_tokens: int = 64
     merge_short_siblings: bool = True
     repeat_table_header: bool = True
 ```
@@ -391,18 +391,33 @@ Two structural rules carry over verbatim from teammind's `handleTable` and `hand
 
 Neither reference implementation does this, and both corpora suffer for it. A thesis produces many 15-token chunks — a heading followed by one sentence, a figure caption, a single table row. Each costs a full embedding call and each retrieves noisily.
 
-> **The unit is words, not tokens (IR-243, 2026-09-15).** `count_tokens` is `len(text.split())` — a deliberate
-> whitespace estimator, so the count is deterministic across processes and versions and the pure domain carries no
-> vendor tokenizer. The consequence had never been measured: on a real 47-page submission an IRIS chunk at the
-> ceiling holds **511 words**, where docling-core's `HybridChunker(max_tokens=512)` — a real BPE tokenizer, same
-> source PDF — caps at **355 words**. So `max_tokens=512` here is ~44% more real tokens than it reads as, and the
-> equivalent of that reference default is nearer **360**.
+> **The unit is real tokens, and 700 means 700 (IR-287, 2026-09-21).** It was not always. Until IR-287
+> `count_tokens` was `len(text.split())` — a whitespace estimator chosen so the count was deterministic across
+> processes and versions and the pure domain carried no vendor tokenizer. IR-243 measured the consequence on a real
+> 47-page submission: an IRIS chunk at the ceiling held **511 words**, where docling-core's
+> `HybridChunker(max_tokens=512)` capped at **355** on the same PDF, so `max_tokens=512` was ~44% more real tokens
+> than it read as.
 >
-> **The default was deliberately not changed.** Nothing overflows (`voyage-context-4` has the context), and what
-> the right ceiling is for theses is a retrieval-quality question that [section 14](#14-open-questions) already
-> lists as open — IR-133's recall@10 harness is what can answer it. Recalibrating now would substitute taste for
-> that measurement and re-chunk the corpus on a guess. Swapping in a real tokenizer later is safe regardless:
-> `token_count` is excluded from the chunk-set hash exactly so it does not stale the corpus.
+> `count_tokens` now uses the tokenizer `voyage-context-4` itself uses — a Qwen2 BPE vocabulary, vendored at
+> `apps/ai/chunking/tokenizer/voyage-context-4.json`, pinned by SHA-256, with HuggingFace's `tokenizers` pinned in
+> `requirements/base.txt`. Nothing is downloaded at build or run time, the determinism the whitespace count was
+> chosen for is preserved by pinning both halves, and the domain still carries no vendor SDK.
+>
+> **IR-287 changed the unit, not the size.** The ceiling moved 512 → 700 in the same change, because switching the
+> counter alone would have shrunk every chunk by ~30% — choosing a new chunk size by implication, which is exactly
+> what IR-243 refused to do without evidence. `tests/test_token_unit_migration.py` chunks the same prose document
+> under both regimes and asserts the boundaries are identical. The ratio is a property of the material, not a
+> constant: ~1.13 on clean flowing prose, ~1.37 on the real Docling-extracted submission 700 is calibrated on, ~1.7
+> on dense technical markdown.
+>
+> **What the right ceiling is for theses is still open** — [section 14](#14-open-questions) lists it, and IR-133's
+> recall@10 harness is what can answer it. The difference is that the number now means what it says. Re-tuning is
+> safe regardless: `token_count` is excluded from the chunk-set hash exactly so it does not stale the corpus.
+>
+> Two consequences of a real tokenizer that word counting hid, both fixed in the same change: a **single word can
+> now exceed the ceiling** (the grapheme-safe last resort caps its character budget at `max_tokens`, since a token
+> is never shorter than a character), and **token counts are not additive across a join** — packing counts the
+> window as its caller will assemble it rather than summing its pieces.
 
 `min_tokens` with `merge_short_siblings` folds a chunk below the floor into its next sibling **within the same heading section**. Never across a heading boundary: that would merge two unrelated topics into one vector, which is exactly the failure the context path is trying to prevent.
 
@@ -942,7 +957,7 @@ Fixture PDFs through the whole path: a text-layer thesis, a scanned thesis, one 
 Fifty labelled questions, as specified in the [third-party services document](rag_third_party_services_architecture.md#p9--without-a-retrieval-eval-set-every-vendor-choice-is-a-guess). For the chunker specifically, it answers the questions no unit test can:
 
 - Does the context path improve recall@10? *(Expected: yes, substantially.)*
-- What is the best `max_tokens` for this corpus? *(256, 512, 1024 — measure, don't guess.)*
+- What is the best `max_tokens` for this corpus? *(measure, don't guess — and since IR-287 the number is real tokens, so 512/700/1024 mean what they say.)*
 - Does `structural-markdown` beat `fixed-window`? *(If not, delete the complexity.)*
 - Does reranking beat widening recall?
 
@@ -991,7 +1006,7 @@ PgBouncer in transaction mode · Redis-backed shared rate limiting across replic
 
 Genuinely undecided — each needs either a measurement or a decision that is not mine to make.
 
-**What is the right `max_tokens` for theses?** 512 is the default in both reference implementations and a reasonable prior. Research documents have long, self-contained methodology paragraphs that may favour 1024. Measure on the eval set.
+**What is the right `max_tokens` for theses?** 700 real tokens is the shipped default, chosen by IR-287 as the measured equivalent of the 512 *words* it replaced rather than as a retrieval decision. Research documents have long, self-contained methodology paragraphs that may favour 1024. Measure on the eval set.
 
 **Should chunks span section boundaries at all?** Strict structural chunking never merges across a heading. That produces some very short chunks and preserves topical purity. `merge_short_siblings` relaxes it within a section. Whether to relax it further is an empirical question.
 
