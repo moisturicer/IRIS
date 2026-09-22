@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("ai", "0009_turn_resolved_question"),
+        ("ai", "0010_turn_embedding"),
     ]
 
     operations = [
