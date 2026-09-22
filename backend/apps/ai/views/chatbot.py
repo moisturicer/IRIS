@@ -19,7 +19,9 @@ The views hold no wiring. They parse a request, ask the composition root for a
 retriever or an answer service, and shape the reply — which is what makes the
 whole path drivable from a test with deterministic fakes.
 """
-from django.http import Http404
+import json
+
+from django.http import Http404, StreamingHttpResponse
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -28,6 +30,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai import resolution
+from apps.ai.answers.events import CitationsResolved, Done, RetrievalFinished, TextDelta
 from apps.ai.composition import composition_root
 from apps.ai.conversations import record_turn
 from apps.ai.models import Conversation
@@ -216,6 +219,143 @@ class ChatQueryView(APIView):
                 "widened": widened,
             }
         )
+
+
+def _sse(event_name: str, data: dict) -> str:
+    return f"event: {event_name}\ndata: {json.dumps(data)}\n\n"
+
+
+class ChatStreamView(APIView):
+    """
+    POST /api/v1/ai/ask/stream/
+
+    The same question `ChatQueryView` answers, as Server-Sent Events instead
+    of one JSON body -- a reader-facing progress line as retrieval and
+    generation happen, rather than a silent wait (IR-326). `/ask/` above is
+    untouched and unrelated to this view beyond sharing its request parsing;
+    a caller picks one endpoint, not both.
+
+    Event vocabulary, in order: `retrieval_started`, `retrieval_finished`
+    (a passage/record count for the progress line), `generation_started`,
+    `text_delta` (repeated), `citations_resolved`, `done` (the same
+    `answer`/`citations`/`sources`/`mode`/`degraded`/`widened` shape
+    `ChatQueryView` returns, so a client ends up in an identical state
+    either way). A memory recall (IR-297) gets no event of its own --
+    folded silently into retrieval, matching the synchronous path's own
+    ordering. `generation_started` and every event after it are skipped
+    outright when there are no readable sources to answer from.
+
+    **This stays a plain synchronous view.** Retrieval, the disclosure gate,
+    memory recall and persistence are the exact same synchronous calls
+    `ChatQueryView` makes; under the ASGI deployment ADR-017 requires,
+    Django's own ASGI handler is what bridges a synchronous view's
+    `StreamingHttpResponse` onto the event loop -- pulling `streaming_content`
+    one chunk at a time via `sync_to_async` internally -- so there is no
+    async plumbing to write by hand here.
+
+    **Recorded limitation.** `composition_root().llm()` wraps the adapter in
+    retry, circuit-breaking and (if configured) fallback decorators
+    (IR-321), none of which override `LLMProvider.stream()` -- so against
+    the real configured model, this endpoint still narrates retrieval
+    incrementally but receives generation as one `text_delta` once the
+    whole answer is back, exactly as `LLMProvider.stream()`'s own default
+    behaves. Only a provider given no resilience wrapping (`ScriptedLLM` in
+    a test, or a bare `OpenAICompatibleAdapter`) streams token by token
+    today. Making the resilience decorators pass a stream through -- rather
+    than buffering it to retry or fail over on -- is follow-up work, not
+    this ticket's.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AIQueryThrottle]
+
+    def post(self, request):
+        conversation = _conversation_for(request)
+        question = (request.data.get("question") or "").strip()
+        if not question:
+            return Response(
+                {"detail": "question is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if len(question) > MAX_QUESTION_LENGTH:
+            return Response(
+                {"detail": f"question must be at most {MAX_QUESTION_LENGTH} characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        history = _recent_turns(conversation) if conversation is not None else []
+
+        resolved_question = None
+        if conversation is not None:
+            resolver = composition_root().resolver()
+            if resolver is not None:
+                resolved_question = resolver.resolve(question, history)
+        effective_question = resolved_question or question
+
+        widen = bool(request.data.get("widen"))
+        scoped_to = conversation.record if conversation is not None else None
+        widened = scoped_to is not None and widen
+        scope_record = None if widened else scoped_to
+
+        service = composition_root().answer_service(
+            max_sources=_parse_top_k(request.data.get("top_k")),
+            record=scope_record,
+        )
+
+        def event_source():
+            for event in service.answer_stream(
+                effective_question,
+                request.user,
+                conversation=conversation,
+                history=history,
+            ):
+                if isinstance(event, RetrievalFinished):
+                    yield _sse(
+                        event.name,
+                        {
+                            "passage_count": event.passage_count,
+                            "record_count": event.record_count,
+                            "degraded": event.degraded,
+                        },
+                    )
+                elif isinstance(event, TextDelta):
+                    yield _sse(event.name, {"text": event.text})
+                elif isinstance(event, CitationsResolved):
+                    yield _sse(event.name, {"citations": citations(event.citations)})
+                elif isinstance(event, Done):
+                    answer = event.answer
+                    mode = answer_mode(answer.state)
+                    if conversation is not None:
+                        record_turn(
+                            conversation, question, answer, resolved_question, widened
+                        )
+                    yield _sse(
+                        event.name,
+                        {
+                            **answer_body(mode, answer.text),
+                            "conversation_id": (
+                                None if conversation is None else conversation.pk
+                            ),
+                            "resolved_question": resolved_question,
+                            "citations": citations(answer.citations),
+                            "sources": record_sources(answer.sources),
+                            "mode": mode,
+                            "degraded": answer.degraded,
+                            "widened": widened,
+                        },
+                    )
+                else:
+                    # RetrievalStarted, GenerationStarted -- no payload
+                    # beyond the event name itself.
+                    yield _sse(event.name, {})
+
+        response = StreamingHttpResponse(
+            event_source(), content_type="text/event-stream"
+        )
+        response["Cache-Control"] = "no-cache"
+        # nginx buffers a proxied response by default, which would turn this
+        # into one delayed burst instead of a stream -- see `nginx.conf`.
+        response["X-Accel-Buffering"] = "no"
+        return response
 
 
 class SemanticSearchView(APIView):

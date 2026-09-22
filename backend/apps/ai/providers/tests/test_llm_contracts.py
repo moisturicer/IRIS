@@ -134,6 +134,36 @@ class DefaultStreamWrappingTests:
         assert provider.calls == [("rules", "question")]
 
 
+class ScriptedStreamingTests:
+    """`ScriptedLLM(stream_deltas=...)` (IR-326): a deterministic multi-chunk
+    stream for a test that wants to observe deltas arriving one at a time,
+    without a vendor account."""
+
+    def test_the_scripted_deltas_are_yielded_in_order(self):
+        deltas = [StreamDelta(text="Sampling "), StreamDelta(text="was weekly [1].")]
+        provider = ScriptedLLM(stream_deltas=deltas)
+
+        assert list(provider.stream(system="s", user="u")) == deltas
+
+    def test_a_scripted_stream_records_its_call_without_calling_generate(self):
+        provider = ScriptedLLM(
+            reply="never used", stream_deltas=[StreamDelta(text="x")]
+        )
+        list(provider.stream(system="rules", user="question"))
+
+        assert provider.calls == [("rules", "question")]
+
+    def test_with_no_deltas_given_streaming_still_falls_back_to_the_default(self):
+        """No script (`stream_deltas=None`, the default) is not the same as
+        an empty one -- it means "behave like every other fake", which is
+        `LLMProvider.stream`'s single-delta wrap of `generate`."""
+        provider = ScriptedLLM(reply="Based on the sources, yes [1].")
+
+        assert list(provider.stream(system="s", user="u")) == [
+            StreamDelta(text="Based on the sources, yes [1].", reasoning="")
+        ]
+
+
 class StreamingAdapterTests:
     """`OpenAICompatibleAdapter.stream` (IR-325): genuine streaming, not the
     default's one-shot wrap -- multiple deltas, a separate reasoning channel,
