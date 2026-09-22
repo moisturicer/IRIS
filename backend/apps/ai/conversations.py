@@ -119,6 +119,10 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
                 if citation.chunk_id is not None
             },
             deleted_at__isnull=True,
+        # Exactly the fields `_resolve_citation` reads. Deferred, not
+        # excluded -- accessing anything else here fires a silent
+        # per-instance query, so a field this helper starts reading must be
+        # added here too.
         ).only("content", "source_page", "context_path")
     }
 
