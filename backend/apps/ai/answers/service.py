@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 from .citations import (
     NO_SOURCES,
+    PARTIAL,
     SYSTEM_PROMPT,
     UNAVAILABLE,
     GroundedAnswer,
@@ -205,6 +206,7 @@ class GroundedAnswerService:
         user,
         conversation: Optional["Conversation"] = None,
         history: Sequence["Turn"] = (),
+        on_interrupted: Optional[Callable[[GroundedAnswer], None]] = None,
     ) -> Iterator[AnswerEvent]:
         """`answer`, event by event, for a reader-facing progress line
         (IR-326).
@@ -228,61 +230,127 @@ class GroundedAnswerService:
         the filter classifies as text ever reaches ``raw_parts`` -- the
         buffer citation parsing and the stored ``Turn.answer`` are built
         from -- so leaked reasoning can corrupt neither.
+
+        **`on_interrupted` is the one seam a caller needs for IR-328.** A
+        `finally` around the whole method calls it, exactly once, with
+        whatever text and sources had been accumulated -- but only when the
+        method is exiting *without* having reached its own `Done`, tracked
+        by the plain `completed` flag rather than inferred from where the
+        exit happened. That makes it fire identically whichever of the
+        cause-agnostic ways this can end: a caller closing the generator
+        early (disconnect), an exception this method does not otherwise
+        catch (an unexpected vendor error), or anything else. Never called
+        on a normal `Done` -- including the `NO_SOURCES` and `UNAVAILABLE`
+        branches below, which are already complete, honestly-stated answers,
+        not truncated ones.
         """
-        yield RetrievalStarted()
-        retrieved, sources = self._retrieve_and_gate(question, user)
-        yield RetrievalFinished(
-            passage_count=len(sources),
-            record_count=len({s.record_id for s in sources}),
-            degraded=retrieved.degraded,
-        )
-        if not sources:
-            yield Done(self._no_sources_answer(retrieved))
-            return
-
-        recalled = self._recall(retrieved, conversation, history)
-
-        yield GenerationStarted()
+        completed = False
+        retrieved = None
+        sources: list[RetrievedChunk] = []
         raw_parts: list[str] = []
         had_reasoning = False
-
-        def classified(text_part: str, reasoning_part: str) -> Iterator[AnswerEvent]:
-            """One `(text, reasoning)` pair, as whichever events it implies --
-            shared by every source of a pair: the vendor's own `reasoning`
-            field, and `ThinkTagFilter`'s split of `.text`, mid-stream or on
-            `flush()`. `had_reasoning` and `raw_parts` are this method's own
-            state, so this closes over them rather than returning something
-            the caller would just apply right back.
-            """
-            nonlocal had_reasoning
-            if reasoning_part:
-                had_reasoning = True
-                yield ReasoningDelta(text=reasoning_part)
-            if text_part:
-                raw_parts.append(text_part)
-                yield TextDelta(text=text_part)
-
-        leak_filter = ThinkTagFilter()
         try:
-            for delta in self._llm.stream(
-                system=SYSTEM_PROMPT,
-                user=build_prompt(question, sources, history=history, recalled=recalled),
-            ):
-                yield from classified("", delta.reasoning)
-                if delta.text:
-                    yield from classified(*leak_filter.feed(delta.text))
-        except LLMUnavailable as exc:
-            logger.warning("answer generation unavailable: %s", exc)
-            yield Done(self._unavailable_answer(retrieved, sources, had_reasoning))
-            return
+            yield RetrievalStarted()
+            retrieved, sources = self._retrieve_and_gate(question, user)
+            yield RetrievalFinished(
+                passage_count=len(sources),
+                record_count=len({s.record_id for s in sources}),
+                degraded=retrieved.degraded,
+            )
+            if not sources:
+                completed = True
+                yield Done(self._no_sources_answer(retrieved))
+                return
 
-        yield from classified(*leak_filter.flush())
+            recalled = self._recall(retrieved, conversation, history)
 
+            yield GenerationStarted()
+
+            def classified(text_part: str, reasoning_part: str) -> Iterator[AnswerEvent]:
+                """One `(text, reasoning)` pair, as whichever events it implies --
+                shared by every source of a pair: the vendor's own `reasoning`
+                field, and `ThinkTagFilter`'s split of `.text`, mid-stream or on
+                `flush()`. `had_reasoning` and `raw_parts` are this method's own
+                state, so this closes over them rather than returning something
+                the caller would just apply right back.
+                """
+                nonlocal had_reasoning
+                if reasoning_part:
+                    had_reasoning = True
+                    yield ReasoningDelta(text=reasoning_part)
+                if text_part:
+                    raw_parts.append(text_part)
+                    yield TextDelta(text=text_part)
+
+            leak_filter = ThinkTagFilter()
+            try:
+                for delta in self._llm.stream(
+                    system=SYSTEM_PROMPT,
+                    user=build_prompt(
+                        question, sources, history=history, recalled=recalled
+                    ),
+                ):
+                    yield from classified("", delta.reasoning)
+                    if delta.text:
+                        yield from classified(*leak_filter.feed(delta.text))
+            except LLMUnavailable as exc:
+                logger.warning("answer generation unavailable: %s", exc)
+                completed = True
+                yield Done(self._unavailable_answer(retrieved, sources, had_reasoning))
+                return
+
+            yield from classified(*leak_filter.flush())
+
+            raw = "".join(raw_parts)
+            text, citations = parse_citations(raw, sources)
+            _warn_if_citations_went_missing(raw, text, citations)
+            yield CitationsResolved(citations=citations)
+            completed = True
+            yield Done(
+                self._grounded_answer(retrieved, sources, text, citations, had_reasoning)
+            )
+        finally:
+            if not completed and on_interrupted is not None:
+                on_interrupted(
+                    self._partial_answer(retrieved, sources, raw_parts, had_reasoning)
+                )
+
+    @staticmethod
+    def _partial_answer(
+        retrieved,
+        sources: Sequence[RetrievedChunk],
+        raw_parts: Sequence[str],
+        had_reasoning: bool,
+    ) -> GroundedAnswer:
+        """Whatever text and sources had been accumulated when the stream cut
+        off, in the same `GroundedAnswer` shape a completed answer takes
+        (IR-328). Citation parsing runs exactly once here, over the
+        truncated text, precisely as it does on a clean completion --
+        never per delta, for the reasons `TextDelta` documents.
+
+        Deliberately skips `_warn_if_citations_went_missing`: an answer cut
+        off mid-sentence routinely ends mid-marker or before any marker at
+        all, and that is expected here, not the drifted-format anomaly that
+        check exists to surface.
+
+        `degraded` is always `True` -- not `retrieved.degraded`, which
+        answers a different question. Completeness is unknown, and that
+        alone is reason enough to ask a reader to weigh it carefully.
+        """
         raw = "".join(raw_parts)
         text, citations = parse_citations(raw, sources)
-        _warn_if_citations_went_missing(raw, text, citations)
-        yield CitationsResolved(citations=citations)
-        yield Done(self._grounded_answer(retrieved, sources, text, citations, had_reasoning))
+        return GroundedAnswer(
+            text=text,
+            citations=citations,
+            degraded=True,
+            state=PARTIAL,
+            sources=tuple(sources),
+            query_vector=None if retrieved is None else retrieved.query_vector,
+            embedding_space_id=(
+                None if retrieved is None else retrieved.embedding_space_id
+            ),
+            had_reasoning=had_reasoning,
+        )
 
     def _model_that_answered(self) -> Optional[str]:
         """Which model actually produced the answer just generated (IR-321).

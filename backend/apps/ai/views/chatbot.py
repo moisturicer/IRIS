@@ -318,6 +318,15 @@ class ChatStreamView(APIView):
     `generation_started` and every event after it are skipped outright when
     there are no readable sources to answer from.
 
+    **A stream that never reaches `done` still persists (IR-328).** Whatever
+    caused it -- a client disconnect, an unexpected vendor error, anything
+    else -- `answer_stream` calls `persist_partial` from its own `finally`,
+    which records a Turn exactly like a completed one except `state` is
+    `partial` and `degraded` is always true: the text is whatever arrived
+    before the cutoff, citation-parsed the same one time a clean completion
+    is, and a reopened transcript shows it as unfinished rather than as a
+    normal answer.
+
     **This stays a plain synchronous view.** Retrieval, the disclosure gate,
     memory recall and persistence are the exact same synchronous calls
     `ChatQueryView` makes; under the ASGI deployment ADR-017 requires,
@@ -352,12 +361,31 @@ class ChatStreamView(APIView):
             record=prepared.scope_record,
         )
 
+        def persist_partial(answer):
+            """The stream ended without a `Done` (IR-328) -- called from
+            inside `answer_stream`'s own `finally`, cause-agnostic to why:
+            a client disconnect closes this generator early, and an
+            exception the service does not otherwise catch propagates
+            through it, both landing here identically. Recorded exactly
+            like a completed Turn, through the same `record_turn`, and
+            skipped for a one-off ask with no Conversation to append to.
+            """
+            if prepared.conversation is not None:
+                record_turn(
+                    prepared.conversation,
+                    prepared.question,
+                    answer,
+                    prepared.resolved_question,
+                    prepared.widened,
+                )
+
         def event_source():
             for event in service.answer_stream(
                 prepared.effective_question,
                 request.user,
                 conversation=prepared.conversation,
                 history=prepared.history,
+                on_interrupted=persist_partial,
             ):
                 if isinstance(event, RetrievalFinished):
                     yield _sse(

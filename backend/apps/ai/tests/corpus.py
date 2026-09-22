@@ -15,7 +15,7 @@ from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.providers.fakes import ScriptedLLM, ScriptedReranker
 from apps.ai.providers.openai_compatible import LLMUnavailable
-from apps.ai.providers.ports import EmbeddingProvider, LLMProvider
+from apps.ai.providers.ports import EmbeddingProvider, LLMProvider, StreamDelta
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
@@ -110,6 +110,23 @@ class _BrokenEmbedder(EmbeddingProvider):
 class _BrokenLLM(LLMProvider):
     def generate(self, system, user):
         raise LLMUnavailable("429 rate limited")
+
+
+class _CutOffLLM(LLMProvider):
+    """A vendor mid-sequence cutoff (IR-328) -- some text arrives, then the
+    stream ends with an ordinary exception, not `LLMUnavailable`. That
+    distinction is the point: `LLMUnavailable` is a *diagnosed* vendor
+    failure with its own honest `done` (state `unavailable`); this is
+    everything else that can end a stream without one -- a socket reset, a
+    killed worker, anything cause-agnostic `Turn.state == "partial"` is for.
+    """
+
+    def generate(self, system, user):
+        raise NotImplementedError("this fake only exercises the streaming path")
+
+    def stream(self, system, user):
+        yield StreamDelta(text="Rainfall gauges feed the model [1]. ")
+        raise RuntimeError("connection reset")
 
 
 def root_with(embedder=None, llm=None, resolver=None):

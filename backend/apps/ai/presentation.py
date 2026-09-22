@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from typing import Iterable, Sequence
 
-from apps.ai.answers.citations import NO_SOURCES, UNAVAILABLE, Citation
+from apps.ai.answers.citations import NO_SOURCES, PARTIAL, UNAVAILABLE, Citation
 from apps.ai.retrieval.ports import RetrievedChunk
 from apps.records.models import Record
 
@@ -178,10 +178,15 @@ def citations(resolved: Iterable[Citation]) -> list[dict]:
 GENERATIVE_MODE = "generative"
 NO_RESULTS_MODE = "no_results"
 UNAVAILABLE_MODE = "unavailable"
+#: A stored Turn whose stream never reached `Done` (IR-328) -- the text is
+#: whatever arrived before the cutoff, not a complete answer, so a reopened
+#: transcript must say so rather than replaying it as `generative`.
+PARTIAL_MODE = "partial"
 
 _WIRE_MODE = {
     NO_SOURCES: NO_RESULTS_MODE,
     UNAVAILABLE: UNAVAILABLE_MODE,
+    PARTIAL: PARTIAL_MODE,
 }
 
 NO_RESULTS_MESSAGE = (
@@ -205,8 +210,13 @@ def answer_body(mode: str, text: str) -> dict:
     case, and the explanation in the unavailable one. The no-results wording
     is this layer's, not the service's, because it points a reader at Discover
     and the domain has no business knowing that screen exists.
+
+    A partial answer takes the generative branch too -- ``text`` is shown,
+    truncated as it is, rather than hidden, because some of it did arrive
+    and hiding it entirely would throw away more than the cutoff already
+    did. ``mode`` is what tells a client to render it as unfinished.
     """
-    if mode == GENERATIVE_MODE:
+    if mode in (GENERATIVE_MODE, PARTIAL_MODE):
         return {"answer": text, "message": None}
     if mode == NO_RESULTS_MODE:
         return {"answer": None, "message": NO_RESULTS_MESSAGE}

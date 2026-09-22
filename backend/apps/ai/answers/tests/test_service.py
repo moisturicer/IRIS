@@ -444,6 +444,109 @@ class StreamingTests:
         assert done.answer.citations == ()
 
 
+class InterruptedStreamTests:
+    """A stream that ends before its own `Done` (IR-328) -- `on_interrupted`
+    is the one seam a caller needs to persist that safely, cause-agnostic to
+    why it happened. Distinct from `_BreaksMidStream` above: `LLMUnavailable`
+    is a *diagnosed* vendor failure with its own honest `done` (state
+    `unavailable`); everything tested here is the stream simply not reaching
+    one at all.
+    """
+
+    def test_an_unexpected_vendor_error_calls_on_interrupted_with_a_partial_answer(
+        self, reader
+    ):
+        record = make_record("Thesis")
+
+        class _CrashesMidStream(LLMProvider):
+            def generate(self, system, user):
+                raise LLMUnavailable("429 rate limited")
+
+            def stream(self, system, user):
+                yield StreamDelta(text="Sampling was weekly [1]. ")
+                raise RuntimeError("connection reset")
+
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), _CrashesMidStream(), permits=lambda r: True
+        )
+
+        captured = []
+        events = []
+        with pytest.raises(RuntimeError):
+            for event in service.answer_stream(
+                "how often?", reader, on_interrupted=captured.append
+            ):
+                events.append(event)
+
+        # The crash is never hidden -- only persisted around.
+        assert [type(e) for e in events] == [
+            RetrievalStarted, RetrievalFinished, GenerationStarted, TextDelta,
+        ]
+        assert len(captured) == 1
+        partial = captured[0]
+        assert partial.state == "partial"
+        assert partial.degraded is True
+        # Citation parsing ran once, over the truncated text, same as a
+        # clean completion.
+        assert partial.text == "Sampling was weekly [1]."
+        assert partial.citations[0].record_id == record.pk
+
+    def test_on_interrupted_is_never_called_on_a_clean_completion(self, reader):
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM([StreamDelta(text="Sampling was weekly [1].")])
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        captured = []
+        list(
+            service.answer_stream("how often?", reader, on_interrupted=captured.append)
+        )
+
+        assert captured == []
+
+    def test_on_interrupted_is_never_called_on_an_unavailable_done(self, reader):
+        """`LLMUnavailable` already ends in an honest, complete `done` --
+        that is not a truncated answer, and must not be double-recorded as
+        one."""
+        record = make_record("Thesis")
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), _BreaksMidStream(), permits=lambda r: True
+        )
+
+        captured = []
+        list(
+            service.answer_stream("q?", reader, on_interrupted=captured.append)
+        )
+
+        assert captured == []
+
+    def test_a_caller_closing_the_generator_early_also_counts(self, reader):
+        """Not every interruption is an exception -- a client disconnect
+        looks like the caller simply stopping mid-iteration, which Python
+        surfaces as `GeneratorExit` once the generator is closed."""
+        record = make_record("Thesis")
+        llm = _StreamingLLM(
+            [StreamDelta(text="Sampling was "), StreamDelta(text="weekly [1].")]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        captured = []
+        gen = service.answer_stream(
+            "how often?", reader, on_interrupted=captured.append
+        )
+        for event in gen:
+            if isinstance(event, TextDelta):
+                break
+        gen.close()
+
+        assert len(captured) == 1
+        assert captured[0].state == "partial"
+        assert captured[0].text == "Sampling was"
+
+
 class ReasoningTests:
     """Reasoning is a structurally distinct channel throughout
     `answer_stream` (IR-327) -- both the vendor's own dedicated
