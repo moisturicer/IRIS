@@ -100,6 +100,47 @@ export default function RAGChatPage() {
     setMessages(data.turns.flatMap(turnToMessages));
   }, []);
 
+  /**
+   * Asks `question` on Conversation `conversationId` and appends both sides
+   * of the exchange, starting from `priorMessages` rather than always
+   * reading `messages` off state — the `?record=` deep link asks its
+   * question before `activeId`/`messages` have committed from `setState`,
+   * so it cannot go through `handleSend`'s read of that state.
+   */
+  const sendQuestion = useCallback(
+    async (conversationId: number, question: string, priorMessages: ChatMessage[]) => {
+      const nextMessages = [...priorMessages, newChatMessage("user", question)];
+      setMessages(nextMessages);
+
+      setLoading(true);
+      try {
+        const { data } = await aiApi.ask(question, { conversationId });
+        const body =
+          data.answer ?? data.message ?? "No readable sources matched that question.";
+        const assistantMsg = newChatMessage("assistant", body, {
+          citations: data.citations,
+          sources:   data.sources,
+          degraded:  data.degraded,
+          widened:   data.widened,
+        });
+        setMessages([...nextMessages, assistantMsg]);
+        if (data.citations?.length) {
+          setSourcesOpen(true);
+        }
+        refreshList();
+      } catch {
+        addToast({
+          type:    "error",
+          message: "IRIS could not answer right now. Check that the AI service is available.",
+        });
+        setMessages(nextMessages);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [addToast, refreshList],
+  );
+
   useEffect(() => {
     let cancelled = false;
     const recordId = searchParams.get("record");
@@ -114,8 +155,7 @@ export default function RAGChatPage() {
           const { data } = await aiApi.conversations.create({ record: Number(recordId) });
           if (cancelled) return;
           setActiveId(data.id);
-          setMessages([newChatMessage("user", prefill)]);
-          refreshList();
+          await sendQuestion(data.id, prefill, []);
           return;
         }
 
@@ -138,8 +178,8 @@ export default function RAGChatPage() {
     })();
 
     return () => { cancelled = true; };
-    // refreshList / loadConversation are stable (useCallback, no deps) —
-    // only a change to the `record` query param should re-run this.
+    // refreshList / loadConversation / sendQuestion are stable across
+    // renders — only a change to the `record` query param should re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -197,43 +237,9 @@ export default function RAGChatPage() {
     addToast({ type: "info", message: "Chat removed." });
   };
 
-  const handleSend = async (text: string) => {
+  const handleSend = (text: string) => {
     if (!activeId) return;
-
-    const userMsg = newChatMessage("user", text);
-    const nextMessages = [...messages, userMsg];
-    setMessages(nextMessages);
-
-    setLoading(true);
-    try {
-      const { data } = await aiApi.ask(text, { conversationId: activeId });
-      const body =
-        data.answer ?? data.message ?? "No readable sources matched that question.";
-      // ADR-008: a reader is told when an answer came the slow way. Carried on
-      // the message rather than spliced into its markdown, so the bubble
-      // renders it as its own labelled note and a test can find it by name.
-      const assistantMsg = newChatMessage("assistant", body, {
-        citations: data.citations,
-        sources:   data.sources,
-        degraded:  data.degraded,
-        widened:   data.widened,
-      });
-      setMessages([...nextMessages, assistantMsg]);
-      if (data.citations?.length) {
-        setSourcesOpen(true);
-      }
-      // The title names itself from the first question, and `updated_at`
-      // reorders the sidebar -- both are the server's doing now.
-      refreshList();
-    } catch {
-      addToast({
-        type:    "error",
-        message: "IRIS could not answer right now. Check that the AI service is available.",
-      });
-      setMessages(nextMessages);
-    } finally {
-      setLoading(false);
-    }
+    return sendQuestion(activeId, text, messages);
   };
 
   return (

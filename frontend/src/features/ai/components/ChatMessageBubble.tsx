@@ -2,16 +2,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { ChatMessage } from "@/types/chat";
-import type { ChatCitation, Citation } from "@/types/ai";
+import type { ChatCitation } from "@/types/ai";
+import { hasCitationQuote } from "@/lib/citedPage";
 import { AskIrisMark, GroundedCitationIcon } from "./AskIrisIcons";
 import { DegradedNotice, OpenPassageLink, PassageQuote, ScopeNotice } from "./PassageQuote";
 import "highlight.js/styles/github.min.css";
-
-/** Whether `citation` carries the quote and title a live answer has, rather
- * than only the pointer a replayed Turn has until IR-299 re-resolves them. */
-function hasQuote(citation: ChatCitation): citation is Citation {
-  return "text" in citation;
-}
 
 /**
  * One citation: the quote, the page, and a way to go and read it.
@@ -33,7 +28,7 @@ function hasQuote(citation: ChatCitation): citation is Citation {
  * no blockquote, no invented title.
  */
 function PassageCitation({ citation }: { citation: ChatCitation }) {
-  if (!hasQuote(citation)) {
+  if (!hasCitationQuote(citation)) {
     return (
       <div className="rounded-lg bg-[#6B0F12]/[0.04] border border-[#6B0F12]/10 px-2.5 py-2">
         <div className="flex items-baseline gap-1.5 flex-wrap">
