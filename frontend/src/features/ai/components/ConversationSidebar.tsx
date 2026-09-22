@@ -1,12 +1,12 @@
 import { cn, formatDate } from "@/lib/utils";
-import type { Conversation } from "@/types/chat";
+import type { ConversationSummary } from "@/types/ai";
 
 interface ConversationSidebarProps {
-  conversations:  Conversation[];
-  activeId:         string | null;
+  conversations:  ConversationSummary[];
+  activeId:         number | null;
   open:             boolean;
-  onSelect:         (id: string) => void;
-  onDelete:         (id: string) => void;
+  onSelect:         (id: number) => void;
+  onDelete:         (id: number) => void;
 }
 
 export function ConversationSidebar({
@@ -64,9 +64,11 @@ export function ConversationSidebar({
                       : "text-stone-700 hover:bg-stone-50"
                     }`}
                 >
-                  <span className="block text-[12px] font-semibold truncate pr-6">{c.title}</span>
+                  <span className="block text-[12px] font-semibold truncate pr-6">
+                    {c.title || "New conversation"}
+                  </span>
                   <span className="block text-[10px] text-stone-400 mt-0.5">
-                    {formatDate(c.updatedAt, "MMM d · h:mm a")}
+                    {formatDate(c.updated_at, "MMM d · h:mm a")}
                   </span>
                 </button>
                 <button

@@ -1,5 +1,12 @@
 import { apiClient } from "./client";
-import type { Passage, SemanticSearchResult, AIAnswer, AIStatus } from "@/types/ai";
+import type {
+  Passage,
+  SemanticSearchResult,
+  AIAnswer,
+  AIStatus,
+  ConversationSummary,
+  ConversationDetail,
+} from "@/types/ai";
 
 interface SemanticSearchResponse {
   /** Ranked Passages — the same shape an answer cites (IR-284). */
@@ -12,6 +19,18 @@ interface SemanticSearchResponse {
   message:  string | null;
 }
 
+interface AskOptions {
+  topK?: number;
+  /** Appends the question and its answer to this Conversation as a Turn (IR-295). */
+  conversationId?: number;
+  /**
+   * Search every paper instead of just the Conversation's Record, for this
+   * question only (IR-298, ADR-026 §9). Has no effect on an unscoped
+   * Conversation or a one-off question with no `conversationId`.
+   */
+  widen?: boolean;
+}
+
 export const aiApi = {
   /** Whether answers will be generated or retrieval-only, and how many records are indexed. */
   status: () => apiClient.get<AIStatus>("/ai/status/"),
@@ -21,8 +40,45 @@ export const aiApi = {
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
   /** Grounded answer plus the records it cites. */
-  ask: (question: string, topK = 5) =>
-    apiClient.post<AIAnswer>("/ai/ask/", { question, top_k: topK }),
+  ask: (question: string, { topK = 5, conversationId, widen }: AskOptions = {}) =>
+    apiClient.post<AIAnswer>("/ai/ask/", {
+      question,
+      top_k: topK,
+      conversation_id: conversationId,
+      widen,
+    }),
+
+  conversations: {
+    /** The caller's own Conversations, most recent first — optionally the
+     * one(s) scoped to a single Record, for Paper Chat to continue (IR-298). */
+    list: (params?: { record?: number }) =>
+      apiClient.get<ConversationSummary[]>("/ai/conversations/", { params }),
+
+    /** Start a Conversation, optionally scoped to a Record. */
+    create: (body: { record?: number; title?: string } = {}) =>
+      apiClient.post<ConversationDetail>("/ai/conversations/", body),
+
+    get: (id: number) =>
+      apiClient.get<ConversationDetail>(`/ai/conversations/${id}/`),
+
+    remove: (id: number) => apiClient.delete(`/ai/conversations/${id}/`),
+
+    /**
+     * The Conversation already scoped to this Record, or a new one if none
+     * exists yet — what Paper Chat opens on (IR-298). Kept next to the calls
+     * it composes rather than in the component, so the "find one, else start
+     * one" decision lives with the data it is about.
+     */
+    findOrCreateForRecord: async (recordId: number): Promise<{ data: ConversationDetail }> => {
+      const { data: existing } = await apiClient.get<ConversationSummary[]>(
+        "/ai/conversations/",
+        { params: { record: recordId } },
+      );
+      return existing[0]
+        ? apiClient.get<ConversationDetail>(`/ai/conversations/${existing[0].id}/`)
+        : apiClient.post<ConversationDetail>("/ai/conversations/", { record: recordId });
+    },
+  },
 };
 
 // NOTE: summarize / embed endpoints are intentionally absent — apps.ai has no

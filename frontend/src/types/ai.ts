@@ -93,6 +93,72 @@ export interface AIAnswer {
   mode:      AIAnswerMode;
   /** True when retrieval fell back to keyword matching because the vendor was out. */
   degraded:  boolean;
+  /**
+   * The Conversation this Turn was appended to, or null for a one-off
+   * question that stored nothing (IR-295).
+   */
+  conversation_id: number | null;
+  /**
+   * What retrieval actually searched with, when a follow-up was rewritten
+   * into a standalone question (IR-296). Null whenever resolution did not
+   * run or changed nothing.
+   */
+  resolved_question: string | null;
+  /**
+   * True when this answer left its Conversation's Record scope because the
+   * caller asked to search all papers instead of just the one being read
+   * (IR-298, ADR-026 §9). Always false with no scope to have left.
+   */
+  widened: boolean;
+}
+
+/**
+ * One citation as a stored Turn replays it (IR-295).
+ *
+ * A stored citation is a pointer only — record id, chunk id, page — never the
+ * quoted text or the record's title, so `record_title`, `text` and
+ * `context_path` are absent here where a live `Citation` always carries them.
+ * Re-resolving those at read time is IR-299; until then a replayed citation
+ * renders as a bare link rather than a quote.
+ */
+export interface ReplayedCitation {
+  marker:    number;
+  record_id: number;
+  chunk_id:  number | null;
+  page:      number | null;
+}
+
+/** A Passage citation, live or replayed — what the chat UI actually renders. */
+export type ChatCitation = Citation | ReplayedCitation;
+
+/** One question-and-answer pair in a persisted Conversation (IR-295). */
+export interface ConversationTurn {
+  id:                 number;
+  question:           string;
+  resolved_question:  string | null;
+  answer:             string | null;
+  message:            string | null;
+  state:              AIAnswerMode;
+  degraded:           boolean;
+  widened:            boolean;
+  created_at:         string;
+  citations:          ReplayedCitation[];
+}
+
+/** A Conversation without its Turns — the shape a sidebar lists (IR-295). */
+export interface ConversationSummary {
+  id:            number;
+  title:         string;
+  record:        number | null;
+  record_title:  string | null;
+  turn_count:    number;
+  created_at:    string;
+  updated_at:    string;
+}
+
+/** One Conversation with its full transcript (IR-295). */
+export interface ConversationDetail extends ConversationSummary {
+  turns: ConversationTurn[];
 }
 
 export interface EmbeddingJobStatus {

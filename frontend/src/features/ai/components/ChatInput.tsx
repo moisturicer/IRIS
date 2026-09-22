@@ -40,6 +40,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           onKeyDown={handleKeyDown}
           disabled={disabled}
           rows={1}
+          aria-label={placeholder ?? "Ask about the research corpus…"}
           placeholder={placeholder ?? "Ask about the research corpus…"}
           className="flex-1 resize-none rounded-full border border-stone-200 bg-stone-50/80 px-5 py-3 text-[13px]
             outline-none focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12] focus:bg-white

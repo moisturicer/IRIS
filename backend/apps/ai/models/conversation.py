@@ -80,6 +80,14 @@ class Turn(models.Model):
     all three of which retrieve on `question` as written. Stored rather than
     re-derived because a wrong resolution silently changed what was asked, so
     it must be inspectable on replay rather than mysterious.
+
+    `widened` is true only when this Turn belonged to a Record-scoped
+    Conversation and the caller explicitly asked to search all papers instead
+    (IR-298, ADR-026 §9). False for every Turn in an unscoped Conversation,
+    since there was never a narrower scope to widen from. Stored rather than
+    inferred from the citations a Turn happens to carry, because a widened
+    question that still matched nothing outside its own paper would otherwise
+    look identical to one that was never widened at all.
     """
 
     conversation = models.ForeignKey(
@@ -90,6 +98,7 @@ class Turn(models.Model):
     answer = models.TextField(blank=True)
     state = models.CharField(max_length=20)
     degraded = models.BooleanField(default=False)
+    widened = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

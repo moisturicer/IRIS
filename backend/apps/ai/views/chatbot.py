@@ -96,7 +96,9 @@ def _conversation_for(request):
     except (TypeError, ValueError):
         raise Http404
     try:
-        return Conversation.objects.get(pk=pk, user=request.user)
+        return Conversation.objects.select_related("record").get(
+            pk=pk, user=request.user
+        )
     except Conversation.DoesNotExist:
         raise Http404
 
@@ -114,7 +116,7 @@ def _recent_turns(conversation: Conversation) -> list:
 class ChatQueryView(APIView):
     """
     POST /api/v1/ai/ask/
-    Body: {"question": str, "top_k": int?, "conversation_id": int?}
+    Body: {"question": str, "top_k": int?, "conversation_id": int?, "widen": bool?}
 
     Returns an answer grounded in passages the asker is permitted to read,
     with the records those passages came from.
@@ -130,8 +132,16 @@ class ChatQueryView(APIView):
     stored as ``question`` and shown back unchanged. Resolution is skipped
     outright — no model call — on the first Turn and on a question with no
     back-reference, and a failed resolution falls back to the raw question
-    rather than erroring. Scoping retrieval to a Conversation's Record is
-    IR-298.
+    rather than erroring.
+
+    **A Conversation scoped to a Record retrieves only that Record's
+    passages by default** (IR-298, ADR-026 §9). ``widen`` opts one question
+    out of that scope to search every paper instead — never automatic, and
+    never remembered onto the next question. It does nothing when the
+    Conversation carries no Record, or when there is no Conversation at all.
+    Whether this answer was actually widened travels back on the response as
+    ``widened`` and is stored on the Turn, so a reopened transcript can say
+    which scope produced each answer rather than guessing from its citations.
 
     **Recent Turns go into the answering prompt verbatim; older ones are
     found by memory recall, never summarised** (IR-297). The search vector
@@ -163,8 +173,17 @@ class ChatQueryView(APIView):
                 resolved_question = resolver.resolve(question, history)
         effective_question = resolved_question or question
 
+        # Widened only when there was a scope to widen *from* -- an unscoped
+        # Conversation, or no Conversation, was never narrower than "every
+        # paper", so `widen` has nothing to do there.
+        widen = bool(request.data.get("widen"))
+        scoped_to = conversation.record if conversation is not None else None
+        widened = scoped_to is not None and widen
+        scope_record = None if widened else scoped_to
+
         service = composition_root().answer_service(
-            max_sources=_parse_top_k(request.data.get("top_k"))
+            max_sources=_parse_top_k(request.data.get("top_k")),
+            record=scope_record,
         )
         answer = service.answer(
             effective_question, request.user, conversation=conversation, history=history
@@ -172,7 +191,7 @@ class ChatQueryView(APIView):
         mode = answer_mode(answer.state)
 
         if conversation is not None:
-            record_turn(conversation, question, answer, resolved_question)
+            record_turn(conversation, question, answer, resolved_question, widened)
 
         return Response(
             {
@@ -192,6 +211,9 @@ class ChatQueryView(APIView):
                 "sources": record_sources(answer.sources),
                 "mode": mode,
                 "degraded": answer.degraded,
+                # Whether this answer left its Conversation's Record scope
+                # (IR-298) -- always false with no scope to have left.
+                "widened": widened,
             }
         )
 

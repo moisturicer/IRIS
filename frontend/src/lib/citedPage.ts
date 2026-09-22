@@ -16,7 +16,20 @@
  * The other end of that link — building it from a citation — lives here too,
  * so the two halves of one URL cannot drift apart.
  */
-import type { Citation } from "@/types/ai";
+import type { ChatCitation, Citation } from "@/types/ai";
+
+/**
+ * Whether `citation` carries the quote and title a live answer has, rather
+ * than only the pointer a replayed Turn has until IR-299 re-resolves them.
+ *
+ * The one check both citation-rendering surfaces (the chat bubble and the
+ * sources panel) need to decide whether there is a quote to show at all —
+ * kept here, next to the other citation-shape helpers, so the two renderers
+ * cannot drift into checking this differently.
+ */
+export function hasCitationQuote(citation: ChatCitation): citation is Citation {
+  return "text" in citation;
+}
 
 /** The page a citation asked for, or null when it named none we can use. */
 export function citedPage(raw: string | null): number | null {
@@ -51,11 +64,16 @@ export function citationHref(citation: Pick<Citation, "record_id" | "page">): st
  * The record's name is in the link text rather than only beside it, so the
  * accessible name of every citation link is distinct — "Open" repeated eight
  * times tells a screen-reader user nothing about which source is which.
+ *
+ * `citation.record_title` is optional because a replayed citation (IR-298)
+ * is a stored pointer with no title of its own — a caller in that position
+ * always supplies `title` explicitly, and the fallback below only exists so
+ * this never renders "Open undefined" if one somehow does not.
  */
 export function openCitationLabel(
-  citation: Pick<Citation, "page" | "record_title">,
+  citation: Pick<Citation, "page"> & Partial<Pick<Citation, "record_title">>,
   title?: string,
 ): string {
-  const name = title ?? citation.record_title;
+  const name = title ?? citation.record_title ?? "the source";
   return citation.page != null ? `Open ${name} at page ${citation.page}` : `Open ${name}`;
 }

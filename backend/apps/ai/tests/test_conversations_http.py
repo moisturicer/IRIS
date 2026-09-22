@@ -26,12 +26,17 @@ from core.permissions import ROLE_ADVISER, ROLE_IERC, ROLE_KTTO
 from .corpus import (
     FLOOD_QUESTION,
     FLOOD_TEXT,
+    POND_TEXT,
     _BrokenLLM,
     ask,
     make_record,
     make_user,
     root_with,
 )
+
+#: A question that only matches the pond corpus -- used to tell "this answer
+#: came from the scoped record" apart from "this answer came from anywhere".
+POND_QUESTION = "tilapia pond sampling procedure brackish water"
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -104,6 +109,40 @@ class StartingAConversationTests:
         assert _without_pk(refused, hidden.pk) == _without_pk(
             missing, hidden.pk + 10_000
         )
+
+    def test_listing_can_be_filtered_to_the_conversation_for_one_record(
+        self, embedder, space, client_for
+    ):
+        """How Paper Chat finds the Conversation it already has for a paper,
+        rather than starting a new one every time the panel opens (IR-298)."""
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        pond = make_record(title="Tilapia Ponds", text=POND_TEXT,
+                           embedder=embedder, space=space)
+        client = client_for(reader)
+        for_flood = start(client, record=flood.pk).json()["id"]
+        start(client, record=pond.pk)
+        start(client)
+
+        listed = client.get(conversations_url(), {"record": flood.pk}).json()
+
+        assert [c["id"] for c in listed] == [for_flood]
+
+    def test_the_record_filter_only_ever_narrows_the_callers_own_list(
+        self, embedder, space, client_for
+    ):
+        owner = make_user("owner@cit.edu")
+        other = make_user("other@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        start(client_for(owner), record=flood.pk)
+
+        listed = client_for(other).get(
+            conversations_url(), {"record": flood.pk}
+        ).json()
+
+        assert listed == []
 
     def test_an_anonymous_caller_cannot_list_or_start_one(self):
         from rest_framework.test import APIClient
@@ -273,6 +312,162 @@ class AppendingTurnsTests:
         assert client.get(
             conversation_url(conversation_id)
         ).json()["title"] == FLOOD_QUESTION
+
+
+class ScopedRetrievalTests:
+    """A Conversation scoped to a Record retrieves only that Record's
+    passages by default, and only widens when explicitly asked (IR-298,
+    ADR-026 §9)."""
+
+    def test_a_scoped_conversation_only_retrieves_its_record(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        make_record(title="Tilapia Ponds", text=POND_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client, record=flood.pk).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client, FLOOD_QUESTION,
+                      conversation_id=conversation_id).json()
+
+        assert [c["record_id"] for c in body["citations"]] == [flood.pk]
+        assert body["widened"] is False
+
+    def test_a_scoped_conversation_never_answers_from_another_paper_unasked(
+        self, embedder, space, client_for
+    ):
+        """The reader must never get an answer drawn from a different paper
+        without having asked for it -- a pond question inside a Conversation
+        scoped to the flood paper still only ever cites the flood paper."""
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        make_record(title="Tilapia Ponds", text=POND_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client, record=flood.pk).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client, POND_QUESTION,
+                      conversation_id=conversation_id).json()
+
+        assert [s["id"] for s in body["sources"]] == [flood.pk]
+        assert body["widened"] is False
+
+    def test_widen_reaches_every_readable_paper(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        pond = make_record(title="Tilapia Ponds", text=POND_TEXT,
+                           embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client, record=flood.pk).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client, POND_QUESTION, conversation_id=conversation_id,
+                      widen=True).json()
+
+        # Widened, so both papers are reachable -- the pond paper is the
+        # better match and ranks first, but the flood paper is no longer
+        # excluded the way it is in the unwidened test above.
+        assert body["sources"][0]["id"] == pond.pk
+        assert {s["id"] for s in body["sources"]} == {flood.pk, pond.pk}
+        assert body["widened"] is True
+
+    def test_widening_is_a_per_question_choice_not_a_standing_one(
+        self, embedder, space, client_for
+    ):
+        """Widening once must not leak into the next question -- scope
+        changes only when the reader asks, every time."""
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        make_record(title="Tilapia Ponds", text=POND_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client, record=flood.pk).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            ask(client, POND_QUESTION, conversation_id=conversation_id, widen=True)
+            second = ask(client, POND_QUESTION,
+                        conversation_id=conversation_id).json()
+
+        # Back to scoped, as if the first widened question never happened.
+        assert second["widened"] is False
+        assert [s["id"] for s in second["sources"]] == [flood.pk]
+
+    def test_widen_does_nothing_to_an_unscoped_conversation(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client, FLOOD_QUESTION, conversation_id=conversation_id,
+                      widen=True).json()
+
+        assert body["widened"] is False
+
+    def test_widen_does_nothing_without_a_conversation_at_all(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client_for(reader), FLOOD_QUESTION, widen=True).json()
+
+        assert body["widened"] is False
+        assert body["answer"]
+
+    def test_the_widened_flag_is_stored_and_replayed(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client, record=flood.pk).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            ask(client, FLOOD_QUESTION, conversation_id=conversation_id,
+               widen=True)
+
+        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
+        assert turn["widened"] is True
+
+    def test_a_scoped_record_that_is_no_longer_readable_yields_no_results(
+        self, embedder, space, client_for
+    ):
+        """The scope is applied through `visible_to`, never instead of it: a
+        Record can stop being readable after a Conversation was scoped to it,
+        and retrieval must still refuse it."""
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client, record=flood.pk).json()["id"]
+
+        Record.objects.filter(pk=flood.pk).update(
+            pipeline_status=PipelineStatus.DRAFT
+        )
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client, FLOOD_QUESTION,
+                      conversation_id=conversation_id).json()
+
+        assert body["sources"] == []
+        assert body["mode"] == "no_results"
 
 
 class ReplayingATurnTests:

@@ -1,10 +1,15 @@
-import type { Citation, SemanticSearchResult } from "@/types/ai";
+import type { ChatCitation, SemanticSearchResult } from "@/types/ai";
+import { hasCitationQuote } from "@/lib/citedPage";
 import { OpenPassageLink, PassageQuote } from "./PassageQuote";
 
 interface SourceContextPanelProps {
   open:       boolean;
-  /** The Passages the latest reply cited, in marker order. */
-  citations:  Citation[];
+  /**
+   * The Passages the latest reply cited, in marker order. A reopened
+   * Conversation's reply (IR-298) carries only the pointer — record, chunk,
+   * page — until IR-299 re-resolves the quote and title at read time.
+   */
+  citations:  ChatCitation[];
   /** The Record cards those Passages came from, as the answer returned them. */
   sources:    SemanticSearchResult[];
   onClose:    () => void;
@@ -59,7 +64,10 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
 
         {citations.map((citation) => {
           const card = cardFor(citation.record_id);
-          const section = citation.context_path?.[citation.context_path.length - 1];
+          const hasQuote = hasCitationQuote(citation);
+          const section = hasQuote
+            ? citation.context_path?.[citation.context_path.length - 1]
+            : undefined;
 
           return (
             <article
@@ -77,10 +85,10 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
                 )}
               </div>
 
-              <PassageQuote text={citation.text} />
+              {hasQuote && <PassageQuote text={citation.text} />}
 
               <h3 className="text-[13px] font-semibold text-stone-900 leading-snug line-clamp-2 mt-3">
-                {card?.title ?? citation.record_title}
+                {card?.title ?? (hasQuote ? citation.record_title : "Source")}
               </h3>
               {section && (
                 <p className="text-[10px] text-stone-500 mt-0.5 line-clamp-1">{section}</p>
@@ -89,7 +97,11 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
                 <p className="text-[11px] text-stone-500 mt-1 line-clamp-1">{card.authors}</p>
               )}
 
-              <OpenPassageLink citation={citation} title={card?.title} className="mt-3" />
+              <OpenPassageLink
+                citation={citation}
+                title={card?.title ?? (hasQuote ? undefined : "the source")}
+                className="mt-3"
+              />
             </article>
           );
         })}

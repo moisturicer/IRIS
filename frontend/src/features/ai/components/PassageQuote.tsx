@@ -45,13 +45,17 @@ export function PassageQuote({ text, className = "" }: { text: string; className
  * `title` overrides the record's name when a caller holds a better one — the
  * sources panel has the record card, whose title is the canonical one, while
  * the citation carries the title retrieval saw.
+ *
+ * `citation` only needs `record_id` and `page` to build the link, so a
+ * replayed citation (IR-298) — a stored pointer with no title of its own —
+ * can pass one through with `title` supplied explicitly instead.
  */
 export function OpenPassageLink({
   citation,
   title,
   className = "",
 }: {
-  citation: Citation;
+  citation: Pick<Citation, "record_id" | "page"> & Partial<Pick<Citation, "record_title">>;
   title?: string;
   className?: string;
 }) {
@@ -85,6 +89,22 @@ export function DegradedNotice({ subject }: { subject: "answer" | "summary" }) {
         Found by keyword matching, not meaning — the search service was unavailable, so
         weigh this {subject} accordingly.
       </span>
+    </p>
+  );
+}
+
+/**
+ * What a reader is told when an answer left the paper they were reading.
+ *
+ * Paper Chat scopes to one Record by default; this is the visible half of
+ * that promise (IR-298, ADR-026 §9) — scope never widens silently, so a
+ * widened answer says so wherever it is read, live or replayed.
+ */
+export function ScopeNotice() {
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-[11px] text-stone-500">
+      <i className="fas fa-layer-group text-[10px] mt-0.5" aria-hidden />
+      <span>Searched all papers, not just the one open — you asked to widen the search.</span>
     </p>
   );
 }

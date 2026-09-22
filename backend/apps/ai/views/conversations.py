@@ -19,8 +19,8 @@ from apps.ai.serializers import (
 
 class ConversationListCreateView(generics.ListCreateAPIView):
     """
-    GET  /api/v1/ai/conversations/   — the caller's own, most recent first
-    POST /api/v1/ai/conversations/   — start one, optionally scoped to a Record
+    GET  /api/v1/ai/conversations/?record=<id>   — the caller's own, most recent first
+    POST /api/v1/ai/conversations/               — start one, optionally scoped to a Record
     """
 
     serializer_class = ConversationSerializer
@@ -28,7 +28,18 @@ class ConversationListCreateView(generics.ListCreateAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return Conversation.objects.owned_by(self.request.user)
+        queryset = Conversation.objects.owned_by(self.request.user)
+        # ``?record=`` is how Paper Chat finds the Conversation it already
+        # has for this paper, if any (IR-298) -- filtered on top of
+        # `owned_by`, never instead of it, so this can only ever narrow the
+        # caller's own list. A malformed id matches nothing rather than 500ing.
+        record_param = self.request.query_params.get("record")
+        if record_param is not None:
+            try:
+                queryset = queryset.filter(record_id=int(record_param))
+            except (TypeError, ValueError):
+                return queryset.none()
+        return queryset
 
     def perform_create(self, serializer):
         # The owner comes from the request; `user` is not writable.

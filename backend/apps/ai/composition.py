@@ -49,7 +49,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from apps.ai.answers.service import GroundedAnswerService
 from apps.ai.providers.ports import EmbeddingProvider, LLMProvider, Reranker
-from apps.ai.retrieval.degraded import DegradableRetriever
+from apps.ai.retrieval.degraded import DegradableRetriever, FullTextRetriever
 from apps.ai.retrieval.ports import Retriever
 from apps.ai.retrieval.reranking import RerankingRetriever, disclosure_permits
 from apps.ai.retrieval.two_stage import TwoStageRetriever
@@ -208,20 +208,31 @@ class CompositionRoot:
 
     # -- the stack ----------------------------------------------------------
 
-    def retriever(self) -> Retriever:
+    def retriever(self, record: Optional[Record] = None) -> Retriever:
+        """The stack, optionally narrowed to one Record for this call (IR-298).
+
+        ``record`` is a call-time argument, not a root-level setting: two
+        requests through the same root can each ask for a differently-scoped
+        retriever, which is what lets Paper Chat stay scoped by default and
+        Ask IRIS stay unscoped, from one root. The `Retriever` port itself
+        carries no such parameter -- see `TwoStageRetriever`'s docstring.
+        """
         return DegradableRetriever(
             RerankingRetriever(
-                TwoStageRetriever(self.embedder()),
+                TwoStageRetriever(self.embedder(), record=record),
                 reranker=self.reranker(),
                 policy_enabled=self._policy_enabled,
                 permits=self._permits,
             ),
+            fallback=FullTextRetriever(record=record),
             degrade_on=_vendor_failures(),
         )
 
-    def answer_service(self, max_sources: int) -> GroundedAnswerService:
+    def answer_service(
+        self, max_sources: int, record: Optional[Record] = None
+    ) -> GroundedAnswerService:
         return GroundedAnswerService(
-            retriever=self.retriever(),
+            retriever=self.retriever(record=record),
             llm=self.llm(),
             permits=self._permits,
             policy_enabled=self._policy_enabled,
