@@ -62,12 +62,17 @@ class RetrievalResult:
     needs to tell the two retrieval paths apart, and to know which index a
     measurement was taken against. Neither is required — a retriever that
     does not know leaves them ``None``.
+
+    ``query_vector`` is the embedding computed to search the corpus, carried
+    out so it can be stored as a Turn's memory vector at no extra vendor
+    cost (IR-297). ``None`` when no vector was computed for this question.
     """
 
     passages: tuple[RetrievedChunk, ...] = ()
     degraded: bool = False
     mode: Optional[str] = None
     embedding_space_id: Optional[int] = None
+    query_vector: Optional[Sequence[float]] = None
 
     def with_passages(self, passages: Sequence[RetrievedChunk]) -> "RetrievalResult":
         """The same result, re-ranked or trimmed.

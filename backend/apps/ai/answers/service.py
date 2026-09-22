@@ -17,12 +17,16 @@ to read themselves instead of a sentence nobody wrote.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Sequence
+from typing import TYPE_CHECKING, Callable, Optional, Sequence
 
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
 from apps.ai.retrieval.ports import RetrievedChunk, Retriever
 from apps.records.models import Record
+
+if TYPE_CHECKING:
+    from apps.ai.memory import ConversationMemory
+    from apps.ai.models import Conversation, Turn
 
 from .citations import (
     NO_SOURCES,
@@ -63,12 +67,14 @@ class GroundedAnswerService:
         permits: Callable[[Record], bool] = _default_permits,
         policy_enabled: bool = True,
         max_sources: int = 8,
+        memory: Optional["ConversationMemory"] = None,
     ) -> None:
         self._retriever = retriever
         self._llm = llm
         self._permits = permits
         self._policy_enabled = policy_enabled
         self._max_sources = max_sources
+        self._memory = memory
 
     def _disclosable(self, chunks: Sequence[RetrievedChunk]) -> list[RetrievedChunk]:
         if not self._policy_enabled:
@@ -80,7 +86,17 @@ class GroundedAnswerService:
         allowed = {rid for rid, rec in records.items() if self._permits(rec)}
         return [c for c in chunks if c.record_id in allowed]
 
-    def answer(self, question: str, user) -> GroundedAnswer:
+    def answer(
+        self,
+        question: str,
+        user,
+        conversation: Optional["Conversation"] = None,
+        history: Sequence["Turn"] = (),
+    ) -> GroundedAnswer:
+        """A grounded answer. ``history`` (a Conversation's recent Turns) goes
+        into the prompt verbatim; memory recall adds older, relevant ones
+        when ``conversation`` is given (IR-297).
+        """
         retrieved = self._retriever.retrieve(question, user, limit=self._max_sources)
         # Read off the result, not off the object with `getattr(..., False)`:
         # that default is what turned a dropped flag into a confident "the
@@ -96,11 +112,23 @@ class GroundedAnswerService:
                 citations=(),
                 degraded=degraded,
                 state=NO_SOURCES,
+                query_vector=retrieved.query_vector,
+                embedding_space_id=retrieved.embedding_space_id,
+            )
+
+        recalled: Sequence["Turn"] = ()
+        if self._memory is not None and conversation is not None:
+            recalled = self._memory.recall(
+                conversation,
+                retrieved.query_vector,
+                retrieved.embedding_space_id,
+                exclude_ids=[turn.pk for turn in history],
             )
 
         try:
             raw = self._llm.generate(
-                system=SYSTEM_PROMPT, user=build_prompt(question, sources)
+                system=SYSTEM_PROMPT,
+                user=build_prompt(question, sources, history=history, recalled=recalled),
             )
         except LLMUnavailable as exc:
             logger.warning("answer generation unavailable: %s", exc)
@@ -113,6 +141,8 @@ class GroundedAnswerService:
                 degraded=True,
                 state=UNAVAILABLE,
                 sources=tuple(sources),
+                query_vector=retrieved.query_vector,
+                embedding_space_id=retrieved.embedding_space_id,
             )
 
         text, citations = parse_citations(raw, sources)
@@ -122,6 +152,8 @@ class GroundedAnswerService:
             citations=citations,
             degraded=degraded,
             sources=tuple(sources),
+            query_vector=retrieved.query_vector,
+            embedding_space_id=retrieved.embedding_space_id,
         )
 
 

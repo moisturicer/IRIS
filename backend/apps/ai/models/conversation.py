@@ -11,9 +11,16 @@ Text frozen into a transcript outlives the permission that allowed it.
 
 No retention field and no expiry - a Conversation lives until its owner
 deletes it (IR-294 Privacy).
+
+`TurnEmbedding` (IR-297) stores the vector already computed to search the
+corpus for a Turn's question. Keyed by turn and space together, like
+`ChunkEmbedding`.
 """
 from django.conf import settings
 from django.db import models
+from pgvector.django import HnswIndex, VectorField
+
+from .embedding_space import VECTOR_COLUMN_DIMENSIONS
 
 
 class ConversationManager(models.Manager):
@@ -129,3 +136,37 @@ class TurnCitation(models.Model):
 
     def __str__(self) -> str:
         return f"TurnCitation(turn={self.turn_id}, marker={self.marker})"
+
+
+class TurnEmbedding(models.Model):
+    """A Turn's question, embedded under one embedding space.
+
+    The vector `TwoStageRetriever` already computed to search the corpus,
+    stored rather than discarded. Read by `apps.ai.memory`.
+    """
+
+    turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name="embeddings")
+    space = models.ForeignKey(
+        "ai.EmbeddingSpace", on_delete=models.CASCADE, related_name="turn_embeddings"
+    )
+    embedding = VectorField(dimensions=VECTOR_COLUMN_DIMENSIONS)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["turn", "space"], name="unique_turn_embedding_per_space"
+            ),
+        ]
+        indexes = [
+            HnswIndex(
+                name="turn_embedding_hnsw_idx",
+                fields=["embedding"],
+                m=16,
+                ef_construction=64,
+                opclasses=["vector_cosine_ops"],
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"TurnEmbedding(turn={self.turn_id}, space={self.space_id})"
