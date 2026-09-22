@@ -3,6 +3,7 @@ rather than lived through."""
 
 import pytest
 
+from apps.ai.providers.errors import ErrorKind
 from apps.ai.resilience.rate_limit import RateLimited
 from apps.ai.resilience.retry import retry_with_backoff
 
@@ -74,6 +75,72 @@ class RetryTests:
     def test_zero_attempts_is_rejected_rather_than_silently_doing_nothing(self):
         with pytest.raises(ValueError):
             retry_with_backoff(lambda: "ok", attempts=0)
+
+    def test_a_classified_kind_can_be_given_up_on_without_naming_the_exception_type(self):
+        """The vendor boundary raises one exception type for many failures
+        (IR-320) -- ``give_up_on_kind`` lets a caller give up on the ones that
+        won't get better without importing that type here, which would make
+        this module depend on which adapter sits behind the port."""
+        calls = []
+
+        def rate_limited():
+            calls.append(1)
+            raise _Classified("spent", ErrorKind.RATE_LIMIT)
+
+        with pytest.raises(_Classified):
+            retry_with_backoff(
+                rate_limited,
+                attempts=5,
+                give_up_on_kind=(ErrorKind.RATE_LIMIT,),
+                sleep=_Sleeper(),
+            )
+        assert len(calls) == 1
+
+    def test_an_unlisted_kind_is_still_retried(self):
+        calls = []
+
+        def flaky():
+            calls.append(1)
+            if len(calls) < 2:
+                raise _Classified("dropped", ErrorKind.NETWORK)
+            return "recovered"
+
+        result = retry_with_backoff(
+            flaky,
+            attempts=3,
+            give_up_on_kind=(ErrorKind.RATE_LIMIT,),
+            sleep=_Sleeper(),
+        )
+        assert result == "recovered"
+        assert len(calls) == 2
+
+    def test_an_exception_with_no_kind_never_matches_give_up_on_kind(self):
+        """A plain exception -- nothing a classified adapter boundary raised
+        -- has no ``.kind`` to read, so this is a no-op for it rather than an
+        error."""
+        calls = []
+
+        def always_fails():
+            calls.append(1)
+            raise RuntimeError("down")
+
+        with pytest.raises(RuntimeError):
+            retry_with_backoff(
+                always_fails,
+                attempts=3,
+                give_up_on_kind=(ErrorKind.RATE_LIMIT,),
+                sleep=_Sleeper(),
+            )
+        assert len(calls) == 3
+
+
+class _Classified(RuntimeError):
+    """A stand-in for the shape `LLMUnavailable`/`VoyageError` share: one
+    exception type carrying a `.kind`."""
+
+    def __init__(self, message, kind):
+        super().__init__(message)
+        self.kind = kind
 
 
 def _raise():
