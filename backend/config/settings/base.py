@@ -382,6 +382,12 @@ LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
 # Grounded answering is extraction from supplied sources, not composition. A
 # higher temperature buys variety nobody asked for and invites invention.
 LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
+# Unset by default -- a Groq/openai/gpt-oss-120b extension ("low"/"medium"/
+# "high") the openai SDK does not type, sent only when configured (IR-325).
+# Requesting it also requests include_reasoning, so a reasoning model's
+# thinking streams on its own delta.reasoning channel rather than interleaved
+# into delta.content. A vendor that doesn't recognise it ignores it.
+LLM_REASONING_EFFORT = config("LLM_REASONING_EFFORT", default="")
 
 # ---- Inference provider fallback (IR-321) --------------------------------
 #
