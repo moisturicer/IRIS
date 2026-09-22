@@ -49,12 +49,14 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from apps.ai.answers.service import GroundedAnswerService
 from apps.ai.providers.ports import EmbeddingProvider, LLMProvider, Reranker
-from apps.ai.retrieval.degraded import DegradableRetriever, FullTextRetriever
+from apps.ai.retrieval.degraded import (
+    DegradableRetriever,
+    FullTextRetriever,
+    is_vendor_unavailable,
+)
 from apps.ai.retrieval.ports import Retriever
 from apps.ai.retrieval.reranking import RerankingRetriever, disclosure_permits
 from apps.ai.retrieval.two_stage import TwoStageRetriever
-from apps.ai.resilience.circuit import CircuitOpen
-from apps.ai.resilience.rate_limit import RateLimited
 from apps.records.models import Record
 
 if TYPE_CHECKING:
@@ -62,22 +64,37 @@ if TYPE_CHECKING:
     from apps.ai.resolution import QuestionResolver
 
 
-def _vendor_failures() -> tuple[type[BaseException], ...]:
+def _vendor_failures() -> Callable[[BaseException], bool]:
     """What counts as "the vendor is unavailable", and so degrades.
 
-    ``DegradableRetriever``'s own default is the circuit breaker and the rate
-    limiter -- the two failures it can name without importing an adapter.
-    ``VoyageError`` is the third case its docstring names and could not list,
-    because the retrieval package does not depend on a vendor adapter and
-    should not start. Naming it *here* is what a composition root is for: this
-    module already knows which adapter is in the stack.
+    ``DegradableRetriever``'s own default (``is_vendor_unavailable``) is the
+    circuit breaker and the rate limiter -- the two failures it can name
+    without importing an adapter. ``VoyageError`` is the third case its
+    docstring names and could not check itself, because the retrieval package
+    does not depend on a vendor adapter and should not start. Naming it *here*
+    is what a composition root is for: this module already knows which
+    adapter is in the stack.
 
-    Still a closed list. A ``TypeError`` from our own query is not an outage,
-    and degrading on it would hide a defect behind slightly worse answers.
+    Not every ``VoyageError`` belongs in that third case, though (IR-320): an
+    auth failure or a rejected oversized prompt will fail identically against
+    full-text search, so degrading past them would hide a configuration
+    mistake or a real error behind a worse answer instead of surfacing it.
+    Read from ``exc.kind`` -- the classification the adapter boundary already
+    produced -- rather than a hand-maintained list of exception classes that
+    could never have told those cases apart, because they are all raised as
+    the same ``VoyageError`` type.
     """
+    from apps.ai.providers.errors import ErrorKind
     from apps.ai.providers.voyage import VoyageError
 
-    return (CircuitOpen, RateLimited, VoyageError)
+    degrading_kinds = (ErrorKind.RATE_LIMIT, ErrorKind.NETWORK, ErrorKind.TIMEOUT)
+
+    def should_degrade(exc: BaseException) -> bool:
+        if is_vendor_unavailable(exc):
+            return True
+        return isinstance(exc, VoyageError) and exc.kind in degrading_kinds
+
+    return should_degrade
 
 
 class CompositionRoot:

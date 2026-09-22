@@ -10,8 +10,10 @@ The contract suite in ``test_provider_contracts.py`` additionally runs these
 adapters against the real API when ``VOYAGE_API_KEY`` is present.
 """
 
+import httpx
 import pytest
 
+from apps.ai.providers.errors import ErrorKind
 from apps.ai.providers.ports import RerankedCandidate
 from apps.ai.providers.voyage import (
     VoyageEmbeddingProvider,
@@ -263,6 +265,80 @@ class MissingKeyTests:
         settings.VOYAGE_API_KEY = ""
         with pytest.raises(VoyageError, match="VOYAGE_API_KEY"):
             VoyageEmbeddingProvider().embed_documents(["alpha"])
+
+    def test_a_missing_key_is_classified_as_auth(self, settings):
+        settings.VOYAGE_API_KEY = ""
+        with pytest.raises(VoyageError) as excinfo:
+            VoyageEmbeddingProvider().embed_documents(["alpha"])
+        assert excinfo.value.kind == ErrorKind.AUTH
+
+
+class VendorFailureClassificationTests:
+    """`VoyageError.kind` is read from the real transport this suite's
+    ``transport`` injection point bypasses (IR-320): the HTTP status when a
+    response came back, or the transport exception's type when it did not.
+    So unlike every other test here, these patch ``httpx.post`` itself rather
+    than injecting a fake transport, to exercise ``_post`` for real.
+    """
+
+    def _embed(self, settings, monkeypatch, respond):
+        settings.VOYAGE_API_KEY = "key"
+        monkeypatch.setattr("httpx.post", respond)
+        return VoyageEmbeddingProvider(dimensions=4)
+
+    def test_a_401_response_is_classified_as_auth(self, settings, monkeypatch):
+        provider = self._embed(
+            settings, monkeypatch,
+            lambda *a, **k: httpx.Response(401, text="unauthorized"),
+        )
+        with pytest.raises(VoyageError) as excinfo:
+            provider.embed_documents(["alpha"])
+        assert excinfo.value.kind == ErrorKind.AUTH
+
+    def test_a_429_response_is_classified_as_rate_limit(self, settings, monkeypatch):
+        provider = self._embed(
+            settings, monkeypatch,
+            lambda *a, **k: httpx.Response(429, text="slow down"),
+        )
+        with pytest.raises(VoyageError) as excinfo:
+            provider.embed_documents(["alpha"])
+        assert excinfo.value.kind == ErrorKind.RATE_LIMIT
+
+    def test_a_5xx_response_is_classified_as_network(self, settings, monkeypatch):
+        provider = self._embed(
+            settings, monkeypatch,
+            lambda *a, **k: httpx.Response(503, text="try again"),
+        )
+        with pytest.raises(VoyageError) as excinfo:
+            provider.embed_documents(["alpha"])
+        assert excinfo.value.kind == ErrorKind.NETWORK
+
+    def test_an_unmapped_status_is_classified_as_unknown(self, settings, monkeypatch):
+        provider = self._embed(
+            settings, monkeypatch,
+            lambda *a, **k: httpx.Response(404, text="not found"),
+        )
+        with pytest.raises(VoyageError) as excinfo:
+            provider.embed_documents(["alpha"])
+        assert excinfo.value.kind == ErrorKind.UNKNOWN
+
+    def test_a_timeout_exception_is_classified_as_timeout(self, settings, monkeypatch):
+        def _raise(*args, **kwargs):
+            raise httpx.ReadTimeout("timed out")
+
+        provider = self._embed(settings, monkeypatch, _raise)
+        with pytest.raises(VoyageError) as excinfo:
+            provider.embed_documents(["alpha"])
+        assert excinfo.value.kind == ErrorKind.TIMEOUT
+
+    def test_a_connection_failure_is_classified_as_network(self, settings, monkeypatch):
+        def _raise(*args, **kwargs):
+            raise httpx.ConnectError("connection refused")
+
+        provider = self._embed(settings, monkeypatch, _raise)
+        with pytest.raises(VoyageError) as excinfo:
+            provider.embed_documents(["alpha"])
+        assert excinfo.value.kind == ErrorKind.NETWORK
 
 
 class OutputDimensionTests:

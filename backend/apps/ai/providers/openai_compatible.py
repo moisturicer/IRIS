@@ -24,6 +24,8 @@ from typing import Any, Optional
 
 from django.conf import settings
 
+from .errors import ClassifiedError, ErrorKind, classify_message, classify_status_code
+
 
 class LLMUnavailable(RuntimeError):
     """The model could not answer.
@@ -32,7 +34,16 @@ class LLMUnavailable(RuntimeError):
     timeout, a malformed response -- so the resilience stack has one thing to
     catch and the domain never learns a vendor's exception hierarchy. This is
     the anti-corruption boundary; vendor quirks stop here.
+
+    ``kind`` adds *why*, without widening that boundary (IR-320): every
+    existing catch site still just catches ``LLMUnavailable``, and a caller
+    that wants to branch on the reason reads ``.kind`` rather than the vendor
+    exception this type replaced.
     """
+
+    def __init__(self, message: str, kind: ErrorKind = ErrorKind.UNKNOWN) -> None:
+        super().__init__(message)
+        self.kind = kind
 
 
 def is_configured() -> bool:
@@ -47,6 +58,34 @@ def is_configured() -> bool:
     reporting "generative" against a key the adapter never reads.
     """
     return bool(getattr(settings, "LLM_API_KEY", ""))
+
+
+def _classify(exc: Exception) -> ClassifiedError:
+    """Classify a raw failure from ``client.chat.completions.create`` (IR-320).
+
+    The ``openai`` SDK is the client for every vendor this adapter reaches
+    (ADR-021), so its exception hierarchy -- not a per-vendor one -- is the
+    first thing read: it already carries the HTTP status apart from a
+    malformed response. Only a failure the SDK does not model (a raw
+    ``RuntimeError`` a test double raises, or a connection error the SDK
+    itself did not wrap) falls through to the message heuristic.
+    """
+    import openai
+
+    if isinstance(exc, (openai.AuthenticationError, openai.PermissionDeniedError)):
+        return ClassifiedError(ErrorKind.AUTH, exc)
+    if isinstance(exc, openai.RateLimitError):
+        return ClassifiedError(ErrorKind.RATE_LIMIT, exc)
+    if isinstance(exc, openai.APITimeoutError):
+        return ClassifiedError(ErrorKind.TIMEOUT, exc)
+    if isinstance(exc, openai.APIConnectionError):
+        return ClassifiedError(ErrorKind.NETWORK, exc)
+    if isinstance(exc, openai.APIStatusError):
+        kind = classify_status_code(
+            exc.status_code, getattr(exc, "code", None), str(exc)
+        )
+        return ClassifiedError(kind, exc)
+    return ClassifiedError(classify_message(str(exc)), exc)
 
 
 class OpenAICompatibleAdapter:
@@ -78,7 +117,8 @@ class OpenAICompatibleAdapter:
             raise LLMUnavailable(
                 "LLM_API_KEY is not set. There is no unauthenticated lane and no "
                 "local model to fall back to (ADR-008, ADR-021), so this fails "
-                "rather than defaulting silently."
+                "rather than defaulting silently.",
+                kind=ErrorKind.AUTH,
             )
         return key
 
@@ -122,7 +162,10 @@ class OpenAICompatibleAdapter:
         except LLMUnavailable:
             raise
         except Exception as exc:
-            raise LLMUnavailable(f"{type(exc).__name__}: {exc}") from exc
+            classified = _classify(exc)
+            raise LLMUnavailable(
+                f"{type(exc).__name__}: {exc}", kind=classified.kind
+            ) from exc
 
         choices = getattr(response, "choices", None) or []
         if not choices:
