@@ -16,7 +16,20 @@
  * The other end of that link — building it from a citation — lives here too,
  * so the two halves of one URL cannot drift apart.
  */
-import type { Citation } from "@/types/ai";
+import type { ChatCitation, Citation } from "@/types/ai";
+
+/**
+ * Whether `citation` carries the quote and title a live answer has, rather
+ * than only the pointer a replayed Turn has until IR-299 re-resolves them.
+ *
+ * The one check both citation-rendering surfaces (the chat bubble and the
+ * sources panel) need to decide whether there is a quote to show at all —
+ * kept here, next to the other citation-shape helpers, so the two renderers
+ * cannot drift into checking this differently.
+ */
+export function hasCitationQuote(citation: ChatCitation): citation is Citation {
+  return "text" in citation;
+}
 
 /** The page a citation asked for, or null when it named none we can use. */
 export function citedPage(raw: string | null): number | null {

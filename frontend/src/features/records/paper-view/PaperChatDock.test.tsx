@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
-import type { AIAnswer, ConversationDetail, ConversationSummary } from "@/types/ai";
+import type { AIAnswer, ConversationDetail } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 
 import { PaperChatPanel } from "./PaperChatDock";
@@ -49,17 +49,13 @@ function answer(overrides: Partial<AIAnswer> = {}): AIAnswer {
   };
 }
 
-const list = vi.fn();
-const get = vi.fn();
-const create = vi.fn();
+const findOrCreateForRecord = vi.fn();
 const ask = vi.fn();
 
 vi.mock("@/api/ai", () => ({
   aiApi: {
     conversations: {
-      list: (...args: unknown[]) => list(...(args as [])),
-      get:  (...args: unknown[]) => get(...(args as [])),
-      create: (...args: unknown[]) => create(...(args as [])),
+      findOrCreateForRecord: (...args: unknown[]) => findOrCreateForRecord(...(args as [])),
     },
     ask: (...args: unknown[]) => ask(...(args as [])),
   },
@@ -72,9 +68,7 @@ beforeEach(() => {
   // jsdom does not implement it; the panel calls it to keep the transcript
   // scrolled to the newest message.
   Element.prototype.scrollIntoView = vi.fn();
-  list.mockResolvedValue({ data: [] as ConversationSummary[] });
-  create.mockResolvedValue({ data: conversation() });
-  get.mockResolvedValue({ data: conversation() });
+  findOrCreateForRecord.mockResolvedValue({ data: conversation() });
   ask.mockResolvedValue({ data: answer() });
 });
 
@@ -84,16 +78,11 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
 
-    await waitFor(() => expect(list).toHaveBeenCalledWith({ record: record.id }));
-    expect(create).toHaveBeenCalledWith({ record: record.id });
-    expect(get).not.toHaveBeenCalled();
+    await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalledWith(record.id));
   });
 
   it("continues the existing Conversation for this Record rather than starting a new one", async () => {
-    list.mockResolvedValue({
-      data: [{ id: 42, title: "Prior chat" } as ConversationSummary],
-    });
-    get.mockResolvedValue({
+    findOrCreateForRecord.mockResolvedValue({
       data: conversation({
         turns: [
           {
@@ -115,14 +104,13 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
     expect(
       screen.getByText("It concludes rainfall gauges predict flooding well."),
     ).toBeTruthy();
-    expect(create).not.toHaveBeenCalled();
   });
 
   it("never prefixes the question with the paper's title", async () => {
     renderScreen(
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
-    await waitFor(() => expect(create).toHaveBeenCalled());
+    await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalled());
 
     const input = screen.getByRole("textbox", { name: /ask about this paper/i });
     await userEvent.type(input, "What datasets were used?");
@@ -137,7 +125,7 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
     renderScreen(
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
-    await waitFor(() => expect(create).toHaveBeenCalled());
+    await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalled());
 
     await userEvent.type(
       screen.getByRole("textbox", { name: /ask about this paper/i }),
@@ -165,7 +153,7 @@ describe("the widen control", () => {
     renderScreen(
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
-    await waitFor(() => expect(create).toHaveBeenCalled());
+    await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalled());
 
     await userEvent.click(await screen.findByRole("button", { name: "This paper" }));
     await userEvent.type(
@@ -184,7 +172,7 @@ describe("the widen control", () => {
     renderScreen(
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
-    await waitFor(() => expect(create).toHaveBeenCalled());
+    await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalled());
 
     await userEvent.type(
       screen.getByRole("textbox", { name: /ask about this paper/i }),
@@ -201,7 +189,7 @@ describe("accessibility", () => {
     const { container } = renderScreen(
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
-    await waitFor(() => expect(create).toHaveBeenCalled());
+    await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalled());
 
     await expectNoBlockingA11yViolations(container);
   });

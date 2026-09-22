@@ -102,10 +102,7 @@ export function PaperChatPanel({
 
     (async () => {
       try {
-        const { data: existing } = await aiApi.conversations.list({ record: record.id });
-        const conversation = existing[0]
-          ? (await aiApi.conversations.get(existing[0].id)).data
-          : (await aiApi.conversations.create({ record: record.id })).data;
+        const { data: conversation } = await aiApi.conversations.findOrCreateForRecord(record.id);
         if (cancelled) return;
         setConversationId(conversation.id);
         setMessages(conversation.turns.flatMap(turnToMessages));

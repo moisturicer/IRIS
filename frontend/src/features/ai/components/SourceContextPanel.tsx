@@ -1,4 +1,5 @@
 import type { ChatCitation, SemanticSearchResult } from "@/types/ai";
+import { hasCitationQuote } from "@/lib/citedPage";
 import { OpenPassageLink, PassageQuote } from "./PassageQuote";
 
 interface SourceContextPanelProps {
@@ -63,7 +64,7 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
 
         {citations.map((citation) => {
           const card = cardFor(citation.record_id);
-          const hasQuote = "text" in citation && "record_title" in citation;
+          const hasQuote = hasCitationQuote(citation);
           const section = hasQuote
             ? citation.context_path?.[citation.context_path.length - 1]
             : undefined;

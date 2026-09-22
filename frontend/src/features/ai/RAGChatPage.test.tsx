@@ -131,6 +131,25 @@ describe("persisted conversations", () => {
     expect(options).toMatchObject({ conversationId: 9 });
   });
 
+  it("actually asks the record deep-link's prefilled question, rather than leaving it unanswered", async () => {
+    // A `?record=` link starts a Conversation scoped to that Record and
+    // used to only display the prefilled question as an inert user bubble,
+    // never asking it -- fixed alongside the rest of this ticket so the
+    // reader lands on a real answer, not a question nobody sent.
+    create.mockResolvedValue({ data: detail({ id: 9, record: 5 }) });
+    ask.mockResolvedValue({ data: answer({ conversation_id: 9 }) });
+
+    renderScreen(<RAGChatPage />, { route: "/ai/ask?record=5" });
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ record: 5 }));
+    await waitFor(() => expect(ask).toHaveBeenCalled());
+    const [question, options] = ask.mock.calls[0];
+    expect(question).toMatch(/record #5/i);
+    expect(options).toMatchObject({ conversationId: 9 });
+
+    expect(await screen.findByText("Rainfall gauges predict flooding [1].")).toBeTruthy();
+  });
+
   it("removes a conversation and falls back to what remains", async () => {
     list.mockResolvedValue({ data: [summary({ id: 9 })] });
     remove.mockResolvedValue({});
