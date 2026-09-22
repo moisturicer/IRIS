@@ -148,6 +148,15 @@ class GroundedAnswer:
     query_vector: Optional[Sequence[float]] = None
     embedding_space_id: Optional[int] = None
 
+    #: Which model actually produced ``text`` (IR-321) -- ``None`` whenever no
+    #: model was reached at all (``NO_SOURCES``, ``UNAVAILABLE``). Read off
+    #: the `LLMProvider` after a successful call rather than assumed from
+    #: configuration, because `FallbackLLMProvider` can answer with a
+    #: different model than the one configured first -- a silent switch is
+    #: exactly the confound ADR-023's recall measurement cannot survive
+    #: undetected.
+    model: Optional[str] = None
+
     @property
     def is_grounded(self) -> bool:
         """Whether the answer actually cited anything.

@@ -149,6 +149,67 @@ class DisclosureGateTests:
         assert answer.citations == ()
 
 
+class _NamedLLM(LLMProvider):
+    """A provider that reports which model it is, like the real adapter's
+    `.model` property -- what `GroundedAnswerService` reads by default."""
+
+    def __init__(self, model, reply="Yes [1]."):
+        self.model = model
+        self._reply = reply
+
+    def generate(self, system, user):
+        return self._reply
+
+
+class _FallbackStandIn(LLMProvider):
+    """Mimics `FallbackLLMProvider.last_model_used` without wrapping real
+    providers -- what `GroundedAnswerService` must prefer over `.model`,
+    since a fallback can answer with a different model than the one
+    configured first (IR-321)."""
+
+    model = "configured-first"
+
+    def __init__(self, answered_with, reply="Yes [1]."):
+        self.last_model_used = answered_with
+        self._reply = reply
+
+    def generate(self, system, user):
+        return self._reply
+
+
+class ModelRecordingTests:
+    def test_the_answering_model_is_recorded(self, reader):
+        record = make_record("Thesis")
+        answer = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _NamedLLM("groq/openai-gpt-oss-120b"),
+            permits=lambda r: True,
+        ).answer("q?", reader)
+
+        assert answer.model == "groq/openai-gpt-oss-120b"
+
+    def test_a_fallback_providers_last_model_used_wins_over_model(self, reader):
+        """ADR-023's recall measurement assumes one model per run; reporting
+        the configured-first model here would hide that a fallback answered
+        instead -- the exact confound IR-321 exists to prevent."""
+        record = make_record("Thesis")
+        answer = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _FallbackStandIn(answered_with="openrouter/some-model"),
+            permits=lambda r: True,
+        ).answer("q?", reader)
+
+        assert answer.model == "openrouter/some-model"
+
+    def test_no_model_is_recorded_when_none_was_reached(self, reader):
+        record = make_record("Thesis")
+        answer = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), _BrokenLLM(), permits=lambda r: True
+        ).answer("q?", reader)
+
+        assert answer.model is None
+
+
 class VendorFailureTests:
     def test_an_unavailable_model_never_produces_a_fabricated_answer(self, reader):
         """ADR-008: the answer is replaced by an explicit unavailable state."""
