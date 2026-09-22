@@ -113,13 +113,10 @@ export interface AIAnswer {
 }
 
 /**
- * One citation as a stored Turn replays it (IR-295).
- *
- * A stored citation is a pointer only — record id, chunk id, page — never the
- * quoted text or the record's title, so `record_title`, `text` and
- * `context_path` are absent here where a live `Citation` always carries them.
- * Re-resolving those at read time is IR-299; until then a replayed citation
- * renders as a bare link rather than a quote.
+ * One citation as a stored Turn replays it when its chunk is no longer live
+ * (IR-295, degraded by IR-299): record id, chunk id, page, never the quoted
+ * text or the record's title. A live chunk replays as a full `Citation`
+ * instead — see `ChatCitation`.
  */
 export interface ReplayedCitation {
   marker:    number;
@@ -142,7 +139,8 @@ export interface ConversationTurn {
   degraded:           boolean;
   widened:            boolean;
   created_at:         string;
-  citations:          ReplayedCitation[];
+  /** Full `Citation` when the cited chunk is still live, `ReplayedCitation` when it was tombstoned (IR-299). */
+  citations:          ChatCitation[];
 }
 
 /** A Conversation without its Turns — the shape a sidebar lists (IR-295). */
