@@ -141,6 +141,12 @@ def ask(client, question, **body):
     return client.post(reverse("ai-ask"), {"question": question, **body}, format="json")
 
 
+def ask_stream(client, question, **body):
+    return client.post(
+        reverse("ai-ask-stream"), {"question": question, **body}, format="json"
+    )
+
+
 def search(client, query, **body):
     return client.post(reverse("ai-search"), {"query": query, **body}, format="json")
 

@@ -1,0 +1,197 @@
+"""Ask IRIS through the streaming HTTP boundary (IR-326).
+
+Same shape as `test_ask_http.py`: driven through the composition root's
+fake-injection seam, no vendor account, no network. What is different here
+is the wire format -- Server-Sent Events rather than one JSON body -- so
+`_parse_sse` turns a response body back into the ordered list of
+``(event, data)`` pairs a reader's browser would see.
+"""
+
+import json
+
+import pytest
+from django.urls import reverse
+
+from apps.ai.composition import use_composition_root
+from apps.ai.providers.fakes import ScriptedLLM
+from apps.ai.providers.ports import StreamDelta
+from core.enums import PipelineStatus
+
+from .corpus import (
+    FLOOD_QUESTION,
+    FLOOD_TEXT,
+    _BrokenLLM,
+    ask_stream,
+    make_record,
+    make_user,
+    root_with,
+)
+
+pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
+
+
+def _parse_sse(response) -> list[tuple[str, dict]]:
+    """A `StreamingHttpResponse`'s events, in order.
+
+    `.content` raises on a streaming response by design (Django's own
+    anti-footgun) -- `streaming_content` is the generator this view actually
+    yields from, consumed here exactly as a real client would.
+    """
+    text = b"".join(response.streaming_content).decode("utf-8")
+    events = []
+    for block in text.split("\n\n"):
+        block = block.strip()
+        if not block:
+            continue
+        name = None
+        data = None
+        for line in block.split("\n"):
+            if line.startswith("event:"):
+                name = line[len("event:"):].strip()
+            elif line.startswith("data:"):
+                data = line[len("data:"):].strip()
+        events.append((name, json.loads(data) if data is not None else None))
+    return events
+
+
+class StreamShapeTests:
+    def test_the_event_vocabulary_arrives_in_order_with_streamed_text(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(text="Rainfall gauges "),
+                StreamDelta(text="feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            response = ask_stream(client_for(reader), FLOOD_QUESTION)
+
+        assert response.status_code == 200
+        assert response["Content-Type"].startswith("text/event-stream")
+        events = _parse_sse(response)
+        names = [name for name, _ in events]
+        assert names == [
+            "retrieval_started",
+            "retrieval_finished",
+            "generation_started",
+            "text_delta",
+            "text_delta",
+            "citations_resolved",
+            "done",
+        ]
+
+        finished = dict(events)["retrieval_finished"]
+        assert finished == {"passage_count": 1, "record_count": 1, "degraded": False}
+
+        deltas = [data["text"] for name, data in events if name == "text_delta"]
+        assert deltas == ["Rainfall gauges ", "feed the model [1]."]
+
+        citations_event = dict(events)["citations_resolved"]
+        citation, = citations_event["citations"]
+        assert citation["record_id"] == flood.pk
+        assert citation["marker"] == 1
+
+        done = dict(events)["done"]
+        assert done["answer"] == "Rainfall gauges feed the model [1]."
+        assert done["mode"] == "generative"
+        assert done["degraded"] is False
+        assert [c["record_id"] for c in done["citations"]] == [flood.pk]
+        assert [s["id"] for s in done["sources"]] == [flood.pk]
+
+    def test_the_done_event_matches_the_synchronous_endpoints_shape(
+        self, embedder, space, client_for
+    ):
+        """The two endpoints must leave a client in the same state -- this is
+        `test_ask_http.py`'s grounding assertion, replayed against the
+        stream's final event instead of a JSON body."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        done = dict(events)["done"]
+        assert done["mode"] == "generative"
+        assert done["degraded"] is False
+        assert done["answer"]
+        assert done["widened"] is False
+
+
+class NoSourcesTests:
+    def test_no_readable_sources_skips_generation_entirely(self, embedder, space, client_for):
+        author = make_user("author@cit.edu")
+        stranger = make_user("stranger@cit.edu")
+        make_record(title="Unpublished Flood Draft", text=FLOOD_TEXT, owner=author,
+                    status=PipelineStatus.DRAFT, embedder=embedder, space=space)
+
+        llm = ScriptedLLM(stream_deltas=[StreamDelta(text="should never run")])
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(
+                ask_stream(client_for(stranger), FLOOD_QUESTION)
+            )
+
+        names = [name for name, _ in events]
+        assert names == ["retrieval_started", "retrieval_finished", "done"]
+        assert llm.calls == []
+
+        done = dict(events)["done"]
+        assert done["mode"] == "no_results"
+        assert done["citations"] == []
+        assert done["sources"] == []
+
+
+class VendorFailureTests:
+    def test_a_vendor_failure_mid_answer_still_ends_in_an_honest_done(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder, llm=_BrokenLLM())):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        names = [name for name, _ in events]
+        assert names == [
+            "retrieval_started", "retrieval_finished", "generation_started", "done",
+        ]
+        done = dict(events)["done"]
+        assert done["answer"] is None
+        assert done["mode"] == "unavailable"
+        assert done["degraded"] is True
+        assert [s["id"] for s in done["sources"]] == [flood.pk]
+
+
+class ValidationTests:
+    def test_a_blank_question_is_rejected_before_any_retrieval(self, client_for):
+        reader = make_user("reader@cit.edu")
+        assert ask_stream(client_for(reader), "   ").status_code == 400
+
+    def test_an_anonymous_caller_is_refused(self):
+        from rest_framework.test import APIClient
+
+        response = APIClient().post(
+            reverse("ai-ask-stream"), {"question": "x"}, format="json"
+        )
+        assert response.status_code in (401, 403)
+
+
+class VisibilityTests:
+    def test_a_passage_from_an_unreadable_record_is_never_on_the_wire(
+        self, embedder, space, client_for
+    ):
+        author = make_user("author@cit.edu")
+        stranger = make_user("stranger@cit.edu")
+        make_record(title="Unpublished Flood Draft", text=FLOOD_TEXT, owner=author,
+                    status=PipelineStatus.DRAFT, embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            response = ask_stream(client_for(stranger), FLOOD_QUESTION)
+            content = b"".join(response.streaming_content)
+
+        assert b"rainfall gauge" not in content

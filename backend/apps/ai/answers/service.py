@@ -17,7 +17,7 @@ to read themselves instead of a sentence nobody wrote.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Callable, Iterator, Optional, Sequence
 
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
@@ -36,6 +36,15 @@ from .citations import (
     build_prompt,
     parse_citations,
     unresolved_marker_candidates,
+)
+from .events import (
+    AnswerEvent,
+    CitationsResolved,
+    Done,
+    GenerationStarted,
+    RetrievalFinished,
+    RetrievalStarted,
+    TextDelta,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,6 +164,98 @@ class GroundedAnswerService:
             query_vector=retrieved.query_vector,
             embedding_space_id=retrieved.embedding_space_id,
             model=self._model_that_answered(),
+        )
+
+    def answer_stream(
+        self,
+        question: str,
+        user,
+        conversation: Optional["Conversation"] = None,
+        history: Sequence["Turn"] = (),
+    ) -> Iterator[AnswerEvent]:
+        """`answer`, event by event, for a reader-facing progress line
+        (IR-326).
+
+        Retrieval, the disclosure gate, memory recall and the final
+        ``Done.answer`` are identical to ``answer()`` -- this is the same
+        service, ordering the same steps, only narrating them as it goes
+        rather than returning once at the end. Only synthesis actually
+        streams: ``self._llm.stream(...)`` in place of ``.generate(...)``,
+        yielding a ``TextDelta`` per chunk of raw text and accumulating it to
+        parse citations once, after the model has finished, for the reasons
+        ``TextDelta`` documents.
+        """
+        yield RetrievalStarted()
+        retrieved = self._retriever.retrieve(question, user, limit=self._max_sources)
+        degraded = retrieved.degraded
+
+        sources = self._disclosable(retrieved.passages)[: self._max_sources]
+        yield RetrievalFinished(
+            passage_count=len(sources),
+            record_count=len({s.record_id for s in sources}),
+            degraded=degraded,
+        )
+        if not sources:
+            yield Done(
+                GroundedAnswer(
+                    text="No readable sources were found for this question.",
+                    citations=(),
+                    degraded=degraded,
+                    state=NO_SOURCES,
+                    query_vector=retrieved.query_vector,
+                    embedding_space_id=retrieved.embedding_space_id,
+                )
+            )
+            return
+
+        recalled: Sequence["Turn"] = ()
+        if self._memory is not None and conversation is not None:
+            recalled = self._memory.recall(
+                conversation,
+                retrieved.query_vector,
+                retrieved.embedding_space_id,
+                exclude_ids=[turn.pk for turn in history],
+            )
+
+        yield GenerationStarted()
+        raw_parts: list[str] = []
+        try:
+            for delta in self._llm.stream(
+                system=SYSTEM_PROMPT,
+                user=build_prompt(question, sources, history=history, recalled=recalled),
+            ):
+                if delta.text:
+                    raw_parts.append(delta.text)
+                    yield TextDelta(text=delta.text)
+        except LLMUnavailable as exc:
+            logger.warning("answer generation unavailable: %s", exc)
+            yield Done(
+                GroundedAnswer(
+                    text=UNAVAILABLE_TEXT,
+                    citations=(),
+                    degraded=True,
+                    state=UNAVAILABLE,
+                    sources=tuple(sources),
+                    query_vector=retrieved.query_vector,
+                    embedding_space_id=retrieved.embedding_space_id,
+                )
+            )
+            return
+
+        raw = "".join(raw_parts)
+        text, citations = parse_citations(raw, sources)
+        _warn_if_citations_went_missing(raw, text, citations)
+        yield CitationsResolved(citations=citations)
+        yield Done(
+            GroundedAnswer(
+                text=text,
+                citations=citations,
+                degraded=degraded,
+                sources=tuple(sources),
+                query_vector=retrieved.query_vector,
+                embedding_space_id=retrieved.embedding_space_id,
+                model=self._model_that_answered(),
+            )
         )
 
     def _model_that_answered(self) -> Optional[str]:
