@@ -80,6 +80,17 @@ def has_back_reference(question: str) -> bool:
     )
 
 
+def turn_qa_lines(turns: Sequence["Turn"]) -> list[str]:
+    """``Q:``/``A:`` lines, one Turn each, in order. Shared with
+    ``apps.ai.answers.citations.build_prompt`` (IR-297)."""
+    lines: list[str] = []
+    for turn in turns:
+        lines.append(f"Q: {turn.question}")
+        if turn.answer:
+            lines.append(f"A: {turn.answer}")
+    return lines
+
+
 def build_resolution_prompt(question: str, turns: Sequence["Turn"]) -> str:
     """The user turn: the recent conversation, then the question to resolve.
 
@@ -87,10 +98,7 @@ def build_resolution_prompt(question: str, turns: Sequence["Turn"]) -> str:
     """
     recent = list(turns)[-MAX_HISTORY_TURNS:]
     lines = ["Conversation so far:"]
-    for turn in recent:
-        lines.append(f"Q: {turn.question}")
-        if turn.answer:
-            lines.append(f"A: {turn.answer}")
+    lines.extend(turn_qa_lines(recent))
     lines.append("")
     lines.append(f"Follow-up question: {question}")
     return "\n".join(lines)

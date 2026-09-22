@@ -4,6 +4,8 @@ Pure -- no vendor, no database. This is where a citation's correctness lives,
 so it has to be testable without an account.
 """
 
+from dataclasses import dataclass
+
 from apps.ai.answers.citations import (
     GroundedAnswer,
     build_prompt,
@@ -18,6 +20,15 @@ def chunk(n, content="a passage", page=1, title="A Thesis", path=("A Thesis", "3
         chunk_id=100 + n, record_id=n, record_title=title, content=content,
         context_path=path, source_page=page, score=1.0,
     )
+
+
+@dataclass
+class _Turn:
+    """Stands in for `apps.ai.models.Turn` (IR-297): `build_prompt` reads
+    only `question` and `answer`."""
+
+    question: str
+    answer: str = ""
 
 
 class PromptAssemblyTests:
@@ -46,6 +57,54 @@ class PromptAssemblyTests:
     def test_no_sources_still_produces_a_usable_prompt(self):
         prompt = build_prompt("q?", [])
         assert "q?" in prompt
+
+
+class ConversationHistoryInPromptTests:
+    """Recent Turns go in verbatim; recalled ones are labelled separately (IR-297)."""
+
+    def test_a_one_off_question_with_no_history_carries_none_of_this(self):
+        prompt = build_prompt("q?", [chunk(1)])
+        assert "Conversation so far" not in prompt
+        assert "Relevant earlier" not in prompt
+
+    def test_recent_turns_appear_verbatim_in_order(self):
+        history = [_Turn("first question", "first answer"), _Turn("second question")]
+        prompt = build_prompt("q?", [chunk(1)], history=history)
+        assert "Conversation so far:" in prompt
+        assert "Q: first question" in prompt
+        assert "A: first answer" in prompt
+        assert "Q: second question" in prompt
+        assert prompt.index("first question") < prompt.index("second question")
+
+    def test_a_turn_with_no_answer_yet_shows_no_answer_line(self):
+        prompt = build_prompt("q?", [chunk(1)], history=[_Turn("first question")])
+        assert "Q: first question" in prompt
+        assert "A:" not in prompt
+
+    def test_recalled_turns_are_labelled_separately_from_recent_ones(self):
+        prompt = build_prompt(
+            "q?",
+            [chunk(1)],
+            history=[_Turn("recent question", "recent answer")],
+            recalled=[_Turn("old fact question", "old fact answer")],
+        )
+        assert "Conversation so far:" in prompt
+        assert "Relevant earlier in this conversation:" in prompt
+        assert "Q: old fact question" in prompt
+        assert "A: old fact answer" in prompt
+        # Verbatim history reads before the recalled section, which reads
+        # before the question actually being asked.
+        assert (
+            prompt.index("recent question")
+            < prompt.index("Relevant earlier")
+            < prompt.index("old fact question")
+            < prompt.index("Question: q?")
+        )
+
+    def test_recalled_with_no_recent_history_still_labels_itself(self):
+        prompt = build_prompt("q?", [chunk(1)], recalled=[_Turn("old fact question")])
+        assert "Relevant earlier in this conversation:" in prompt
+        assert "Q: old fact question" in prompt
 
 
 class CitationParsingTests:
