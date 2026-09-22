@@ -1,12 +1,16 @@
-"""Writing a Turn down, and reading one back safely (IR-295).
+"""Writing a Turn down, and reading one back safely (IR-295, IR-299).
 
 A module, not a port: one implementation, fully exercisable through HTTP.
 
 Reading is where the security lives. A stored citation is a pointer, so
-reopening a transcript resolves those pointers now, against
-`visible_to(user)`. One into a Record the reader lost access to is dropped.
-IR-299 turns the dropped case into a record-level link with a re-resolved
-quote; dropping is the fail-closed version of the same rule.
+reopening a transcript re-resolves each one now, against two things that may
+have changed since it was written: whether the reader may still see the
+Record (`visible_to(user)`), and whether the chunk it pointed at is still
+live (re-chunking tombstones a chunk rather than deleting it, IR-115). A
+citation into a Record the reader lost access to is dropped outright --
+existence must not leak. A citation whose chunk was tombstoned degrades to a
+record-level pointer instead: the Record is still there to link to, but the
+text it once pointed at may no longer represent it.
 """
 from __future__ import annotations
 
@@ -15,7 +19,7 @@ from typing import Optional
 from django.db import transaction
 
 from apps.ai.answers.citations import GroundedAnswer
-from apps.ai.models import Conversation, Turn, TurnCitation, TurnEmbedding
+from apps.ai.models import Conversation, DocumentChunk, Turn, TurnCitation, TurnEmbedding
 from apps.ai.presentation import answer_body, answer_mode
 from apps.records.models import Record
 
@@ -89,19 +93,38 @@ def record_turn(
 
 
 def turns_for_reader(conversation: Conversation, user) -> list[dict]:
-    """The conversation's Turns, every citation re-checked against ``user``.
+    """The conversation's Turns, every citation re-resolved against ``user``.
 
-    One visibility query for the whole transcript, not one per citation.
+    Two queries for the whole transcript, not one pair per citation: which
+    cited Records the reader may still see, and which cited chunks are still
+    live. Everything else -- dropping an invisible citation, degrading a
+    tombstoned one -- is a lookup into those two results.
     """
     turns = list(conversation.turns.prefetch_related("citations"))
-    cited_record_ids = {
-        citation.record_id for turn in turns for citation in turn.citations.all()
-    }
-    visible = set(
+    all_citations = [
+        citation for turn in turns for citation in turn.citations.all()
+    ]
+
+    visible_titles = dict(
         Record.objects.visible_to(user)
-        .filter(pk__in=cited_record_ids)
-        .values_list("pk", flat=True)
+        .filter(pk__in={citation.record_id for citation in all_citations})
+        .values_list("pk", "title")
     )
+    live_chunks = {
+        chunk.pk: chunk
+        for chunk in DocumentChunk.objects.filter(
+            pk__in={
+                citation.chunk_id
+                for citation in all_citations
+                if citation.chunk_id is not None
+            },
+            deleted_at__isnull=True,
+        # Exactly the fields `_resolve_citation` reads. Deferred, not
+        # excluded -- accessing anything else here fires a silent
+        # per-instance query, so a field this helper starts reading must be
+        # added here too.
+        ).only("content", "source_page", "context_path")
+    }
 
     return [
         {
@@ -114,15 +137,48 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
             "widened": turn.widened,
             "created_at": turn.created_at,
             "citations": [
-                {
-                    "marker": citation.marker,
-                    "record_id": citation.record_id,
-                    "chunk_id": citation.chunk_id,
-                    "page": citation.page,
-                }
+                resolved
                 for citation in turn.citations.all()
-                if citation.record_id in visible
+                if (
+                    resolved := _resolve_citation(
+                        citation, visible_titles, live_chunks
+                    )
+                )
+                is not None
             ],
         }
         for turn in turns
     ]
+
+
+def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
+    """One stored citation, re-resolved against what the reader may see now.
+
+    ``None`` when the Record is no longer visible -- existence must not leak,
+    so this is indistinguishable from a citation that was never stored at
+    all. A record-level pointer (no ``text``, no ``record_title``) when the
+    Record is visible but the chunk it pointed at was tombstoned by a
+    re-chunk: the text it once quoted may no longer represent the record, so
+    showing it would be a stale quote rather than a re-resolved one.
+    """
+    if citation.record_id not in visible_titles:
+        return None
+
+    chunk = live_chunks.get(citation.chunk_id) if citation.chunk_id else None
+    if chunk is None:
+        return {
+            "marker": citation.marker,
+            "record_id": citation.record_id,
+            "chunk_id": citation.chunk_id,
+            "page": citation.page,
+        }
+
+    return {
+        "marker": citation.marker,
+        "chunk_id": citation.chunk_id,
+        "record_id": citation.record_id,
+        "record_title": visible_titles[citation.record_id],
+        "page": chunk.source_page,
+        "text": chunk.content,
+        "context_path": list(chunk.context_path or ()),
+    }
