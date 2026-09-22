@@ -11,13 +11,21 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from apps.ai.answers.citations import SYSTEM_PROMPT
+from apps.ai.answers.events import (
+    CitationsResolved,
+    Done,
+    GenerationStarted,
+    RetrievalFinished,
+    RetrievalStarted,
+    TextDelta,
+)
 from apps.ai.answers.service import (
     NO_ANSWER_HINT,
     UNAVAILABLE_TEXT,
     GroundedAnswerService,
 )
 from apps.ai.providers.openai_compatible import LLMUnavailable
-from apps.ai.providers.ports import LLMProvider
+from apps.ai.providers.ports import LLMProvider, StreamDelta
 from apps.ai.retrieval.ports import RetrievalResult, RetrievedChunk, Retriever
 from apps.records.models import Record
 from core.enums import PipelineStatus
@@ -326,3 +334,110 @@ class DriftTelemetryTests:
         service.answer("how often?", reader)
 
         assert "no citation-shaped markers were found" in service_logs.text
+
+
+class _StreamingLLM(LLMProvider):
+    """A vendor that streams a scripted sequence of deltas rather than
+    answering all at once -- `answer_stream`'s equivalent of `_RecordingLLM`.
+    """
+
+    def __init__(self, deltas):
+        self._deltas = deltas
+        self.prompts: list[tuple[str, str]] = []
+
+    def generate(self, system, user):
+        self.prompts.append((system, user))
+        return "".join(delta.text for delta in self._deltas)
+
+    def stream(self, system, user):
+        self.prompts.append((system, user))
+        yield from self._deltas
+
+
+class _BreaksMidStream(LLMProvider):
+    """A vendor that answers, then fails partway through -- so a caller
+    reading `answer_stream` can see the deltas already sent are not
+    discarded, only the `Done` they end in changes."""
+
+    def generate(self, system, user):
+        raise LLMUnavailable("429 rate limited")
+
+    def stream(self, system, user):
+        yield StreamDelta(text="partial ")
+        raise LLMUnavailable("429 rate limited")
+
+
+class StreamingTests:
+    """`answer_stream` (IR-326): the same steps `answer` takes, narrated as
+    they happen, ending in the identical `GroundedAnswer` on its `Done`."""
+
+    def test_events_are_yielded_in_order_with_a_grounded_answer(self, reader):
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [StreamDelta(text="Sampling was "), StreamDelta(text="weekly [1].")]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        events = list(service.answer_stream("how often?", reader))
+
+        assert [type(e) for e in events] == [
+            RetrievalStarted,
+            RetrievalFinished,
+            GenerationStarted,
+            TextDelta,
+            TextDelta,
+            CitationsResolved,
+            Done,
+        ]
+        assert [e.text for e in events if isinstance(e, TextDelta)] == [
+            "Sampling was ",
+            "weekly [1].",
+        ]
+        finished = events[1]
+        assert finished.passage_count == 1
+        assert finished.record_count == 1
+        assert finished.degraded is False
+
+        done = events[-1]
+        assert done.answer.is_grounded
+        assert done.answer.text == "Sampling was weekly [1]."
+        assert done.answer.citations[0].record_title == "Tilapia Study"
+        # Identical to what `answer()` would have produced from the same
+        # script joined into one string -- the streaming path adds
+        # narration, not a second answer.
+        assert done.answer.text == service.answer("how often?", reader).text
+
+    def test_nothing_disclosable_skips_straight_to_done(self, reader):
+        record = make_record("IP Work", is_ip=True)
+        llm = _StreamingLLM([StreamDelta(text="should never be asked for")])
+        service = GroundedAnswerService(_FixedRetriever([chunk_for(record)]), llm)
+
+        events = list(service.answer_stream("q?", reader))
+
+        assert [type(e) for e in events] == [RetrievalStarted, RetrievalFinished, Done]
+        assert llm.prompts == [], "the model was asked to answer from nothing"
+        assert "No readable sources" in events[-1].answer.text
+
+    def test_a_vendor_failure_mid_stream_ends_in_an_unavailable_done(self, reader):
+        record = make_record("Thesis")
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), _BreaksMidStream(), permits=lambda r: True
+        )
+
+        events = list(service.answer_stream("q?", reader))
+
+        assert [type(e) for e in events] == [
+            RetrievalStarted,
+            RetrievalFinished,
+            GenerationStarted,
+            TextDelta,
+            Done,
+        ]
+        done = events[-1]
+        assert done.answer.text == UNAVAILABLE_TEXT
+        assert done.answer.degraded is True
+        # ADR-008: retrieval worked, so the sources travel with the failure.
+        assert done.answer.sources
+        assert done.answer.citations == ()

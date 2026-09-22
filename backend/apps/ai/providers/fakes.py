@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import math
-from typing import Sequence
+from typing import Iterator, Optional, Sequence
 
-from .ports import EmbeddingProvider, LLMProvider, RerankedCandidate, Reranker
+from .ports import EmbeddingProvider, LLMProvider, RerankedCandidate, Reranker, StreamDelta
 
 
 #: Reserved dimension carrying the document/query marker. Reproducing
@@ -136,10 +136,26 @@ class ScriptedLLM(LLMProvider):
     answer path is exercisable with no key and no network.
     """
 
-    def __init__(self, reply: str = "Based on the sources, yes [1]."):
+    def __init__(
+        self,
+        reply: str = "Based on the sources, yes [1].",
+        stream_deltas: Optional[Sequence[StreamDelta]] = None,
+    ):
         self._reply = reply
+        # ``None`` means "no script" -- `stream()` then falls through to the
+        # port's own default, which wraps `generate()` as a single delta.
+        # Given explicitly (IR-326), it lets a streaming test assert on
+        # multiple `TextDelta` events without a vendor account.
+        self._stream_deltas = stream_deltas
         self.calls: list[tuple[str, str]] = []
 
     def generate(self, system: str, user: str) -> str:
         self.calls.append((system, user))
         return self._reply
+
+    def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
+        if self._stream_deltas is None:
+            yield from super().stream(system, user)
+            return
+        self.calls.append((system, user))
+        yield from self._stream_deltas

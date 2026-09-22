@@ -21,7 +21,7 @@ from apps.ai.providers.openai_compatible import (
     LLMUnavailable,
     OpenAICompatibleAdapter,
 )
-from apps.ai.providers.ports import LLMProvider
+from apps.ai.providers.ports import LLMProvider, StreamDelta
 
 pytestmark = pytest.mark.django_required
 
@@ -40,11 +40,39 @@ def provider(request) -> LLMProvider:
 class _FakeClient:
     """The one call the adapter makes, and a record of how it was made."""
 
-    def __init__(self, reply="An answer [1].", fail=None, empty=False):
+    def __init__(
+        self,
+        reply="An answer [1].",
+        fail=None,
+        empty=False,
+        stream_chunks=None,
+        stream_fail=None,
+    ):
         self.calls = []
         self._reply = reply
         self._fail = fail
         self._empty = empty
+        self._stream_chunks = stream_chunks
+        self._stream_fail = stream_fail
+
+    def _stream_response(self):
+        chunks = (
+            self._stream_chunks
+            if self._stream_chunks is not None
+            else [(self._reply, "")]
+        )
+
+        def generator():
+            for text, reasoning in chunks:
+                delta = type(
+                    "D", (), {"content": text or None, "reasoning": reasoning or None}
+                )()
+                choice = type("C", (), {"delta": delta})()
+                yield type("Chunk", (), {"choices": [choice]})()
+            if self._stream_fail:
+                raise self._stream_fail
+
+        return generator()
 
     class _Completions:
         def __init__(self, outer):
@@ -52,6 +80,10 @@ class _FakeClient:
 
         def create(self, **kwargs):
             self._outer.calls.append(kwargs)
+            if kwargs.get("stream"):
+                if self._outer._fail:
+                    raise self._outer._fail
+                return self._outer._stream_response()
             if self._outer._fail:
                 raise self._outer._fail
             if self._outer._empty:
@@ -75,6 +107,130 @@ class LLMProviderContractTests:
         first = provider.generate(system="s", user="u")
         second = provider.generate(system="s", user="u")
         assert isinstance(first, str) and isinstance(second, str)
+
+    def test_streaming_yields_at_least_one_delta_whose_text_concatenates_to_an_answer(
+        self, provider
+    ):
+        deltas = list(provider.stream(system="You answer questions.", user="A question?"))
+        assert deltas
+        assert all(isinstance(d, StreamDelta) for d in deltas)
+        assert "".join(d.text for d in deltas).strip()
+
+
+class DefaultStreamWrappingTests:
+    """`LLMProvider.stream`'s default (IR-325): every existing fake and
+    resilience decorator implements only `generate`, and must keep working
+    unmodified, wrapping the whole answer as one delta."""
+
+    def test_a_provider_with_no_stream_override_yields_exactly_one_delta(self):
+        provider = ScriptedLLM(reply="Based on the sources, yes [1].")
+        deltas = list(provider.stream(system="s", user="u"))
+        assert len(deltas) == 1
+        assert deltas[0] == StreamDelta(text="Based on the sources, yes [1].", reasoning="")
+
+    def test_the_default_still_calls_generate_with_the_same_arguments(self):
+        provider = ScriptedLLM()
+        list(provider.stream(system="rules", user="question"))
+        assert provider.calls == [("rules", "question")]
+
+
+class ScriptedStreamingTests:
+    """`ScriptedLLM(stream_deltas=...)` (IR-326): a deterministic multi-chunk
+    stream for a test that wants to observe deltas arriving one at a time,
+    without a vendor account."""
+
+    def test_the_scripted_deltas_are_yielded_in_order(self):
+        deltas = [StreamDelta(text="Sampling "), StreamDelta(text="was weekly [1].")]
+        provider = ScriptedLLM(stream_deltas=deltas)
+
+        assert list(provider.stream(system="s", user="u")) == deltas
+
+    def test_a_scripted_stream_records_its_call_without_calling_generate(self):
+        provider = ScriptedLLM(
+            reply="never used", stream_deltas=[StreamDelta(text="x")]
+        )
+        list(provider.stream(system="rules", user="question"))
+
+        assert provider.calls == [("rules", "question")]
+
+    def test_with_no_deltas_given_streaming_still_falls_back_to_the_default(self):
+        """No script (`stream_deltas=None`, the default) is not the same as
+        an empty one -- it means "behave like every other fake", which is
+        `LLMProvider.stream`'s single-delta wrap of `generate`."""
+        provider = ScriptedLLM(reply="Based on the sources, yes [1].")
+
+        assert list(provider.stream(system="s", user="u")) == [
+            StreamDelta(text="Based on the sources, yes [1].", reasoning="")
+        ]
+
+
+class StreamingAdapterTests:
+    """`OpenAICompatibleAdapter.stream` (IR-325): genuine streaming, not the
+    default's one-shot wrap -- multiple deltas, a separate reasoning channel,
+    and the vendor error handling `generate` already has."""
+
+    def test_multiple_chunks_arrive_as_separate_deltas(self):
+        client = _FakeClient(stream_chunks=[("Based ", ""), ("on the sources", ""), (" [1].", "")])
+        deltas = list(OpenAICompatibleAdapter(client=client).stream(system="s", user="u"))
+
+        assert [d.text for d in deltas] == ["Based ", "on the sources", " [1]."]
+        assert "".join(d.text for d in deltas) == "Based on the sources [1]."
+
+    def test_reasoning_deltas_arrive_on_their_own_channel(self):
+        client = _FakeClient(
+            stream_chunks=[("", "Let me check the sources."), ("The answer is yes [1].", "")]
+        )
+        deltas = list(
+            OpenAICompatibleAdapter(client=client, reasoning_effort="medium").stream(
+                system="s", user="u"
+            )
+        )
+
+        assert deltas[0].reasoning == "Let me check the sources."
+        assert deltas[0].text == ""
+        assert deltas[1].text == "The answer is yes [1]."
+        assert deltas[1].reasoning == ""
+
+    def test_reasoning_effort_is_sent_as_extra_body_once_iteration_starts(self):
+        client = _FakeClient()
+        deltas = OpenAICompatibleAdapter(client=client, reasoning_effort="high").stream(
+            system="s", user="u"
+        )
+        list(deltas)
+
+        assert client.calls[0]["extra_body"] == {
+            "reasoning_effort": "high",
+            "include_reasoning": True,
+        }
+        assert client.calls[0]["stream"] is True
+
+    def test_no_extra_body_when_reasoning_effort_is_not_configured(self):
+        client = _FakeClient()
+        list(OpenAICompatibleAdapter(client=client).stream(system="s", user="u"))
+
+        assert "extra_body" not in client.calls[0]
+
+    def test_a_vendor_error_mid_stream_becomes_one_domain_exception(self):
+        client = _FakeClient(
+            stream_chunks=[("Based ", "")], stream_fail=RuntimeError("connection reset")
+        )
+        with pytest.raises(LLMUnavailable):
+            list(OpenAICompatibleAdapter(client=client).stream(system="s", user="u"))
+
+    def test_a_vendor_error_before_the_stream_opens_becomes_one_domain_exception(self):
+        client = _FakeClient(fail=RuntimeError("429 rate limited"))
+        with pytest.raises(LLMUnavailable):
+            list(OpenAICompatibleAdapter(client=client).stream(system="s", user="u"))
+
+    def test_an_empty_stream_is_an_error_not_a_silent_no_op(self):
+        client = _FakeClient(stream_chunks=[])
+        with pytest.raises(LLMUnavailable):
+            list(OpenAICompatibleAdapter(client=client).stream(system="s", user="u"))
+
+    def test_it_refuses_to_stream_without_a_key(self, settings):
+        settings.LLM_API_KEY = ""
+        with pytest.raises(LLMUnavailable, match="LLM_API_KEY"):
+            list(OpenAICompatibleAdapter().stream(system="s", user="u"))
 
 
 class AdapterRequestTests:

@@ -17,11 +17,11 @@ to read themselves instead of a sentence nobody wrote.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Callable, Iterator, Optional, Sequence
 
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
-from apps.ai.retrieval.ports import RetrievedChunk, Retriever
+from apps.ai.retrieval.ports import RetrievalResult, RetrievedChunk, Retriever
 from apps.records.models import Record
 
 if TYPE_CHECKING:
@@ -36,6 +36,15 @@ from .citations import (
     build_prompt,
     parse_citations,
     unresolved_marker_candidates,
+)
+from .events import (
+    AnswerEvent,
+    CitationsResolved,
+    Done,
+    GenerationStarted,
+    RetrievalFinished,
+    RetrievalStarted,
+    TextDelta,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,6 +95,69 @@ class GroundedAnswerService:
         allowed = {rid for rid, rec in records.items() if self._permits(rec)}
         return [c for c in chunks if c.record_id in allowed]
 
+    def _retrieve_and_gate(
+        self, question: str, user
+    ) -> tuple[RetrievalResult, list[RetrievedChunk]]:
+        """Retrieval plus the disclosure gate -- the one step ``answer`` and
+        ``answer_stream`` must never disagree about, since it is where
+        IR-129's visibility guarantee lives. Shared rather than duplicated
+        (IR-326 code review) so a fix here reaches both.
+        """
+        retrieved = self._retriever.retrieve(question, user, limit=self._max_sources)
+        sources = self._disclosable(retrieved.passages)[: self._max_sources]
+        return retrieved, sources
+
+    def _recall(self, retrieved, conversation, history) -> Sequence["Turn"]:
+        if self._memory is None or conversation is None:
+            return ()
+        return self._memory.recall(
+            conversation,
+            retrieved.query_vector,
+            retrieved.embedding_space_id,
+            exclude_ids=[turn.pk for turn in history],
+        )
+
+    @staticmethod
+    def _no_sources_answer(retrieved) -> GroundedAnswer:
+        # Nothing to ground an answer in. Saying so beats asking a model to
+        # answer from nothing, which is how an invention gets written.
+        return GroundedAnswer(
+            text="No readable sources were found for this question.",
+            citations=(),
+            degraded=retrieved.degraded,
+            state=NO_SOURCES,
+            query_vector=retrieved.query_vector,
+            embedding_space_id=retrieved.embedding_space_id,
+        )
+
+    @staticmethod
+    def _unavailable_answer(retrieved, sources: Sequence[RetrievedChunk]) -> GroundedAnswer:
+        # Degraded whatever retrieval did: the reader is getting sources
+        # instead of an answer, which is exactly what the flag exists to
+        # say. The sources travel with it -- retrieval worked (ADR-008).
+        return GroundedAnswer(
+            text=UNAVAILABLE_TEXT,
+            citations=(),
+            degraded=True,
+            state=UNAVAILABLE,
+            sources=tuple(sources),
+            query_vector=retrieved.query_vector,
+            embedding_space_id=retrieved.embedding_space_id,
+        )
+
+    def _grounded_answer(
+        self, retrieved, sources: Sequence[RetrievedChunk], text: str, citations
+    ) -> GroundedAnswer:
+        return GroundedAnswer(
+            text=text,
+            citations=citations,
+            degraded=retrieved.degraded,
+            sources=tuple(sources),
+            query_vector=retrieved.query_vector,
+            embedding_space_id=retrieved.embedding_space_id,
+            model=self._model_that_answered(),
+        )
+
     def answer(
         self,
         question: str,
@@ -97,33 +169,11 @@ class GroundedAnswerService:
         into the prompt verbatim; memory recall adds older, relevant ones
         when ``conversation`` is given (IR-297).
         """
-        retrieved = self._retriever.retrieve(question, user, limit=self._max_sources)
-        # Read off the result, not off the object with `getattr(..., False)`:
-        # that default is what turned a dropped flag into a confident "the
-        # vendor was fine" instead of an error (IR-279).
-        degraded = retrieved.degraded
-
-        sources = self._disclosable(retrieved.passages)[: self._max_sources]
+        retrieved, sources = self._retrieve_and_gate(question, user)
         if not sources:
-            # Nothing to ground an answer in. Saying so beats asking a model to
-            # answer from nothing, which is how an invention gets written.
-            return GroundedAnswer(
-                text="No readable sources were found for this question.",
-                citations=(),
-                degraded=degraded,
-                state=NO_SOURCES,
-                query_vector=retrieved.query_vector,
-                embedding_space_id=retrieved.embedding_space_id,
-            )
+            return self._no_sources_answer(retrieved)
 
-        recalled: Sequence["Turn"] = ()
-        if self._memory is not None and conversation is not None:
-            recalled = self._memory.recall(
-                conversation,
-                retrieved.query_vector,
-                retrieved.embedding_space_id,
-                exclude_ids=[turn.pk for turn in history],
-            )
+        recalled = self._recall(retrieved, conversation, history)
 
         try:
             raw = self._llm.generate(
@@ -132,30 +182,64 @@ class GroundedAnswerService:
             )
         except LLMUnavailable as exc:
             logger.warning("answer generation unavailable: %s", exc)
-            # Degraded whatever retrieval did: the reader is getting sources
-            # instead of an answer, which is exactly what the flag exists to
-            # say. The sources travel with it -- retrieval worked.
-            return GroundedAnswer(
-                text=UNAVAILABLE_TEXT,
-                citations=(),
-                degraded=True,
-                state=UNAVAILABLE,
-                sources=tuple(sources),
-                query_vector=retrieved.query_vector,
-                embedding_space_id=retrieved.embedding_space_id,
-            )
+            return self._unavailable_answer(retrieved, sources)
 
         text, citations = parse_citations(raw, sources)
         _warn_if_citations_went_missing(raw, text, citations)
-        return GroundedAnswer(
-            text=text,
-            citations=citations,
-            degraded=degraded,
-            sources=tuple(sources),
-            query_vector=retrieved.query_vector,
-            embedding_space_id=retrieved.embedding_space_id,
-            model=self._model_that_answered(),
+        return self._grounded_answer(retrieved, sources, text, citations)
+
+    def answer_stream(
+        self,
+        question: str,
+        user,
+        conversation: Optional["Conversation"] = None,
+        history: Sequence["Turn"] = (),
+    ) -> Iterator[AnswerEvent]:
+        """`answer`, event by event, for a reader-facing progress line
+        (IR-326).
+
+        Retrieval, the disclosure gate, memory recall and the final
+        ``Done.answer`` are identical to ``answer()`` -- this is the same
+        service, ordering the same steps through the same private helpers,
+        only narrating them as it goes rather than returning once at the
+        end. Only synthesis actually streams: ``self._llm.stream(...)`` in
+        place of ``.generate(...)``, yielding a ``TextDelta`` per chunk of
+        raw text and accumulating it to parse citations once, after the
+        model has finished, for the reasons ``TextDelta`` documents.
+        """
+        yield RetrievalStarted()
+        retrieved, sources = self._retrieve_and_gate(question, user)
+        yield RetrievalFinished(
+            passage_count=len(sources),
+            record_count=len({s.record_id for s in sources}),
+            degraded=retrieved.degraded,
         )
+        if not sources:
+            yield Done(self._no_sources_answer(retrieved))
+            return
+
+        recalled = self._recall(retrieved, conversation, history)
+
+        yield GenerationStarted()
+        raw_parts: list[str] = []
+        try:
+            for delta in self._llm.stream(
+                system=SYSTEM_PROMPT,
+                user=build_prompt(question, sources, history=history, recalled=recalled),
+            ):
+                if delta.text:
+                    raw_parts.append(delta.text)
+                    yield TextDelta(text=delta.text)
+        except LLMUnavailable as exc:
+            logger.warning("answer generation unavailable: %s", exc)
+            yield Done(self._unavailable_answer(retrieved, sources))
+            return
+
+        raw = "".join(raw_parts)
+        text, citations = parse_citations(raw, sources)
+        _warn_if_citations_went_missing(raw, text, citations)
+        yield CitationsResolved(citations=citations)
+        yield Done(self._grounded_answer(retrieved, sources, text, citations))
 
     def _model_that_answered(self) -> Optional[str]:
         """Which model actually produced the answer just generated (IR-321).

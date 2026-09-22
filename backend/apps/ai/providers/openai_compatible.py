@@ -20,11 +20,12 @@ failure it hides.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 from django.conf import settings
 
 from .errors import ClassifiedError, ErrorKind, classify_message, classify_status_code
+from .ports import StreamDelta
 
 
 class LLMUnavailable(RuntimeError):
@@ -98,12 +99,14 @@ class OpenAICompatibleAdapter:
         model: Optional[str] = None,
         client: Any = None,
         temperature: Optional[float] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> None:
         self._base_url = base_url
         self._api_key = api_key
         self._model = model
         self._client = client
         self._temperature = temperature
+        self._reasoning_effort = reasoning_effort
 
     # -- configuration ------------------------------------------------------
 
@@ -177,3 +180,82 @@ class OpenAICompatibleAdapter:
             # indication that anything went wrong.
             raise LLMUnavailable("the model returned an empty message")
         return content
+
+    def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
+        """Genuine streaming (IR-325), for a model reachable behind this
+        adapter's vendor account.
+
+        ``reasoning_effort`` -- unset by default -- is sent only when
+        configured, as a Groq/``openai/gpt-oss-120b`` extension the ``openai``
+        SDK does not type, alongside ``include_reasoning`` so a reasoning
+        model's thinking arrives as its own ``delta.reasoning`` channel
+        instead of being interleaved into ``delta.content``. A vendor that
+        does not recognise it (any non-reasoning OpenAI-compatible model)
+        simply never populates ``StreamDelta.reasoning``.
+        """
+        client = self._client or self._build_client()
+
+        temperature = (
+            self._temperature
+            if self._temperature is not None
+            else getattr(settings, "LLM_TEMPERATURE", 0.1)
+        )
+        reasoning_effort = (
+            self._reasoning_effort
+            if self._reasoning_effort is not None
+            else getattr(settings, "LLM_REASONING_EFFORT", "")
+        )
+
+        extra: dict = {}
+        if reasoning_effort:
+            extra["extra_body"] = {
+                "reasoning_effort": reasoning_effort,
+                "include_reasoning": True,
+            }
+
+        try:
+            chunks = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=temperature,
+                stream=True,
+                **extra,
+            )
+        except LLMUnavailable:
+            raise
+        except Exception as exc:
+            classified = _classify(exc)
+            raise LLMUnavailable(
+                f"{type(exc).__name__}: {exc}", kind=classified.kind
+            ) from exc
+
+        received_any = False
+        try:
+            for chunk in chunks:
+                choices = getattr(chunk, "choices", None) or []
+                if not choices:
+                    continue
+                delta = choices[0].delta
+                text = getattr(delta, "content", None) or ""
+                reasoning = (
+                    getattr(delta, "reasoning", None)
+                    or getattr(delta, "reasoning_content", None)
+                    or ""
+                )
+                if not text and not reasoning:
+                    continue
+                received_any = True
+                yield StreamDelta(text=text, reasoning=reasoning)
+        except LLMUnavailable:
+            raise
+        except Exception as exc:
+            classified = _classify(exc)
+            raise LLMUnavailable(
+                f"{type(exc).__name__}: {exc}", kind=classified.kind
+            ) from exc
+
+        if not received_any:
+            raise LLMUnavailable("the model returned no choices")

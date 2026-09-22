@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AIStatusView,
     ChatQueryView,
+    ChatStreamView,
     SemanticSearchView,
     ConversationListCreateView,
     ConversationDetailView,
@@ -15,7 +16,8 @@ from .views import (
 # stays out until its service exists — a 404 is more honest than a 500 from a
 # `pass` body.
 urlpatterns = [
-    path("ask/",    ChatQueryView.as_view(),      name="ai-ask"),
+    path("ask/",        ChatQueryView.as_view(),  name="ai-ask"),
+    path("ask/stream/", ChatStreamView.as_view(), name="ai-ask-stream"),
     path("search/", SemanticSearchView.as_view(), name="ai-search"),
     path("status/", AIStatusView.as_view(),       name="ai-status"),
     path("conversations/",           ConversationListCreateView.as_view(),
