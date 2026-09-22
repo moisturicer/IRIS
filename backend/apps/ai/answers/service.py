@@ -154,6 +154,23 @@ class GroundedAnswerService:
             sources=tuple(sources),
             query_vector=retrieved.query_vector,
             embedding_space_id=retrieved.embedding_space_id,
+            model=self._model_that_answered(),
+        )
+
+    def _model_that_answered(self) -> Optional[str]:
+        """Which model actually produced the answer just generated (IR-321).
+
+        `FallbackLLMProvider.last_model_used` is read first because it is the
+        only source of truth when a fallback provider handled the call --
+        `.model` alone would report whichever provider is configured first,
+        which is wrong exactly when a fallback happened. Every other
+        `LLMProvider` this composes with (a lone adapter, a retry/circuit
+        decorator, a test fake) either has no `.model` or reports the one
+        provider it can ever call, so falling back to `.model` is correct
+        for all of them.
+        """
+        return getattr(self._llm, "last_model_used", None) or getattr(
+            self._llm, "model", None
         )
 
 

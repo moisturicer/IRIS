@@ -383,6 +383,25 @@ LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
 # higher temperature buys variety nobody asked for and invites invention.
 LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
 
+# ---- Inference provider fallback (IR-321) --------------------------------
+#
+# Optional, and empty by default -- a deployment that sets nothing here runs
+# exactly the single-provider policy the block above describes. Setting
+# LLM_FALLBACK_API_KEY opts into apps.ai.resilience.llm.FallbackLLMProvider,
+# which switches to this provider when the primary's failure is rate-limit,
+# network or timeout shaped.
+#
+# This is a recorded contradiction, not a quiet extension: ADR-008 rejected
+# "a secondary LLM provider for failover" by name -- a second API key, a
+# second data-governance question, a second cost line -- and ADR-021 restates
+# it as "one provider per environment". Built anyway, per IR-321's explicit
+# acceptance criteria and an explicit decision to implement it and flag the
+# conflict for a human to resolve (amend ADR-008, or revert this half of the
+# ticket) rather than resolve it unilaterally. See apps/ai/resilience/llm.py.
+LLM_FALLBACK_BASE_URL = config("LLM_FALLBACK_BASE_URL", default="")
+LLM_FALLBACK_API_KEY  = config("LLM_FALLBACK_API_KEY", default="")
+LLM_FALLBACK_MODEL    = config("LLM_FALLBACK_MODEL", default="")
+
 # ---- Question resolution (IR-296, ADR-026 Decisions 1 and 8) -------------
 #
 # "what about its limitations?" has no subject on its own -- retrieval finds
