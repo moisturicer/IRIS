@@ -32,7 +32,13 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai import resolution
-from apps.ai.answers.events import CitationsResolved, Done, RetrievalFinished, TextDelta
+from apps.ai.answers.events import (
+    CitationsResolved,
+    Done,
+    ReasoningDelta,
+    RetrievalFinished,
+    TextDelta,
+)
 from apps.ai.composition import composition_root
 from apps.ai.conversations import record_turn
 from apps.ai.models import Conversation
@@ -274,6 +280,11 @@ class ChatQueryView(APIView):
                 # Whether this answer left its Conversation's Record scope
                 # (IR-298) -- always false with no scope to have left.
                 "widened": prepared.widened,
+                # Whether the model produced any reasoning (IR-327) -- never
+                # the reasoning text itself, which is never sent. Always
+                # false here: `answer()` calls `generate()`, not `stream()`,
+                # so this endpoint never requests a reasoning channel at all.
+                "had_reasoning": answer.had_reasoning,
             }
         )
 
@@ -294,13 +305,18 @@ class ChatStreamView(APIView):
 
     Event vocabulary, in order: `retrieval_started`, `retrieval_finished`
     (a passage/record count for the progress line), `generation_started`,
-    `text_delta` (repeated), `citations_resolved`, `done` (the same
-    `answer`/`citations`/`sources`/`mode`/`degraded`/`widened` shape
-    `ChatQueryView` returns, so a client ends up in an identical state
-    either way). A memory recall (IR-297) gets no event of its own --
-    folded silently into retrieval, matching the synchronous path's own
-    ordering. `generation_started` and every event after it are skipped
-    outright when there are no readable sources to answer from.
+    `reasoning_delta` and `text_delta` interleaved as the model produces
+    them (IR-327 -- a reasoning delta never contains answer text and a text
+    delta never contains reasoning, whichever channel the vendor actually
+    sent it on), `citations_resolved`, `done` (the same
+    `answer`/`citations`/`sources`/`mode`/`degraded`/`widened`/`had_reasoning`
+    shape `ChatQueryView` returns, so a client ends up in an identical state
+    either way -- `had_reasoning` records only *that* reasoning happened,
+    never the reasoning text, which is discarded once the stream ends). A
+    memory recall (IR-297) gets no event of its own -- folded silently into
+    retrieval, matching the synchronous path's own ordering.
+    `generation_started` and every event after it are skipped outright when
+    there are no readable sources to answer from.
 
     **This stays a plain synchronous view.** Retrieval, the disclosure gate,
     memory recall and persistence are the exact same synchronous calls
@@ -352,7 +368,7 @@ class ChatStreamView(APIView):
                             "degraded": event.degraded,
                         },
                     )
-                elif isinstance(event, TextDelta):
+                elif isinstance(event, (TextDelta, ReasoningDelta)):
                     yield _sse(event.name, {"text": event.text})
                 elif isinstance(event, CitationsResolved):
                     yield _sse(event.name, {"citations": citations(event.citations)})
@@ -382,6 +398,7 @@ class ChatStreamView(APIView):
                             "mode": mode,
                             "degraded": answer.degraded,
                             "widened": prepared.widened,
+                            "had_reasoning": answer.had_reasoning,
                         },
                     )
                 else:

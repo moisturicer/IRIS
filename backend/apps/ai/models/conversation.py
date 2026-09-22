@@ -88,6 +88,13 @@ class Turn(models.Model):
     inferred from the citations a Turn happens to carry, because a widened
     question that still matched nothing outside its own paper would otherwise
     look identical to one that was never widened at all.
+
+    `had_reasoning` is a structural fact, never the reasoning text itself
+    (IR-327): whether the model produced any reasoning while answering this
+    Turn, over the streaming path's dedicated channel or leaked into the text
+    channel and caught there. Reasoning content is never stored -- only
+    `answer_stream`'s narration ever sees it, and it is discarded once the
+    stream ends.
     """
 
     conversation = models.ForeignKey(
@@ -99,6 +106,7 @@ class Turn(models.Model):
     state = models.CharField(max_length=20)
     degraded = models.BooleanField(default=False)
     widened = models.BooleanField(default=False)
+    had_reasoning = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

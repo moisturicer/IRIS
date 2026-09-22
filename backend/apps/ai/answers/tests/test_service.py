@@ -15,6 +15,7 @@ from apps.ai.answers.events import (
     CitationsResolved,
     Done,
     GenerationStarted,
+    ReasoningDelta,
     RetrievalFinished,
     RetrievalStarted,
     TextDelta,
@@ -441,3 +442,181 @@ class StreamingTests:
         # ADR-008: retrieval worked, so the sources travel with the failure.
         assert done.answer.sources
         assert done.answer.citations == ()
+
+
+class ReasoningTests:
+    """Reasoning is a structurally distinct channel throughout
+    `answer_stream` (IR-327) -- both the vendor's own dedicated
+    `StreamDelta.reasoning` field, and the defensive `<think>...</think>`
+    split for the known behaviour where reasoning leaks into `.text`
+    instead (reported against gpt-oss-120b on Groq).
+    """
+
+    def test_reasoning_deltas_are_distinct_from_text_deltas(self, reader):
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [
+                StreamDelta(reasoning="Let me check the sources. "),
+                StreamDelta(text="Sampling was "),
+                StreamDelta(reasoning="Looks consistent."),
+                StreamDelta(text="weekly [1]."),
+            ]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        events = list(service.answer_stream("how often?", reader))
+
+        assert [type(e) for e in events] == [
+            RetrievalStarted,
+            RetrievalFinished,
+            GenerationStarted,
+            ReasoningDelta,
+            TextDelta,
+            ReasoningDelta,
+            TextDelta,
+            CitationsResolved,
+            Done,
+        ]
+        reasoning_texts = [e.text for e in events if isinstance(e, ReasoningDelta)]
+        assert reasoning_texts == ["Let me check the sources. ", "Looks consistent."]
+        text_texts = [e.text for e in events if isinstance(e, TextDelta)]
+        assert text_texts == ["Sampling was ", "weekly [1]."]
+
+    def test_reasoning_is_never_concatenated_into_the_stored_answer(self, reader):
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [
+                StreamDelta(reasoning="internal monologue"),
+                StreamDelta(text="Sampling was weekly [1]."),
+            ]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        done = list(service.answer_stream("how often?", reader))[-1]
+
+        assert done.answer.text == "Sampling was weekly [1]."
+        assert "internal monologue" not in done.answer.text
+
+    def test_had_reasoning_flag_is_false_when_no_reasoning_arrived(self, reader):
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM([StreamDelta(text="Sampling was weekly [1].")])
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        done = list(service.answer_stream("how often?", reader))[-1]
+
+        assert done.answer.had_reasoning is False
+
+    def test_had_reasoning_flag_is_true_when_reasoning_arrived(self, reader):
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [
+                StreamDelta(reasoning="thinking"),
+                StreamDelta(text="Sampling was weekly [1]."),
+            ]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        done = list(service.answer_stream("how often?", reader))[-1]
+
+        assert done.answer.had_reasoning is True
+
+    def test_had_reasoning_survives_a_vendor_failure_after_reasoning_arrived(self, reader):
+        """Reasoning that genuinely streamed before the model failed is still
+        a fact worth recording, even though the answer itself becomes the
+        unavailable-state text."""
+        record = make_record("Thesis")
+
+        class _ReasonsThenBreaks(LLMProvider):
+            def generate(self, system, user):
+                raise LLMUnavailable("429 rate limited")
+
+            def stream(self, system, user):
+                yield StreamDelta(reasoning="thinking it over")
+                raise LLMUnavailable("429 rate limited")
+
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), _ReasonsThenBreaks(), permits=lambda r: True
+        )
+
+        done = list(service.answer_stream("q?", reader))[-1]
+
+        assert done.answer.text == UNAVAILABLE_TEXT
+        assert done.answer.had_reasoning is True
+
+    def test_reasoning_leaked_into_the_text_channel_is_redirected(self, reader):
+        """The defensive case (IR-327): gpt-oss-120b on Groq is known to emit
+        reasoning inside `<think>` tags in `.text` even when configured
+        hidden. It must arrive as `ReasoningDelta`, not `TextDelta`, and
+        never reach the stored answer."""
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [
+                StreamDelta(text="<think>the model's inner monologue</think>"),
+                StreamDelta(text="Sampling was weekly [1]."),
+            ]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        events = list(service.answer_stream("how often?", reader))
+
+        text_deltas = [e.text for e in events if isinstance(e, TextDelta)]
+        reasoning_deltas = [e.text for e in events if isinstance(e, ReasoningDelta)]
+        assert "".join(text_deltas) == "Sampling was weekly [1]."
+        assert "".join(reasoning_deltas) == "the model's inner monologue"
+
+        done = events[-1]
+        assert done.answer.text == "Sampling was weekly [1]."
+        assert done.answer.had_reasoning is True
+        assert done.answer.is_grounded
+
+    def test_a_leaked_think_block_split_across_chunks_is_still_caught(self, reader):
+        """The boundary case a naive per-chunk string check would miss: the
+        vendor is free to split `<think>` across two deltas."""
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [
+                StreamDelta(text="<thi"),
+                StreamDelta(text="nk>secret</think>Sampling was weekly [1]."),
+            ]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        done = list(service.answer_stream("how often?", reader))[-1]
+
+        assert done.answer.text == "Sampling was weekly [1]."
+        assert done.answer.had_reasoning is True
+
+    def test_a_citation_shaped_marker_hidden_in_leaked_reasoning_is_never_parsed(self, reader):
+        """Reasoning content is never scanned for citation markers -- a
+        marker-shaped string the model happened to think out loud must not
+        resolve into a citation the reader never actually saw cited."""
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [
+                StreamDelta(
+                    text="<think>maybe cite [1] here, or [2]?</think>"
+                    "Sampling was weekly [1]."
+                ),
+            ]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        done = list(service.answer_stream("how often?", reader))[-1]
+
+        assert done.answer.text == "Sampling was weekly [1]."
+        assert len(done.answer.citations) == 1
+        assert done.answer.citations[0].marker == 1

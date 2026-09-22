@@ -54,6 +54,9 @@ def record_turn(
     the caller's decision to record, not something re-derived from citations:
     a widened question that still matched nothing outside its own paper must
     still say it was widened.
+
+    ``answer.had_reasoning`` (IR-327) is stored as the structural flag it is
+    -- never the reasoning text, which `answer_stream` already discarded.
     """
     turn = Turn.objects.create(
         conversation=conversation,
@@ -63,6 +66,7 @@ def record_turn(
         state=answer.state,
         degraded=answer.degraded,
         widened=widened,
+        had_reasoning=answer.had_reasoning,
     )
     TurnCitation.objects.bulk_create(
         TurnCitation(
@@ -135,6 +139,7 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
             "state": answer_mode(turn.state),
             "degraded": turn.degraded,
             "widened": turn.widened,
+            "had_reasoning": turn.had_reasoning,
             "created_at": turn.created_at,
             "citations": [
                 resolved

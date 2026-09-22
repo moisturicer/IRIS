@@ -48,6 +48,21 @@ class GenerationStarted(AnswerEvent):
 
 
 @dataclass(frozen=True)
+class ReasoningDelta(AnswerEvent):
+    """One increment of the model's reasoning (IR-327) -- structurally
+    distinct from `TextDelta` at every layer downstream, per the vendor's own
+    separate `reasoning` channel (IR-325's `StreamDelta.reasoning`) and per
+    the defensive `<think>...</think>` split in `apps/ai/answers/reasoning.py`
+    for the known leak into the text channel. Never concatenated into the
+    answer, never scanned for citation markers, never persisted as
+    `Turn.answer` -- only whether any arrived is recorded, on `Turn.had_reasoning`.
+    """
+
+    text: str
+    name: ClassVar[str] = "reasoning_delta"
+
+
+@dataclass(frozen=True)
 class TextDelta(AnswerEvent):
     """One increment of the model's answer, exactly as written.
 
