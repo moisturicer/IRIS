@@ -21,7 +21,7 @@ on `RetrievalResult`, which a decorator has to work to lose.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Callable, Optional
 
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 
@@ -33,6 +33,20 @@ from apps.records.models import Record
 from .ports import FULL_TEXT, RetrievalResult, RetrievedChunk, Retriever
 
 logger = logging.getLogger(__name__)
+
+
+def is_vendor_unavailable(exc: BaseException) -> bool:
+    """The two failures this module can name without importing an adapter
+    (IR-132): IRIS's own resilience signals, raised only when a vendor call
+    was refused outright (an open circuit) or already over its own budget (a
+    spent rate limit).
+
+    Exported so a composition root can extend it with a vendor-specific
+    ``.kind`` check -- a raw ``VoyageError`` is not always one of these two,
+    see ``composition._vendor_failures`` (IR-320) -- without duplicating this
+    half of the decision.
+    """
+    return isinstance(exc, (CircuitOpen, RateLimited))
 
 
 class FullTextRetriever(Retriever):
@@ -97,26 +111,36 @@ class DegradableRetriever(Retriever):
     """Tries the vector path; falls back to full text when the vendor is out.
 
     Only falls back for failures that mean *the vendor is unavailable* --
-    an open circuit, an exhausted rate limit, a vendor error. A bug in our own
-    query is not a vendor outage, and silently returning keyword results for it
-    would hide the bug behind slightly worse answers, which is how a defect
-    survives a release.
+    an open circuit, an exhausted rate limit, a network or timeout failure. A
+    bug in our own query is not a vendor outage, and silently returning
+    keyword results for it would hide the bug behind slightly worse answers,
+    which is how a defect survives a release. Nor is every vendor error an
+    outage (IR-320): an auth failure or a rejected oversized prompt will fail
+    identically against full text, so degrading past them would hide a real
+    problem the same way.
+
+    ``degrade_on`` is a predicate rather than a tuple of exception types,
+    because that distinction cannot be made by type alone -- a single vendor
+    exception (``VoyageError``) can be either kind of failure, and only its
+    ``.kind`` attribute says which.
     """
 
     def __init__(
         self,
         primary: Retriever,
         fallback: Optional[Retriever] = None,
-        degrade_on: tuple[type[BaseException], ...] = (CircuitOpen, RateLimited),
+        degrade_on: Callable[[BaseException], bool] = is_vendor_unavailable,
     ) -> None:
         self._primary = primary
         self._fallback = fallback or FullTextRetriever()
-        self._degrade_on = degrade_on
+        self._should_degrade = degrade_on
 
     def retrieve(self, question: str, user, limit: int = 20):
         try:
             results = self._primary.retrieve(question, user, limit=limit)
-        except self._degrade_on as exc:
+        except Exception as exc:
+            if not self._should_degrade(exc):
+                raise
             logger.warning(
                 "retrieval degraded to full-text search: %s", exc, exc_info=False
             )

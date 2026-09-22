@@ -23,6 +23,7 @@ import httpx
 from django.conf import settings
 
 from .batching import batch_documents_by_token_budget, estimate_tokens
+from .errors import ClassifiedError, ErrorKind, classify_status_code
 from .ports import EmbeddingProvider, RerankedCandidate, Reranker
 
 _BASE_URL = "https://api.voyageai.com/v1"
@@ -60,7 +61,17 @@ Transport = Callable[[str, dict[str, Any]], dict[str, Any]]
 
 class VoyageError(RuntimeError):
     """A Voyage call failed. Raised rather than swallowed so the resilience
-    decorators in IR-132 have something to catch."""
+    decorators in IR-132 have something to catch.
+
+    ``kind`` adds *why*, without widening that boundary (IR-320): every
+    existing catch site still just catches ``VoyageError``, and a caller that
+    wants to branch on the reason reads ``.kind`` rather than a Voyage-specific
+    exception this type would otherwise have to grow one of.
+    """
+
+    def __init__(self, message: str, kind: ErrorKind = ErrorKind.UNKNOWN) -> None:
+        super().__init__(message)
+        self.kind = kind
 
 
 def _api_key() -> str:
@@ -70,9 +81,33 @@ def _api_key() -> str:
             "VOYAGE_API_KEY is not set. Per CLAUDE.md's environment rule the "
             "application must fail on a missing required secret rather than "
             "defaulting silently -- there is no unauthenticated Voyage mode "
-            "and no local model to fall back to (ADR-008, ADR-015)."
+            "and no local model to fall back to (ADR-008, ADR-015).",
+            kind=ErrorKind.AUTH,
         )
     return key
+
+
+def _classify_transport_error(exc: httpx.HTTPError) -> ClassifiedError:
+    """Classify a failure that never got a response back (IR-320).
+
+    ``httpx.TimeoutException`` is the one subtype worth distinguishing from
+    every other transport failure -- a dropped connection, a DNS failure, a
+    reset -- which all mean the same thing to a caller: the wire, not the
+    vendor's application logic, is where this failed.
+    """
+    if isinstance(exc, httpx.TimeoutException):
+        return ClassifiedError(ErrorKind.TIMEOUT, exc)
+    return ClassifiedError(ErrorKind.NETWORK, exc)
+
+
+def _classify_response(response: httpx.Response) -> ErrorKind:
+    """Classify a failure the vendor did answer, just with an error status.
+
+    Read by status code alone, not a parsed error body: Voyage's error-body
+    shape is not documented here and guessing at one risks silently mis-typing
+    a real failure. The status code is the one thing this can trust.
+    """
+    return classify_status_code(response.status_code, None, response.text)
 
 
 def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -83,11 +118,17 @@ def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
             headers={"Authorization": f"Bearer {_api_key()}"},
             timeout=getattr(settings, "VOYAGE_TIMEOUT_SECONDS", 60),
         )
+    except VoyageError:
+        raise
     except httpx.HTTPError as exc:
-        raise VoyageError(f"Voyage request to {path} failed: {exc}") from exc
+        classified = _classify_transport_error(exc)
+        raise VoyageError(
+            f"Voyage request to {path} failed: {exc}", kind=classified.kind
+        ) from exc
     if response.status_code >= 400:
         raise VoyageError(
-            f"Voyage returned {response.status_code} at {path}: {response.text[:300]}"
+            f"Voyage returned {response.status_code} at {path}: {response.text[:300]}",
+            kind=_classify_response(response),
         )
     return response.json()
 

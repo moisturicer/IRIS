@@ -67,10 +67,17 @@ def a_chunk(chunk_id: int = 1) -> RetrievedChunk:
 
 class _Failing(Retriever):
     """A vendor that is out. The failure is injected through the port rather
-    than by patching a call, because what is under test is the result."""
+    than by patching a call, because what is under test is the result.
+
+    Defaults to an open circuit; a test that cares about a specific
+    classified failure (IR-320) passes its own exception instead.
+    """
+
+    def __init__(self, exception: Optional[BaseException] = None):
+        self._exception = exception or CircuitOpen("the vendor is out")
 
     def retrieve(self, question, user, limit=20):
-        raise CircuitOpen("the vendor is out")
+        raise self._exception
 
 
 class _Fixed(Retriever):
@@ -86,10 +93,16 @@ _DEGRADED_FALLBACK = RetrievalResult(
 )
 
 
-def full_stack(inner: Retriever, fallback: Retriever = None) -> Retriever:
+def full_stack(
+    inner: Retriever, fallback: Retriever = None, degrade_on=None
+) -> Retriever:
     """The stack as it is composed today: reranking wrapped around
     degradation. Reranking is the decorator that dropped the flag, so a test
     that stops below it tests nothing.
+
+    ``degrade_on`` defaults to ``DegradableRetriever``'s own default; a test
+    exercising the composition root's kind-aware policy (IR-320) passes
+    ``composition._vendor_failures()`` instead.
 
     Note what this ordering means and what this ticket does not change: the
     reranker sits *outside* the degradable wrapper, so a reranking vendor
@@ -97,8 +110,11 @@ def full_stack(inner: Retriever, fallback: Retriever = None) -> Retriever:
     ticket's framing says "the embedding **or reranking** vendor". Whether
     the composition root should wrap the other way is IR-283's to decide.
     """
+    kwargs = {} if degrade_on is None else {"degrade_on": degrade_on}
     return RerankingRetriever(
-        DegradableRetriever(inner, fallback=fallback or _Fixed(_DEGRADED_FALLBACK)),
+        DegradableRetriever(
+            inner, fallback=fallback or _Fixed(_DEGRADED_FALLBACK), **kwargs
+        ),
         reranker=NoOpReranker(),
         policy_enabled=False,
     )
@@ -173,6 +189,46 @@ def test_the_mode_and_space_a_retriever_reported_survive_the_stack():
     result = full_stack(healthy).retrieve("sampling", None)
 
     assert (result.mode, result.embedding_space_id) == (VECTOR, 7)
+
+
+# ---------------------------------------------------------------------------
+# IR-320: not every vendor failure means the vendor is unavailable
+# ---------------------------------------------------------------------------
+
+
+def test_an_auth_failure_does_not_degrade(reader):
+    """A bad key fails identically against full-text search too -- degrading
+    past it would hide a configuration mistake behind a worse answer instead
+    of surfacing it, exercised through the composition root's actual policy
+    rather than a bare `DegradableRetriever`."""
+    from apps.ai.composition import _vendor_failures
+    from apps.ai.providers.errors import ErrorKind
+    from apps.ai.providers.voyage import VoyageError
+
+    failing = _Failing(VoyageError("bad key", kind=ErrorKind.AUTH))
+
+    with pytest.raises(VoyageError):
+        full_stack(failing, degrade_on=_vendor_failures()).retrieve("sampling", reader)
+
+
+@pytest.mark.parametrize("kind_name", ["RATE_LIMIT", "NETWORK", "TIMEOUT"])
+def test_a_reachability_failure_degrades(reader, kind_name):
+    """A rate limit, a dropped connection, or a slow vendor all mean the same
+    thing a `CircuitOpen`/`RateLimited` already means: try full-text search
+    and say so."""
+    from apps.ai.composition import _vendor_failures
+    from apps.ai.providers.errors import ErrorKind
+    from apps.ai.providers.voyage import VoyageError
+
+    make_record("A Thesis", reader, ["weekly pond sampling"])
+    failing = _Failing(VoyageError("down", kind=getattr(ErrorKind, kind_name)))
+
+    result = full_stack(
+        failing, fallback=FullTextRetriever(), degrade_on=_vendor_failures()
+    ).retrieve("sampling", reader)
+
+    assert result.degraded is True
+    assert [p.content for p in result.passages] == ["weekly pond sampling"]
 
 
 # ---------------------------------------------------------------------------

@@ -11,8 +11,11 @@ returns nothing -- is tested without a network or an account.
 
 import os
 
+import httpx
+import openai
 import pytest
 
+from apps.ai.providers.errors import ErrorKind
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.openai_compatible import (
     LLMUnavailable,
@@ -122,3 +125,88 @@ class AdapterRequestTests:
         client = _FakeClient()
         OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
         assert client.calls[0]["temperature"] <= 0.3
+
+
+def _status_error(cls, status: int, **kwargs):
+    """A real ``openai`` SDK exception, not a stand-in for one -- IR-320's
+    classifier reads the SDK's own hierarchy, so the test has to hand it a
+    genuine instance rather than something that merely looks like one.
+    ``openai``'s exception constructors only read ``.status_code`` and
+    ``.headers`` off the response they're given, so a real ``httpx.Response``
+    satisfies them without reaching for the vendored ``httpx2`` the SDK uses
+    internally -- this file has no reason to depend on that implementation
+    detail when the repo's own ``httpx`` already does the job.
+    """
+    request = httpx.Request("POST", "https://example.invalid/v1/chat/completions")
+    return cls(response=httpx.Response(status, request=request), **kwargs)
+
+
+class VendorFailureClassificationTests:
+    """`LLMUnavailable.kind` is read from the vendor's own exception type or
+    status code first, and only falls back to a message heuristic when the
+    SDK gives nothing better (IR-320)."""
+
+    def test_an_authentication_error_is_classified_as_auth(self):
+        exc = _status_error(openai.AuthenticationError, 401, message="bad key", body=None)
+        client = _FakeClient(fail=exc)
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.AUTH
+
+    def test_a_permission_denied_error_is_classified_as_auth(self):
+        exc = _status_error(
+            openai.PermissionDeniedError, 403, message="no access", body=None
+        )
+        client = _FakeClient(fail=exc)
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.AUTH
+
+    def test_a_rate_limit_error_is_classified_as_rate_limit(self):
+        exc = _status_error(openai.RateLimitError, 429, message="slow down", body=None)
+        client = _FakeClient(fail=exc)
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.RATE_LIMIT
+
+    def test_an_api_timeout_is_classified_as_timeout(self):
+        request = httpx.Request("POST", "https://example.invalid/v1/chat/completions")
+        exc = openai.APITimeoutError(request=request)
+        client = _FakeClient(fail=exc)
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.TIMEOUT
+
+    def test_a_connection_error_is_classified_as_network(self):
+        request = httpx.Request("POST", "https://example.invalid/v1/chat/completions")
+        exc = openai.APIConnectionError(request=request)
+        client = _FakeClient(fail=exc)
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.NETWORK
+
+    def test_a_context_length_bad_request_is_classified_as_context_overflow(self):
+        exc = _status_error(
+            openai.BadRequestError,
+            400,
+            message="too long",
+            body={"code": "context_length_exceeded"},
+        )
+        client = _FakeClient(fail=exc)
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.CONTEXT_OVERFLOW
+
+    def test_an_unclassified_exception_falls_back_to_the_message_heuristic(self):
+        """A test double, or a vendor failure the SDK does not wrap, carries
+        no status code -- the message is all there is to classify."""
+        client = _FakeClient(fail=RuntimeError("429 rate limited"))
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client).generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.RATE_LIMIT
+
+    def test_a_missing_key_is_classified_as_auth(self, settings):
+        settings.LLM_API_KEY = ""
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter().generate(system="s", user="u")
+        assert excinfo.value.kind == ErrorKind.AUTH
