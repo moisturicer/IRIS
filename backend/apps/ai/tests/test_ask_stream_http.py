@@ -180,6 +180,131 @@ class ValidationTests:
         assert response.status_code in (401, 403)
 
 
+class ReasoningTests:
+    """The reasoning channel at the HTTP seam (IR-327): a scripted fake
+    emitting `StreamDelta.reasoning`, the same seam `StreamShapeTests` above
+    drives for text -- no vendor account, no network."""
+
+    def test_reasoning_deltas_arrive_as_their_own_sse_event(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(reasoning="Checking the sources. "),
+                StreamDelta(text="Rainfall gauges "),
+                StreamDelta(reasoning="Looks right."),
+                StreamDelta(text="feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            response = ask_stream(client_for(reader), FLOOD_QUESTION)
+
+        events = _parse_sse(response)
+        names = [name for name, _ in events]
+        assert names == [
+            "retrieval_started",
+            "retrieval_finished",
+            "generation_started",
+            "reasoning_delta",
+            "text_delta",
+            "reasoning_delta",
+            "text_delta",
+            "citations_resolved",
+            "done",
+        ]
+
+        reasoning_texts = [data["text"] for name, data in events if name == "reasoning_delta"]
+        assert reasoning_texts == ["Checking the sources. ", "Looks right."]
+        text_texts = [data["text"] for name, data in events if name == "text_delta"]
+        assert text_texts == ["Rainfall gauges ", "feed the model [1]."]
+
+        done = dict(events)["done"]
+        assert done["answer"] == "Rainfall gauges feed the model [1]."
+        assert "Checking the sources" not in done["answer"]
+        assert done["had_reasoning"] is True
+        assert [c["record_id"] for c in done["citations"]] == [flood.pk]
+
+    def test_a_leaked_think_block_never_reaches_the_stored_answer(
+        self, embedder, space, client_for
+    ):
+        """The defensive case: reasoning arriving in the text channel as
+        `<think>...</think>` (the known gpt-oss-120b/Groq behaviour) must
+        still surface as `reasoning_delta`, not `text_delta`, and must not
+        appear in the persisted Turn."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(text="<think>internal notes on rainfall gauges</think>"),
+                StreamDelta(text="Rainfall gauges feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            response = ask_stream(client_for(reader), FLOOD_QUESTION)
+
+        events = _parse_sse(response)
+        text_texts = "".join(data["text"] for name, data in events if name == "text_delta")
+        reasoning_texts = "".join(
+            data["text"] for name, data in events if name == "reasoning_delta"
+        )
+        assert text_texts == "Rainfall gauges feed the model [1]."
+        assert reasoning_texts == "internal notes on rainfall gauges"
+
+        done = dict(events)["done"]
+        assert done["answer"] == "Rainfall gauges feed the model [1]."
+        assert "internal notes" not in done["answer"]
+        assert done["had_reasoning"] is True
+
+    def test_had_reasoning_is_false_with_no_reasoning_at_all(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(text="Rainfall gauges "),
+                StreamDelta(text="feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        assert not any(name == "reasoning_delta" for name, _ in events)
+        assert dict(events)["done"]["had_reasoning"] is False
+
+    def test_a_stored_turn_records_had_reasoning_without_the_reasoning_text(
+        self, embedder, space, client_for
+    ):
+        from apps.ai.models import Conversation, Turn
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+        conversation = Conversation.objects.create(user=reader)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(reasoning="a secret train of thought"),
+                StreamDelta(text="Rainfall gauges feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            _parse_sse(
+                ask_stream(
+                    client_for(reader), FLOOD_QUESTION, conversation_id=conversation.pk
+                )
+            )
+
+        turn = Turn.objects.get(conversation=conversation)
+        assert turn.had_reasoning is True
+        assert "secret train of thought" not in turn.answer
+
+
 class VisibilityTests:
     def test_a_passage_from_an_unreadable_record_is_never_on_the_wire(
         self, embedder, space, client_for

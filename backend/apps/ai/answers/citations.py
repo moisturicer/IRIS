@@ -157,6 +157,12 @@ class GroundedAnswer:
     #: undetected.
     model: Optional[str] = None
 
+    #: Whether the model produced any reasoning while answering (IR-327) --
+    #: a structural fact, never the reasoning text itself. Always ``False``
+    #: from ``answer()``: only ``answer_stream()`` requests a reasoning
+    #: channel at all.
+    had_reasoning: bool = False
+
     @property
     def is_grounded(self) -> bool:
         """Whether the answer actually cited anything.

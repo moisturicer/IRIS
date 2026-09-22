@@ -42,10 +42,12 @@ from .events import (
     CitationsResolved,
     Done,
     GenerationStarted,
+    ReasoningDelta,
     RetrievalFinished,
     RetrievalStarted,
     TextDelta,
 )
+from .reasoning import ThinkTagFilter
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +133,9 @@ class GroundedAnswerService:
         )
 
     @staticmethod
-    def _unavailable_answer(retrieved, sources: Sequence[RetrievedChunk]) -> GroundedAnswer:
+    def _unavailable_answer(
+        retrieved, sources: Sequence[RetrievedChunk], had_reasoning: bool = False
+    ) -> GroundedAnswer:
         # Degraded whatever retrieval did: the reader is getting sources
         # instead of an answer, which is exactly what the flag exists to
         # say. The sources travel with it -- retrieval worked (ADR-008).
@@ -143,10 +147,16 @@ class GroundedAnswerService:
             sources=tuple(sources),
             query_vector=retrieved.query_vector,
             embedding_space_id=retrieved.embedding_space_id,
+            had_reasoning=had_reasoning,
         )
 
     def _grounded_answer(
-        self, retrieved, sources: Sequence[RetrievedChunk], text: str, citations
+        self,
+        retrieved,
+        sources: Sequence[RetrievedChunk],
+        text: str,
+        citations,
+        had_reasoning: bool = False,
     ) -> GroundedAnswer:
         return GroundedAnswer(
             text=text,
@@ -156,6 +166,7 @@ class GroundedAnswerService:
             query_vector=retrieved.query_vector,
             embedding_space_id=retrieved.embedding_space_id,
             model=self._model_that_answered(),
+            had_reasoning=had_reasoning,
         )
 
     def answer(
@@ -206,6 +217,17 @@ class GroundedAnswerService:
         place of ``.generate(...)``, yielding a ``TextDelta`` per chunk of
         raw text and accumulating it to parse citations once, after the
         model has finished, for the reasons ``TextDelta`` documents.
+
+        **Reasoning is a separate channel throughout** (IR-327).
+        ``delta.reasoning`` -- the vendor's own dedicated field -- becomes a
+        ``ReasoningDelta``, never a ``TextDelta``. ``delta.text`` is passed
+        through ``ThinkTagFilter`` first: the known gpt-oss-120b/Groq
+        behaviour is that reasoning sometimes leaks into the text channel as
+        ``<think>...</think>`` even when configured hidden, and a leaked span
+        is reasoning by content, not by which field it arrived in. Only what
+        the filter classifies as text ever reaches ``raw_parts`` -- the
+        buffer citation parsing and the stored ``Turn.answer`` are built
+        from -- so leaked reasoning can corrupt neither.
         """
         yield RetrievalStarted()
         retrieved, sources = self._retrieve_and_gate(question, user)
@@ -222,24 +244,45 @@ class GroundedAnswerService:
 
         yield GenerationStarted()
         raw_parts: list[str] = []
+        had_reasoning = False
+
+        def classified(text_part: str, reasoning_part: str) -> Iterator[AnswerEvent]:
+            """One `(text, reasoning)` pair, as whichever events it implies --
+            shared by every source of a pair: the vendor's own `reasoning`
+            field, and `ThinkTagFilter`'s split of `.text`, mid-stream or on
+            `flush()`. `had_reasoning` and `raw_parts` are this method's own
+            state, so this closes over them rather than returning something
+            the caller would just apply right back.
+            """
+            nonlocal had_reasoning
+            if reasoning_part:
+                had_reasoning = True
+                yield ReasoningDelta(text=reasoning_part)
+            if text_part:
+                raw_parts.append(text_part)
+                yield TextDelta(text=text_part)
+
+        leak_filter = ThinkTagFilter()
         try:
             for delta in self._llm.stream(
                 system=SYSTEM_PROMPT,
                 user=build_prompt(question, sources, history=history, recalled=recalled),
             ):
+                yield from classified("", delta.reasoning)
                 if delta.text:
-                    raw_parts.append(delta.text)
-                    yield TextDelta(text=delta.text)
+                    yield from classified(*leak_filter.feed(delta.text))
         except LLMUnavailable as exc:
             logger.warning("answer generation unavailable: %s", exc)
-            yield Done(self._unavailable_answer(retrieved, sources))
+            yield Done(self._unavailable_answer(retrieved, sources, had_reasoning))
             return
+
+        yield from classified(*leak_filter.flush())
 
         raw = "".join(raw_parts)
         text, citations = parse_citations(raw, sources)
         _warn_if_citations_went_missing(raw, text, citations)
         yield CitationsResolved(citations=citations)
-        yield Done(self._grounded_answer(retrieved, sources, text, citations))
+        yield Done(self._grounded_answer(retrieved, sources, text, citations, had_reasoning))
 
     def _model_that_answered(self) -> Optional[str]:
         """Which model actually produced the answer just generated (IR-321).
