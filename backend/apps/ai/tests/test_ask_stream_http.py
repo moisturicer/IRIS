@@ -21,6 +21,7 @@ from .corpus import (
     FLOOD_QUESTION,
     FLOOD_TEXT,
     _BrokenLLM,
+    ask,
     ask_stream,
     make_record,
     make_user,
@@ -106,20 +107,18 @@ class StreamShapeTests:
     def test_the_done_event_matches_the_synchronous_endpoints_shape(
         self, embedder, space, client_for
     ):
-        """The two endpoints must leave a client in the same state -- this is
-        `test_ask_http.py`'s grounding assertion, replayed against the
-        stream's final event instead of a JSON body."""
+        """The two endpoints must leave a client in an identical state --
+        compared field-for-field against `/ask/`'s own JSON body, not just
+        spot-checked, since that is the claim the `done` event makes."""
         reader = make_user("reader@cit.edu")
         make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
 
         with use_composition_root(root_with(embedder=embedder)):
+            sync_body = ask(client_for(reader), FLOOD_QUESTION).json()
             events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
 
         done = dict(events)["done"]
-        assert done["mode"] == "generative"
-        assert done["degraded"] is False
-        assert done["answer"]
-        assert done["widened"] is False
+        assert done == sync_body
 
 
 class NoSourcesTests:
