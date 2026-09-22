@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterator, Sequence
 
 
 class EmbeddingProvider(ABC):
@@ -121,8 +121,23 @@ class Reranker(ABC):
         """
 
 
+@dataclass(frozen=True)
+class StreamDelta:
+    """One increment of a streamed answer.
+
+    ``text`` and ``reasoning`` are independent channels on the same type
+    rather than a tagged union of two delta classes: a chunk can carry either,
+    both, or (rarely) neither, and a caller relaying both channels to the
+    browser (IR-323's reasoning-token foundation) reads one attribute per
+    channel instead of ``isinstance``-branching on delta type.
+    """
+
+    text: str = ""
+    reasoning: str = ""
+
+
 class LLMProvider(ABC):
-    """Text in, text out.
+    """Text in, text out -- or text in, text out as it is produced.
 
     Deliberately smaller than the gateway's version of this port, which takes
     ``(prompt, context)``. Two loosely-typed strings invite a caller to shove
@@ -130,9 +145,6 @@ class LLMProvider(ABC):
     the *caller* assembles the prompt (see `apps/ai/answers/`) and this port
     only transports it. Prompt assembly is the part with citation numbering in
     it, and it belongs in the domain where it can be tested without a vendor.
-
-    One method, and no streaming: ADR-017's streaming work is gateway-side and
-    gated on an ASGI deployment IRIS does not yet run.
     """
 
     @abstractmethod
@@ -144,3 +156,15 @@ class LLMProvider(ABC):
         asker said, which is how a prompt injection sitting in an uploaded
         document ends up outranking the system prompt.
         """
+
+    def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
+        """Answer incrementally, as ``StreamDelta`` chunks (IR-325).
+
+        Concrete rather than abstract, and its default wraps ``generate``:
+        every existing fake and resilience decorator that implements only
+        ``generate`` keeps working unmodified, yielding its whole answer as
+        one delta rather than gaining a silent behavioural gap. A provider
+        that can genuinely stream -- currently only
+        ``OpenAICompatibleAdapter`` -- overrides this instead.
+        """
+        yield StreamDelta(text=self.generate(system, user))
