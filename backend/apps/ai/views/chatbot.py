@@ -20,6 +20,8 @@ retriever or an answer service, and shape the reply — which is what makes the
 whole path drivable from a test with deterministic fakes.
 """
 import json
+from dataclasses import dataclass
+from typing import Optional
 
 from django.http import Http404, StreamingHttpResponse
 
@@ -116,6 +118,75 @@ def _recent_turns(conversation: Conversation) -> list:
     )[::-1]
 
 
+@dataclass(frozen=True)
+class _AskRequest:
+    """One parsed, validated `/ask/`-shaped request -- everything both
+    `ChatQueryView` and `ChatStreamView` need before calling the answer
+    service, gathered in one place (IR-326 code review) rather than kept as
+    two copies of the same ~30 lines that would drift the next time
+    resolution or scoping changes.
+    """
+
+    conversation: Optional[Conversation]
+    question: str
+    effective_question: str
+    resolved_question: Optional[str]
+    history: list
+    widened: bool
+    scope_record: object
+
+
+def _prepare_ask_request(request):
+    """Parse and validate one question, resolve it and its scope.
+
+    Returns ``(prepared, None)`` on success or ``(None, error_response)`` on
+    a validation failure the caller should return exactly as given -- a 400
+    happens identically whether the answer that follows is one JSON body or
+    a stream of events.
+    """
+    conversation = _conversation_for(request)
+    question = (request.data.get("question") or "").strip()
+    if not question:
+        return None, Response(
+            {"detail": "question is required."}, status=status.HTTP_400_BAD_REQUEST
+        )
+    if len(question) > MAX_QUESTION_LENGTH:
+        return None, Response(
+            {"detail": f"question must be at most {MAX_QUESTION_LENGTH} characters."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    history = _recent_turns(conversation) if conversation is not None else []
+
+    resolved_question = None
+    if conversation is not None:
+        resolver = composition_root().resolver()
+        if resolver is not None:
+            resolved_question = resolver.resolve(question, history)
+    effective_question = resolved_question or question
+
+    # Widened only when there was a scope to widen *from* -- an unscoped
+    # Conversation, or no Conversation, was never narrower than "every
+    # paper", so `widen` has nothing to do there.
+    widen = bool(request.data.get("widen"))
+    scoped_to = conversation.record if conversation is not None else None
+    widened = scoped_to is not None and widen
+    scope_record = None if widened else scoped_to
+
+    return (
+        _AskRequest(
+            conversation=conversation,
+            question=question,
+            effective_question=effective_question,
+            resolved_question=resolved_question,
+            history=history,
+            widened=widened,
+            scope_record=scope_record,
+        ),
+        None,
+    )
+
+
 class ChatQueryView(APIView):
     """
     POST /api/v1/ai/ask/
@@ -155,55 +226,41 @@ class ChatQueryView(APIView):
     throttle_classes = [AIQueryThrottle]
 
     def post(self, request):
-        conversation = _conversation_for(request)
-        question = (request.data.get("question") or "").strip()
-        if not question:
-            return Response(
-                {"detail": "question is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
-        if len(question) > MAX_QUESTION_LENGTH:
-            return Response(
-                {"detail": f"question must be at most {MAX_QUESTION_LENGTH} characters."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        history = _recent_turns(conversation) if conversation is not None else []
-
-        resolved_question = None
-        if conversation is not None:
-            resolver = composition_root().resolver()
-            if resolver is not None:
-                resolved_question = resolver.resolve(question, history)
-        effective_question = resolved_question or question
-
-        # Widened only when there was a scope to widen *from* -- an unscoped
-        # Conversation, or no Conversation, was never narrower than "every
-        # paper", so `widen` has nothing to do there.
-        widen = bool(request.data.get("widen"))
-        scoped_to = conversation.record if conversation is not None else None
-        widened = scoped_to is not None and widen
-        scope_record = None if widened else scoped_to
+        prepared, error = _prepare_ask_request(request)
+        if error is not None:
+            return error
 
         service = composition_root().answer_service(
             max_sources=_parse_top_k(request.data.get("top_k")),
-            record=scope_record,
+            record=prepared.scope_record,
         )
         answer = service.answer(
-            effective_question, request.user, conversation=conversation, history=history
+            prepared.effective_question,
+            request.user,
+            conversation=prepared.conversation,
+            history=prepared.history,
         )
         mode = answer_mode(answer.state)
 
-        if conversation is not None:
-            record_turn(conversation, question, answer, resolved_question, widened)
+        if prepared.conversation is not None:
+            record_turn(
+                prepared.conversation,
+                prepared.question,
+                answer,
+                prepared.resolved_question,
+                prepared.widened,
+            )
 
         return Response(
             {
                 **answer_body(mode, answer.text),
-                "conversation_id": None if conversation is None else conversation.pk,
+                "conversation_id": (
+                    None if prepared.conversation is None else prepared.conversation.pk
+                ),
                 # What retrieval actually searched with, shown so a reader
                 # can see when IRIS guessed wrong (IR-296). Null whenever
                 # resolution did not run or changed nothing.
-                "resolved_question": resolved_question,
+                "resolved_question": prepared.resolved_question,
                 # A citation is an object: the record it belongs to, the page,
                 # and the quoted passage (IR-284). A bare record id asked a
                 # reader to find the sentence themselves.
@@ -216,7 +273,7 @@ class ChatQueryView(APIView):
                 "degraded": answer.degraded,
                 # Whether this answer left its Conversation's Record scope
                 # (IR-298) -- always false with no scope to have left.
-                "widened": widened,
+                "widened": prepared.widened,
             }
         )
 
@@ -270,43 +327,21 @@ class ChatStreamView(APIView):
     throttle_classes = [AIQueryThrottle]
 
     def post(self, request):
-        conversation = _conversation_for(request)
-        question = (request.data.get("question") or "").strip()
-        if not question:
-            return Response(
-                {"detail": "question is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
-        if len(question) > MAX_QUESTION_LENGTH:
-            return Response(
-                {"detail": f"question must be at most {MAX_QUESTION_LENGTH} characters."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        history = _recent_turns(conversation) if conversation is not None else []
-
-        resolved_question = None
-        if conversation is not None:
-            resolver = composition_root().resolver()
-            if resolver is not None:
-                resolved_question = resolver.resolve(question, history)
-        effective_question = resolved_question or question
-
-        widen = bool(request.data.get("widen"))
-        scoped_to = conversation.record if conversation is not None else None
-        widened = scoped_to is not None and widen
-        scope_record = None if widened else scoped_to
+        prepared, error = _prepare_ask_request(request)
+        if error is not None:
+            return error
 
         service = composition_root().answer_service(
             max_sources=_parse_top_k(request.data.get("top_k")),
-            record=scope_record,
+            record=prepared.scope_record,
         )
 
         def event_source():
             for event in service.answer_stream(
-                effective_question,
+                prepared.effective_question,
                 request.user,
-                conversation=conversation,
-                history=history,
+                conversation=prepared.conversation,
+                history=prepared.history,
             ):
                 if isinstance(event, RetrievalFinished):
                     yield _sse(
@@ -324,23 +359,29 @@ class ChatStreamView(APIView):
                 elif isinstance(event, Done):
                     answer = event.answer
                     mode = answer_mode(answer.state)
-                    if conversation is not None:
+                    if prepared.conversation is not None:
                         record_turn(
-                            conversation, question, answer, resolved_question, widened
+                            prepared.conversation,
+                            prepared.question,
+                            answer,
+                            prepared.resolved_question,
+                            prepared.widened,
                         )
                     yield _sse(
                         event.name,
                         {
                             **answer_body(mode, answer.text),
                             "conversation_id": (
-                                None if conversation is None else conversation.pk
+                                None
+                                if prepared.conversation is None
+                                else prepared.conversation.pk
                             ),
-                            "resolved_question": resolved_question,
+                            "resolved_question": prepared.resolved_question,
                             "citations": citations(answer.citations),
                             "sources": record_sources(answer.sources),
                             "mode": mode,
                             "degraded": answer.degraded,
-                            "widened": widened,
+                            "widened": prepared.widened,
                         },
                     )
                 else:
