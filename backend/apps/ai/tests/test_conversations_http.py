@@ -314,6 +314,107 @@ class AppendingTurnsTests:
         ).json()["title"] == FLOOD_QUESTION
 
 
+# -- re-resolving a stored citation's quote (IR-299) ---------------------------
+
+
+class CitationReResolutionTests:
+    """A stored citation is a pointer (record, chunk, page). Reopening a
+    transcript re-resolves it against the reader's *current* visibility and
+    the chunk's *current* liveness, rather than replaying whatever was true
+    when the Turn was written."""
+
+    def test_a_visible_citation_replays_with_its_quote_and_page(
+        self, embedder, space, client_for
+    ):
+        """The whole point of IR-299: a reopened transcript shows the same
+        quote a fresh answer would, not a bare pointer."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            live = ask(client, FLOOD_QUESTION,
+                       conversation_id=conversation_id).json()
+
+        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
+        stored, = turn["citations"]
+        live_citation, = live["citations"]
+
+        assert stored["text"] == live_citation["text"]
+        assert stored["record_title"] == live_citation["record_title"]
+        assert stored["page"] == live_citation["page"]
+        assert stored["context_path"] == live_citation["context_path"]
+
+    def test_a_citation_whose_chunk_was_tombstoned_by_rechunking_degrades_to_a_record_level_link(
+        self, embedder, space, client_for
+    ):
+        """Re-chunking tombstones a chunk (`deleted_at`) rather than deleting
+        the row (IR-115) -- so the pointer still resolves, but to content that
+        no longer represents the record. Showing a reader that stale text
+        would be worse than showing them nothing to quote at all."""
+        from django.utils import timezone
+
+        from apps.ai.models import DocumentChunk, TurnCitation
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+
+        citation = TurnCitation.objects.get()
+        DocumentChunk.objects.filter(pk=citation.chunk_id).update(
+            deleted_at=timezone.now()
+        )
+
+        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
+        stored, = turn["citations"]
+
+        assert stored["record_id"] == citation.record_id
+        assert stored["chunk_id"] == citation.chunk_id
+        assert "text" not in stored
+        assert "record_title" not in stored
+
+    def test_rereading_a_conversation_costs_the_same_regardless_of_citation_count(
+        self, embedder, space, client_for
+    ):
+        """Re-resolution reads two batched queries for the whole transcript
+        (which records are visible, which chunks are live) -- never one pair
+        per citation. Asserted by comparing query counts across a growing
+        transcript rather than pinning an exact number, so this stays
+        meaningful however many queries auth/session middleware happens to
+        cost on a given day."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+
+        with CaptureQueriesContext(connection) as one_turn:
+            assert client.get(conversation_url(conversation_id)).status_code == 200
+
+        with use_composition_root(root_with(embedder=embedder)):
+            for _ in range(7):
+                ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+
+        with CaptureQueriesContext(connection) as eight_turns:
+            body = client.get(conversation_url(conversation_id)).json()
+
+        assert len(body["turns"]) == 8
+        assert len(eight_turns.captured_queries) == len(one_turn.captured_queries)
+
+
 class ScopedRetrievalTests:
     """A Conversation scoped to a Record retrieves only that Record's
     passages by default, and only widens when explicitly asked (IR-298,
