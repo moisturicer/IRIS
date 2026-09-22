@@ -403,6 +403,14 @@ LLM_RESOLUTION_MODEL = config(
     "LLM_RESOLUTION_MODEL", default="llama-3.1-8b-instant"
 )
 
+# ---- Conversation memory (IR-297, ADR-026 Decision 6) -------------------
+#
+# Older Turns are found by search rather than summarised or dropped. No
+# vendor key: recall reuses the vector retrieval already computed.
+AI_CONVERSATION_MEMORY_ENABLED = config(
+    "AI_CONVERSATION_MEMORY_ENABLED", default=True, cast=bool
+)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in

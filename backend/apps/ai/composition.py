@@ -58,6 +58,7 @@ from apps.ai.resilience.rate_limit import RateLimited
 from apps.records.models import Record
 
 if TYPE_CHECKING:
+    from apps.ai.memory import ConversationMemory
     from apps.ai.resolution import QuestionResolver
 
 
@@ -95,6 +96,7 @@ class CompositionRoot:
         reranker: Optional[Reranker] = None,
         llm: Optional[LLMProvider] = None,
         resolver: Optional["QuestionResolver"] = None,
+        memory: Optional["ConversationMemory"] = None,
         permits: Callable[[Record], bool] = disclosure_permits,
         policy_enabled: bool = True,
     ) -> None:
@@ -102,6 +104,7 @@ class CompositionRoot:
         self._reranker = reranker
         self._llm = llm
         self._resolver = resolver
+        self._memory = memory
         self._permits = permits
         self._policy_enabled = policy_enabled
 
@@ -166,6 +169,24 @@ class CompositionRoot:
             )
         return self._resolver
 
+    def memory(self) -> Optional["ConversationMemory"]:
+        """The conversation-memory recaller, or ``None`` when off.
+
+        Same switch shape as ``resolver()`` (``AI_CONVERSATION_MEMORY_ENABLED``,
+        IR-297), but this collaborator calls no vendor, so there is no key to
+        be missing.
+        """
+        if self._memory is None:
+            from django.conf import settings
+
+            if not getattr(settings, "AI_CONVERSATION_MEMORY_ENABLED", True):
+                return None
+
+            from apps.ai.memory import ConversationMemory
+
+            self._memory = ConversationMemory()
+        return self._memory
+
     def generation_configured(self) -> bool:
         """Whether a model would actually answer, without calling one.
 
@@ -205,6 +226,7 @@ class CompositionRoot:
             permits=self._permits,
             policy_enabled=self._policy_enabled,
             max_sources=max_sources,
+            memory=self.memory(),
         )
 
 
