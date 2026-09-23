@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import Iterable, Sequence
 
 from apps.ai.answers.citations import NO_SOURCES, UNAVAILABLE, Citation
+from apps.ai.regions import regions_wire
 from apps.ai.retrieval.ports import RetrievedChunk
 from apps.records.models import Record
 
@@ -53,6 +54,9 @@ def passage(chunk: RetrievedChunk) -> dict:
         "page": chunk.source_page,
         "text": chunk.content,
         "context_path": list(chunk.context_path or ()),
+        # Where to draw the highlight, as fractions of the page (IR-334).
+        # Empty is a real answer: open the page, draw nothing.
+        "regions": regions_wire(chunk.regions or ()),
         "score": round(float(chunk.score), 4),
     }
 
@@ -76,6 +80,7 @@ def citation(resolved: Citation) -> dict:
         "page": resolved.source_page,
         "text": resolved.text,
         "context_path": list(resolved.context_path or ()),
+        "regions": regions_wire(resolved.regions or ()),
     }
 
 

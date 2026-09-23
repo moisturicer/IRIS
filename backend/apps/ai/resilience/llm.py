@@ -56,10 +56,10 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional, Sequence
+from typing import Callable, Dict, Iterator, Optional, Sequence, Tuple
 
 from apps.ai.providers.errors import ErrorKind
-from apps.ai.providers.ports import LLMProvider
+from apps.ai.providers.ports import LLMProvider, StreamDelta
 
 from .circuit import CircuitBreaker, CircuitOpen
 from .retry import retry_with_backoff
@@ -99,6 +99,39 @@ def is_switchable_failure(exc: BaseException) -> bool:
     return getattr(exc, "kind", None) in _SWITCH_KINDS
 
 
+# -- streaming through a decorator -------------------------------------------
+#
+# The rule all three decorators below follow: **retry and failover are
+# permitted only before the first delta is yielded** (IR-334). Once a token
+# has reached the reader's screen, re-running the call would repeat text they
+# have already read, so a failure after first output propagates instead.
+#
+# `_open_stream` is how that line is drawn. It starts the stream and pulls one
+# delta, so everything a vendor fails on at connection time -- a bad key, an
+# exhausted quota, a dropped socket -- happens inside whatever guard the
+# caller wrapped it in, and everything after is a plain pass-through.
+
+
+def _open_stream(
+    make_stream: Callable[[], Iterator[StreamDelta]],
+) -> Tuple[Optional[StreamDelta], Iterator[StreamDelta]]:
+    """Start a stream and take its first delta, or ``None`` if it was empty."""
+    iterator = iter(make_stream())
+    try:
+        return next(iterator), iterator
+    except StopIteration:
+        return None, iter(())
+
+
+def _yield_from_opened(
+    opened: Tuple[Optional[StreamDelta], Iterator[StreamDelta]],
+) -> Iterator[StreamDelta]:
+    first, rest = opened
+    if first is not None:
+        yield first
+    yield from rest
+
+
 class RetryingLLMProvider(LLMProvider):
     """Retries a transient (`network`/`timeout`) failure against the same
     provider, bounded to `attempts` tries in total.
@@ -130,6 +163,23 @@ class RetryingLLMProvider(LLMProvider):
             **kwargs,
         )
 
+    def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
+        """The same retry, around opening the stream only.
+
+        Without this the port's buffering default ran instead, and every
+        answer arrived as one delta once generation had entirely finished --
+        the limitation `ChatStreamView` recorded.
+        """
+        kwargs = {} if self._sleep is None else {"sleep": self._sleep}
+        yield from _yield_from_opened(
+            retry_with_backoff(
+                lambda: _open_stream(lambda: self._provider.stream(system, user)),
+                attempts=self._attempts,
+                give_up_on_kind=_GIVE_UP_ON_RETRY,
+                **kwargs,
+            )
+        )
+
 
 class CircuitBreakingLLMProvider(LLMProvider):
     """Refuses to call a provider whose circuit is open, rather than waiting
@@ -154,6 +204,21 @@ class CircuitBreakingLLMProvider(LLMProvider):
 
     def generate(self, system: str, user: str) -> str:
         return self._breaker.call(lambda: self._provider.generate(system, user))
+
+    def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
+        """Guards opening the stream, not consuming it.
+
+        A vendor that produced a first token is not the down vendor this
+        breaker exists to stop us hammering, so a failure later in the stream
+        is not counted against it. Wrapping the whole consumption instead is
+        not an option anyway: `call` records success the moment its operation
+        returns, and a generator returns before it has produced anything.
+        """
+        yield from _yield_from_opened(
+            self._breaker.call(
+                lambda: _open_stream(lambda: self._provider.stream(system, user))
+            )
+        )
 
 
 class FallbackLLMProvider(LLMProvider):
@@ -192,12 +257,7 @@ class FallbackLLMProvider(LLMProvider):
                 if not self._switch_on(exc):
                     raise
                 failure = exc
-                logger.warning(
-                    "LLM provider %s unavailable (%s); trying the next "
-                    "configured provider",
-                    getattr(provider, "model", "?"),
-                    getattr(exc, "kind", type(exc).__name__),
-                )
+                self._log_switch(provider, exc)
                 continue
             self.last_model_used = getattr(provider, "model", None)
             return text
@@ -206,6 +266,38 @@ class FallbackLLMProvider(LLMProvider):
         # last pass through the loop above.
         assert failure is not None
         raise failure
+
+    def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
+        """The same walk down the provider list, switching only while the
+        stream has produced nothing.
+
+        A provider that failed after its first delta is not retried on the
+        next one: the reader has already seen text, and a second provider
+        would start its own answer from the beginning underneath it.
+        """
+        failure: Optional[BaseException] = None
+        for provider in self._providers:
+            try:
+                opened = _open_stream(lambda p=provider: p.stream(system, user))
+            except Exception as exc:
+                if not self._switch_on(exc):
+                    raise
+                failure = exc
+                self._log_switch(provider, exc)
+                continue
+            self.last_model_used = getattr(provider, "model", None)
+            yield from _yield_from_opened(opened)
+            return
+        assert failure is not None
+        raise failure
+
+    def _log_switch(self, provider: LLMProvider, exc: BaseException) -> None:
+        logger.warning(
+            "LLM provider %s unavailable (%s); trying the next "
+            "configured provider",
+            getattr(provider, "model", "?"),
+            getattr(exc, "kind", type(exc).__name__),
+        )
 
 
 # -- process-lifetime circuit state ------------------------------------------

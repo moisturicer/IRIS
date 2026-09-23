@@ -30,6 +30,7 @@ from apps.ai.models.chunk import ChunkEmbedding
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.providers.ports import EmbeddingProvider
+from apps.ai.regions import normalized_regions
 from apps.records.models import Record
 
 from .ports import VECTOR, RetrievalResult, RetrievedChunk, Retriever
@@ -110,7 +111,9 @@ class TwoStageRetriever(Retriever):
                 chunk__chunk_set__is_active=True,
                 chunk__deleted_at__isnull=True,
             )
-            .select_related("chunk", "chunk__record")
+            # `chunk_set` for its `page_sizes`, which is what turns a
+            # chunk's stored rectangles into drawable ones (IR-334).
+            .select_related("chunk", "chunk__record", "chunk__chunk_set")
             .annotate(distance=distance)
             .order_by("distance")[:limit]
         )
@@ -128,6 +131,9 @@ class TwoStageRetriever(Retriever):
                     # the complement, so a larger score is a better match
                     # whichever metric a future space uses.
                     score=1.0 - float(row.distance),
+                    regions=normalized_regions(
+                        row.chunk.bboxes, row.chunk.chunk_set.page_sizes
+                    ),
                 )
                 for row in rows
             ),

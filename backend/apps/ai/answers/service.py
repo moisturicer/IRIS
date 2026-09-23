@@ -20,6 +20,7 @@ import logging
 from typing import TYPE_CHECKING, Callable, Iterator, Optional, Sequence
 
 from apps.ai.providers.openai_compatible import LLMUnavailable
+from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.providers.ports import LLMProvider
 from apps.ai.retrieval.ports import RetrievalResult, RetrievedChunk, Retriever
 from apps.records.models import Record
@@ -192,7 +193,7 @@ class GroundedAnswerService:
                 system=SYSTEM_PROMPT,
                 user=build_prompt(question, sources, history=history, recalled=recalled),
             )
-        except LLMUnavailable as exc:
+        except (LLMUnavailable, CircuitOpen) as exc:
             logger.warning("answer generation unavailable: %s", exc)
             return self._unavailable_answer(retrieved, sources)
 
@@ -283,7 +284,7 @@ class GroundedAnswerService:
                     yield from classified("", delta.reasoning)
                     if delta.text:
                         yield from classified(*leak_filter.feed(delta.text))
-            except LLMUnavailable as exc:
+            except (LLMUnavailable, CircuitOpen) as exc:
                 logger.warning("answer generation unavailable: %s", exc)
                 completed = True
                 yield Done(self._unavailable_answer(retrieved, sources, had_reasoning))

@@ -50,13 +50,23 @@ def make_user(email, role_name=ROLE_STUDENT):
     )
 
 
+#: `page_sizes` for a letter-size page 4 -- `make_record`'s chunk is always
+#: `source_page=4`, and `page_sizes` is keyed by page number as a string,
+#: the same shape `apps.ai.extraction.docling_mapping._page_sizes` writes.
+LETTER = {"4": [612.0, 792.0]}
+
+
 def make_record(*, title, text, embedder, space, status=PipelineStatus.PUBLISHED,
-                owner=None):
+                owner=None, bboxes=None, page_sizes=None, content_hash=None):
     """A record with one active chunk set, one chunk, and both vectors.
 
     Both, because retrieval is two-stage: the record vector is what stage 1
     ranks a record on, and without it the record is not a candidate and its
     chunks are never reached.
+
+    `bboxes` and `page_sizes` default to none at all, which is the corpus a
+    record with no recovered rectangles produces (IR-334) -- the case every
+    other suite here is unaffected by. A test about highlighting passes both.
     """
     record = Record.objects.create(
         title=title, abstract=f"An abstract for {title}.", pipeline_status=status
@@ -71,13 +81,14 @@ def make_record(*, title, text, embedder, space, status=PipelineStatus.PUBLISHED
     )
     chunk_set = ChunkSet.objects.create(
         record=record, extraction_hash=f"e{title}", strategy_id="s",
-        options={}, content_hash=f"c{title}", is_active=True,
+        options={}, content_hash=content_hash or f"c{title}", is_active=True,
+        page_sizes=page_sizes or {},
     )
     chunk = DocumentChunk.objects.create(
         chunk_set=chunk_set, record=record, sequence=0, max_sequence=0,
         text=text, content=text, context_path=[title, "Methods"],
         token_count=len(text.split()), text_hash=f"t{record.pk}",
-        source_page=4, element_kinds=["paragraph"], bboxes=[],
+        source_page=4, element_kinds=["paragraph"], bboxes=bboxes or [],
     )
     ChunkEmbedding.objects.create(
         chunk=chunk, space=space, embedding=embedder.embed_documents([text])[0]

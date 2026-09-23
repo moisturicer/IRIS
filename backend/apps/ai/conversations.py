@@ -21,6 +21,7 @@ from django.db import transaction
 from apps.ai.answers.citations import PARTIAL, GroundedAnswer
 from apps.ai.models import Conversation, DocumentChunk, Turn, TurnCitation, TurnEmbedding
 from apps.ai.presentation import answer_body, answer_mode
+from apps.ai.regions import normalized_regions, regions_wire
 from apps.records.models import Record
 
 #: An unnamed conversation takes its name from the question that started it.
@@ -123,11 +124,16 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
                 if citation.chunk_id is not None
             },
             deleted_at__isnull=True,
+        )
+        # `page_sizes` lives on the chunk set, and regions are useless
+        # without it (IR-334).
+        .select_related("chunk_set")
         # Exactly the fields `_resolve_citation` reads. Deferred, not
         # excluded -- accessing anything else here fires a silent
         # per-instance query, so a field this helper starts reading must be
         # added here too.
-        ).only("content", "source_page", "context_path")
+        .only("content", "source_page", "context_path", "bboxes",
+              "chunk_set__page_sizes")
     }
 
     return [
@@ -189,4 +195,7 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
         "page": chunk.source_page,
         "text": chunk.content,
         "context_path": list(chunk.context_path or ()),
+        "regions": regions_wire(
+            normalized_regions(chunk.bboxes, chunk.chunk_set.page_sizes)
+        ),
     }

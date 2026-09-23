@@ -62,6 +62,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     your_office    = serializers.SerializerMethodField()
     your_office_label = serializers.SerializerMethodField()
     files          = serializers.SerializerMethodField()
+    # Read as the manuscript endpoint, not the stored `/media/` path (IR-334).
+    abstract_file  = serializers.SerializerMethodField()
     # Derived from the routing tables, never stored (ADR-021 §4, IR-258).
     workflow_state       = serializers.SerializerMethodField()
     workflow_state_label = serializers.SerializerMethodField()
@@ -171,16 +173,34 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         return obj.files.count()
 
     def get_files(self, obj):
+        # `/documents/files/<id>/download/`, not `f.file.url`. The latter is a
+        # `/media/` path, which nothing has served since IR-152 removed both
+        # the nginx block and Django's DEBUG route -- every one of these links
+        # was a 404 (IR-334).
         return [
             {
                 "id":          f.id,
                 "filename":    f.filename,
-                "url":         f.file.url if f.file else None,
+                "url":         f"/api/v1/documents/files/{f.id}/download/" if f.file else None,
                 "size_bytes":  f.file.size if f.file else 0,
                 "created_at":  f.created_at.isoformat(),
             }
             for f in obj.files.all().order_by("-created_at")
         ]
+
+    def get_abstract_file(self, obj):
+        """The paper, at a URL that is actually served (IR-334).
+
+        The stored value is a `/media/` path that IR-152 left unroutable, so
+        this reports the manuscript endpoint instead. Null when the record
+        carries no file anywhere -- `manuscript` also falls back to the newest
+        upload, so a record with only an upload still answers here.
+        """
+        from .download_service import has_record_download_file
+
+        if not has_record_download_file(obj):
+            return None
+        return f"/api/v1/records/{obj.id}/manuscript/"
 
     class Meta:
         model  = Record
