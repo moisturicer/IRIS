@@ -54,6 +54,17 @@ export const recordsApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+  /**
+   * The manuscript's own bytes, for the in-app PDF reader (IR-334, IR-335).
+   * Through `apiClient` rather than a plain `<a href>`: `/records/<id>/
+   * manuscript/` requires `IsAuthenticated`, and a bare anchor navigation
+   * carries no `Authorization` header — the bearer token lives in memory, not
+   * a cookie. `responseType: "blob"` so the reader can make one object URL
+   * do double duty: `Blob.arrayBuffer()` feeds pdf.js, and the same URL
+   * backs a "download"/"open in new tab" link with no second request.
+   */
+  manuscriptBlob: (id: number) =>
+    apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob" }),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // `dpaAccepted` is required, not optional (IR-226). The backend refuses a
   // submit without consent, and an optional flag would let a future caller

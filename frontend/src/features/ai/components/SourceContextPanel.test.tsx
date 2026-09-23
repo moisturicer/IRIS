@@ -26,6 +26,7 @@ const citation: Citation = {
   page:         6,
   text:         QUOTE,
   context_path: ["Tilapia Pond Sampling", "Methods"],
+  regions:      [],
 };
 
 const card: SemanticSearchResult = {

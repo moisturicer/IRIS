@@ -4,7 +4,7 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import type { ChatCitation } from "@/types/ai";
-import { citationHref, hasCitationQuote, openCitationLabel } from "@/lib/citedPage";
+import { citationHref, citationNavigationState, hasCitationQuote, openCitationLabel } from "@/lib/citedPage";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -60,6 +60,10 @@ function CitationChip({ citation }: { citation: ChatCitation }) {
   return (
     <Link
       to={citationHref(citation)}
+      // The citation itself, regions included -- so the paper view can draw
+      // the highlight without a second fetch (IR-335). See
+      // `citationNavigationState`'s own doc for the graceful fallback.
+      state={citationNavigationState(citation)}
       title={label}
       aria-label={label}
       className="inline-flex items-center justify-center w-[15px] h-[15px] rounded-full

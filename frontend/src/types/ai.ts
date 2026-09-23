@@ -1,4 +1,18 @@
 /**
+ * One highlightable rectangle on a page, as a fraction of it (0–1), left/top
+ * origin (IR-334). Fractions rather than pixels or PDF points: a reader's PDF
+ * page is rendered at whatever zoom the viewer is at, and a fraction of the
+ * page stays correct without recomputing anything when the zoom changes.
+ */
+export interface Region {
+  page:   number;
+  left:   number;
+  top:    number;
+  right:  number;
+  bottom: number;
+}
+
+/**
  * A quoted span of a Record's text, carrying the page it came from (IR-284).
  *
  * The reader-facing counterpart of a chunk — see `CONTEXT.md`. A chunk is how
@@ -16,6 +30,12 @@ export interface Passage {
   text:          string;
   /** The section trail the passage sits under, outermost first. */
   context_path:  string[];
+  /**
+   * The rectangles a reader's PDF viewer highlights for this passage
+   * (IR-334). Empty when extraction recovered none — the page still opens,
+   * nothing is drawn on it; a box in the wrong place is worse than none.
+   */
+  regions:       Region[];
   score:         number;
 }
 
@@ -76,6 +96,32 @@ export interface AIStatus {
    * like a shipped configuration. Removed with the bypass, by IR-250.
    */
   disclosure_bypass: boolean;
+}
+
+/**
+ * A record's cached AI Overview (IR-334) — `GET /ai/records/<id>/overview/`.
+ *
+ * Three states, not a boolean: `not_indexed` (nothing extracted yet) and
+ * `unavailable` (no model reachable, never cached) both carry a null
+ * `overview`, and the UI renders each differently rather than treating
+ * "no overview" as one undifferentiated blank.
+ */
+export interface RecordOverviewResponse {
+  state:    "ready" | "not_indexed" | "unavailable";
+  overview: RecordOverview | null;
+  /** Present only on `ready` — whether this read hit the cache. */
+  cached?:  boolean;
+}
+
+export interface RecordOverview {
+  text:          string;
+  /** The same citation shape chat renders — see `Citation`, minus a `marker`
+   * numbering scheme of its own (the overview's own [n] markers are numbered
+   * independently, same as any other grounded answer). */
+  citations:     Citation[];
+  degraded:      boolean;
+  model:         string | null;
+  generated_at:  string;
 }
 
 export interface AIAnswer {

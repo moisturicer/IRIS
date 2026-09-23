@@ -1,20 +1,21 @@
 /**
- * Landing on the page a citation points at (IR-284).
+ * Landing on the page a citation points at (IR-284, revised IR-335).
  *
- * A citation links to `/records/<id>?page=<n>`, and the record view turns that
- * into a link that opens the PDF at that page. Two small decisions live here
- * rather than inside the view, so they can be tested without standing up a
- * screen that fetches a record, a review history and a similarity list:
+ * A citation links to `/records/<id>?page=<n>`, and the paper view reads that
+ * to open its embedded reader at that page. What counts as a page lives here
+ * — the query string is whatever was typed into the address bar, so anything
+ * that is not a positive whole number is ignored rather than passed through
+ * to the reader — and so does the other end of the link, building it from a
+ * citation, so the two halves cannot drift apart.
  *
- * * **what counts as a page** — the query string is whatever was typed into
- *   the address bar, so anything that is not a positive whole number is
- *   ignored rather than passed through to the viewer;
- * * **how a page is asked for** — `#page=N`, the fragment every browser PDF
- *   viewer understands. A viewer that does not simply opens at page 1, which
- *   is a worse landing and never a broken link.
- *
- * The other end of that link — building it from a citation — lives here too,
- * so the two halves of one URL cannot drift apart.
+ * **`paperHrefAtPage` (the `#page=N` fragment link to a raw PDF URL) is
+ * gone, not merely renamed.** It stopped being just outdated and became
+ * actively wrong once IR-334 put the manuscript behind `IsAuthenticated`: a
+ * plain `<a href>` navigation carries no `Authorization` header — the bearer
+ * token lives in memory, never a cookie — so a link built from it now 401s.
+ * `PaperPdfReader` fetches the file through `apiClient` instead, and a
+ * citation's job is to say which page and which chunk, not to shape a URL to
+ * the file at all.
  */
 import type { ChatCitation, Citation } from "@/types/ai";
 
@@ -37,13 +38,6 @@ export function citedPage(raw: string | null): number | null {
   const page = Number(raw);
   return Number.isInteger(page) && page > 0 ? page : null;
 }
-
-/** The paper's URL, opened at `page` when there is one to open it at. */
-export function paperHrefAtPage(url: string | null, page: number | null): string | null {
-  if (!url) return null;
-  return page == null ? url : `${url}#page=${page}`;
-}
-
 
 /**
  * Where a citation sends a reader.
@@ -76,4 +70,27 @@ export function openCitationLabel(
 ): string {
   const name = title ?? citation.record_title ?? "the source";
   return citation.page != null ? `Open ${name} at page ${citation.page}` : `Open ${name}`;
+}
+
+/**
+ * Router `state` for a `<Link>` built from `citationHref` (IR-335).
+ *
+ * Carries the citation itself, regions included, so the paper view can draw
+ * the highlight the moment it renders — no second fetch per citation, the
+ * same rule `apps/ai/presentation.py`'s module docstring already states for
+ * the record card riding alongside an answer. A replayed citation with no
+ * regions of its own still carries its page through the URL; this just adds
+ * nothing to highlight with.
+ *
+ * A caller reads it back with `useLocation().state as CitationNavigationState
+ * | null` — `null` on any navigation this link did not originate (a typed
+ * URL, a bookmark, a page refresh), which is the graceful case `PaperPdfReader`
+ * already handles: no regions, open the page anyway.
+ */
+export interface CitationNavigationState {
+  citation: ChatCitation;
+}
+
+export function citationNavigationState(citation: ChatCitation): CitationNavigationState {
+  return { citation };
 }

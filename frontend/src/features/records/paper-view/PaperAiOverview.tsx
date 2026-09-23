@@ -1,37 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { aiApi } from "@/api/ai";
-import type { AIAnswer } from "@/types/ai";
+import type { RecordOverviewResponse } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcons";
-import {
-  DegradedNotice,
-  OpenPassageLink,
-  PassageQuote,
-} from "@/features/ai/components/PassageQuote";
+import { CitationText } from "@/features/ai/components/CitationText";
+import { DegradedNotice } from "@/features/ai/components/PassageQuote";
 
 /**
  * AI Overview — a grounded summary of the record being viewed.
  *
- * This runs the same `/ai/ask/` pipeline as Ask IRIS, over the same visibility
- * predicate, so it can only ever draw on records the reader may already open.
- * Nothing here is invented locally: whatever the pipeline could not produce is
- * reported as unavailable rather than filled in.
+ * **Cached server-side, not re-asked on every view (IR-334, IR-335).** This
+ * used to fire `/ai/ask/` from this component's own `useEffect`, a corpus-
+ * wide question on every mount — a paid vendor call on every page view for an
+ * answer that is a pure function of the record's own extracted text.
+ * `GET /ai/records/<id>/overview/` now generates once, scoped to the record,
+ * and returns the cached row on every read after; the vendor is called again
+ * only when a re-chunk changes what there is to summarise.
  *
- * Each claim is backed by a **Passage** — the quoted text and the page it sits
- * on (IR-284) — so a reader can check the summary against the paper rather
- * than taking it on trust.
+ * This runs the same retrieval and visibility predicate as Ask IRIS, so it
+ * can only ever draw on the record being viewed. Nothing here is invented
+ * locally: whatever the pipeline could not produce is reported as
+ * unavailable rather than filled in (ADR-008).
  *
- * Only the `generative` mode produces an overview. When no model is reachable
- * the endpoint answers `unavailable` and returns the passages unsummarised, so
- * this renders an explicit "AI summary unavailable" state rather than composing
- * one locally — what ADR-008 asks for.
- *
- * The generative branch is live and will render as soon as a provider is
- * configured — that choice is the team's open decision D-4, not this file's.
+ * Rendered as markdown through `CitationText` (IR-335) rather than plain
+ * text — the same renderer chat uses, so headings, lists and emphasis in the
+ * summary read as such, and its citation markers become the same clickable
+ * chips that open the in-app reader at the cited page and passage.
  */
 export function PaperAiOverview({ record }: { record: RecordDetail }) {
-  const [answer, setAnswer] = useState<AIAnswer | null>(null);
+  const [response, setResponse] = useState<RecordOverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -39,27 +36,21 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
     setLoading(true);
     setFailed(false);
     try {
-      const { data } = await aiApi.ask(
-        `${record.title}. Summarise the research objectives, methodology and key findings of this work.`,
-        { topK: 3 },
-      );
-      setAnswer(data);
+      const { data } = await aiApi.overview(record.id);
+      setResponse(data);
     } catch {
       setFailed(true);
     } finally {
       setLoading(false);
     }
-  }, [record.title]);
+  }, [record.id]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const mode = answer?.mode;
-  // Only a generative answer is an overview: ADR-008 requires the answer to be
-  // replaced by an explicit unavailable state when no model ran, rather than by
-  // something assembled here out of the passages.
-  const hasOverview = mode === "generative" && Boolean(answer?.answer);
+  const state = response?.state;
+  const overview = response?.overview ?? null;
 
   return (
     <section className="bg-white border border-stone-200 rounded-2xl p-5">
@@ -68,7 +59,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
           <AskIrisMark className="w-3.5 h-3.5 text-brand" />
           AI Overview
         </h2>
-        {mode === "generative" && (
+        {state === "ready" && (
           <span className="text-[11px] text-stone-400">RAG-indexed paper synthesis</span>
         )}
       </div>
@@ -107,7 +98,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
         </div>
       )}
 
-      {!loading && !failed && !hasOverview && mode === "unavailable" && (
+      {!loading && !failed && state === "unavailable" && (
         <div className="flex items-start gap-3">
           <i className="fas fa-microchip text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
@@ -123,62 +114,32 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
         </div>
       )}
 
-      {!loading && !failed && !hasOverview && mode !== "unavailable" && (
+      {!loading && !failed && state === "not_indexed" && (
         <div className="flex items-start gap-3">
           <i className="fas fa-circle-info text-[13px] text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-stone-700">Nothing indexed to summarise</p>
             <p className="text-[12px] text-stone-500 mt-0.5">
-              {answer?.message ??
-                "This record has no indexed text the retrieval service could draw on."}
+              This record has no indexed text the retrieval service could draw on.
             </p>
           </div>
         </div>
       )}
 
-      {!loading && !failed && hasOverview && (
+      {!loading && !failed && state === "ready" && overview && (
         <>
-          <p className="text-[13px] text-stone-700 leading-[1.7] whitespace-pre-wrap">
-            {answer?.answer}
-          </p>
+          <CitationText
+            text={overview.text}
+            citations={overview.citations}
+            className="text-[13px] text-stone-700 leading-[1.7] [&_h1]:text-[16px] [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1.5 [&_h2]:text-[14px] [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-0.5 [&_strong]:font-semibold [&_strong]:text-stone-800"
+          />
 
-          {answer?.degraded && <DegradedNotice subject="summary" />}
+          {overview.degraded && <DegradedNotice subject="summary" />}
 
-          {answer && (answer.citations.length > 0 || answer.sources.length > 0) && (
-            <div className="mt-3 pt-3 border-t border-stone-100">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-2">
-                Grounded in
-              </p>
-              <ul className="space-y-2 list-none pl-0">
-                {answer.citations.map((citation) => (
-                  <li
-                    key={`${citation.chunk_id}-${citation.marker}`}
-                    className="rounded-lg border border-stone-200 bg-stone-50/60 px-2.5 py-2"
-                  >
-                    <PassageQuote text={citation.text} />
-                    <OpenPassageLink citation={citation} className="mt-1.5" />
-                  </li>
-                ))}
-              </ul>
-
-              {/* A model that cited nothing still read something. Naming the
-                  records keeps that answer from looking ungrounded, which is
-                  what this block showed before passages existed. */}
-              {answer.citations.length === 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {answer.sources.map((s) => (
-                    <Link
-                      key={s.id}
-                      to={`/records/${s.id}`}
-                      className="max-w-full inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200 text-[11px] font-semibold text-stone-700 hover:border-brand/30 transition-colors"
-                    >
-                      <i className="fas fa-file-lines text-[9px] text-stone-400" aria-hidden />
-                      <span className="truncate">{s.title}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+          {overview.citations.length === 0 && (
+            <p className="mt-2 text-[12px] text-stone-400 italic">
+              Grounded in this record's indexed passages.
+            </p>
           )}
         </>
       )}

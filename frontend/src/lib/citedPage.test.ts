@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { citedPage, paperHrefAtPage } from "./citedPage";
+import { citationNavigationState, citedPage } from "./citedPage";
+import type { Citation, ReplayedCitation } from "@/types/ai";
 
 describe("the page a citation asked for", () => {
   it("reads a page number off the query string", () => {
@@ -24,22 +25,38 @@ describe("the page a citation asked for", () => {
   });
 });
 
-describe("opening the paper at that page", () => {
-  it("asks the PDF viewer for the page with its own fragment", () => {
-    expect(paperHrefAtPage("https://iris.test/media/thesis.pdf", 12)).toBe(
-      "https://iris.test/media/thesis.pdf#page=12",
-    );
+// `paperHrefAtPage` (the `#page=N` fragment link to a raw PDF URL) and its
+// three tests above are deleted, deliberately, not merely outdated (IR-335):
+// IR-334 put the manuscript behind `IsAuthenticated`, and a plain `<a href>`
+// navigation built from that function carries no `Authorization` header, so
+// every link it produced now 401s. `PaperPdfReader` fetches the file through
+// `apiClient` instead, and `citationNavigationState` below replaces the
+// paper-URL-as-string approach with the citation itself.
+
+const liveCitation: Citation = {
+  marker:       1,
+  chunk_id:     11,
+  record_id:    7,
+  record_title: "Flood Prediction in the Mananga Catchment",
+  page:         12,
+  text:         "the network reduced mean absolute error by twelve per cent",
+  context_path: ["Flood Prediction", "Results"],
+  regions:      [{ page: 12, left: 0.1, top: 0.2, right: 0.6, bottom: 0.3 }],
+};
+
+const replayedCitation: ReplayedCitation = {
+  marker:    2,
+  record_id: 7,
+  chunk_id:  null,
+  page:      3,
+};
+
+describe("carrying a citation to the paper view", () => {
+  it("wraps a live citation, regions included, for router state", () => {
+    expect(citationNavigationState(liveCitation)).toEqual({ citation: liveCitation });
   });
 
-  it("links to the paper unchanged when no page was named", () => {
-    expect(paperHrefAtPage("https://iris.test/media/thesis.pdf", null)).toBe(
-      "https://iris.test/media/thesis.pdf",
-    );
-  });
-
-  it("stays null when the reader may not fetch the file at all", () => {
-    // The backend withholds the URL from someone who cannot download it, and
-    // a page anchor must not conjure a link out of that absence.
-    expect(paperHrefAtPage(null, 12)).toBeNull();
+  it("wraps a replayed citation the same way, with no regions to carry", () => {
+    expect(citationNavigationState(replayedCitation)).toEqual({ citation: replayedCitation });
   });
 });
