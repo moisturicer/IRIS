@@ -8,13 +8,19 @@ interface ChatMessageBubbleProps {
   message: ChatMessage;
 }
 
-/** One turn of the transcript. Citations render as inline chips via
- *  `CitationText` (IR-329), not a repeated card list below the message. */
+/**
+ * One turn of the transcript. Citations render as inline chips via
+ * `CitationText` (IR-329), not a repeated card list below the message.
+ *
+ * User turns sit in a flat, borderless bar; assistant turns flow as plain
+ * text with no card/border/shadow, closer to a read surface than a chat
+ * widget — the avatar is still what tells the two apart.
+ */
 export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
+    <div className="flex gap-3">
       <div
         className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[12px]
           ${isUser ? "bg-stone-100 text-stone-500" : "bg-brand/10 text-brand"}`}
@@ -23,15 +29,9 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         {isUser ? <i className="fas fa-user" aria-hidden /> : <AskIrisMark className="w-[18px] h-[18px]" />}
       </div>
 
-      <div
-        className={`max-w-[min(88%,40rem)] rounded-2xl px-4 py-3 text-[13px] leading-relaxed
-          ${isUser
-            ? "bg-brand text-white rounded-br-sm"
-            : "bg-white border border-stone-200/90 text-stone-800 rounded-bl-sm shadow-sm"
-          }`}
-      >
+      <div className={`min-w-0 flex-1 text-[15px] leading-relaxed ${isUser ? "bg-stone-100 rounded-2xl px-4 py-3" : ""}`}>
         {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
         ) : (
           <CitationText
             text={message.content}

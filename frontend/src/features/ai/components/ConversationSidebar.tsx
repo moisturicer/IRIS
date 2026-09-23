@@ -40,14 +40,14 @@ export function ConversationSidebar({
           rule visibly stepped down at the divider. px-5 lines the label up with
           the conversation titles below, which sit at nav px-2 + button px-3. */}
       <div className="flex items-center gap-2 px-5 py-2 min-h-[56px] border-b border-stone-200/80">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex-1">
+        <span className="text-[12px] font-bold uppercase tracking-wider text-stone-500 flex-1">
           Chat history
         </span>
       </div>
 
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2 space-y-1">
         {conversations.length === 0 ? (
-          <p className="px-3 py-6 text-[11px] text-stone-500 text-center">
+          <p className="px-3 py-6 text-[12px] text-stone-500 text-center">
             Your past chats will appear here.
           </p>
         ) : (
@@ -64,10 +64,10 @@ export function ConversationSidebar({
                       : "text-stone-700 hover:bg-stone-50"
                     }`}
                 >
-                  <span className="block text-[12px] font-semibold truncate pr-6">
+                  <span className="block text-[13px] font-semibold truncate pr-6">
                     {c.title || "New conversation"}
                   </span>
-                  <span className="block text-[10px] text-stone-400 mt-0.5">
+                  <span className="block text-[11px] text-stone-400 mt-0.5">
                     {formatDate(c.updated_at, "MMM d · h:mm a")}
                   </span>
                 </button>
