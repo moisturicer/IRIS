@@ -16,6 +16,10 @@
  * `/records/mine/` already returns RecordDetailSerializer's payload
  * (clearances, ip_type, requested_itso/ierc/ktto — see api/records.ts),
  * so nothing on the backend needed to change for this page.
+ *
+ * A case's stage, holding office and "Action Required" flag come from the
+ * API's `workflow_state` and `current_holders` (IR-259, ADR-021 §4) through
+ * `lib/workspaceStages`, never from the stored stage values IR-260 retires.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -201,8 +205,11 @@ export default function MyWorkspacePage() {
             const flagged = needsAuthorAction(record);
 
             return (
-              <div
+              // An article named by its title, so a case card is a landmark a
+              // screen reader can jump between, and a test can find one card.
+              <article
                 key={record.id}
+                aria-label={record.title}
                 className={cn(
                   "bg-white rounded-xl border p-4",
                   flagged ? "border-red-200" : "border-stone-200",
@@ -274,7 +281,7 @@ export default function MyWorkspacePage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
