@@ -191,12 +191,19 @@ export default function RAGChatPage() {
       .classifications()
       .then(({ data }) => {
         if (cancelled) return;
-        const names = (data.results ?? []).map((c) => c.name).slice(0, 3);
-        setSuggestions(
-          names.length > 0
-            ? names.map((n) => `What research exists on ${n.toLowerCase()}?`)
-            : ["What research has been published at CIT-U?"],
-        );
+        const names = (data.results ?? []).map((c) => c.name).slice(0, 4);
+        const fromCatalogue = names.map((n) => `What research exists on ${n.toLowerCase()}?`);
+        // Generic, catalogue-agnostic prompts fill out to 4 when there are
+        // fewer than 4 classifications -- still safe to suggest since they
+        // never assume a specific classification exists.
+        const fallback = [
+          "What research has been published at CIT-U?",
+          "What are the most recent submissions?",
+          "Summarize a thesis from the repository",
+          "What departments have published research?",
+        ];
+        const combined = [...fromCatalogue, ...fallback.filter((p) => !fromCatalogue.includes(p))];
+        setSuggestions(combined.slice(0, 4));
       })
       .catch(() => {});
 

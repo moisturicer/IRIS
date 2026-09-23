@@ -32,15 +32,19 @@ interface SourceContextPanelProps {
  * answer text carry citation detail now, this is just a reference list.
  */
 export function SourceContextPanel({ open, citations, sources, onClose }: SourceContextPanelProps) {
-  if (!open) return null;
-
   const cardFor = (recordId: number) => sources.find((s) => s.id === recordId);
 
   return (
     <aside
-      className="shrink-0 w-[min(100%,320px)] sm:w-[300px] flex flex-col border-l border-stone-200/80 bg-stone-50/50"
+      // Collapses by width, matching `ConversationSidebar`'s own transition,
+      // rather than mounting/unmounting instantly.
+      className={`shrink-0 flex flex-col border-l border-stone-200/80 bg-stone-50/50
+        overflow-hidden transition-[width] duration-200 ease-out
+        ${open ? "w-[min(100%,320px)] sm:w-[300px]" : "w-0 border-l-0 invisible"}`}
       aria-label="Referenced passages"
+      aria-hidden={!open}
     >
+      <div className="w-[min(100vw,320px)] sm:w-[300px] flex flex-col h-full">
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60 bg-white">
         <div>
           <h2 className="text-[13px] font-bold text-stone-800">Referenced passages</h2>
@@ -99,6 +103,7 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
             </article>
           );
         })}
+      </div>
       </div>
     </aside>
   );

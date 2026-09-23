@@ -1,6 +1,7 @@
 import type { ChatMessage } from "@/types/chat";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
+import { CopyButton } from "./CopyButton";
 import { DegradedNotice, PartialAnswerNotice, ScopeNotice } from "./PassageQuote";
 import "highlight.js/styles/github.min.css";
 
@@ -20,7 +21,7 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
+    <div className={`group flex gap-3 animate-fade-in-up motion-reduce:animate-none ${isUser ? "flex-row-reverse" : ""}`}>
       <div
         className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[12px]
           ${isUser ? "bg-stone-100 text-stone-500" : "bg-brand/10 text-brand"}`}
@@ -49,6 +50,12 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         {!isUser && message.degraded && <DegradedNotice subject="answer" />}
         {!isUser && message.widened && <ScopeNotice />}
         {!isUser && message.partial && <PartialAnswerNotice />}
+
+        {!isUser && (
+          <div className="mt-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+            <CopyButton text={message.content} label="Copy answer" />
+          </div>
+        )}
       </div>
     </div>
   );

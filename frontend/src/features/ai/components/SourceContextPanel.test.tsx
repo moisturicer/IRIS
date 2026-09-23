@@ -89,10 +89,12 @@ describe("the referenced passages panel", () => {
     expect(screen.getByText(/Ask a question to see the passages/i)).toBeTruthy();
   });
 
-  it("renders nothing at all when closed", () => {
-    const { container } = renderPanel({ open: false });
+  it("collapses to zero width and drops out of the tab order when closed", () => {
+    renderPanel({ open: false });
 
-    expect(container.firstChild).toBeNull();
+    const aside = screen.getByLabelText("Referenced passages");
+    expect(aside.className).toContain("w-0");
+    expect(aside.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("has no serious or critical accessibility violations", async () => {
