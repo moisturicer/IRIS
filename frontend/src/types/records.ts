@@ -130,6 +130,12 @@ export interface RecordDetail extends RecordListItem {
   current_holders:      TrackerHolder[];
   /** The parties this viewer may act as. Empty for almost everyone. */
   can_act:              Party[];
+  /**
+   * The parties this viewer may ask the owner for documents as (ADR-022,
+   * IR-262): a party they hold. Wider than `can_act`, which the legacy
+   * pipeline still narrows.
+   */
+  can_request_document: Party[];
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +205,8 @@ export interface TrackerPartyRow {
   outcome_label: string | null;
   at:            string | null;
   preserved:     boolean;
+  /** This party has an open document request and is waiting on it (◐). */
+  awaiting_document: boolean;
 }
 
 export interface TrackerRoutingGroup {
@@ -238,7 +246,7 @@ export interface RecordTracker {
   routing_recorded_from: string | null;
   reviews:               TrackerReview[];
   resubmissions:         TrackerResubmission[];
-  document_requests:     unknown[];
+  document_requests:     DocumentRequest[];
   clearances:            RecordClearance[];
   resubmission:          RecordResubmission;
 }
@@ -304,4 +312,45 @@ export interface DeleteRequest {
   reviewed_by:         number | null;
   reviewed_at:         string | null;
   created_at:          string;
+}
+
+// ---------------------------------------------------------------------------
+// Document requests (ADR-022, IR-262)
+// ---------------------------------------------------------------------------
+
+export type DocumentRequestState = "open" | "fulfilled" | "withdrawn";
+export type DocumentRequestItemState = "missing" | "uploaded" | "accepted" | "rejected";
+
+export interface DocumentRequestItem {
+  id:          number;
+  /** Null for a free-text "Other" item. */
+  slot:        number | null;
+  label:       string;
+  state:       DocumentRequestItemState;
+  state_label: string;
+  upload:      number | null;
+  uploaded_at: string | null;
+}
+
+export interface DocumentRequest {
+  id:           number;
+  party:        Party;
+  /** Server-worded; Intake reads "Intake" to the owner. */
+  label:        string;
+  state:        DocumentRequestState;
+  state_label:  string;
+  /** Plain text, as the reviewer wrote it. Never render as markup. */
+  message:      string;
+  requested_by: string | null;
+  created_at:   string;
+  closed_at:    string | null;
+  items:        DocumentRequestItem[];
+}
+
+/** One entry of a new request: a picklist slot, or free text for "Other". */
+export type DocumentRequestItemInput = { slot: number } | { label: string };
+
+export interface DocumentRequestSlot {
+  id:   number;
+  name: string;
 }

@@ -530,6 +530,108 @@ def notify_proposal_completed(record, marked_by):
         pass
 
 
+def _role_for_party(party: str):
+    """
+    The role that staffs an office party (ADR-021 §1), read from the tracker's
+    one role-to-party map rather than restated here. None for the Adviser
+    party, which is a person -- the record's own `adviser` -- not a role.
+    """
+    from apps.reviews.tracker import ROLE_TO_PARTIES
+
+    for role_name, parties in ROLE_TO_PARTIES.items():
+        if role_name != RoleName.ADVISER and party in parties:
+            return _role(role_name)
+    return None
+
+
+def notify_document_requested(document_request, *, party_label: str):
+    """
+    Tell every owner that a party has asked for documents (ADR-022 §3.1).
+
+    `party_label` is the student-facing name, so Intake reads "Intake".
+    """
+    try:
+        record = document_request.record
+        wanted = ", ".join(item.label for item in document_request.items.all())
+        message = (
+            f'{party_label} requested documents for "{record.title}": {wanted}. '
+            f"Upload them from the record page."
+        )
+        owners = list(record.owners.select_related("user").all())
+        notif_type = NotificationType.objects.get_or_create(name="Document Requested")[0]
+        for ownership in owners:
+            Notification.objects.create(
+                sender=document_request.requested_by,
+                recipient=ownership.user,
+                record=record,
+                notif_type=notif_type,
+                message=message,
+            )
+        if owners:
+            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
+            send_email_async(
+                subject=f"[IRIS] Documents requested: {record.title[:60]}",
+                message=(
+                    f"Hello {primary.first_name},\n\n"
+                    f"{message}\n\n"
+                    f"{party_label} wrote:\n{document_request.message}\n\n"
+                    f"{_record_url(record)}\n\n"
+                    f"-- The IRIS Team"
+                ),
+                recipient_list=[primary.email],
+            )
+    except Exception:
+        pass
+
+
+def notify_document_request_fulfilled(document_request, *, uploaded_by):
+    """
+    Tell the requesting party that every item now has an upload (ADR-022 §3.3).
+
+    An office hears as a role broadcast, as offices do everywhere else here.
+    The Adviser party is the record's assigned Adviser, directly.
+    """
+    try:
+        record = document_request.record
+        notif_type = NotificationType.objects.get_or_create(name="Document Request Fulfilled")[0]
+        message = (
+            f'Every document you requested for "{record.title}" has been uploaded. '
+            f"It is ready for you to check."
+        )
+        if document_request.party == ReviewStage.ADVISER:
+            if record.adviser is None:
+                return
+            Notification.objects.create(
+                sender=uploaded_by, recipient=record.adviser, record=record,
+                notif_type=notif_type, message=message,
+            )
+            send_email_async(
+                subject=f"[IRIS] Requested documents uploaded: {record.title[:60]}",
+                message=(
+                    f"Hello {record.adviser.first_name},\n\n{message}\n\n"
+                    f"{_record_url(record)}\n\n-- The IRIS Team"
+                ),
+                recipient_list=[record.adviser.email],
+            )
+            return
+
+        role = _role_for_party(document_request.party)
+        if not role:
+            return
+        Notification.objects.create(
+            sender=uploaded_by, broadcast_to_role=role, record=record,
+            notif_type=notif_type, message=message,
+        )
+        _email_role_users(
+            role=role,
+            subject=f"[IRIS] Requested documents uploaded: {record.title[:60]}",
+            greeting=f"Hello {role.name} Team",
+            body=f"{message}\n\n{_record_url(record)}",
+        )
+    except Exception:
+        pass
+
+
 def notify_role_request(user, requested_role):
     """
     Broadcast to RDCO when a new role request is submitted.

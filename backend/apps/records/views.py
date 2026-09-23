@@ -348,6 +348,72 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         return Response(tracker_payload(self.get_object(), request.user))
 
+    @action(detail=True, methods=["get", "post"], url_path="document-requests")
+    def document_requests(self, request, pk=None):
+        """
+        GET  /records/<id>/document-requests/ -- every request, oldest first
+        POST /records/<id>/document-requests/ -- a holder asks the owner for documents
+
+        ADR-022 §5, IR-262. `get_object()` resolves through `visible_to()`, so a
+        viewer without access gets a 404 on both. Creating one further needs an
+        active assignment the user can staff; a visible record the user does
+        not hold is a 403.
+
+        POST body: `{"message": str, "items": [{"slot": id} | {"label": str}],
+        "party"?: str}`. `party` is needed only by someone holding the record
+        as two parties at once (RDCO as Intake and as RDCO Final).
+        """
+        from apps.documents import requests as document_requests
+        from apps.notifications.services import notify_document_requested
+        from apps.reviews.tracker import party_label, is_staff_viewer
+
+        record = self.get_object()
+        staff = is_staff_viewer(request.user)
+
+        if request.method == "GET":
+            return Response([
+                document_requests.payload(r, staff_viewer=staff)
+                for r in document_requests.requests_for(record)
+            ])
+
+        try:
+            created = document_requests.create_request(
+                record, request.user,
+                message=request.data.get("message"),
+                raw_items=request.data.get("items"),
+                party=request.data.get("party"),
+            )
+        except document_requests.NotAHolder as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except document_requests.DocumentRequestError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        notify_document_requested(
+            created, party_label=party_label(created.party, staff_viewer=False)
+        )
+        created = document_requests.requests_for(record).get(pk=created.pk)
+        return Response(
+            document_requests.payload(created, staff_viewer=staff),
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        detail=True, methods=["get"],
+        url_path="document-requests/slots", url_name="document-request-slots",
+    )
+    def document_request_slots(self, request, pk=None):
+        """
+        GET /records/<id>/document-requests/slots/ -- the picklist (ADR-022 §2).
+
+        The record type's upload slots. Served per record, because Record detail
+        names its type rather than giving its id, and 404 like the rest.
+        """
+        from apps.documents.requests import picklist
+
+        return Response([
+            {"id": slot.pk, "name": slot.name} for slot in picklist(self.get_object())
+        ])
+
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):
         """POST /records/<id>/increment_access/"""

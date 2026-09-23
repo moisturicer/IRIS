@@ -9,9 +9,9 @@ Nothing here writes, and nothing the frontend shows is worked out on the client.
 
 **`workflow_state` is derived in one function and never stored.**
 `derive_workflow_state` takes the facts as arguments, so the precedence -- the
-part ADR-021 says must not be reordered -- is one readable block, and the one
-rule no request can reach yet (`awaiting_document`, IR-262's table) can still
-be pinned.
+part ADR-021 says must not be reordered -- is one readable block. Open
+`DocumentRequest` rows (ADR-022, IR-262) are what make a record
+`awaiting_document`.
 
 **`can_act` answers what the server will accept today.** Under ADR-021 a party
 may act when it holds an active assignment and the viewer can staff it. Until
@@ -31,6 +31,7 @@ from apps.records import lifecycle
 from core.enums import (
     ASSIGNABLE_PARTIES,
     AssignmentState,
+    DocumentRequestState,
     Office,
     Party,
     PipelineStatus,
@@ -144,12 +145,17 @@ def _entry_party_has_acted(record, entry_party: str) -> bool:
     ).exists()
 
 
-def _open_document_requests(record) -> int:
+def _open_document_request_parties(record) -> list[str]:
     """
-    Always 0: `DocumentRequest` is IR-262's table and does not exist yet, so no
-    record can be waiting on one. IR-262 replaces this body with the count.
+    The requesting party of each open document request on `record`, one entry
+    per request (ADR-022 §3.1). Its length is the open-request count.
     """
-    return 0
+    from apps.documents.models import DocumentRequest
+
+    return list(
+        DocumentRequest.objects.filter(record=record, state=DocumentRequestState.OPEN)
+        .values_list("party", flat=True)
+    )
 
 
 def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
@@ -165,7 +171,7 @@ def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
         open_resubmissions=ResubmissionRequest.objects.filter(
             record=record, state=ResubmissionRequestState.OPEN
         ).count(),
-        open_document_requests=_open_document_requests(record),
+        open_document_requests=len(_open_document_request_parties(record)),
         active_parties=[a.party for a in active],
         entry_party=entry,
         entry_party_has_acted=_entry_party_has_acted(record, entry),
@@ -182,7 +188,7 @@ def workflow_state_label(state: str) -> str:
 
 # --- labels -------------------------------------------------------------------
 
-def _is_staff_viewer(user) -> bool:
+def is_staff_viewer(user) -> bool:
     return get_role_name(user) in REVIEWER_ROLES
 
 
@@ -247,6 +253,21 @@ def can_act(record, user, *, active_assignments: Optional[list] = None) -> list[
     return [str(p) for p in TRACKER_ORDER if str(p) in eligible]
 
 
+def requestable_parties(record, user, *, active_assignments: Optional[list] = None) -> list[str]:
+    """
+    The parties `user` may ask for documents as (ADR-022 §Security).
+
+    An active assignment the user can staff -- `can_act` without the legacy
+    pipeline narrowing. A request moves nothing that narrowing protects, so
+    IERC may ask for a consent form while ITSO still holds the clearance gate.
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return []
+    active = active_assignments if active_assignments is not None else _active_assignments(record)
+    eligible = {a.party for a in active} & _staffable_parties(record, user)
+    return [str(p) for p in TRACKER_ORDER if str(p) in eligible]
+
+
 def _party_value(stage) -> Optional[str]:
     party = party_for_stage(stage)
     return str(party) if party else None
@@ -262,7 +283,7 @@ def _iso(value) -> Optional[str]:
 
 def current_holders(record, user, *, active_assignments: Optional[list] = None) -> list[dict]:
     active = active_assignments if active_assignments is not None else _active_assignments(record)
-    staff = _is_staff_viewer(user)
+    staff = is_staff_viewer(user)
     return [
         {
             "party": a.party,
@@ -275,7 +296,7 @@ def current_holders(record, user, *, active_assignments: Optional[list] = None) 
 
 
 def workflow_fields(record, user) -> dict[str, Any]:
-    """The three fields Record detail carries (IR-258)."""
+    """The workflow fields Record detail carries (IR-258, IR-262)."""
     active = _active_assignments(record)
     state = workflow_state(record, active_assignments=active)
     return {
@@ -283,6 +304,7 @@ def workflow_fields(record, user) -> dict[str, Any]:
         "workflow_state_label": workflow_state_label(state),
         "current_holders": current_holders(record, user, active_assignments=active),
         "can_act": can_act(record, user, active_assignments=active),
+        "can_request_document": requestable_parties(record, user, active_assignments=active),
     }
 
 
@@ -301,6 +323,7 @@ def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list
 
     clearance_by_office = {c.office: c for c in clearances}
     deciders = {str(p) for p in lifecycle.deciding_parties_for(record)}
+    awaiting_document = set(_open_document_request_parties(record))
 
     rows = []
     for member in TRACKER_ORDER:
@@ -347,6 +370,12 @@ def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list
             # §8.2's split of an active party: reviewing already, or
             # requested but not yet started. Meaningless for any other state.
             "started": state is TrackerPartyState.ACTIVE and review is not None,
+            # §9.1's ◐: this party has asked the owner for a document and is
+            # waiting on it. Independent of `state` -- a party may close its
+            # assignment while its request stays open (ADR-022 §1). The key
+            # is named for the workflow state this party is holding the record
+            # in (§8.1), so it is spelled through that enum.
+            WorkflowState.AWAITING_DOCUMENT.value: party in awaiting_document,
             "outcome": outcome,
             "outcome_label": outcome_label,
             "at": _iso(at),
@@ -410,7 +439,9 @@ def _resubmissions(record, *, staff: bool) -> list[dict]:
 
 def tracker_payload(record, user) -> dict[str, Any]:
     """`GET /records/<id>/tracker/` -- §8.1 of the architecture doc."""
-    staff = _is_staff_viewer(user)
+    from apps.documents.requests import payload as document_request_payload, requests_for
+
+    staff = is_staff_viewer(user)
     reviews = list(
         Review.objects.filter(record=record)
         .select_related("reviewed_by").order_by("created_at", "pk")
@@ -441,8 +472,9 @@ def tracker_payload(record, user) -> dict[str, Any]:
             for r in reviews
         ],
         "resubmissions": _resubmissions(record, staff=staff),
-        # IR-262 adds the table; until then no record can have a request.
-        "document_requests": [],
+        "document_requests": [
+            document_request_payload(r, staff_viewer=staff) for r in requests_for(record)
+        ],
         "clearances": [
             clearance_payload(c, last_resubmitted_at=record.last_resubmitted_at)
             for c in clearances

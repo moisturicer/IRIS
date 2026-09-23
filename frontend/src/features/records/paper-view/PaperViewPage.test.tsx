@@ -87,6 +87,7 @@ const record: RecordDetail = {
   workflow_state_label: "Published",
   current_holders: [],
   can_act: [],
+  can_request_document: [],
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -135,6 +136,7 @@ const approvedProposal: RecordDetail = {
   workflow_state_label: "Approved",
   current_holders: [],
   can_act: [],
+  can_request_document: [],
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -143,6 +145,8 @@ let shownRecord: RecordDetail = record;
 
 const completeProposal = vi.fn((_id: number) => Promise.resolve({ data: { detail: "ok" } }));
 
+const documentRequests = vi.fn(() => Promise.resolve({ data: [] as unknown[] }));
+
 vi.mock("@/api/records", () => ({
   recordsApi: {
     detail:           vi.fn(() => Promise.resolve({ data: shownRecord })),
@@ -150,6 +154,9 @@ vi.mock("@/api/records", () => ({
     similar:          vi.fn(() => Promise.resolve({ data: { results: [] } })),
     // The tracker panel loads itself; it has its own test file (IR-258).
     tracker:          vi.fn(() => Promise.reject(new Error("not under test"))),
+    // The Action required panel loads itself; its behaviour is tested in
+    // features/document-requests (IR-262). Here only its placement is.
+    documentRequests: () => documentRequests(),
     updateTags:       vi.fn(),
     completeProposal: (id: number) => completeProposal(id),
   },
@@ -292,6 +299,7 @@ const inReview: RecordDetail = {
     { party: "itso", label: "ITSO", opened_at: "2026-09-02T08:00:00Z", opened_by: null },
   ],
   can_act: [],
+  can_request_document: [],
 };
 
 async function waitForRecord(title: string) {
@@ -382,5 +390,57 @@ describe("the status the paper shows", () => {
     // Once as the badge, once as the governance ledger's status row.
     expect(screen.getAllByText("Final review")).toHaveLength(2);
     expect(screen.queryByText("RDCO Final Review")).not.toBeInTheDocument();
+  });
+});
+
+describe("document requests (IR-262)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const openRequest = {
+    id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open",
+    message: "The signed consent forms are missing.", requested_by: null,
+    created_at: "2026-09-20T02:00:00Z", closed_at: null,
+    items: [{
+      id: 11, slot: 3, label: "Ethics Clearance", state: "missing",
+      state_label: "Missing", upload: null, uploaded_at: null,
+    }],
+  };
+
+  it("shows the owner an Action required panel for an open request", async () => {
+    documentRequests.mockResolvedValueOnce({ data: [openRequest] });
+    shownRecord = { ...inReview, workflow_state: "awaiting_document", workflow_state_label: "Awaiting document" };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const panel = await screen.findByRole("region", { name: "Action required" });
+    expect(panel).toHaveTextContent("The signed consent forms are missing.");
+  });
+
+  it("does not load requests for a viewer who does not own the record", async () => {
+    shownRecord = inReview;
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(documentRequests).not.toHaveBeenCalled();
+  });
+
+  it("offers Request documents exactly when the API names a party", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    signInAs(2, "IERC");
+    renderPaperView();
+
+    expect(await screen.findByRole("button", { name: "Request documents" })).toBeInTheDocument();
+  });
+
+  it("does not offer Request documents otherwise", async () => {
+    shownRecord = inReview;
+    signInAs(2, "IERC");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
   });
 });

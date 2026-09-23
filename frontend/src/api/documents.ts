@@ -16,6 +16,21 @@ export const documentsApi = {
   uploads:        (recordId: number) =>
     apiClient.get<RecordUpload[]>("/documents/uploads/", { params: { record: recordId } }),
 
+  /**
+   * Upload a PDF answering one item of a document request (ADR-022 §3.2,
+   * IR-262). Same endpoint as `upload`; the server takes the slot from the item.
+   */
+  uploadForRequestItem: (recordId: number, itemId: number, file: File) => {
+    const fd = new FormData();
+    fd.append("record",       String(recordId));
+    fd.append("request_item", String(itemId));
+    fd.append("file",         file);
+    return apiClient.post<{ upload: RecordUpload; extraction: { id: number; status: string } }>(
+      "/documents/submit/", fd,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+  },
+
   // Upload a PDF to a slot — triggers Celery extraction task
   upload:         (recordId: number, slotId: number, file: File) => {
     const fd = new FormData();
