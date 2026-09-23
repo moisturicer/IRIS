@@ -75,10 +75,18 @@ export default {
           "0%":   { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        // A citation's highlight briefly reads brighter on arrival, so a
+        // reader's eye finds it on the page rather than searching for a
+        // static box among the surrounding text (IR-335).
+        "citation-flash": {
+          "0%":   { backgroundColor: "rgb(252 211 77 / 0.75)" },
+          "100%": { backgroundColor: "rgb(252 211 77 / 0.35)" },
+        },
       },
       animation: {
         "fade-in-up": "fade-in-up 0.3s ease-out",
         "fade-in":    "fade-in 0.2s ease-out",
+        "citation-flash": "citation-flash 1.6s ease-out",
       },
     },
   },

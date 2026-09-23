@@ -21,6 +21,7 @@ const citation: Citation = {
   page:         4,
   text:         "we trained a convolutional neural network on rainfall gauge data",
   context_path: ["Flood Prediction in the Mananga Catchment", "Methods"],
+  regions:      [],
 };
 
 describe("a finished message's inline citations", () => {

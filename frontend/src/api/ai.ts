@@ -9,6 +9,7 @@ import type {
   AIStatus,
   ConversationSummary,
   ConversationDetail,
+  RecordOverviewResponse,
 } from "@/types/ai";
 
 interface SemanticSearchResponse {
@@ -72,6 +73,13 @@ async function* streamAsk(
 export const aiApi = {
   /** Whether answers will be generated or retrieval-only, and how many records are indexed. */
   status: () => apiClient.get<AIStatus>("/ai/status/"),
+
+  /**
+   * A record's AI Overview, generated once and cached server-side (IR-334).
+   * Replaces firing `ask()` from the paper view on every mount.
+   */
+  overview: (recordId: number) =>
+    apiClient.get<RecordOverviewResponse>(`/ai/records/${recordId}/overview/`),
 
   /** Ranked retrieval over the readable corpus, without synthesis. */
   search: (query: string, topK = 10) =>

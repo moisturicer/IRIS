@@ -2,13 +2,17 @@
  * Two independent concerns on the same screen, merged into one file because
  * `@/api/records` can only be mocked once per module.
  *
- * **Arriving from a citation (IR-284).** `lib/citedPage` is unit-tested on
- * both halves — reading the page off the query string, and asking the PDF
- * viewer for it — but the two halves being right does not make the *join*
- * right, and the join is what a reader actually walks: a citation link
- * carries `?page=N`, and this screen has to turn that into a paper opened at
- * that page. So this test starts where the citation sends them and asserts
- * where they end up.
+ * **Arriving from a citation (IR-284, revised IR-335).** `lib/citedPage` is
+ * unit-tested on its own halves — reading the page off the query string, and
+ * wrapping a citation for router state — but the two halves being right does
+ * not make the *join* right, and the join is what a reader actually walks: a
+ * citation carries `?page=N` (and, live, its own regions as router state),
+ * and this screen has to turn that into the embedded reader opened at that
+ * page with the right thing to highlight. `PaperPdfReader` itself is mocked
+ * here — it fetches and renders real PDF bytes through pdf.js, which is its
+ * own test file's job (`PaperPdfReader.test.tsx`) — so what this file checks
+ * is that this screen hands it the right `scrollToPage` and
+ * `highlightRegions`, and that the Abstract/Paper toggle follows along.
  *
  * **Who sees "Mark as completed" (IR-267).** ADR-021 §3: a Proposal is
  * completed by its assigned Adviser or by RDCO. The button follows the same
@@ -157,10 +161,33 @@ vi.mock("@/api/records", () => ({
 
 vi.mock("@/api/reviews", () => ({ reviewsApi: { resubmit: vi.fn() } }));
 
-// The AI overview asks a question of its own; this screen is not what that
+// The AI overview reads its own cache; this screen is not what that
 // behaviour is tested through (`PaperAiOverview.test.tsx` is).
 vi.mock("@/api/ai", () => ({
-  aiApi: { ask: vi.fn(() => Promise.reject(new Error("not under test"))) },
+  aiApi: {
+    ask:      vi.fn(() => Promise.reject(new Error("not under test"))),
+    overview: vi.fn(() => Promise.reject(new Error("not under test"))),
+  },
+}));
+
+// `PaperPdfReader` fetches and renders real PDF bytes through pdf.js, which
+// jsdom cannot do at all (no canvas 2D context, no worker) and which is this
+// component's own test file's job (`PaperPdfReader.test.tsx`). This screen
+// only has to hand it the right props -- asserted below by rendering what
+// they were.
+vi.mock("./PaperPdfReader", () => ({
+  PaperPdfReader: ({
+    scrollToPage,
+    highlightRegions,
+  }: {
+    scrollToPage: number | null;
+    highlightRegions: unknown[];
+  }) => (
+    <div data-testid="paper-pdf-reader">
+      Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
+      highlight
+    </div>
+  ),
 }));
 
 function signInAs(id: number, role_name: User["role_name"]) {
@@ -184,12 +211,12 @@ function signInAs(id: number, role_name: User["role_name"]) {
 }
 
 /** Mounted on its real path, so `useParams` sees the record id. */
-function renderPaper(route: string) {
+function renderPaper(route: string, state?: unknown) {
   return renderScreen(
     <Routes>
       <Route path="/records/:id" element={<PaperViewPage />} />
     </Routes>,
-    { route },
+    { route, state },
   );
 }
 
@@ -202,25 +229,51 @@ describe("arriving from a citation", () => {
     shownRecord = record;
   });
 
-  it("opens the paper at the cited page", async () => {
+  it("opens the embedded reader at the cited page, without leaving the app", async () => {
     renderPaper(`/records/${RECORD_ID}?page=12`);
 
-    const link = await screen.findByRole("link", { name: /View Paper at page 12/i });
-    expect(link.getAttribute("href")).toBe(`${PAPER_URL}#page=12`);
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
   });
 
-  it("opens the paper plainly when no page was named", async () => {
+  it("carries a citation's regions to the reader as router state, with no second fetch", async () => {
+    const citation = {
+      marker: 1,
+      chunk_id: 11,
+      record_id: RECORD_ID,
+      record_title: record.title,
+      page: 12,
+      text: "the network reduced mean absolute error by twelve per cent",
+      context_path: [record.title, "Results"],
+      regions: [{ page: 12, left: 0.1, top: 0.2, right: 0.6, bottom: 0.3 }],
+    };
+
+    renderPaper(`/records/${RECORD_ID}?page=12`, { citation });
+
+    expect(await screen.findByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
+  });
+
+  it("opens on the Abstract tab, with a View Paper button, when no page was named", async () => {
     renderPaper(`/records/${RECORD_ID}`);
 
-    const link = await screen.findByRole("link", { name: /^View Paper$/i });
-    expect(link.getAttribute("href")).toBe(PAPER_URL);
+    expect(await screen.findByRole("tab", { name: "Abstract", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^View Paper$/i })).toBeInTheDocument();
   });
 
-  it("ignores a page that is not a page", async () => {
+  it("ignores a page that is not a page and stays on Abstract", async () => {
     renderPaper(`/records/${RECORD_ID}?page=not-a-page`);
 
-    const link = await screen.findByRole("link", { name: /^View Paper$/i });
-    expect(link.getAttribute("href")).toBe(PAPER_URL);
+    expect(await screen.findByRole("tab", { name: "Abstract", selected: true })).toBeInTheDocument();
+  });
+
+  it("switches to the reader when View Paper is clicked", async () => {
+    renderPaper(`/records/${RECORD_ID}`);
+
+    const button = await screen.findByRole("button", { name: /^View Paper$/i });
+    await userEvent.click(button);
+
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
+    expect(await screen.findByTestId("paper-pdf-reader")).toBeInTheDocument();
   });
 });
 

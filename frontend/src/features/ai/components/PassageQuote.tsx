@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import type { Citation } from "@/types/ai";
-import { citationHref, openCitationLabel } from "@/lib/citedPage";
+import type { ChatCitation, Citation } from "@/types/ai";
+import { citationHref, citationNavigationState, openCitationLabel } from "@/lib/citedPage";
 
 /**
  * The pieces every surface that shows a Passage needs (IR-284).
@@ -49,19 +49,28 @@ export function PassageQuote({ text, className = "" }: { text: string; className
  * `citation` only needs `record_id` and `page` to build the link, so a
  * replayed citation (IR-298) — a stored pointer with no title of its own —
  * can pass one through with `title` supplied explicitly instead.
+ *
+ * When `citation` is a full `Citation` or `ReplayedCitation` (every real
+ * caller today), it also rides along as router `state` (IR-335), so the
+ * paper view can draw its highlight with no second fetch. A caller passing a
+ * bare `{record_id, page}` literal simply carries nothing to highlight with —
+ * the link still opens the right page.
  */
 export function OpenPassageLink({
   citation,
   title,
   className = "",
 }: {
-  citation: Pick<Citation, "record_id" | "page"> & Partial<Pick<Citation, "record_title">>;
+  citation:
+    | ChatCitation
+    | (Pick<Citation, "record_id" | "page"> & Partial<Pick<Citation, "record_title">>);
   title?: string;
   className?: string;
 }) {
   return (
     <Link
       to={citationHref(citation)}
+      state={"marker" in citation ? citationNavigationState(citation) : undefined}
       className={
         "inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#6B0F12] " +
         "hover:underline " +

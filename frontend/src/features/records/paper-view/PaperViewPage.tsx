@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
-import { citedPage, paperHrefAtPage } from "@/lib/citedPage";
+import { citedPage, type CitationNavigationState } from "@/lib/citedPage";
 import type { RecordDetail, IpType, RecordReview } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
-import type { SemanticSearchResult } from "@/types/ai";
+import type { Region, SemanticSearchResult } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
@@ -24,6 +24,14 @@ import {
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
+
+// Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
+// and most visits to this screen never open the Paper tab at all. Splitting
+// it out of the main bundle means only a reader who actually opens the
+// reader pays for it.
+const PaperPdfReader = lazy(() =>
+  import("./PaperPdfReader").then((m) => ({ default: m.PaperPdfReader })),
+);
 
 // ---------------------------------------------------------------------------
 // Role predicates — these mirror the server's rules; the server still enforces.
@@ -303,10 +311,13 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
+type PaperViewTab = "abstract" | "paper";
+
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { user } = useAuth();
 
   const chat = usePaperChat();
@@ -317,6 +328,28 @@ export default function PaperViewPage() {
   const [resubmitError, setResubmitError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
+
+  // A citation links here with `?page=` (IR-284), so acting on it lands on
+  // the page that supports the claim rather than the paper's first. The
+  // rules for reading that number live in `lib/citedPage`, testable without
+  // standing up this screen.
+  const openAtPage = citedPage(searchParams.get("page"));
+
+  // An Abstract/Paper toggle, alphaxiv-style (IR-335): Abstract is this
+  // screen's own detail, Paper is the embedded reader. Arriving with a page
+  // named -- from a citation, or a shared link -- opens straight into Paper;
+  // `useState`'s initializer only runs once, so the effect below is what
+  // keeps a *later* citation click (the component instance is reused; the
+  // route only changes its `:id`/query, not its element) switching tabs too.
+  const [tab, setTab] = useState<PaperViewTab>(openAtPage != null ? "paper" : "abstract");
+
+  useEffect(() => {
+    if (openAtPage != null) setTab("paper");
+    // `location.key` is unique per navigation, including a second click on
+    // the very citation already open -- without it in the dependency list,
+    // clicking the same marker twice would not re-fire this effect to
+    // re-scroll and re-flash the highlight.
+  }, [openAtPage, location.key]);
 
   useEffect(() => {
     if (!id) return;
@@ -409,49 +442,93 @@ export default function PaperViewPage() {
 
   const primaryOwner = record.owners.find((o) => o.is_primary) ?? record.owners[0];
 
-  // The paper itself. `abstract_file` is the uploaded manuscript when there is
-  // one; otherwise fall back to the first attachment. The Documents rail covers
-  // the rest, so this button is only ever "the paper".
-  const paperUrl = record.abstract_file ?? record.files[0]?.url ?? null;
+  // Whether there is a paper to read at all. `manuscript/` resolves the same
+  // abstract_file-then-newest-upload fallback server-side (`download_service
+  // .resolve_record_download_file`), so this is only ever an affordance
+  // decision -- the reader itself is the one source of truth for what it can
+  // actually fetch.
+  const hasPaper = Boolean(record.abstract_file) || record.files.length > 0;
 
-  // A citation links here with `?page=` (IR-284), so acting on it lands on the
-  // page that supports the claim rather than on the paper's first. The rules
-  // for reading and using that number live in `lib/citedPage`, where they are
-  // testable without standing up this screen.
-  const openAtPage = citedPage(searchParams.get("page"));
-  const paperHref = paperHrefAtPage(paperUrl, openAtPage);
+  // A citation carries the exact chunk it points at as router `state`
+  // (IR-335), so the reader draws its highlight with no second fetch. A
+  // navigation this link did not originate -- a typed URL, a refresh, a
+  // bookmark -- carries no state, and the reader still opens at `openAtPage`
+  // with nothing to highlight, which is the same graceful case a passage
+  // with no recovered regions already is.
+  const navCitation = (location.state as CitationNavigationState | null)?.citation;
+  const highlightRegions: Region[] =
+    navCitation && navCitation.record_id === record.id && "regions" in navCitation
+      ? navCitation.regions
+      : [];
 
   return (
-    <div
-      className={cn(
-        "lg:flex lg:gap-6 lg:items-start",
-        chat.dock === "left" && "lg:flex-row-reverse",
-      )}
-    >
-      <div className="min-w-0 lg:flex-1">
-        {/* Orientation bar */}
-        <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-[13px] font-semibold text-stone-600 hover:text-brand transition-colors"
-          >
-            <i className="fas fa-arrow-left text-[11px]" aria-hidden />
-            Back
-          </button>
-          <div className="flex items-center gap-4 text-[12px] text-stone-400">
-            <span className="flex items-center gap-1.5">
-              <i className="fas fa-calendar text-[11px]" aria-hidden />
-              Added {formatDate(record.created_at)}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <i className="fas fa-eye text-[11px]" aria-hidden />
-              {record.access_count} view{record.access_count === 1 ? "" : "s"}
-            </span>
-          </div>
-        </div>
+    // Centred, not stretched edge to edge (IR-335) -- alphaxiv's reading
+    // layout. `AppShell`'s own `<main>` sets no max-width, deliberately: it
+    // is shared by every screen, and this constraint belongs to the one that
+    // reads like a paper. The right rail stays inside this same container,
+    // centred with the main column as a pair, rather than moving elsewhere.
+    <div className="max-w-6xl mx-auto">
+      <div
+        className={cn(
+          "lg:flex lg:gap-6 lg:items-start",
+          chat.dock === "left" && "lg:flex-row-reverse",
+        )}
+      >
+        <div className="min-w-0 lg:flex-1">
+          {/* Orientation bar */}
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 text-[13px] font-semibold text-stone-600 hover:text-brand transition-colors"
+            >
+              <i className="fas fa-arrow-left text-[11px]" aria-hidden />
+              Back
+            </button>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+            {/* Abstract / Paper toggle (IR-335), alphaxiv-style. */}
+            <div role="tablist" aria-label="Paper view" className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "abstract"}
+                onClick={() => setTab("abstract")}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[12px] font-semibold transition-colors",
+                  tab === "abstract" ? "bg-brand text-white" : "text-stone-500 hover:text-stone-800",
+                )}
+              >
+                Abstract
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "paper"}
+                onClick={() => setTab("paper")}
+                disabled={!hasPaper}
+                title={hasPaper ? undefined : "No paper file has been uploaded for this record yet."}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                  tab === "paper" ? "bg-brand text-white" : "text-stone-500 hover:text-stone-800",
+                )}
+              >
+                Paper
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 text-[12px] text-stone-400">
+              <span className="flex items-center gap-1.5">
+                <i className="fas fa-calendar text-[11px]" aria-hidden />
+                Added {formatDate(record.created_at)}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <i className="fas fa-eye text-[11px]" aria-hidden />
+                {record.access_count} view{record.access_count === 1 ? "" : "s"}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
           {/* ------------------------------------------------------------- */}
           {/* Main column                                                    */}
           {/* ------------------------------------------------------------- */}
@@ -551,6 +628,30 @@ export default function PaperViewPage() {
               </div>
             )}
 
+            {tab === "paper" ? (
+              hasPaper ? (
+                <Suspense
+                  fallback={
+                    <div className="flex flex-col items-center gap-3 py-16">
+                      <i className="fas fa-circle-notch fa-spin text-[24px] text-stone-300" aria-hidden />
+                      <p className="text-[12px] text-stone-400">Loading the reader…</p>
+                    </div>
+                  }
+                >
+                  <PaperPdfReader
+                    recordId={record.id}
+                    scrollToPage={openAtPage}
+                    highlightRegions={highlightRegions}
+                    navKey={location.key}
+                  />
+                </Suspense>
+              ) : (
+                <p className="text-[13px] text-stone-400 italic py-8 text-center">
+                  No paper file has been uploaded for this record yet.
+                </p>
+              )
+            ) : (
+              <>
             {/* Abstract */}
             <section>
               <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">
@@ -569,16 +670,15 @@ export default function PaperViewPage() {
 
             {/* Action row */}
             <div className="flex items-center gap-2 flex-wrap pb-6 border-b border-stone-200">
-              {paperHref ? (
-                <a
-                  href={paperHref}
-                  target="_blank"
-                  rel="noreferrer"
+              {hasPaper ? (
+                <button
+                  type="button"
+                  onClick={() => setTab("paper")}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-light transition-colors"
                 >
                   <i className="fas fa-book-open text-[12px]" aria-hidden />
                   {openAtPage != null ? `View Paper at page ${openAtPage}` : "View Paper"}
-                </a>
+                </button>
               ) : (
                 <span
                   title="No paper file has been uploaded for this record yet."
@@ -657,6 +757,8 @@ export default function PaperViewPage() {
             )}
 
             <SimilarPapers recordId={record.id} />
+              </>
+            )}
           </div>
 
           {/* ------------------------------------------------------------- */}
@@ -685,6 +787,7 @@ export default function PaperViewPage() {
       ) : (
         <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
       )}
+      </div>
     </div>
   );
 }

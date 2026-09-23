@@ -26,6 +26,7 @@ const citation: Citation = {
   page:         4,
   text:         "we trained a convolutional neural network on rainfall gauge data to predict flooding",
   context_path: ["Flood Prediction in the Mananga Catchment", "Methods"],
+  regions:      [],
 };
 
 function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
