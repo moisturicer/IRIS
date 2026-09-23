@@ -4,6 +4,19 @@ from django.http import FileResponse
 from apps.documents.models import RecordUpload
 
 
+def has_record_download_file(record) -> bool:
+    """Whether `resolve_record_download_file` would find something.
+
+    The same two places, asked without opening a handle -- a serializer only
+    needs to know whether to advertise a URL.
+    """
+    if record.abstract_file:
+        return True
+    return (
+        RecordUpload.objects.filter(record=record).exclude(file="").exists()
+    )
+
+
 def resolve_record_download_file(record):
     """
     Pick the best available PDF for download.

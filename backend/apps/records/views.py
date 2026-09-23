@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
@@ -34,7 +34,7 @@ from core.permissions import (
     IsStaff,
     get_role_name,
 )
-from .download_service import file_response_for_record
+from .download_service import file_response_for_record, resolve_record_download_file
 from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
@@ -309,6 +309,47 @@ class RecordViewSet(viewsets.ModelViewSet):
             {"detail": f"Record submitted successfully. The {stage_label} has been notified."},
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["get"])
+    def manuscript(self, request, pk=None):
+        """
+        GET /records/<id>/manuscript/ — the paper itself, for a reader.
+
+        **This replaces a link that has been dead since IR-152** (ADR-031).
+        `RecordSerializer` emits `abstract_file` as a `/media/` URL, and
+        IR-152 removed both the nginx `/media/` block and Django's `DEBUG`
+        `static()` route, so nothing has served that path in any environment.
+        Every "View Paper" button and every citation followed to its page hit
+        a 404.
+
+        Served inline rather than as an attachment: the reader renders it in
+        the page (IR-335), and `as_attachment` would make the browser offer a
+        save dialog instead. `Accept-Ranges` is what lets that renderer fetch
+        pages rather than the whole file up front.
+
+        `get_object()` resolves through `visible_to(user)`, so a reader
+        without access gets the same 404 as a missing record — never a 403,
+        which would confirm the record exists.
+        """
+        record = self.get_object()
+        handle, filename = resolve_record_download_file(record)
+        if handle is None:
+            return Response(
+                {"detail": "No paper has been uploaded for this record."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "manuscript", "inline": True},
+        )
+        response = FileResponse(
+            handle, content_type="application/pdf", as_attachment=False,
+            filename=filename,
+        )
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        response["Accept-Ranges"] = "bytes"
+        return response
 
     @action(detail=True, methods=["get"])
     def similar(self, request, pk=None):

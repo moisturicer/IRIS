@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Sequence
 
+from apps.ai.regions import Region
 from apps.ai.resolution import turn_qa_lines
 from apps.ai.retrieval.ports import RetrievedChunk
 
@@ -113,6 +114,10 @@ class Citation:
     source_page: int | None
     text: str
     context_path: tuple[str, ...]
+    #: The rectangles a viewer highlights on that page (IR-334), already
+    #: normalized to fractions of the page. Empty when extraction recovered
+    #: none -- the page still opens, nothing is drawn on it.
+    regions: tuple[Region, ...] = ()
 
 
 #: What produced this answer. Strings rather than an enum for the reason
@@ -258,6 +263,7 @@ def parse_citations(
                     source_page=chunk.source_page,
                     text=chunk.content,
                     context_path=tuple(chunk.context_path or ()),
+                    regions=tuple(chunk.regions or ()),
                 )
             )
         if not valid:

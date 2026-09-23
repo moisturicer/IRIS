@@ -329,17 +329,11 @@ class ChatStreamView(APIView):
     one chunk at a time via `sync_to_async` internally -- so there is no
     async plumbing to write by hand here.
 
-    **Recorded limitation.** `composition_root().llm()` wraps the adapter in
-    retry, circuit-breaking and (if configured) fallback decorators
-    (IR-321), none of which override `LLMProvider.stream()` -- so against
-    the real configured model, this endpoint still narrates retrieval
-    incrementally but receives generation as one `text_delta` once the
-    whole answer is back, exactly as `LLMProvider.stream()`'s own default
-    behaves. Only a provider given no resilience wrapping (`ScriptedLLM` in
-    a test, or a bare `OpenAICompatibleAdapter`) streams token by token
-    today. Making the resilience decorators pass a stream through -- rather
-    than buffering it to retry or fail over on -- is follow-up work, not
-    this ticket's.
+    **Generation streams against the real configured model as of IR-334.**
+    The IR-321 resilience decorators implement `stream()` now, rather than
+    inheriting the port's buffering default, so a reader sees text as the
+    model writes it instead of in one burst at the end. Retry and failover
+    happen only before the first delta -- see `apps/ai/resilience/llm.py`.
     """
 
     permission_classes = [IsAuthenticated]

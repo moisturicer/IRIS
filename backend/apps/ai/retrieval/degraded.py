@@ -26,6 +26,7 @@ from typing import Callable, Optional
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 
 from apps.ai.models.chunk import DocumentChunk
+from apps.ai.regions import normalized_regions
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.resilience.rate_limit import RateLimited
 from apps.records.models import Record
@@ -85,7 +86,7 @@ class FullTextRetriever(Retriever):
             )
             .annotate(rank=SearchRank(vector, query))
             .filter(rank__gt=0)
-            .select_related("record")
+            .select_related("record", "chunk_set")
             .order_by("-rank")[:limit]
         )
 
@@ -99,6 +100,9 @@ class FullTextRetriever(Retriever):
                     context_path=tuple(row.context_path or ()),
                     source_page=row.source_page,
                     score=float(row.rank),
+                    regions=normalized_regions(
+                        row.bboxes, row.chunk_set.page_sizes
+                    ),
                 )
                 for row in rows
             ),

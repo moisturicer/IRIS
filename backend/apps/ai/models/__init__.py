@@ -1,5 +1,5 @@
 from .conversation import Conversation, Turn, TurnCitation, TurnEmbedding
-from .summary import DocumentSummary
+from .summary import RecordOverview
 from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, EmbeddingJob
 from .embedding_space import (
@@ -17,7 +17,7 @@ __all__ = [
     "Turn",
     "TurnCitation",
     "TurnEmbedding",
-    "DocumentSummary",
+    "RecordOverview",
     "DocumentMetadata",
     "RecordEmbedding",
     "EmbeddingJob",

@@ -13,6 +13,7 @@ makes IR-133's with-and-without comparison possible at all.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Callable, Optional, Sequence
 
 from apps.ai.policy import decision_for_record
@@ -114,17 +115,13 @@ class RerankingRetriever(Retriever):
             if self._cache is not None:
                 self._cache[key] = order
 
+        # `replace`, not a field-by-field rebuild: this decorator changes the
+        # score and nothing else, and listing every other field here is how a
+        # field added to `RetrievedChunk` silently stops surviving reranking
+        # (IR-334 -- `regions` would have been the first).
         return inner.with_passages(
             [
-                RetrievedChunk(
-                    chunk_id=candidates[index].chunk_id,
-                    record_id=candidates[index].record_id,
-                    record_title=candidates[index].record_title,
-                    content=candidates[index].content,
-                    context_path=candidates[index].context_path,
-                    source_page=candidates[index].source_page,
-                    score=score,
-                )
+                replace(candidates[index], score=score)
                 for index, score in order
             ][:limit]
         )

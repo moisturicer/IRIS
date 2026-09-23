@@ -12,6 +12,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from typing import Optional, Sequence
 
+from apps.ai.regions import Region
+
 #: The two ways a result can have been produced. Strings rather than an enum
 #: because this crosses into an API response and a log line, where a name is
 #: what is wanted; the set is small and closed enough that a constant each is
@@ -27,6 +29,11 @@ class RetrievedChunk:
     Carries the record and page alongside the text because a citation needs
     them, and fetching them later would be a second query per result -- and,
     worse, a second place where visibility could be forgotten.
+
+    ``regions`` is the same argument one step further (IR-334): the rectangles
+    a viewer highlights, already normalized to fractions of the page. Empty
+    when extraction recovered none, which a reader sees as a page opened with
+    nothing drawn on it.
     """
 
     chunk_id: int
@@ -36,6 +43,7 @@ class RetrievedChunk:
     context_path: Sequence[str]
     source_page: Optional[int]
     score: float
+    regions: Sequence[Region] = ()
 
 
 @dataclass(frozen=True)

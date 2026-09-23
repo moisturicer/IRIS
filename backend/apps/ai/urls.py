@@ -10,6 +10,7 @@ from .views import (
     EmbedRecordView,
     EmbedAllView,
     EmbeddingJobListView,
+    RecordOverviewView,
 )
 
 # Only routes backed by an implemented view are registered here. Summarisation
@@ -20,6 +21,8 @@ urlpatterns = [
     path("ask/stream/", ChatStreamView.as_view(), name="ai-ask-stream"),
     path("search/", SemanticSearchView.as_view(), name="ai-search"),
     path("status/", AIStatusView.as_view(),       name="ai-status"),
+    path("records/<int:pk>/overview/", RecordOverviewView.as_view(),
+         name="ai-record-overview"),
     path("conversations/",           ConversationListCreateView.as_view(),
          name="ai-conversations"),
     path("conversations/<int:pk>/",  ConversationDetailView.as_view(),
