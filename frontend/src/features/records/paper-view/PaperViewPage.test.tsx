@@ -183,7 +183,7 @@ vi.mock("./PaperPdfReader", () => ({
     scrollToPage: number | null;
     highlightRegions: unknown[];
   }) => (
-    <div data-testid="paper-pdf-reader">
+    <div>
       Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
       highlight
     </div>
@@ -273,7 +273,7 @@ describe("arriving from a citation", () => {
     await userEvent.click(button);
 
     expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
-    expect(await screen.findByTestId("paper-pdf-reader")).toBeInTheDocument();
+    expect(await screen.findByText(/open at page none, 0 region\(s\)/i)).toBeInTheDocument();
   });
 });
 

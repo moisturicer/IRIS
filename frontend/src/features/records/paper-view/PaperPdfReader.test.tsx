@@ -12,6 +12,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { render, screen, userEvent, waitFor } from "@/test/render";
 import type { Region } from "@/types/ai";
 
@@ -113,19 +114,16 @@ describe("scrolling to the cited page", () => {
       <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={[]} navKey="a" />,
     );
 
-    await waitFor(() => expect(screen.getByText("3 pages")).toBeInTheDocument());
-    await waitFor(() => {
-      const target = document.querySelector('[data-page-number="2"]');
-      expect(target?.scrollIntoView).toHaveBeenCalled();
-    });
+    const target = await screen.findByRole("group", { name: "Page 2" });
+    await waitFor(() => expect(target.scrollIntoView).toHaveBeenCalled());
   });
 
   it("scrolls again on a repeated navigation to the same page", async () => {
     const { rerender } = render(
       <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={[]} navKey="first" />,
     );
-    await waitFor(() => expect(screen.getByText("3 pages")).toBeInTheDocument());
-    const target = document.querySelector('[data-page-number="2"]') as HTMLElement;
+    const target = await screen.findByRole("group", { name: "Page 2" });
+    await waitFor(() => expect(target.scrollIntoView).toHaveBeenCalled());
     vi.mocked(target.scrollIntoView).mockClear();
 
     // A second click on the very same citation still means "look here" --
@@ -142,9 +140,9 @@ describe("scrolling to the cited page", () => {
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
     );
 
-    await waitFor(() => expect(screen.getByText("3 pages")).toBeInTheDocument());
-    for (const el of document.querySelectorAll("[data-page-number]")) {
-      expect(el.scrollIntoView).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getAllByRole("group")).toHaveLength(3));
+    for (const page of screen.getAllByRole("group")) {
+      expect(page.scrollIntoView).not.toHaveBeenCalled();
     }
   });
 });
@@ -158,12 +156,17 @@ describe("citation highlights", () => {
     render(
       <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={regions} navKey="a" />,
     );
-    await waitFor(() => expect(screen.getByText("3 pages")).toBeInTheDocument());
+    const page1 = await screen.findByRole("group", { name: "Page 1" });
+    const page2 = await screen.findByRole("group", { name: "Page 2" });
 
-    const page1 = document.querySelector('[data-page-number="1"]');
-    const page2 = document.querySelector('[data-page-number="2"]');
-    expect(page1?.querySelector("[aria-hidden='true'] > div")).toBeNull();
-    expect(page2?.querySelector("[aria-hidden='true'] > div")).not.toBeNull();
+    // The highlight box itself is `aria-hidden` (CitationOverlay.tsx) --
+    // decorative for a sighted reader scanning the rendered page, and
+    // meaningless to a screen reader, which cannot read a `<canvas>` at all.
+    // There is no accessible-tree query for "is a decorative box drawn
+    // here", so this one assertion reaches past it, scoped to the page
+    // `getByRole` above already found accessibly.
+    expect(page1.querySelector("[aria-hidden='true'] > div")).toBeNull();
+    expect(page2.querySelector("[aria-hidden='true'] > div")).not.toBeNull();
   });
 });
 
@@ -204,5 +207,35 @@ describe("downloading the paper", () => {
     );
 
     expect(screen.getByRole("button", { name: /download/i })).toBeDisabled();
+  });
+});
+
+describe("accessibility", () => {
+  it("has no serious or critical violations while loading", async () => {
+    const { container } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("has no serious or critical violations once the reader is ready, with a highlight drawn", async () => {
+    const regions: Region[] = [{ page: 1, left: 0.1, top: 0.1, right: 0.4, bottom: 0.2 }];
+    const { container } = render(
+      <PaperPdfReader recordId={7} scrollToPage={1} highlightRegions={regions} navKey="a" />,
+    );
+
+    await waitFor(() => expect(screen.getByText("3 pages")).toBeInTheDocument());
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("has no serious or critical violations in the error state", async () => {
+    manuscriptBlob.mockRejectedValue(new Error("network"));
+    const { container } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+
+    await screen.findByText(/could not load the paper/i);
+    await expectNoBlockingA11yViolations(container);
   });
 });

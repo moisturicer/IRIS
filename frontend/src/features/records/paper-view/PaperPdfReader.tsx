@@ -48,6 +48,13 @@ function PdfPageView({
     <div
       ref={(el) => registerRef(pageNumber, el)}
       data-page-number={pageNumber}
+      // A real accessible name, not only a data attribute this component's
+      // own tests would otherwise have to reach for as a test id (CLAUDE.md:
+      // queries go through the accessible tree). It also gives a screen
+      // reader user landing on this region something to orient by, which a
+      // bare `<canvas>` -- inherently opaque to assistive tech -- does not.
+      role="group"
+      aria-label={`Page ${pageNumber}`}
       className="relative mx-auto mb-4 bg-white shadow-card border border-stone-200"
       style={size ? { width: size.width, height: size.height } : { minHeight: 400 }}
     >
