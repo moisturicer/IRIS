@@ -15,7 +15,7 @@ from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.providers.fakes import ScriptedLLM, ScriptedReranker
 from apps.ai.providers.openai_compatible import LLMUnavailable
-from apps.ai.providers.ports import EmbeddingProvider, LLMProvider
+from apps.ai.providers.ports import EmbeddingProvider, LLMProvider, StreamDelta
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
@@ -110,6 +110,19 @@ class _BrokenEmbedder(EmbeddingProvider):
 class _BrokenLLM(LLMProvider):
     def generate(self, system, user):
         raise LLMUnavailable("429 rate limited")
+
+
+class _CutOffLLM(LLMProvider):
+    """A mid-sequence cutoff (IR-328): text arrives, then an ordinary
+    exception -- not `LLMUnavailable`, which already ends in its own
+    honest `done`."""
+
+    def generate(self, system, user):
+        raise NotImplementedError("this fake only exercises the streaming path")
+
+    def stream(self, system, user):
+        yield StreamDelta(text="Rainfall gauges feed the model [1]. ")
+        raise RuntimeError("connection reset")
 
 
 def root_with(embedder=None, llm=None, resolver=None):

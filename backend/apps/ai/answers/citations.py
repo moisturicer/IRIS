@@ -127,6 +127,9 @@ GENERATED = "generated"
 NO_SOURCES = "no_sources"
 UNAVAILABLE = "unavailable"
 
+#: A stream ended before its `Done` was reached (IR-328) -- cause-agnostic.
+PARTIAL = "partial"
+
 
 @dataclass(frozen=True)
 class GroundedAnswer:

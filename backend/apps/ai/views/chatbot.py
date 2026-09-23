@@ -318,6 +318,9 @@ class ChatStreamView(APIView):
     `generation_started` and every event after it are skipped outright when
     there are no readable sources to answer from.
 
+    **A stream that never reaches `done` still persists (IR-328)** -- as a
+    Turn with `state` `partial`, via `persist_partial` below.
+
     **This stays a plain synchronous view.** Retrieval, the disclosure gate,
     memory recall and persistence are the exact same synchronous calls
     `ChatQueryView` makes; under the ASGI deployment ADR-017 requires,
@@ -352,12 +355,24 @@ class ChatStreamView(APIView):
             record=prepared.scope_record,
         )
 
+        def persist_partial(answer):
+            """`answer_stream`'s `on_interrupted` (IR-328)."""
+            if prepared.conversation is not None:
+                record_turn(
+                    prepared.conversation,
+                    prepared.question,
+                    answer,
+                    prepared.resolved_question,
+                    prepared.widened,
+                )
+
         def event_source():
             for event in service.answer_stream(
                 prepared.effective_question,
                 request.user,
                 conversation=prepared.conversation,
                 history=prepared.history,
+                on_interrupted=persist_partial,
             ):
                 if isinstance(event, RetrievalFinished):
                     yield _sse(

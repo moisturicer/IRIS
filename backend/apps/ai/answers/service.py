@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 from .citations import (
     NO_SOURCES,
+    PARTIAL,
     SYSTEM_PROMPT,
     UNAVAILABLE,
     GroundedAnswer,
@@ -205,6 +206,7 @@ class GroundedAnswerService:
         user,
         conversation: Optional["Conversation"] = None,
         history: Sequence["Turn"] = (),
+        on_interrupted: Optional[Callable[[GroundedAnswer], None]] = None,
     ) -> Iterator[AnswerEvent]:
         """`answer`, event by event, for a reader-facing progress line
         (IR-326).
@@ -228,61 +230,107 @@ class GroundedAnswerService:
         the filter classifies as text ever reaches ``raw_parts`` -- the
         buffer citation parsing and the stored ``Turn.answer`` are built
         from -- so leaked reasoning can corrupt neither.
+
+        `on_interrupted` (IR-328) fires from `finally`, once, only when no
+        `Done` was reached -- cause-agnostic to why.
         """
-        yield RetrievalStarted()
-        retrieved, sources = self._retrieve_and_gate(question, user)
-        yield RetrievalFinished(
-            passage_count=len(sources),
-            record_count=len({s.record_id for s in sources}),
-            degraded=retrieved.degraded,
-        )
-        if not sources:
-            yield Done(self._no_sources_answer(retrieved))
-            return
-
-        recalled = self._recall(retrieved, conversation, history)
-
-        yield GenerationStarted()
+        completed = False
+        retrieved = None
+        sources: list[RetrievedChunk] = []
         raw_parts: list[str] = []
         had_reasoning = False
-
-        def classified(text_part: str, reasoning_part: str) -> Iterator[AnswerEvent]:
-            """One `(text, reasoning)` pair, as whichever events it implies --
-            shared by every source of a pair: the vendor's own `reasoning`
-            field, and `ThinkTagFilter`'s split of `.text`, mid-stream or on
-            `flush()`. `had_reasoning` and `raw_parts` are this method's own
-            state, so this closes over them rather than returning something
-            the caller would just apply right back.
-            """
-            nonlocal had_reasoning
-            if reasoning_part:
-                had_reasoning = True
-                yield ReasoningDelta(text=reasoning_part)
-            if text_part:
-                raw_parts.append(text_part)
-                yield TextDelta(text=text_part)
-
-        leak_filter = ThinkTagFilter()
         try:
-            for delta in self._llm.stream(
-                system=SYSTEM_PROMPT,
-                user=build_prompt(question, sources, history=history, recalled=recalled),
-            ):
-                yield from classified("", delta.reasoning)
-                if delta.text:
-                    yield from classified(*leak_filter.feed(delta.text))
-        except LLMUnavailable as exc:
-            logger.warning("answer generation unavailable: %s", exc)
-            yield Done(self._unavailable_answer(retrieved, sources, had_reasoning))
-            return
+            yield RetrievalStarted()
+            retrieved, sources = self._retrieve_and_gate(question, user)
+            yield RetrievalFinished(
+                passage_count=len(sources),
+                record_count=len({s.record_id for s in sources}),
+                degraded=retrieved.degraded,
+            )
+            if not sources:
+                completed = True
+                yield Done(self._no_sources_answer(retrieved))
+                return
 
-        yield from classified(*leak_filter.flush())
+            recalled = self._recall(retrieved, conversation, history)
 
-        raw = "".join(raw_parts)
-        text, citations = parse_citations(raw, sources)
-        _warn_if_citations_went_missing(raw, text, citations)
-        yield CitationsResolved(citations=citations)
-        yield Done(self._grounded_answer(retrieved, sources, text, citations, had_reasoning))
+            yield GenerationStarted()
+
+            def classified(text_part: str, reasoning_part: str) -> Iterator[AnswerEvent]:
+                """One `(text, reasoning)` pair, as whichever events it implies --
+                shared by every source of a pair: the vendor's own `reasoning`
+                field, and `ThinkTagFilter`'s split of `.text`, mid-stream or on
+                `flush()`. `had_reasoning` and `raw_parts` are this method's own
+                state, so this closes over them rather than returning something
+                the caller would just apply right back.
+                """
+                nonlocal had_reasoning
+                if reasoning_part:
+                    had_reasoning = True
+                    yield ReasoningDelta(text=reasoning_part)
+                if text_part:
+                    raw_parts.append(text_part)
+                    yield TextDelta(text=text_part)
+
+            leak_filter = ThinkTagFilter()
+            try:
+                for delta in self._llm.stream(
+                    system=SYSTEM_PROMPT,
+                    user=build_prompt(
+                        question, sources, history=history, recalled=recalled
+                    ),
+                ):
+                    yield from classified("", delta.reasoning)
+                    if delta.text:
+                        yield from classified(*leak_filter.feed(delta.text))
+            except LLMUnavailable as exc:
+                logger.warning("answer generation unavailable: %s", exc)
+                completed = True
+                yield Done(self._unavailable_answer(retrieved, sources, had_reasoning))
+                return
+
+            yield from classified(*leak_filter.flush())
+
+            raw, text, citations = _parse(raw_parts, sources)
+            _warn_if_citations_went_missing(raw, text, citations)
+            yield CitationsResolved(citations=citations)
+            completed = True
+            yield Done(
+                self._grounded_answer(retrieved, sources, text, citations, had_reasoning)
+            )
+        finally:
+            if not completed and on_interrupted is not None:
+                on_interrupted(
+                    self._partial_answer(retrieved, sources, raw_parts, had_reasoning)
+                )
+
+    @staticmethod
+    def _partial_answer(
+        retrieved,
+        sources: Sequence[RetrievedChunk],
+        raw_parts: Sequence[str],
+        had_reasoning: bool,
+    ) -> GroundedAnswer:
+        """Whatever text and sources had accumulated when the stream cut off
+        (IR-328). Citation parsing runs once, same as a clean completion; no
+        `_warn_if_citations_went_missing`, since ending mid-marker here is
+        expected, not a drifted format. `degraded` is always true, the same
+        call `_unavailable_answer` makes: completeness is unknown, which
+        alone is reason to weigh the answer carefully.
+        """
+        _, text, citations = _parse(raw_parts, sources)
+        return GroundedAnswer(
+            text=text,
+            citations=citations,
+            degraded=True,
+            state=PARTIAL,
+            sources=tuple(sources),
+            query_vector=None if retrieved is None else retrieved.query_vector,
+            embedding_space_id=(
+                None if retrieved is None else retrieved.embedding_space_id
+            ),
+            had_reasoning=had_reasoning,
+        )
 
     def _model_that_answered(self) -> Optional[str]:
         """Which model actually produced the answer just generated (IR-321).
@@ -299,6 +347,16 @@ class GroundedAnswerService:
         return getattr(self._llm, "last_model_used", None) or getattr(
             self._llm, "model", None
         )
+
+
+def _parse(
+    raw_parts: Sequence[str], sources: Sequence[RetrievedChunk]
+) -> tuple[str, str, tuple]:
+    """Join and citation-parse a stream's text, once. Shared by a clean
+    completion and `_partial_answer` (IR-328), so the two never drift."""
+    raw = "".join(raw_parts)
+    text, citations = parse_citations(raw, sources)
+    return raw, text, citations
 
 
 def _warn_if_citations_went_missing(raw: str, text: str, citations: Sequence) -> None:

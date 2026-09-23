@@ -21,6 +21,7 @@ from .corpus import (
     FLOOD_QUESTION,
     FLOOD_TEXT,
     _BrokenLLM,
+    _CutOffLLM,
     ask,
     ask_stream,
     make_record,
@@ -164,6 +165,52 @@ class VendorFailureTests:
         assert done["mode"] == "unavailable"
         assert done["degraded"] is True
         assert [s["id"] for s in done["sources"]] == [flood.pk]
+
+
+class InterruptedStreamTests:
+    """A mid-sequence cutoff (IR-328): some text arrives, then no `done`."""
+
+    def test_a_mid_sequence_cutoff_persists_a_partial_turn(
+        self, embedder, space, client_for
+    ):
+        from apps.ai.models import Conversation, Turn
+
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+        conversation = Conversation.objects.create(user=reader)
+
+        with use_composition_root(root_with(embedder=embedder, llm=_CutOffLLM())):
+            response = ask_stream(
+                client_for(reader), FLOOD_QUESTION, conversation_id=conversation.pk
+            )
+            with pytest.raises(RuntimeError):
+                b"".join(response.streaming_content)
+
+        turn = Turn.objects.get(conversation=conversation)
+        assert turn.state == "partial"
+        assert turn.degraded is True
+        assert turn.answer == "Rainfall gauges feed the model [1]."
+        citation, = turn.citations.all()
+        assert citation.record_id == flood.pk
+        assert citation.marker == 1
+
+    def test_a_one_off_ask_with_no_conversation_persists_nothing(
+        self, embedder, space, client_for
+    ):
+        """No Conversation, so nothing to mark partial either."""
+        from apps.ai.models import Turn
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder, llm=_CutOffLLM())):
+            response = ask_stream(client_for(reader), FLOOD_QUESTION)
+            with pytest.raises(RuntimeError):
+                b"".join(response.streaming_content)
+
+        assert not Turn.objects.exists()
 
 
 class ValidationTests:
