@@ -7,9 +7,13 @@ so it has to be testable without an account.
 from dataclasses import dataclass
 
 from apps.ai.answers.citations import (
+    DEFAULT_RESPONSE_STYLE,
+    RESPONSE_STYLES,
+    SYSTEM_PROMPT,
     GroundedAnswer,
     build_prompt,
     parse_citations,
+    system_prompt_for,
     unresolved_marker_candidates,
 )
 from apps.ai.retrieval.ports import RetrievedChunk
@@ -295,6 +299,25 @@ class GroundedAnswerTests:
         able to tell before presenting it as evidence."""
         answer = GroundedAnswer(text="The sources do not cover this.", citations=())
         assert answer.is_grounded is False
+
+
+class ResponseStyleTests:
+    """`system_prompt_for` (IR-332) -- length/structure only, never a second
+    copy of the citation contract `SYSTEM_PROMPT` already states."""
+
+    def test_every_style_still_carries_the_base_citation_contract(self):
+        for style in RESPONSE_STYLES:
+            assert SYSTEM_PROMPT in system_prompt_for(style)
+
+    def test_each_style_appends_its_own_distinct_instruction(self):
+        prompts = {style: system_prompt_for(style) for style in RESPONSE_STYLES}
+        assert len(set(prompts.values())) == len(RESPONSE_STYLES)
+
+    def test_an_unrecognized_style_falls_back_to_the_default(self):
+        assert system_prompt_for("loud and proud") == system_prompt_for(DEFAULT_RESPONSE_STYLE)
+
+    def test_default_style_is_itself_a_recognized_style(self):
+        assert DEFAULT_RESPONSE_STYLE in RESPONSE_STYLES
 
 
 class UnresolvedMarkerDetectionTests:

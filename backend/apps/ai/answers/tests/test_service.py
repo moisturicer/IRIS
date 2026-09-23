@@ -10,7 +10,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from apps.ai.answers.citations import SYSTEM_PROMPT
+from apps.ai.answers.citations import DEFAULT_RESPONSE_STYLE, SYSTEM_PROMPT, system_prompt_for
 from apps.ai.answers.events import (
     CitationsResolved,
     Done,
@@ -109,7 +109,7 @@ class AnsweringTests:
         ).answer("q?", reader)
 
         system, user = llm.prompts[0]
-        assert system == SYSTEM_PROMPT
+        assert system == system_prompt_for(DEFAULT_RESPONSE_STYLE)
         assert "weekly pond sampling" in user
 
     def test_the_model_is_told_to_say_when_it_does_not_know(self):

@@ -29,13 +29,14 @@ if TYPE_CHECKING:
     from apps.ai.models import Conversation, Turn
 
 from .citations import (
+    DEFAULT_RESPONSE_STYLE,
     NO_SOURCES,
     PARTIAL,
-    SYSTEM_PROMPT,
     UNAVAILABLE,
     GroundedAnswer,
     build_prompt,
     parse_citations,
+    system_prompt_for,
     unresolved_marker_candidates,
 )
 from .events import (
@@ -176,10 +177,16 @@ class GroundedAnswerService:
         user,
         conversation: Optional["Conversation"] = None,
         history: Sequence["Turn"] = (),
+        style: str = DEFAULT_RESPONSE_STYLE,
     ) -> GroundedAnswer:
         """A grounded answer. ``history`` (a Conversation's recent Turns) goes
         into the prompt verbatim; memory recall adds older, relevant ones
         when ``conversation`` is given (IR-297).
+
+        ``style`` (IR-332) governs only how the answer is worded -- length
+        and structure, via `system_prompt_for` -- never what it is grounded
+        in. Request-level validation of the value lives in
+        `views/chatbot.py`; this trusts its caller.
         """
         retrieved, sources = self._retrieve_and_gate(question, user)
         if not sources:
@@ -189,7 +196,7 @@ class GroundedAnswerService:
 
         try:
             raw = self._llm.generate(
-                system=SYSTEM_PROMPT,
+                system=system_prompt_for(style),
                 user=build_prompt(question, sources, history=history, recalled=recalled),
             )
         except LLMUnavailable as exc:
@@ -207,6 +214,7 @@ class GroundedAnswerService:
         conversation: Optional["Conversation"] = None,
         history: Sequence["Turn"] = (),
         on_interrupted: Optional[Callable[[GroundedAnswer], None]] = None,
+        style: str = DEFAULT_RESPONSE_STYLE,
     ) -> Iterator[AnswerEvent]:
         """`answer`, event by event, for a reader-facing progress line
         (IR-326).
@@ -275,7 +283,7 @@ class GroundedAnswerService:
             leak_filter = ThinkTagFilter()
             try:
                 for delta in self._llm.stream(
-                    system=SYSTEM_PROMPT,
+                    system=system_prompt_for(style),
                     user=build_prompt(
                         question, sources, history=history, recalled=recalled
                     ),

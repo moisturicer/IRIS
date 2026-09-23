@@ -32,6 +32,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai import resolution
+from apps.ai.answers.citations import DEFAULT_RESPONSE_STYLE, RESPONSE_STYLES
 from apps.ai.answers.events import (
     CitationsResolved,
     Done,
@@ -140,6 +141,7 @@ class _AskRequest:
     history: list
     widened: bool
     scope_record: object
+    style: str
 
 
 def _prepare_ask_request(request):
@@ -159,6 +161,18 @@ def _prepare_ask_request(request):
     if len(question) > MAX_QUESTION_LENGTH:
         return None, Response(
             {"detail": f"question must be at most {MAX_QUESTION_LENGTH} characters."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    raw_style = request.data.get("response_style")
+    style = raw_style if raw_style is not None else DEFAULT_RESPONSE_STYLE
+    if style not in RESPONSE_STYLES:
+        return None, Response(
+            {
+                "detail": (
+                    f"response_style must be one of {sorted(RESPONSE_STYLES)}."
+                )
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -188,6 +202,7 @@ def _prepare_ask_request(request):
             history=history,
             widened=widened,
             scope_record=scope_record,
+            style=style,
         ),
         None,
     )
@@ -196,7 +211,8 @@ def _prepare_ask_request(request):
 class ChatQueryView(APIView):
     """
     POST /api/v1/ai/ask/
-    Body: {"question": str, "top_k": int?, "conversation_id": int?, "widen": bool?}
+    Body: {"question": str, "top_k": int?, "conversation_id": int?, "widen": bool?,
+           "response_style": "concise"|"balanced"|"thorough"?}
 
     Returns an answer grounded in passages the asker is permitted to read,
     with the records those passages came from.
@@ -226,6 +242,12 @@ class ChatQueryView(APIView):
     **Recent Turns go into the answering prompt verbatim; older ones are
     found by memory recall, never summarised** (IR-297). The search vector
     is stored on the new Turn as its own memory vector, at no extra cost.
+
+    **``response_style`` controls only how the answer is worded** (IR-332)
+    -- ``concise``, ``balanced`` (the default when omitted), or
+    ``thorough``. It changes length and structure, never which sources are
+    retrieved or what the model is allowed to say. An unrecognized value is
+    a 400, not a silent fallback.
     """
 
     permission_classes = [IsAuthenticated]
@@ -245,6 +267,7 @@ class ChatQueryView(APIView):
             request.user,
             conversation=prepared.conversation,
             history=prepared.history,
+            style=prepared.style,
         )
         mode = answer_mode(answer.state)
 
@@ -373,6 +396,7 @@ class ChatStreamView(APIView):
                 conversation=prepared.conversation,
                 history=prepared.history,
                 on_interrupted=persist_partial,
+                style=prepared.style,
             ):
                 if isinstance(event, RetrievalFinished):
                     yield _sse(

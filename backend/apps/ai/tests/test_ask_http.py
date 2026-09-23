@@ -89,6 +89,36 @@ class AskTests:
         assert APIClient().post(reverse("ai-ask"), {"question": "x"},
                                 format="json").status_code in (401, 403)
 
+    def test_response_style_reaches_the_system_prompt(self, embedder, space, client_for):
+        """IR-332 -- the wording asked for actually reaches the model, not
+        only a request field nobody reads."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Catchment Study", text=FLOOD_TEXT, embedder=embedder, space=space)
+
+        llm = ScriptedLLM()
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            response = ask(client_for(reader), FLOOD_QUESTION, response_style="thorough")
+
+        assert response.status_code == 200
+        (system, _prompt), = llm.calls
+        assert "headings and bullet points" in system
+
+    def test_an_unrecognized_response_style_is_rejected(self, client_for):
+        reader = make_user("reader@cit.edu")
+        response = ask(client_for(reader), "x", response_style="shouting")
+        assert response.status_code == 400
+
+    def test_omitting_response_style_still_answers(self, embedder, space, client_for):
+        """The default (`balanced`), not a required field a pre-IR-332
+        caller would now be broken by omitting."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Catchment Study", text=FLOOD_TEXT, embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            response = ask(client_for(reader), FLOOD_QUESTION)
+
+        assert response.status_code == 200
+
 
 class PassagesOnTheWireTests:
     """IR-284: a citation says which sentence, and which page.

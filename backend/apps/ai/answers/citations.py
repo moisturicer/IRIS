@@ -85,8 +85,46 @@ SYSTEM_PROMPT = (
     "and do not use any other bracket style.\n"
     "If the sources do not contain the answer, say so plainly instead of "
     "guessing.\n"
-    "Never invent a title, author, finding or number. Be concise and factual."
+    "Never invent a title, author, finding or number. Be factual."
 )
+
+#: How long and how structured an answer should be (IR-332) -- orthogonal to
+#: `SYSTEM_PROMPT`'s citation and grounding rules above, which every style
+#: obeys identically. Appended, never substituted in, so a style choice can
+#: never accidentally drop the citation contract.
+RESPONSE_STYLES: dict[str, str] = {
+    "concise": (
+        "Answer in a few sentences at most -- the shortest answer that fully "
+        "supports itself with citations. No headings, no restating the "
+        "question, no elaboration the sources do not need to make the point."
+    ),
+    "balanced": (
+        "Answer in a few clear paragraphs -- enough to cover the question "
+        "completely without padding it out."
+    ),
+    "thorough": (
+        "Answer thoroughly. Use headings and bullet points where they make "
+        "the answer easier to follow, and cover what the sources say in more "
+        "depth than a brief answer would."
+    ),
+}
+
+#: What an unrecognized or absent style resolves to.
+DEFAULT_RESPONSE_STYLE = "balanced"
+
+
+def system_prompt_for(style: str) -> str:
+    """`SYSTEM_PROMPT`, plus the length/structure instruction for `style`.
+
+    Falls back to `DEFAULT_RESPONSE_STYLE` for a style this dict does not
+    recognize, rather than raising -- request-level validation
+    (`views/chatbot.py`) is where an unrecognized style is rejected with a
+    400; a caller that reaches this function is trusted to have passed
+    something valid, and a stored `Turn` replaying an old, since-removed
+    style name should still render rather than 500.
+    """
+    instruction = RESPONSE_STYLES.get(style, RESPONSE_STYLES[DEFAULT_RESPONSE_STYLE])
+    return f"{SYSTEM_PROMPT}\n{instruction}"
 
 
 @dataclass(frozen=True)
