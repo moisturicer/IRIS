@@ -1,14 +1,21 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/types/chat";
+import type { StreamingState } from "../hooks/useAskStream";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
+import { StreamingMessageBubble } from "./StreamingMessageBubble";
 import { AskIrisEmblem } from "./AskIrisIcons";
 
 interface ChatMessageListProps {
   messages:           ChatMessage[];
   isLoading:          boolean;
-  /** Hide citation chips in bubbles when the sources panel is open */
-  showInlineSources?: boolean;
+  /**
+   * The in-flight answer's live progress (IR-329) — rendered in place of
+   * the old fixed skeleton whenever it is set. `isLoading` can still be
+   * true with this `null` for the brief gap before the first stream event
+   * lands, which is what the skeleton fallback below still covers.
+   */
+  streaming?:         StreamingState | null;
   /** Prompts built from what is actually in the corpus. */
   suggestions?:       string[];
   onSuggestion?:      (prompt: string) => void;
@@ -19,7 +26,7 @@ interface ChatMessageListProps {
 export function ChatMessageList({
   messages,
   isLoading,
-  showInlineSources = true,
+  streaming = null,
   suggestions = [],
   onSuggestion,
   indexedRecords = null,
@@ -28,7 +35,7 @@ export function ChatMessageList({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, streaming]);
 
   if (messages.length === 0 && !isLoading) {
     return (
@@ -69,9 +76,9 @@ export function ChatMessageList({
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-6 space-y-6 bg-[#FBFCFD]">
       {messages.map((m) => (
-        <ChatMessageBubble key={m.id} message={m} showSources={showInlineSources} />
+        <ChatMessageBubble key={m.id} message={m} />
       ))}
-      {isLoading && <AssistantMessageSkeleton />}
+      {isLoading && (streaming ? <StreamingMessageBubble state={streaming} /> : <AssistantMessageSkeleton />)}
       <div ref={bottomRef} />
     </div>
   );

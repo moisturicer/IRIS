@@ -28,7 +28,9 @@ from .corpus import (
     FLOOD_TEXT,
     POND_TEXT,
     _BrokenLLM,
+    _CutOffLLM,
     ask,
+    ask_stream,
     make_record,
     make_user,
     root_with,
@@ -610,6 +612,44 @@ class ReplayingATurnTests:
         assert live["mode"] == turn["state"] == "no_results"
         assert turn["answer"] is None
         assert turn["message"] == live["message"]
+
+    def test_a_partial_turn_replays_with_its_partial_flag_set(
+        self, embedder, space, client_for
+    ):
+        """A stream cut off mid-answer (IR-328) stores `state="partial"`.
+        `answer_mode` still maps that to `"generative"` -- a partial answer
+        is still an answer a model wrote -- so replay must carry a separate
+        `partial` flag or a reopened transcript could not tell a cut-off
+        reply from a complete one (IR-329)."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder, llm=_CutOffLLM())):
+            response = ask_stream(client, FLOOD_QUESTION, conversation_id=conversation_id)
+            with pytest.raises(RuntimeError):
+                b"".join(response.streaming_content)
+
+        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
+        assert turn["state"] == "generative"
+        assert turn["partial"] is True
+
+    def test_a_complete_turn_replays_with_no_partial_flag(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+
+        with use_composition_root(root_with(embedder=embedder)):
+            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+
+        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
+        assert turn["partial"] is False
 
 
 class LongConversationTests:

@@ -141,6 +141,15 @@ export interface ConversationTurn {
   created_at:         string;
   /** Full `Citation` when the cited chunk is still live, `ReplayedCitation` when it was tombstoned (IR-299). */
   citations:          ChatCitation[];
+  /**
+   * True when a stream never reached its terminal `done` event (IR-328) —
+   * orthogonal to `state`/`mode`, which stay `"generative"`: a partial
+   * answer is still an answer a model wrote, just possibly cut short, not
+   * the "no answer at all" `unavailable` already means (IR-329). Optional
+   * only so existing fixtures/tests that predate this field still type-check
+   * — a real response always sends it.
+   */
+  partial?:           boolean;
 }
 
 /** A Conversation without its Turns — the shape a sidebar lists (IR-295). */

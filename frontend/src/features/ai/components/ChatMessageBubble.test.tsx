@@ -1,10 +1,11 @@
 /**
- * What a reader can actually check (IR-284).
+ * What a reader can actually check (IR-284, redesigned for inline chips by
+ * IR-329).
  *
  * The claim this ticket makes is that an answer now shows *which sentence*
- * supports it and *which page* that sentence is on. That claim is only true
- * if those things are on the screen and reachable, so this asserts them the
- * way a reader meets them: by the text they read and the link they click.
+ * supports it and *which page* that sentence is on, as a clickable chip
+ * sitting inline in the sentence itself rather than a card repeated below
+ * the message a second time.
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
@@ -17,16 +18,13 @@ import type { ChatMessage } from "@/types/chat";
 
 import { ChatMessageBubble } from "./ChatMessageBubble";
 
-const QUOTE =
-  "we trained a convolutional neural network on rainfall gauge data to predict flooding";
-
 const citation: Citation = {
   marker:       1,
   chunk_id:     11,
   record_id:    7,
   record_title: "Flood Prediction in the Mananga Catchment",
   page:         4,
-  text:         QUOTE,
+  text:         "we trained a convolutional neural network on rainfall gauge data to predict flooding",
   context_path: ["Flood Prediction in the Mananga Catchment", "Methods"],
 };
 
@@ -42,28 +40,27 @@ function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 describe("a cited answer", () => {
-  it("quotes the passage the claim rests on", () => {
+  it("shows the marker as a clickable chip, right where it sits in the sentence", () => {
     renderScreen(<ChatMessageBubble message={assistantMessage()} />);
 
-    expect(screen.getByRole("blockquote").textContent).toBe(QUOTE);
-  });
-
-  it("names the page the passage sits on, in the link a reader follows", () => {
-    renderScreen(<ChatMessageBubble message={assistantMessage()} />);
-
-    const link = screen.getByRole("link", {
+    const chip = screen.getByRole("link", {
       name: /Open Flood Prediction in the Mananga Catchment at page 4/i,
     });
-    expect(link.getAttribute("href")).toBe("/records/7?page=4");
+    expect(chip.getAttribute("href")).toBe("/records/7?page=4");
+    expect(chip.textContent).toBe("1");
   });
 
-  it("counts passages rather than records, because two can come from one paper", () => {
+  it("gives a second citation its own chip, keyed to its own page", () => {
     const second: Citation = { ...citation, marker: 2, chunk_id: 12, page: 9 };
     renderScreen(
-      <ChatMessageBubble message={assistantMessage({ citations: [citation, second] })} />,
+      <ChatMessageBubble
+        message={assistantMessage({
+          content: "Rainfall gauge data was used [1] and validated separately [2].",
+          citations: [citation, second],
+        })}
+      />,
     );
 
-    expect(screen.getByText(/Grounded in 2 passages/i)).toBeTruthy();
     expect(
       screen.getByRole("link", { name: /at page 9/i }).getAttribute("href"),
     ).toBe("/records/7?page=9");
@@ -93,13 +90,7 @@ describe("a cited answer", () => {
     expect(screen.queryByText(/keyword matching, not meaning/i)).toBeNull();
   });
 
-  it("hides the passage strip when the sources panel is showing them instead", () => {
-    renderScreen(<ChatMessageBubble message={assistantMessage()} showSources={false} />);
-
-    expect(screen.queryByRole("blockquote")).toBeNull();
-  });
-
-  it("renders a replayed citation as a bare link when there is no quote to show", () => {
+  it("renders a replayed citation as a bare chip when there is no quote to show", () => {
     // A reopened Conversation's stored citation is a pointer only -- record,
     // chunk, page -- until IR-299 re-resolves the quote (IR-298).
     renderScreen(
@@ -110,7 +101,6 @@ describe("a cited answer", () => {
       />,
     );
 
-    expect(screen.queryByRole("blockquote")).toBeNull();
     const link = screen.getByRole("link", { name: /Open the source at page 4/i });
     expect(link.getAttribute("href")).toBe("/records/7?page=4");
   });
@@ -125,6 +115,18 @@ describe("a cited answer", () => {
     renderScreen(<ChatMessageBubble message={assistantMessage()} />);
 
     expect(screen.queryByText(/Searched all papers/i)).toBeNull();
+  });
+
+  it("says when the reply was cut off before it finished (IR-328)", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage({ partial: true })} />);
+
+    expect(screen.getByText(/cut off before it finished/i)).toBeTruthy();
+  });
+
+  it("says nothing about being cut off for a complete answer", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage()} />);
+
+    expect(screen.queryByText(/cut off before it finished/i)).toBeNull();
   });
 
   it("has no serious or critical accessibility violations", async () => {

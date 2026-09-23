@@ -18,7 +18,7 @@ from typing import Optional
 
 from django.db import transaction
 
-from apps.ai.answers.citations import GroundedAnswer
+from apps.ai.answers.citations import PARTIAL, GroundedAnswer
 from apps.ai.models import Conversation, DocumentChunk, Turn, TurnCitation, TurnEmbedding
 from apps.ai.presentation import answer_body, answer_mode
 from apps.records.models import Record
@@ -140,6 +140,9 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
             "degraded": turn.degraded,
             "widened": turn.widened,
             "had_reasoning": turn.had_reasoning,
+            # Orthogonal to `state` (stays "generative") -- a cut-off
+            # stream is still an answer, not `unavailable` (IR-328/329).
+            "partial": turn.state == PARTIAL,
             "created_at": turn.created_at,
             "citations": [
                 resolved

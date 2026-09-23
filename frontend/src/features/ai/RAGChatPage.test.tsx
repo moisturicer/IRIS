@@ -39,11 +39,16 @@ function answer(overrides: Partial<AIAnswer> = {}): AIAnswer {
   };
 }
 
+/** A one-event stream: straight to `done`, the shape most of these tests need. */
+async function* doneStreamOf(overrides: Partial<AIAnswer> = {}) {
+  yield { event: "done", data: answer(overrides) };
+}
+
 const list = vi.fn();
 const get = vi.fn();
 const create = vi.fn();
 const remove = vi.fn();
-const ask = vi.fn();
+const askStream = vi.fn();
 const status = vi.fn();
 const classifications = vi.fn();
 
@@ -55,8 +60,8 @@ vi.mock("@/api/ai", () => ({
       create: (...args: unknown[]) => create(...(args as [])),
       remove: (...args: unknown[]) => remove(...(args as [])),
     },
-    ask:    (...args: unknown[]) => ask(...(args as [])),
-    status: (...args: unknown[]) => status(...(args as [])),
+    askStream: (...args: unknown[]) => askStream(...(args as [])),
+    status:    (...args: unknown[]) => status(...(args as [])),
   },
 }));
 
@@ -74,7 +79,7 @@ beforeEach(() => {
   list.mockResolvedValue({ data: [] as ConversationSummary[] });
   create.mockResolvedValue({ data: detail() });
   get.mockResolvedValue({ data: detail() });
-  ask.mockResolvedValue({ data: answer() });
+  askStream.mockImplementation(() => doneStreamOf());
   status.mockResolvedValue({ data: { generative: true, indexed_records: 4 } as AIStatus });
   classifications.mockResolvedValue({ data: { results: [] } });
 });
@@ -125,8 +130,8 @@ describe("persisted conversations", () => {
     await userEvent.type(input, "What about its limitations?");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
 
-    await waitFor(() => expect(ask).toHaveBeenCalled());
-    const [question, options] = ask.mock.calls[0];
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    const [question, options] = askStream.mock.calls[0];
     expect(question).toBe("What about its limitations?");
     expect(options).toMatchObject({ conversationId: 9 });
   });
@@ -137,17 +142,20 @@ describe("persisted conversations", () => {
     // never asking it -- fixed alongside the rest of this ticket so the
     // reader lands on a real answer, not a question nobody sent.
     create.mockResolvedValue({ data: detail({ id: 9, record: 5 }) });
-    ask.mockResolvedValue({ data: answer({ conversation_id: 9 }) });
+    askStream.mockImplementation(() => doneStreamOf({ conversation_id: 9 }));
 
     renderScreen(<RAGChatPage />, { route: "/ai/ask?record=5" });
 
     await waitFor(() => expect(create).toHaveBeenCalledWith({ record: 5 }));
-    await waitFor(() => expect(ask).toHaveBeenCalled());
-    const [question, options] = ask.mock.calls[0];
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    const [question, options] = askStream.mock.calls[0];
     expect(question).toMatch(/record #5/i);
     expect(options).toMatchObject({ conversationId: 9 });
 
-    expect(await screen.findByText("Rainfall gauges predict flooding [1].")).toBeTruthy();
+    // The `[1]` marker itself renders as an inline citation chip (IR-329),
+    // not literal text -- with no citation supplied here it resolves to
+    // nothing, so only the surrounding prose is asserted.
+    expect(await screen.findByText(/Rainfall gauges predict flooding/)).toBeTruthy();
   });
 
   it("removes a conversation and falls back to what remains", async () => {
