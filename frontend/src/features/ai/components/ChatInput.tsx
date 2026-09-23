@@ -1,12 +1,25 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
+import type { ResponseStyle } from "@/types/ai";
+import { ResponseStyleSelect } from "./ResponseStyleSelect";
 
 interface ChatInputProps {
   onSend:    (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** How long/structured the next answer should be (IR-332). Omit both to
+   *  hide the control entirely -- a caller with nowhere to hold the state
+   *  gets the old, style-less input rather than a half-wired control. */
+  responseStyle?:       ResponseStyle;
+  onResponseStyleChange?: (style: ResponseStyle) => void;
 }
 
-export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  disabled,
+  placeholder,
+  responseStyle,
+  onResponseStyleChange,
+}: ChatInputProps) {
   const [text, setText] = useState("");
 
   const submit = () => {
@@ -33,6 +46,15 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
       onSubmit={handleSubmit}
       className="shrink-0 border-t border-stone-200/80 bg-white px-4 sm:px-6 py-4"
     >
+      {responseStyle && onResponseStyleChange && (
+        <div className="flex justify-end max-w-3xl mx-auto mb-2">
+          <ResponseStyleSelect
+            value={responseStyle}
+            onChange={onResponseStyleChange}
+            disabled={disabled}
+          />
+        </div>
+      )}
       <div className="flex gap-2 items-end max-w-3xl mx-auto">
         <textarea
           value={text}

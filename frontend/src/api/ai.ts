@@ -9,6 +9,7 @@ import type {
   AIStatus,
   ConversationSummary,
   ConversationDetail,
+  ResponseStyle,
 } from "@/types/ai";
 
 interface SemanticSearchResponse {
@@ -32,6 +33,9 @@ interface AskOptions {
    * Conversation or a one-off question with no `conversationId`.
    */
   widen?: boolean;
+  /** How long and structured the answer should be (IR-332). Server default
+   *  is "balanced" when omitted. */
+  responseStyle?: ResponseStyle;
 }
 
 /**
@@ -78,22 +82,29 @@ export const aiApi = {
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
   /** Grounded answer plus the records it cites. */
-  ask: (question: string, { topK = 5, conversationId, widen }: AskOptions = {}) =>
+  ask: (question: string, { topK = 5, conversationId, widen, responseStyle }: AskOptions = {}) =>
     apiClient.post<AIAnswer>("/ai/ask/", {
       question,
       top_k: topK,
       conversation_id: conversationId,
       widen,
+      response_style: responseStyle,
     }),
 
   /** The same question, narrated as SSE (IR-326, IR-329) -- see `streamAsk`. */
   askStream: (
     question: string,
-    { topK = 5, conversationId, widen }: AskOptions = {},
+    { topK = 5, conversationId, widen, responseStyle }: AskOptions = {},
     signal?: AbortSignal,
   ) =>
     streamAsk(
-      { question, top_k: topK, conversation_id: conversationId, widen },
+      {
+        question,
+        top_k: topK,
+        conversation_id: conversationId,
+        widen,
+        response_style: responseStyle,
+      },
       signal,
     ),
 

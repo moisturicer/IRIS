@@ -1,4 +1,11 @@
 /**
+ * How long and structured an answer should be (IR-332) -- orthogonal to
+ * grounding and citations, which every style obeys identically. Mirrors the
+ * backend's `RESPONSE_STYLES` keys in `apps/ai/answers/citations.py`.
+ */
+export type ResponseStyle = "concise" | "balanced" | "thorough";
+
+/**
  * A quoted span of a Record's text, carrying the page it came from (IR-284).
  *
  * The reader-facing counterpart of a chunk — see `CONTEXT.md`. A chunk is how

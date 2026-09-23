@@ -13,7 +13,7 @@ import { aiApi } from "@/api/ai";
 import { useUIStore } from "@/store/ui.store";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import type { ChatMessage } from "@/types/chat";
-import type { AIStatus, ConversationSummary } from "@/types/ai";
+import type { AIStatus, ConversationSummary, ResponseStyle } from "@/types/ai";
 import { recordsApi } from "@/api/records";
 import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
@@ -76,6 +76,7 @@ export default function RAGChatPage() {
   const [sourcesOpen, setSourcesOpen]       = useState(false);
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
+  const [responseStyle, setResponseStyle]   = useState<ResponseStyle>("balanced");
   const { streaming, ask }                  = useAskStream();
 
   // Read off the reply itself, so the panel cannot show one conversation's
@@ -116,7 +117,7 @@ export default function RAGChatPage() {
 
       setLoading(true);
       try {
-        const { message } = await ask(question, { conversationId });
+        const { message } = await ask(question, { conversationId, responseStyle });
         setMessages([...nextMessages, message]);
         if (message.citations?.length) {
           setSourcesOpen(true);
@@ -132,7 +133,7 @@ export default function RAGChatPage() {
         setLoading(false);
       }
     },
-    [ask, addToast, refreshList],
+    [ask, addToast, refreshList, responseStyle],
   );
 
   useEffect(() => {
@@ -318,6 +319,8 @@ export default function RAGChatPage() {
             onSend={handleSend}
             disabled={loading || !activeId}
             placeholder="Ask a follow-up about the research corpus…"
+            responseStyle={responseStyle}
+            onResponseStyleChange={setResponseStyle}
           />
         </div>
 

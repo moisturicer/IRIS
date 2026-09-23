@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage } from "@/lib/chatMessages";
-import type { ChatCitation } from "@/types/ai";
+import type { ChatCitation, ResponseStyle } from "@/types/ai";
 import type { ChatMessage } from "@/types/chat";
 
 /**
@@ -24,6 +24,7 @@ interface AskStreamOptions {
   conversationId?: number;
   topK?:           number;
   widen?:          boolean;
+  responseStyle?:  ResponseStyle;
 }
 
 export interface AskStreamResult {
