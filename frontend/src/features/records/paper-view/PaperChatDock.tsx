@@ -3,8 +3,10 @@ import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
-import { AskIrisEmblem, AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcons";
+import { AskIrisEmblem, AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
+import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessageBubble";
+import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { cn } from "@/lib/utils";
 
 export type DockMode = "left" | "right" | "floating";
@@ -92,6 +94,7 @@ export function PaperChatPanel({
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { streaming, ask } = useAskStream();
 
   // Find or start the Conversation for this Record. Re-runs if the reader
   // navigates to a different paper while the panel stays open.
@@ -116,7 +119,7 @@ export function PaperChatPanel({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, busy]);
+  }, [messages, busy, streaming]);
 
   const send = async () => {
     const question = input.trim();
@@ -126,16 +129,8 @@ export function PaperChatPanel({
     setMessages((prev) => [...prev, newChatMessage("user", question)]);
     setBusy(true);
     try {
-      const { data } = await aiApi.ask(question, { conversationId, widen });
-      setMessages((prev) => [
-        ...prev,
-        newChatMessage("assistant", data.answer ?? data.message ?? "No matching record found.", {
-          citations: data.citations,
-          sources:   data.sources,
-          degraded:  data.degraded,
-          widened:   data.widened,
-        }),
-      ]);
+      const { message } = await ask(question, { conversationId, widen });
+      setMessages((prev) => [...prev, message]);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -232,12 +227,7 @@ export function PaperChatPanel({
           <ChatMessageBubble key={m.id} message={m} />
         ))}
 
-        {busy && (
-          <div className="flex items-center gap-2 text-[12px] text-stone-400">
-            <SynthesisIcon className="w-4 h-4" spinning />
-            Searching the repository…
-          </div>
-        )}
+        {busy && streaming && <StreamingMessageBubble state={streaming} />}
         <div ref={bottomRef} />
       </div>
 

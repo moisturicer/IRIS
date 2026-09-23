@@ -1,4 +1,7 @@
 import { apiClient } from "./client";
+import { API_BASE } from "@/lib/constants";
+import { readSSE, type SSEEvent } from "@/lib/sse";
+import { useAuthStore } from "@/store/auth.store";
 import type {
   Passage,
   SemanticSearchResult,
@@ -31,6 +34,41 @@ interface AskOptions {
   widen?: boolean;
 }
 
+/**
+ * `/ai/ask/stream/` as Server-Sent Events (IR-329). Goes through `fetch`
+ * directly, not `apiClient` -- `EventSource` can't carry the auth header,
+ * and this bypasses axios's 401-refresh interceptor too (accepted gap: a
+ * session that expires mid-stream just surfaces as a stream failure).
+ */
+async function* streamAsk(
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): AsyncGenerator<SSEEvent> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch(`${API_BASE}/ai/ask/stream/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!response.ok) {
+    let detail = "IRIS could not answer right now.";
+    try {
+      const errorBody = await response.json();
+      detail = errorBody.detail ?? detail;
+    } catch {
+      /* a non-JSON error body -- the generic message stands */
+    }
+    throw new Error(detail);
+  }
+
+  yield* readSSE(response);
+}
+
 export const aiApi = {
   /** Whether answers will be generated or retrieval-only, and how many records are indexed. */
   status: () => apiClient.get<AIStatus>("/ai/status/"),
@@ -47,6 +85,17 @@ export const aiApi = {
       conversation_id: conversationId,
       widen,
     }),
+
+  /** The same question, narrated as SSE (IR-326, IR-329) -- see `streamAsk`. */
+  askStream: (
+    question: string,
+    { topK = 5, conversationId, widen }: AskOptions = {},
+    signal?: AbortSignal,
+  ) =>
+    streamAsk(
+      { question, top_k: topK, conversation_id: conversationId, widen },
+      signal,
+    ),
 
   conversations: {
     /** The caller's own Conversations, most recent first — optionally the

@@ -37,5 +37,12 @@ export interface ChatMessage {
    * user message, and for an assistant message in an unscoped Conversation.
    */
   widened?:   boolean;
+  /**
+   * True when the stream that produced this reply never reached its
+   * terminal event — the connection dropped, the vendor timed out, the
+   * server restarted (IR-328) — so `content` is whatever text arrived
+   * before the cutoff, not the model's complete answer (IR-329).
+   */
+  partial?:   boolean;
   createdAt:  string;
 }

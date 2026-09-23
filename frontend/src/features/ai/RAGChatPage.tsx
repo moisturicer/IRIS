@@ -21,6 +21,7 @@ import { ChatInput } from "./components/ChatInput";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ConversationSidebar } from "./components/ConversationSidebar";
 import { SourceContextPanel } from "./components/SourceContextPanel";
+import { useAskStream } from "./hooks/useAskStream";
 
 /** The most recent reply that cited anything — what the sources panel shows. */
 function latestGrounded(messages: ChatMessage[]): ChatMessage | null {
@@ -75,6 +76,7 @@ export default function RAGChatPage() {
   const [sourcesOpen, setSourcesOpen]       = useState(false);
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
+  const { streaming, ask }                  = useAskStream();
 
   // Read off the reply itself, so the panel cannot show one conversation's
   // cards beside another's passages, and a reload restores both together
@@ -114,17 +116,9 @@ export default function RAGChatPage() {
 
       setLoading(true);
       try {
-        const { data } = await aiApi.ask(question, { conversationId });
-        const body =
-          data.answer ?? data.message ?? "No readable sources matched that question.";
-        const assistantMsg = newChatMessage("assistant", body, {
-          citations: data.citations,
-          sources:   data.sources,
-          degraded:  data.degraded,
-          widened:   data.widened,
-        });
-        setMessages([...nextMessages, assistantMsg]);
-        if (data.citations?.length) {
+        const { message } = await ask(question, { conversationId });
+        setMessages([...nextMessages, message]);
+        if (message.citations?.length) {
           setSourcesOpen(true);
         }
         refreshList();
@@ -138,7 +132,7 @@ export default function RAGChatPage() {
         setLoading(false);
       }
     },
-    [addToast, refreshList],
+    [ask, addToast, refreshList],
   );
 
   useEffect(() => {
@@ -315,7 +309,7 @@ export default function RAGChatPage() {
           <ChatMessageList
             messages={messages}
             isLoading={loading}
-            showInlineSources={!sourcesOpen}
+            streaming={streaming}
             suggestions={suggestions}
             onSuggestion={handleSend}
             indexedRecords={status?.indexed_records ?? null}

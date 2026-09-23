@@ -108,3 +108,14 @@ export function ScopeNotice() {
     </p>
   );
 }
+
+/** Shown when a stream never reached its terminal event (IR-328/329) --
+ *  the text above is whatever arrived before the cutoff, live or replayed. */
+export function PartialAnswerNotice() {
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-700">
+      <i className="fas fa-circle-half-stroke text-[10px] mt-0.5" aria-hidden />
+      <span>This answer was cut off before it finished — it may be incomplete.</span>
+    </p>
+  );
+}

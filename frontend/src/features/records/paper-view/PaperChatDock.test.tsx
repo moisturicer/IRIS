@@ -49,15 +49,20 @@ function answer(overrides: Partial<AIAnswer> = {}): AIAnswer {
   };
 }
 
+/** A one-event stream: straight to `done`, the shape most of these tests need. */
+async function* doneStreamOf(overrides: Partial<AIAnswer> = {}) {
+  yield { event: "done", data: answer(overrides) };
+}
+
 const findOrCreateForRecord = vi.fn();
-const ask = vi.fn();
+const askStream = vi.fn();
 
 vi.mock("@/api/ai", () => ({
   aiApi: {
     conversations: {
       findOrCreateForRecord: (...args: unknown[]) => findOrCreateForRecord(...(args as [])),
     },
-    ask: (...args: unknown[]) => ask(...(args as [])),
+    askStream: (...args: unknown[]) => askStream(...(args as [])),
   },
 }));
 
@@ -69,7 +74,7 @@ beforeEach(() => {
   // scrolled to the newest message.
   Element.prototype.scrollIntoView = vi.fn();
   findOrCreateForRecord.mockResolvedValue({ data: conversation() });
-  ask.mockResolvedValue({ data: answer() });
+  askStream.mockImplementation(() => doneStreamOf());
 });
 
 describe("Paper Chat opens or continues a Conversation scoped to the Record", () => {
@@ -116,8 +121,8 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
     await userEvent.type(input, "What datasets were used?");
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    await waitFor(() => expect(ask).toHaveBeenCalled());
-    const [question] = ask.mock.calls[0];
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    const [question] = askStream.mock.calls[0];
     expect(question).toBe("What datasets were used?");
   });
 
@@ -133,8 +138,8 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
     );
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    await waitFor(() => expect(ask).toHaveBeenCalled());
-    const [, options] = ask.mock.calls[0];
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    const [, options] = askStream.mock.calls[0];
     expect(options).toMatchObject({ conversationId: 42, widen: false });
   });
 });
@@ -162,13 +167,13 @@ describe("the widen control", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    await waitFor(() => expect(ask).toHaveBeenCalled());
-    const [, options] = ask.mock.calls[0];
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    const [, options] = askStream.mock.calls[0];
     expect(options).toMatchObject({ widen: true });
   });
 
   it("says when an answer left this paper's scope", async () => {
-    ask.mockResolvedValue({ data: answer({ widened: true }) });
+    askStream.mockImplementation(() => doneStreamOf({ widened: true }));
     renderScreen(
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
