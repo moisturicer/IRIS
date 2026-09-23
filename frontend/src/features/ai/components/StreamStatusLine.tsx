@@ -27,7 +27,7 @@ export function StreamStatusLine({ state }: { state: StreamingState }) {
   if (!text) return null;
 
   return (
-    <p aria-live="polite" className="flex items-center gap-2 text-[12px] font-medium text-stone-500">
+    <p aria-live="polite" className="flex items-center gap-2 text-[13px] font-medium text-stone-500 mb-2">
       <span
         aria-hidden
         className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse motion-reduce:animate-none"

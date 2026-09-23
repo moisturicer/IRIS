@@ -42,7 +42,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           rows={1}
           aria-label={placeholder ?? "Ask about the research corpus…"}
           placeholder={placeholder ?? "Ask about the research corpus…"}
-          className="flex-1 resize-none rounded-full border border-stone-200 bg-stone-50/80 px-5 py-3 text-[13px]
+          className="flex-1 resize-none rounded-full border border-stone-200 bg-stone-50/80 px-5 py-3 text-[14px]
             outline-none focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12] focus:bg-white
             text-stone-900 placeholder:text-stone-400 disabled:opacity-50 min-h-[48px] max-h-[120px]"
         />
@@ -56,7 +56,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           <i className="fas fa-arrow-up text-[14px]" aria-hidden />
         </button>
       </div>
-      <p className="text-[10px] text-stone-400 text-center mt-2 max-w-3xl mx-auto">
+      <p className="text-[11px] text-stone-400 text-center mt-2 max-w-3xl mx-auto">
         Enter to send · Shift+Enter for new line · Verify answers using Sources
       </p>
     </form>
