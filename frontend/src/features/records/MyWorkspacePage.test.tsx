@@ -221,6 +221,14 @@ const CASES: Case[] = [
     current: "Current: Rejected",
     office: "—",
   },
+  {
+    // A published record whose owner asked RDCO to delete it. Still readable
+    // to its owner; filed with Rejected, as the page always has.
+    was: "pending_delete",
+    record: { pipeline_status: "pending_delete", workflow_state: "pending_delete" },
+    current: "Current: Rejected",
+    office: "—",
+  },
 ];
 
 let shownRecords: RecordDetail[] = [];

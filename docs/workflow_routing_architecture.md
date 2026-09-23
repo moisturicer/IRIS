@@ -316,7 +316,7 @@ GET /api/v1/records/<id>/tracker/
     {"party": "ierc",   "label": "IERC",            "state": "active",    "awaiting_document": true},
     {"party": "ktto",   "label": "KTTO",            "state": "not_requested"},
     {"party": "adviser","label": "Adviser",         "state": "not_requested"},
-    {"party": "rdco",   "label": "RDCO",            "state": "awaiting"}
+    {"party": "rdco",   "label": "RDCO Final",      "state": "awaiting"}
   ],
   "routing_history":      [{"group_id": "…", "from": "intake", "to": ["itso","ierc"], "actor": "…", "reason": "…", "at": "…"}],
   "routing_recorded_from": "2026-09-…",
