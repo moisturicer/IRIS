@@ -9,7 +9,7 @@
  * positions on one bar; a case can be in both at once. This derives a
  * per-record stage list and office-pill row instead of pretending otherwise.
  */
-import type { RecordDetail, RecordClearance } from "@/types/records";
+import type { Party, RecordDetail, RecordClearance } from "@/types/records";
 
 export type WorkspaceStage =
   | "validation"
@@ -18,7 +18,7 @@ export type WorkspaceStage =
   | "final_review"
   | "ongoing"
   | "completed"
-  | "declined"
+  | "revision_requested"
   | "rejected";
 
 const STAGE_LABELS: Record<WorkspaceStage, string> = {
@@ -28,23 +28,32 @@ const STAGE_LABELS: Record<WorkspaceStage, string> = {
   final_review: "Final Review",
   ongoing: "Research Ongoing",
   completed: "Completed",
-  declined: "Declined",
+  revision_requested: "Declined",
   rejected: "Rejected",
 };
 
-/** The tab a record's *current* pipeline_status belongs to, if any. */
+/**
+ * The tab a record belongs to, from where the API says it stands (IR-259).
+ *
+ * `workflow_state` plus the parties holding the record, never the stored
+ * stage values IR-260 retires. One row needs the holders: a Proposal enters
+ * at its Adviser, who also decides it, so once the Adviser has acted the API
+ * says `final_review` -- but the student is still waiting on their Adviser,
+ * which this page has always called Review & Routing, not RDCO's Final Review.
+ */
 export function currentStage(record: RecordDetail): WorkspaceStage {
-  switch (record.pipeline_status) {
+  switch (record.workflow_state) {
     case "draft":
       return "validation";
-    case "adviser_review":
-    case "rdco_intake":
+    case "submitted":
       return "review_routing";
-    case "itso_review":
-    case "parallel_review":
+    case "final_review":
+      return heldOnlyBy(record, "adviser") ? "review_routing" : "final_review";
+    case "in_review":
+    case "awaiting_document":
       return "office_review";
-    case "rdco_review":
-      return "final_review";
+    case "awaiting_resubmission":
+      return "revision_requested";
     // `approved` is NOT finished: the adviser signed off and the research is
     // now actually being done. Only a manual /complete/ call -- by RDCO or the
     // assigned Adviser (ADR-021 §3, IR-267) -- ends a Proposal. Collapsing the two
@@ -55,14 +64,17 @@ export function currentStage(record: RecordDetail): WorkspaceStage {
     case "completed":
     case "published":
       return "completed";
-    case "declined":
-      return "declined";
     case "rejected":
     case "pending_delete":
       return "rejected";
     default:
       return "validation";
   }
+}
+
+function heldOnlyBy(record: RecordDetail, party: Party): boolean {
+  const holders = record.current_holders ?? [];
+  return holders.length > 0 && holders.every((h) => h.party === party);
 }
 
 /** The ordered stage list a *this specific record* actually passes through. */
@@ -99,22 +111,24 @@ export function inCommercialization(record: RecordDetail): boolean {
 }
 
 /**
- * The office(s) actually holding a case up right now, for the card's "Office"
- * line. Not the ADR-018 request -- what's genuinely pending. Falls back to
- * who owns the *current sequential* stage when there's no clearance yet.
+ * Who is holding a case up right now, for the card's "Office" line, in the
+ * party labels the API serves (`current_holders`, IR-259).
+ *
+ * While the author owes a revision, a holder that asked for it is waiting on
+ * the author, not working -- the card has always shown only who is still
+ * reviewing. That is an office whose clearance is still pending: the party
+ * that sent the record back holds a declined clearance, or none at all when a
+ * sequential party (Intake, Adviser, RDCO) did. The open resubmission requests
+ * would say this directly, but only `/records/<id>/tracker/` carries them, and
+ * this page lists every case from one `/records/mine/` call.
  */
 export function currentOfficeLabel(record: RecordDetail): string {
-  const pending = pendingClearances(record);
-  if (pending.length > 0) return pending.map((c) => c.office_label).join(" + ");
-  switch (record.pipeline_status) {
-    case "adviser_review":
-      return "Adviser";
-    case "rdco_intake":
-    case "rdco_review":
-      return "RDCO";
-    default:
-      return "—";
+  let holders = record.current_holders ?? [];
+  if (record.workflow_state === "awaiting_resubmission") {
+    const reviewing = new Set(pendingClearances(record).map((c) => c.office as string));
+    holders = holders.filter((h) => reviewing.has(h.party));
   }
+  return holders.length > 0 ? holders.map((h) => h.label).join(" + ") : "—";
 }
 
 /**
@@ -128,5 +142,5 @@ export function formatCaseId(record: RecordDetail): string {
 
 /** A record the owner must act on -- the sole real match for "Actions Required". */
 export function needsAuthorAction(record: RecordDetail): boolean {
-  return record.pipeline_status === "declined";
+  return record.workflow_state === "awaiting_resubmission";
 }

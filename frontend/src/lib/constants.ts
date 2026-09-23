@@ -40,6 +40,9 @@ export const AUDIT_LOG_ROLES: RoleName[] = [
 /** Record pipeline statuses — match `Record.PIPELINE_STATUS` in Django. */
 export const PIPELINE_STATUS = {
   DRAFT:          "draft",
+  // The one in-review status IR-260 stores in place of the stage values below
+  // (ADR-021 §4). Mirrors `PipelineStatus.IN_REVIEW`, added by IR-256.
+  IN_REVIEW:      "in_review",
   // Proposal pipeline
   ADVISER_REVIEW: "adviser_review",
   APPROVED:       "approved",       // Proposal approved by adviser — research ongoing; not public (IR-264)

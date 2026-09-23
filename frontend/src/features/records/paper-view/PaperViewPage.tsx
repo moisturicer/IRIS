@@ -29,28 +29,6 @@ import { PaperDocuments } from "./PaperDocuments";
 // Role predicates — these mirror the server's rules; the server still enforces.
 // ---------------------------------------------------------------------------
 
-/**
- * True when this user's role is the expected reviewer at the record's current
- * pipeline stage.
- *
- *   adviser_review  -> Adviser (the assigned one; enforced server-side)
- *   rdco_intake     -> RDCO
- *   itso_review     -> ITSO or KTTO
- *   parallel_review -> ITSO, IERC or KTTO (per-office clearances)
- *   rdco_review     -> RDCO
- */
-function canReview(roleName: string | undefined, pipelineStatus: string): boolean {
-  if (!roleName) return false;
-  switch (pipelineStatus) {
-    case "adviser_review":  return roleName === "Adviser";
-    case "rdco_intake":     return roleName === "RDCO";
-    case "itso_review":     return roleName === "ITSO" || roleName === "KTTO";
-    case "parallel_review": return roleName === "ITSO" || roleName === "IERC" || roleName === "KTTO";
-    case "rdco_review":     return roleName === "RDCO";
-    default:                return false;
-  }
-}
-
 function isOwner(record: RecordDetail, userId: number | undefined): boolean {
   if (!userId) return false;
   return record.owners.some((o) => o.user === userId);
@@ -414,8 +392,10 @@ export default function PaperViewPage() {
   }
 
   const userIsOwner      = isOwner(record, user?.id);
-  const userCanReview    = canReview(user?.role_name ?? undefined, record.pipeline_status);
-  const canBeResubmitted = record.pipeline_status === "declined" && userIsOwner;
+  // Both gates read the API (IR-259), which knows who holds the record and
+  // what the server will accept from this viewer. The server still enforces.
+  const userCanReview    = record.can_act.length > 0;
+  const canBeResubmitted = record.workflow_state === "awaiting_resubmission" && userIsOwner;
   const showIpTagger =
     canTag(user?.role_name ?? undefined) && record.pipeline_status === "published";
   // RDCO or the Proposal's assigned Adviser (ADR-021 §3, IR-267) -- the same
@@ -478,7 +458,7 @@ export default function PaperViewPage() {
           <div className="min-w-0 space-y-6">
             {/* Chips */}
             <div className="flex items-center gap-2 flex-wrap">
-              <StatusBadge status={record.pipeline_status} />
+              <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
               {record.is_ip && (
                 <span className="px-2 py-0.5 rounded-full bg-brand text-white text-[11px] font-semibold flex items-center gap-1.5">
                   <i className="fas fa-shield-halved text-[9px]" aria-hidden />

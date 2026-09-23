@@ -1,6 +1,5 @@
 import type { RecordDetail } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
-import { pipelineLabel } from "@/lib/utils";
 
 /**
  * Institutional governance facts, as a label/value ledger.
@@ -11,7 +10,8 @@ import { pipelineLabel } from "@/lib/utils";
  */
 export function PaperGovernance({ record }: { record: RecordDetail }) {
   const rows: { label: string; value: string; emphasis?: boolean }[] = [
-    { label: "Pipeline Status", value: pipelineLabel(record.pipeline_status), emphasis: true },
+    // The API's own wording for where the record stands (IR-259).
+    { label: "Pipeline Status", value: record.workflow_state_label, emphasis: true },
     { label: "Classification", value: record.classification_name ?? "—" },
     { label: "Record Type", value: record.record_type_name ?? "—" },
     { label: "Year Accomplished", value: record.year_accomplished ? String(record.year_accomplished) : "—" },

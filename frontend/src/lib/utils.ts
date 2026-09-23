@@ -14,6 +14,7 @@ export function formatDate(value: string | Date | null | undefined, pattern = "M
 
 const PIPELINE_LABELS: Record<PipelineStatus, string> = {
   draft:           "Draft",
+  in_review:       "In Review",
   adviser_review:  "Adviser Review",
   approved:        "Approved — Ongoing",
   completed:       "Completed",

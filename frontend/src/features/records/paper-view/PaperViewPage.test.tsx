@@ -17,6 +17,13 @@
  * else; this only keeps the page from offering an action that would be
  * refused.
  *
+ * **Who sees the review and resubmit controls (IR-259).** Both read the API,
+ * never the stored stage: "Review this record" appears exactly when `can_act`
+ * names a party for this viewer, and "Resubmit for review" exactly when the
+ * record is `awaiting_resubmission` and the viewer owns it. The records below
+ * carry a `pipeline_status` that would have said the opposite, so a gate that
+ * still read the stage would fail here.
+ *
  * Every query goes through the accessible tree, by role and accessible name.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -266,5 +273,114 @@ describe("Mark as completed on an approved Proposal", () => {
 
     await screen.findByRole("heading", { name: approvedProposal.title });
     expect(screen.queryByRole("button", MARK_COMPLETED)).not.toBeInTheDocument();
+  });
+});
+
+const OWNER_ID = 40;
+const REVIEW_THIS = { name: "Review this record" } as const;
+const RESUBMIT = { name: "Resubmit for review" } as const;
+
+/** A Thesis/Research in office review, for the IR-259 gate tests. */
+const inReview: RecordDetail = {
+  ...record,
+  title: "Groundwater Recharge Mapping in Metro Cebu",
+  pipeline_status: "in_review",
+  owners: [{ id: 1, user: OWNER_ID, email: "owner@cit.edu", full_name: "Rhea Owner", is_primary: true }],
+  workflow_state: "in_review",
+  workflow_state_label: "In review",
+  current_holders: [
+    { party: "itso", label: "ITSO", opened_at: "2026-09-02T08:00:00Z", opened_by: null },
+  ],
+  can_act: [],
+};
+
+async function waitForRecord(title: string) {
+  // Assert absences only after the record renders, not against the skeleton.
+  await screen.findByRole("heading", { name: title });
+}
+
+describe("the review control follows can_act", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("is offered when the API says this viewer can act", async () => {
+    shownRecord = { ...inReview, can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    const { container } = renderPaperView();
+
+    expect(await screen.findByRole("link", REVIEW_THIS)).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("is not offered to a same-role viewer the API does not name, whatever the stage", async () => {
+    // `parallel_review` is a stage an ITSO reviewer used to be shown the
+    // control at by role alone. The API says this one cannot act.
+    shownRecord = { ...inReview, pipeline_status: "parallel_review", can_act: [] };
+    signInAs(2, "ITSO");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("link", REVIEW_THIS)).not.toBeInTheDocument();
+  });
+
+  it("is not offered to the owner", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("link", REVIEW_THIS)).not.toBeInTheDocument();
+  });
+});
+
+describe("the resubmit control follows workflow_state", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const awaiting: RecordDetail = {
+    ...inReview,
+    workflow_state: "awaiting_resubmission",
+    workflow_state_label: "Awaiting resubmission",
+  };
+
+  it("is offered to the owner of a record awaiting resubmission", async () => {
+    shownRecord = awaiting;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("button", RESUBMIT)).toBeInTheDocument();
+  });
+
+  it("is not offered to someone who does not own it", async () => {
+    shownRecord = awaiting;
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+  });
+
+  it("is not offered while the record is still in review, even if stored as declined", async () => {
+    shownRecord = { ...inReview, pipeline_status: "declined" };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+  });
+});
+
+describe("the status the paper shows", () => {
+  it("is the API's workflow_state_label, on the badge and in governance", async () => {
+    shownRecord = { ...inReview, pipeline_status: "rdco_review", workflow_state_label: "Final review", workflow_state: "final_review" };
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    // Once as the badge, once as the governance ledger's status row.
+    expect(screen.getAllByText("Final review")).toHaveLength(2);
+    expect(screen.queryByText("RDCO Final Review")).not.toBeInTheDocument();
   });
 });
