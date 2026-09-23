@@ -127,10 +127,7 @@ GENERATED = "generated"
 NO_SOURCES = "no_sources"
 UNAVAILABLE = "unavailable"
 
-#: A stream ended before its `Done` was reached -- client disconnect, vendor
-#: timeout, server restart, or anything else that leaves completeness unknown
-#: (IR-328). Cause-agnostic by design: the one fact worth recording is that
-#: the answer may be truncated, not which of those causes it was.
+#: A stream ended before its `Done` was reached (IR-328) -- cause-agnostic.
 PARTIAL = "partial"
 
 

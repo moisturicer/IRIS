@@ -231,18 +231,8 @@ class GroundedAnswerService:
         buffer citation parsing and the stored ``Turn.answer`` are built
         from -- so leaked reasoning can corrupt neither.
 
-        **`on_interrupted` is the one seam a caller needs for IR-328.** A
-        `finally` around the whole method calls it, exactly once, with
-        whatever text and sources had been accumulated -- but only when the
-        method is exiting *without* having reached its own `Done`, tracked
-        by the plain `completed` flag rather than inferred from where the
-        exit happened. That makes it fire identically whichever of the
-        cause-agnostic ways this can end: a caller closing the generator
-        early (disconnect), an exception this method does not otherwise
-        catch (an unexpected vendor error), or anything else. Never called
-        on a normal `Done` -- including the `NO_SOURCES` and `UNAVAILABLE`
-        branches below, which are already complete, honestly-stated answers,
-        not truncated ones.
+        `on_interrupted` (IR-328) fires from `finally`, once, only when no
+        `Done` was reached -- cause-agnostic to why.
         """
         completed = False
         retrieved = None
@@ -301,8 +291,7 @@ class GroundedAnswerService:
 
             yield from classified(*leak_filter.flush())
 
-            raw = "".join(raw_parts)
-            text, citations = parse_citations(raw, sources)
+            raw, text, citations = _parse(raw_parts, sources)
             _warn_if_citations_went_missing(raw, text, citations)
             yield CitationsResolved(citations=citations)
             completed = True
@@ -322,23 +311,14 @@ class GroundedAnswerService:
         raw_parts: Sequence[str],
         had_reasoning: bool,
     ) -> GroundedAnswer:
-        """Whatever text and sources had been accumulated when the stream cut
-        off, in the same `GroundedAnswer` shape a completed answer takes
-        (IR-328). Citation parsing runs exactly once here, over the
-        truncated text, precisely as it does on a clean completion --
-        never per delta, for the reasons `TextDelta` documents.
-
-        Deliberately skips `_warn_if_citations_went_missing`: an answer cut
-        off mid-sentence routinely ends mid-marker or before any marker at
-        all, and that is expected here, not the drifted-format anomaly that
-        check exists to surface.
-
-        `degraded` is always `True` -- not `retrieved.degraded`, which
-        answers a different question. Completeness is unknown, and that
-        alone is reason enough to ask a reader to weigh it carefully.
+        """Whatever text and sources had accumulated when the stream cut off
+        (IR-328). Citation parsing runs once, same as a clean completion; no
+        `_warn_if_citations_went_missing`, since ending mid-marker here is
+        expected, not a drifted format. `degraded` is always true, the same
+        call `_unavailable_answer` makes: completeness is unknown, which
+        alone is reason to weigh the answer carefully.
         """
-        raw = "".join(raw_parts)
-        text, citations = parse_citations(raw, sources)
+        _, text, citations = _parse(raw_parts, sources)
         return GroundedAnswer(
             text=text,
             citations=citations,
@@ -367,6 +347,16 @@ class GroundedAnswerService:
         return getattr(self._llm, "last_model_used", None) or getattr(
             self._llm, "model", None
         )
+
+
+def _parse(
+    raw_parts: Sequence[str], sources: Sequence[RetrievedChunk]
+) -> tuple[str, str, tuple]:
+    """Join and citation-parse a stream's text, once. Shared by a clean
+    completion and `_partial_answer` (IR-328), so the two never drift."""
+    raw = "".join(raw_parts)
+    text, citations = parse_citations(raw, sources)
+    return raw, text, citations
 
 
 def _warn_if_citations_went_missing(raw: str, text: str, citations: Sequence) -> None:

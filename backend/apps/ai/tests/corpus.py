@@ -113,13 +113,9 @@ class _BrokenLLM(LLMProvider):
 
 
 class _CutOffLLM(LLMProvider):
-    """A vendor mid-sequence cutoff (IR-328) -- some text arrives, then the
-    stream ends with an ordinary exception, not `LLMUnavailable`. That
-    distinction is the point: `LLMUnavailable` is a *diagnosed* vendor
-    failure with its own honest `done` (state `unavailable`); this is
-    everything else that can end a stream without one -- a socket reset, a
-    killed worker, anything cause-agnostic `Turn.state == "partial"` is for.
-    """
+    """A mid-sequence cutoff (IR-328): text arrives, then an ordinary
+    exception -- not `LLMUnavailable`, which already ends in its own
+    honest `done`."""
 
     def generate(self, system, user):
         raise NotImplementedError("this fake only exercises the streaming path")

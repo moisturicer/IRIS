@@ -168,10 +168,7 @@ class VendorFailureTests:
 
 
 class InterruptedStreamTests:
-    """A mid-sequence cutoff (IR-328) -- not `LLMUnavailable`, which already
-    ends in an honest `done`, but the ordinary-exception shape a real
-    disconnect or vendor timeout takes: some text arrives, then the stream
-    ends with nothing more, no `done` event at all."""
+    """A mid-sequence cutoff (IR-328): some text arrives, then no `done`."""
 
     def test_a_mid_sequence_cutoff_persists_a_partial_turn(
         self, embedder, space, client_for
@@ -201,9 +198,7 @@ class InterruptedStreamTests:
     def test_a_one_off_ask_with_no_conversation_persists_nothing(
         self, embedder, space, client_for
     ):
-        """No Conversation to append to, so there is nothing to mark
-        partial either -- matching the completed-stream path, which
-        persists nothing for a one-off ask too."""
+        """No Conversation, so nothing to mark partial either."""
         from apps.ai.models import Turn
 
         reader = make_user("reader@cit.edu")

@@ -445,13 +445,9 @@ class StreamingTests:
 
 
 class InterruptedStreamTests:
-    """A stream that ends before its own `Done` (IR-328) -- `on_interrupted`
-    is the one seam a caller needs to persist that safely, cause-agnostic to
-    why it happened. Distinct from `_BreaksMidStream` above: `LLMUnavailable`
-    is a *diagnosed* vendor failure with its own honest `done` (state
-    `unavailable`); everything tested here is the stream simply not reaching
-    one at all.
-    """
+    """A stream that ends before its own `Done` (IR-328), cause-agnostic --
+    distinct from `_BreaksMidStream` above, whose `LLMUnavailable` already
+    ends in an honest `done`."""
 
     def test_an_unexpected_vendor_error_calls_on_interrupted_with_a_partial_answer(
         self, reader
@@ -478,7 +474,6 @@ class InterruptedStreamTests:
             ):
                 events.append(event)
 
-        # The crash is never hidden -- only persisted around.
         assert [type(e) for e in events] == [
             RetrievalStarted, RetrievalFinished, GenerationStarted, TextDelta,
         ]
@@ -486,8 +481,6 @@ class InterruptedStreamTests:
         partial = captured[0]
         assert partial.state == "partial"
         assert partial.degraded is True
-        # Citation parsing ran once, over the truncated text, same as a
-        # clean completion.
         assert partial.text == "Sampling was weekly [1]."
         assert partial.citations[0].record_id == record.pk
 
@@ -506,9 +499,7 @@ class InterruptedStreamTests:
         assert captured == []
 
     def test_on_interrupted_is_never_called_on_an_unavailable_done(self, reader):
-        """`LLMUnavailable` already ends in an honest, complete `done` --
-        that is not a truncated answer, and must not be double-recorded as
-        one."""
+        """Already an honest, complete `done` -- not a truncated answer."""
         record = make_record("Thesis")
         service = GroundedAnswerService(
             _FixedRetriever([chunk_for(record)]), _BreaksMidStream(), permits=lambda r: True
@@ -522,9 +513,7 @@ class InterruptedStreamTests:
         assert captured == []
 
     def test_a_caller_closing_the_generator_early_also_counts(self, reader):
-        """Not every interruption is an exception -- a client disconnect
-        looks like the caller simply stopping mid-iteration, which Python
-        surfaces as `GeneratorExit` once the generator is closed."""
+        """A disconnect surfaces as `GeneratorExit`, not an exception."""
         record = make_record("Thesis")
         llm = _StreamingLLM(
             [StreamDelta(text="Sampling was "), StreamDelta(text="weekly [1].")]

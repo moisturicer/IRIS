@@ -24,10 +24,8 @@ from apps.ai.answers.citations import GENERATED, NO_SOURCES, PARTIAL, UNAVAILABL
 
 from .embedding_space import VECTOR_COLUMN_DIMENSIONS
 
-#: `Turn.state`'s allowed values, straight from the domain constants
-#: `apps/ai/answers/citations.py` already defines and `record_turn` already
-#: writes -- one source of truth, this field's `choices` only documents it
-#: (IR-328, migration 0013).
+#: `Turn.state`'s allowed values, from the same constants `record_turn`
+#: already writes (migration 0013).
 _STATE_CHOICES = [
     (GENERATED, "Generated"),
     (NO_SOURCES, "No sources"),
@@ -83,11 +81,10 @@ class Turn(models.Model):
     """One question and the answer it produced.
 
     `state` is the wire's name for how the answer came out — generative, no
-    results, the model was unreachable, or (IR-328) the stream ended before
-    a `Done` was reached and the recorded text may be truncated — stored
-    rather than re-derived, because "no answer was written" and "the answer
-    was empty" are different facts and a reopened transcript must not
-    present the second as the first.
+    results, the model was unreachable, or `partial` (IR-328, the stream
+    never reached a `Done`) — stored rather than re-derived, because "no
+    answer was written" and "the answer was empty" are different facts and
+    a reopened transcript must not present the second as the first.
 
     `resolved_question` is blank unless resolution actually ran and changed
     something (IR-296, ADR-026) — skipped on the first Turn, skipped when the
