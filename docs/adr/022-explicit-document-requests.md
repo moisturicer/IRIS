@@ -125,9 +125,20 @@ ADR would need to be undone for that.
 
 ### 3. Fulfilment
 
-1. **The reviewer creates the request.** The submitter is notified. The requesting party's
-   tracker row shows *awaiting document*, and the record's `workflow_state` becomes
-   `awaiting_document` (ADR-021 §4). Both are derived from open requests and never stored.
+1. **The reviewer creates the request.** The submitter is notified. The record's
+   `workflow_state` becomes `awaiting_document` (ADR-021 §4). **For workflow participants
+   only** (§Amendment 5), the requesting party's tracker row also shows *awaiting document*.
+   Both are derived from open requests and never stored.
+
+   > **Amended 2026-09-24.** This step originally said, without qualification, that the
+   > requesting party's tracker row shows *awaiting document*. Per §Amendment 5:
+   > - Only authorised workflow participants receive document-request workflow information:
+   >   owners and submitters, and parties that hold, held or acted on the Record, or that took
+   >   part in the request.
+   > - A non-participant receives `null` for that per-party flag and for the tracker's
+   >   `document_requests`, and no other request information.
+   > - Published-record visibility alone never grants it.
+   > - The generic `workflow_state` stays visible to anyone who may view the Record.
 2. **The submitter uploads against an item** through the existing documents upload endpoint,
    using a `request_item` parameter.
    - A slot-backed item creates an ordinary `RecordUpload`.
