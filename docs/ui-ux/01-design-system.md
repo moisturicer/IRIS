@@ -2,7 +2,22 @@
 
 A system exists. It is systematically bypassed. **The recommendation is adoption, not replacement.**
 
+> **Amended 2026-09-25 (IR-356).** The project lead authorised redesigning the frontend and changing this system where that serves the product, provided this document records it. The amendments are marked **IR-356** below; they supersede the text they sit beside.
+
 ---
+
+## 0 · IR-356 amendments at a glance
+
+| Area | Rule now | Replaces |
+|---|---|---|
+| **Palette** | **White, black, grey (`stone`) and maroon (`brand`, with its `50`–`200` tints, `light` and `dark`) only.** No green, amber, orange, yellow, red, blue, violet, teal or sky. Errors and rejections use maroon. `brand-400…600` are bright reds, not maroon — do not use them. **Applied so far to the reading surfaces** — Paper View, Paper Chat, and what they render (`StatusBadge`, the document-request panels, the passage notices and the Ask IRIS emblem, which Ask IRIS and the Evaluation page share). **Not yet converted:** `Button`'s `danger` variant, `Badge`, `Toast`, `ConfirmDialog`, `WorkspaceOfficePills` and My Workspace — convert each as it is touched. `gray`/`slate` should also give way to `stone` as files are touched | "Semantic colours come from Tailwind defaults — green/amber/red/blue" (§1) |
+| **Status tones** | Four, by meaning: **quiet** `stone-100/stone-700` (not yet with a reviewer) · **active** `brand-50/brand` (with a reviewer, or recoverable) · **attention** solid `brand`, white text (terminal or blocking) · **settled** `stone-900`, white text (finished). Every chip carries its label, and the states that stop a record also carry an icon: **revision requested** is *active* with a return arrow, **rejected** is *attention* with a ban sign — soft versus solid, arrow versus ban, never alike (§7) | The per-status colour families in §7–8 |
+| **Type** | **Inter** for the interface and **EB Garamond** (`font-display`, weight 600) for titles and section headings on reading surfaces (Paper View, Paper Chat). Both **self-hosted** through `@fontsource` and bundled by Vite — no font CDN. Inter was declared but never loaded before this; every screen had been rendering in the OS fallback face. Display sizes above the 11–16 px body scale: `text-xl` (20 px) section headings, `text-3xl`/`text-4xl` (30/36 px) a paper's title | "`Inter` with a system fallback stack" (§1) |
+| **Reading measure** | Long-form text (an abstract) at `text-lg` with `leading-7` (1.75), about 65 characters wide, left-aligned, never justified | — |
+| **Actions** | Page actions are 44 px pills from `components/ui/pillStyles.ts`: **one** `PILL_PRIMARY` per row (the most important action for this viewer), the rest `PILL_SECONDARY`, a toggle that is on `PILL_SELECTED` | Mixed 32–36 px rounded-rect buttons |
+| **`Button`** | `size="icon"` (44 px below `lg`, 32 px above; `aria-label` required by the type) and the `aria-pressed:` state on `ghost` — **added by IR-352**, listed here because this section is the one place to find the current system | "5 variants × 3 sizes" (§3) |
+| **Header search** | Not shown on Paper View (a reading surface). It is inert on every screen — it has no handler — which is a separate fix | — |
+
 
 ## 1 · Tokens as defined
 
@@ -20,11 +35,11 @@ A system exists. It is systematically bypassed. **The recommendation is adoption
 | `gold.dark` | `#A87B2A` | ≈3.9:1 | ❌ still below 4.5:1 for body text |
 | `cream` | `#F5F0E8` | — | ✅ background |
 
-Semantic colours come from Tailwind defaults — green/amber/red/blue for status. That is fine and worth keeping; inventing a parallel semantic ramp would be cost without benefit.
+~~Semantic colours come from Tailwind defaults — green/amber/red/blue for status.~~ **Superseded by IR-356 (§0): the interface uses white, black, grey and maroon only, and status is carried by four tones plus a label.**
 
 ### Type
 
-`Inter` with a system fallback stack. Scale defined as `2xs` 11px · `xs` 12px · `sm` 13px · `base` 14px · `md` 15px · `lg` 16px.
+`Inter` with a system fallback stack — **IR-356: now actually loaded (self-hosted), with `EB Garamond` as `font-display` for reading-surface titles and headings (§0).** Scale defined as `2xs` 11px · `xs` 12px · `sm` 13px · `base` 14px · `md` 15px · `lg` 16px.
 
 **13px base is small** but internally consistent and appropriate for a dense institutional tool. Keep it. Do not go below 11px anywhere.
 
@@ -125,6 +140,8 @@ One quirk: the Discover home is special-cased full-bleed with no Header. Accepta
 
 ## 7 · Status colour semantics
 
+> **IR-356:** the colour families below are superseded by the four tones in §0. The rule that matters survives unchanged: never colour alone. "Revision requested" (`awaiting_resubmission`, legacy `declined`) is a **soft maroon chip with a return arrow**; "Rejected" is a **solid maroon chip with a ban sign**. Tone, icon and label all differ.
+
 `StatusBadge` maps pipeline statuses to Tailwind colour families. The mapping is reasonable; the **contrast is not verified**. All are `-100` background with `-700` text, which typically passes AA, but `amber-100/amber-700` and `yellow-100/yellow-700` should be checked ([12](12-accessibility.md)).
 
 **A semantic problem worth fixing:** `declined` (amber) and `rejected` (red) are visually adjacent but semantically opposite — one is recoverable, one is terminal. Given that resubmission is the thesis contribution, the difference must be unmissable.
@@ -134,6 +151,8 @@ One quirk: the Discover home is special-cased full-bleed with no Header. Accepta
 ---
 
 ## 8 · Proposed additions for the Clearance Track
+
+> **IR-356:** the *Visual* column is superseded by §0's palette — map cleared/preserved to **settled**, pending/not_started to **quiet**, in_review to **active**, declined/rejected to **attention**. Icons and labels stand as proposed.
 
 New semantic tokens, colour-independent, defined once and reused across every clearance surface:
 
