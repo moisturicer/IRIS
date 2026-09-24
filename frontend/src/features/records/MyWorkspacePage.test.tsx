@@ -68,6 +68,7 @@ const base: RecordDetail = {
   workflow_state_label: "In review",
   current_holders: [],
   can_act: [],
+  can_request_document: [],
 };
 
 /** The student-facing holder labels the API serves (ADR-021 §2). */

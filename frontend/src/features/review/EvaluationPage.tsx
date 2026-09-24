@@ -12,6 +12,7 @@ import type { PipelineStatus } from "@/lib/constants";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { clearReviewDraft, readReviewDraft, writeReviewDraft } from "@/lib/reviewDraft";
+import { RequestDocumentDialog } from "@/features/document-requests/RequestDocumentDialog";
 
 interface FormData {
   status:  ReviewStatus;
@@ -78,6 +79,8 @@ export default function EvaluationPage() {
   /** A rejection held back until it is explicitly confirmed. */
   const [pendingReject, setPendingReject] = useState<FormData | null>(null);
   const [rejecting, setRejecting] = useState(false);
+  const [requestingDocs, setRequestingDocs] = useState(false);
+  const [docsRequested, setDocsRequested] = useState(false);
 
   /**
    * Read once, at mount. `useForm` only consults `defaultValues` on its first
@@ -263,6 +266,32 @@ export default function EvaluationPage() {
               Record Detail
             </Link>
           </div>
+
+          {/* ADR-022: a missing form is a document request, not a revision --
+              the record stays in review and no clearance resets (IR-262). */}
+          {record.can_request_document.length > 0 && (
+            <div className="pt-3 border-t border-gray-100">
+              <p className="text-[12px] text-gray-600">
+                Only missing a file? Ask for it without sending the record back.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setDocsRequested(false);
+                  setRequestingDocs(true);
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <i className="fas fa-file-circle-plus text-[11px]" aria-hidden />
+                Request documents
+              </button>
+              {docsRequested && (
+                <p role="status" className="mt-2 text-[12px] text-green-700">
+                  Documents requested. The owner has been notified.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Review form */}
@@ -371,6 +400,21 @@ export default function EvaluationPage() {
           </div>
         </form>
       </div>
+
+      {requestingDocs && (
+        <RequestDocumentDialog
+          recordId={record.id}
+          parties={record.can_request_document}
+          partyLabels={Object.fromEntries(
+            record.current_holders.map((h) => [h.party, h.label]),
+          )}
+          onClose={() => setRequestingDocs(false)}
+          onCreated={() => {
+            setRequestingDocs(false);
+            setDocsRequested(true);
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={pendingReject !== null}

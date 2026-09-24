@@ -14,6 +14,8 @@ import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
+import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
+import { RequestDocumentDialog } from "@/features/document-requests/RequestDocumentDialog";
 import {
   usePaperChat,
   PaperChatPanel,
@@ -328,6 +330,10 @@ export default function PaperViewPage() {
   const [resubmitError, setResubmitError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
+  const [requestingDocs, setRequestingDocs] = useState(false);
+  const [docsRequested, setDocsRequested] = useState(false);
+  /** Bumped when a document request changes, so the tracker reloads. */
+  const [trackerVersion, setTrackerVersion] = useState(0);
 
   // A citation links here with `?page=` (IR-284), so acting on it lands on
   // the page that supports the claim rather than the paper's first. The
@@ -401,6 +407,18 @@ export default function PaperViewPage() {
       );
     } finally {
       setCompleting(false);
+    }
+  };
+
+  /** A document request was made or answered: re-read what derives from it. */
+  const handleDocumentRequestChanged = async () => {
+    setTrackerVersion((v) => v + 1);
+    if (!id) return;
+    try {
+      const { data } = await recordsApi.detail(Number(id));
+      setRecord(data);
+    } catch {
+      // The panel already shows the new state; the badge catches up on reload.
     }
   };
 
@@ -616,6 +634,13 @@ export default function PaperViewPage() {
               </div>
             )}
 
+            {userIsOwner && (
+              <ActionRequiredPanel
+                recordId={record.id}
+                onChanged={handleDocumentRequestChanged}
+              />
+            )}
+
             {record.pipeline_status === "rejected" && (
               <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
                 <p className="text-[13px] font-bold text-red-900 flex items-center gap-2">
@@ -699,6 +724,20 @@ export default function PaperViewPage() {
                 </Link>
               )}
 
+              {record.can_request_document.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocsRequested(false);
+                    setRequestingDocs(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-stone-200 bg-white text-stone-700 text-[13px] font-bold hover:border-brand/40 transition-colors"
+                >
+                  <i className="fas fa-file-circle-plus text-[12px]" aria-hidden />
+                  Request documents
+                </button>
+              )}
+
               {canComplete && (
                 <button
                   type="button"
@@ -724,6 +763,11 @@ export default function PaperViewPage() {
             </div>
 
             {completeError && <p className="text-[12px] text-red-600">{completeError}</p>}
+            {docsRequested && (
+              <p role="status" className="text-[12px] text-emerald-700">
+                Documents requested. The owner has been notified.
+              </p>
+            )}
 
             <PaperAiOverview record={record} />
 
@@ -765,13 +809,29 @@ export default function PaperViewPage() {
           {/* Right rail                                                     */}
           {/* ------------------------------------------------------------- */}
           <aside className="space-y-4 lg:sticky lg:top-6">
-            <ReviewRoutingTracker recordId={record.id} />
+            <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
             <PaperGovernance record={record} />
             <PaperDocuments recordId={record.id} files={record.files} />
           </aside>
         </div>
 
         <PaperCiteModal record={record} isOpen={citeOpen} onClose={() => setCiteOpen(false)} />
+
+        {requestingDocs && (
+          <RequestDocumentDialog
+            recordId={record.id}
+            parties={record.can_request_document}
+            partyLabels={Object.fromEntries(
+              record.current_holders.map((h) => [h.party, h.label]),
+            )}
+            onClose={() => setRequestingDocs(false)}
+            onCreated={() => {
+              setRequestingDocs(false);
+              setDocsRequested(true);
+              void handleDocumentRequestChanged();
+            }}
+          />
+        )}
       </div>
 
       {chat.open ? (

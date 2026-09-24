@@ -92,6 +92,7 @@ const record: RecordDetail = {
   workflow_state_label: "In review",
   current_holders: [],
   can_act: [],
+  can_request_document: [],
 };
 
 /** What the mocked detail endpoint returns; a test may park it at another stage. */

@@ -74,6 +74,12 @@ GOVERNED_ENUMS = (
     # branches on these values, so a hand-typed copy is the same drift risk.
     WorkflowState,
     TrackerPartyState,
+    # IR-262: `DocumentRequestState` and `DocumentRequestItemState` are
+    # deliberately not here. Their `"open"` and `"uploaded"` are also, as
+    # unrelated concepts, bare values in `ai/resilience/circuit.py` (a circuit
+    # breaker's state) and `ai/ingestion/lifecycle.py` (an ingestion job's),
+    # and `apps/ai` is outside this change's reach. Their `"withdrawn"` and
+    # `"rejected"` stay governed through `AssignmentState` and `PipelineStatus`.
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
