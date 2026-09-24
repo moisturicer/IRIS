@@ -93,6 +93,21 @@ def test_it_asks_for_ocr_tables_and_structured_output():
     assert "json" in body
 
 
+def test_it_asks_for_formula_enrichment():
+    """ADR-025: without this, an equation returns as whatever the text layer
+    held — mangled glyphs or nothing — rather than as LaTeX."""
+    seen = {}
+
+    def handler(request):
+        seen["body"] = request.content.decode("utf-8", "replace")
+        return httpx.Response(200, json={"document": {"json_content": _DOCUMENT}})
+
+    _extractor(handler).extract(b"pdf", filename="thesis.pdf")
+
+    assert 'name="do_formula_enrichment"' in seen["body"]
+    assert "true" in seen["body"]
+
+
 def test_a_trailing_slash_on_the_base_url_does_not_double_up():
     seen = {}
 
