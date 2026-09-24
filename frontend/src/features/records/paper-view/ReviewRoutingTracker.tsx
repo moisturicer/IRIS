@@ -152,7 +152,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         recordedFrom={data.routing_recorded_from}
       />
 
-      {data.document_requests.length > 0 && (
+      {data.document_requests && data.document_requests.length > 0 && (
         <div>
           <h3
             id="tracker-document-requests-label"

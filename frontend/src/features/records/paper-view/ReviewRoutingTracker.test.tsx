@@ -276,6 +276,28 @@ describe("ReviewRoutingTracker", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("discloses nothing about requests to a viewer who may not read them (IR-349)", async () => {
+    const undisclosed = payload({
+      ...afterResubmission,
+      workflow_state: "awaiting_document",
+      workflow_state_label: "Awaiting document",
+      parties: afterResubmission.parties.map((p) => ({ ...p, awaiting_document: null })),
+      document_requests: null,
+    });
+    tracker.mockResolvedValue({ data: undisclosed });
+    const { container } = renderTracker();
+
+    for (const party of [/^ierc/i, /^ktto/i, /^itso/i]) {
+      const row = await partyRow(party);
+      expect(row).not.toHaveTextContent(/awaiting document/i);
+      expect(row).not.toHaveTextContent("◐");
+    }
+    expect(screen.queryByRole("list", { name: /document requests/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /document requests/i })).not.toBeInTheDocument();
+
+    await expectNoBlockingA11yViolations(container);
+  });
+
   it("says when routing history begins", async () => {
     tracker.mockResolvedValue({ data: thesisAtIntake });
     renderTracker();

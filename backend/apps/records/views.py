@@ -396,7 +396,9 @@ class RecordViewSet(viewsets.ModelViewSet):
         POST /records/<id>/document-requests/ -- a holder asks the owner for documents
 
         ADR-022 §5, IR-262. `get_object()` resolves through `visible_to()`, so a
-        viewer without access gets a 404 on both. Creating one further needs an
+        viewer without access gets a 404 on both. Listing further needs
+        participation (`may_read_requests`, IR-349): a visible record the user
+        took no part in is a 403. Creating one further needs an
         active assignment the user can staff; a visible record the user does
         not hold is a 403.
 
@@ -412,6 +414,12 @@ class RecordViewSet(viewsets.ModelViewSet):
         staff = is_staff_viewer(request.user)
 
         if request.method == "GET":
+            # Internal workflow data (IR-349): a visible Record is not enough.
+            if not document_requests.may_read_requests(record, request.user):
+                return Response(
+                    {"detail": "Only the owner and the parties involved may read these requests."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             return Response([
                 document_requests.payload(r, staff_viewer=staff)
                 for r in document_requests.requests_for(record)
