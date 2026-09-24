@@ -118,7 +118,11 @@ python manage.py load_corpus <dir> --dry-run             # bulk-load PDFs as Rec
                                    # itself — the viewset hook that normally does this does not fire
                                    # for ORM writes. Needs Docling + a worker on the `extraction`
                                    # queue to complete; chunking is queued automatically after.
-                                   # No vendor account needed: chunking does not embed
+                                   # No vendor account needed: chunking does not embed.
+                                   # Verified on the dev database 2026-09-25: a 20-paper, 4-category
+                                   # corpus loaded 12 new records (8 already present from an earlier
+                                   # partial load, correctly skipped) and every one extracted and
+                                   # chunked cleanly — 354 chunks, zero failures
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 python manage.py backfill_embeddings --dry-run           # what indexing the corpus would cost (IR-282).
                                    # Prints records/chunks/tokens and an approximate cost, then stops.
