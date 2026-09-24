@@ -58,27 +58,6 @@ def authorize_record_documents(request, record_id):
     return record, None
 
 
-def _slot_for_record(record, slot_id):
-    """
-    Resolve `slot_id` as a slot this record's files may go in. Returns
-    `(slot, None)` or `(None, 404 Response)`.
-
-    Another record's ad-hoc slot (ADR-022 §3) answers exactly like a missing
-    slot: it is no place for this file, and the refusal confirms nothing.
-    """
-    from .requests import slot_accepts_uploads_for
-
-    try:
-        slot = UploadSlot.objects.get(pk=slot_id)
-    except (UploadSlot.DoesNotExist, ValueError, TypeError):
-        slot = None
-    if slot is None or not slot_accepts_uploads_for(slot, record):
-        return None, Response(
-            {"detail": "Record or slot not found."}, status=status.HTTP_404_NOT_FOUND,
-        )
-    return slot, None
-
-
 class SubmitDocumentView(APIView):
     """
     POST /api/v1/documents/submit/
@@ -89,12 +68,9 @@ class SubmitDocumentView(APIView):
     without blocking the response.
 
     Request (multipart/form-data):
-        record        — Record PK
-        slot          — UploadSlot PK (optional with request_item)
-        request_item  — DocumentRequestItem PK, when the file answers a
-                        reviewer's document request (ADR-022 §3.2, IR-262).
-                        The slot is then taken from the item.
-        file          — PDF file
+        record  — Record PK
+        slot    — UploadSlot PK
+        file    — PDF file
 
     Response 201:
         upload      — RecordUpload data
@@ -107,11 +83,10 @@ class SubmitDocumentView(APIView):
 
         record_id = request.data.get("record")
         slot_id   = request.data.get("slot")
-        item_id   = request.data.get("request_item")
         file      = request.FILES.get("file")
 
         # --- Basic presence check ---
-        if not all([record_id, slot_id or item_id, file]):
+        if not all([record_id, slot_id, file]):
             return Response(
                 {"detail": "record, slot, and file are required."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -142,26 +117,16 @@ class SubmitDocumentView(APIView):
         if denied:
             return denied
 
-        # --- Persist the upload: against a request item, or into a slot ---
-        if item_id:
-            # ADR-022 §3.2. One transaction from resolving the item to marking
-            # it uploaded, with the item locked, so two uploads cannot both
-            # answer it and the request cannot close in between.
-            from django.db import transaction
-            from .requests import DocumentRequestError, fulfil_item, resolve_item_for_upload
+        # --- Persist the upload ---
+        try:
+            slot = UploadSlot.objects.get(pk=slot_id)
+        except (UploadSlot.DoesNotExist, ValueError, TypeError):
+            return Response(
+                {"detail": "Record or slot not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-            try:
-                with transaction.atomic():
-                    item, slot = resolve_item_for_upload(record, item_id, slot_id)
-                    upload = create_upload(record, slot, file, uploaded_by=request.user)
-                    fulfil_item(item, upload, uploaded_by=request.user)
-            except DocumentRequestError as exc:
-                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            slot, missing = _slot_for_record(record, slot_id)
-            if missing:
-                return missing
-            upload = create_upload(record, slot, file, uploaded_by=request.user)
+        upload = create_upload(record, slot, file, uploaded_by=request.user)
 
         # --- Create extraction tracker and queue the background task ---
         # Every seeded UploadSlot is supplementary -- an Ethics Clearance
@@ -188,9 +153,7 @@ class UploadSlotListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Ad-hoc slots belong to one record's document request (ADR-022 §3),
-        # never to a type's list.
-        qs = UploadSlot.objects.filter(record__isnull=True).order_by("pk")
+        qs = UploadSlot.objects.all()
         rt = self.request.query_params.get("record_type")
         if rt:
             qs = qs.filter(record_type_id=rt)
@@ -214,12 +177,7 @@ class RecordSlotListView(APIView):
         record, denied = authorize_record_documents(request, pk)
         if denied:
             return denied
-        from django.db.models import Q
-
-        # The type's slots, plus this record's own ad-hoc ones (ADR-022 §3).
-        slots = UploadSlot.objects.filter(
-            Q(record__isnull=True) | Q(record=record), record_type=record.record_type,
-        )
+        slots = UploadSlot.objects.filter(record_type=record.record_type)
         data  = SlotWithUploadsSerializer(slots, many=True, context={"record_id": pk, "request": request}).data
         return Response(data)
 
@@ -315,9 +273,10 @@ class RecordUploadCreateView(APIView):
         if denied:
             return denied
 
-        slot, missing = _slot_for_record(record, slot_id)
-        if missing:
-            return missing
+        try:
+            slot = UploadSlot.objects.get(pk=slot_id)
+        except (UploadSlot.DoesNotExist, ValueError, TypeError):
+            return Response({"detail": "Slot not found."}, status=status.HTTP_404_NOT_FOUND)
 
         upload = create_upload(record, slot, file, uploaded_by=request.user)
         create_audit_event(

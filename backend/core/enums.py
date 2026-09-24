@@ -228,35 +228,6 @@ class ResubmissionRequestState(models.TextChoices):
     WITHDRAWN = "withdrawn", "Withdrawn"
 
 
-class DocumentRequestState(models.TextChoices):
-    """
-    Where one party's request for documents stands. `DocumentRequest.state`.
-
-    ADR-022 §1. `OPEN` holds the record at `awaiting_document`; `FULFILLED`
-    means every item has an upload; `WITHDRAWN` is the requesting party
-    dropping it, or a decision closing it (§3, §4).
-    """
-
-    OPEN = "open", "Open"
-    FULFILLED = "fulfilled", "Fulfilled"
-    WITHDRAWN = "withdrawn", "Withdrawn"
-
-
-class DocumentRequestItemState(models.TextChoices):
-    """
-    One requested document. `DocumentRequestItem.state`.
-
-    ADR-022 §1 and §3. The owner's upload moves `MISSING` to `UPLOADED`; the
-    requesting party's review moves it to `ACCEPTED`, or back to `MISSING` by
-    way of `REJECTED` (IR-263).
-    """
-
-    MISSING = "missing", "Missing"
-    UPLOADED = "uploaded", "Uploaded"
-    ACCEPTED = "accepted", "Accepted"
-    REJECTED = "rejected", "Rejected"
-
-
 class WorkflowState(models.TextChoices):
     """
     Where an in-review record stands, as the API states it (ADR-021 §4).

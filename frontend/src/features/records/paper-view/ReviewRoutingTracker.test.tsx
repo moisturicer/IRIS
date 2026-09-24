@@ -47,7 +47,6 @@ function row(
     outcome_label: null,
     at: state === "not_requested" || state === "awaiting" ? null : "2026-09-18T02:00:00Z",
     preserved: false,
-    awaiting_document: false,
     ...extra,
   };
 }
@@ -241,39 +240,6 @@ describe("ReviewRoutingTracker", () => {
     expect(request).toHaveTextContent(/ierc/i);
     expect(request).toHaveTextContent(/resubmitted/i);
     expect(request).toHaveTextContent("Consent form is missing.");
-  });
-
-  it("marks a party waiting on a document and lists the request (IR-262)", async () => {
-    const awaitingDocument = payload({
-      ...afterResubmission,
-      workflow_state: "awaiting_document",
-      workflow_state_label: "Awaiting document",
-      parties: afterResubmission.parties.map((p) =>
-        p.party === "ierc" ? { ...p, awaiting_document: true } : p,
-      ),
-      document_requests: [{
-        id: 5, party: "ierc", label: "IERC", state: "open", state_label: "Open",
-        message: "Rescan the consent form.", requested_by: "Ivy Ethics",
-        created_at: "2026-09-20T02:00:00Z", closed_at: null,
-        items: [{
-          id: 51, slot: null, label: "Consent form", state: "missing",
-          state_label: "Missing", upload: null, uploaded_at: null,
-        }],
-      }],
-    });
-    tracker.mockResolvedValue({ data: awaitingDocument });
-    const { container } = renderTracker();
-
-    expect(await partyRow(/^ierc/i)).toHaveTextContent(/awaiting document/i);
-    expect(await partyRow(/^ktto/i)).not.toHaveTextContent(/awaiting document/i);
-
-    const list = screen.getByRole("list", { name: /document requests/i });
-    const [request] = within(list).getAllByRole("listitem");
-    expect(request).toHaveTextContent("IERC asked for Consent form");
-    expect(request).toHaveTextContent("Open");
-    expect(request).toHaveTextContent("Rescan the consent form.");
-
-    await expectNoBlockingA11yViolations(container);
   });
 
   it("says when routing history begins", async () => {

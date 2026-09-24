@@ -10,9 +10,9 @@ all from persisted rows. Record detail gains three of those answers,
 **Seam: the records API** (IR-255's confirmed seam). Records are driven through
 the real submit / review / resubmit endpoints, so the shadow rows IR-257
 dual-writes are the ones the tracker reads -- nothing here builds an assignment
-by hand. `awaiting_document`'s precedence is pinned on the pure derivation
-below; reaching it over HTTP is `apps/documents/tests/test_document_requests.py`
-(IR-262).
+by hand. The one exception is `awaiting_document`: its table is IR-262's, so no
+request can reach that rule yet, and it is pinned on the pure derivation
+instead.
 
 **Deliberately not built on `test_workflow_characterisation`'s base.** IR-260
 retires that suite; this one has to outlive it.
@@ -317,8 +317,8 @@ class WorkflowStatePrecedenceTests(TrackerTestBase):
 
 class DeriveWorkflowStateTests(SimpleTestCase):
     """
-    Where `awaiting_document` ranks, pinned on the pure derivation. An open
-    `DocumentRequest` reaching it end to end is `test_document_requests.py`.
+    The one rule no request can reach yet. `DocumentRequest` is IR-262's table,
+    so the derivation takes the count as a fact and this pins where it ranks.
     """
 
     def derive(self, **facts):

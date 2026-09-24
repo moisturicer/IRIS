@@ -152,31 +152,6 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         recordedFrom={data.routing_recorded_from}
       />
 
-      {data.document_requests.length > 0 && (
-        <div>
-          <h3
-            id="tracker-document-requests-label"
-            className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1.5"
-          >
-            Document requests
-          </h3>
-          <ol aria-labelledby="tracker-document-requests-label" className="space-y-2">
-            {data.document_requests.map((r) => (
-              <li key={r.id} className="text-[12px] text-stone-700">
-                <span className="font-bold text-stone-900">{r.label}</span> asked for{" "}
-                {r.items.map((i) => i.label).join(", ")}
-                {" · "}
-                <span className="font-semibold">{r.state_label}</span>
-                <span className="text-stone-500"> · {formatDate(r.created_at, "MMM d")}</span>
-                {r.message && (
-                  <p className="text-stone-600 mt-0.5 leading-relaxed break-words">“{r.message}”</p>
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-
       {data.resubmissions.length > 0 && (
         <div>
           <h3
@@ -204,14 +179,8 @@ function TrackerBody({ data }: { data: RecordTracker }) {
   );
 }
 
-/**
- * §9.1's ◐: the party asked the owner for a document and is waiting on it
- * (ADR-022). Overrides the state's glyph, not its words.
- */
-const AWAITING_DOCUMENT_META = { glyph: "◐", tone: "text-amber-700", muted: false };
-
 function PartyRow({ row }: { row: TrackerPartyRow }) {
-  const meta = row.awaiting_document ? AWAITING_DOCUMENT_META : STATE_META[row.state];
+  const meta = STATE_META[row.state];
   // An outcome is shown once there is one. "Pending" is not a conclusion.
   const outcome = row.outcome && row.outcome !== "pending" ? row.outcome : null;
 
@@ -239,9 +208,6 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
             <span className={cn("font-semibold", OUTCOME_TONE[outcome])}>
               · {row.outcome_label}
             </span>
-          )}
-          {row.awaiting_document && (
-            <span className="font-semibold text-amber-700">· Awaiting document</span>
           )}
           {row.preserved && (
             <span

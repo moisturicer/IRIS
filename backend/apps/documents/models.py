@@ -1,7 +1,4 @@
 from django.db import models
-from django.utils import timezone
-
-from core.enums import ASSIGNABLE_PARTIES, DocumentRequestItemState, DocumentRequestState
 
 
 class UploadSlot(models.Model):
@@ -9,21 +6,12 @@ class UploadSlot(models.Model):
     Defines what kind of document a record type requires.
     E.g. "Proposal" record type might require "Ethical Clearance", "Concept Paper", etc.
     Seed these via a data migration.
-
-    `record` is set only on an **ad-hoc** slot: one made for a document request's
-    free-text "Other" item (ADR-022 §3), so the file still belongs to a slot
-    rather than being a loose `RecordFile`. An ad-hoc slot is that record's
-    alone and is never on its type's list.
     """
     name        = models.CharField(max_length=200)
     record_type = models.ForeignKey(
         "records.RecordType", on_delete=models.CASCADE, related_name="upload_slots"
     )
     is_required = models.BooleanField(default=True)
-    record      = models.ForeignKey(
-        "records.Record", on_delete=models.CASCADE, null=True, blank=True,
-        related_name="adhoc_slots",
-    )
 
     def __str__(self):
         return f"{self.record_type.name} | {self.name}"
@@ -217,80 +205,3 @@ class RecordFile(models.Model):
 
     def __str__(self):
         return self.filename
-
-
-# ---------------------------------------------------------------------------
-# Document requests (ADR-022, IR-262)
-#
-# A reviewer asking the owner for specific documents without a resubmission.
-# Like ADR-021's tables, nothing deletes from these: a request changes `state`
-# and the row is the history. The record's `awaiting_document` state is derived
-# from open rows here and never stored.
-# ---------------------------------------------------------------------------
-
-class DocumentRequest(models.Model):
-    """One party asking the owner for documents. ADR-022 §1."""
-
-    record       = models.ForeignKey(
-        "records.Record", on_delete=models.CASCADE, related_name="document_requests"
-    )
-    #: The assignment the request was made under. `party` is stored as well,
-    #: because the assignment may close while the request is still open.
-    assignment   = models.ForeignKey(
-        "reviews.RecordAssignment", on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="document_requests",
-    )
-    party        = models.CharField(
-        max_length=20, choices=[(p.value, p.label) for p in ASSIGNABLE_PARTIES]
-    )
-    requested_by = models.ForeignKey(
-        "accounts.User", on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="document_requests_made",
-    )
-    #: Why, shown to the owner as written. Plain text, never markup.
-    message      = models.TextField()
-    state        = models.CharField(
-        max_length=20, choices=DocumentRequestState.choices,
-        default=DocumentRequestState.OPEN,
-    )
-    created_at   = models.DateTimeField(default=timezone.now)
-    closed_at    = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ["record", "created_at", "pk"]
-        indexes  = [models.Index(fields=["record", "state"])]
-
-    def __str__(self):
-        return f"Record {self.record_id} | {self.party} | {self.state}"
-
-
-class DocumentRequestItem(models.Model):
-    """One document asked for. ADR-022 §1."""
-
-    request    = models.ForeignKey(
-        DocumentRequest, on_delete=models.CASCADE, related_name="items"
-    )
-    #: Chosen from the picklist. Null for a free-text "Other" item.
-    slot       = models.ForeignKey(
-        UploadSlot, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="request_items",
-    )
-    #: `slot.name` for a picklist item, the reviewer's words for "Other".
-    label      = models.CharField(max_length=200)
-    #: The upload that answered it. `SET_NULL`: deleting a file version must
-    #: not delete the record that it was asked for.
-    upload     = models.ForeignKey(
-        RecordUpload, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="request_items",
-    )
-    state      = models.CharField(
-        max_length=20, choices=DocumentRequestItemState.choices,
-        default=DocumentRequestItemState.MISSING,
-    )
-    sort_order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ["request", "sort_order", "pk"]
-
-    def __str__(self):
-        return f"Request {self.request_id} | {self.label} | {self.state}"

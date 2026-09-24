@@ -3,7 +3,6 @@ import type {
   RecordListItem, RecordDetail, RecordFormData,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest, RecordTracker,
-  DocumentRequest, DocumentRequestItemInput, DocumentRequestSlot, Party,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -36,18 +35,6 @@ export const recordsApi = {
    * not a RecordListItem.
    */
   tracker:        (id: number) => apiClient.get<RecordTracker>(`/records/${id}/tracker/`),
-
-  /** Document requests on a record, oldest first (ADR-022 §5, IR-262). */
-  documentRequests: (id: number) =>
-    apiClient.get<DocumentRequest[]>(`/records/${id}/document-requests/`),
-  /** A holder asks the owner for documents. `party` only when holding two. */
-  createDocumentRequest: (
-    id: number,
-    body: { message: string; items: DocumentRequestItemInput[]; party?: Party },
-  ) => apiClient.post<DocumentRequest>(`/records/${id}/document-requests/`, body),
-  /** The picklist: the record type's upload slots. */
-  documentRequestSlots: (id: number) =>
-    apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),
   similar:        (id: number) =>
     apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
   create:         (data: RecordFormData) => apiClient.post<RecordDetail>("/records/", data),

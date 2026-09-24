@@ -69,8 +69,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     workflow_state_label = serializers.SerializerMethodField()
     current_holders      = serializers.SerializerMethodField()
     can_act              = serializers.SerializerMethodField()
-    # The parties this viewer may ask the owner for documents as (IR-262).
-    can_request_document = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -96,9 +94,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
     def get_can_act(self, obj):
         return self._workflow(obj)["can_act"]
-
-    def get_can_request_document(self, obj):
-        return self._workflow(obj)["can_request_document"]
 
     def get_reviews(self, obj):
         from apps.reviews.models import Review
@@ -220,7 +215,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "your_office", "your_office_label",
             "workflow_state", "workflow_state_label", "current_holders", "can_act",
-            "can_request_document",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
