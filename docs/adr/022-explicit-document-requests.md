@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-09-15. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
+**Accepted** — 2026-09-15 · **amended 2026-09-24, §Amendment (fulfilment and refusals)**. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
 takes effect when [PR #81](https://github.com/moisturicer/IRIS/pull/81) merges. Tracked on
 [IR-254](https://citiris.atlassian.net/browse/IR-254); implemented by
 [IR-262](https://citiris.atlassian.net/browse/IR-262) (backend) and
@@ -174,6 +174,25 @@ PATCH  /api/v1/document-request-items/<id>/        accept / reject (requesting p
 Uploading uses the existing documents endpoint with a `request_item` parameter. It is not a
 second upload path.
 
+## Amendment — 2026-09-24: who fulfils a request, how, and what a refusal says
+
+Settled by **Lee Jasmin Adolfo** after the post-merge review of IR-262 ([PR #117](https://github.com/moisturicer/IRIS/pull/117)). IR-262 implemented §1–§3 and §5 as written. This amendment changes §3 in two ways, adds one route to §5, and writes down the refusal convention §Security Impact relied on without stating it.
+
+**1. The owner may fulfil a request through the ordinary upload.** It amends §3.2. When the Record owner uploads a requested **canonical** document to its slot through the normal Documents flow (`POST /documents/submit/` or `/documents/uploads/create/` with `slot`), every open request item asking for that slot on that Record is answered. The owner is not required to use the Action required panel. A free-text **Other** item has no canonical slot to infer, so it still needs `request_item`. As implemented in IR-262, only a `request_item` upload counts, which leaves a request stalled after the owner has in fact provided the document (§4). **Not yet built:** [IR-346](https://citiris.atlassian.net/browse/IR-346).
+
+**2. The requesting party cannot fulfil its own request.** It amends §3. Fulfilment is by the Record owner or an authorised submitter. A reviewer or office that asked for a document may accept, reject or withdraw (§3.4, §4). It may **not** answer its own request by uploading the file just because staff have generic document-upload permission (`authorize_record_documents` admits every office). As implemented in IR-262, any staff upload against an item fulfils it. **Not yet built:** [IR-263](https://citiris.atlassian.net/browse/IR-263) (for `request_item` uploads) and IR-346 (for slot uploads).
+
+**3. The picklist route.** It adds to §5. `GET /api/v1/records/<id>/document-requests/slots/` serves the record type's upload slots, excluding any ad-hoc slot. It is served per Record because Record detail names its type rather than giving its id, and because Advisers cannot use the documents app's per-record slot listing. Record detail also carries `can_request_document`, the parties the viewer may ask as. Both shipped in IR-262.
+
+**4. 404 versus 403. The existing behaviour is kept and stated.**
+
+| Response | Means | Where |
+|---|---|---|
+| **404** | The caller cannot see the Record or object at all. The response is identical to a missing id, so it confirms nothing (IR-153). | Listing requests, creating one, and the picklist, for a Record outside `visible_to()`. An upload naming a request item of another Record. |
+| **403** | The caller can see the Record but may not perform this action on it. | Creating a request on a visible Record the caller does not hold (§Security Impact). Uploading through the documents endpoints without owner-or-staff access, per `authorize_record_documents`'s deliberate 403. The owner-only fulfilment refusal in point 2. |
+
+No authorization code changes with this amendment. Where the documents endpoints answer 403 to a caller who could not see the Record, that is `authorize_record_documents`' existing rule (the caller named the Record id themselves, so a 404 hides nothing). IR-262's "users without access get 404" acceptance criterion is read against the document-request routes, not the documents app's upload route.
+
 ## Alternatives Considered
 
 **Keep asking in a decline comment (the status quo).** Rejected because of the three side effects
@@ -258,4 +277,4 @@ FR-M2-01 (partially) · FR-M5-03 · NFR-U2. These IDs are stable labels only.
 
 ## Related Tasks
 
-IR-254 · IR-262 · IR-263 · IR-118 (still deferred) · IR-144, IR-216 · ADR-018 §Status.
+IR-254 · IR-262 · IR-263 · IR-346 · IR-118 (still deferred) · IR-144, IR-216 · ADR-018 §Status.
