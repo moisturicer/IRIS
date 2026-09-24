@@ -12,8 +12,9 @@ the real submit and review endpoints, so the assignments a request is checked
 against are the ones IR-257 dual-writes. Uploads go through the existing
 `/documents/submit/` endpoint, because ADR-022 adds no second upload path.
 
-Accepting, rejecting and withdrawing (ADR-022 §3.4, §4) are IR-263's. A
-decision closing open requests (§3) is IR-270's.
+Accepting, rejecting and withdrawing (ADR-022 §3.4, §4), and the rule that
+only the owner fulfils, are IR-263's: `test_document_request_decisions.py`.
+A decision closing open requests (§3) is IR-270's.
 """
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -183,7 +184,9 @@ class UploadsFulfilTheRequestTests(DocumentRequestTestBase):
             record, self.ierc,
             [{"slot": self.slot(record, "Ethics Clearance").pk}, {"label": "Consent form"}],
         )
-        before = Notification.objects.filter(broadcast_to_role=self.ierc.role).count()
+        # The same filter on both sides (IR-263): this Record's IERC broadcasts.
+        notices = Notification.objects.filter(broadcast_to_role=self.ierc.role, record=record)
+        before = notices.count()
 
         for item in data["items"]:
             self.uploaded(record, item["id"])
@@ -191,7 +194,6 @@ class UploadsFulfilTheRequestTests(DocumentRequestTestBase):
         [request] = self.listed(record)
         self.assertEqual(request["state"], "fulfilled")
         self.assertIsNotNone(request["closed_at"])
-        notices = Notification.objects.filter(broadcast_to_role=self.ierc.role, record=record)
         self.assertEqual(notices.count(), before + 1)
         self.assertIn("uploaded", notices.latest("created_at").message)
 
@@ -403,6 +405,26 @@ class ValidationTests(DocumentRequestTestBase):
         response = self.request_documents(record, self.ierc, [{"slot": proposal_slot.pk}])
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_blank_slot_beside_a_label_is_an_other_item(self):
+        # Kept when input moved onto a serializer (IR-263).
+        record = self.at_parallel_review()
+
+        data = self.requested(record, self.ierc, [{"slot": "", "label": "Consent form"}])
+
+        self.assertIsNone(data["items"][0]["slot"])
+        self.assertEqual(data["items"][0]["label"], "Consent form")
+
+    def test_a_slot_that_is_not_an_id_is_refused_as_not_on_the_picklist(self):
+        record = self.at_parallel_review()
+
+        response = self.request_documents(record, self.ierc, [{"slot": "ethics"}])
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"],
+            "That document is not one this record type can be asked for.",
+        )
 
     def test_an_item_needs_a_slot_or_a_label(self):
         record = self.at_parallel_review()

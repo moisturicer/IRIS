@@ -471,9 +471,8 @@ def _resubmissions(record, *, staff: bool) -> list[dict]:
 
 def tracker_payload(record, user) -> dict[str, Any]:
     """`GET /records/<id>/tracker/` -- §8.1 of the architecture doc."""
-    from apps.documents.requests import (
-        may_read_requests, payload as document_request_payload, requests_for,
-    )
+    from apps.documents.request_serializers import serialize_requests
+    from apps.documents.requests import may_read_requests, requests_for
 
     staff = is_staff_viewer(user)
     # Document requests are internal workflow data (IR-349). A viewer who may
@@ -512,9 +511,9 @@ def tracker_payload(record, user) -> dict[str, Any]:
             for r in reviews
         ],
         "resubmissions": _resubmissions(record, staff=staff),
-        "document_requests": [
-            document_request_payload(r, staff_viewer=staff) for r in requests_for(record)
-        ] if disclose_requests else None,
+        "document_requests": (
+            serialize_requests(record, user, requests_for(record)) if disclose_requests else None
+        ),
         "clearances": [
             clearance_payload(c, last_resubmitted_at=record.last_resubmitted_at)
             for c in clearances

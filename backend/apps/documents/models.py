@@ -288,6 +288,12 @@ class DocumentRequestItem(models.Model):
         default=DocumentRequestItemState.MISSING,
     )
     sort_order = models.PositiveIntegerField(default=0)
+    #: The requesting party's reason, the last time it rejected an upload
+    #: (ADR-022 §3.4, IR-263). The item itself goes back to `missing`, so this
+    #: is what tells the owner why. Plain text, never markup.
+    rejection_reason = models.TextField(blank=True, default="")
+    #: When the requesting party last accepted or rejected an upload.
+    decided_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["request", "sort_order", "pk"]

@@ -10,6 +10,7 @@ urlpatterns = [
     path("api/v1/records/",       include("apps.records.urls")),
     path("api/v1/reviews/",       include("apps.reviews.urls")),
     path("api/v1/documents/",     include("apps.documents.urls")),
+    path("api/v1/",               include("apps.documents.urls_requests")),  # ADR-022 §5
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/audit/",         include("apps.audit.urls")),
     path("api/v1/ai/",            include("apps.ai.urls")),

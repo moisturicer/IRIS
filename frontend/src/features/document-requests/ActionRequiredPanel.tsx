@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { cn, formatDate } from "@/lib/utils";
+import { errorDetail } from "./errorDetail";
 import type { DocumentRequest, DocumentRequestItem, DocumentRequestItemState } from "@/types/records";
 
 interface ActionRequiredPanelProps {
@@ -19,13 +20,6 @@ const ITEM_TONE: Record<DocumentRequestItemState, string> = {
   rejected: "text-red-800 bg-red-100",
 };
 
-function detailOf(err: unknown): string {
-  return (
-    (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-    "The upload failed. Please try again."
-  );
-}
-
 /**
  * The owner's list of what reviewers have asked them to provide (IR-262,
  * ADR-022 §3, workflow_routing_architecture.md §9.3).
@@ -39,11 +33,18 @@ function detailOf(err: unknown): string {
  * A request the owner fulfils **during this visit** stays on screen, marked
  * fulfilled, so the last upload visibly lands somewhere instead of the whole
  * entry vanishing. On the next visit it is gone from here and lives on in the
- * tracker's document-request history.
+ * tracker's document-request history. A withdrawn request is never shown: the
+ * reviewer no longer needs it (IR-263).
+ *
+ * An upload the requesting party rejected is back to missing, with the
+ * reviewer's reason beside it and the upload control offered again (ADR-022
+ * §3.4). A list that fails to load says so: an empty panel would read as
+ * "nothing required", which is exactly the wrong thing to tell an owner.
  */
 export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanelProps) {
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
+  const [failed, setFailed] = useState(false);
   /** Ids of requests seen open since this panel mounted. */
   const seenOpen = useRef<Set<number>>(new Set());
 
@@ -54,8 +55,9 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
         .then(({ data }) => {
           data.filter((r) => r.state === "open").forEach((r) => seenOpen.current.add(r.id));
           setRequests(data);
+          setFailed(false);
         })
-        .catch(() => setRequests([])),
+        .catch(() => setFailed(true)),
     [recordId],
   );
 
@@ -63,8 +65,19 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
     void load();
   }, [load]);
 
+  if (failed) {
+    return (
+      <p
+        role="alert"
+        className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900"
+      >
+        Could not load the documents reviewers asked for. Reload the page to try again.
+      </p>
+    );
+  }
+
   const shown = (requests ?? []).filter(
-    (r) => r.state === "open" || seenOpen.current.has(r.id),
+    (r) => r.state === "open" || (r.state === "fulfilled" && seenOpen.current.has(r.id)),
   );
   if (shown.length === 0) return null;
   const anyOpen = shown.some((r) => r.state === "open");
@@ -124,7 +137,13 @@ function RequestEntry({
       </p>
       <ul aria-labelledby={listId} className="mt-3 divide-y divide-stone-100">
         {request.items.map((item) => (
-          <ItemRow key={item.id} recordId={recordId} item={item} onUploaded={onUploaded} />
+          <ItemRow
+            key={item.id}
+            recordId={recordId}
+            item={item}
+            asker={request.label}
+            onUploaded={onUploaded}
+          />
         ))}
       </ul>
     </article>
@@ -134,10 +153,13 @@ function RequestEntry({
 function ItemRow({
   recordId,
   item,
+  asker,
   onUploaded,
 }: {
   recordId: number;
   item: DocumentRequestItem;
+  /** Who asked, as the server words it. */
+  asker: string;
   onUploaded: () => Promise<void>;
 }) {
   const inputId = useId();
@@ -152,7 +174,7 @@ function ItemRow({
       await documentsApi.uploadForRequestItem(recordId, item.id, file);
       await onUploaded();
     } catch (err) {
-      setError(detailOf(err));
+      setError(errorDetail(err, "The upload failed. Please try again."));
     } finally {
       setUploading(false);
     }
@@ -196,6 +218,11 @@ function ItemRow({
           )}
         </span>
       </div>
+      {item.state === "missing" && item.rejection_reason && (
+        <p className="text-[12px] text-red-800 mt-1 break-words">
+          {asker} did not accept your last upload: “{item.rejection_reason}”
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-[12px] text-red-700 mt-1">
           {error}

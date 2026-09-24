@@ -40,15 +40,15 @@ function request(overrides: Partial<DocumentRequest> = {}): DocumentRequest {
     message: "The signed consent forms are missing.",
     requested_by: "Ivy Ethics",
     created_at: "2026-09-20T02:00:00Z",
-    closed_at: null,
+    closed_at: null, can_manage: false,
     items: [
       {
         id: 11, slot: 3, label: "Ethics Clearance", state: "missing",
-        state_label: "Missing", upload: null, uploaded_at: null,
+        state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
       },
       {
         id: 12, slot: null, label: "Consent form", state: "uploaded",
-        state_label: "Uploaded", upload: 40, uploaded_at: "2026-09-21T02:00:00Z",
+        state_label: "Uploaded", upload: 40, uploaded_at: "2026-09-21T02:00:00Z", rejection_reason: null, decided_at: null,
       },
     ],
     ...overrides,
@@ -156,6 +156,9 @@ describe("ActionRequiredPanel", () => {
     expect(
       await screen.findByText("<b>Bold</b> <img src=x onerror=alert(1)>"),
     ).toBeInTheDocument();
+    // Structural queries on purpose, and the one exception to querying the
+    // accessibility tree: what is proved here is that the message produced
+    // *no* elements, and an absent <b> or <img> has no role or name to find.
     expect(container.querySelector("b")).toBeNull();
     expect(container.querySelector("img")).toBeNull();
   });
@@ -168,6 +171,45 @@ describe("ActionRequiredPanel", () => {
 
     await waitFor(() => expect(documentRequests).toHaveBeenCalled());
     expect(screen.queryByRole("region", { name: "Action required" })).not.toBeInTheDocument();
+  });
+
+  it("shows the owner why an upload was rejected, with the upload offered again", async () => {
+    documentRequests.mockResolvedValue({
+      data: [request({
+        items: [{
+          ...request().items[0],
+          rejection_reason: "The scan is unreadable; please rescan at 300 dpi.",
+          decided_at: "2026-09-22T02:00:00Z",
+        }],
+      })],
+    });
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const panel = await screen.findByRole("region", { name: "Action required" });
+    const [row] = within(panel).getAllByRole("listitem");
+    expect(row).toHaveTextContent(
+      "IERC did not accept your last upload: “The scan is unreadable; please rescan at 300 dpi.”",
+    );
+    expect(within(row).getByLabelText("Upload Ethics Clearance")).toBeInTheDocument();
+  });
+
+  it("drops a withdrawn request", async () => {
+    documentRequests.mockResolvedValue({
+      data: [request({ state: "withdrawn", state_label: "Withdrawn" })],
+    });
+    const { container } = renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    await waitFor(() => expect(documentRequests).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("says so when the requests cannot be loaded, instead of showing nothing", async () => {
+    documentRequests.mockRejectedValue(new Error("Network Error"));
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /could not load the documents reviewers asked for/i,
+    );
   });
 
   it("has no blocking accessibility violations", async () => {

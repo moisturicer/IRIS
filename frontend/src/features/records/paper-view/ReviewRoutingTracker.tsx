@@ -164,13 +164,21 @@ function TrackerBody({ data }: { data: RecordTracker }) {
             {data.document_requests.map((r) => (
               <li key={r.id} className="text-[12px] text-stone-700">
                 <span className="font-bold text-stone-900">{r.label}</span> asked for{" "}
-                {r.items.map((i) => i.label).join(", ")}
+                {/* Each item with its state: accepted, still missing... (IR-263). */}
+                {r.items.map((i) => `${i.label} (${i.state_label})`).join(", ")}
                 {" · "}
                 <span className="font-semibold">{r.state_label}</span>
                 <span className="text-stone-500"> · {formatDate(r.created_at, "MMM d")}</span>
                 {r.message && (
                   <p className="text-stone-600 mt-0.5 leading-relaxed break-words">“{r.message}”</p>
                 )}
+                {r.items
+                  .filter((i) => i.rejection_reason)
+                  .map((i) => (
+                    <p key={i.id} className="text-stone-600 mt-0.5 leading-relaxed break-words">
+                      {r.label} rejected an upload of {i.label}: “{i.rejection_reason}”
+                    </p>
+                  ))}
               </li>
             ))}
           </ol>
