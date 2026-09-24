@@ -232,7 +232,30 @@ Uninvolved offices and public readers may not.
 - 403 on the list endpoint when the Record is visible but the data is not;
 - `null` in the tracker's `document_requests` for such a viewer.
 
-The exact definition of a "relevant" party, and whether the record-level `awaiting_document` status stays visible to every reader of the Record, are open on IR-349 for the project lead to confirm.
+**Who counts as relevant is decided by participation, not by role** (settled by Lee Jasmin Adolfo on 2026-09-24). A user may read a Record's document-request data only if at least one of these holds:
+- they own or submitted the Record;
+- they can staff a party that **currently holds** an assignment on the Record;
+- they can staff a party that **previously held**, or **acted on** (recorded a review, finding or clearance under), an assignment on the Record;
+- they **created or took part in** a document request on the Record: they are its `requested_by`, or they can staff its requesting party.
+
+**A role alone grants nothing.** Being an Adviser, RDCO, ITSO, IERC or KTTO user is not participation. So:
+
+| Who | Access to request data |
+|---|---|
+| A named Adviser never assigned to, or involved in, the Record | No |
+| RDCO before it has held or acted on the Record | No |
+| An office that actually held, reviewed or requested on the Record | Yes |
+| Owners and authorised submitters | Yes |
+| Public readers and uninvolved offices | No |
+
+**Record-level status stays; request details do not** (settled 2026-09-24). The generic `workflow_state` value `awaiting_document`, and its label, remain visible to anyone otherwise allowed to view the Record. That is ADR-021 §4's derived state, and the UI relies on it. It is the *only* document-request fact such a viewer learns. Anyone without request access must not be shown:
+- which office or party asked;
+- the messages;
+- the request or fulfilment history;
+- accept, reject or withdraw details;
+- any other request metadata.
+
+This includes the tracker's per-party `awaiting_document` flag, because it names the requesting party. For such a viewer the flag is `null`, meaning "not disclosed". Owners and participating parties see everything.
 
 ## Alternatives Considered
 
@@ -294,9 +317,11 @@ per record type.
 ## Security Impact
 
 - **Amended 2026-09-24 (§Amendment 5).** Document-request data is internal workflow data.
-  Only the Record's owners and authorised submitters, and the workflow parties relevant to the
-  request, may read it: through the list endpoint and through the tracker's `document_requests[]`
-  alike. Reading the Record, whether published or visible to an office through
+  Only the Record's owners and authorised submitters, and the workflow parties that actually
+  participated in the Record's workflow or in the request, may read it: through the list endpoint
+  and through the tracker's `document_requests[]` and per-party `awaiting_document` flag alike.
+  §Amendment 5 defines participation. A role alone is never enough. The generic
+  `workflow_state = awaiting_document` stays visible to anyone who may view the Record. Reading the Record, whether published or visible to an office through
   `visible_to()`, does not grant it. A caller who cannot see the Record gets a 404 (IR-153). A
   caller who can see the Record but not its requests gets a 403 from the list, and `null` in the
   tracker. This line originally said listing and reading go through `visible_to()`. IR-262
