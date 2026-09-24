@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, useLocation, Link } from "reac
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
@@ -26,6 +27,7 @@ import {
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
+import { PANE_MAX_HEIGHT, PANE_TOP } from "./paneLayout";
 
 // Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
 // and most visits to this screen never open the Paper tab at all. Splitting
@@ -660,12 +662,7 @@ export default function PaperViewPage() {
             {tab === "paper" ? (
               hasPaper ? (
                 <Suspense
-                  fallback={
-                    <div className="flex flex-col items-center gap-3 py-16">
-                      <i className="fas fa-circle-notch fa-spin text-[24px] text-stone-300" aria-hidden />
-                      <p className="text-[12px] text-stone-400">Loading the reader…</p>
-                    </div>
-                  }
+                  fallback={<Skeleton rows={8} label="Loading the reader…" />}
                 >
                   <PaperPdfReader
                     recordId={record.id}
@@ -806,7 +803,7 @@ export default function PaperViewPage() {
               than the window would hide its lower cards until the paper
               ended. */}
           {!chatDocked && (
-            <aside className="space-y-4 lg:sticky lg:top-[82px] lg:max-h-[calc(100vh-106px)] lg:overflow-y-auto">
+            <aside className={cn("space-y-4 lg:sticky lg:overflow-y-auto", PANE_TOP, PANE_MAX_HEIGHT)}>
               <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
               <PaperGovernance record={record} />
               <PaperDocuments recordId={record.id} files={record.files} />

@@ -68,7 +68,7 @@ no-restricted-syntax on /\[#6B0F12\]/ → "use bg-brand / text-brand"
 
 | Component | State | Change |
 |---|---|---|
-| `Button` | 5 variants × 3 sizes, `loading`, forwardRef | **Add `aria-label` requirement when children are icon-only** ([12](12-accessibility.md)) · use tokens |
+| `Button` | 5 variants × 5 sizes (`full` from IR-204, `icon` from IR-352), `loading`, forwardRef | ~~Add `aria-label` requirement when children are icon-only~~ **Done for `size="icon"` (IR-352): the type requires it** ([12](12-accessibility.md)) · use tokens |
 | `Input` | label, error, hint, leading, derived `id` | **Wire `aria-invalid` and `aria-describedby`** to the error/hint |
 | `Card` + `CardHeader` | Border, not shadow | Adopt `shadow-card`; keep the border option |
 | `Badge` | 6 variants, 11px, rounded-full | Keep |

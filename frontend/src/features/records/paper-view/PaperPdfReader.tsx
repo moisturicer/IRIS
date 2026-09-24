@@ -1,22 +1,33 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { recordsApi } from "@/api/records";
-import { downloadBlob } from "@/lib/utils";
-import { loadPdfDocument, renderPageToCanvas, type PdfPage } from "@/lib/pdf";
+import { Button, Skeleton } from "@/components/ui";
+import { useElementWidth } from "@/hooks/useElementWidth";
+import { cn, downloadBlob } from "@/lib/utils";
+import { loadPdfDocument, pageSize, renderPageToCanvas, type PdfPage } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 import { CitationOverlay } from "./CitationOverlay";
+import { PAGE_SCROLL_MARGIN, PANE_HEIGHT, READER_TOOLBAR_TOP } from "./paneLayout";
+import { MAX_SCALE, MIN_SCALE, fitScale } from "./readerGeometry";
+import { useReadingPosition } from "./useReadingPosition";
 
-const MIN_SCALE = 0.6;
-const MAX_SCALE = 2.4;
 const SCALE_STEP = 0.2;
+/** Used only until the pane has been measured, or where it cannot be. */
 const DEFAULT_SCALE = 1.3;
+/**
+ * A window drag reports a new width every frame, and each refit repaints
+ * every page. The first measurement applies at once, so the paper opens
+ * fitted; later ones wait for the width to settle.
+ */
+const REFIT_DELAY_MS = 120;
 
 /**
  * One rendered page: its own canvas, its own citation overlay, and a ref the
  * parent uses to scroll to it (IR-335).
  *
- * A page renders itself independently rather than the reader rendering all
- * pages in one pass, so a scale change or a re-mount cancels and restarts
- * only the pages actually visible to re-render, not the whole document.
+ * The box is sized from the page's own dimensions at the current zoom before
+ * the canvas paints (IR-352), so a zoom change moves every page at once
+ * instead of one by one as each render lands. That is also what lets the
+ * reader restore its position in the same frame.
  */
 function PdfPageView({
   page,
@@ -32,13 +43,13 @@ function PdfPageView({
   registerRef: (pageNumber: number, el: HTMLDivElement | null) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const { width, height } = pageSize(page, scale);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rendering = renderPageToCanvas(page, canvas, scale);
-    rendering.promise.then(setSize).catch(() => {
+    rendering.promise.catch(() => {
       /* a cancelled render rejects on purpose -- nothing to report */
     });
     return () => rendering.cancel();
@@ -55,13 +66,13 @@ function PdfPageView({
       // bare `<canvas>` -- inherently opaque to assistive tech -- does not.
       role="group"
       aria-label={`Page ${pageNumber}`}
-      // `scroll-mt` so a page scrolled to lands below the fixed header and the
-      // sticky toolbar (which ends ~112px down) instead of beneath them
-      // (IR-351). Landing on the passage itself is IR-354's.
-      className="relative mx-auto mb-4 scroll-mt-[120px] bg-white shadow-card border border-stone-200"
-      style={size ? { width: size.width, height: size.height } : { minHeight: 400 }}
+      className={cn(
+        "relative mx-auto mb-4 last:mb-0 bg-white shadow-card ring-1 ring-stone-200",
+        PAGE_SCROLL_MARGIN,
+      )}
+      style={{ width, height }}
     >
-      <canvas ref={canvasRef} className="block" />
+      <canvas ref={canvasRef} className="block w-full h-full" />
       <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
     </div>
   );
@@ -86,6 +97,13 @@ export interface PaperPdfReaderProps {
  * the iframe/native-plugin viewer ADR-025 found could not be drawn on or
  * scrolled to programmatically.
  *
+ * At `lg` and up it is a contained viewer (IR-352), like a document viewer's:
+ * a pane as tall as the viewport below the header, whose pages scroll inside
+ * it under a toolbar that never leaves. Below `lg` the page itself scrolls
+ * and the toolbar sticks under the header (IR-351), because a scroll area
+ * inside a scrolling page is awkward on touch. Either way the paper opens
+ * fitted to the width it has.
+ *
  * Fetched as a blob through `apiClient`, not a plain `<a href>`: the
  * manuscript endpoint requires `IsAuthenticated`, and only a request carrying
  * the bearer token in memory can reach it. The same blob backs the
@@ -98,12 +116,43 @@ export function PaperPdfReader({
   navKey,
 }: PaperPdfReaderProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [attempt, setAttempt] = useState(0);
   const [pages, setPages] = useState<PdfPage[]>([]);
-  const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [zoom, setZoom] = useState<number | "fit">("fit");
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadBytes, setDownloadBytes] = useState<Blob | null>(null);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const destroyRef = useRef<(() => Promise<void>) | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  // The scroll area is both measured and scrolled. A callback ref, so the
+  // one that replaces it after "Try again" is observed rather than the old.
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const [observeArea, paneWidth] = useElementWidth<HTMLDivElement>(REFIT_DELAY_MS);
+  const scrollAreaCallbackRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      scrollAreaRef.current = el;
+      observeArea(el);
+    },
+    [observeArea],
+  );
+
+  // Fitted to the widest page, so a landscape table page never overflows.
+  const baseWidth = useMemo(
+    () => pages.reduce((widest, page) => Math.max(widest, pageSize(page, 1).width), 0),
+    [pages],
+  );
+  const fitted = fitScale(baseWidth, paneWidth);
+  const scale = zoom === "fit" ? (fitted ?? DEFAULT_SCALE) : zoom;
+
+  const currentPage = useReadingPosition({
+    ready: status === "ready",
+    pageCount: pages.length,
+    scale,
+    pageRefs,
+    toolbarRef,
+    scrollAreaRef,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +191,7 @@ export function PaperPdfReader({
       void destroyRef.current?.();
       destroyRef.current = null;
     };
-  }, [recordId]);
+  }, [recordId, attempt]);
 
   useEffect(() => {
     return () => {
@@ -153,7 +202,8 @@ export function PaperPdfReader({
   useEffect(() => {
     if (status !== "ready" || scrollToPage == null) return;
     const target = pageRefs.current.get(scrollToPage);
-    target?.scrollIntoView({ block: "start", behavior: "smooth" });
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    target?.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
     // `navKey` deliberately in the dependency list with no other use: it is
     // what makes clicking the same citation twice scroll (and re-flash the
     // highlight, via CitationOverlay's fresh element) a second time.
@@ -164,8 +214,8 @@ export function PaperPdfReader({
     else pageRefs.current.delete(pageNumber);
   };
 
-  const zoomIn = () => setScale((s) => Math.min(MAX_SCALE, +(s + SCALE_STEP).toFixed(2)));
-  const zoomOut = () => setScale((s) => Math.max(MIN_SCALE, +(s - SCALE_STEP).toFixed(2)));
+  const zoomIn = () => setZoom(Math.min(MAX_SCALE, +(scale + SCALE_STEP).toFixed(2)));
+  const zoomOut = () => setZoom(Math.max(MIN_SCALE, +(scale - SCALE_STEP).toFixed(2)));
 
   const handleDownload = () => {
     if (downloadBytes) downloadBlob(downloadBytes, `record-${recordId}.pdf`);
@@ -173,69 +223,117 @@ export function PaperPdfReader({
 
   if (status === "error") {
     return (
-      <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <i className="fas fa-file-circle-exclamation text-[28px] text-stone-300" aria-hidden />
-        <p className="text-[13px] font-semibold text-stone-700">Could not load the paper</p>
-        <p className="text-[12px] text-stone-500">
-          The file could not be read. Try again, or use Documents in the sidebar.
+      <div className="flex flex-col items-center gap-3 py-16 px-6 text-center rounded-2xl border border-stone-200 bg-stone-50">
+        <i className="fas fa-file-circle-exclamation text-2xl text-stone-300" aria-hidden />
+        <p className="text-sm font-semibold text-stone-700">Could not load the paper</p>
+        <p className="text-xs text-stone-500 max-w-sm">
+          The file could not be read. Try again, or open it from Documents on the record.
         </p>
+        <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
+          <i className="fas fa-rotate-right" aria-hidden />
+          Try again
+        </Button>
       </div>
     );
   }
 
+  const ready = status === "ready";
+
   return (
-    <div className="flex flex-col">
-      {/* Sticks just below the fixed 58px app header (IR-351). */}
-      <div className="sticky top-[66px] z-10 flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-xl bg-white/90 backdrop-blur border border-stone-200">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
+    <div
+      className={cn(
+        "flex flex-col",
+        PANE_HEIGHT,
+        "lg:rounded-2xl lg:border lg:border-stone-200 lg:bg-stone-100 lg:overflow-hidden",
+      )}
+    >
+      <div
+        ref={toolbarRef}
+        className={cn(
+          "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
+          "rounded-xl bg-white/90 backdrop-blur border border-stone-200",
+          READER_TOOLBAR_TOP,
+          "lg:static lg:shrink-0 lg:mb-0 lg:rounded-none lg:border-0 lg:border-b lg:bg-white lg:backdrop-blur-none",
+        )}
+      >
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={zoomOut}
-            disabled={status !== "ready" || scale <= MIN_SCALE}
+            disabled={!ready || scale <= MIN_SCALE}
             aria-label="Zoom out"
-            className="w-7 h-7 rounded-md border border-stone-200 text-stone-600 hover:border-brand/40 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            <i className="fas fa-minus text-[10px]" aria-hidden />
-          </button>
-          <span className="text-[11px] font-semibold text-stone-500 w-10 text-center tabular-nums">
+            <i className="fas fa-minus" aria-hidden />
+          </Button>
+          {/* The percentage gives way below `sm`, so the toolbar keeps its
+              44px controls on one row at 360px. */}
+          <span className="hidden sm:inline text-2xs font-semibold text-stone-500 w-10 text-center tabular-nums">
             {Math.round(scale * 100)}%
           </span>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={zoomIn}
-            disabled={status !== "ready" || scale >= MAX_SCALE}
+            disabled={!ready || scale >= MAX_SCALE}
             aria-label="Zoom in"
-            className="w-7 h-7 rounded-md border border-stone-200 text-stone-600 hover:border-brand/40 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            <i className="fas fa-plus text-[10px]" aria-hidden />
-          </button>
+            <i className="fas fa-plus" aria-hidden />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setZoom("fit")}
+            disabled={!ready}
+            aria-label="Fit to width"
+            aria-pressed={zoom === "fit"}
+            title="Fit to width"
+          >
+            <i className="fas fa-arrows-left-right-to-line" aria-hidden />
+          </Button>
         </div>
 
-        {status === "ready" && (
-          <span className="text-[11px] text-stone-400">{pages.length} page{pages.length === 1 ? "" : "s"}</span>
+        {ready && (
+          <span className="text-xs font-semibold text-stone-600 tabular-nums">
+            Page {currentPage} / {pages.length}
+          </span>
         )}
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleDownload}
           disabled={!downloadBytes}
-          className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-600 hover:text-brand disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label="Download"
+          title="Download the paper"
         >
-          <i className="fas fa-download text-[10px]" aria-hidden />
-          Download
-        </button>
+          <i className="fas fa-download" aria-hidden />
+        </Button>
       </div>
 
-      {status === "loading" && (
-        <div className="flex flex-col items-center gap-3 py-16">
-          <i className="fas fa-circle-notch fa-spin text-[24px] text-stone-300" aria-hidden />
-          <p className="text-[12px] text-stone-400">Loading the paper…</p>
-        </div>
-      )}
+      {/* The pane's scroll area at `lg` and up; below it, just the pages.
+          Focusable and named either way, so a keyboard user can page
+          through it (axe: scrollable-region-focusable). */}
+      <div
+        ref={scrollAreaCallbackRef}
+        role="region"
+        aria-label={ready ? `Paper, ${pages.length} page${pages.length === 1 ? "" : "s"}` : "Paper"}
+        tabIndex={0}
+        className={cn(
+          "rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+          // A stable gutter, so the scrollbar appearing once the pages load
+          // does not narrow the pane and set off a second refit.
+          "lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:[scrollbar-gutter:stable] lg:rounded-none lg:p-4 lg:focus-visible:ring-inset",
+        )}
+      >
+        {status === "loading" && (
+          <div className="mx-auto max-w-2xl bg-white shadow-card ring-1 ring-stone-200">
+            <Skeleton rows={8} label="Loading the paper…" />
+          </div>
+        )}
 
-      {status === "ready" && (
-        <div>
-          {pages.map((page, index) => (
+        {ready &&
+          pages.map((page, index) => (
             <PdfPageView
               key={index + 1}
               page={page}
@@ -245,8 +343,7 @@ export function PaperPdfReader({
               registerRef={registerRef}
             />
           ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

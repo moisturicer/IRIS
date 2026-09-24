@@ -8,6 +8,7 @@ import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
 import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessageBubble";
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { cn } from "@/lib/utils";
+import { PANE_HEIGHT, PANE_TOP } from "./paneLayout";
 
 export type DockMode = "left" | "right" | "floating";
 
@@ -292,14 +293,14 @@ export function PaperChatPanel({
  * or the record's own rail. Below `lg` there is no room for a second column,
  * so it falls back to a bottom sheet.
  *
- * The offsets clear the fixed 58px `Header`: the panel sticks 24px below it
- * (82px) and is sized to what remains of the viewport less a 24px bottom
- * margin (106px), so its own header and composer are never hidden (IR-351).
+ * It shares the reader pane's offsets (`paneLayout.ts`): it sits below the
+ * fixed header, so its own header and composer are never hidden (IR-351),
+ * and it is exactly as tall as the reader beside it (IR-352).
  */
 export const DOCKED_PANEL_CLASS =
   "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-2xl " +
-  "lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-[82px] lg:z-auto " +
-  "lg:h-[calc(100vh-106px)] lg:w-[22rem] lg:shrink-0 lg:rounded-2xl";
+  `lg:sticky lg:inset-x-auto lg:bottom-auto ${PANE_TOP} lg:z-auto ` +
+  `${PANE_HEIGHT} lg:w-[22rem] lg:shrink-0 lg:rounded-2xl`;
 
 /** Positioning for the floating panel — deliberately overlays the page. */
 export const FLOATING_PANEL_CLASS =
