@@ -1,0 +1,83 @@
+/**
+ * The arithmetic behind the contained reader (IR-352): what zoom fits a page
+ * to its pane, and where the reader is, so a zoom change can put them back.
+ *
+ * Pure functions, so they are tested here without a DOM; jsdom has no layout,
+ * and the component tests can only check that the reader uses them.
+ */
+import { describe, expect, it } from "vitest";
+
+import { MAX_SCALE, MIN_SCALE, anchorDelta, fitScale, readingAnchor } from "./readerGeometry";
+
+describe("fitScale", () => {
+  it("fits a page's width to the pane, less the page's 1px border each side", () => {
+    // A US Letter page is 612pt wide at scale 1.
+    expect(fitScale(612, 808)).toBe(1.31);
+  });
+
+  it("rounds down, so the page never ends up a fraction wider than the pane", () => {
+    const scale = fitScale(612, 776) ?? Infinity;
+    expect(612 * scale + 2).toBeLessThanOrEqual(776);
+  });
+
+  it("stays within the zoom range the controls allow", () => {
+    expect(fitScale(612, 100)).toBe(MIN_SCALE);
+    expect(fitScale(612, 4000)).toBe(MAX_SCALE);
+  });
+
+  it("has nothing to fit to until the pane has been measured", () => {
+    expect(fitScale(612, 0)).toBeNull();
+    expect(fitScale(0, 800)).toBeNull();
+  });
+});
+
+describe("readingAnchor", () => {
+  // Three 1000px pages with a 16px gap, the view's top edge at y = 100.
+  const pages = [
+    { top: -1500, height: 1000 },
+    { top: -484, height: 1000 },
+    { top: 532, height: 1000 },
+  ];
+
+  it("names the page under the top of the view, and how far into it", () => {
+    expect(readingAnchor(pages, 100)).toEqual({ page: 2, fraction: 0.584 });
+  });
+
+  it("is the first page, from its top, before anything has scrolled", () => {
+    const unscrolled = [
+      { top: 150, height: 1000 },
+      { top: 1166, height: 1000 },
+    ];
+    expect(readingAnchor(unscrolled, 100)).toEqual({ page: 1, fraction: 0 });
+  });
+
+  it("moves on to the next page when the previous one ends a sub-pixel past the view's top", () => {
+    // A page scrolled to rests with the page above it ending exactly at the
+    // view's top edge; rounding can leave that edge a fraction past it.
+    const landed = [
+      { top: -899.8, height: 1000 },
+      { top: 116, height: 1000 },
+    ];
+    expect(readingAnchor(landed, 99.8)).toEqual({ page: 2, fraction: 0 });
+  });
+
+  it("is the last page once the view is past every page", () => {
+    expect(readingAnchor([{ top: -3000, height: 1000 }], 100)).toEqual({ page: 1, fraction: 1 });
+  });
+
+  it("is nothing when there are no pages", () => {
+    expect(readingAnchor([], 100)).toBeNull();
+  });
+});
+
+describe("anchorDelta", () => {
+  it("is how far to scroll so the same point of the page is back at the top of the view", () => {
+    // After a zoom the page is 1300px tall and its top moved to y = -200.
+    // 58.4% down it is at -200 + 759.2 = 559.2; the view's top is at 100.
+    expect(anchorDelta({ top: -200, height: 1300 }, 0.584, 100)).toBeCloseTo(459.2);
+  });
+
+  it("is zero when the point is already at the top of the view", () => {
+    expect(anchorDelta({ top: 100, height: 1000 }, 0, 100)).toBe(0);
+  });
+});
