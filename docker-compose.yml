@@ -93,7 +93,9 @@ services:
 
   # AI services
   docling:
-    image: quay.io/docling-project/docling-serve:latest
+    build:
+      context: ./docling
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "5001:5001"
@@ -120,7 +122,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4g
+          # 4g was sized before CodeFormula (IR-290): a single formula
+          # enrichment pass alone peaked at 95% of that cap, and
+          # DOCLING_SERVE_CONCURRENCY allows four such passes at once.
+          memory: 8g
 
   ai-gateway:
     build:
