@@ -196,6 +196,37 @@ def fulfil_item(item: DocumentRequestItem, upload, *, uploaded_by) -> DocumentRe
     return request
 
 
+def may_read_requests(record, user) -> bool:
+    """
+    May `user` read `record`'s document requests? (IR-349, ADR-022 §Amendment 5)
+
+    Document-request data is internal workflow data, so reading the Record --
+    published, or through `visible_to()` for an office -- is not enough. Access
+    is by **participation, never by role**: the user owns the Record, asked for
+    documents on it, or can staff a party that holds or held an assignment on
+    it, reviewed or signed a clearance on it, or asked for documents on it.
+
+    The one rule for every route that serves the data: the list endpoint and
+    the tracker's `document_requests` and per-party `awaiting_document`.
+    """
+    from apps.reviews.tracker import participating_parties, staffable_parties
+
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if record.owners.filter(user=user).exists():
+        return True
+    if DocumentRequest.objects.filter(record=record, requested_by=user).exists():
+        return True
+
+    staffable = staffable_parties(record, user)
+    if not staffable:
+        return False
+    requesting = set(
+        DocumentRequest.objects.filter(record=record).values_list("party", flat=True)
+    )
+    return bool(staffable & (participating_parties(record) | requesting))
+
+
 def payload(request: DocumentRequest, *, staff_viewer: bool) -> dict:
     """One request as the API and the tracker state it."""
     from apps.reviews.tracker import party_label

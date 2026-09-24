@@ -205,8 +205,12 @@ export interface TrackerPartyRow {
   outcome_label: string | null;
   at:            string | null;
   preserved:     boolean;
-  /** This party has an open document request and is waiting on it (◐). */
-  awaiting_document: boolean;
+  /**
+   * This party has an open document request and is waiting on it (◐). Null
+   * when the viewer may not read the record's document requests (IR-349):
+   * not disclosed, which is not the same as false.
+   */
+  awaiting_document: boolean | null;
 }
 
 export interface TrackerRoutingGroup {
@@ -246,7 +250,8 @@ export interface RecordTracker {
   routing_recorded_from: string | null;
   reviews:               TrackerReview[];
   resubmissions:         TrackerResubmission[];
-  document_requests:     DocumentRequest[];
+  /** Null when the viewer may not read them (IR-349) -- not "there are none". */
+  document_requests:     DocumentRequest[] | null;
   clearances:            RecordClearance[];
   resubmission:          RecordResubmission;
 }

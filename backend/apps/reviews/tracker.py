@@ -44,7 +44,9 @@ from core.enums import (
 from core.permissions import REVIEWER_ROLES, get_role_name
 
 from .clearance_state import clearance_payload, resubmission_payload
-from .models import RecordAssignment, ResubmissionRequest, Review, RoutingEvent
+from .models import (
+    RecordAssignment, RecordClearance, ResubmissionRequest, Review, RoutingEvent,
+)
 from .shadow import party_for_stage
 
 #: The statuses at which a record is in review. The five stage values and
@@ -63,7 +65,7 @@ IN_REVIEW_STATUSES = frozenset({
 
 #: Which parties a role can staff (ADR-021 §1). RDCO staffs two. An Adviser
 #: staffs `adviser` only on a record whose `adviser` is that user --
-#: `_staffable_parties` applies that per-record condition.
+#: `staffable_parties` applies that per-record condition.
 ROLE_TO_PARTIES = {
     RoleName.ADVISER: frozenset({Party.ADVISER}),
     RoleName.RDCO: frozenset({Party.INTAKE, Party.RDCO}),
@@ -206,11 +208,33 @@ def party_label(party: Optional[str], *, staff_viewer: bool) -> Optional[str]:
 
 # --- who may act --------------------------------------------------------------
 
-def _staffable_parties(record, user) -> frozenset:
+def staffable_parties(record, user) -> frozenset:
     parties = ROLE_TO_PARTIES.get(get_role_name(user), frozenset())
     if Party.ADVISER in parties and record.adviser_id != getattr(user, "pk", None):
         parties = parties - {Party.ADVISER}
     return frozenset(str(p) for p in parties)
+
+
+def participating_parties(record) -> frozenset:
+    """
+    The parties that have taken part in `record`'s review (IR-349): held an
+    assignment on it, active or closed, or acted -- recorded a `Review` under
+    their stage, or signed a clearance. A role that never did is not here.
+    """
+    parties = set(
+        RecordAssignment.objects.filter(record=record).values_list("party", flat=True)
+    )
+    for stage in Review.objects.filter(record=record).values_list("stage", flat=True).distinct():
+        party = party_for_stage(stage)
+        if party:
+            parties.add(str(party))
+    # `Party` spells the three clearance offices as `Office` does.
+    parties.update(
+        str(Party(office)) for office in
+        RecordClearance.objects.filter(record=record, reviewed_by__isnull=False)
+        .values_list("office", flat=True)
+    )
+    return frozenset(parties)
 
 
 def _legacy_gate_allows(record, user) -> frozenset:
@@ -249,7 +273,7 @@ def can_act(record, user, *, active_assignments: Optional[list] = None) -> list[
         return []
     active = active_assignments if active_assignments is not None else _active_assignments(record)
     held = {a.party for a in active}
-    eligible = held & _staffable_parties(record, user) & _legacy_gate_allows(record, user)
+    eligible = held & staffable_parties(record, user) & _legacy_gate_allows(record, user)
     return [str(p) for p in TRACKER_ORDER if str(p) in eligible]
 
 
@@ -264,7 +288,7 @@ def requestable_parties(record, user, *, active_assignments: Optional[list] = No
     if user is None or not getattr(user, "is_authenticated", False):
         return []
     active = active_assignments if active_assignments is not None else _active_assignments(record)
-    eligible = {a.party for a in active} & _staffable_parties(record, user)
+    eligible = {a.party for a in active} & staffable_parties(record, user)
     return [str(p) for p in TRACKER_ORDER if str(p) in eligible]
 
 
@@ -310,7 +334,9 @@ def workflow_fields(record, user) -> dict[str, Any]:
 
 # --- the tracker --------------------------------------------------------------
 
-def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list[dict]:
+def _party_rows(
+    record, *, reviews: list, clearances: list, staff: bool, disclose_requests: bool,
+) -> list[dict]:
     assignments: dict[str, RecordAssignment] = {}
     for a in RecordAssignment.objects.filter(record=record).order_by("opened_at", "pk"):
         assignments[a.party] = a  # last one wins: the party's latest turn
@@ -323,7 +349,9 @@ def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list
 
     clearance_by_office = {c.office: c for c in clearances}
     deciders = {str(p) for p in lifecycle.deciding_parties_for(record)}
-    awaiting_document = set(_open_document_request_parties(record))
+    awaiting_document = (
+        set(_open_document_request_parties(record)) if disclose_requests else None
+    )
 
     rows = []
     for member in TRACKER_ORDER:
@@ -374,8 +402,12 @@ def _party_rows(record, *, reviews: list, clearances: list, staff: bool) -> list
             # waiting on it. Independent of `state` -- a party may close its
             # assignment while its request stays open (ADR-022 §1). The key
             # is named for the workflow state this party is holding the record
-            # in (§8.1), so it is spelled through that enum.
-            WorkflowState.AWAITING_DOCUMENT.value: party in awaiting_document,
+            # in (§8.1), so it is spelled through that enum. It names the
+            # requesting party, so it is `None` -- not disclosed -- to a viewer
+            # who may not read the requests (IR-349).
+            WorkflowState.AWAITING_DOCUMENT.value: (
+                party in awaiting_document if awaiting_document is not None else None
+            ),
             "outcome": outcome,
             "outcome_label": outcome_label,
             "at": _iso(at),
@@ -439,9 +471,14 @@ def _resubmissions(record, *, staff: bool) -> list[dict]:
 
 def tracker_payload(record, user) -> dict[str, Any]:
     """`GET /records/<id>/tracker/` -- §8.1 of the architecture doc."""
-    from apps.documents.requests import payload as document_request_payload, requests_for
+    from apps.documents.requests import (
+        may_read_requests, payload as document_request_payload, requests_for,
+    )
 
     staff = is_staff_viewer(user)
+    # Document requests are internal workflow data (IR-349). A viewer who may
+    # not read them gets `null` -- not `[]`, which would claim there are none.
+    disclose_requests = may_read_requests(record, user)
     reviews = list(
         Review.objects.filter(record=record)
         .select_related("reviewed_by").order_by("created_at", "pk")
@@ -455,7 +492,10 @@ def tracker_payload(record, user) -> dict[str, Any]:
         "record_id": record.pk,
         "record_type": lifecycle.type_name_of(record) or None,
         **workflow_fields(record, user),
-        "parties": _party_rows(record, reviews=reviews, clearances=clearances, staff=staff),
+        "parties": _party_rows(
+            record, reviews=reviews, clearances=clearances, staff=staff,
+            disclose_requests=disclose_requests,
+        ),
         "routing_history": _routing_history(record, staff=staff),
         "routing_recorded_from": _routing_recorded_from(),
         "reviews": [
@@ -474,7 +514,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
         "resubmissions": _resubmissions(record, staff=staff),
         "document_requests": [
             document_request_payload(r, staff_viewer=staff) for r in requests_for(record)
-        ],
+        ] if disclose_requests else None,
         "clearances": [
             clearance_payload(c, last_resubmitted_at=record.last_resubmitted_at)
             for c in clearances
