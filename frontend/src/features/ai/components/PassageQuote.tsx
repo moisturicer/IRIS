@@ -29,7 +29,7 @@ export function PassageQuote({ text, className = "" }: { text: string; className
     <blockquote
       title={text}
       className={
-        "text-[12px] text-stone-600 leading-relaxed line-clamp-3 border-l-2 " +
+        "text-xs text-stone-600 leading-relaxed line-clamp-3 border-l-2 " +
         "border-[#6B0F12]/25 pl-2 italic " +
         className
       }
@@ -72,13 +72,13 @@ export function OpenPassageLink({
       to={citationHref(citation)}
       state={"marker" in citation ? citationNavigationState(citation) : undefined}
       className={
-        "inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#6B0F12] " +
+        "inline-flex items-center gap-1.5 text-xs font-semibold text-brand " +
         "hover:underline " +
         className
       }
     >
       {openCitationLabel(citation, title)}
-      <i className="fas fa-arrow-right text-[9px]" aria-hidden />
+      <i className="fas fa-arrow-right text-2xs" aria-hidden />
     </Link>
   );
 }
@@ -92,8 +92,8 @@ export function OpenPassageLink({
  */
 export function DegradedNotice({ subject }: { subject: "answer" | "summary" }) {
   return (
-    <p className="mt-2 flex items-start gap-1.5 text-[12px] text-amber-700">
-      <i className="fas fa-triangle-exclamation text-[10px] mt-0.5" aria-hidden />
+    <p className="mt-2 flex items-start gap-1.5 text-xs text-brand">
+      <i className="fas fa-triangle-exclamation text-2xs mt-0.5" aria-hidden />
       <span>
         Found by keyword matching, not meaning — the search service was unavailable, so
         weigh this {subject} accordingly.
@@ -111,8 +111,8 @@ export function DegradedNotice({ subject }: { subject: "answer" | "summary" }) {
  */
 export function ScopeNotice() {
   return (
-    <p className="mt-2 flex items-start gap-1.5 text-[12px] text-stone-500">
-      <i className="fas fa-layer-group text-[10px] mt-0.5" aria-hidden />
+    <p className="mt-2 flex items-start gap-1.5 text-xs text-stone-500">
+      <i className="fas fa-layer-group text-2xs mt-0.5" aria-hidden />
       <span>Searched all papers, not just the one open — you asked to widen the search.</span>
     </p>
   );
@@ -122,8 +122,8 @@ export function ScopeNotice() {
  *  the text above is whatever arrived before the cutoff, live or replayed. */
 export function PartialAnswerNotice() {
   return (
-    <p className="mt-2 flex items-start gap-1.5 text-[12px] text-amber-700">
-      <i className="fas fa-circle-half-stroke text-[10px] mt-0.5" aria-hidden />
+    <p className="mt-2 flex items-start gap-1.5 text-xs text-brand">
+      <i className="fas fa-circle-half-stroke text-2xs mt-0.5" aria-hidden />
       <span>This answer was cut off before it finished — it may be incomplete.</span>
     </p>
   );

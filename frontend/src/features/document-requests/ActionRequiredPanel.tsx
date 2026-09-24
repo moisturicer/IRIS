@@ -14,10 +14,10 @@ interface ActionRequiredPanelProps {
 
 /** Presentation only; every word comes from the server. */
 const ITEM_TONE: Record<DocumentRequestItemState, string> = {
-  missing:  "text-amber-800 bg-amber-100",
-  uploaded: "text-emerald-800 bg-emerald-100",
-  accepted: "text-emerald-800 bg-emerald-100",
-  rejected: "text-red-800 bg-red-100",
+  missing:  "text-brand bg-brand-100",
+  uploaded: "text-stone-900 bg-stone-100",
+  accepted: "text-stone-900 bg-stone-100",
+  rejected: "text-brand bg-brand-100",
 };
 
 /**
@@ -69,7 +69,7 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
     return (
       <p
         role="alert"
-        className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900"
+        className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-dark"
       >
         Could not load the documents reviewers asked for. Reload the page to try again.
       </p>
@@ -90,10 +90,10 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
   return (
     <section
       aria-labelledby={headingId}
-      className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-4"
+      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 space-y-4"
     >
-      <h2 id={headingId} className="text-[13px] font-bold text-amber-900 flex items-center gap-2">
-        <i className="fas fa-file-circle-exclamation text-[12px]" aria-hidden />
+      <h2 id={headingId} className="text-sm font-bold text-brand-dark flex items-center gap-2">
+        <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />
         {anyOpen ? "Action required" : "Requested documents"}
       </h2>
       {shown.map((r) => (
@@ -114,22 +114,22 @@ function RequestEntry({
 }) {
   const listId = useId();
   return (
-    <article className="bg-white border border-amber-200 rounded-xl p-3.5">
-      <h3 className="text-[13px] font-bold text-stone-900">
+    <article className="bg-white border border-brand-200 rounded-xl p-3.5">
+      <h3 className="text-sm font-bold text-stone-900">
         {request.label} requested documents
       </h3>
-      <p className="text-[11px] text-stone-500 mt-0.5">
+      <p className="text-2xs text-stone-500 mt-0.5">
         {request.requested_by && `${request.requested_by} · `}
         {formatDate(request.created_at, "MMM d")}
       </p>
       {request.state === "fulfilled" && (
-        <p className="mt-2 text-[12px] font-semibold text-emerald-800 flex items-center gap-1.5">
-          <i className="fas fa-circle-check text-[11px]" aria-hidden />
+        <p className="mt-2 text-xs font-semibold text-stone-900 flex items-center gap-1.5">
+          <i className="fas fa-circle-check text-2xs" aria-hidden />
           {request.state_label} — {request.label} has been told everything is uploaded.
         </p>
       )}
       {/* A text node, never innerHTML: the reviewer's words, exactly (ADR-022 §Security). */}
-      <p className="text-[13px] text-stone-700 leading-relaxed mt-2 whitespace-pre-line break-words">
+      <p className="text-sm text-stone-700 leading-relaxed mt-2 whitespace-pre-line break-words">
         {request.message}
       </p>
       <p id={listId} className="sr-only">
@@ -183,12 +183,12 @@ function ItemRow({
   return (
     <li className="py-2 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <span className="text-[13px] font-semibold text-stone-800 min-w-0 break-words">
+        <span className="text-sm font-semibold text-stone-800 min-w-0 break-words">
           {item.label}
         </span>
         <span className="flex items-center gap-2">
           <span
-            className={cn("px-1.5 py-0.5 rounded text-[11px] font-bold", ITEM_TONE[item.state])}
+            className={cn("px-1.5 py-0.5 rounded text-2xs font-bold", ITEM_TONE[item.state])}
           >
             {item.state_label}
           </span>
@@ -196,11 +196,11 @@ function ItemRow({
             <label
               htmlFor={inputId}
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-[12px] font-bold cursor-pointer hover:bg-brand-light focus-within:ring-2 focus-within:ring-brand/40",
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light focus-within:ring-2 focus-within:ring-brand/40",
                 uploading && "opacity-60 pointer-events-none",
               )}
             >
-              <i className="fas fa-upload text-[10px]" aria-hidden />
+              <i className="fas fa-upload text-2xs" aria-hidden />
               {uploading ? "Uploading…" : "Upload"}
               <span className="sr-only"> {item.label}</span>
               <input
@@ -219,12 +219,12 @@ function ItemRow({
         </span>
       </div>
       {item.state === "missing" && item.rejection_reason && (
-        <p className="text-[12px] text-red-800 mt-1 break-words">
+        <p className="text-xs text-brand mt-1 break-words">
           {asker} did not accept your last upload: “{item.rejection_reason}”
         </p>
       )}
       {error && (
-        <p role="alert" className="text-[12px] text-red-700 mt-1">
+        <p role="alert" className="text-xs text-brand mt-1">
           {error}
         </p>
       )}

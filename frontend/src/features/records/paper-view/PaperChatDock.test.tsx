@@ -12,7 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { AIAnswer, ConversationDetail } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 
@@ -186,6 +186,46 @@ describe("the widen control", () => {
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
     expect(await screen.findByText(/Searched all papers/i)).toBeTruthy();
+  });
+});
+
+describe("starter questions (IR-356)", () => {
+  it("fill the composer with a suggested question, without sending it", async () => {
+    renderScreen(
+      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+    );
+
+    const suggestions = await screen.findByRole("group", { name: /suggested questions/i });
+    await userEvent.click(
+      within(suggestions).getByRole("button", { name: "What are the key findings?" }),
+    );
+
+    expect(screen.getByRole("textbox", { name: /ask about this paper/i })).toHaveValue(
+      "What are the key findings?",
+    );
+    expect(askStream).not.toHaveBeenCalled();
+  });
+
+  it("are not offered once the conversation has turns", async () => {
+    findOrCreateForRecord.mockResolvedValue({
+      data: conversation({
+        turns: [
+          {
+            id: 1, question: "What does this paper conclude?",
+            resolved_question: null,
+            answer: "It concludes rainfall gauges predict flooding well.",
+            message: null, state: "generative", degraded: false, widened: false,
+            created_at: "2026-09-20T00:00:00.000Z", citations: [],
+          },
+        ],
+      }),
+    });
+    renderScreen(
+      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+    );
+
+    await screen.findByText("What does this paper conclude?");
+    expect(screen.queryByRole("group", { name: /suggested questions/i })).not.toBeInTheDocument();
   });
 });
 

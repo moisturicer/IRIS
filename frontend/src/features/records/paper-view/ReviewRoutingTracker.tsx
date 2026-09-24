@@ -9,6 +9,7 @@ import type {
   TrackerPartyState,
   TrackerRoutingGroup,
 } from "@/types/records";
+import { RailHeading } from "./headings";
 
 interface ReviewRoutingTrackerProps {
   recordId: number;
@@ -21,7 +22,7 @@ interface ReviewRoutingTrackerProps {
  * student/staff wording of Intake stays the server's call.
  */
 const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted: boolean }> = {
-  completed:     { glyph: "✓", tone: "text-emerald-700", muted: false },
+  completed:     { glyph: "✓", tone: "text-stone-900", muted: false },
   active:        { glyph: "●", tone: "text-brand",       muted: false },
   withdrawn:     { glyph: "–", tone: "text-stone-500",   muted: true },
   awaiting:      { glyph: "○", tone: "text-stone-500",   muted: true },
@@ -31,12 +32,12 @@ const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted
 /** Outcome colour. Exhaustive, so an unstyled outcome fails `tsc`. */
 const OUTCOME_TONE: Record<TrackerOutcome, string> = {
   pending: "text-stone-700",
-  cleared: "text-emerald-700",
-  approved: "text-emerald-700",
-  declined: "text-amber-700",
-  not_cleared: "text-red-700",
-  negative_finding: "text-red-700",
-  rejected: "text-red-700",
+  cleared: "text-stone-900",
+  approved: "text-stone-900",
+  declined: "text-brand",
+  not_cleared: "text-brand",
+  negative_finding: "text-brand",
+  rejected: "text-brand",
 };
 
 const HEADING_ID = "review-routing-tracker-heading";
@@ -77,24 +78,19 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
   return (
     <section
       aria-labelledby={HEADING_ID}
-      className="bg-white border border-stone-200 rounded-2xl p-5"
+      className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card"
     >
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h2
-          id={HEADING_ID}
-          className="text-[11px] font-bold uppercase tracking-wider text-stone-500"
-        >
-          Review &amp; Routing
-        </h2>
+        <RailHeading id={HEADING_ID}>Review &amp; Routing</RailHeading>
         {data && (
-          <span className="px-2 py-0.5 rounded-md bg-stone-100 text-[11px] font-bold text-stone-700">
+          <span className="px-2 py-0.5 rounded-md bg-stone-100 text-2xs font-bold text-stone-700">
             {data.workflow_state_label}
           </span>
         )}
       </div>
 
       {failed ? (
-        <p role="alert" className="text-[12px] text-stone-600">
+        <p role="alert" className="text-xs text-stone-600">
           Could not load the review tracker. Reload the page to try again.
         </p>
       ) : !data ? (
@@ -115,14 +111,14 @@ function TrackerBody({ data }: { data: RecordTracker }) {
     <div className="space-y-4">
       {data.current_holders.length > 0 && (
         <div>
-          <p id="tracker-holders-label" className="text-[11px] font-semibold text-stone-500 mb-1">
+          <p id="tracker-holders-label" className="text-2xs font-semibold text-stone-500 mb-1">
             Currently with
           </p>
           <ul aria-labelledby="tracker-holders-label" className="flex flex-wrap gap-1.5">
             {data.current_holders.map((h) => (
               <li
                 key={h.party}
-                className="px-2 py-0.5 rounded-md bg-brand-50 text-brand text-[12px] font-bold"
+                className="px-2 py-0.5 rounded-md bg-brand-50 text-brand text-xs font-bold"
               >
                 {h.label}
               </li>
@@ -156,13 +152,13 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         <div>
           <h3
             id="tracker-document-requests-label"
-            className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1.5"
+            className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
           >
             Document requests
           </h3>
           <ol aria-labelledby="tracker-document-requests-label" className="space-y-2">
             {data.document_requests.map((r) => (
-              <li key={r.id} className="text-[12px] text-stone-700">
+              <li key={r.id} className="text-xs text-stone-700">
                 <span className="font-bold text-stone-900">{r.label}</span> asked for{" "}
                 {/* Each item with its state: accepted, still missing... (IR-263). */}
                 {r.items.map((i) => `${i.label} (${i.state_label})`).join(", ")}
@@ -189,13 +185,13 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         <div>
           <h3
             id="tracker-resubmissions-label"
-            className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1.5"
+            className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
           >
             Resubmission history
           </h3>
           <ol aria-labelledby="tracker-resubmissions-label" className="space-y-2">
             {data.resubmissions.map((r) => (
-              <li key={r.id} className="text-[12px] text-stone-700">
+              <li key={r.id} className="text-xs text-stone-700">
                 <span className="font-bold text-stone-900">{r.label}</span> asked for changes
                 {" · "}
                 <span className="font-semibold">{r.state_label}</span>
@@ -216,7 +212,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
  * §9.1's ◐: the party asked the owner for a document and is waiting on it
  * (ADR-022). Overrides the state's glyph, not its words.
  */
-const AWAITING_DOCUMENT_META = { glyph: "◐", tone: "text-amber-700", muted: false };
+const AWAITING_DOCUMENT_META = { glyph: "◐", tone: "text-brand", muted: false };
 
 function PartyRow({ row }: { row: TrackerPartyRow }) {
   const meta = row.awaiting_document ? AWAITING_DOCUMENT_META : STATE_META[row.state];
@@ -227,12 +223,12 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
     <tr className="border-t border-stone-100 first:border-t-0 align-top">
       <th scope="row" className="py-1.5 pr-2 font-normal">
         <span className="flex items-center gap-2">
-          <span aria-hidden className={cn("w-3 text-center text-[12px] leading-none", meta.tone)}>
+          <span aria-hidden className={cn("w-3 text-center text-xs leading-none", meta.tone)}>
             {meta.glyph}
           </span>
           <span
             className={cn(
-              "text-[13px]",
+              "text-sm",
               meta.muted ? "text-stone-500" : "font-bold text-stone-900",
             )}
           >
@@ -241,7 +237,7 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
         </span>
       </th>
       <td className="py-1.5 pr-2">
-        <span className="flex items-center gap-1.5 flex-wrap text-[11px]">
+        <span className="flex items-center gap-1.5 flex-wrap text-2xs">
           <span className={cn("font-semibold", meta.tone)}>{row.state_label}</span>
           {outcome && (
             <span className={cn("font-semibold", OUTCOME_TONE[outcome])}>
@@ -249,20 +245,20 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
             </span>
           )}
           {row.awaiting_document && (
-            <span className="font-semibold text-amber-700">· Awaiting document</span>
+            <span className="font-semibold text-brand">· Awaiting document</span>
           )}
           {row.preserved && (
             <span
-              className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1"
+              className="px-1.5 py-0.5 rounded bg-stone-100 text-stone-900 border border-stone-300 text-2xs font-bold flex items-center gap-1"
               title="Cleared before the current submission and carried over — this office will not review again"
             >
-              <i className="fas fa-shield-halved text-[8px]" aria-hidden />
+              <i className="fas fa-shield-halved text-2xs" aria-hidden />
               Preserved
             </span>
           )}
         </span>
       </td>
-      <td className="py-1.5 text-right text-[11px] text-stone-500 whitespace-nowrap">
+      <td className="py-1.5 text-right text-2xs text-stone-500 whitespace-nowrap">
         {row.at ? formatDate(row.at, "MMM d") : ""}
       </td>
     </tr>
@@ -280,16 +276,16 @@ function RoutingHistory({
     <div>
       <h3
         id="tracker-routing-label"
-        className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1.5"
+        className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
       >
         Routing history
       </h3>
       {groups.length === 0 ? (
-        <p className="text-[12px] text-stone-500">No routing recorded yet.</p>
+        <p className="text-xs text-stone-500">No routing recorded yet.</p>
       ) : (
         <ol aria-labelledby="tracker-routing-label" className="space-y-2">
           {groups.map((g) => (
-            <li key={g.group_id} className="text-[12px] text-stone-700">
+            <li key={g.group_id} className="text-xs text-stone-700">
               <span className="font-semibold text-stone-900">
                 {g.from_label
                   ? `${g.from_label} → ${g.to_labels.join(" + ")}`
@@ -308,7 +304,7 @@ function RoutingHistory({
         </ol>
       )}
       {recordedFrom && (
-        <p className="text-[11px] text-stone-500 mt-2">
+        <p className="text-2xs text-stone-500 mt-2">
           Routing recorded from {formatDate(recordedFrom)}.
         </p>
       )}
