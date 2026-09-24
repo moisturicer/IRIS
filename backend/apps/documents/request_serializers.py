@@ -63,7 +63,6 @@ class DocumentRequestSerializer(serializers.ModelSerializer):
     requested_by      = serializers.SerializerMethodField()
     created_at        = IsoDateTimeField()
     closed_at         = IsoDateTimeField()
-    withdrawal_reason = BlankAsNullField()
     can_manage        = serializers.SerializerMethodField()
     items             = DocumentRequestItemSerializer(many=True, read_only=True)
 
@@ -71,7 +70,7 @@ class DocumentRequestSerializer(serializers.ModelSerializer):
         model  = DocumentRequest
         fields = [
             "id", "party", "label", "state", "state_label", "message", "requested_by",
-            "created_at", "closed_at", "withdrawal_reason", "can_manage", "items",
+            "created_at", "closed_at", "can_manage", "items",
         ]
         read_only_fields = fields
 
@@ -202,13 +201,12 @@ class ItemDecisionSerializer(serializers.Serializer):
 
 
 class WithdrawSerializer(serializers.Serializer):
-    """`PATCH /document-requests/<id>/` (§4). The reason is optional."""
+    """`PATCH /document-requests/<id>/` (§4). No reason: IR-270 defines any."""
 
     action = serializers.ChoiceField(
         choices=["withdraw"],
         error_messages={"invalid_choice": "The only action on a request is withdraw."},
     )
-    reason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 def first_error(errors) -> str:

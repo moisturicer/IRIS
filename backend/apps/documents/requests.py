@@ -217,13 +217,14 @@ def is_requester(request: DocumentRequest, user) -> bool:
     return request.party in staffable_parties(request.record, user)
 
 
-def readable_request(request_id, user) -> Optional[DocumentRequest]:
+def request_on_visible_record(request_id, user) -> Optional[DocumentRequest]:
     """
-    The request, or None when `user` may not see it.
+    The request, or None when there is none or `user` cannot see its Record.
 
-    Not seeing the Record (`visible_to`), and seeing it without being allowed
-    its request data (`may_read_requests`), both read as a missing id: the
-    request is an object this caller cannot see (§Amendment 4).
+    Only those two read as a missing id (ADR-022 §Amendment 4, 404). Seeing the
+    Record but not its request data is a separate refusal, a 403, and the
+    caller asks `may_read_requests` for it: a 404 never hides request
+    authorization on a visible Record (settled 2026-09-24).
     """
     from apps.records.models import Record
 
@@ -232,8 +233,6 @@ def readable_request(request_id, user) -> Optional[DocumentRequest]:
     except (DocumentRequest.DoesNotExist, TypeError, ValueError):
         return None
     if not Record.objects.visible_to(user).filter(pk=request.record_id).exists():
-        return None
-    if not may_read_requests(request.record, user):
         return None
     return request
 
@@ -294,11 +293,14 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
     return request
 
 
-def withdraw_request(request: DocumentRequest, *, reason: str = "") -> DocumentRequest:
+def withdraw_request(request: DocumentRequest) -> DocumentRequest:
     """
     The requesting party no longer needs it (ADR-022 §4). Only an open
     request: a fulfilled one is already closed, and its uploads are decided
     item by item. It stays in the history; the owner's panel drops it.
+
+    No reason is recorded: IR-263 adds none, and IR-270 defines any a
+    decision needs when it closes requests.
     """
     with transaction.atomic():
         request = DocumentRequest.objects.select_for_update().get(pk=request.pk)
@@ -306,8 +308,7 @@ def withdraw_request(request: DocumentRequest, *, reason: str = "") -> DocumentR
             raise DocumentRequestError("Only an open request can be withdrawn.")
         request.state = DocumentRequestState.WITHDRAWN
         request.closed_at = timezone.now()
-        request.withdrawal_reason = reason
-        request.save(update_fields=["state", "closed_at", "withdrawal_reason"])
+        request.save(update_fields=["state", "closed_at"])
     return request
 
 

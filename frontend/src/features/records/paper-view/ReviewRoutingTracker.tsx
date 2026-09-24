@@ -179,11 +179,6 @@ function TrackerBody({ data }: { data: RecordTracker }) {
                       {r.label} rejected an upload of {i.label}: “{i.rejection_reason}”
                     </p>
                   ))}
-                {r.withdrawal_reason && (
-                  <p className="text-stone-600 mt-0.5 leading-relaxed break-words">
-                    Withdrawn: “{r.withdrawal_reason}”
-                  </p>
-                )}
               </li>
             ))}
           </ol>

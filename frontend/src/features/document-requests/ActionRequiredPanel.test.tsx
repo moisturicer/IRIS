@@ -40,7 +40,7 @@ function request(overrides: Partial<DocumentRequest> = {}): DocumentRequest {
     message: "The signed consent forms are missing.",
     requested_by: "Ivy Ethics",
     created_at: "2026-09-20T02:00:00Z",
-    closed_at: null, withdrawal_reason: null, can_manage: false,
+    closed_at: null, can_manage: false,
     items: [
       {
         id: 11, slot: 3, label: "Ethics Clearance", state: "missing",

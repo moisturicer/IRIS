@@ -254,7 +254,7 @@ describe("ReviewRoutingTracker", () => {
       document_requests: [{
         id: 5, party: "ierc", label: "IERC", state: "open", state_label: "Open",
         message: "Rescan the consent form.", requested_by: "Ivy Ethics",
-        created_at: "2026-09-20T02:00:00Z", closed_at: null, withdrawal_reason: null, can_manage: false,
+        created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
         items: [{
           id: 51, slot: null, label: "Consent form", state: "missing",
           state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
@@ -288,7 +288,7 @@ describe("ReviewRoutingTracker", () => {
         document_requests: [
           {
             ...base, id: 5, state: "fulfilled", state_label: "Fulfilled",
-            closed_at: "2026-09-22T02:00:00Z", withdrawal_reason: null,
+            closed_at: "2026-09-22T02:00:00Z",
             items: [
               { ...itemBase, id: 51, label: "Consent form", state: "accepted",
                 state_label: "Accepted", rejection_reason: "Unreadable scan." },
@@ -298,7 +298,7 @@ describe("ReviewRoutingTracker", () => {
           },
           {
             ...base, id: 6, state: "withdrawn", state_label: "Withdrawn",
-            closed_at: "2026-09-23T02:00:00Z", withdrawal_reason: "Found it in the appendix.",
+            closed_at: "2026-09-23T02:00:00Z",
             items: [{ ...itemBase, id: 61, label: "Budget", state: "missing",
               state_label: "Missing", rejection_reason: null }],
           },
@@ -311,8 +311,7 @@ describe("ReviewRoutingTracker", () => {
     const [accepted, withdrawn] = within(list).getAllByRole("listitem");
     expect(accepted).toHaveTextContent("Consent form (Accepted), Protocol (Accepted)");
     expect(accepted).toHaveTextContent("IERC rejected an upload of Consent form: “Unreadable scan.”");
-    expect(withdrawn).toHaveTextContent("Withdrawn");
-    expect(withdrawn).toHaveTextContent("“Found it in the appendix.”");
+    expect(withdrawn).toHaveTextContent("IERC asked for Budget (Missing) · Withdrawn");
   });
 
   it("discloses nothing about requests to a viewer who may not read them (IR-349)", async () => {

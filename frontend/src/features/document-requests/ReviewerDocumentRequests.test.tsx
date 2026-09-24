@@ -25,7 +25,7 @@ vi.mock("@/api/records", () => ({
   recordsApi: {
     documentRequests: (id: number) => documentRequests(id),
     decideDocumentRequestItem: (id: number, body: unknown) => decideDocumentRequestItem(id, body),
-    withdrawDocumentRequest: (id: number, reason?: string) => withdrawDocumentRequest(id, reason),
+    withdrawDocumentRequest: (id: number) => withdrawDocumentRequest(id),
     documentRequestSlots: () => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] }),
     createDocumentRequest: () => Promise.resolve({ data: {} }),
   },
@@ -46,7 +46,7 @@ function request(overrides: Partial<DocumentRequest> = {}): DocumentRequest {
     id: 1, party: "ierc", label: "IERC", state: "fulfilled", state_label: "Fulfilled",
     message: "The signed consent forms are missing.", requested_by: "Ivy Ethics",
     created_at: "2026-09-20T02:00:00Z", closed_at: "2026-09-21T02:00:00Z",
-    withdrawal_reason: null, can_manage: true, items: [item()],
+    can_manage: true, items: [item()],
     ...overrides,
   };
 }
@@ -182,7 +182,7 @@ describe("ReviewerDocumentRequests", () => {
     expect(within(region).getByText(/Unreadable scan\./)).toBeInTheDocument();
   });
 
-  it("withdraws an open request, with an optional reason", async () => {
+  it("withdraws an open request once confirmed, asking no reason", async () => {
     const user = userEvent.setup();
     documentRequests.mockResolvedValue({
       data: [request({
@@ -193,10 +193,11 @@ describe("ReviewerDocumentRequests", () => {
     renderBlock();
 
     await user.click(await screen.findByRole("button", { name: "Withdraw request" }));
-    await user.type(screen.getByRole("textbox", { name: /reason/i }), "Found it.");
+    // IR-263 records no withdrawal reason; IR-270 defines any it needs.
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Confirm withdrawal" }));
 
-    await waitFor(() => expect(withdrawDocumentRequest).toHaveBeenCalledWith(1, "Found it."));
+    await waitFor(() => expect(withdrawDocumentRequest).toHaveBeenCalledWith(1));
   });
 
   it("offers no withdrawal on a request that is already closed", async () => {

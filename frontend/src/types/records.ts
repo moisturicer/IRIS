@@ -357,8 +357,6 @@ export interface DocumentRequest {
   requested_by: string | null;
   created_at:   string;
   closed_at:    string | null;
-  /** Why it was withdrawn, when the requesting party said (IR-263). Plain text. */
-  withdrawal_reason: string | null;
   /**
    * The viewer can staff the party that asked, so may accept, reject or
    * withdraw (ADR-022 §3.4, §4). Server-decided; the controls follow it.

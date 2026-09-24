@@ -255,9 +255,6 @@ class DocumentRequest(models.Model):
     )
     created_at   = models.DateTimeField(default=timezone.now)
     closed_at    = models.DateTimeField(null=True, blank=True)
-    #: Why the requesting party withdrew it, when it said (ADR-022 §4, IR-263).
-    #: Internal workflow data, like `message` (§Amendment 5). Plain text.
-    withdrawal_reason = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["record", "created_at", "pk"]

@@ -559,6 +559,7 @@ class RecordFileDownloadAllView(APIView):
 
 # --- Deciding and withdrawing document requests (ADR-022 §3.4, §4; IR-263) ----
 
+_NOT_A_READER = "Only the owner and the parties involved may read these requests."
 _NOT_THE_REQUESTER = "Only the party that asked for these documents can do that."
 
 
@@ -566,15 +567,19 @@ def _managed_request(request_id, user):
     """
     `(document_request, None)` when `user` may manage it, else `(None, refusal)`.
 
-    ADR-022 §Amendment 4: a request the caller cannot see -- the Record is not
-    visible to them, or its request data is not (IR-349) -- reads as a missing
-    id, 404; a reader who is not the requesting party gets a 403.
+    ADR-022 §Amendment 4, settled 2026-09-24:
+    - **404** when there is no such request or the caller cannot see its Record;
+    - **403** when the caller sees the Record but may not read its request data
+      (IR-349's `may_read_requests`) -- the list endpoint's refusal, word for word;
+    - **403** when the caller reads it but cannot staff the requesting party.
     """
-    from .requests import is_requester, readable_request
+    from .requests import is_requester, may_read_requests, request_on_visible_record
 
-    document_request = readable_request(request_id, user)
+    document_request = request_on_visible_record(request_id, user)
     if document_request is None:
         return None, Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+    if not may_read_requests(document_request.record, user):
+        return None, Response({"detail": _NOT_A_READER}, status=status.HTTP_403_FORBIDDEN)
     if not is_requester(document_request, user):
         return None, Response(
             {"detail": _NOT_THE_REQUESTER}, status=status.HTTP_403_FORBIDDEN
@@ -600,7 +605,7 @@ def _apply(document_request, user, body, change):
 
 class DocumentRequestDecisionView(APIView):
     """
-    PATCH /api/v1/document-requests/<id>/   {"action": "withdraw", "reason"?: str}
+    PATCH /api/v1/document-requests/<id>/   {"action": "withdraw"}
 
     The requesting party withdraws an open request (ADR-022 §4). Refusals as
     `_managed_request` says.
@@ -616,7 +621,7 @@ class DocumentRequestDecisionView(APIView):
             return refused
         return _apply(
             document_request, request.user, WithdrawSerializer(data=request.data),
-            lambda data: withdraw_request(document_request, reason=data["reason"]),
+            lambda data: withdraw_request(document_request),
         )
 
 

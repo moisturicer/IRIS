@@ -11,10 +11,11 @@ the history.
 Record's owners answer an item, so a staff upload against a `request_item` is
 a 403 even though `authorize_record_documents` admits every office.
 
-§Amendment 4 and 5: the decision routes follow the refusal convention. A
-caller who cannot see the Record, or may not read its request data
-(`may_read_requests`), gets a 404 -- the request is an object they cannot see.
-A caller who can read it but is not the requesting party gets a 403.
+§Amendment 4 and 5, settled 2026-09-24: a caller who cannot see the Record,
+or names an id that does not exist, gets a 404. A caller who can see the
+Record but may not read its request data (`may_read_requests`) gets a 403 --
+the 404 is never used to hide request authorization on a visible Record. A
+reader who is not the requesting party gets a 403 as well.
 
 **Seam: the HTTP API**, as for IR-262 and IR-349.
 """
@@ -54,12 +55,11 @@ class DecisionTestBase(DocumentRequestTestBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         return response.data
 
-    def withdraw(self, request_id, actor, reason=None):
+    def withdraw(self, request_id, actor):
         self.client.force_authenticate(actor)
-        body = {"action": "withdraw"}
-        if reason is not None:
-            body["reason"] = reason
-        return self.client.patch(self.request_url(request_id), body, format="json")
+        return self.client.patch(
+            self.request_url(request_id), {"action": "withdraw"}, format="json"
+        )
 
     def one_item_uploaded(self, record=None):
         """IERC asked for one document and the owner uploaded it: fulfilled."""
@@ -209,24 +209,24 @@ class WithdrawTests(DecisionTestBase):
         record = self.at_parallel_review()
         data = self.requested(record, self.ierc, [{"label": "Consent form"}])
 
-        response = self.withdraw(data["id"], self.ierc, "Found it in the appendix.")
+        response = self.withdraw(data["id"], self.ierc)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["state"], "withdrawn")
         self.assertIsNotNone(response.data["closed_at"])
-        self.assertEqual(response.data["withdrawal_reason"], "Found it in the appendix.")
         [request] = self.tracker_ok(record)["document_requests"]
         self.assertEqual(request["state"], "withdrawn")
         self.assertEqual(self.detail(record)["workflow_state"], "in_review")
 
-    def test_a_reason_is_optional(self):
+    def test_a_withdrawal_carries_no_reason_field(self):
+        # IR-263 adds no withdrawal reason; IR-270 defines any it needs.
         record = self.at_parallel_review()
         data = self.requested(record, self.ierc, [{"label": "Consent form"}])
 
         response = self.withdraw(data["id"], self.ierc)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertIsNone(response.data["withdrawal_reason"])
+        self.assertNotIn("withdrawal_reason", response.data)
 
     def test_only_an_open_request_can_be_withdrawn(self):
         _, request_id, _ = self.one_item_uploaded()
@@ -304,29 +304,40 @@ class OnlyTheRequestingPartyTests(DecisionTestBase):
         self.assertIs(request["can_manage"], True)
 
 
-class NotFoundTests(DecisionTestBase):
-    """A request the caller cannot see is indistinguishable from a missing one."""
+class RefusalTests(DecisionTestBase):
+    """
+    ADR-022 §Amendment 4, settled 2026-09-24. 404 only when the Record (or the
+    id) cannot be seen at all; a visible Record whose request data the caller
+    may not read is a 403, never hidden behind a 404.
+    """
 
-    def assert_not_found(self, actor, request_id, item_id):
-        self.assertEqual(
-            self.decide(item_id, actor, "accept").status_code, status.HTTP_404_NOT_FOUND
-        )
-        self.assertEqual(
-            self.withdraw(request_id, actor).status_code, status.HTTP_404_NOT_FOUND
-        )
+    def assert_refused(self, actor, request_id, item_id, code):
+        decided = self.decide(item_id, actor, "accept")
+        withdrawn = self.withdraw(request_id, actor)
+        self.assertEqual(decided.status_code, code)
+        self.assertEqual(withdrawn.status_code, code)
+        return decided, withdrawn
 
-    def test_a_user_who_cannot_see_the_record(self):
+    def test_a_user_who_cannot_see_the_record_gets_404(self):
         _, request_id, item_id = self.one_item_uploaded()
 
-        self.assert_not_found(self.stranger, request_id, item_id)
+        self.assert_refused(self.stranger, request_id, item_id, status.HTTP_404_NOT_FOUND)
 
-    def test_a_reader_of_a_published_record(self):
+    def test_an_id_that_does_not_exist_gets_404(self):
+        self.assert_refused(self.ierc, 999999, 999999, status.HTTP_404_NOT_FOUND)
+
+    def test_a_reader_of_a_published_record_gets_403_and_learns_nothing(self):
         record, request_id, item_id = self.one_item_uploaded()
         Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
 
-        self.assert_not_found(self.stranger, request_id, item_id)
+        for response in self.assert_refused(
+            self.stranger, request_id, item_id, status.HTTP_403_FORBIDDEN
+        ):
+            self.assertNotIn("Consent form", json.dumps(response.data))
+        self.assertEqual(self.item_state(item_id), "uploaded")
+        self.assertEqual(self.request_state(request_id), "fulfilled")
 
-    def test_an_office_that_took_no_part(self):
+    def test_an_office_that_took_no_part_gets_403(self):
         # KTTO was never requested, so it may see the Record but not its requests.
         record = self.submitted(
             RecordTypeName.THESIS_RESEARCH, requested_itso=True, requested_ierc=True,
@@ -335,30 +346,39 @@ class NotFoundTests(DecisionTestBase):
         self.review(record, self.itso, "approved", "No patent concerns.")
         _, request_id, item_id = self.one_item_uploaded(record)
 
-        self.assert_not_found(self.ktto, request_id, item_id)
+        self.assert_refused(self.ktto, request_id, item_id, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.item_state(item_id), "uploaded")
 
-    def test_an_id_that_does_not_exist(self):
-        self.assert_not_found(self.ierc, 999999, 999999)
+    def test_the_decision_routes_agree_with_the_list_endpoint(self):
+        # One rule for every route: where the list is 404 or 403, so are these.
+        record, request_id, item_id = self.one_item_uploaded()
+        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
+
+        for viewer in (self.stranger, self.adviser, self.other_adviser):
+            with self.subTest(viewer=viewer.email):
+                self.client.force_authenticate(viewer)
+                listed = self.client.get(self.requests_url(record)).status_code
+                self.assertEqual(listed, status.HTTP_403_FORBIDDEN)
+                self.assert_refused(viewer, request_id, item_id, listed)
 
 
 class DecisionDataIsInternalTests(DecisionTestBase):
     """IR-349's predicate covers what this ticket adds (ADR-022 §Amendment 5)."""
 
-    def test_a_public_reader_never_sees_a_reject_or_withdrawal_reason(self):
+    def test_a_public_reader_never_sees_a_reject_reason_or_a_withdrawal(self):
         record = self.at_parallel_review()
         rejected = self.requested(record, self.ierc, [{"label": "Consent form"}])
         self.uploaded(record, rejected["items"][0]["id"])
         self.decided(rejected["items"][0]["id"], self.ierc, "reject", REASON)
         withdrawn = self.requested(record, self.ierc, [{"label": "Protocol"}])
-        self.withdraw(withdrawn["id"], self.ierc, "No longer needed, thanks.")
+        self.withdraw(withdrawn["id"], self.ierc)
         Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
 
         self.client.force_authenticate(self.stranger)
         listed = self.client.get(self.requests_url(record))
         self.assertEqual(listed.status_code, status.HTTP_403_FORBIDDEN)
         tracker = json.dumps(self.tracker_ok(record, self.stranger))
-        for secret in (REASON, "No longer needed, thanks.", "rejection_reason", "withdrawal_reason"):
+        for secret in (REASON, "rejection_reason", "Protocol"):
             with self.subTest(secret=secret):
                 self.assertNotIn(secret, json.dumps(listed.data))
                 self.assertNotIn(secret, tracker)

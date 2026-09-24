@@ -296,9 +296,7 @@ function Withdraw({
   request: DocumentRequest;
   onChanged: () => Promise<void>;
 }) {
-  const reasonId = useId();
   const [confirming, setConfirming] = useState(false);
-  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -306,7 +304,7 @@ function Withdraw({
     setError(null);
     setBusy(true);
     try {
-      await recordsApi.withdrawDocumentRequest(request.id, reason.trim() || undefined);
+      await recordsApi.withdrawDocumentRequest(request.id);
       await onChanged();
     } catch (err) {
       setError(errorDetail(err, "Could not withdraw the request. Please try again."));
@@ -331,16 +329,6 @@ function Withdraw({
       <p className="text-[12px] text-stone-700">
         The owner will no longer be asked for these documents. The request stays in the history.
       </p>
-      <label htmlFor={reasonId} className="block text-[12px] font-semibold text-stone-700">
-        Reason <span className="font-normal text-stone-500">(optional)</span>
-      </label>
-      <textarea
-        id={reasonId}
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        rows={2}
-        className="w-full rounded-lg border border-stone-200 p-2 text-[13px] focus:outline-none focus:border-brand"
-      />
       <div className="flex gap-2">
         <button
           type="button"

@@ -149,13 +149,17 @@ ADR would need to be undone for that.
 4. **The requesting party accepts or rejects each item.** A rejected item goes back to `missing`
    with a comment, and the request reopens.
 
-   > **As built in IR-263 (2026-09-24).** A rejected item is **stored** as `missing`, with the
-   > comment in `rejection_reason` and the time in `decided_at`, so the owner can upload against
-   > it again. §1's `rejected` state is kept in the enum but nothing writes it. The rejected file
-   > is not deleted; the item just stops pointing at it. Accepting marks the item `accepted`; a
-   > request whose items were all uploaded is already `fulfilled`, so accepting every item leaves
-   > it closed. "The requesting party" means anyone who can staff the request's `party`, not only
-   > its `requested_by`. The owner is notified of a rejection, with the comment.
+   > **Settled 2026-09-24 by Lee Jasmin Adolfo; built in IR-263.**
+   > - **Rejection returns the item to `missing` and reopens the request.** No `rejected`
+   >   state is persisted and none is introduced for this: §1's `rejected` value stays in the
+   >   enum, and nothing writes it. The comment is kept as the item's `rejection_reason`, with
+   >   `decided_at`. The owner sees it in Action required and is notified. The rejected file is
+   >   not deleted; the item just stops pointing at it.
+   > - **Accepting** marks the item `accepted`. A request whose items were all uploaded is
+   >   already `fulfilled`, so accepting every item leaves it closed.
+   > - **"The requesting party" is the workflow party, not a person.** Any authorised staff
+   >   member of the requesting party (anyone who can staff the request's `party`) may accept,
+   >   reject or withdraw. Permission never depends on who `requested_by` is.
 
 **An open request never blocks another party.** ITSO can clear while IERC waits for a consent
 form. That is the reason for not using a decline.
@@ -169,6 +173,10 @@ is their judgement whether that matters; it is not a lock.
 
 The requesting party may withdraw a request — for example, after reading further it no longer
 needs the document.
+
+> **Settled 2026-09-24 by Lee Jasmin Adolfo.** Withdrawal records **no reason**. IR-263 adds no
+> withdrawal-reason field, and none is added in advance for IR-270. When IR-270 builds §3's
+> "a decision closes open requests", it defines whatever reason that needs.
 
 **A record can now wait indefinitely.** Under the old model, a missing document produced a
 `declined` record, which was at least visibly stuck. An open request on an `in_review` record is
@@ -193,13 +201,17 @@ PATCH  /api/v1/document-request-items/<id>/        accept / reject (requesting p
 Uploading uses the existing documents endpoint with a `request_item` parameter. It is not a
 second upload path.
 
-> **As built in IR-263 (2026-09-24).** The bodies are `{"action": "withdraw", "reason"?: str}`
-> and `{"action": "accept"} | {"action": "reject", "reason": str}`, and both answer with the
-> whole request. Only an **open** request can be withdrawn, and only an `uploaded` item decided.
-> A caller who cannot see the Record, or may not read its request data (§Amendment 5), gets a
-> **404** on both routes; a reader who is not the requesting party gets a **403**. The request
-> payload gains `withdrawal_reason` and a per-viewer `can_manage`, and each item gains
-> `rejection_reason` and `decided_at`, all behind the same read rule.
+> **As built in IR-263 (2026-09-24).** The bodies are `{"action": "withdraw"}` and
+> `{"action": "accept"} | {"action": "reject", "reason": str}`, and both answer with the whole
+> request. Only an **open** request can be withdrawn, and only an `uploaded` item decided.
+> Refusals follow §Amendment 4 as settled on 2026-09-24:
+> - **404** when the id does not exist or the caller cannot see the Record;
+> - **403** when the caller can see the Record but may not read its request data (§Amendment 5),
+>   the same refusal as the list endpoint;
+> - **403** when the caller may read it but cannot staff the requesting party.
+>
+> The request payload gains a per-viewer `can_manage`, and each item gains `rejection_reason`
+> and `decided_at`, all behind the same read rule.
 
 > **Amended 2026-09-24.** The list line originally read `list (visible_to)`. Document-request
 > data is internal workflow data, and being able to read a Record does not grant access to it.
@@ -235,8 +247,9 @@ What the code does today, verified against `main` on 2026-09-24:
 | Uploading through `/documents/submit/` or `/documents/uploads/create/` to a Record that exists but that the caller neither owns nor staffs | **403**, **even when the caller cannot see the Record** | `authorize_record_documents` (IR-153) |
 | Uploading to another Record's ad-hoc slot | **404**, "Record or slot not found." | `_slot_for_record` |
 | Anyone but a Record owner uploading against a `request_item`, including the requesting party (point 2) | **403** | IR-263, `SubmitDocumentView` via `requests.may_fulfil` |
-| Accepting, rejecting or withdrawing a request the caller cannot see, or whose request data it may not read (point 5) | **404** | IR-263, `requests.readable_request` |
-| Accepting, rejecting or withdrawing as anyone but the requesting party | **403** | IR-263, `requests.is_requester` |
+| Accepting, rejecting or withdrawing a request that does not exist, or on a Record the caller cannot see | **404** | IR-263, `requests.request_on_visible_record` |
+| Accepting, rejecting or withdrawing on a visible Record whose request data the caller may not read (point 5) | **403**, the list endpoint's refusal. A 404 is never used to hide request authorization on a visible Record (settled 2026-09-24) | IR-263, `requests.may_read_requests` |
+| Accepting, rejecting or withdrawing as a reader who cannot staff the requesting party | **403** | IR-263, `requests.is_requester` |
 
 **The one exception to the convention is recorded here, not converted.** `authorize_record_documents` answers 403 to a caller who cannot see the Record. That is an **intentional existing exception**, chosen in IR-153 and documented in the function itself: the documents endpoints take the Record id from the caller's own request parameter, so "a 404 would hide nothing, and 403 says what actually happened". The exception covers the documents app's upload and listing routes only; every document-request route follows the convention. No ticket exists to change it, and this amendment does not create one. **Aligning the documents app with the 404 convention would be a separate decision and a separate ticket**, and would touch every endpoint that calls `authorize_record_documents`, not just this ADR's.
 

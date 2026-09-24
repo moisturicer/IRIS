@@ -11,11 +11,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name='documentrequest',
-            name='withdrawal_reason',
-            field=models.TextField(blank=True, default=''),
-        ),
-        migrations.AddField(
             model_name='documentrequestitem',
             name='decided_at',
             field=models.DateTimeField(blank=True, null=True),
