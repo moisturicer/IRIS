@@ -56,7 +56,7 @@ A component library exists. Roughly a tenth of the product uses it.
 | Component | Lines | Verdict | Work |
 |---|---|---|---|
 | `DataTable` | 124 | **FIX** | `<caption>`, `<th scope>`, `overflow-x-auto`, cards below 768 px ([13](13-responsive.md)). Fix once — the two consumers and every future one inherit it |
-| `StatusBadge` | 26 | **FIX** | Remove the stale `ktto_review` key; take labels from the API, not a literal map ([11](11-saas-admin.md)) |
+| `StatusBadge` | 26 | **FIX** | Remove the stale `ktto_review` key; take labels from the API, not a literal map ([11](11-saas-admin.md)). **IR-356:** now four palette tones (quiet · active · attention · settled, [01](01-design-system.md) §0) instead of eleven colour families |
 | `EmptyState` | 15 | **FIX** | `text-gray-400` → `text-gray-500`. Add an optional action slot — most empty states in these docs prescribe a next step |
 | `ConfirmDialog` | 49 | **KEEP** | Correct. **Use it on the reject action** ([07](07-review-clearance.md)) |
 | `FileUploadZone` | 74 | **FIX** | Must expose a real keyboard-operable `<input type="file">`, not drag-only ([05](05-submission.md)) |
@@ -158,3 +158,19 @@ The inventory is worth nothing without these.
 | Storage / folder-browser components | — | Not on the workflow spine ([02](02-information-architecture.md)) |
 
 **Removed means unrouted, not deleted from the repository.** No component in this document set needs to be destroyed — the router is the scope boundary, and it can be changed back in an afternoon if the pilot proves a need. Full disposition in [15](15-mvp-ui-scope.md).
+
+---
+
+## IR-356 additions (2026-09-25)
+
+| Component | Change |
+|---|---|
+| `ChatMessageBubble`, `StreamingMessageBubble` | `compact` prop: Paper Chat's density (smaller avatar and type, the reader's question in a `brand-50` bubble). Ask IRIS keeps the default |
+| `PaperSaveDropdown` | `variant="pill"` for a page's action row (labelled Save / Saved, 44 px), beside the card-sized `icon` default that Discover uses |
+| `paper-view/paneLayout.ts` | The Paper View's sticky and pane offsets in one place, derived from the header height and the floating Abstract / Paper switch |
+| `Header` | Search box hidden on Paper View; the bell stays |
+| `components/ui/pillStyles.ts` | `PILL_PRIMARY` / `PILL_SECONDARY` / `PILL_SELECTED`: the 44 px page-action pills, shared by buttons, router links and the Save trigger ([01](01-design-system.md) §0) |
+| `paper-view/headings.tsx` | `SectionHeading` (serif, reading column) and `RailHeading` (tracked capitals, side cards): one definition each |
+| `StatusBadge` | Revision requested / rejected / pending delete carry an icon (return arrow / ban / bin) as well as a tone and label |
+| `AskIrisEmblem` and the Ask IRIS line icons | Amber and green accents replaced by maroon shades and `currentColor`; the "IRIS AI" label marks AI content |
+

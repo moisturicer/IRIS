@@ -3,27 +3,49 @@ import type { PipelineStatus } from "@/lib/constants";
 import type { WorkflowState } from "@/types/records";
 
 /**
- * A record's workflow state, as a coloured chip (IR-259).
+ * A record's workflow state, as a chip (IR-259).
  *
- * The words are the API's (`workflow_state_label`); only the colour is chosen
- * here, keyed by `workflow_state`. The palette carries over from the stored
- * stages each state replaces, so a record reads in the same colour it did.
+ * The words are the API's (`workflow_state_label`); only the tone is chosen
+ * here, keyed by `workflow_state`. Four tones, in the IRIS palette of white,
+ * grey, black and maroon (IR-356). Colour is never the only signal: every
+ * chip carries its label.
  */
+const QUIET     = "bg-stone-100 text-stone-700 ring-1 ring-stone-200"; // not yet with a reviewer
+const ACTIVE    = "bg-brand-50 text-brand ring-1 ring-brand-200";     // with a reviewer, moving
+const ATTENTION = "bg-brand text-white";                              // stopped: someone must act
+const SETTLED   = "bg-stone-900 text-white";                          // finished
+
 const WORKFLOW_COLORS: Record<string, string> = {
-  draft:                 "bg-gray-100 text-gray-600",
-  submitted:             "bg-orange-100 text-orange-700",
-  in_review:             "bg-blue-100 text-blue-700",
-  awaiting_document:     "bg-amber-100 text-amber-700",
-  awaiting_resubmission: "bg-amber-100 text-amber-700", // revision requested
-  final_review:          "bg-purple-100 text-purple-700",
-  approved:              "bg-teal-100 text-teal-700",    // proposal approved — ongoing
-  completed:             "bg-emerald-100 text-emerald-700", // proposal research finished
-  published:             "bg-green-100 text-green-700",
-  rejected:              "bg-red-100 text-red-700",       // terminal rejection
-  pending_delete:        "bg-rose-100 text-rose-700",
+  draft:                 QUIET,
+  submitted:             QUIET,
+  in_review:             ACTIVE,
+  awaiting_document:     ACTIVE,
+  awaiting_resubmission: ACTIVE,    // revision requested: recoverable, so soft; the icon marks it
+  final_review:          ACTIVE,
+  approved:              ACTIVE,    // proposal approved -- ongoing
+  completed:             SETTLED,   // proposal research finished
+  published:             SETTLED,
+  rejected:              ATTENTION, // terminal rejection
+  pending_delete:        ATTENTION,
 };
 
-const NEUTRAL = "bg-gray-100 text-gray-600";
+const NEUTRAL = QUIET;
+
+/**
+ * The states that stop a record carry a shape as well as a word, so that a
+ * recoverable one never reads like a terminal one at a glance: resubmission
+ * is the thesis contribution (01-design-system.md section 7).
+ */
+const WORKFLOW_ICONS: Record<string, string> = {
+  awaiting_resubmission: "fa-rotate-left", // revision requested: recoverable
+  rejected:              "fa-ban",         // terminal
+  pending_delete:        "fa-trash-can",
+};
+const LEGACY_ICONS: Record<string, string> = {
+  declined:       "fa-rotate-left",
+  rejected:       "fa-ban",
+  pending_delete: "fa-trash-can",
+};
 
 type StatusBadgeProps =
   | { state: WorkflowState; label: string; status?: never }
@@ -31,13 +53,14 @@ type StatusBadgeProps =
   | { status: PipelineStatus; state?: never; label?: never };
 
 export function StatusBadge(props: StatusBadgeProps) {
-  const [text, color] =
+  const [text, color, icon] =
     props.state !== undefined
-      ? [props.label, WORKFLOW_COLORS[props.state] ?? NEUTRAL]
-      : [pipelineLabel(props.status), LEGACY_COLORS[props.status] ?? NEUTRAL];
+      ? [props.label, WORKFLOW_COLORS[props.state] ?? NEUTRAL, WORKFLOW_ICONS[props.state]]
+      : [pipelineLabel(props.status), LEGACY_COLORS[props.status] ?? NEUTRAL, LEGACY_ICONS[props.status]];
 
   return (
-    <span className={cn("inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold", color)}>
+    <span className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold", color)}>
+      {icon && <i className={cn("fas", icon)} aria-hidden />}
       {text}
     </span>
   );
@@ -47,17 +70,17 @@ export function StatusBadge(props: StatusBadgeProps) {
 // `status` form above, which the Evaluation screen uses until IR-268 moves it
 // onto `workflow_state`. Nothing else may add a caller.
 const LEGACY_COLORS: Record<string, string> = {
-  draft:           "bg-gray-100 text-gray-600",
-  adviser_review:  "bg-yellow-100 text-yellow-700",
-  approved:        "bg-teal-100 text-teal-700",
-  completed:       "bg-emerald-100 text-emerald-700",
-  rdco_intake:     "bg-orange-100 text-orange-700",
-  itso_review:     "bg-indigo-100 text-indigo-700",
-  ktto_review:     "bg-blue-100 text-blue-700",
-  parallel_review: "bg-blue-100 text-blue-700",
-  rdco_review:     "bg-purple-100 text-purple-700",
-  published:       "bg-green-100 text-green-700",
-  declined:        "bg-amber-100 text-amber-700",
-  rejected:        "bg-red-100 text-red-700",
-  pending_delete:  "bg-rose-100 text-rose-700",
+  draft:           QUIET,
+  adviser_review:  ACTIVE,
+  approved:        ACTIVE,
+  completed:       SETTLED,
+  rdco_intake:     QUIET,
+  itso_review:     ACTIVE,
+  ktto_review:     ACTIVE,
+  parallel_review: ACTIVE,
+  rdco_review:     ACTIVE,
+  published:       SETTLED,
+  declined:        ACTIVE,
+  rejected:        ATTENTION,
+  pending_delete:  ATTENTION,
 };

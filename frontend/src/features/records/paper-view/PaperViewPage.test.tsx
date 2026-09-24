@@ -264,11 +264,11 @@ describe("arriving from a citation", () => {
     expect(await screen.findByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
   });
 
-  it("opens on the Abstract tab, with a View Paper button, when no page was named", async () => {
+  it("opens on the Abstract tab, with the Paper tab one click away, when no page was named", async () => {
     renderPaper(`/records/${RECORD_ID}`);
 
     expect(await screen.findByRole("tab", { name: "Abstract", selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /^View Paper$/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Paper", selected: false })).toBeEnabled();
   });
 
   it("ignores a page that is not a page and stays on Abstract", async () => {
@@ -277,11 +277,12 @@ describe("arriving from a citation", () => {
     expect(await screen.findByRole("tab", { name: "Abstract", selected: true })).toBeInTheDocument();
   });
 
-  it("switches to the reader when View Paper is clicked", async () => {
+  it("switches to the reader when the Paper tab is chosen", async () => {
     renderPaper(`/records/${RECORD_ID}`);
 
-    const button = await screen.findByRole("button", { name: /^View Paper$/i });
-    await userEvent.click(button);
+    // The floating switch is the one way into the reader (IR-356): the
+    // header's "View Paper" button duplicated it and is now Share.
+    await userEvent.click(await screen.findByRole("tab", { name: "Paper" }));
 
     expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
     expect(await screen.findByText(/open at page none, 0 region\(s\)/i)).toBeInTheDocument();
@@ -516,7 +517,7 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
     localStorage.setItem(DOCK_KEY, mode);
     renderPaperView();
     await waitForRecord(record.title);
-    await userEvent.click(screen.getByRole("button", { name: "Open Paper Chat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
     await screen.findByRole("complementary", { name: "Paper Chat" });
   }
 
@@ -536,5 +537,44 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
     await openChatDocked("right");
     await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
     expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
+  });
+});
+
+describe("sharing the paper (IR-356)", () => {
+  const original = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  const stubClipboard = (writeText: () => Promise<void>) =>
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+  });
+
+  afterEach(() => {
+    if (original) Object.defineProperty(navigator, "clipboard", original);
+    else delete (navigator as { clipboard?: unknown }).clipboard;
+  });
+
+  it("copies the paper's link and says so", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    stubClipboard(writeText);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await userEvent.click(screen.getByRole("button", { name: "Share" }));
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/records/${RECORD_ID}`);
+    expect(await screen.findByRole("button", { name: "Link copied" })).toBeInTheDocument();
+  });
+
+  it("says so when the link cannot be copied, rather than failing silently", async () => {
+    stubClipboard(vi.fn(() => Promise.reject(new Error("no permission"))));
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await userEvent.click(screen.getByRole("button", { name: "Share" }));
+
+    expect(await screen.findByRole("button", { name: /couldn.t copy/i })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/copy it from the address bar/i);
   });
 });

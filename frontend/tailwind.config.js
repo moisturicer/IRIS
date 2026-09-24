@@ -33,8 +33,11 @@ export default {
       },
 
       fontFamily: {
-        sans:  ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        sans:  ['"Inter Variable"', "Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
         serif: ["Georgia", "Cambria", '"Times New Roman"', "Times", "serif"],
+        // Titles and section headings on reading surfaces (IR-356), for an
+        // academic, library feel. Everything else stays Inter.
+        display: ['"EB Garamond"', "Georgia", "Cambria", "serif"],
       },
 
       fontSize: {
