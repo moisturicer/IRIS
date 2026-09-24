@@ -304,6 +304,25 @@ change at step 4, and IR-261 supplies them, so no throwaway compatibility layer 
 
 ### 8.1 Payload
 
+**Document-request fields are authorised separately from the rest of the tracker** (ADR-022
+§Amendment 5, 2026-09-24). A viewer who may read the Record gets every field below. The
+document-request fields are the exception:
+- the per-party `awaiting_document` flag, which names the party that asked;
+- `document_requests`: the requests, messages, items and their history.
+
+These go only to **workflow participants**: owners and submitters, and anyone who can staff a
+party that holds, held or acted on an assignment on the Record, or that took part in the
+request. A role alone never qualifies, and neither does being able to read a published Record.
+
+For anyone else, both fields are `null`, meaning "not disclosed". `[]` would wrongly say the
+Record has no requests. The generic `workflow_state` still reads `awaiting_document` while a
+request is open.
+
+Implementation: IR-349. Until it lands, the shipped tracker returns both fields to every reader
+of the Record.
+
+**As a workflow participant sees it:**
+
 ```
 GET /api/v1/records/<id>/tracker/
 {
@@ -327,6 +346,19 @@ GET /api/v1/records/<id>/tracker/
 }
 ```
 
+**As a non-participant sees the same Record**, such as a public reader or an uninvolved office:
+the same payload, except for the document-request fields.
+
+```
+  "workflow_state": "awaiting_document",          ← generic state: still shown
+  "parties": [
+    …
+    {"party": "ierc", "label": "IERC", "state": "active", "awaiting_document": null},
+    …                                              ← every row's flag is null
+  ],
+  "document_requests": null                        ← not disclosed; never []
+```
+
 ### 8.2 What the tracker must answer, and where each answer comes from
 
 | Question | Derived from |
@@ -336,7 +368,7 @@ GET /api/v1/records/<id>/tracker/
 | Active reviews | `state = active` and the party has at least one `Review` |
 | Requested but not yet started | `state = active` and the party has no `Review` |
 | Offices never requested | Parties with no assignment row at all (see RDCO rule below) |
-| Document requests and their status | `DocumentRequest` + items |
+| Document requests and their status | `DocumentRequest` + items. **Workflow participants only** (ADR-022 §Amendment 5; IR-349). `null` for anyone else |
 | Routing history | `RoutingEvent`, grouped by `group_id` |
 | Review history | `Review` |
 | Resubmission history | `ResubmissionRequest` |
