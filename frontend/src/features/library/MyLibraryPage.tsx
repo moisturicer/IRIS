@@ -223,8 +223,10 @@ export default function MyLibraryPage() {
       </div>
 
       <div className="lg:flex lg:gap-5 lg:items-start">
+        {/* The rail sticks below the fixed 58px Header (IR-351: sticky only
+            started working once AppShell stopped being a scroll container). */}
         {railOpen ? (
-          <div className="mb-4 lg:mb-0 lg:w-64 lg:shrink-0 lg:sticky lg:top-6 lg:h-[calc(100vh-8rem)]">
+          <div className="mb-4 lg:mb-0 lg:w-64 lg:shrink-0 lg:sticky lg:top-[82px] lg:h-[calc(100vh-8rem)]">
             <LibraryFolderRail
               collections={collections}
               view={view}

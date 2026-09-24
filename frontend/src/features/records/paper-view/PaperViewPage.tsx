@@ -472,6 +472,7 @@ export default function PaperViewPage() {
   // with nothing to highlight, which is the same graceful case a passage
   // with no recovered regions already is.
   const navCitation = (location.state as CitationNavigationState | null)?.citation;
+  const chatDocked = chat.open && chat.dock !== "floating";
   const highlightRegions: Region[] =
     navCitation && navCitation.record_id === record.id && "regions" in navCitation
       ? navCitation.regions
@@ -544,7 +545,12 @@ export default function PaperViewPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+          <div
+            className={cn(
+              "grid gap-6 items-start",
+              !chatDocked && "lg:grid-cols-[minmax(0,1fr)_20rem]",
+            )}
+          >
           {/* ------------------------------------------------------------- */}
           {/* Main column                                                    */}
           {/* ------------------------------------------------------------- */}
@@ -793,11 +799,19 @@ export default function PaperViewPage() {
           {/* ------------------------------------------------------------- */}
           {/* Right rail                                                     */}
           {/* ------------------------------------------------------------- */}
-          <aside className="space-y-4 lg:sticky lg:top-6">
-            <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
-            <PaperGovernance record={record} />
-            <PaperDocuments recordId={record.id} files={record.files} />
-          </aside>
+          {/* Not shown while chat is docked (IR-351): a docked chat beside
+              the rail squeezed the paper under it. Floating or closing the
+              chat brings it back. Sticky below the fixed 58px header, capped
+              to the viewport and scrollable, because a sticky rail taller
+              than the window would hide its lower cards until the paper
+              ended. */}
+          {!chatDocked && (
+            <aside className="space-y-4 lg:sticky lg:top-[82px] lg:max-h-[calc(100vh-106px)] lg:overflow-y-auto">
+              <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
+              <PaperGovernance record={record} />
+              <PaperDocuments recordId={record.id} files={record.files} />
+            </aside>
+          )}
         </div>
 
         <PaperCiteModal record={record} isOpen={citeOpen} onClose={() => setCiteOpen(false)} />

@@ -47,9 +47,16 @@ export function AppShell() {
         )}
       >
         {!isFullBleed && <Header />}
+        {/* The window is the scroll root, not `main` (IR-351). Nothing bounds
+            main's height, so an `overflow-y-auto` here never scrolled; it only
+            made main the nearest scroll container, which left every `sticky`
+            descendant inert. No overflow value at all, not `overflow-x-clip`:
+            a wide table with no scroll wrapper of its own (DocumentsPage,
+            ApprovedProposalsPage) must stay reachable by scrolling the window
+            sideways, not be cut off. */}
         <main
           className={cn(
-            "flex-1 overflow-y-auto",
+            "flex-1",
             isFullBleed ? "pt-0 p-0" : "pt-[58px] p-4 sm:p-7"
           )}
         >

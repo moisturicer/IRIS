@@ -30,7 +30,7 @@
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -39,6 +39,7 @@ import { useAuthStore } from "@/store/auth.store";
 import type { User } from "@/types/auth";
 import type { RecordDetail } from "@/types/records";
 
+import { DOCK_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
 
 const RECORD_ID = 7;
@@ -174,6 +175,9 @@ vi.mock("@/api/ai", () => ({
   aiApi: {
     ask:      vi.fn(() => Promise.reject(new Error("not under test"))),
     overview: vi.fn(() => Promise.reject(new Error("not under test"))),
+    // Paper Chat opens its Conversation on mount; its behaviour is
+    // `PaperChatDock.test.tsx`'s. Here only where the panel sits is.
+    conversations: { findOrCreateForRecord: vi.fn(() => new Promise(() => {})) },
   },
 }));
 
@@ -495,5 +499,42 @@ describe("document requests (IR-262)", () => {
 
     await waitForRecord(inReview.title);
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the rail while Paper Chat is docked (IR-351)", () => {
+  const RAIL = { name: "Institutional Governance" };
+
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+  });
+
+  afterEach(() => localStorage.removeItem(DOCK_KEY));
+
+  async function openChatDocked(mode: "left" | "right" | "floating") {
+    localStorage.setItem(DOCK_KEY, mode);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", { name: "Open Paper Chat" }));
+    await screen.findByRole("complementary", { name: "Paper Chat" });
+  }
+
+  // Docked beside the rail, the chat squeezed the paper under it; the rail is
+  // not shown at all while docked. It is back as soon as the chat floats.
+  it.each(["left", "right"] as const)("is not shown while docked %s", async (mode) => {
+    await openChatDocked(mode);
+    expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
+  });
+
+  it("is shown while the chat floats", async () => {
+    await openChatDocked("floating");
+    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
+  });
+
+  it("comes back when the docked chat is closed", async () => {
+    await openChatDocked("right");
+    await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
+    expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
   });
 });
