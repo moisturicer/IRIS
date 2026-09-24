@@ -55,7 +55,10 @@ function PdfPageView({
       // bare `<canvas>` -- inherently opaque to assistive tech -- does not.
       role="group"
       aria-label={`Page ${pageNumber}`}
-      className="relative mx-auto mb-4 bg-white shadow-card border border-stone-200"
+      // `scroll-mt` so a page scrolled to lands below the fixed header and the
+      // sticky toolbar (which ends ~112px down) instead of beneath them
+      // (IR-351). Landing on the passage itself is IR-354's.
+      className="relative mx-auto mb-4 scroll-mt-[120px] bg-white shadow-card border border-stone-200"
       style={size ? { width: size.width, height: size.height } : { minHeight: 400 }}
     >
       <canvas ref={canvasRef} className="block" />
@@ -182,7 +185,8 @@ export function PaperPdfReader({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-xl bg-white/90 backdrop-blur border border-stone-200">
+      {/* Sticks just below the fixed 58px app header (IR-351). */}
+      <div className="sticky top-[66px] z-10 flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-xl bg-white/90 backdrop-blur border border-stone-200">
         <div className="flex items-center gap-1.5">
           <button
             type="button"

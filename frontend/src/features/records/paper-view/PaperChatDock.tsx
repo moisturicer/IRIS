@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 export type DockMode = "left" | "right" | "floating";
 
-const DOCK_KEY = "iris_paper_chat_dock";
+export const DOCK_KEY = "iris_paper_chat_dock";
 
 function readDock(): DockMode {
   try {
@@ -93,7 +93,7 @@ export function PaperChatPanel({
   const [widen, setWiden] = useState(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
   const { streaming, ask } = useAskStream();
 
   // Find or start the Conversation for this Record. Re-runs if the reader
@@ -117,8 +117,12 @@ export function PaperChatPanel({
     return () => { cancelled = true; };
   }, [record.id]);
 
+  // Scroll the transcript itself, never with `scrollIntoView` (IR-351): that
+  // scrolls every scrollable ancestor too, the window included, and threw a
+  // reader at page 6 back to the top of the paper just for opening the panel.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const transcript = transcriptRef.current;
+    if (transcript) transcript.scrollTop = transcript.scrollHeight;
   }, [messages, busy, streaming]);
 
   const send = async () => {
@@ -212,7 +216,7 @@ export function PaperChatPanel({
       </div>
 
       {/* Transcript */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#FBFCFD]">
+      <div ref={transcriptRef} className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#FBFCFD]">
         {ready && messages.length === 0 && (
           <div className="text-center py-8 px-4">
             <AskIrisEmblem className="w-10 h-10 mx-auto mb-3" />
@@ -228,7 +232,6 @@ export function PaperChatPanel({
         ))}
 
         {busy && streaming && <StreamingMessageBubble state={streaming} />}
-        <div ref={bottomRef} />
       </div>
 
       {/* Composer */}
@@ -288,11 +291,15 @@ export function PaperChatPanel({
  * beside the page content, so it can never cover the app sidebar, the header,
  * or the record's own rail. Below `lg` there is no room for a second column,
  * so it falls back to a bottom sheet.
+ *
+ * The offsets clear the fixed 58px `Header`: the panel sticks 24px below it
+ * (82px) and is sized to what remains of the viewport less a 24px bottom
+ * margin (106px), so its own header and composer are never hidden (IR-351).
  */
 export const DOCKED_PANEL_CLASS =
   "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-2xl " +
-  "lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-6 lg:z-auto " +
-  "lg:h-[calc(100vh-3rem)] lg:w-[22rem] lg:shrink-0 lg:rounded-2xl";
+  "lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-[82px] lg:z-auto " +
+  "lg:h-[calc(100vh-106px)] lg:w-[22rem] lg:shrink-0 lg:rounded-2xl";
 
 /** Positioning for the floating panel — deliberately overlays the page. */
 export const FLOATING_PANEL_CLASS =

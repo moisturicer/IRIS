@@ -70,8 +70,8 @@ const noop = () => {};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // jsdom does not implement it; the panel calls it to keep the transcript
-  // scrolled to the newest message.
+  // jsdom does not implement it. The panel must not call it (IR-351); the
+  // stub is here so a regression fails an assertion rather than throwing.
   Element.prototype.scrollIntoView = vi.fn();
   findOrCreateForRecord.mockResolvedValue({ data: conversation() });
   askStream.mockImplementation(() => doneStreamOf());
@@ -186,6 +186,36 @@ describe("the widen control", () => {
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
     expect(await screen.findByText(/Searched all papers/i)).toBeTruthy();
+  });
+});
+
+describe("keeping the newest message in view (IR-351)", () => {
+  // `scrollIntoView` scrolls every scrollable ancestor, the window included:
+  // opening docked Paper Chat at page 6 of a paper used to throw the reader
+  // back to the top of the record. The transcript must scroll itself only.
+  it("scrolls its own transcript, never an ancestor, as messages arrive", async () => {
+    const scrollTopSet = vi.spyOn(Element.prototype, "scrollTop", "set");
+    renderScreen(
+      <PaperChatPanel record={record} dock="right" onDockChange={noop} onClose={noop} />,
+    );
+    await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalled());
+
+    await userEvent.type(
+      screen.getByRole("textbox", { name: /ask about this paper/i }),
+      "What datasets were used?",
+    );
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    await screen.findByText(/reduced mean absolute error/i);
+
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+
+    const panel = screen.getByRole("complementary", { name: "Paper Chat" });
+    const scrolled = scrollTopSet.mock.contexts as Element[];
+    expect(scrolled.length).toBeGreaterThan(0);
+    for (const el of scrolled) {
+      expect(el).not.toBe(panel);
+      expect(panel.contains(el)).toBe(true);
+    }
   });
 });
 
