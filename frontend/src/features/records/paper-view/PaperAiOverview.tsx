@@ -5,6 +5,7 @@ import type { RecordDetail } from "@/types/records";
 import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcons";
 import { CitationText } from "@/features/ai/components/CitationText";
 import { DegradedNotice } from "@/features/ai/components/PassageQuote";
+import { RailHeading } from "./headings";
 
 /**
  * AI Overview — a grounded summary of the record being viewed.
@@ -53,20 +54,20 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   const overview = response?.overview ?? null;
 
   return (
-    <section className="bg-white border border-stone-200 rounded-2xl p-5">
+    <section className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card border-t-2 border-t-brand/70">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-2">
+        <RailHeading className="flex items-center gap-2">
           <AskIrisMark className="w-3.5 h-3.5 text-brand" />
           AI Overview
-        </h2>
+        </RailHeading>
         {state === "ready" && (
-          <span className="text-[11px] text-stone-400">RAG-indexed paper synthesis</span>
+          <span className="text-2xs text-stone-500">RAG-indexed paper synthesis</span>
         )}
       </div>
 
       {loading && (
         <div>
-          <p className="flex items-center gap-2 text-[12px] text-stone-400 mb-3">
+          <p className="flex items-center gap-2 text-xs text-stone-500 mb-3">
             <SynthesisIcon className="w-4 h-4" spinning />
             Reading the indexed record set…
           </p>
@@ -80,17 +81,17 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
 
       {!loading && failed && (
         <div className="flex items-start gap-3">
-          <i className="fas fa-plug-circle-xmark text-[13px] text-stone-300 mt-0.5" aria-hidden />
+          <i className="fas fa-plug-circle-xmark text-sm text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-stone-700">AI overview unavailable</p>
-            <p className="text-[12px] text-stone-500 mt-0.5">
+            <p className="text-sm font-semibold text-stone-700">AI overview unavailable</p>
+            <p className="text-xs text-stone-500 mt-0.5">
               IRIS could not reach the answering service. Nothing is summarised here rather than
               guessed.
             </p>
             <button
               type="button"
               onClick={() => void load()}
-              className="mt-2 text-[12px] font-semibold text-brand hover:underline"
+              className="mt-2 text-xs font-semibold text-brand hover:underline"
             >
               Try again
             </button>
@@ -100,12 +101,12 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
 
       {!loading && !failed && state === "unavailable" && (
         <div className="flex items-start gap-3">
-          <i className="fas fa-microchip text-[13px] text-stone-300 mt-0.5" aria-hidden />
+          <i className="fas fa-microchip text-sm text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-stone-700">
+            <p className="text-sm font-semibold text-stone-700">
               AI summary unavailable
             </p>
-            <p className="text-[12px] text-stone-500 mt-0.5 leading-relaxed">
+            <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
               The answering model could not be reached, so IRIS is not summarising this paper.
               Retrieval still works — see Related Institutional Works below, or ask a question in
               Paper Chat.
@@ -116,10 +117,10 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
 
       {!loading && !failed && state === "not_indexed" && (
         <div className="flex items-start gap-3">
-          <i className="fas fa-circle-info text-[13px] text-stone-300 mt-0.5" aria-hidden />
+          <i className="fas fa-circle-info text-sm text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-stone-700">Nothing indexed to summarise</p>
-            <p className="text-[12px] text-stone-500 mt-0.5">
+            <p className="text-sm font-semibold text-stone-700">Nothing indexed to summarise</p>
+            <p className="text-xs text-stone-500 mt-0.5">
               This record has no indexed text the retrieval service could draw on.
             </p>
           </div>
@@ -131,13 +132,13 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
           <CitationText
             text={overview.text}
             citations={overview.citations}
-            className="text-[13px] text-stone-700 leading-[1.7] [&_h1]:text-[16px] [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1.5 [&_h2]:text-[14px] [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-0.5 [&_strong]:font-semibold [&_strong]:text-stone-800"
+            className="text-sm text-stone-700 leading-[1.7] [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1.5 [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-2 [&_li]:mb-0.5 [&_strong]:font-semibold [&_strong]:text-stone-800"
           />
 
           {overview.degraded && <DegradedNotice subject="summary" />}
 
           {overview.citations.length === 0 && (
-            <p className="mt-2 text-[12px] text-stone-400 italic">
+            <p className="mt-2 text-xs text-stone-500 italic">
               Grounded in this record's indexed passages.
             </p>
           )}

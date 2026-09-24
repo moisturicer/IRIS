@@ -23,10 +23,10 @@ interface ReviewerDocumentRequestsProps {
 
 /** Presentation only; every word comes from the server. */
 const ITEM_TONE: Record<DocumentRequestItemState, string> = {
-  missing:  "text-amber-800 bg-amber-100",
-  uploaded: "text-sky-800 bg-sky-100",
-  accepted: "text-emerald-800 bg-emerald-100",
-  rejected: "text-red-800 bg-red-100",
+  missing:  "text-brand bg-brand-100",
+  uploaded: "text-brand bg-brand-50",
+  accepted: "text-stone-900 bg-stone-100",
+  rejected: "text-brand bg-brand-100",
 };
 
 /** A request still asks something of the party that made it. */
@@ -85,7 +85,7 @@ export function ReviewerDocumentRequests({
     <div className={cn("space-y-3", className)}>
       {canRequest && (
         <div>
-          <p className="text-[12px] text-stone-600">
+          <p className="text-xs text-stone-600">
             Only missing a file? Ask for it without sending the record back.
           </p>
           <button
@@ -94,13 +94,13 @@ export function ReviewerDocumentRequests({
               setRequested(false);
               setRequesting(true);
             }}
-            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-white text-[12px] font-bold text-stone-700 hover:border-brand/40 transition-colors"
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-white text-xs font-bold text-stone-700 hover:border-brand/40 transition-colors"
           >
-            <i className="fas fa-file-circle-plus text-[11px]" aria-hidden />
+            <i className="fas fa-file-circle-plus text-2xs" aria-hidden />
             Request documents
           </button>
           {requested && (
-            <p role="status" className="mt-2 text-[12px] text-emerald-700">
+            <p role="status" className="mt-2 text-xs text-stone-900">
               Documents requested. The owner has been notified.
             </p>
           )}
@@ -109,7 +109,7 @@ export function ReviewerDocumentRequests({
 
       {mine.length > 0 && (
         <section aria-labelledby={headingId} className="space-y-2">
-          <h2 id={headingId} className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+          <h2 id={headingId} className="text-2xs font-bold uppercase tracking-wider text-stone-500">
             Documents you requested
           </h2>
           {mine.map((r) => (
@@ -147,11 +147,11 @@ function ManagedRequest({
   const listId = useId();
   return (
     <article className="bg-white border border-stone-200 rounded-xl p-3.5">
-      <p className="text-[11px] text-stone-500">
+      <p className="text-2xs text-stone-500">
         {request.label} · {request.state_label} · {formatDate(request.created_at, "MMM d")}
       </p>
       {/* A text node, never innerHTML (ADR-022 §Security). */}
-      <p className="text-[13px] text-stone-700 leading-relaxed mt-1 whitespace-pre-line break-words">
+      <p className="text-sm text-stone-700 leading-relaxed mt-1 whitespace-pre-line break-words">
         {request.message}
       </p>
       <p id={listId} className="sr-only">
@@ -200,11 +200,11 @@ function ManagedItem({
   return (
     <li className="py-2 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <span className="text-[13px] font-semibold text-stone-800 min-w-0 break-words">
+        <span className="text-sm font-semibold text-stone-800 min-w-0 break-words">
           {item.label}
         </span>
         <span className="flex items-center gap-1.5 flex-wrap">
-          <span className={cn("px-1.5 py-0.5 rounded text-[11px] font-bold", ITEM_TONE[item.state])}>
+          <span className={cn("px-1.5 py-0.5 rounded text-2xs font-bold", ITEM_TONE[item.state])}>
             {item.state_label}
           </span>
           {decidable && (
@@ -214,7 +214,7 @@ function ManagedItem({
                 disabled={busy}
                 aria-label={`Accept ${item.label}`}
                 onClick={() => void decide({ action: "accept" })}
-                className="px-2 py-1 rounded-lg bg-emerald-700 text-white text-[12px] font-bold hover:bg-emerald-800 disabled:opacity-60"
+                className="px-2 py-1 rounded-lg bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 disabled:opacity-60"
               >
                 Accept
               </button>
@@ -224,7 +224,7 @@ function ManagedItem({
                 aria-label={`Reject ${item.label}`}
                 aria-expanded={rejecting}
                 onClick={() => setRejecting((v) => !v)}
-                className="px-2 py-1 rounded-lg border border-red-200 text-[12px] font-bold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                className="px-2 py-1 rounded-lg border border-brand-200 text-xs font-bold text-brand hover:bg-brand-50 disabled:opacity-60"
               >
                 Reject
               </button>
@@ -234,7 +234,7 @@ function ManagedItem({
       </div>
 
       {item.state === "missing" && item.rejection_reason && (
-        <p className="text-[12px] text-stone-600 mt-1 break-words">
+        <p className="text-xs text-stone-600 mt-1 break-words">
           You rejected the last upload: “{item.rejection_reason}”
         </p>
       )}
@@ -247,7 +247,7 @@ function ManagedItem({
             if (reason.trim()) void decide({ action: "reject", reason: reason.trim() });
           }}
         >
-          <label htmlFor={reasonId} className="block text-[12px] font-semibold text-stone-700">
+          <label htmlFor={reasonId} className="block text-xs font-semibold text-stone-700">
             Why is {item.label} not acceptable?{" "}
             <span className="font-normal text-stone-500">The owner reads this.</span>
           </label>
@@ -256,13 +256,13 @@ function ManagedItem({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-stone-200 p-2 text-[13px] focus:outline-none focus:border-brand"
+            className="w-full rounded-lg border border-stone-200 p-2 text-sm focus:outline-none focus:border-brand"
           />
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={busy || !reason.trim()}
-              className="px-2.5 py-1 rounded-lg bg-red-700 text-white text-[12px] font-bold hover:bg-red-800 disabled:opacity-60"
+              className="px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-60"
             >
               Send rejection
             </button>
@@ -272,7 +272,7 @@ function ManagedItem({
                 setRejecting(false);
                 setReason("");
               }}
-              className="px-2.5 py-1 rounded-lg border border-stone-200 text-[12px] font-semibold text-stone-700 hover:bg-stone-50"
+              className="px-2.5 py-1 rounded-lg border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50"
             >
               Cancel
             </button>
@@ -281,7 +281,7 @@ function ManagedItem({
       )}
 
       {error && (
-        <p role="alert" className="text-[12px] text-red-700 mt-1">
+        <p role="alert" className="text-xs text-brand mt-1">
           {error}
         </p>
       )}
@@ -317,7 +317,7 @@ function Withdraw({
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="mt-2 text-[12px] font-semibold text-stone-600 underline underline-offset-2 hover:text-stone-900"
+        className="mt-2 text-xs font-semibold text-stone-600 underline underline-offset-2 hover:text-stone-900"
       >
         Withdraw request
       </button>
@@ -326,7 +326,7 @@ function Withdraw({
 
   return (
     <div className="mt-2 pt-2 border-t border-stone-100 space-y-2">
-      <p className="text-[12px] text-stone-700">
+      <p className="text-xs text-stone-700">
         The owner will no longer be asked for these documents. The request stays in the history.
       </p>
       <div className="flex gap-2">
@@ -334,7 +334,7 @@ function Withdraw({
           type="button"
           disabled={busy}
           onClick={() => void withdraw()}
-          className="px-2.5 py-1 rounded-lg bg-stone-800 text-white text-[12px] font-bold hover:bg-stone-900 disabled:opacity-60"
+          className="px-2.5 py-1 rounded-lg bg-stone-800 text-white text-xs font-bold hover:bg-stone-900 disabled:opacity-60"
         >
           Confirm withdrawal
         </button>
@@ -342,13 +342,13 @@ function Withdraw({
           type="button"
           disabled={busy}
           onClick={() => setConfirming(false)}
-          className="px-2.5 py-1 rounded-lg border border-stone-200 text-[12px] font-semibold text-stone-700 hover:bg-stone-50"
+          className="px-2.5 py-1 rounded-lg border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50"
         >
           Keep request
         </button>
       </div>
       {error && (
-        <p role="alert" className="text-[12px] text-red-700">
+        <p role="alert" className="text-xs text-brand">
           {error}
         </p>
       )}

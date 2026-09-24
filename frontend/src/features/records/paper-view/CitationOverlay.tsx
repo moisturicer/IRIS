@@ -22,7 +22,7 @@ export function CitationOverlay({ regions }: { regions: Region[] }) {
       {regions.map((region, index) => (
         <div
           key={index}
-          className="absolute rounded-[2px] bg-amber-300/35 ring-2 ring-amber-500/80 motion-safe:animate-citation-flash"
+          className="absolute rounded-[2px] bg-brand-200/40 ring-2 ring-brand/70 motion-safe:animate-citation-flash"
           style={{
             left:   `${region.left * 100}%`,
             top:    `${region.top * 100}%`,
