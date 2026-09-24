@@ -247,8 +247,13 @@ class DocumentRequestItemState(models.TextChoices):
     One requested document. `DocumentRequestItem.state`.
 
     ADR-022 §1 and §3. The owner's upload moves `MISSING` to `UPLOADED`; the
-    requesting party's review moves it to `ACCEPTED`, or back to `MISSING` by
-    way of `REJECTED` (IR-263).
+    requesting party's review moves it to `ACCEPTED`, or rejects it.
+
+    **A rejected item is stored as `MISSING`, not `REJECTED`** (IR-263):
+    §3.4 sends it "back to `missing` with a comment", and the owner must be
+    able to upload against it again. The rejection is recorded as the item's
+    `rejection_reason` and `decided_at`. `REJECTED` is kept because ADR-022
+    §1 lists it, but nothing writes it.
     """
 
     MISSING = "missing", "Missing"

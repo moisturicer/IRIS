@@ -254,10 +254,10 @@ describe("ReviewRoutingTracker", () => {
       document_requests: [{
         id: 5, party: "ierc", label: "IERC", state: "open", state_label: "Open",
         message: "Rescan the consent form.", requested_by: "Ivy Ethics",
-        created_at: "2026-09-20T02:00:00Z", closed_at: null,
+        created_at: "2026-09-20T02:00:00Z", closed_at: null, withdrawal_reason: null, can_manage: false,
         items: [{
           id: 51, slot: null, label: "Consent form", state: "missing",
-          state_label: "Missing", upload: null, uploaded_at: null,
+          state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
         }],
       }],
     });
@@ -274,6 +274,45 @@ describe("ReviewRoutingTracker", () => {
     expect(request).toHaveTextContent("Rescan the consent form.");
 
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows each item's state, a reject reason and a withdrawal in the history (IR-263)", async () => {
+    const base = {
+      party: "ierc" as const, label: "IERC", message: "Rescan the consent form.",
+      requested_by: "Ivy Ethics", created_at: "2026-09-20T02:00:00Z", can_manage: false,
+    };
+    const itemBase = { slot: null, upload: null, uploaded_at: null, decided_at: null };
+    tracker.mockResolvedValue({
+      data: payload({
+        ...afterResubmission,
+        document_requests: [
+          {
+            ...base, id: 5, state: "fulfilled", state_label: "Fulfilled",
+            closed_at: "2026-09-22T02:00:00Z", withdrawal_reason: null,
+            items: [
+              { ...itemBase, id: 51, label: "Consent form", state: "accepted",
+                state_label: "Accepted", rejection_reason: "Unreadable scan." },
+              { ...itemBase, id: 52, label: "Protocol", state: "accepted",
+                state_label: "Accepted", rejection_reason: null },
+            ],
+          },
+          {
+            ...base, id: 6, state: "withdrawn", state_label: "Withdrawn",
+            closed_at: "2026-09-23T02:00:00Z", withdrawal_reason: "Found it in the appendix.",
+            items: [{ ...itemBase, id: 61, label: "Budget", state: "missing",
+              state_label: "Missing", rejection_reason: null }],
+          },
+        ],
+      }),
+    });
+    renderTracker();
+
+    const list = await screen.findByRole("list", { name: /document requests/i });
+    const [accepted, withdrawn] = within(list).getAllByRole("listitem");
+    expect(accepted).toHaveTextContent("Consent form (Accepted), Protocol (Accepted)");
+    expect(accepted).toHaveTextContent("IERC rejected an upload of Consent form: “Unreadable scan.”");
+    expect(withdrawn).toHaveTextContent("Withdrawn");
+    expect(withdrawn).toHaveTextContent("“Found it in the appendix.”");
   });
 
   it("discloses nothing about requests to a viewer who may not read them (IR-349)", async () => {

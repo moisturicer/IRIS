@@ -1,13 +1,17 @@
 """
 Document requests: a reviewer asks the owner for documents (ADR-022, IR-262).
 
-ADR-022 §3. Creating a request and fulfilling it are the only two writes, and
-**neither touches the record's workflow**: no `pipeline_status` change, no
-clearance reset, no assignment closed. The record's `awaiting_document` state is
-derived from open requests by `apps.reviews.tracker` and never stored.
+ADR-022 §3 and §4. Creating a request, fulfilling it, accepting or rejecting
+an upload and withdrawing it (IR-263) are the writes, and **none of them
+touches the record's workflow**: no `pipeline_status` change, no clearance
+reset, no assignment closed. The record's `awaiting_document` state is derived
+from open requests by `apps.reviews.tracker` and never stored.
 
-Accepting, rejecting and withdrawing (§3.4, §4) are IR-263's. A decision closing
-open requests (§3) is IR-270's.
+Who does what (§Amendment 2): the requesting party creates, decides and
+withdraws; only the Record's owners fulfil. A decision closing open requests
+(§3) is IR-270's.
+
+The wire shape is `request_serializers`; this module builds no payload.
 """
 
 from __future__ import annotations
@@ -44,53 +48,15 @@ def picklist(record):
     ).order_by("pk")
 
 
-def parse_items(record, raw_items) -> list[ItemSpec]:
+def requesting_party(record, user, party=None) -> str:
     """
-    `[{"slot": id} | {"label": text}, ...]` to item specs.
-
-    A slot must be on this record's picklist. A label alone is an "Other" item.
-    """
-    if not isinstance(raw_items, list) or not raw_items:
-        raise DocumentRequestError("Choose at least one document.")
-
-    allowed = {slot.pk: slot for slot in picklist(record)}
-    specs: list[ItemSpec] = []
-    seen_slots: set[int] = set()
-    for raw in raw_items:
-        if not isinstance(raw, dict):
-            raise DocumentRequestError("Each item needs a slot or a label.")
-        slot_id = raw.get("slot")
-        label = str(raw.get("label") or "").strip()
-        if slot_id not in (None, ""):
-            try:
-                slot = allowed[int(slot_id)]
-            except (KeyError, TypeError, ValueError):
-                raise DocumentRequestError(
-                    "That document is not one this record type can be asked for."
-                )
-            if slot.pk in seen_slots:
-                raise DocumentRequestError(f'"{slot.name}" is listed twice.')
-            seen_slots.add(slot.pk)
-            specs.append(ItemSpec(slot=slot, label=slot.name))
-        elif label:
-            if len(label) > 200:
-                raise DocumentRequestError("A document name is at most 200 characters.")
-            specs.append(ItemSpec(slot=None, label=label))
-        else:
-            raise DocumentRequestError("Each item needs a slot or a label.")
-    return specs
-
-
-def create_request(record, user, *, message, raw_items, party=None) -> DocumentRequest:
-    """
-    Open a request as `party` (inferred when the user holds exactly one).
+    The party `user` asks as: `party`, or the only one they hold.
 
     ADR-022 §Security: the user must hold the record -- an active assignment
-    for a party they can staff (`tracker.requestable_parties`).
+    for a party they can staff (`tracker.requestable_parties`). Asked before
+    the body is validated, so someone who may not ask is told that first.
     """
-    from apps.reviews.models import RecordAssignment
     from apps.reviews.tracker import requestable_parties
-    from core.enums import AssignmentState
 
     parties = requestable_parties(record, user)
     if party in (None, ""):
@@ -98,14 +64,16 @@ def create_request(record, user, *, message, raw_items, party=None) -> DocumentR
             if not parties:
                 raise NotAHolder("You do not hold this record.")
             raise DocumentRequestError("Say which party you are asking as.")
-        party = parties[0]
-    elif party not in parties:
+        return parties[0]
+    if party not in parties:
         raise NotAHolder("You do not hold this record as that party.")
+    return party
 
-    message = str(message or "").strip()
-    if not message:
-        raise DocumentRequestError("Tell the owner why you need these documents.")
-    specs = parse_items(record, raw_items)
+
+def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> DocumentRequest:
+    """Open a request as `party`, which `requesting_party` has already vetted."""
+    from apps.reviews.models import RecordAssignment
+    from core.enums import AssignmentState
 
     with transaction.atomic():
         request = DocumentRequest.objects.create(
@@ -227,33 +195,120 @@ def may_read_requests(record, user) -> bool:
     return bool(staffable & (participating_parties(record) | requesting))
 
 
-def payload(request: DocumentRequest, *, staff_viewer: bool) -> dict:
-    """One request as the API and the tracker state it."""
-    from apps.reviews.tracker import party_label
+def may_fulfil(record, user) -> bool:
+    """
+    Only the Record's owners answer a request (ADR-022 §Amendment 2, IR-263).
+    §Amendment 2's "authorised submitter" is a `RecordOwner`: co-authors are
+    added as owners, and IRIS has no other kind of submitter.
 
-    return {
-        "id": request.pk,
-        "party": request.party,
-        "label": party_label(request.party, staff_viewer=staff_viewer),
-        "state": request.state,
-        "state_label": request.get_state_display(),
-        "message": request.message,
-        "requested_by": request.requested_by.get_full_name() if request.requested_by else None,
-        "created_at": request.created_at.isoformat(),
-        "closed_at": request.closed_at.isoformat() if request.closed_at else None,
-        "items": [
-            {
-                "id": item.pk,
-                "slot": item.slot_id,
-                "label": item.label,
-                "state": item.state,
-                "state_label": item.get_state_display(),
-                "upload": item.upload_id,
-                "uploaded_at": item.upload.created_at.isoformat() if item.upload else None,
-            }
-            for item in request.items.all()
-        ],
-    }
+    Staff pass `authorize_record_documents` on every Record, so without this
+    the office that asked could answer its own request by uploading the file.
+    """
+    return bool(
+        user is not None and getattr(user, "is_authenticated", False)
+        and record.owners.filter(user=user).exists()
+    )
+
+
+def is_requester(request: DocumentRequest, user) -> bool:
+    """`user` can staff the party that asked. The party counts, not the person."""
+    from apps.reviews.tracker import staffable_parties
+
+    return request.party in staffable_parties(request.record, user)
+
+
+def readable_request(request_id, user) -> Optional[DocumentRequest]:
+    """
+    The request, or None when `user` may not see it.
+
+    Not seeing the Record (`visible_to`), and seeing it without being allowed
+    its request data (`may_read_requests`), both read as a missing id: the
+    request is an object this caller cannot see (§Amendment 4).
+    """
+    from apps.records.models import Record
+
+    try:
+        request = DocumentRequest.objects.select_related("record").get(pk=int(request_id))
+    except (DocumentRequest.DoesNotExist, TypeError, ValueError):
+        return None
+    if not Record.objects.visible_to(user).filter(pk=request.record_id).exists():
+        return None
+    if not may_read_requests(request.record, user):
+        return None
+    return request
+
+
+def _lock_decidable(item: DocumentRequestItem) -> tuple[DocumentRequestItem, DocumentRequest]:
+    """
+    Lock the item, then its request -- the order the upload path locks them,
+    so a decision and an upload cannot interleave -- and confirm the item is
+    an upload awaiting the requesting party's verdict. Call in a transaction.
+    """
+    item = DocumentRequestItem.objects.select_for_update().get(pk=item.pk)
+    request = DocumentRequest.objects.select_for_update().get(pk=item.request_id)
+    if request.state == DocumentRequestState.WITHDRAWN:
+        raise DocumentRequestError("That request was withdrawn.")
+    if item.state != DocumentRequestItemState.UPLOADED:
+        raise DocumentRequestError("Only an uploaded document can be accepted or rejected.")
+    return item, request
+
+
+def accept_item(item: DocumentRequestItem) -> DocumentRequest:
+    """
+    The upload satisfies the request (ADR-022 §3.4). A request whose items
+    were all uploaded is already fulfilled, so it stays closed. The caller has
+    checked `is_requester`.
+    """
+    with transaction.atomic():
+        item, request = _lock_decidable(item)
+        item.state = DocumentRequestItemState.ACCEPTED
+        item.decided_at = timezone.now()
+        item.save(update_fields=["state", "decided_at"])
+    return request
+
+
+def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequest:
+    """
+    The upload does not satisfy the request (ADR-022 §3.4). The item goes
+    back to `missing` with `reason` and forgets the upload -- the file version
+    itself stays on the Record -- the request reopens, and the owners are told
+    once the transaction commits. The caller has checked `is_requester`.
+    """
+    with transaction.atomic():
+        item, request = _lock_decidable(item)
+        item.state = DocumentRequestItemState.MISSING
+        item.upload = None
+        item.rejection_reason = reason
+        item.decided_at = timezone.now()
+        item.save(update_fields=["state", "upload", "rejection_reason", "decided_at"])
+        if request.state != DocumentRequestState.OPEN:
+            request.state = DocumentRequestState.OPEN
+            request.closed_at = None
+            request.save(update_fields=["state", "closed_at"])
+
+        from apps.notifications.services import notify_document_rejected
+
+        transaction.on_commit(
+            lambda: notify_document_rejected(request, item, rejected_by=user)
+        )
+    return request
+
+
+def withdraw_request(request: DocumentRequest, *, reason: str = "") -> DocumentRequest:
+    """
+    The requesting party no longer needs it (ADR-022 §4). Only an open
+    request: a fulfilled one is already closed, and its uploads are decided
+    item by item. It stays in the history; the owner's panel drops it.
+    """
+    with transaction.atomic():
+        request = DocumentRequest.objects.select_for_update().get(pk=request.pk)
+        if request.state != DocumentRequestState.OPEN:
+            raise DocumentRequestError("Only an open request can be withdrawn.")
+        request.state = DocumentRequestState.WITHDRAWN
+        request.closed_at = timezone.now()
+        request.withdrawal_reason = reason
+        request.save(update_fields=["state", "closed_at", "withdrawal_reason"])
+    return request
 
 
 def requests_for(record):

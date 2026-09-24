@@ -454,10 +454,10 @@ describe("document requests (IR-262)", () => {
   const openRequest = {
     id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open",
     message: "The signed consent forms are missing.", requested_by: null,
-    created_at: "2026-09-20T02:00:00Z", closed_at: null,
+    created_at: "2026-09-20T02:00:00Z", closed_at: null, withdrawal_reason: null, can_manage: false,
     items: [{
       id: 11, slot: 3, label: "Ethics Clearance", state: "missing",
-      state_label: "Missing", upload: null, uploaded_at: null,
+      state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
     }],
   };
 

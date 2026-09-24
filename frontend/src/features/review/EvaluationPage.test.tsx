@@ -101,6 +101,8 @@ let shownRecord: RecordDetail = record;
 vi.mock("@/api/records", () => ({
   recordsApi: {
     detail: vi.fn(() => Promise.resolve({ data: shownRecord })),
+    // The shared reviewer block loads the reviewer's own requests (IR-263).
+    documentRequests: vi.fn(() => Promise.resolve({ data: [] })),
   },
 }));
 

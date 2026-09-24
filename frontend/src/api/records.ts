@@ -3,7 +3,8 @@ import type {
   RecordListItem, RecordDetail, RecordFormData,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest, RecordTracker,
-  DocumentRequest, DocumentRequestItemInput, DocumentRequestSlot, Party,
+  DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
+  DocumentRequestSlot, Party,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -45,6 +46,15 @@ export const recordsApi = {
     id: number,
     body: { message: string; items: DocumentRequestItemInput[]; party?: Party },
   ) => apiClient.post<DocumentRequest>(`/records/${id}/document-requests/`, body),
+  /** The requesting party accepts or rejects one upload; answers with the request. */
+  decideDocumentRequestItem: (itemId: number, body: DocumentRequestItemDecision) =>
+    apiClient.patch<DocumentRequest>(`/document-request-items/${itemId}/`, body),
+  /** The requesting party withdraws an open request (IR-263). */
+  withdrawDocumentRequest: (requestId: number, reason?: string) =>
+    apiClient.patch<DocumentRequest>(`/document-requests/${requestId}/`, {
+      action: "withdraw",
+      ...(reason ? { reason } : {}),
+    }),
   /** The picklist: the record type's upload slots. */
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),

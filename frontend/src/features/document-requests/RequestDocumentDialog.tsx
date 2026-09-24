@@ -3,6 +3,8 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { recordsApi } from "@/api/records";
 import type { DocumentRequestItemInput, DocumentRequestSlot, Party } from "@/types/records";
 
+import { errorDetail } from "./errorDetail";
+
 interface RequestDocumentDialogProps {
   recordId: number;
   /** The parties the reviewer may ask as -- `can_request_document`. Non-empty. */
@@ -11,13 +13,6 @@ interface RequestDocumentDialogProps {
   partyLabels: Partial<Record<Party, string>>;
   onClose: () => void;
   onCreated: () => void;
-}
-
-function detailOf(err: unknown): string {
-  return (
-    (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-    "Something went wrong. Please try again."
-  );
 }
 
 /**
@@ -103,7 +98,7 @@ export function RequestDocumentDialog({
       });
       onCreated();
     } catch (err) {
-      setError(detailOf(err));
+      setError(errorDetail(err, "Something went wrong. Please try again."));
     } finally {
       setSending(false);
     }

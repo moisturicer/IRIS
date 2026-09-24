@@ -407,11 +407,13 @@ class RecordViewSet(viewsets.ModelViewSet):
         as two parties at once (RDCO as Intake and as RDCO Final).
         """
         from apps.documents import requests as document_requests
+        from apps.documents.request_serializers import (
+            DocumentRequestCreateSerializer, first_error, serialize_request, serialize_requests,
+        )
         from apps.notifications.services import notify_document_requested
-        from apps.reviews.tracker import party_label, is_staff_viewer
+        from apps.reviews.tracker import party_label
 
         record = self.get_object()
-        staff = is_staff_viewer(request.user)
 
         if request.method == "GET":
             # Internal workflow data (IR-349): a visible Record is not enough.
@@ -420,30 +422,38 @@ class RecordViewSet(viewsets.ModelViewSet):
                     {"detail": "Only the owner and the parties involved may read these requests."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-            return Response([
-                document_requests.payload(r, staff_viewer=staff)
-                for r in document_requests.requests_for(record)
-            ])
+            return Response(serialize_requests(
+                record, request.user, document_requests.requests_for(record)
+            ))
 
+        # Who may ask comes before what they asked: a non-holder is a 403
+        # whatever the body says.
         try:
-            created = document_requests.create_request(
-                record, request.user,
-                message=request.data.get("message"),
-                raw_items=request.data.get("items"),
-                party=request.data.get("party"),
+            party = document_requests.requesting_party(
+                record, request.user, request.data.get("party")
             )
         except document_requests.NotAHolder as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except document_requests.DocumentRequestError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+        body = DocumentRequestCreateSerializer(data=request.data, context={"record": record})
+        if not body.is_valid():
+            return Response(
+                {"detail": first_error(body.errors)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        created = document_requests.create_request(
+            record, request.user, party=party,
+            message=body.validated_data["message"],
+            specs=body.validated_data["items"],
+        )
+
         notify_document_requested(
             created, party_label=party_label(created.party, staff_viewer=False)
         )
         created = document_requests.requests_for(record).get(pk=created.pk)
         return Response(
-            document_requests.payload(created, staff_viewer=staff),
-            status=status.HTTP_201_CREATED,
+            serialize_request(created, request.user), status=status.HTTP_201_CREATED
         )
 
     @action(

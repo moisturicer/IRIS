@@ -255,6 +255,9 @@ class DocumentRequest(models.Model):
     )
     created_at   = models.DateTimeField(default=timezone.now)
     closed_at    = models.DateTimeField(null=True, blank=True)
+    #: Why the requesting party withdrew it, when it said (ADR-022 §4, IR-263).
+    #: Internal workflow data, like `message` (§Amendment 5). Plain text.
+    withdrawal_reason = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["record", "created_at", "pk"]
@@ -288,6 +291,12 @@ class DocumentRequestItem(models.Model):
         default=DocumentRequestItemState.MISSING,
     )
     sort_order = models.PositiveIntegerField(default=0)
+    #: The requesting party's reason, the last time it rejected an upload
+    #: (ADR-022 §3.4, IR-263). The item itself goes back to `missing`, so this
+    #: is what tells the owner why. Plain text, never markup.
+    rejection_reason = models.TextField(blank=True, default="")
+    #: When the requesting party last accepted or rejected an upload.
+    decided_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["request", "sort_order", "pk"]

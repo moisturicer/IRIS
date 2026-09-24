@@ -149,6 +149,14 @@ ADR would need to be undone for that.
 4. **The requesting party accepts or rejects each item.** A rejected item goes back to `missing`
    with a comment, and the request reopens.
 
+   > **As built in IR-263 (2026-09-24).** A rejected item is **stored** as `missing`, with the
+   > comment in `rejection_reason` and the time in `decided_at`, so the owner can upload against
+   > it again. §1's `rejected` state is kept in the enum but nothing writes it. The rejected file
+   > is not deleted; the item just stops pointing at it. Accepting marks the item `accepted`; a
+   > request whose items were all uploaded is already `fulfilled`, so accepting every item leaves
+   > it closed. "The requesting party" means anyone who can staff the request's `party`, not only
+   > its `requested_by`. The owner is notified of a rejection, with the comment.
+
 **An open request never blocks another party.** ITSO can clear while IERC waits for a consent
 form. That is the reason for not using a decline.
 
@@ -185,6 +193,14 @@ PATCH  /api/v1/document-request-items/<id>/        accept / reject (requesting p
 Uploading uses the existing documents endpoint with a `request_item` parameter. It is not a
 second upload path.
 
+> **As built in IR-263 (2026-09-24).** The bodies are `{"action": "withdraw", "reason"?: str}`
+> and `{"action": "accept"} | {"action": "reject", "reason": str}`, and both answer with the
+> whole request. Only an **open** request can be withdrawn, and only an `uploaded` item decided.
+> A caller who cannot see the Record, or may not read its request data (§Amendment 5), gets a
+> **404** on both routes; a reader who is not the requesting party gets a **403**. The request
+> payload gains `withdrawal_reason` and a per-viewer `can_manage`, and each item gains
+> `rejection_reason` and `decided_at`, all behind the same read rule.
+
 > **Amended 2026-09-24.** The list line originally read `list (visible_to)`. Document-request
 > data is internal workflow data, and being able to read a Record does not grant access to it.
 > See §Amendment 5. The same rule governs the tracker's `document_requests[]`.
@@ -199,7 +215,7 @@ Settled by **Lee Jasmin Adolfo** after the post-merge review of IR-262 ([PR #117
 
 **1. The owner may fulfil a request through the ordinary upload.** It amends §3.2. When the Record owner uploads a requested **canonical** document to its slot through the normal Documents flow (`POST /documents/submit/` or `/documents/uploads/create/` with `slot`), every open request item asking for that slot on that Record is answered. The owner is not required to use the Action required panel. A free-text **Other** item has no canonical slot to infer, so it still needs `request_item`. As implemented in IR-262, only a `request_item` upload counts, which leaves a request stalled after the owner has in fact provided the document (§4). **Not yet built:** [IR-346](https://citiris.atlassian.net/browse/IR-346).
 
-**2. The requesting party cannot fulfil its own request.** It amends §3. Fulfilment is by the Record owner or an authorised submitter. A reviewer or office that asked for a document may accept, reject or withdraw (§3.4, §4). It may **not** answer its own request by uploading the file just because staff have generic document-upload permission (`authorize_record_documents` admits every office). As implemented in IR-262, any staff upload against an item fulfils it. **Not yet built:** [IR-263](https://citiris.atlassian.net/browse/IR-263) (for `request_item` uploads) and IR-346 (for slot uploads).
+**2. The requesting party cannot fulfil its own request.** It amends §3. Fulfilment is by the Record owner or an authorised submitter. A reviewer or office that asked for a document may accept, reject or withdraw (§3.4, §4). It may **not** answer its own request by uploading the file just because staff have generic document-upload permission (`authorize_record_documents` admits every office). As implemented in IR-262, any staff upload against an item fulfils it. **Built for `request_item` uploads in [IR-263](https://citiris.atlassian.net/browse/IR-263)** (`requests.may_fulfil`: a Record owner, otherwise 403 with the item left `missing` and nobody notified). **Slot uploads: not yet built,** IR-346.
 
 **3. The picklist route.** It adds to §5. `GET /api/v1/records/<id>/document-requests/slots/` serves the record type's upload slots, excluding any ad-hoc slot. It is served per Record because Record detail names its type rather than giving its id, and because Advisers cannot use the documents app's per-record slot listing. Record detail also carries `can_request_document`, the parties the viewer may ask as. Both shipped in IR-262, and **both are retained as intentional additions to this ADR's API**. The picklist serves slot names only, not request data, so point 5 does not restrict it.
 
@@ -218,7 +234,9 @@ What the code does today, verified against `main` on 2026-09-24:
 | Uploading with a `request_item` that belongs to a different Record, or does not exist | **400**, "That requested document does not exist." | `resolve_item_for_upload`. The item is looked up *within* the named Record, so a foreign item reads exactly like a missing one and confirms nothing. It is a 400, not a 404, because the Record is found; it is the request body that names nothing valid. |
 | Uploading through `/documents/submit/` or `/documents/uploads/create/` to a Record that exists but that the caller neither owns nor staffs | **403**, **even when the caller cannot see the Record** | `authorize_record_documents` (IR-153) |
 | Uploading to another Record's ad-hoc slot | **404**, "Record or slot not found." | `_slot_for_record` |
-| A requesting party uploading against its own request (point 2) | **403**, once built | IR-263 |
+| Anyone but a Record owner uploading against a `request_item`, including the requesting party (point 2) | **403** | IR-263, `SubmitDocumentView` via `requests.may_fulfil` |
+| Accepting, rejecting or withdrawing a request the caller cannot see, or whose request data it may not read (point 5) | **404** | IR-263, `requests.readable_request` |
+| Accepting, rejecting or withdrawing as anyone but the requesting party | **403** | IR-263, `requests.is_requester` |
 
 **The one exception to the convention is recorded here, not converted.** `authorize_record_documents` answers 403 to a caller who cannot see the Record. That is an **intentional existing exception**, chosen in IR-153 and documented in the function itself: the documents endpoints take the Record id from the caller's own request parameter, so "a 404 would hide nothing, and 403 says what actually happened". The exception covers the documents app's upload and listing routes only; every document-request route follows the convention. No ticket exists to change it, and this amendment does not create one. **Aligning the documents app with the 404 convention would be a separate decision and a separate ticket**, and would touch every endpoint that calls `authorize_record_documents`, not just this ADR's.
 

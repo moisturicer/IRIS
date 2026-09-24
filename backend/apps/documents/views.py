@@ -93,7 +93,9 @@ class SubmitDocumentView(APIView):
         slot          — UploadSlot PK (optional with request_item)
         request_item  — DocumentRequestItem PK, when the file answers a
                         reviewer's document request (ADR-022 §3.2, IR-262).
-                        The slot is then taken from the item.
+                        The slot is then taken from the item. Owners only:
+                        the party that asked cannot answer its own request
+                        (§Amendment 2, IR-263), so any other caller is a 403.
         file          — PDF file
 
     Response 201:
@@ -148,7 +150,17 @@ class SubmitDocumentView(APIView):
             # it uploaded, with the item locked, so two uploads cannot both
             # answer it and the request cannot close in between.
             from django.db import transaction
-            from .requests import DocumentRequestError, fulfil_item, resolve_item_for_upload
+            from .requests import (
+                DocumentRequestError, fulfil_item, may_fulfil, resolve_item_for_upload,
+            )
+
+            # §Amendment 2: staff pass `authorize_record_documents` on every
+            # Record, so this is what stops an office answering its own request.
+            if not may_fulfil(record, request.user):
+                return Response(
+                    {"detail": "Only the record's owners can upload a requested document."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
             try:
                 with transaction.atomic():
@@ -543,3 +555,100 @@ class RecordFileDownloadAllView(APIView):
             metadata={"record_id": record.pk, "file_count": files.count()},
         )
         return response
+
+
+# --- Deciding and withdrawing document requests (ADR-022 §3.4, §4; IR-263) ----
+
+_NOT_THE_REQUESTER = "Only the party that asked for these documents can do that."
+
+
+def _managed_request(request_id, user):
+    """
+    `(document_request, None)` when `user` may manage it, else `(None, refusal)`.
+
+    ADR-022 §Amendment 4: a request the caller cannot see -- the Record is not
+    visible to them, or its request data is not (IR-349) -- reads as a missing
+    id, 404; a reader who is not the requesting party gets a 403.
+    """
+    from .requests import is_requester, readable_request
+
+    document_request = readable_request(request_id, user)
+    if document_request is None:
+        return None, Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+    if not is_requester(document_request, user):
+        return None, Response(
+            {"detail": _NOT_THE_REQUESTER}, status=status.HTTP_403_FORBIDDEN
+        )
+    return document_request, None
+
+
+def _apply(document_request, user, body, change):
+    """Validate `body`, run `change(validated_data)`, answer with the whole request."""
+    from .request_serializers import first_error, serialize_request
+    from .requests import DocumentRequestError, requests_for
+
+    if not body.is_valid():
+        return Response({"detail": first_error(body.errors)}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        change(body.validated_data)
+    except DocumentRequestError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(serialize_request(
+        requests_for(document_request.record).get(pk=document_request.pk), user
+    ))
+
+
+class DocumentRequestDecisionView(APIView):
+    """
+    PATCH /api/v1/document-requests/<id>/   {"action": "withdraw", "reason"?: str}
+
+    The requesting party withdraws an open request (ADR-022 §4). Refusals as
+    `_managed_request` says.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        from .request_serializers import WithdrawSerializer
+        from .requests import withdraw_request
+
+        document_request, refused = _managed_request(pk, request.user)
+        if refused:
+            return refused
+        return _apply(
+            document_request, request.user, WithdrawSerializer(data=request.data),
+            lambda data: withdraw_request(document_request, reason=data["reason"]),
+        )
+
+
+class DocumentRequestItemDecisionView(APIView):
+    """
+    PATCH /api/v1/document-request-items/<id>/
+          {"action": "accept"} | {"action": "reject", "reason": str}
+
+    The requesting party's verdict on one upload (ADR-022 §3.4). Refusals as
+    `_managed_request` says. Answers with the whole request, since a
+    rejection reopens it.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        from .models import DocumentRequestItem
+        from .request_serializers import ItemDecisionSerializer
+        from .requests import accept_item, reject_item
+
+        item = DocumentRequestItem.objects.filter(pk=pk).first()
+        document_request, refused = _managed_request(
+            item.request_id if item else None, request.user
+        )
+        if refused:
+            return refused
+
+        def decide(data):
+            if data["action"] == "accept":
+                accept_item(item)
+            else:
+                reject_item(item, request.user, reason=data["reason"])
+
+        return _apply(
+            document_request, request.user, ItemDecisionSerializer(data=request.data), decide
+        )

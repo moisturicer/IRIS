@@ -335,6 +335,14 @@ export interface DocumentRequestItem {
   state_label: string;
   upload:      number | null;
   uploaded_at: string | null;
+  /**
+   * The requesting party's reason, the last time it rejected an upload
+   * (IR-263). A rejected item is back to `missing`; this says why. Plain
+   * text. Null when it was never rejected.
+   */
+  rejection_reason: string | null;
+  /** When the requesting party last accepted or rejected an upload. */
+  decided_at:  string | null;
 }
 
 export interface DocumentRequest {
@@ -349,8 +357,20 @@ export interface DocumentRequest {
   requested_by: string | null;
   created_at:   string;
   closed_at:    string | null;
+  /** Why it was withdrawn, when the requesting party said (IR-263). Plain text. */
+  withdrawal_reason: string | null;
+  /**
+   * The viewer can staff the party that asked, so may accept, reject or
+   * withdraw (ADR-022 §3.4, §4). Server-decided; the controls follow it.
+   */
+  can_manage:   boolean;
   items:        DocumentRequestItem[];
 }
+
+/** `PATCH /document-request-items/<id>/` (IR-263). A rejection needs a reason. */
+export type DocumentRequestItemDecision =
+  | { action: "accept" }
+  | { action: "reject"; reason: string };
 
 /** One entry of a new request: a picklist slot, or free text for "Other". */
 export type DocumentRequestItemInput = { slot: number } | { label: string };
