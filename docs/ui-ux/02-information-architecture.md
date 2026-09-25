@@ -1,5 +1,9 @@
 # 02 — Information Architecture
 
+> **Note, 2026-09-26:** [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md) changes the
+> review screens: one Paper View for every role (see [16](16-paper-view-and-review.md)), **My Reviews**
+> in place of per-office queue pages, no Intake & Triage screen, and a Proposals section in Discover.
+
 ---
 
 ## 1 · Content model, as the user sees it

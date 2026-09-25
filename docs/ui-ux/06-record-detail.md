@@ -1,5 +1,11 @@
 # 06 — Record Detail
 
+> **Extended by [16 — Paper View, Review and My Reviews](16-paper-view-and-review.md)**
+> ([ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md)): one Paper View with Reading,
+> Author, Review and Summary modes chosen by server `capabilities`, plus versions, lineage, and
+> separate review and public discussions. The clearance track below becomes the party status strip,
+> without an Intake row.
+
 **Verdict: KEEP, with the Clearance Track added.** The workflow's home, and the screen where the thesis contribution becomes visible or does not.
 
 ---
