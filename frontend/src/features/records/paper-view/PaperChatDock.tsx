@@ -79,6 +79,11 @@ interface PaperChatPanelProps {
   dock: DockMode;
   onDockChange: (mode: DockMode) => void;
   onClose: () => void;
+  /**
+   * Whether the reader may move the panel. Off on the Paper tab, where Ask
+   * IRIS is always docked left (IR-372); a menu with one choice is no menu.
+   */
+  canChangePosition?: boolean;
   /** Positioning is the caller's job — the panel only styles its own interior. */
   className?: string;
 }
@@ -98,6 +103,7 @@ export function PaperChatPanel({
   dock,
   onDockChange,
   onClose,
+  canChangePosition = true,
   className,
 }: PaperChatPanelProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -190,6 +196,7 @@ export function PaperChatPanel({
             <p className="text-2xs text-stone-500 truncate">{record.title}</p>
           </div>
 
+          {canChangePosition && (
           <div className="relative">
             <Button
               variant="ghost"
@@ -229,6 +236,7 @@ export function PaperChatPanel({
               </div>
             )}
           </div>
+          )}
 
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close Paper Chat">
             <i className="fas fa-xmark" aria-hidden />
@@ -337,10 +345,19 @@ export function PaperChatPanel({
  * fixed header, so its own header and composer are never hidden (IR-351),
  * and it is exactly as tall as the reader beside it (IR-352).
  */
-export const DOCKED_PANEL_CLASS =
+const DOCKED_PANEL_BASE =
   "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-2xl " +
   `lg:sticky lg:inset-x-auto lg:bottom-auto ${PANE_TOP} lg:z-auto ` +
-  `${PANE_HEIGHT} lg:w-[22rem] lg:shrink-0 lg:rounded-2xl`;
+  `${PANE_HEIGHT} lg:shrink-0 lg:rounded-2xl`;
+
+export const DOCKED_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[22rem]`;
+
+/**
+ * The Paper tab's docked panel (IR-372): wider, because it shares the full
+ * content width with the reader alone -- no rail, no centred column -- and a
+ * 22rem transcript beside a full-width paper read as cramped.
+ */
+export const PAPER_TAB_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[26rem] xl:w-[30rem]`;
 
 /** Positioning for the floating panel — deliberately overlays the page. */
 export const FLOATING_PANEL_CLASS =

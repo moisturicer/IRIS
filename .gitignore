@@ -91,3 +91,5 @@ skills-lock.json
 
 # Local design captures and scratch screenshots — not part of the repo
 screenshots/
+.firecrawl/
+docker-compose.override.yml

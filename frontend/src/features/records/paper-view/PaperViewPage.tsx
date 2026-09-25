@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams, useLocation, Link } from "reac
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Skeleton } from "@/components/ui";
+import { Button, Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
@@ -21,9 +21,12 @@ import {
   usePaperChat,
   PaperChatPanel,
   PaperChatLauncher,
+  type DockMode,
   DOCKED_PANEL_CLASS,
   FLOATING_PANEL_CLASS,
+  PAPER_TAB_PANEL_CLASS,
 } from "./PaperChatDock";
+import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
@@ -489,7 +492,15 @@ export default function PaperViewPage() {
   // with nothing to highlight, which is the same graceful case a passage
   // with no recovered regions already is.
   const navCitation = (location.state as CitationNavigationState | null)?.citation;
-  const chatDocked = chat.open && chat.dock !== "floating";
+  // The Paper tab is the paper and Ask IRIS, nothing else (IR-372): chat is
+  // always docked right there, the rail is never drawn, and the pair spans
+  // the full content width rather than a centred column. The reader's own
+  // dock choice is only overridden, never overwritten, so the Abstract tab
+  // gets it back unchanged.
+  const onPaperTab = tab === "paper";
+  const dock: DockMode = onPaperTab ? "right" : chat.dock;
+  const chatDocked = chat.open && dock !== "floating";
+  const showRail = !onPaperTab && !chatDocked;
   const highlightRegions: Region[] =
     navCitation && navCitation.record_id === record.id && "regions" in navCitation
       ? navCitation.regions
@@ -501,11 +512,14 @@ export default function PaperViewPage() {
     // is shared by every screen, and this constraint belongs to the one that
     // reads like a paper. The right rail stays inside this same container,
     // centred with the main column as a pair, rather than moving elsewhere.
-    <div className="max-w-6xl mx-auto">
+    // The Paper tab is the exception (IR-372): the reader and Ask IRIS use
+    // the whole width, so a wide screen gives the paper more room instead of
+    // margins.
+    <div className={cn(!onPaperTab && "max-w-6xl mx-auto")}>
       <div
         className={cn(
           "lg:flex lg:gap-6 lg:items-start",
-          chat.dock === "left" && "lg:flex-row-reverse",
+          dock === "left" && "lg:flex-row-reverse",
         )}
       >
         <div className="min-w-0 lg:flex-1">
@@ -549,7 +563,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               "grid gap-6 items-start",
-              !chatDocked && "lg:grid-cols-[minmax(0,1fr)_20rem]",
+              showRail && "lg:grid-cols-[minmax(0,1fr)_20rem]",
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -735,6 +749,19 @@ export default function PaperViewPage() {
                     scrollToPage={openAtPage}
                     highlightRegions={highlightRegions}
                     navKey={location.key}
+                    toolbarStart={
+                      !chat.open && (
+                        <Button
+                          variant="outline"
+                          onClick={() => chat.setOpen(true)}
+                          title="Ask IRIS about this paper"
+                          className="min-h-11 lg:min-h-8 mr-1 font-semibold"
+                        >
+                          <AskIrisMark className="w-4 h-4 text-brand" />
+                          Ask IRIS
+                        </Button>
+                      )
+                    }
                   />
                 </Suspense>
               ) : (
@@ -803,13 +830,14 @@ export default function PaperViewPage() {
           {/* ------------------------------------------------------------- */}
           {/* Right rail                                                     */}
           {/* ------------------------------------------------------------- */}
-          {/* Not shown while chat is docked (IR-351): a docked chat beside
-              the rail squeezed the paper under it. Floating or closing the
-              chat brings it back. Sticky below the fixed 58px header, capped
+          {/* Never on the Paper tab (IR-372). On the Abstract tab, not shown
+              while chat is docked (IR-351): a docked chat beside the rail
+              squeezed the paper under it. Floating or closing the chat brings
+              it back. Sticky below the fixed 58px header, capped
               to the viewport and scrollable, because a sticky rail taller
               than the window would hide its lower cards until the paper
               ended. */}
-          {!chatDocked && (
+          {showRail && (
             <aside className={cn("space-y-4 lg:sticky lg:overflow-y-auto", PANE_TOP, PANE_MAX_HEIGHT)}>
               <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
               <PaperGovernance record={record} />
@@ -824,15 +852,22 @@ export default function PaperViewPage() {
       {chat.open ? (
         <PaperChatPanel
           record={record}
-          dock={chat.dock}
+          dock={dock}
           onDockChange={chat.setDockMode}
           onClose={() => chat.setOpen(false)}
+          canChangePosition={!onPaperTab}
           className={
-            chat.dock === "floating" ? FLOATING_PANEL_CLASS : DOCKED_PANEL_CLASS
+            onPaperTab
+              ? PAPER_TAB_PANEL_CLASS
+              : dock === "floating"
+                ? FLOATING_PANEL_CLASS
+                : DOCKED_PANEL_CLASS
           }
         />
       ) : (
-        <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
+        // On the Paper tab the way back sits in the reader's toolbar instead,
+        // so nothing floats over the paper (IR-372).
+        !onPaperTab && <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
       )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { recordsApi } from "@/api/records";
 import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
@@ -90,6 +90,11 @@ export interface PaperPdfReaderProps {
    * `location.key` from the caller is exactly that value.
    */
   navKey: string;
+  /**
+   * Rendered first in the toolbar: the Paper tab's way back to Ask IRIS
+   * while the chat is closed (IR-372), so nothing floats over the paper.
+   */
+  toolbarStart?: ReactNode;
 }
 
 /**
@@ -114,6 +119,7 @@ export function PaperPdfReader({
   scrollToPage,
   highlightRegions,
   navKey,
+  toolbarStart,
 }: PaperPdfReaderProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
@@ -257,6 +263,7 @@ export function PaperPdfReader({
         )}
       >
         <div className="flex items-center gap-1">
+          {toolbarStart}
           <Button
             variant="ghost"
             size="icon"
