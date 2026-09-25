@@ -102,7 +102,7 @@ So the remaining exposure is `SettingsPage`, and the wizard carries a hand-maint
 
 Two refinements landed with IR-204 and apply to **every** consumer:
 
-- The error message is `text-red-600` (**4.83 : 1**), not `text-red-500` (**3.76 : 1**, which fails AA for text at this size — an unreadable error defeats the association).
+- The error message is `text-red-600` (**4.83 : 1**), not `text-red-500` (**3.76 : 1**, which fails AA for text at this size — an unreadable error defeats the association). **IR-359:** it is now `text-brand` (**12.3 : 1**) with an `aria-hidden` glyph, because the palette has no red; the glyph keeps the error from being carried by colour alone now that maroon is also the focus colour.
 - A field can be invalid **without owning the message that explains why**. A rejected sign-in is described by one alert above the form; the caller passes a bare `aria-invalid`, and the field looks and announces invalid without repeating the sentence under every field. Only a *credential* rejection does this — an unverified account or a server failure says nothing about what is in the fields, so neither marks them invalid.
 - `Input` gained a `size` step (`lg`) and `Button` a `full` step, both ≥ 44 px, so a screen adopting the primitives is not forced to choose between the primitive's sizing and the target size in section 4 below.
 

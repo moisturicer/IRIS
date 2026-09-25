@@ -21,19 +21,6 @@ import { offPaletteClasses } from "./palette";
  * files found on 2026-09-25.
  */
 const NOT_YET_CONVERTED: readonly string[] = [
-  // IR-359 -- shared components and the app shell
-  "src/components/auth/AccountLockedModal.tsx",
-  "src/components/auth/AuthAlert.tsx",
-  "src/components/auth/ForbiddenScreen.tsx",
-  "src/components/compliance/DpaConsentGate.tsx",
-  "src/components/layout/Sidebar.tsx",
-  "src/components/shared/ComingSoonPage.tsx",
-  "src/components/shared/ConfirmDialog.tsx",
-  "src/components/shared/FileUploadZone.tsx",
-  "src/components/ui/Badge.tsx",
-  "src/components/ui/Button.tsx",
-  "src/components/ui/Input.tsx",
-  "src/components/ui/Toast.tsx",
   // IR-360 -- the submission wizard
   "src/features/records/AddRecordPage.tsx",
   "src/features/records/EditRecordPage.tsx",

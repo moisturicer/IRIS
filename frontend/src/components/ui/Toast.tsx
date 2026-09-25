@@ -1,15 +1,24 @@
-import { useUIStore } from "@/store/ui.store";
+import { TONES } from "@/components/ui/statusTones";
+import { useUIStore, type Toast } from "@/store/ui.store";
 
-const ICON: Record<string, string> = {
-  success: "fa-check-circle text-green-500",
-  error:   "fa-times-circle text-red-500",
-  info:    "fa-info-circle text-blue-500",
-};
+type Kind = Toast["type"];
 
-const BG: Record<string, string> = {
-  success: "border-green-200 bg-green-50",
-  error:   "border-red-200 bg-red-50",
-  info:    "border-blue-200 bg-blue-50",
+// A kind is carried three ways (IR-359): its tone, its glyph, and a word a
+// screen reader hears before the message. Success and error are both dark in
+// this palette, so the tone alone would not tell them apart.
+const KIND: Record<Kind, { tone: string; icon: string; word: string; dismiss: string }> = {
+  success: {
+    tone: TONES.settled, icon: "fa-circle-check", word: "Success:",
+    dismiss: "text-white/70 hover:text-white",
+  },
+  error: {
+    tone: TONES.attention, icon: "fa-circle-xmark", word: "Error:",
+    dismiss: "text-white/70 hover:text-white",
+  },
+  info: {
+    tone: TONES.quiet, icon: "fa-circle-info", word: "Notice:",
+    dismiss: "text-stone-600 hover:text-stone-900",
+  },
 };
 
 export function ToastContainer() {
@@ -17,23 +26,27 @@ export function ToastContainer() {
 
   return (
     <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`pointer-events-auto flex items-start gap-3 w-80 rounded-xl border px-4 py-3 shadow-lg
-            text-[13px] text-gray-800 ${BG[t.type]}`}
-        >
-          <i className={`fa ${ICON[t.type]} mt-0.5 shrink-0`} aria-hidden />
-          <p className="flex-1">{t.message}</p>
-          <button
-            onClick={() => removeToast(t.id)}
-            className="text-gray-500 hover:text-gray-600 shrink-0"
-            aria-label="Dismiss"
+      {toasts.map((t) => {
+        const kind = KIND[t.type];
+        return (
+          <div
+            key={t.id}
+            className={`pointer-events-auto flex items-start gap-3 w-80 rounded-xl px-4 py-3 shadow-lg
+              text-[13px] ${kind.tone}`}
           >
-            <i className="fa fa-times text-[12px]" aria-hidden />
-          </button>
-        </div>
-      ))}
+            <i className={`fa ${kind.icon} mt-0.5 shrink-0`} aria-hidden />
+            <span className="sr-only">{kind.word}</span>
+            <p className="flex-1">{t.message}</p>
+            <button
+              onClick={() => removeToast(t.id)}
+              className={`shrink-0 ${kind.dismiss}`}
+              aria-label="Dismiss"
+            >
+              <i className="fa fa-times text-[12px]" aria-hidden />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -51,15 +51,15 @@ export function FileUploadZone({
       onDrop={handleDrop}
       className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed
         px-6 py-10 cursor-pointer transition-colors select-none
-        ${dragging ? "border-[#6B0F12] bg-red-50" : "border-gray-300 hover:border-gray-400 bg-gray-50"}
+        ${dragging ? "border-brand bg-brand-50" : "border-stone-300 hover:border-stone-400 bg-stone-50"}
         ${disabled ? "opacity-50 cursor-not-allowed" : ""}
       `}
     >
-      <i className="fa fa-cloud-upload-alt text-3xl text-gray-500" aria-hidden />
-      <p className="text-[13px] text-gray-600 font-medium">
-        Drag and drop here, or <span className="text-[#6B0F12]">browse</span>
+      <i className="fa fa-cloud-upload-alt text-3xl text-stone-500" aria-hidden />
+      <p className="text-[13px] text-stone-600 font-medium">
+        Drag and drop here, or <span className="text-brand">browse</span>
       </p>
-      {hint && <p className="text-[12px] text-gray-500">{hint}</p>}
+      {hint && <p className="text-[12px] text-stone-500">{hint}</p>}
       <input
         ref={inputRef}
         type="file"

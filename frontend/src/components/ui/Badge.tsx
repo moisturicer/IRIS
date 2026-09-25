@@ -1,3 +1,5 @@
+import { TONES } from "@/components/ui/statusTones";
+
 type BadgeVariant = "default" | "success" | "warning" | "danger" | "info" | "neutral";
 
 interface BadgeProps {
@@ -6,13 +8,16 @@ interface BadgeProps {
   className?: string;
 }
 
+// By meaning, onto the four shared tones (IR-359). The palette has one grey, so
+// `default`, `info` and `neutral` all read as quiet: a badge always carries its
+// own label, and that label is what tells one from another.
 const VARIANT_CLASSES: Record<BadgeVariant, string> = {
-  default: "bg-gray-100 text-gray-700",
-  success: "bg-green-100 text-green-700",
-  warning: "bg-yellow-100 text-yellow-700",
-  danger:  "bg-red-100 text-red-700",
-  info:    "bg-blue-100 text-blue-700",
-  neutral: "bg-slate-100 text-slate-600",
+  default: TONES.quiet,
+  success: TONES.settled,
+  warning: TONES.active,
+  danger:  TONES.attention,
+  info:    TONES.quiet,
+  neutral: TONES.quiet,
 };
 
 export function Badge({ variant = "default", children, className = "" }: BadgeProps) {

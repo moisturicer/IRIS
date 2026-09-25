@@ -26,13 +26,16 @@ const VARIANT_CLASSES: Record<Variant, string> = {
   // Tokens, not hex: 01-design-system.md section 2 asks any component being
   // touched to adopt them, and names Button's hardcoded brand as an example.
   primary:   "bg-brand text-white hover:bg-brand-light disabled:opacity-50",
-  secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50",
-  danger:    "bg-red-600 text-white hover:bg-red-700 disabled:opacity-50",
+  secondary: "bg-stone-100 text-stone-700 hover:bg-stone-200 disabled:opacity-50",
+  // Maroon, like primary (IR-359: the palette has no red), so it is told apart
+  // by the glyph the component adds below and by the verb the caller writes
+  // ("Decline", "Lock"), never by colour alone.
+  danger:    "bg-brand-dark text-white hover:bg-brand disabled:opacity-50",
   // `aria-pressed:` for a toggle (IR-352): the attribute selector outranks the
   // base colour whatever the stylesheet order, which a caller's className
   // would not (no tailwind-merge; see the note on Size above).
-  ghost:     "text-gray-600 hover:bg-gray-100 disabled:opacity-50 aria-pressed:bg-brand-50 aria-pressed:text-brand",
-  outline:   "border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50",
+  ghost:     "text-stone-600 hover:bg-stone-100 disabled:opacity-50 aria-pressed:bg-brand-50 aria-pressed:text-brand",
+  outline:   "border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-50",
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
@@ -65,6 +68,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
+        )}
+        {variant === "danger" && !loading && (
+          <i className="fas fa-triangle-exclamation shrink-0" aria-hidden />
         )}
         {children}
       </button>

@@ -39,7 +39,7 @@ function NavSection({
           drawer is always full width, so it keeps its titles either way. */}
       <div
         className={cn(
-          "px-4 py-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase",
+          "px-4 py-2 text-[10px] font-bold tracking-widest text-stone-500 uppercase",
           collapsed ? "block md:hidden" : "block",
         )}
       >
@@ -57,8 +57,8 @@ function NavSection({
               "flex items-center gap-3 mx-2 py-2.5 rounded-md text-[13px] font-medium transition-colors relative",
               collapsed ? "px-4 md:px-2 justify-start md:justify-center" : "px-4 justify-start",
               isActive
-                ? "bg-red-50 text-[#6B0F12] font-semibold before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-[#6B0F12]"
-                : "text-gray-600 hover:bg-red-50/60 hover:text-[#6B0F12]"
+                ? "bg-brand-50 text-brand font-semibold before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-brand"
+                : "text-stone-600 hover:bg-brand-50/60 hover:text-brand"
             )
           }
         >
@@ -84,7 +84,7 @@ function NavSection({
           {item.badge != null && item.badge > 0 && (
             <span
               className={cn(
-                "min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold items-center justify-center",
+                "min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[10px] font-bold items-center justify-center",
                 collapsed ? "flex md:hidden" : "flex",
               )}
             >
@@ -93,7 +93,7 @@ function NavSection({
           )}
           {/* Collapsed: a dot keeps unread counts visible without the label */}
           {collapsed && item.badge != null && item.badge > 0 && (
-            <span className="hidden md:block absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
+            <span className="hidden md:block absolute top-1 right-1 w-2 h-2 rounded-full bg-brand" />
           )}
         </NavLink>
       ))}
@@ -176,7 +176,7 @@ export function Sidebar({ className }: SidebarProps) {
       className={cn(
         // Mobile (<768px): always a full 230px drawer, overlaid.
         // Desktop (≥768px): 230px, or a 60px icon rail when collapsed.
-        "fixed top-0 left-0 w-[230px] h-screen bg-white border-r border-gray-200 flex flex-col z-50",
+        "fixed top-0 left-0 w-[230px] h-screen bg-white border-r border-stone-200 flex flex-col z-50",
         "transition-[width] duration-200 ease-out",
         collapsed ? "md:w-[60px]" : "md:w-[230px]",
         className
@@ -185,7 +185,7 @@ export function Sidebar({ className }: SidebarProps) {
       {/* ── Logo / Brand header ─────────────────────────────────────── */}
       <div
         className={cn(
-          "py-4 border-b border-gray-100 flex items-center gap-3",
+          "py-4 border-b border-stone-100 flex items-center gap-3",
           collapsed ? "px-4 md:px-2 md:justify-center" : "px-4",
         )}
       >
@@ -208,7 +208,7 @@ export function Sidebar({ className }: SidebarProps) {
               aria-label="Expand sidebar"
               aria-expanded={false}
               title="Expand sidebar"
-              className="absolute inset-0 w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-500 flex items-center justify-center opacity-0 transition-opacity hover:text-brand hover:border-brand-200 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+              className="absolute inset-0 w-10 h-10 rounded-lg border border-stone-200 bg-white text-stone-500 flex items-center justify-center opacity-0 transition-opacity hover:text-brand hover:border-brand-200 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
             >
               <i className="fas fa-chevron-right text-[13px]" aria-hidden />
             </button>
@@ -225,10 +225,10 @@ export function Sidebar({ className }: SidebarProps) {
             collapsed ? "block md:hidden" : "block",
           )}
         >
-          <div className="text-[22px] font-extrabold tracking-[4px] text-[#6B0F12] leading-none">
+          <div className="text-[22px] font-extrabold tracking-[4px] text-brand leading-none">
             IRIS
           </div>
-          <div className="text-[9px] font-bold tracking-[2px] text-gold uppercase mt-1 leading-snug">
+          <div className="text-[9px] font-bold tracking-[2px] text-stone-500 uppercase mt-1 leading-snug">
             Research-to-IP Platform
           </div>
         </div>
@@ -241,7 +241,7 @@ export function Sidebar({ className }: SidebarProps) {
             aria-label="Collapse sidebar"
             aria-expanded
             title="Collapse sidebar"
-            className="hidden md:flex w-8 h-8 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:text-brand hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+            className="hidden md:flex w-8 h-8 flex-shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 transition-colors hover:text-brand hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
           >
             <i className="fas fa-chevron-left text-[13px]" aria-hidden />
           </button>
@@ -251,7 +251,7 @@ export function Sidebar({ className }: SidebarProps) {
         <button
           type="button"
           onClick={closeSidebar}
-          className="md:hidden p-1.5 text-gray-500 hover:text-brand rounded-md"
+          className="md:hidden p-1.5 text-stone-500 hover:text-brand rounded-md"
           aria-label="Close menu"
         >
           <i className="fas fa-times text-[14px]" aria-hidden />
@@ -274,7 +274,7 @@ export function Sidebar({ className }: SidebarProps) {
       {/* ── User footer ─────────────────────────────────────────────── */}
       <div
         className={cn(
-          "py-3 border-t border-gray-100",
+          "py-3 border-t border-stone-100",
           collapsed ? "px-4 md:px-2" : "px-4",
         )}
       >
@@ -284,15 +284,15 @@ export function Sidebar({ className }: SidebarProps) {
             collapsed ? "justify-start md:justify-center" : "justify-start",
           )}
         >
-          <div className="w-[34px] h-[34px] rounded-full bg-[#6B0F12] text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">
+          <div className="w-[34px] h-[34px] rounded-full bg-brand text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">
             {initials || "?"}
           </div>
 
           <div className={cn("min-w-0 flex-1", collapsed ? "block md:hidden" : "block")}>
-            <div className="text-[12px] font-semibold text-gray-900 truncate">
+            <div className="text-[12px] font-semibold text-stone-900 truncate">
               {user?.first_name} {user?.last_name}
             </div>
-            <div className="text-[11px] text-gray-500 truncate">
+            <div className="text-[11px] text-stone-500 truncate">
               {roleName ?? user?.email}
             </div>
           </div>
@@ -304,7 +304,7 @@ export function Sidebar({ className }: SidebarProps) {
             aria-label="Sign out"
             title="Sign out"
             className={cn(
-              "p-1.5 rounded-md text-gray-500 hover:text-brand hover:bg-red-50 transition-colors flex-shrink-0",
+              "p-1.5 rounded-md text-stone-500 hover:text-brand hover:bg-brand-50 transition-colors flex-shrink-0",
               collapsed ? "block md:hidden" : "block",
             )}
           >
@@ -319,7 +319,7 @@ export function Sidebar({ className }: SidebarProps) {
             onClick={handleSignOut}
             aria-label="Sign out"
             title="Sign out"
-            className="hidden md:flex w-full mt-2 py-1.5 rounded-md text-gray-500 hover:text-brand hover:bg-red-50 transition-colors items-center justify-center"
+            className="hidden md:flex w-full mt-2 py-1.5 rounded-md text-stone-500 hover:text-brand hover:bg-brand-50 transition-colors items-center justify-center"
           >
             <i className="fas fa-arrow-right-from-bracket text-[13px]" aria-hidden />
           </button>
