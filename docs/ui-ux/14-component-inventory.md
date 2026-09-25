@@ -194,3 +194,10 @@ The Paper tab overrides the stored dock choice but never overwrites it, so the A
 | `PaperPdfReader` | `toolbarStart` slot, rendered first in the toolbar |
 | `PaperChatDock` | `PAPER_TAB_PANEL_CLASS`: the wider docked geometry above |
 
+## IR-358 additions (2026-09-25)
+
+| Component | Change |
+|---|---|
+| `components/ui/statusTones.ts` | `TONES`: the four status tones (quiet · active · attention · settled, [01](01-design-system.md) §0) defined once, for any screen that shows a state. `StatusBadge` takes its colours from here |
+| `src/test/palette.test.ts` | The palette guard: fails naming the file and class on any off-palette colour ([01](01-design-system.md) §0) outside `NOT_YET_CONVERTED`, and on any file in that list that no longer has one. The list only shrinks as IR-357's subtasks land; IR-366 removes it |
+
