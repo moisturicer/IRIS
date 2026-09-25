@@ -2,12 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { recordsApi } from "@/api/records";
 import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn, downloadBlob } from "@/lib/utils";
 import { loadPdfDocument, pageSize, renderPageToCanvas, type PdfPage } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 import { CitationOverlay } from "./CitationOverlay";
-import { PAGE_SCROLL_MARGIN, PANE_HEIGHT, READER_TOOLBAR_TOP } from "./paneLayout";
-import { MAX_SCALE, MIN_SCALE, fitScale } from "./readerGeometry";
+import {
+  CONTAINED_LAYOUT_QUERY,
+  PANE_HEIGHT,
+  PANE_TOP_PX,
+  READER_TOOLBAR_TOP,
+  READER_TOOLBAR_TOP_PX,
+} from "./paneLayout";
+import { MAX_SCALE, MIN_SCALE, citationLandingDelta, firstRegionOn, fitScale } from "./readerGeometry";
 import { useReadingPosition } from "./useReadingPosition";
 
 const SCALE_STEP = 0.2;
@@ -19,6 +26,15 @@ const DEFAULT_SCALE = 1.3;
  * fitted; later ones wait for the width to settle.
  */
 const REFIT_DELAY_MS = 120;
+/**
+ * How long after a citation lands a refit still counts as the paper
+ * settling rather than the reader acting (IR-354). The window's scrollbar
+ * appears once the pages are in, the pane narrows, and the refit
+ * `REFIT_DELAY_MS` later moves the passage and cancels the smooth scroll
+ * on its way there; a refit this soon lands again. One much later -- the
+ * reader dragging the window -- keeps their place instead.
+ */
+const SETTLE_AFTER_LANDING_MS = 1500;
 
 /**
  * One rendered page: its own canvas, its own citation overlay, and a ref the
@@ -66,10 +82,7 @@ function PdfPageView({
       // bare `<canvas>` -- inherently opaque to assistive tech -- does not.
       role="group"
       aria-label={`Page ${pageNumber}`}
-      className={cn(
-        "relative mx-auto mb-4 last:mb-0 bg-white shadow-card ring-1 ring-stone-200",
-        PAGE_SCROLL_MARGIN,
-      )}
+      className="relative mx-auto mb-4 last:mb-0 bg-white shadow-card ring-1 ring-stone-200"
       style={{ width, height }}
     >
       <canvas ref={canvasRef} className="block w-full h-full" />
@@ -129,7 +142,15 @@ export function PaperPdfReader({
   const [downloadBytes, setDownloadBytes] = useState<Blob | null>(null);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const destroyRef = useRef<(() => Promise<void>) | null>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const contained = useMediaQuery(CONTAINED_LAYOUT_QUERY);
+  // Read when a citation lands, not a reason to land again: the caller
+  // builds a fresh `[]` on every render.
+  const regionsRef = useRef(highlightRegions);
+  regionsRef.current = highlightRegions;
+  /** The last citation landed on: which navigation, at what zoom, and when. */
+  const landedRef = useRef<{ navKey: string; scale: number; at: number } | null>(null);
 
   // The scroll area is both measured and scrolled. A callback ref, so the
   // one that replaces it after "Try again" is observed rather than the old.
@@ -205,15 +226,57 @@ export function PaperPdfReader({
     };
   }, [downloadUrl]);
 
+  // Land a citation on its passage (IR-354): the first highlighted region
+  // comes to rest just below the reader's toolbar, with a line or two above
+  // it, rather than the page's top edge at the window's top -- under the
+  // fixed header, and a lower passage off the screen altogether.
   useEffect(() => {
     if (status !== "ready" || scrollToPage == null) return;
-    const target = pageRefs.current.get(scrollToPage);
+    const landed = landedRef.current;
+    const followed = landed?.navKey !== navKey;
+    const settling =
+      !followed &&
+      landed !== null &&
+      landed.scale !== scale &&
+      performance.now() - landed.at < SETTLE_AFTER_LANDING_MS;
+    if (!followed && !settling) return;
+    const page = pageRefs.current.get(scrollToPage);
+    const toolbar = toolbarRef.current;
+    if (!page || !toolbar) return;
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    target?.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
-    // `navKey` deliberately in the dependency list with no other use: it is
-    // what makes clicking the same citation twice scroll (and re-flash the
-    // highlight, via CitationOverlay's fresh element) a second time.
-  }, [status, scrollToPage, navKey]);
+    const behavior: ScrollBehavior = reduceMotion ? "auto" : "smooth";
+    const region = firstRegionOn(regionsRef.current, scrollToPage);
+    const pageRect = page.getBoundingClientRect();
+    const pageBox = { top: pageRect.top, height: pageRect.height };
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const area = scrollAreaRef.current;
+
+    if (contained && area && paneRef.current) {
+      // The pane rests under the header and the view switch, and its pages
+      // scroll under its own toolbar. Both are measured before either
+      // scroll, and the window's scroll moves the toolbar and the page
+      // alike, so neither changes the other's distance.
+      const paneTop = paneRef.current.getBoundingClientRect().top;
+      window.scrollBy({ top: paneTop - PANE_TOP_PX, behavior });
+      const view = { top: toolbarRect.bottom, bottom: area.getBoundingClientRect().bottom };
+      area.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
+    } else {
+      // The window scrolls, under a toolbar that sticks below the header.
+      // Where it rests once stuck is what counts, not where it is now: a
+      // reader at the top of the record has it well below that.
+      const view = { top: READER_TOOLBAR_TOP_PX + toolbarRect.height, bottom: window.innerHeight };
+      window.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
+    }
+    // The settling window runs from the landing itself, so a paper that
+    // keeps refitting cannot keep pulling the reader back.
+    landedRef.current = { navKey, scale, at: followed ? performance.now() : (landed?.at ?? 0) };
+    // `navKey` is what makes clicking the same citation twice scroll (and
+    // re-flash the highlight, via CitationOverlay's fresh element) a second
+    // time. `scale` is for the settling refit above. `contained` is read,
+    // not a trigger: crossing the breakpoint keeps the reader's place
+    // (`useReadingPosition`), it does not land again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, scrollToPage, navKey, scale]);
 
   const registerRef = (pageNumber: number, el: HTMLDivElement | null) => {
     if (el) pageRefs.current.set(pageNumber, el);
@@ -247,6 +310,7 @@ export function PaperPdfReader({
 
   return (
     <div
+      ref={paneRef}
       className={cn(
         "flex flex-col",
         PANE_HEIGHT,

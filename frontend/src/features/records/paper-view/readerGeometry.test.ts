@@ -7,7 +7,17 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { MAX_SCALE, MIN_SCALE, anchorDelta, fitScale, readingAnchor } from "./readerGeometry";
+import {
+  CITATION_CONTEXT,
+  MAX_SCALE,
+  MIN_SCALE,
+  PAGE_LANDING_GAP,
+  anchorDelta,
+  citationLandingDelta,
+  firstRegionOn,
+  fitScale,
+  readingAnchor,
+} from "./readerGeometry";
 
 describe("fitScale", () => {
   it("fits a page's width to the pane, less the page's 1px border each side", () => {
@@ -79,5 +89,64 @@ describe("anchorDelta", () => {
 
   it("is zero when the point is already at the top of the view", () => {
     expect(anchorDelta({ top: 100, height: 1000 }, 0, 100)).toBe(0);
+  });
+});
+
+describe("citationLandingDelta (IR-354)", () => {
+  // A 1000px page whose top is 2000px down; readable from y = 180 (below the
+  // header and the reader's toolbar) to the bottom of a 780px window.
+  const page = { top: 2000, height: 1000 };
+  const view = { top: 180, bottom: 780 };
+
+  it("lands the region's top, not the page's, just below the view's top with some context above it", () => {
+    const delta = citationLandingDelta(page, { top: 0.85, bottom: 0.9 }, view);
+
+    // The region starts at 2000 + 850 = 2850.
+    expect(delta).toBe(2850 - 180 - CITATION_CONTEXT);
+    // After scrolling, the whole region is inside the view.
+    const regionTop = 2850 - delta;
+    const regionBottom = 2900 - delta;
+    expect(regionTop).toBeGreaterThanOrEqual(view.top);
+    expect(regionBottom).toBeLessThanOrEqual(view.bottom);
+  });
+
+  it("keeps a region at the very top of a page below the view's top too", () => {
+    const delta = citationLandingDelta(page, { top: 0.02, bottom: 0.05 }, view);
+
+    expect(2020 - delta).toBe(view.top + CITATION_CONTEXT);
+  });
+
+  it("gives up context rather than push a tall region's end out of the view", () => {
+    // 580px of region in a 600px view leaves room for 20px of context only.
+    const tall = citationLandingDelta(page, { top: 0.1, bottom: 0.68 }, view);
+    expect(2100 - tall).toBeCloseTo(view.top + 20);
+
+    // Taller than the view: its top lands at the view's top, and no higher.
+    const taller = citationLandingDelta(page, { top: 0.1, bottom: 0.9 }, view);
+    expect(2100 - taller).toBe(view.top);
+  });
+
+  it("lands on the page's top edge, clear of the view's top, when there is no region", () => {
+    const delta = citationLandingDelta(page, null, view);
+
+    expect(2000 - delta).toBe(view.top + PAGE_LANDING_GAP);
+  });
+});
+
+describe("firstRegionOn (IR-354)", () => {
+  it("is the page's first region in reading order, ignoring the other pages", () => {
+    // A two-column page: the passage starts low in the left column and
+    // carries on at the top of the right one. It lands on its start.
+    const regions = [
+      { page: 4, left: 0.1, top: 0.1, right: 0.9, bottom: 0.2 },
+      { page: 5, left: 0.05, top: 0.8, right: 0.48, bottom: 0.9 },
+      { page: 5, left: 0.52, top: 0.1, right: 0.95, bottom: 0.2 },
+    ];
+
+    expect(firstRegionOn(regions, 5)).toEqual(regions[1]);
+  });
+
+  it("is nothing when the page has no region", () => {
+    expect(firstRegionOn([{ page: 4, left: 0, top: 0, right: 1, bottom: 1 }], 5)).toBeNull();
   });
 });

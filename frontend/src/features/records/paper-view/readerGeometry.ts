@@ -2,6 +2,7 @@
  * The arithmetic behind the contained reader (IR-352), kept apart from the
  * component so it can be tested without layout, which jsdom does not have.
  */
+import type { Region } from "@/types/ai";
 
 /** The zoom range the reader's controls allow. The floor is low enough that
  *  fit-to-width still fits a US Letter page on a 360px phone (NFR-U3). */
@@ -67,4 +68,53 @@ export function readingAnchor(pages: PageBox[], viewTop: number): ReadingAnchor 
  */
 export function anchorDelta(page: PageBox, fraction: number, viewTop: number): number {
   return page.top + fraction * page.height - viewTop;
+}
+
+/** Room left above a cited passage when it lands: a line or two of what leads into it. */
+export const CITATION_CONTEXT = 48;
+
+/** Room left above a page when a citation lands on the page alone. */
+export const PAGE_LANDING_GAP = 16;
+
+/**
+ * The band of the screen a passage can be read in: from under the header
+ * and the reader's toolbar down to the bottom of what is visible. In the
+ * same coordinates as the page's box -- the viewport's, as measured.
+ */
+export interface ReadingBand {
+  top: number;
+  bottom: number;
+}
+
+/**
+ * How far to scroll so a citation lands where it can be read (IR-354).
+ * Positive scrolls down.
+ *
+ * With a region -- a fraction of the page's height, as a citation carries
+ * it -- the region's top comes to rest `CITATION_CONTEXT` below the view's
+ * top, or less where a tall region would otherwise run out of the view;
+ * never above the view's top. Without one, the page's top edge rests just
+ * below the view's top, as a page scrolled to would.
+ */
+export function citationLandingDelta(
+  page: PageBox,
+  region: Pick<Region, "top" | "bottom"> | null,
+  view: ReadingBand,
+): number {
+  if (!region) return page.top - view.top - PAGE_LANDING_GAP;
+  const regionTop = page.top + region.top * page.height;
+  const regionHeight = (region.bottom - region.top) * page.height;
+  const spare = view.bottom - view.top - regionHeight;
+  const context = Math.min(CITATION_CONTEXT, Math.max(0, spare));
+  return regionTop - view.top - context;
+}
+
+/**
+ * The region a citation should land on: its first on `page`. Regions arrive
+ * in reading order (`apps/ai/regions.py`), so in a two-column paper a
+ * passage starting low in the left column lands on its start, not on its
+ * continuation at the top of the right one.
+ */
+export function firstRegionOn(regions: Region[], page: number): Region | null {
+  return regions.find((region) => region.page === page) ?? null;
 }
