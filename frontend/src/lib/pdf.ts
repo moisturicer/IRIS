@@ -37,15 +37,31 @@ export async function loadPdfDocument(data: ArrayBuffer): Promise<LoadedPdf> {
   return { document, destroy: () => task.destroy() };
 }
 
-/** A rendered page's own pixel size, so its container can be sized before the
- *  next layout pass rather than jumping once the canvas paints. */
-export interface RenderedPageSize {
+/** A page's size in CSS pixels at a given zoom. */
+export interface PageSize {
   width:  number;
   height: number;
 }
 
 /**
- * Renders one page into `canvas` at `scale` and returns its pixel size.
+ * A page's pixel size at `scale`, without rendering it (IR-352).
+ *
+ * pdf.js computes a viewport synchronously, so the reader can size every
+ * page's box the moment the zoom changes, before any canvas repaints. That
+ * keeps the layout from jumping, and lets a reading position be restored in
+ * the same frame. At scale 1 it is the page's size in PDF points.
+ */
+export function pageSize(page: PdfPage, scale: number): PageSize {
+  const { width, height } = page.getViewport({ scale });
+  return { width, height };
+}
+
+/**
+ * Renders one page into `canvas` at `scale`.
+ *
+ * Drawn off-screen first and copied in once complete (IR-352): resizing a
+ * canvas clears it, so rendering straight into the visible one blanked every
+ * page for as long as a zoom change took to repaint them.
  *
  * Cancellable: `pdf.js`'s own `RenderTask.cancel()` is the documented way to
  * abandon a render that a scale change or an unmount has made moot, rather
@@ -55,14 +71,19 @@ export function renderPageToCanvas(
   page: PdfPage,
   canvas: HTMLCanvasElement,
   scale: number,
-): { promise: Promise<RenderedPageSize>; cancel: () => void } {
+): { promise: Promise<void>; cancel: () => void } {
   const viewport = page.getViewport({ scale });
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
+  const offscreen = document.createElement("canvas");
+  offscreen.width = viewport.width;
+  offscreen.height = viewport.height;
 
-  const task = page.render({ canvas, viewport });
+  const task = page.render({ canvas: offscreen, viewport });
   return {
-    promise: task.promise.then(() => ({ width: viewport.width, height: viewport.height })),
+    promise: task.promise.then(() => {
+      canvas.width = offscreen.width;
+      canvas.height = offscreen.height;
+      canvas.getContext("2d")?.drawImage(offscreen, 0, 0);
+    }),
     cancel: () => task.cancel(),
   };
 }

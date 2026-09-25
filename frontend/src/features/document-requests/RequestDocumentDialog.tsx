@@ -114,10 +114,10 @@ export function RequestDocumentDialog({
       >
         <form onSubmit={submit} noValidate className="p-6 space-y-4">
           <div>
-            <h2 id={titleId} className="text-[15px] font-bold text-stone-900">
+            <h2 id={titleId} className="text-md font-bold text-stone-900">
               Request documents
             </h2>
-            <p className="text-[12px] text-stone-600 mt-1 leading-relaxed">
+            <p className="text-xs text-stone-600 mt-1 leading-relaxed">
               The owner is asked to upload these. The record stays in review and no clearance
               changes — use this instead of Request Revision when only a file is missing.
             </p>
@@ -127,7 +127,7 @@ export function RequestDocumentDialog({
             <div>
               <label
                 htmlFor={`${ids}-party`}
-                className="block text-[12px] font-semibold text-stone-700 mb-1"
+                className="block text-xs font-semibold text-stone-700 mb-1"
               >
                 Asking as
               </label>
@@ -135,7 +135,7 @@ export function RequestDocumentDialog({
                 id={`${ids}-party`}
                 value={party}
                 onChange={(e) => setParty(e.target.value as Party)}
-                className="w-full border border-stone-200 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-brand"
+                className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
               >
                 {parties.map((p) => (
                   <option key={p} value={p}>
@@ -147,9 +147,9 @@ export function RequestDocumentDialog({
           )}
 
           <fieldset>
-            <legend className="text-[12px] font-semibold text-stone-700 mb-1.5">Documents</legend>
+            <legend className="text-xs font-semibold text-stone-700 mb-1.5">Documents</legend>
             {slotsFailed ? (
-              <p className="text-[12px] text-stone-600">
+              <p className="text-xs text-stone-600">
                 Could not load this record type's documents. Name what you need under Other.
               </p>
             ) : slots === null ? (
@@ -159,14 +159,14 @@ export function RequestDocumentDialog({
                 ))}
               </div>
             ) : slots.length === 0 ? (
-              <p className="text-[12px] text-stone-600">
+              <p className="text-xs text-stone-600">
                 This record type lists no documents. Name what you need under Other.
               </p>
             ) : (
               <ul className="max-h-48 overflow-y-auto space-y-1 pr-1">
                 {slots.map((s) => (
                   <li key={s.id}>
-                    <label className="flex items-center gap-2 text-[13px] text-stone-800 py-0.5 cursor-pointer">
+                    <label className="flex items-center gap-2 text-sm text-stone-800 py-0.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={chosen.has(s.id)}
@@ -181,7 +181,7 @@ export function RequestDocumentDialog({
             )}
             <label
               htmlFor={`${ids}-other`}
-              className="block text-[12px] font-semibold text-stone-700 mt-3 mb-1"
+              className="block text-xs font-semibold text-stone-700 mt-3 mb-1"
             >
               Other document <span className="font-normal text-stone-500">(optional)</span>
             </label>
@@ -192,16 +192,16 @@ export function RequestDocumentDialog({
               maxLength={200}
               onChange={(e) => setOther(e.target.value)}
               placeholder="e.g. Rescanned consent form"
-              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-brand"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
             />
           </fieldset>
 
           <div>
             <label
               htmlFor={`${ids}-message`}
-              className="block text-[12px] font-semibold text-stone-700 mb-1"
+              className="block text-xs font-semibold text-stone-700 mb-1"
             >
-              Message to the owner <span className="font-normal text-red-600">(required)</span>
+              Message to the owner <span className="font-normal text-brand">(required)</span>
             </label>
             <textarea
               id={`${ids}-message`}
@@ -209,12 +209,12 @@ export function RequestDocumentDialog({
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
               placeholder="Why you need these, and anything they should check first."
-              className="w-full border border-stone-200 rounded-lg p-3 text-[13px] resize-y focus:outline-none focus:border-brand"
+              className="w-full border border-stone-200 rounded-lg p-3 text-sm resize-y focus:outline-none focus:border-brand"
             />
           </div>
 
           {error && (
-            <p role="alert" className="text-[12px] text-red-700">
+            <p role="alert" className="text-xs text-brand">
               {error}
             </p>
           )}
@@ -224,14 +224,14 @@ export function RequestDocumentDialog({
               type="button"
               onClick={onClose}
               disabled={sending}
-              className="px-4 py-2 rounded-lg border border-stone-200 text-[13px] font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+              className="px-4 py-2 rounded-lg border border-stone-200 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={sending}
-              className="px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-light disabled:opacity-60"
+              className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-bold hover:bg-brand-light disabled:opacity-60"
             >
               {sending ? "Sending…" : "Send request"}
             </button>

@@ -1,5 +1,6 @@
 import type { RecordDetail } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
+import { RailHeading } from "./headings";
 
 /**
  * Institutional governance facts, as a label/value ledger.
@@ -30,19 +31,17 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
   ];
 
   return (
-    <section className="bg-white border border-stone-200 rounded-2xl p-5">
-      <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-3">
-        Institutional Governance
-      </h2>
+    <section className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
+      <RailHeading className="mb-3">Institutional Governance</RailHeading>
       <dl className="space-y-2">
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-3">
-            <dt className="text-[12px] text-stone-500 shrink-0">{row.label}</dt>
+            <dt className="text-xs text-stone-500 shrink-0">{row.label}</dt>
             <dd
               className={
                 row.emphasis
-                  ? "text-[12px] font-bold text-stone-900 text-right"
-                  : "text-[12px] font-semibold text-stone-700 text-right"
+                  ? "text-xs font-bold text-stone-900 text-right"
+                  : "text-xs font-semibold text-stone-700 text-right"
               }
             >
               {row.value}

@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, useLocation, Link } from "reac
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
@@ -26,6 +27,9 @@ import {
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
+import { PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
+import { SectionHeading } from "./headings";
+import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
 // Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
 // and most visits to this screen never open the Paper tab at all. Splitting
@@ -53,16 +57,19 @@ function canTag(roleName: string | undefined): boolean {
 // Review history
 // ---------------------------------------------------------------------------
 
+// Declined (recoverable: revision requested) and rejected (terminal) must
+// never look alike -- resubmission is the thesis contribution. Soft versus
+// solid maroon, and their labels (IR-356).
 const REVIEW_STATUS_STYLES: Record<string, string> = {
-  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  declined: "bg-amber-50 text-amber-700 border-amber-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
+  approved: "bg-stone-100 text-stone-900 border-stone-300",
+  declined: "bg-brand-50 text-brand border-brand-200",
+  rejected: "bg-brand text-white border-brand",
 };
 
 function ReviewHistory({ reviews }: { reviews: RecordReview[] }) {
   return (
     <section className="bg-white border border-stone-200 rounded-2xl p-5">
-      <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-3">
+      <h2 className="text-2xs font-bold uppercase tracking-wider text-stone-400 mb-3">
         Review History
       </h2>
       <ol className="space-y-3">
@@ -70,14 +77,14 @@ function ReviewHistory({ reviews }: { reviews: RecordReview[] }) {
           <li key={r.id} className="flex gap-3">
             <span
               className={cn(
-                "shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold border capitalize",
+                "shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-2xs font-bold border capitalize",
                 REVIEW_STATUS_STYLES[r.status] ?? "bg-stone-50 text-stone-600 border-stone-200",
               )}
             >
               {r.status}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-stone-400">
+              <p className="text-2xs text-stone-400">
                 <span className="font-semibold text-stone-600">
                   {r.reviewed_by_name ?? "Reviewer"}
                 </span>
@@ -87,9 +94,9 @@ function ReviewHistory({ reviews }: { reviews: RecordReview[] }) {
                 {formatDate(r.created_at)}
               </p>
               {r.comment ? (
-                <p className="text-[13px] text-stone-700 leading-relaxed mt-0.5">{r.comment}</p>
+                <p className="text-sm text-stone-700 leading-relaxed mt-0.5">{r.comment}</p>
               ) : (
-                <p className="text-[12px] text-stone-400 italic mt-0.5">No comment provided.</p>
+                <p className="text-xs text-stone-400 italic mt-0.5">No comment provided.</p>
               )}
             </div>
           </li>
@@ -142,10 +149,10 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
 
   return (
     <section className="bg-white border border-stone-200 rounded-2xl p-5">
-      <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-1">
+      <h2 className="text-2xs font-bold uppercase tracking-wider text-stone-400 mb-1">
         IP Classification
       </h2>
-      <p className="text-[12px] text-stone-500 mb-3">
+      <p className="text-xs text-stone-500 mb-3">
         Staff only. Sets the structured IP type recorded against this disclosure.
       </p>
 
@@ -157,7 +164,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
             aria-pressed={selected === opt}
             onClick={() => setSelected(opt === selected ? "" : opt)}
             className={cn(
-              "px-2.5 py-1 rounded-full text-[12px] font-semibold border transition-colors",
+              "px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors",
               selected === opt
                 ? "bg-brand text-white border-brand"
                 : "bg-white text-stone-600 border-stone-200 hover:border-brand/40",
@@ -173,12 +180,12 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
           type="button"
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="px-3 py-1.5 rounded-lg bg-brand text-white text-[12px] font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
+          className="px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
         >
           {saving ? "Saving…" : "Save classification"}
         </button>
-        {saved && <span className="text-[12px] font-semibold text-emerald-600">Saved</span>}
-        {error && <span className="text-[12px] text-red-600">{error}</span>}
+        {saved && <span className="text-xs font-semibold text-stone-900">Saved</span>}
+        {error && <span className="text-xs text-brand">{error}</span>}
       </div>
     </section>
   );
@@ -213,14 +220,12 @@ function SimilarPapers({ recordId }: { recordId: number }) {
   if (items === null) {
     return (
       <section>
-        <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-3">
-          Related Institutional Works
-        </h2>
+        <SectionHeading>Related works</SectionHeading>
         <div className="grid gap-3 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="h-24 rounded-2xl border border-stone-200 bg-white animate-pulse"
+              className="h-28 rounded-2xl ring-1 ring-stone-200 bg-white animate-pulse motion-reduce:animate-none"
             />
           ))}
         </div>
@@ -236,10 +241,8 @@ function SimilarPapers({ recordId }: { recordId: number }) {
   if (items.length === 0) {
     return (
       <section>
-        <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-3">
-          Related Institutional Works
-        </h2>
-        <p className="text-[12px] text-stone-500">
+        <SectionHeading>Related works</SectionHeading>
+        <p className="text-sm text-stone-500">
           No related works found. Similarity is computed from indexed records, and indexing
           has not run for this repository yet.
         </p>
@@ -249,11 +252,9 @@ function SimilarPapers({ recordId }: { recordId: number }) {
 
   return (
     <section>
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-          Related Institutional Works
-        </h2>
-        <Link to="/discover" className="text-[12px] font-semibold text-brand hover:underline">
+      <div className="flex items-baseline justify-between gap-3">
+        <SectionHeading>Related works</SectionHeading>
+        <Link to="/discover" className="text-sm font-semibold text-brand hover:underline">
           Explore all papers →
         </Link>
       </div>
@@ -262,15 +263,15 @@ function SimilarPapers({ recordId }: { recordId: number }) {
           <Link
             key={item.id}
             to={`/records/${item.id}`}
-            className="bg-white border border-stone-200 rounded-2xl p-3.5 hover:border-brand/30 hover:shadow-card-md transition-all"
+            className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 border-t-2 border-t-brand/70 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
           >
-            <p className="text-[10px] font-bold tracking-wider text-stone-300 mb-1.5">
+            <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
               CIT-U #{item.id}
             </p>
-            <p className="text-[13px] font-bold text-stone-900 leading-snug line-clamp-3">
+            <p className="font-display text-lg font-semibold text-stone-900 leading-snug line-clamp-3 group-hover:text-brand transition-colors duration-200">
               {item.title}
             </p>
-            <p className="text-[11px] text-stone-400 mt-1.5">
+            <p className="text-2xs text-stone-500 mt-2">
               {item.year ?? "—"}
               {item.classification ? ` · ${item.classification}` : ""}
             </p>
@@ -326,6 +327,7 @@ export default function PaperViewPage() {
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [citeOpen, setCiteOpen] = useState(false);
+  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const [resubmitting, setResubmitting] = useState(false);
   const [resubmitError, setResubmitError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
@@ -390,6 +392,21 @@ export default function PaperViewPage() {
     }
   };
 
+  // Share copies the paper's permanent link (IR-356), the address a reader
+  // would paste to a colleague. A blocked clipboard claims nothing.
+  const handleShare = async () => {
+    let outcome: "copied" | "failed" = "copied";
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/records/${id}`);
+    } catch {
+      // No clipboard (plain http, or permission refused): say so rather
+      // than failing silently; the address bar still has the link.
+      outcome = "failed";
+    }
+    setShareState(outcome);
+    window.setTimeout(() => setShareState("idle"), 2500);
+  };
+
   const handleComplete = async () => {
     if (!id) return;
     setCompleting(true);
@@ -425,14 +442,14 @@ export default function PaperViewPage() {
   if (!record) {
     return (
       <div className="max-w-md mx-auto text-center py-20">
-        <i className="fas fa-file-circle-question text-[28px] text-stone-300 mb-3" aria-hidden />
-        <p className="text-[15px] font-bold text-stone-800">Record not available</p>
-        <p className="text-[13px] text-stone-500 mt-1">
+        <i className="fas fa-file-circle-question text-3xl text-stone-300 mb-3" aria-hidden />
+        <p className="text-md font-bold text-stone-800">Record not available</p>
+        <p className="text-sm text-stone-500 mt-1">
           It may have been withdrawn, or you may not have access to it.
         </p>
         <Link
           to="/discover"
-          className="inline-block mt-4 px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-light transition-colors"
+          className="inline-block mt-4 px-4 py-2 rounded-lg bg-brand text-white text-sm font-bold hover:bg-brand-light transition-colors"
         >
           Back to Discover
         </Link>
@@ -492,27 +509,22 @@ export default function PaperViewPage() {
         )}
       >
         <div className="min-w-0 lg:flex-1">
-          {/* Orientation bar */}
-          <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-2 text-[13px] font-semibold text-stone-600 hover:text-brand transition-colors"
+          {/* The Abstract / Paper switch floats just under the app header,
+              so either view is one click away at any depth (IR-356). */}
+          <div className={cn("sticky z-30 flex justify-center mb-4 pointer-events-none", VIEW_SWITCH_TOP)}>
+            <div
+              role="tablist"
+              aria-label="Paper view"
+              className="pointer-events-auto inline-flex gap-1 rounded-full bg-white/90 backdrop-blur p-0.5 shadow-card-md ring-1 ring-stone-200"
             >
-              <i className="fas fa-arrow-left text-[11px]" aria-hidden />
-              Back
-            </button>
-
-            {/* Abstract / Paper toggle (IR-335), alphaxiv-style. */}
-            <div role="tablist" aria-label="Paper view" className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5">
               <button
                 type="button"
                 role="tab"
                 aria-selected={tab === "abstract"}
                 onClick={() => setTab("abstract")}
                 className={cn(
-                  "px-3 py-1 rounded-md text-[12px] font-semibold transition-colors",
-                  tab === "abstract" ? "bg-brand text-white" : "text-stone-500 hover:text-stone-800",
+                  "min-h-11 px-6 rounded-full text-md font-semibold transition-colors duration-200",
+                  tab === "abstract" ? "bg-brand text-white shadow-card" : "text-stone-600 hover:text-brand",
                 )}
               >
                 Abstract
@@ -525,23 +537,12 @@ export default function PaperViewPage() {
                 disabled={!hasPaper}
                 title={hasPaper ? undefined : "No paper file has been uploaded for this record yet."}
                 className={cn(
-                  "px-3 py-1 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
-                  tab === "paper" ? "bg-brand text-white" : "text-stone-500 hover:text-stone-800",
+                  "min-h-11 px-6 rounded-full text-md font-semibold transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed",
+                  tab === "paper" ? "bg-brand text-white shadow-card" : "text-stone-600 hover:text-brand",
                 )}
               >
                 Paper
               </button>
-            </div>
-
-            <div className="flex items-center gap-4 text-[12px] text-stone-400">
-              <span className="flex items-center gap-1.5">
-                <i className="fas fa-calendar text-[11px]" aria-hidden />
-                Added {formatDate(record.created_at)}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <i className="fas fa-eye text-[11px]" aria-hidden />
-                {record.access_count} view{record.access_count === 1 ? "" : "s"}
-              </span>
             </div>
           </div>
 
@@ -555,72 +556,139 @@ export default function PaperViewPage() {
           {/* Main column                                                    */}
           {/* ------------------------------------------------------------- */}
           <div className="min-w-0 space-y-6">
-            {/* Chips */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
-              {record.is_ip && (
-                <span className="px-2 py-0.5 rounded-full bg-brand text-white text-[11px] font-semibold flex items-center gap-1.5">
-                  <i className="fas fa-shield-halved text-[9px]" aria-hidden />
-                  Intellectual Property
-                </span>
-              )}
-              {record.ip_type && (
-                <span className="px-2 py-0.5 rounded-full bg-stone-900 text-white text-[11px] font-semibold">
-                  {IP_TYPE_LABELS[record.ip_type]}
-                </span>
-              )}
-              {record.for_commercialization && (
-                <span className="px-2 py-0.5 rounded-full border border-stone-300 text-stone-700 text-[11px] font-semibold">
-                  For Commercialization
-                </span>
-              )}
-              {record.community_extension && (
-                <span className="px-2 py-0.5 rounded-full border border-stone-300 text-stone-700 text-[11px] font-semibold">
-                  Community Extension
-                </span>
-              )}
-              {record.record_type_name && (
-                <span className="px-2 py-0.5 rounded-full border border-stone-300 text-stone-700 text-[11px] font-semibold">
-                  {record.record_type_name}
-                </span>
-              )}
-              {record.classification_name && (
-                <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand border border-brand-200 text-[11px] font-semibold">
-                  {record.classification_name}
-                </span>
-              )}
-            </div>
+            {/* Editorial header (IR-356): where it sits, what it is, who
+                wrote it, then what to do with it. */}
+            <header className="space-y-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-2 min-h-11 -my-2 text-sm font-medium text-stone-500 hover:text-brand transition-colors duration-200"
+              >
+                <i className="fas fa-arrow-left text-2xs" aria-hidden />
+                Back
+              </button>
 
-            {/* Title + attribution */}
-            <div>
-              <h1 className="text-[26px] leading-[1.2] font-bold text-stone-900 tracking-tight">
+              <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
+                {(record.record_type_name || record.classification_name) && (
+                  <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand">
+                    {[record.record_type_name, record.classification_name].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
+              </div>
+
+              <h1 className="font-display font-semibold text-3xl sm:text-4xl leading-tight text-stone-900 text-balance">
                 {record.title}
               </h1>
-              {primaryOwner && (
-                <div className="flex items-center gap-2 flex-wrap mt-3">
-                  <span className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-stone-200 bg-white">
-                    <span className="w-6 h-6 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
+
+              <div className="flex items-center gap-x-3 gap-y-2 flex-wrap text-sm text-stone-600">
+                {primaryOwner && (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-full bg-brand text-white text-2xs font-bold flex items-center justify-center" aria-hidden>
                       {initials(primaryOwner.full_name)}
                     </span>
-                    <span className="text-[13px] font-semibold text-stone-800">
-                      {primaryOwner.full_name}
-                    </span>
+                    <span className="font-semibold text-stone-800">{primaryOwner.full_name}</span>
                   </span>
-                  <span className="text-[12px] text-stone-400">
-                    · Cebu Institute of Technology – University
+                )}
+                <span>Cebu Institute of Technology – University</span>
+              </div>
+
+              <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-stone-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="fas fa-calendar text-2xs" aria-hidden />
+                  Added {formatDate(record.created_at)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="fas fa-eye text-2xs" aria-hidden />
+                  {record.access_count} view{record.access_count === 1 ? "" : "s"}
+                </span>
+                {record.is_ip && (
+                  <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 font-semibold inline-flex items-center gap-1">
+                    <i className="fas fa-shield-halved text-2xs" aria-hidden />
+                    Intellectual Property
+                  </span>
+                )}
+                {record.ip_type && (
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
+                    {IP_TYPE_LABELS[record.ip_type]}
+                  </span>
+                )}
+                {record.for_commercialization && (
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
+                    For Commercialization
+                  </span>
+                )}
+                {record.community_extension && (
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
+                    Community Extension
+                  </span>
+                )}
+              </div>
+
+              {tab === "abstract" && (
+                // One filled action (IR-356): the reviewer's review, else the
+                // adviser's completion, else a reader's Save.
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  {userCanReview && (
+                    <Link to={`/review/${record.id}/evaluate`} className={PILL_PRIMARY}>
+                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
+                      Review this record
+                    </Link>
+                  )}
+
+                  {canComplete && (
+                    <button
+                      type="button"
+                      onClick={handleComplete}
+                      disabled={completing}
+                      className={userCanReview ? PILL_SECONDARY : PILL_PRIMARY}
+                    >
+                      <i className="fas fa-circle-check text-xs" aria-hidden />
+                      {completing ? "Marking…" : "Mark as completed"}
+                    </button>
+                  )}
+
+                  <PaperSaveDropdown
+                    record={record}
+                    variant="pill"
+                    emphasis={userCanReview || canComplete ? "secondary" : "primary"}
+                  />
+
+                  <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
+                    <i className="fas fa-quote-right text-2xs" aria-hidden />
+                    Cite
+                  </button>
+
+                  <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
+                    <i
+                      className={cn(
+                        "fas text-2xs",
+                        shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
+                      )}
+                      aria-hidden
+                    />
+                    {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn\u2019t copy" : "Share"}
+                  </button>
+                  <span className="sr-only" role="status" aria-live="polite">
+                    {shareState === "copied"
+                      ? "Link to this paper copied"
+                      : shareState === "failed"
+                        ? "Couldn\u2019t copy the link. Copy it from the address bar."
+                        : ""}
                   </span>
                 </div>
               )}
-            </div>
+              {completeError && <p className="text-xs text-brand">{completeError}</p>}
+            </header>
 
             {/* Owner-actionable banners */}
             {canBeResubmitted && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-[13px] font-bold text-amber-900 flex items-center gap-2">
-                  <i className="fas fa-arrow-rotate-left text-[12px]" aria-hidden />
+              <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
+                  <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
                   Revision requested
                 </p>
-                <p className="text-[13px] text-amber-800 leading-relaxed mt-1">
+                <p className="text-sm text-brand leading-relaxed mt-1">
                   Address the reviewer comments below, then resubmit. Offices that already cleared
                   this record keep their clearance — only the office that asked for changes reviews
                   it again.
@@ -629,12 +697,12 @@ export default function PaperViewPage() {
                   type="button"
                   onClick={handleResubmit}
                   disabled={resubmitting}
-                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-[13px] font-bold hover:bg-amber-700 disabled:opacity-60 transition-colors"
+                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-sm font-bold hover:bg-brand-light disabled:opacity-60 transition-colors"
                 >
-                  <i className="fas fa-paper-plane text-[11px]" aria-hidden />
+                  <i className="fas fa-paper-plane text-2xs" aria-hidden />
                   {resubmitting ? "Resubmitting…" : "Resubmit for review"}
                 </button>
-                {resubmitError && <p className="text-[12px] text-red-700 mt-2">{resubmitError}</p>}
+                {resubmitError && <p className="text-xs text-brand mt-2">{resubmitError}</p>}
               </div>
             )}
 
@@ -646,12 +714,12 @@ export default function PaperViewPage() {
             )}
 
             {record.pipeline_status === "rejected" && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                <p className="text-[13px] font-bold text-red-900 flex items-center gap-2">
-                  <i className="fas fa-circle-xmark text-[12px]" aria-hidden />
+              <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
+                  <i className="fas fa-circle-xmark text-xs" aria-hidden />
                   This record was rejected
                 </p>
-                <p className="text-[13px] text-red-800 leading-relaxed mt-1">
+                <p className="text-sm text-brand leading-relaxed mt-1">
                   It cannot be resubmitted. Contact the relevant office if you have questions.
                 </p>
               </div>
@@ -660,12 +728,7 @@ export default function PaperViewPage() {
             {tab === "paper" ? (
               hasPaper ? (
                 <Suspense
-                  fallback={
-                    <div className="flex flex-col items-center gap-3 py-16">
-                      <i className="fas fa-circle-notch fa-spin text-[24px] text-stone-300" aria-hidden />
-                      <p className="text-[12px] text-stone-400">Loading the reader…</p>
-                    </div>
-                  }
+                  fallback={<Skeleton rows={8} label="Loading the reader…" />}
                 >
                   <PaperPdfReader
                     recordId={record.id}
@@ -675,84 +738,27 @@ export default function PaperViewPage() {
                   />
                 </Suspense>
               ) : (
-                <p className="text-[13px] text-stone-400 italic py-8 text-center">
+                <p className="text-sm text-stone-400 italic py-8 text-center">
                   No paper file has been uploaded for this record yet.
                 </p>
               )
             ) : (
               <>
-            {/* Abstract */}
+            {/* Abstract, as a reading column: a measure of ~65 characters
+                and relaxed leading, not justified text (IR-356). */}
             <section>
-              <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">
-                Abstract
-              </h2>
+              <SectionHeading>Abstract</SectionHeading>
               {record.abstract ? (
-                <p className="text-[14px] text-stone-700 leading-[1.75] text-justify">
+                <p className="max-w-prose text-lg text-stone-700 leading-7">
                   {record.abstract}
                 </p>
               ) : (
-                <p className="text-[13px] text-stone-400 italic">
+                <p className="text-sm text-stone-500 italic">
                   No abstract was provided for this record.
                 </p>
               )}
             </section>
 
-            {/* Action row */}
-            <div className="flex items-center gap-2 flex-wrap pb-6 border-b border-stone-200">
-              {hasPaper ? (
-                <button
-                  type="button"
-                  onClick={() => setTab("paper")}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-light transition-colors"
-                >
-                  <i className="fas fa-book-open text-[12px]" aria-hidden />
-                  {openAtPage != null ? `View Paper at page ${openAtPage}` : "View Paper"}
-                </button>
-              ) : (
-                <span
-                  title="No paper file has been uploaded for this record yet."
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-100 text-stone-400 text-[13px] font-bold cursor-not-allowed"
-                >
-                  <i className="fas fa-book-open text-[12px]" aria-hidden />
-                  View Paper
-                </span>
-              )}
-
-              {userCanReview && (
-                <Link
-                  to={`/review/${record.id}/evaluate`}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 text-white text-[13px] font-bold hover:bg-emerald-800 transition-colors"
-                >
-                  <i className="fas fa-clipboard-check text-[12px]" aria-hidden />
-                  Review this record
-                </Link>
-              )}
-
-              {canComplete && (
-                <button
-                  type="button"
-                  onClick={handleComplete}
-                  disabled={completing}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 text-white text-[13px] font-bold hover:bg-emerald-800 disabled:opacity-60 transition-colors"
-                >
-                  <i className="fas fa-circle-check text-[12px]" aria-hidden />
-                  {completing ? "Marking…" : "Mark as completed"}
-                </button>
-              )}
-
-              <PaperSaveDropdown record={record} />
-
-              <button
-                type="button"
-                onClick={() => setCiteOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-stone-200 bg-white text-stone-700 text-[13px] font-bold hover:border-brand/40 transition-colors"
-              >
-                <i className="fas fa-quote-right text-[11px]" aria-hidden />
-                Cite
-              </button>
-            </div>
-
-            {completeError && <p className="text-[12px] text-red-600">{completeError}</p>}
             {/* Request documents, and the requests this reviewer made:
                 accept, reject, withdraw (IR-262, IR-263). */}
             <ReviewerDocumentRequests
@@ -765,14 +771,12 @@ export default function PaperViewPage() {
             {/* Authors */}
             {record.authors.length > 0 && (
               <section>
-                <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">
-                  Authors
-                </h2>
-                <div className="flex flex-wrap gap-1.5">
+                <SectionHeading>Authors</SectionHeading>
+                <div className="flex flex-wrap gap-2">
                   {record.authors.map((a) => (
                     <span
                       key={a.id}
-                      className="px-2.5 py-1 rounded-lg bg-stone-100 text-[12px] font-medium text-stone-700"
+                      className="px-3 py-1.5 rounded-full bg-white ring-1 ring-stone-200 text-sm font-medium text-stone-700"
                     >
                       {a.name}
                     </span>
@@ -806,7 +810,7 @@ export default function PaperViewPage() {
               than the window would hide its lower cards until the paper
               ended. */}
           {!chatDocked && (
-            <aside className="space-y-4 lg:sticky lg:top-[82px] lg:max-h-[calc(100vh-106px)] lg:overflow-y-auto">
+            <aside className={cn("space-y-4 lg:sticky lg:overflow-y-auto", PANE_TOP, PANE_MAX_HEIGHT)}>
               <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
               <PaperGovernance record={record} />
               <PaperDocuments recordId={record.id} files={record.files} />

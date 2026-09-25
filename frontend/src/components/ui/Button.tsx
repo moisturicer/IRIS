@@ -7,13 +7,20 @@ type Variant = "primary" | "secondary" | "danger" | "ghost" | "outline";
 // project's class helper is plain clsx with no tailwind-merge -- a caller
 // passing `py-3.5` alongside the primitive's `py-2.5` keeps *both*, and
 // stylesheet order silently decides which wins.
-type Size    = "sm" | "md" | "lg" | "full";
+// "icon" is a square, label-less button for a toolbar glyph (IR-352); its
+// `aria-label` is required by ButtonProps below.
+type Size    = "sm" | "md" | "lg" | "full" | "icon";
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface BaseButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
-  size?:    Size;
   loading?: boolean;
 }
+
+// An icon button has no text of its own, so its accessible name is required
+// by the type rather than left to a comment (01-design-system.md section 3).
+type ButtonProps =
+  | (BaseButtonProps & { size: "icon"; "aria-label": string })
+  | (BaseButtonProps & { size?: Exclude<Size, "icon"> });
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   // Tokens, not hex: 01-design-system.md section 2 asks any component being
@@ -21,7 +28,10 @@ const VARIANT_CLASSES: Record<Variant, string> = {
   primary:   "bg-brand text-white hover:bg-brand-light disabled:opacity-50",
   secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50",
   danger:    "bg-red-600 text-white hover:bg-red-700 disabled:opacity-50",
-  ghost:     "text-gray-600 hover:bg-gray-100 disabled:opacity-50",
+  // `aria-pressed:` for a toggle (IR-352): the attribute selector outranks the
+  // base colour whatever the stylesheet order, which a caller's className
+  // would not (no tailwind-merge; see the note on Size above).
+  ghost:     "text-gray-600 hover:bg-gray-100 disabled:opacity-50 aria-pressed:bg-brand-50 aria-pressed:text-brand",
   outline:   "border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50",
 };
 
@@ -34,6 +44,9 @@ const SIZE_CLASSES: Record<Size, string> = {
   md:   "px-4 py-2 text-[13px]",
   lg:   "px-5 py-2.5 text-[14px]",
   full: "w-full justify-center min-h-11 px-5 py-3.5 text-md",
+  // 44px square on touch-sized screens (12-accessibility.md section 4), a
+  // compact 32px beside a desktop pointer.
+  icon: "w-11 h-11 lg:w-8 lg:h-8 justify-center text-xs",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
