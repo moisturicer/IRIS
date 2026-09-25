@@ -20,7 +20,11 @@ export const recordFormSchema = z.object({
     .min(1990, "Year must be 1990 or later.")
     .max(new Date().getFullYear() + 1, "Year cannot be in the future."),
 
-  record_type: z.string().min(1, "Record type is required."),
+  // An untouched radio group is null, not "", so the type errors need the
+  // message too -- without it Zod says "Expected string, received null".
+  record_type: z
+    .string({ required_error: "Record type is required.", invalid_type_error: "Record type is required." })
+    .min(1, "Record type is required."),
 
   /**
    * Adviser is only required for Proposal records.

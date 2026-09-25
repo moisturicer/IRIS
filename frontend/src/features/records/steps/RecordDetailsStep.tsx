@@ -25,6 +25,7 @@ export function RecordDetailsStep() {
     formState: { errors },
     watch,
     setValue,
+    getValues,
   } = useFormContext<RecordFormValues>();
 
   const authors          = watch("authors") ?? [];
@@ -53,6 +54,13 @@ export function RecordDetailsStep() {
       .catch(() => setLoadError(true))
       .finally(() => setLoadingData(false));
   }, []);
+
+  // The select mounts before its options arrive, so the browser cannot select
+  // the saved type then and falls back to the placeholder, although the form
+  // still holds the value. Put it back once the options exist.
+  useEffect(() => {
+    if (!loadingData) setValue("record_type", getValues("record_type"));
+  }, [loadingData, getValues, setValue]);
 
   const addAuthor = () => {
     const trimmed = authorInput.trim();
