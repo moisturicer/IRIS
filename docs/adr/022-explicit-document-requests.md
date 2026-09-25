@@ -2,6 +2,10 @@
 
 ## Status
 
+> **Note, 2026-09-26:** [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) (Proposed)
+> retires the `intake` party. Every rule below still holds for the remaining parties (Adviser,
+> ITSO, IERC, KTTO, RDCO). Read "including `intake`" as historical.
+
 **Accepted** — 2026-09-15 · **amended 2026-09-24, §Amendment (fulfilment, who may read request data, refusals)**. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
 takes effect when [PR #81](https://github.com/moisturicer/IRIS/pull/81) merges. Tracked on
 [IR-254](https://citiris.atlassian.net/browse/IR-254); implemented by

@@ -2,6 +2,10 @@
 
 ## Status
 
+> **Further superseded by [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md)** (Proposed
+> 2026-09-26): there is no intake step, and the requested-office booleans are now only a hint the
+> Adviser sees when deciding whether to route. See also ADR-021.
+
 **Accepted** — 2026-09-07, by **Lee Jasmin Adolfo**. Proposed 2026-09-04 and implemented behind
 this ADR so the change had a paper trail before the team decided; the decision has now been
 taken, so the code and this document agree on their own status again.

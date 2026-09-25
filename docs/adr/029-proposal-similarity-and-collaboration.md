@@ -2,6 +2,12 @@
 
 ## Status
 
+> **§3–§4 partially superseded by [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §8**
+> (Proposed 2026-09-26). The unbuilt Collaboration opt-in becomes a Proposal's **Discoverable**
+> visibility setting, and that setting *does* permit listing the title and abstract in Discover,
+> the larger disclosure §4 said would need its own consent. The manuscript stays unreadable and
+> `visible_to()` is still not widened. Matching (§1, §2, §5–§7) is unchanged.
+
 **Accepted** — 2026-09-19.
 
 **Depends on** IR-281 for record-level vectors. Nothing here can be built before those exist.

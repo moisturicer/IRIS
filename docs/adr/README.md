@@ -8,7 +8,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 
 ## Index
 
-**Twenty active decisions.** Read these for "what does IRIS do today and why." **ADR-021 and ADR-022 are Accepted but not yet built**: they settle the MVP workflow (2026-09-15), and their implementation is IR-255. Until that lands, the code still runs the fixed pipeline they replace.
+**Twenty active decisions.** Read these for "what does IRIS do today and why." **ADR-021 and ADR-022 are Accepted and partly built** (IR-255). **[ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) (Proposed 2026-09-26) reopens the workflow**: it removes the intake party, makes the Adviser every record's entry reviewer, and adds office reviewer pools, versions, lineage and a capability-driven Paper View. Until ADR-032 is accepted, the unbuilt IR-255 slices it lists in §14 should not be started.
 
 | ADR | Title | Status | Impact |
 |---|---|---|---|
@@ -27,12 +27,13 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [015](015-voyage-embedding-and-reranking.md) | Voyage for embedding and reranking, always — `voyage-context-4` | Accepted · **amended 2026-09-20 (awaiting acceptance)** | Architecture · Security · Cost |
 | [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Accepted · **amended 2026-09-04 (twice)** | Architecture · Scope · **Research** |
 | [017](017-asgi-deployment-for-gateway-streaming.md) | ASGI deployment so Django can call the gateway asynchronously | Accepted | Architecture · Deployment · Performance |
-| [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Accepted** — 2026-09-07 · **partially superseded by [021](021-reviewer-directed-routing.md)** | Architecture · Research |
+| [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Accepted** — 2026-09-07 · **partially superseded by [021](021-reviewer-directed-routing.md) and [032](032-adviser-first-review-and-office-reviewer-pools.md)** | Architecture · Research |
 | [019](019-persisted-unified-conversation-history.md) | Persisted conversation history, unified across Ask IRIS and Paper Chat | Accepted | Architecture · **Research** |
 | [020](020-per-record-assessment-brief.md) | The IRIS Assessment Brief — per-record decision support at intake | **Accepted** — 2026-09-10 | Scope · Security · **Research** |
-| [021](021-reviewer-directed-routing.md) | Intake, specialist review, and reviewer-directed routing | **Accepted** — 2026-09-15 · not yet built (IR-255) | Architecture · Security · **Research** |
+| [021](021-reviewer-directed-routing.md) | Intake, specialist review, and reviewer-directed routing | **Accepted** — 2026-09-15 · partly built (IR-255) · **partially superseded by [032](032-adviser-first-review-and-office-reviewer-pools.md)** | Architecture · Security · **Research** |
 | [022](022-explicit-document-requests.md) | Explicit document requests, distinct from resubmission | **Accepted** — 2026-09-15 · not yet built (IR-262/263) | Architecture · Scope |
 | [023](023-migrate-on-container-boot.md) | Compose containers migrate on boot, unconditionally | **Accepted** — 2026-09-21 | Deployment · Reliability |
+| [032](032-adviser-first-review-and-office-reviewer-pools.md) | Adviser-first review, office reviewer pools, record versions and lineage, one capability-driven Paper View | **Proposed** — 2026-09-26 (IR-373) · partially supersedes 021, 029 §3–§4, 018 | Architecture · Security · **Research** |
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 
@@ -79,6 +80,8 @@ Two questions are recorded as research and project-management considerations. **
 
 - whether ad-hoc routing moves ADR-003's novelty argument into CMMN territory;
 - what this work displaces from ADR-001's budget.
+
+**ADR-032 (2026-09-26) reopens the workflow ADR-021 settled.** The project lead reopened it deliberately. The central change is that **the Adviser, who has read the paper, is every record's entry reviewer and decides whether any specialist office is needed**. Intake & Triage is removed, an Adviser may publish a Thesis/Project that needs no specialist review, and RDCO decides only on the specialist path. It keeps ADR-021's assignment, routing, resubmission-request and tracker machinery, which is already built, and with it ADR-003's clearance-aware reset. It adds per-person seats inside each office (pool, claim, coordinator assign), record versions, Proposal → Thesis/Project lineage, private review and public discussions, Discoverable Proposals (title and abstract only), and one Paper View rendered from server `capabilities`. Four points were settled explicitly in the session: Adviser may publish; Discoverable shows a summary only; routing lands in an office pool; queue tabs are To review · In review · Done. The design defaults that fill the remaining gaps are each flagged in the ADR's own text.
 
 ADRs 001–012 record the conclusions of a structured architecture review conducted 31 August – 1 September 2026, in three passes:
 

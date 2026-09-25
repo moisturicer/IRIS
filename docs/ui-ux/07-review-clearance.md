@@ -1,5 +1,10 @@
 # 07 — Review & Clearance
 
+> **Queue and review screen superseded by [16 — Paper View, Review and My Reviews](16-paper-view-and-review.md)**
+> ([ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md)). There is no separate
+> decision page: review happens in the Paper View's Review mode, and the queue is **My Reviews**
+> (To review · In review · Done). §1–§2's findings and the preserved "Request Revision" copy still apply.
+
 **Verdict: KEEP the queue and the decision screen. MERGE four list pages into one. Make the decision screen self-sufficient.**
 
 This is where the reviewer side of the contribution lives. A reviewer who cannot see what the other offices have done is being asked to make a parallel decision with sequential information.

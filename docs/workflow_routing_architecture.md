@@ -1,5 +1,12 @@
 # Workflow routing — current code, settled model, and the path between them
 
+> **Read with [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) (Proposed 2026-09-26),
+> which reopened the workflow at the project lead's instruction.** Everything below about the
+> **intake** party, Intake & Triage queues and UI, the Proposal "complete" act, and RDCO as a
+> mandatory decider for Thesis/Project is **superseded**. The code mapping, migration shape,
+> tracker derivation and test seams still hold. ADR-032 §14 lists how each unbuilt IR-255 slice
+> changes. The phrase "does not reopen it" below was true when written.
+
 **Status: the implementation companion to two Accepted ADRs.** The decisions are in
 [ADR-021](adr/021-reviewer-directed-routing.md) and
 [ADR-022](adr/022-explicit-document-requests.md). The workflow was settled on 2026-09-15 by the
