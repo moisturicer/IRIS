@@ -2,7 +2,7 @@
 
 ## Status
 
-> **Note, 2026-09-26:** [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) (Proposed)
+> **Note, 2026-09-26:** [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) (Accepted)
 > retires the `intake` party. Every rule below still holds for the remaining parties (Adviser,
 > ITSO, IERC, KTTO, RDCO). Read "including `intake`" as historical.
 

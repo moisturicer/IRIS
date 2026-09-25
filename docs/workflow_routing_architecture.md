@@ -1,6 +1,6 @@
 # Workflow routing — current code, settled model, and the path between them
 
-> **Read with [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) (Proposed 2026-09-26),
+> **Read with [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) (Accepted 2026-09-26),
 > which reopened the workflow at the project lead's instruction.** Everything below about the
 > **intake** party, Intake & Triage queues and UI, the Proposal "complete" act, and RDCO as a
 > mandatory decider for Thesis/Project is **superseded**. The code mapping, migration shape,

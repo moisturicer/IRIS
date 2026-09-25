@@ -2,7 +2,17 @@
 
 ## Status
 
-**Proposed** — 2026-09-26. Tracked on [IR-373](https://citiris.atlassian.net/browse/IR-373).
+**Accepted** — 2026-09-26, by **Lee Jasmin Adolfo** (project lead), after [PR #133](https://github.com/moisturicer/IRIS/pull/133) merged. Tracked on [IR-373](https://citiris.atlassian.net/browse/IR-373).
+
+**The five design defaults are confirmed as part of acceptance.** They were marked as defaults in the Proposed draft; they are now decisions:
+
+1. the record's Adviser must not be one of its owners (§1);
+2. RDCO keeps *accept, keep unlisted* (§3);
+3. the Proposal *complete* act is retired (§2);
+4. one continuation per Proposal (§6);
+5. the author takes part in the review discussion (§7).
+
+**The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
 
@@ -66,7 +76,7 @@ Party = adviser | itso | ierc | ktto | rdco
 
 `intake` is **retired**. Nothing new is assigned to it, routed to it, or asked for changes by it. The stored rows that hold it are history, and IR-260's migration handles them (§13). `ENTRY_PARTY` becomes `adviser` for every record type.
 
-**The record's Adviser must not be one of its owners.** Nobody reviews their own submission. A faculty member who submits their own Thesis or Project names a different faculty member as its Adviser. *This is a design default the session did not state. It is recorded here because, without it, "faculty upload" plus "Adviser may publish" (§3) lets a person publish their own work unreviewed.*
+**The record's Adviser must not be one of its owners.** Nobody reviews their own submission. A faculty member who submits their own Thesis or Project names a different faculty member as its Adviser. *Confirmed at acceptance. It was not stated in the session; it exists because, without it, "faculty upload" plus "Adviser may publish" (§3) lets a person publish their own work unreviewed.*
 
 ### 2. Proposal
 
@@ -104,7 +114,7 @@ The ADR-018 office booleans on the submission form are shown to the Adviser as t
 - **accept, keep unlisted** (`completed`)
 - route to an office for further review
 
-*"Keep unlisted" is kept from ADR-021 and was not raised in the session. It is kept because the specialist path exists largely for IP concerns, and a record ITSO flagged as patentable may need to be accepted without being published before a filing. Delete it if the team disagrees; nothing else depends on it.*
+*"Keep unlisted" is kept from ADR-021 and was not raised in the session. It is kept because the specialist path exists largely for IP concerns, and a record ITSO flagged as patentable may need to be accepted without being published before a filing. Confirmed at acceptance.*
 
 **Specialist offices never reject and never publish.** This is unchanged from ADR-021 §7.
 
@@ -173,7 +183,7 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 - **Continue as Thesis / Continue as Project** is available to an owner of an `approved` Proposal. It creates a new `draft` record of the chosen type with `derived_from` set to the Proposal. It pre-fills title, abstract, keywords, classification, owners and Adviser, all editable. The owner then uploads the full manuscript and submits it, and the new record enters with its Adviser (§1) as any other record does.
 - **The Proposal is never mutated.** Its versions, reviews and discussion stay on it.
 - **The two records point at each other.** The Thesis shows *"Developed from Proposal #123 — View proposal"*. The Proposal shows *"Continued as Thesis #456"*.
-- **One continuation per Proposal.** That is what `unique` enforces. *This is a design default. A Proposal that genuinely splits into two outputs would need the constraint lifted, and nothing else would change.*
+- **One continuation per Proposal.** That is what `unique` enforces. *Confirmed at acceptance. A Proposal that genuinely splits into two outputs would need the constraint lifted, and nothing else would change.*
 - **Direct submission still exists.** A Thesis or Project can be submitted with no Proposal behind it. It then has no origin, and nothing else differs.
 
 ### 7. Two discussions, never mixed
@@ -185,7 +195,7 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 | **On which records** | Every submitted record | `published` records and Discoverable Proposals (§8) only |
 | **Shown as** | One **timeline** interleaving comments, versions, seat openings, reviews and findings, routing, document requests, and resubmission requests and their resolution. The shape of a GitHub pull request. | A flat thread under the paper |
 
-- **The author takes part in the review discussion.** It is their pull request. *This is a design default. If an office later needs notes the author must not see, that is a third, reviewer-only channel, not a visibility flag on this one.*
+- **The author takes part in the review discussion.** It is their pull request. *Confirmed at acceptance. If an office later needs notes the author must not see, that is a third, reviewer-only channel, not a visibility flag on this one.*
 - **The timeline is derived** from the rows that already exist plus `ReviewComment`, the same way the tracker is (ADR-021 §14). Nothing is duplicated into an event table.
 - **Public comments are moderated by hiding, not by deleting.** Owners and system administrators can hide a comment.
 
@@ -417,17 +427,19 @@ FR-M5-01 · FR-M5-03 · FR-M4 · NFR-R3 · NFR-S4. These are stable labels only.
 
 | Ticket | Was (ADR-021) | Becomes |
 |---|---|---|
-| IR-261 | route, with intake as initial router | route from Adviser-accept, office to office, and RDCO to office. Targets land in pools. Adds nominate. |
+| IR-261 | route, with intake as initial router | **Every record type enters at the Adviser.** Route from Adviser-accept, office to office, and RDCO to office. Targets land in pools. Adds nominate. |
 | IR-268 | queues per party incl. Intake & Triage | **My Reviews** over seats: To review · In review · Done. Office pool with claim/assign. |
 | IR-269 | clear / finding, hand-back | Holds. Office completion = all seats done. Hand-back opens RDCO only on the specialist path. |
 | IR-270 | RDCO decides every Thesis/Project | RDCO decides specialist-path records only. Adds *accept & publish* for the Adviser on the non-specialist path. |
 | IR-271 | Adviser **or RDCO** decides and **completes** a Proposal | Adviser alone: revise / reject / accept. **Complete retired.** Continuation moves to a new ticket. |
 | IR-272 | request resubmission | Holds. The request records the version it was made against. |
 | IR-273 | resubmit and reset | Resubmit **writes a `RecordVersion`**. Only the requesting seats reopen. |
-| IR-260 | cutover incl. `rdco_intake` → `intake` rename | Cutover retires intake instead of renaming it (§13). |
+| IR-260 | cutover incl. `rdco_intake` → `intake` rename | Cutover retires intake instead of renaming it (§13). New submissions enter at the Adviser, and an owner named as Adviser is refused. |
 | IR-274 | delete the old pipeline | Holds, and also deletes the intake queue and UI. |
 
-**New tickets to create when this ADR is accepted:**
+**Re-planned 2026-09-26.** Each ticket above has been rewritten in Jira to this column, relabelled `not-ready` until the tickets it now depends on exist, and has its frontend acceptance criteria held for the frontend redesign specification.
+
+**New tickets, to be created after the frontend redesign specification is reconciled:**
 
 - seats, pool and coordinator
 - record versions and the version picker

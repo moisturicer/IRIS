@@ -3,7 +3,7 @@
 ## Status
 
 > **Partially superseded by [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md)**
-> (Proposed 2026-09-26). The intake party (§1–§2), the Proposal rule "Adviser or RDCO decides and
+> (Accepted 2026-09-26). The intake party (§1–§2), the Proposal rule "Adviser or RDCO decides and
 > completes" (§3), RDCO as a mandatory gate for Thesis/Research and Project (§3, §10), and
 > party-only assignment are replaced. The assignment, routing, resubmission and tracker machinery
 > (§4, §6, §8, §11, §12, §14) is kept. The body below is left as decided, per this project's
