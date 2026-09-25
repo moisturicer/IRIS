@@ -21,14 +21,6 @@ import { offPaletteClasses } from "./palette";
  * files found on 2026-09-25.
  */
 const NOT_YET_CONVERTED: readonly string[] = [
-  // IR-360 -- the submission wizard
-  "src/features/records/AddRecordPage.tsx",
-  "src/features/records/EditRecordPage.tsx",
-  "src/features/records/steps/PaperDetailsStep.tsx",
-  "src/features/records/steps/RecordDetailsStep.tsx",
-  "src/features/records/steps/TitleAbstractStep.tsx",
-  "src/features/records/steps/TypeRouteStep.tsx",
-  "src/features/records/steps/UploadsStep.tsx",
   // IR-361 -- My Workspace, review and clearance
   "src/features/records/MyWorkspacePage.tsx",
   "src/features/records/WorkspaceOfficePills.tsx",

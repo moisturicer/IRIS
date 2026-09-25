@@ -14,6 +14,7 @@ import { FileUploadZone }  from "@/components/shared/FileUploadZone";
 import { Badge }           from "@/components/ui/Badge";
 import { Spinner }         from "@/components/ui/Spinner";
 import type { UploadSlot } from "@/types/documents";
+import { FieldError }      from "./FieldError";
 
 const MAX_PDF_BYTES = 50 * 1024 * 1024; // 50 MB — mirrors documents/views.py::MAX_PDF_SIZE_BYTES
 
@@ -51,6 +52,29 @@ interface UploadsStepProps {
    * it. EditRecordPage still wants the full list, so this defaults to false.
    */
   hideSlots?: boolean;
+}
+
+/**
+ * A staged file's state. "Uploaded" is near-black and "Error" is maroon, the
+ * brand's own colour, so the two that end a file's journey also carry a glyph
+ * (IR-360). The word stays; the glyph is aria-hidden.
+ */
+function UploadState({ uploaded, error }: { uploaded?: boolean; error?: string }) {
+  if (uploaded) {
+    return (
+      <Badge variant="success">
+        <i className="fas fa-check mr-1" aria-hidden />Uploaded
+      </Badge>
+    );
+  }
+  if (error) {
+    return (
+      <Badge variant="danger">
+        <i className="fas fa-circle-exclamation mr-1" aria-hidden />Error
+      </Badge>
+    );
+  }
+  return <Badge variant="neutral">Staged</Badge>;
 }
 
 export interface StagedFile {
@@ -157,12 +181,12 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
           <span className="text-[13px] font-semibold text-stone-800">
             Full Research Manuscript / Final Paper
           </span>
-          <Badge variant="danger">Mandatory</Badge>
+          {/* A requirement, not a failure: soft maroon, so it does not wear
+              the solid maroon an upload "Error" does (IR-360). */}
+          <Badge variant="warning">Mandatory</Badge>
         </div>
         {manuscript && !manuscriptBusy && (
-          <Badge variant={manuscript.uploaded ? "success" : manuscript.error ? "danger" : "neutral"}>
-            {manuscript.uploaded ? "Uploaded" : manuscript.error ? "Error" : "Staged"}
-          </Badge>
+          <UploadState uploaded={manuscript.uploaded} error={manuscript.error} />
         )}
       </div>
       <div className="p-4">
@@ -170,16 +194,16 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
           <div className="flex justify-center py-6"><Spinner /></div>
         ) : manuscript && !manuscript.error ? (
           <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg border border-stone-200">
-            <i className="fa fa-file-pdf text-stone-400" aria-hidden />
+            <i className="fa fa-file-pdf text-stone-500" aria-hidden />
             <span className="text-[13px] text-stone-700 flex-1 truncate">{manuscript.file.name}</span>
-            <button type="button" onClick={removeManuscript} className="text-stone-400 hover:text-red-500 text-[12px]" aria-label="Remove manuscript">
+            <button type="button" onClick={removeManuscript} className="text-stone-500 hover:text-brand text-[12px]" aria-label="Remove manuscript">
               <i className="fa fa-times" aria-hidden />
             </button>
           </div>
         ) : (
           <FileUploadZone onFiles={stageManuscript} accept=".pdf" hint="PDF only, up to 50 MB" />
         )}
-        {manuscript?.error && <p className="text-[12px] text-red-500 mt-1">{manuscript.error}</p>}
+        {manuscript?.error && <FieldError>{manuscript.error}</FieldError>}
       </div>
     </div>
   );
@@ -195,7 +219,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
   return (
     <div className="flex flex-col gap-5">
       {!recordId && (
-        <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-[13px] text-amber-700">
+        <div className="px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-[13px] text-stone-700">
           <i className="fa fa-info-circle mr-2" aria-hidden />
           {hideSlots
             ? "Your manuscript is uploaded once the record is saved."
@@ -206,12 +230,12 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
       {manuscriptCard}
 
       {hideSlots ? (
-        <p className="text-[12px] text-stone-400 leading-relaxed">
+        <p className="text-[12px] text-stone-500 leading-relaxed">
           Other documents an office needs — an ethics clearance form, a similarity report — are
           requested once your disclosure is routed there, from this record's Documents page.
         </p>
       ) : slots.length === 0 ? (
-        <p className="text-[13px] text-gray-500 text-center py-4">
+        <p className="text-[13px] text-stone-500 text-center py-4">
           No additional documents are required for this type.
         </p>
       ) : (
@@ -220,10 +244,10 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
           const isUp = uploading[slot.id];
 
           return (
-            <div key={slot.id} className="border border-gray-200 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div key={slot.id} className="border border-stone-200 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 bg-stone-50 border-b border-stone-200">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-gray-800">{slot.name}</span>
+                  <span className="text-[13px] font-semibold text-stone-800">{slot.name}</span>
                   {/* Only mark what is genuinely required. Every slot used to
                       carry a badge, so an "Optional" one said nothing and a
                       "Required" one was false -- 37 of 41 slots claimed to be
@@ -232,13 +256,9 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                       submitter cannot possibly attach. IR-118 dropped the claim;
                       this stops the UI making it. When an office states its real
                       list, set is_required and the badge returns by itself. */}
-                  {slot.is_required && <Badge variant="danger">Required</Badge>}
+                  {slot.is_required && <Badge variant="warning">Required</Badge>}
                 </div>
-                {file && (
-                  <Badge variant={file.uploaded ? "success" : file.error ? "danger" : "neutral"}>
-                    {file.uploaded ? "Uploaded" : file.error ? "Error" : "Staged"}
-                  </Badge>
-                )}
+                {file && <UploadState uploaded={file.uploaded} error={file.error} />}
               </div>
 
               <div className="p-4">
@@ -247,9 +267,9 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                     <Spinner />
                   </div>
                 ) : file && !file.error ? (
-                  <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <i className="fa fa-file text-gray-500" aria-hidden />
-                    <span className="text-[13px] text-gray-700 flex-1 truncate">{file.file.name}</span>
+                  <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg border border-stone-200">
+                    <i className="fa fa-file text-stone-500" aria-hidden />
+                    <span className="text-[13px] text-stone-700 flex-1 truncate">{file.file.name}</span>
                     <button
                       type="button"
                       onClick={() => setStaged((prev) => {
@@ -258,7 +278,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                         return next;
                       })}
                       aria-label={`Remove ${slot.name}`}
-                      className="text-gray-500 hover:text-red-500 text-[12px]"
+                      className="text-stone-500 hover:text-brand text-[12px]"
                     >
                       <i className="fa fa-times" aria-hidden />
                     </button>
@@ -270,9 +290,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                     hint="PDF only, up to 50 MB"
                   />
                 )}
-                {file?.error && (
-                  <p className="text-[12px] text-red-500 mt-1">{file.error}</p>
-                )}
+                {file?.error && <FieldError>{file.error}</FieldError>}
               </div>
             </div>
           );

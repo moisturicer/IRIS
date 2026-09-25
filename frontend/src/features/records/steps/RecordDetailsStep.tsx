@@ -16,6 +16,8 @@ import { recordsApi } from "@/api/records";
 import type { User } from "@/types/auth";
 import type { RecordType } from "@/types/records";
 import type { RecordFormValues } from "../recordFormSchema";
+import { FieldError } from "./FieldError";
+import { LABEL, LOAD_ERROR, fieldClasses } from "./fieldClasses";
 
 export function RecordDetailsStep() {
   const {
@@ -67,7 +69,8 @@ export function RecordDetailsStep() {
   return (
     <div className="flex flex-col gap-5">
       {loadError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
+        <div className={LOAD_ERROR}>
+          <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
           Failed to load form data. Please refresh the page and try again.
         </div>
       )}
@@ -82,37 +85,30 @@ export function RecordDetailsStep() {
 
       {/* Record type — fetched from API */}
       <div>
-        <label className="block text-[13px] font-medium text-gray-700 mb-1">
-          Record Type <span className="text-red-500">*</span>
+        <label className={LABEL}>
+          Record Type <span className="text-brand">*</span>
         </label>
         <select
           {...register("record_type")}
           disabled={loadingData}
-          className={`w-full border rounded-lg px-3 py-2 text-[13px] outline-none transition-colors
-            disabled:bg-gray-50 disabled:text-gray-500
-            ${errors.record_type
-              ? "border-red-400 focus:border-red-500"
-              : "border-gray-300 focus:border-[#6B0F12]"
-            } focus:ring-1`}
+          className={fieldClasses(Boolean(errors.record_type))}
         >
           <option value="">{loadingData ? "Loading…" : "Select record type"}</option>
           {recordTypes.map((rt) => (
             <option key={rt.id} value={String(rt.id)}>{rt.name}</option>
           ))}
         </select>
-        {errors.record_type && (
-          <p className="text-[12px] text-red-500 mt-1">{errors.record_type.message}</p>
-        )}
+        {errors.record_type && <FieldError>{errors.record_type.message}</FieldError>}
       </div>
 
       {/* Adviser — only required for Proposal; shown as optional for other types */}
       <div>
-        <label className="block text-[13px] font-medium text-gray-700 mb-1">
+        <label className={LABEL}>
           Adviser{" "}
           {isProposal ? (
-            <span className="text-red-500">*</span>
+            <span className="text-brand">*</span>
           ) : (
-            <span className="text-gray-500 font-normal text-[12px]">
+            <span className="text-stone-500 font-normal text-[12px]">
               {selectedTypeName ? "(optional for this record type)" : "(select record type first)"}
             </span>
           )}
@@ -120,12 +116,7 @@ export function RecordDetailsStep() {
         <select
           {...register("adviser", { valueAsNumber: true })}
           disabled={loadingData}
-          className={`w-full border rounded-lg px-3 py-2 text-[13px] outline-none transition-colors
-            disabled:bg-gray-50 disabled:text-gray-500
-            ${errors.adviser
-              ? "border-red-400 focus:border-red-500"
-              : "border-gray-300 focus:border-[#6B0F12]"
-            } focus:ring-1`}
+          className={fieldClasses(Boolean(errors.adviser))}
         >
           <option value="">{loadingData ? "Loading…" : "Select adviser"}</option>
           {advisers.map((a) => (
@@ -134,11 +125,9 @@ export function RecordDetailsStep() {
             </option>
           ))}
         </select>
-        {errors.adviser && (
-          <p className="text-[12px] text-red-500 mt-1">{errors.adviser.message}</p>
-        )}
+        {errors.adviser && <FieldError>{errors.adviser.message}</FieldError>}
         {isProposal && (
-          <p className="text-[11px] text-gray-500 mt-0.5">
+          <p className="text-[11px] text-stone-500 mt-0.5">
             Proposal records must have an assigned adviser before submission.
           </p>
         )}
@@ -146,8 +135,8 @@ export function RecordDetailsStep() {
 
       {/* Authors — required, min 1 */}
       <div>
-        <label className="block text-[13px] font-medium text-gray-700 mb-1">
-          Authors <span className="text-red-500">*</span>
+        <label className={LABEL}>
+          Authors <span className="text-brand">*</span>
         </label>
         <div className="flex gap-2 mb-2">
           <input
@@ -155,13 +144,13 @@ export function RecordDetailsStep() {
             onChange={(e) => setAuthorInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAuthor())}
             placeholder="Type author name and press Enter or Add"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[13px] outline-none
-              focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12]"
+            className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-[13px] text-stone-900 outline-none
+              placeholder:text-stone-500 focus:border-brand focus:ring-1 focus:ring-brand"
           />
           <button
             type="button"
             onClick={addAuthor}
-            className="px-3 py-2 bg-gray-100 rounded-lg text-[13px] text-gray-600 hover:bg-gray-200"
+            className="px-3 py-2 bg-stone-100 rounded-lg text-[13px] text-stone-700 hover:bg-stone-200"
           >
             Add
           </button>
@@ -173,13 +162,13 @@ export function RecordDetailsStep() {
             {authors.map((a, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-full text-[12px] text-gray-700"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-100 rounded-full text-[12px] text-stone-700"
               >
                 {a}
                 <button
                   type="button"
                   onClick={() => removeAuthor(i)}
-                  className="text-gray-500 hover:text-gray-600"
+                  className="text-stone-500 hover:text-stone-900"
                   aria-label={`Remove author ${a}`}
                 >
                   <i className="fa fa-times text-[10px]" aria-hidden />
@@ -190,11 +179,11 @@ export function RecordDetailsStep() {
         )}
 
         {errors.authors && (
-          <p className="text-[12px] text-red-500 mt-1">
+          <FieldError>
             {typeof errors.authors.message === "string"
               ? errors.authors.message
               : "At least one author is required."}
-          </p>
+          </FieldError>
         )}
       </div>
     </div>

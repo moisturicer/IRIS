@@ -72,7 +72,7 @@ export function DpaConsentInline({ accepted, onAcceptedChange }: DpaConsentInlin
           checked={accepted}
           onChange={(e) => onAcceptedChange(e.target.checked)}
           aria-describedby={`${textId}-label`}
-          className="mt-0.5 w-4 h-4 rounded border-stone-300 text-brand focus:ring-brand cursor-pointer"
+          className="mt-0.5 w-4 h-4 rounded border-stone-300 text-brand accent-brand focus:ring-brand cursor-pointer"
         />
         <span id={`${textId}-label`} className="text-[12px] text-stone-700 leading-relaxed group-hover:text-stone-900">
           {DPA_CHECKBOX_LABEL}

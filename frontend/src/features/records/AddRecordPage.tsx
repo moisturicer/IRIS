@@ -196,39 +196,49 @@ export default function AddRecordPage() {
           }
         />
 
-        <p className="text-[12px] text-stone-400 mb-6 -mt-3">
+        <p className="text-[12px] text-stone-500 mb-6 -mt-3">
           <Link to="/workspace" className="hover:text-brand">My Workspace</Link>
           <span className="mx-1.5">/</span>
           <span className="text-stone-600 font-medium">New Disclosure</span>
         </p>
 
-        {/* Step indicator — <ol> with aria-current="step" per docs/ui-ux/05-submission.md a11y spec */}
+        {/* Step indicator — <ol> with aria-current="step" per docs/ui-ux/05-submission.md a11y spec.
+            Done, current and upcoming differ by more than colour (IR-360): a done
+            step has a check and says so to a screen reader, the current one is a
+            filled maroon pill, and an upcoming one is its number in an outline. */}
         <ol className="flex items-center gap-0 mb-6" aria-label="Submission steps">
-          {STEPS.map((s, i) => (
-            <li key={s.title} className="flex items-center">
-              <div
-                aria-current={step === i + 1 ? "step" : undefined}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold transition-colors",
-                  step === i + 1 ? "bg-brand text-white" : step > i + 1 ? "text-emerald-600" : "text-stone-400",
-                )}
-              >
-                <span
+          {STEPS.map((s, i) => {
+            const current = step === i + 1;
+            const done = step > i + 1;
+            return (
+              <li key={s.title} className="flex items-center">
+                <div
+                  aria-current={current ? "step" : undefined}
                   className={cn(
-                    "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold",
-                    step === i + 1 ? "bg-white text-brand" : step > i + 1 ? "bg-emerald-100" : "bg-stone-100",
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold transition-colors",
+                    current ? "bg-brand text-white" : done ? "text-stone-900" : "text-stone-500",
                   )}
                 >
-                  {step > i + 1 ? <i className="fa fa-check text-[9px]" aria-hidden /> : i + 1}
-                </span>
-                {s.title}
-              </div>
-              {i < STEPS.length - 1 && <div className="w-8 h-px bg-stone-200 mx-1" />}
-            </li>
-          ))}
+                  <span
+                    className={cn(
+                      "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold",
+                      current ? "bg-white text-brand" : done ? "bg-stone-900 text-white" : "border border-stone-300 text-stone-600",
+                    )}
+                  >
+                    {done ? <i className="fa fa-check text-[9px]" aria-hidden /> : i + 1}
+                  </span>
+                  {/* Below sm only the current step is named on screen, or the row
+                      scrolls sideways at 360px; the others stay in the a11y tree. */}
+                  <span className={current ? undefined : "sr-only sm:not-sr-only"}>{s.title}</span>
+                  {done && <span className="sr-only">, completed</span>}
+                </div>
+                {i < STEPS.length - 1 && <div className="w-8 h-px bg-stone-200 mx-1" />}
+              </li>
+            );
+          })}
         </ol>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-stone-200 p-6">
           {/* All steps stay mounted -- CSS visibility preserves RHF values and UploadsStep local state */}
 
           <div style={{ display: step === 1 ? "block" : "none" }}>
@@ -258,7 +268,10 @@ export default function AddRecordPage() {
             </div>
 
             {submitError && (
-              <p className="mt-4 text-[13px] text-red-600" role="alert">{submitError}</p>
+              <p className="mt-4 flex items-start gap-1.5 text-[13px] text-brand" role="alert">
+                <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+                {submitError}
+              </p>
             )}
 
             <div className="flex gap-2 mt-6">
@@ -283,11 +296,16 @@ export default function AddRecordPage() {
 
       <Modal open={confirmOpen} onClose={() => (submitting ? undefined : setConfirmOpen(false))} title="Submit this disclosure?">
         <div className="p-5">
-          <p className="text-[13px] text-gray-700 leading-relaxed">
+          <p className="text-[13px] text-stone-700 leading-relaxed">
             Submitting sends this to {route?.firstStage ?? "the first reviewer"}. You will not
             be able to edit it while it is under review.
           </p>
-          {submitError && <p className="text-[13px] text-red-600 mt-3" role="alert">{submitError}</p>}
+          {submitError && (
+            <p className="flex items-start gap-1.5 text-[13px] text-brand mt-3" role="alert">
+              <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+              {submitError}
+            </p>
+          )}
           <div className="flex justify-end gap-2 mt-5">
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={submitting}>
               Keep editing
