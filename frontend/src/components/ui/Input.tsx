@@ -75,13 +75,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1">
         {label && (
-          <label htmlFor={inputId} className="text-[13px] font-medium text-gray-700">
+          <label htmlFor={inputId} className="text-[13px] font-medium text-stone-700">
             {label}
           </label>
         )}
         <div className="relative">
           {leading && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-500">
               {leading}
             </div>
           )}
@@ -91,15 +91,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={invalid ? true : undefined}
             aria-describedby={describedByIds || undefined}
             className={`w-full border rounded-lg outline-none transition-colors
-              placeholder:text-gray-500 text-gray-900
+              placeholder:text-stone-500 text-stone-900
               ${SIZE_CLASSES[size]}
               ${leading ? "pl-9" : ""}
               ${trailing ? "pr-16" : ""}
               ${invalid
-                ? "border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                : "border-gray-300 focus:border-brand focus:ring-1 focus:ring-brand"
+                // Maroon is also the focus colour (IR-359), so an invalid field
+                // keeps a maroon border at rest and takes a heavier ring on
+                // focus; the glyph on its message says the rest.
+                ? "border-brand focus:border-brand focus:ring-2 focus:ring-brand"
+                : "border-stone-300 focus:border-brand focus:ring-1 focus:ring-brand"
               }
-              disabled:bg-gray-50 disabled:text-gray-500
+              disabled:bg-stone-50 disabled:text-stone-500
               ${className}`}
             {...rest}
           />
@@ -109,11 +112,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
         </div>
-        {/* red-600 (4.83:1 on white), not red-500 -- red-500 is 3.76:1 and
-            fails AA for text this size, which would make the error unreadable
-            for exactly the users the association below is for. */}
-        {error && <p id={errorId} className="text-[12px] text-red-600">{error}</p>}
-        {hint && !error && <p id={hintId} className="text-[12px] text-gray-500">{hint}</p>}
+        {/* Maroon (12.3:1 on white) with a glyph, so the error is readable and
+            is not carried by colour alone (IR-359). The glyph is aria-hidden,
+            so the description the field announces is the sentence only. */}
+        {error && (
+          <p id={errorId} className="flex items-start gap-1.5 text-[12px] text-brand">
+            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+            {error}
+          </p>
+        )}
+        {hint && !error && <p id={hintId} className="text-[12px] text-stone-500">{hint}</p>}
       </div>
     );
   }

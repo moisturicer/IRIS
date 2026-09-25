@@ -1,20 +1,13 @@
 import { Badge } from "@/components/ui/Badge";
 
-type BadgeVariantType = Parameters<typeof Badge>[0]["variant"];
-
-const ROLE_VARIANT: Record<string, BadgeVariantType> = {
-  Student:  "info",
-  Adviser:  "success",
-  KTTO:     "warning",
-  RDCO:     "warning",
-  ITSO:     "neutral",
-  IERC:     "neutral",
-};
-
 interface RoleBadgeProps {
   role: string;
 }
 
+// A role is not a state, so it takes no status tone (IR-359): Badge's variants
+// now mean settled, attention and so on, and the old per-role hues had put an
+// Adviser in the "finished" black. Every role reads quiet; its name tells them
+// apart.
 export function RoleBadge({ role }: RoleBadgeProps) {
-  return <Badge variant={ROLE_VARIANT[role] ?? "default"}>{role}</Badge>;
+  return <Badge>{role}</Badge>;
 }

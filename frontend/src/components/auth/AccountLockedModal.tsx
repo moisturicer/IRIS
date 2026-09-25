@@ -44,8 +44,8 @@ export function AccountLockedModal({ open, onClose, unlockAt }: AccountLockedMod
         aria-modal="true"
         aria-labelledby="lockout-title"
       >
-        <div className="mx-auto w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-5">
-          <svg className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+        <div className="mx-auto w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center mb-5">
+          <svg className="w-7 h-7 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -54,19 +54,19 @@ export function AccountLockedModal({ open, onClose, unlockAt }: AccountLockedMod
           </svg>
         </div>
 
-        <h2 id="lockout-title" className="text-[20px] font-bold text-gray-900">
+        <h2 id="lockout-title" className="text-[20px] font-bold text-stone-900">
           Account Locked
         </h2>
-        <p className="mt-3 text-[14px] text-gray-600 leading-relaxed">
+        <p className="mt-3 text-[14px] text-stone-600 leading-relaxed">
           Too many failed login attempts. Please try again in{" "}
-          <span className="font-bold text-red-600 tabular-nums">{formatCountdown(remaining)}</span>
+          <span className="font-bold text-brand tabular-nums">{formatCountdown(remaining)}</span>
         </p>
 
         <button
           type="button"
           onClick={onClose}
-          className="mt-8 w-full py-3 rounded-lg text-[14px] font-semibold text-gray-700
-            bg-gray-100 hover:bg-gray-200 transition-colors"
+          className="mt-8 w-full py-3 rounded-lg text-[14px] font-semibold text-stone-700
+            bg-stone-100 hover:bg-stone-200 transition-colors"
         >
           Close
         </button>
