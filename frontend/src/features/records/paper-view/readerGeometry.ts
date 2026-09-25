@@ -98,7 +98,7 @@ export interface ReadingBand {
  */
 export function citationLandingDelta(
   page: PageBox,
-  region: Pick<Region, "top" | "bottom"> | null,
+  region: RegionBand | null,
   view: ReadingBand,
 ): number {
   if (!region) return page.top - view.top - PAGE_LANDING_GAP;
@@ -117,4 +117,18 @@ export function citationLandingDelta(
  */
 export function firstRegionOn(regions: Region[], page: number): Region | null {
   return regions.find((region) => region.page === page) ?? null;
+}
+
+/** A band of a page, as fractions of its height: a region or a find match. */
+export type RegionBand = Pick<Region, "top" | "bottom">;
+
+/**
+ * Whether `region` of `page` lies wholly inside `view` (IR-353). Find
+ * leaves a match the reader can already see where it is, as a browser's
+ * find does, rather than jumping the paper on every "next".
+ */
+export function regionInView(page: PageBox, region: RegionBand, view: ReadingBand): boolean {
+  const top = page.top + region.top * page.height;
+  const bottom = page.top + region.bottom * page.height;
+  return top >= view.top && bottom <= view.bottom;
 }

@@ -4,9 +4,19 @@ import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn, downloadBlob } from "@/lib/utils";
-import { loadPdfDocument, pageSize, renderPageToCanvas, type PdfPage } from "@/lib/pdf";
+import {
+  loadPdfDocument,
+  pageSize,
+  renderPageToCanvas,
+  renderTextLayer,
+  type PdfPage,
+  type TextLayerHandle,
+} from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 import { CitationOverlay } from "./CitationOverlay";
+import { paintFindHits } from "./findHighlights";
+import type { FindHit } from "./findInPaper";
+import { PaperFind } from "./PaperFind";
 import {
   CONTAINED_LAYOUT_QUERY,
   PANE_HEIGHT,
@@ -14,7 +24,16 @@ import {
   READER_TOOLBAR_TOP,
   READER_TOOLBAR_TOP_PX,
 } from "./paneLayout";
-import { MAX_SCALE, MIN_SCALE, citationLandingDelta, firstRegionOn, fitScale } from "./readerGeometry";
+import {
+  MAX_SCALE,
+  MIN_SCALE,
+  citationLandingDelta,
+  firstRegionOn,
+  fitScale,
+  regionInView,
+  type RegionBand,
+} from "./readerGeometry";
+import { usePaperFind } from "./usePaperFind";
 import { useReadingPosition } from "./useReadingPosition";
 
 const SCALE_STEP = 0.2;
@@ -36,9 +55,16 @@ const REFIT_DELAY_MS = 120;
  */
 const SETTLE_AFTER_LANDING_MS = 1500;
 
+/** A page with no find hits: one value, so such pages never repaint. */
+const NO_HITS: FindHit[] = [];
+
 /**
- * One rendered page: its own canvas, its own citation overlay, and a ref the
- * parent uses to scroll to it (IR-335).
+ * One rendered page: its own canvas, its text layer, its own citation
+ * overlay, and a ref the parent uses to scroll to it (IR-335).
+ *
+ * The text layer (IR-353) is what makes the paper's text selectable and
+ * what find highlights. It sits over the canvas and under the citation
+ * overlay, so a citation's highlight still shows above a find's.
  *
  * The box is sized from the page's own dimensions at the current zoom before
  * the canvas paints (IR-352), so a zoom change moves every page at once
@@ -50,16 +76,24 @@ function PdfPageView({
   pageNumber,
   scale,
   regions,
+  hits,
   registerRef,
 }: {
   page: PdfPage;
   pageNumber: number;
   scale: number;
   regions: Region[];
+  hits: FindHit[];
   registerRef: (pageNumber: number, el: HTMLDivElement | null) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<TextLayerHandle | null>(null);
+  const [textReady, setTextReady] = useState(false);
   const { width, height } = pageSize(page, scale);
+  // The scale the text layer is first drawn at; later zooms `update` it.
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -70,6 +104,34 @@ function PdfPageView({
     });
     return () => rendering.cancel();
   }, [page, scale]);
+
+  useEffect(() => {
+    const container = textLayerRef.current;
+    if (!container) return;
+    const layer = renderTextLayer(page, container, scaleRef.current);
+    layerRef.current = layer;
+    layer.promise.then(
+      () => setTextReady(true),
+      () => {
+        /* cancelled, or a page pdf.js could not read text from -- it stays unselectable */
+      },
+    );
+    return () => {
+      layer.cancel();
+      layerRef.current = null;
+      container.replaceChildren();
+      setTextReady(false);
+    };
+  }, [page]);
+
+  useEffect(() => {
+    if (textReady) layerRef.current?.update(scale);
+  }, [textReady, scale]);
+
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (textReady && layer) paintFindHits(layer.spans(), hits);
+  }, [textReady, hits]);
 
   return (
     <div
@@ -83,9 +145,11 @@ function PdfPageView({
       role="group"
       aria-label={`Page ${pageNumber}`}
       className="relative mx-auto mb-4 last:mb-0 bg-white shadow-card ring-1 ring-stone-200"
-      style={{ width, height }}
+      // pdf.js sizes the text layer's glyphs from this (index.css, `.textLayer`).
+      style={{ width, height, ["--total-scale-factor" as string]: scale }}
     >
       <canvas ref={canvasRef} className="block w-full h-full" />
+      <div ref={textLayerRef} className="textLayer" />
       <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
     </div>
   );
@@ -226,6 +290,49 @@ export function PaperPdfReader({
     };
   }, [downloadUrl]);
 
+  /**
+   * Brings `region` of page `pageNumber` to rest just below the reader's
+   * toolbar, with a line or two above it, or the page's top edge when there
+   * is no region (IR-354). With `onlyIfHidden`, a region already in view
+   * stays where it is, as a browser's find leaves a match the reader can
+   * already see (IR-353). Returns whether there was a page to land on.
+   */
+  const land = (
+    pageNumber: number,
+    region: RegionBand | null,
+    behavior: ScrollBehavior,
+    onlyIfHidden = false,
+  ): boolean => {
+    const page = pageRefs.current.get(pageNumber);
+    const toolbar = toolbarRef.current;
+    if (!page || !toolbar) return false;
+    const pageRect = page.getBoundingClientRect();
+    const pageBox = { top: pageRect.top, height: pageRect.height };
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const area = scrollAreaRef.current;
+
+    if (contained && area && paneRef.current) {
+      // The pane rests under the header and the view switch, and its pages
+      // scroll under its own toolbar. Both are measured before either
+      // scroll, and the window's scroll moves the toolbar and the page
+      // alike, so neither changes the other's distance.
+      const paneTop = paneRef.current.getBoundingClientRect().top;
+      const view = { top: toolbarRect.bottom, bottom: area.getBoundingClientRect().bottom };
+      const atRest = Math.abs(paneTop - PANE_TOP_PX) < 1;
+      if (onlyIfHidden && region && atRest && regionInView(pageBox, region, view)) return true;
+      window.scrollBy({ top: paneTop - PANE_TOP_PX, behavior });
+      area.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
+    } else {
+      // The window scrolls, under a toolbar that sticks below the header.
+      // Where it rests once stuck is what counts, not where it is now: a
+      // reader at the top of the record has it well below that.
+      const view = { top: READER_TOOLBAR_TOP_PX + toolbarRect.height, bottom: window.innerHeight };
+      if (onlyIfHidden && region && regionInView(pageBox, region, view)) return true;
+      window.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
+    }
+    return true;
+  };
+
   // Land a citation on its passage (IR-354): the first highlighted region
   // comes to rest just below the reader's toolbar, with a line or two above
   // it, rather than the page's top edge at the window's top -- under the
@@ -240,33 +347,9 @@ export function PaperPdfReader({
       landed.scale !== scale &&
       performance.now() - landed.at < SETTLE_AFTER_LANDING_MS;
     if (!followed && !settling) return;
-    const page = pageRefs.current.get(scrollToPage);
-    const toolbar = toolbarRef.current;
-    if (!page || !toolbar) return;
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const behavior: ScrollBehavior = reduceMotion ? "auto" : "smooth";
     const region = firstRegionOn(regionsRef.current, scrollToPage);
-    const pageRect = page.getBoundingClientRect();
-    const pageBox = { top: pageRect.top, height: pageRect.height };
-    const toolbarRect = toolbar.getBoundingClientRect();
-    const area = scrollAreaRef.current;
-
-    if (contained && area && paneRef.current) {
-      // The pane rests under the header and the view switch, and its pages
-      // scroll under its own toolbar. Both are measured before either
-      // scroll, and the window's scroll moves the toolbar and the page
-      // alike, so neither changes the other's distance.
-      const paneTop = paneRef.current.getBoundingClientRect().top;
-      window.scrollBy({ top: paneTop - PANE_TOP_PX, behavior });
-      const view = { top: toolbarRect.bottom, bottom: area.getBoundingClientRect().bottom };
-      area.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
-    } else {
-      // The window scrolls, under a toolbar that sticks below the header.
-      // Where it rests once stuck is what counts, not where it is now: a
-      // reader at the top of the record has it well below that.
-      const view = { top: READER_TOOLBAR_TOP_PX + toolbarRect.height, bottom: window.innerHeight };
-      window.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
-    }
+    if (!land(scrollToPage, region, reduceMotion ? "auto" : "smooth")) return;
     // The settling window runs from the landing itself, so a paper that
     // keeps refitting cannot keep pulling the reader back.
     landedRef.current = { navKey, scale, at: followed ? performance.now() : (landed?.at ?? 0) };
@@ -277,6 +360,16 @@ export function PaperPdfReader({
     // (`useReadingPosition`), it does not land again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, scrollToPage, navKey, scale]);
+
+  const find = usePaperFind({
+    ready: status === "ready",
+    pages,
+    currentPage,
+    paneRef,
+    // Instant, as a browser's find moves: a smooth scroll per keystroke
+    // would still be travelling when the next one lands.
+    land: (page, region) => land(page, region, "auto", true),
+  });
 
   const registerRef = (pageNumber: number, el: HTMLDivElement | null) => {
     if (el) pageRefs.current.set(pageNumber, el);
@@ -311,6 +404,7 @@ export function PaperPdfReader({
   return (
     <div
       ref={paneRef}
+      onKeyDown={find.onReaderKeyDown}
       className={cn(
         "flex flex-col",
         PANE_HEIGHT,
@@ -362,6 +456,18 @@ export function PaperPdfReader({
           >
             <i className="fas fa-arrows-left-right-to-line" aria-hidden />
           </Button>
+          <Button
+            ref={find.toggleRef}
+            variant="ghost"
+            size="icon"
+            onClick={find.open ? find.closeFind : find.openFind}
+            disabled={!ready}
+            aria-label="Find in this paper"
+            aria-expanded={find.open}
+            title="Find in this paper (Ctrl+F)"
+          >
+            <i className="fas fa-magnifying-glass" aria-hidden />
+          </Button>
         </div>
 
         {ready && (
@@ -380,6 +486,20 @@ export function PaperPdfReader({
         >
           <i className="fas fa-download" aria-hidden />
         </Button>
+
+        {/* A row of its own inside the toolbar, so it sticks with it and a
+            match lands below both. */}
+        {find.open && (
+          <PaperFind
+            ref={find.inputRef}
+            query={find.query}
+            status={find.status}
+            onQueryChange={find.changeQuery}
+            onNext={find.next}
+            onPrevious={find.previous}
+            onClose={find.closeFind}
+          />
+        )}
       </div>
 
       {/* The pane's scroll area at `lg` and up; below it, just the pages.
@@ -411,6 +531,7 @@ export function PaperPdfReader({
               pageNumber={index + 1}
               scale={scale}
               regions={highlightRegions}
+              hits={find.hitsByPage.get(index + 1) ?? NO_HITS}
               registerRef={registerRef}
             />
           ))}

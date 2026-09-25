@@ -17,6 +17,7 @@ import {
   firstRegionOn,
   fitScale,
   readingAnchor,
+  regionInView,
 } from "./readerGeometry";
 
 describe("fitScale", () => {
@@ -148,5 +149,20 @@ describe("firstRegionOn (IR-354)", () => {
 
   it("is nothing when the page has no region", () => {
     expect(firstRegionOn([{ page: 4, left: 0, top: 0, right: 1, bottom: 1 }], 5)).toBeNull();
+  });
+});
+
+describe("regionInView (IR-353)", () => {
+  // A 1000px page 100px down a view from 200px to 800px.
+  const page = { top: 100, height: 1000 };
+  const view = { top: 200, bottom: 800 };
+
+  it("is true for a band wholly inside the view", () => {
+    expect(regionInView(page, { top: 0.2, bottom: 0.25 }, view)).toBe(true);
+  });
+
+  it("is false for a band under the toolbar, or below the view", () => {
+    expect(regionInView(page, { top: 0.05, bottom: 0.12 }, view)).toBe(false);
+    expect(regionInView(page, { top: 0.68, bottom: 0.72 }, view)).toBe(false);
   });
 });

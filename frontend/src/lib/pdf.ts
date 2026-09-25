@@ -87,3 +87,122 @@ export function renderPageToCanvas(
     cancel: () => task.cancel(),
   };
 }
+
+/**
+ * One run of a page's text as pdf.js extracted it (IR-353): what find
+ * searches, and where on the page it sits.
+ *
+ * `top` and `bottom` are fractions of the page's height, like a citation's
+ * `Region`, so a match lands through the same arithmetic a citation does
+ * without the reader measuring the text layer. Runs are in the order the
+ * text layer draws them, one span each, so a match's run index is also the
+ * span it highlights.
+ */
+export interface TextRun {
+  str: string;
+  /** The run ends a line: find reads a space here, not two words joined. */
+  eol: boolean;
+  top: number;
+  bottom: number;
+}
+
+/** A glyph's descent below its baseline, as a share of its height. */
+const DESCENT = 0.2;
+
+type TextContent = Awaited<ReturnType<PdfPage["getTextContent"]>>;
+type ContentItem = TextContent["items"][number];
+type TextItem = Extract<ContentItem, { str: string }>;
+
+/**
+ * The text content pdf.js extracts from `page`, fetched once and shared by
+ * the text layer and find (IR-353), which would otherwise each ask the
+ * worker for the same thing.
+ */
+const textContents = new WeakMap<PdfPage, Promise<TextContent>>();
+
+function textContent(page: PdfPage): Promise<TextContent> {
+  let content = textContents.get(page);
+  if (!content) {
+    content = page.getTextContent();
+    textContents.set(page, content);
+  }
+  return content;
+}
+
+/** A text run, not a marked-content boundary -- the items the text layer draws a span for. */
+function isTextItem(item: ContentItem): item is TextItem {
+  return "str" in item;
+}
+
+/**
+ * The page's text as runs (IR-353). A scanned page yields none, or only
+ * whitespace, which is how the reader tells "no searchable text" from
+ * "no matches".
+ */
+export async function pageText(page: PdfPage): Promise<TextRun[]> {
+  const { items } = await textContent(page);
+  const viewport = page.getViewport({ scale: 1 });
+  return items.filter(isTextItem).map((item) => {
+    const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+    const fontHeight = Math.hypot(tx[2], tx[3]);
+    const baseline = tx[5];
+    return {
+      str: item.str,
+      eol: item.hasEOL,
+      top: clampFraction((baseline - fontHeight) / viewport.height),
+      bottom: clampFraction((baseline + fontHeight * DESCENT) / viewport.height),
+    };
+  });
+}
+
+function clampFraction(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+/** A page's text layer, drawn into a container over its canvas. */
+export interface TextLayerHandle {
+  /** Settles once every span is in the container. */
+  promise: Promise<void>;
+  /** Lays the spans out again for a new zoom. */
+  update: (scale: number) => void;
+  cancel: () => void;
+  /** One span per `TextRun`, in the same order. */
+  spans: () => HTMLElement[];
+}
+
+/**
+ * Draws `page`'s text as transparent, positioned spans into `container`
+ * (IR-353): what makes the paper's text selectable, and what find
+ * highlights. pdf.js's own `TextLayer`, not its `PDFViewer`, which IRIS does
+ * not use.
+ *
+ * The spans are placed in percentages of the page and sized from the
+ * `--total-scale-factor` the page's box sets, so they follow a zoom with
+ * no re-render; `update` only re-measures each span's width.
+ */
+export function renderTextLayer(page: PdfPage, container: HTMLElement, scale: number): TextLayerHandle {
+  let layer: pdfjsLib.TextLayer | null = null;
+  let cancelled = false;
+  const promise = textContent(page).then((content) => {
+    if (cancelled) return;
+    layer = new pdfjsLib.TextLayer({
+      textContentSource: content,
+      container,
+      viewport: page.getViewport({ scale }),
+    });
+    // pdf.js sizes the layer with CSS `round()`; the page's box already has
+    // the right size, and the layer is `inset: 0` inside it.
+    container.style.width = "100%";
+    container.style.height = "100%";
+    return layer.render();
+  });
+  return {
+    promise: promise.then(() => undefined),
+    update: (next) => layer?.update({ viewport: page.getViewport({ scale: next }) }),
+    cancel: () => {
+      cancelled = true;
+      layer?.cancel();
+    },
+    spans: () => layer?.textDivs ?? [],
+  };
+}
