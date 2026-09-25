@@ -11,6 +11,7 @@ docling-serve returns under ``document.json_content``.
 
 from apps.ai.chunking.document import (
     CAPTION,
+    FORMULA,
     BoundingBox,
     HEADING,
     LIST_ITEM,
@@ -146,28 +147,50 @@ def test_known_labels_map_onto_the_chunker_kinds():
             _text_item("#/texts/0", "paragraph", "a paragraph"),
             _text_item("#/texts/1", "list_item", "an item"),
             _text_item("#/texts/2", "caption", "Figure 1"),
+            _text_item("#/texts/3", "formula", "x^2"),
         ]
     )
 
     kinds = [e.kind for e in normalized_document_from_docling(doc).elements]
 
-    assert kinds == [PARAGRAPH, LIST_ITEM, CAPTION]
+    assert kinds == [PARAGRAPH, LIST_ITEM, CAPTION, FORMULA]
 
 
 def test_an_unknown_label_is_carried_through_as_its_own_kind():
     """``document.py`` promises a kind outside the known set degrades to plain
     text rather than failing the document — and page furniture has to stay
     distinguishable so the normalizer stage can drop it."""
-    doc = _doc(
-        texts=[
-            _text_item("#/texts/0", "page_footer", "Page 12 of 340"),
-            _text_item("#/texts/1", "formula", "E = mc^2"),
-        ]
-    )
+    doc = _doc(texts=[_text_item("#/texts/0", "page_footer", "Page 12 of 340")])
 
     kinds = [e.kind for e in normalized_document_from_docling(doc).elements]
 
-    assert kinds == ["page_footer", "formula"]
+    assert kinds == ["page_footer"]
+
+
+def test_a_formula_becomes_a_declared_kind_carrying_its_latex():
+    """ADR-025: ``formula`` is a declared kind, not an unmapped label that
+    survives by accident. The text is what formula enrichment recovered —
+    LaTeX here, mangled glyphs before it was turned on — and the mapping
+    does not touch it either way."""
+    doc = _doc(
+        texts=[_text_item("#/texts/0", "formula", "E = mc^2", page=1, bbox=_topleft(10, 20, 90, 40))]
+    )
+
+    (element,) = normalized_document_from_docling(doc).elements
+
+    assert element.kind == FORMULA
+    assert element.text == "E = mc^2"
+    assert element.page == 1
+    assert element.bbox is not None
+
+
+def test_a_formula_with_no_recoverable_text_is_dropped():
+    """An equation formula enrichment could not read fails closed — dropped,
+    like any other element with no text — rather than stored as garbled
+    text presented as the author's notation."""
+    doc = _doc(texts=[_text_item("#/texts/0", "formula", "")])
+
+    assert normalized_document_from_docling(doc).elements == ()
 
 
 def test_elements_with_no_text_are_dropped():

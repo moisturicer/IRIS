@@ -33,6 +33,7 @@ from typing import Any, Iterator, Mapping, Optional
 
 from apps.ai.chunking.document import (
     CAPTION,
+    FORMULA,
     HEADING,
     LIST_ITEM,
     PARAGRAPH,
@@ -53,6 +54,7 @@ _LABEL_KINDS: Mapping[str, str] = {
     "paragraph": PARAGRAPH,
     "list_item": LIST_ITEM,
     "caption": CAPTION,
+    "formula": FORMULA,
 }
 
 # US Letter. Only ever used to convert a bottom-left region on a page Docling

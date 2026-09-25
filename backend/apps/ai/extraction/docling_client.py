@@ -42,14 +42,17 @@ _CONVERT_PATH = "/v1/convert/file"
 # OCR is on because a meaningful share of the corpus is scanned submissions,
 # and Docling's own OCR is the reason ADR-016 could drop a separate OCR
 # fallback library. Accurate table structure is on because theses are full of
-# tables and a table read as prose retrieves as noise. Images are off: the
-# citation overlay draws regions over the real PDF, so a rendered picture
-# would be megabytes of derived asset nothing reads.
+# tables and a table read as prose retrieves as noise. Formula enrichment is
+# on so an equation returns as LaTeX rather than mangled text-layer glyphs
+# (ADR-025). Images are off: the citation overlay draws regions over the real
+# PDF, so a rendered picture would be megabytes of derived asset nothing
+# reads.
 _CONVERT_OPTIONS: dict[str, Any] = {
     "to_formats": ["json"],
     "do_ocr": "true",
     "do_table_structure": "true",
     "table_mode": "accurate",
+    "do_formula_enrichment": "true",
     "include_images": "false",
 }
 

@@ -22,6 +22,7 @@ TABLE_ROW = "table_row"
 TABLE_HEADER = "table_header"
 LIST_ITEM = "list_item"
 CAPTION = "caption"
+FORMULA = "formula"
 
 # Not mapped by the Docling adapter (see docling_mapping.py's module
 # docstring) — these arrive as Docling's own labels, carried through
