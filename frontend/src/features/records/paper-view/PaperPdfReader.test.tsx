@@ -5,11 +5,12 @@
  * and cannot run the pdf.js worker, so nothing here exercises real rendering.
  * What is under test is this component's own logic around it -- fetching
  * through `apiClient` (never a bare URL, which would 401 against the
- * authenticated manuscript endpoint), scrolling to the right page, drawing
+ * authenticated manuscript endpoint), landing on the cited passage, drawing
  * regions on the right page and no other, and the zoom/download affordances.
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -58,7 +59,6 @@ function pdfBlob() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  Element.prototype.scrollIntoView = vi.fn();
   // jsdom has no `URL.createObjectURL`/`revokeObjectURL` -- the reader uses
   // both for the download affordance.
   URL.createObjectURL = vi.fn(() => "blob:mock-url");
@@ -127,42 +127,185 @@ describe("loading the paper", () => {
   });
 });
 
-describe("scrolling to the cited page", () => {
-  it("scrolls to the requested page once the document is ready", async () => {
-    render(
-      <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={[]} navKey="a" />,
+/**
+ * Where a citation lands (IR-354): on the passage, not the page's top, and
+ * clear of the fixed header and the reader's own toolbar.
+ *
+ * jsdom lays nothing out, so each test renders the reader, gives the pages,
+ * the toolbar and the pane boxes, then follows a citation -- which is also
+ * how it happens live: the reader is open when a citation in the chat
+ * beside it is clicked.
+ */
+describe("landing on a cited passage (IR-354)", () => {
+  const PASSAGE_LOW: Region[] = [{ page: 2, left: 0.1, top: 0.85, right: 0.9, bottom: 0.9 }];
+  const PASSAGE_HIGH: Region[] = [{ page: 2, left: 0.1, top: 0.02, right: 0.9, bottom: 0.05 }];
+
+  /**
+   * The reader's parts. The paper is found by its role and name; the toolbar
+   * and the pane have neither, so they are reached from what does -- the
+   * toolbar is what holds the Download control, the pane what holds both.
+   */
+  async function openReader() {
+    const view = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="opened" />,
     );
+    await screen.findByText("Page 1 / 3");
+    const area = screen.getByRole("region", { name: "Paper, 3 pages" });
+    return {
+      ...view,
+      area,
+      toolbar: screen.getByRole("button", { name: "Download" }).parentElement as HTMLElement,
+      pane: area.parentElement as HTMLElement,
+    };
+  }
 
-    const target = await screen.findByRole("group", { name: "Page 2" });
-    await waitFor(() => expect(target.scrollIntoView).toHaveBeenCalled());
-  });
-
-  it("scrolls again on a repeated navigation to the same page", async () => {
-    const { rerender } = render(
-      <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={[]} navKey="first" />,
-    );
-    const target = await screen.findByRole("group", { name: "Page 2" });
-    await waitFor(() => expect(target.scrollIntoView).toHaveBeenCalled());
-    vi.mocked(target.scrollIntoView).mockClear();
-
-    // A second click on the very same citation still means "look here" --
-    // only `navKey` changes, the page number does not.
+  function follow(
+    rerender: (ui: ReactElement) => void,
+    regions: Region[],
+    navKey = "followed",
+  ) {
     rerender(
-      <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={[]} navKey="second" />,
+      <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={regions} navKey={navKey} />,
     );
+  }
 
-    await waitFor(() => expect(target.scrollIntoView).toHaveBeenCalled());
+  describe("below lg, where the window scrolls", () => {
+    let scrollBy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      scrollBy = vi.fn();
+      vi.stubGlobal("scrollBy", scrollBy);
+    });
+
+    async function openAt() {
+      const reader = await openReader();
+      // Page 2 is 1000px tall, 1500px down. The toolbar has not stuck yet --
+      // it is 400px down -- but it will have by the time the passage lands.
+      placePages([
+        { top: 484, height: 1000 },
+        { top: 1500, height: 1000 },
+        { top: 2516, height: 1000 },
+      ]);
+      vi.spyOn(reader.toolbar, "getBoundingClientRect").mockReturnValue(box(400, 44));
+      return reader;
+    }
+
+    it("scrolls to the region's top, not the page's, below the header and the stuck toolbar", async () => {
+      const { rerender } = await openAt();
+      follow(rerender, PASSAGE_LOW);
+
+      // The region starts at 1500 + 850 = 2350. It lands 48px of context
+      // below the toolbar, which sticks at 122px and is 44px tall.
+      await waitFor(() =>
+        expect(scrollBy).toHaveBeenCalledWith({ top: 2350 - (122 + 44) - 48, behavior: "smooth" }),
+      );
+    });
+
+    it("keeps a region at the top of the page clear of the header and toolbar too", async () => {
+      const { rerender } = await openAt();
+      follow(rerender, PASSAGE_HIGH);
+
+      await waitFor(() =>
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1520 - (122 + 44) - 48, behavior: "smooth" }),
+      );
+    });
+
+    it("lands on the page's top edge, below the toolbar, when the citation has no region", async () => {
+      const { rerender } = await openAt();
+      follow(rerender, []);
+
+      await waitFor(() =>
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1500 - (122 + 44) - 16, behavior: "smooth" }),
+      );
+    });
+
+    it("lands again when the same citation is followed a second time", async () => {
+      const { rerender } = await openAt();
+      follow(rerender, PASSAGE_LOW, "first");
+      await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(1));
+
+      // A second click on the very same citation still means "look here" --
+      // only `navKey` changes, the page number does not.
+      follow(rerender, PASSAGE_LOW, "second");
+
+      await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(2));
+    });
+
+    it("lands again when the paper refits just after landing, as a scrollbar appearing makes it", async () => {
+      const pane = measurePaneAs(602);
+      const { rerender } = await openAt();
+      follow(rerender, PASSAGE_LOW);
+      await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(1));
+
+      // The window's scrollbar appears once the pages are in, the pane
+      // narrows, and the paper refits -- which moves the passage, and
+      // cancels a smooth scroll still on its way to it.
+      placePages([
+        { top: 470, height: 970 },
+        { top: 1456, height: 970 },
+        { top: 2442, height: 970 },
+      ]);
+      act(() => pane.resizeTo(585));
+      expect(await screen.findByText("194%")).toBeInTheDocument();
+
+      // From where the passage is now: 1456 + 0.85 * 970 = 2280.5.
+      await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(2));
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 2280.5 - (122 + 44) - 48, behavior: "smooth" });
+    });
+
+    it("does not pull the reader back to the passage for a refit long after landing", async () => {
+      const pane = measurePaneAs(602);
+      const now = vi.spyOn(performance, "now").mockReturnValue(1_000);
+      const { rerender } = await openAt();
+      follow(rerender, PASSAGE_LOW);
+      await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(1));
+
+      // Minutes later the reader drags the window narrower.
+      now.mockReturnValue(1_000 + 5 * 60_000);
+      act(() => pane.resizeTo(585));
+      expect(await screen.findByText("194%")).toBeInTheDocument();
+
+      // Only the landing itself: no second one.
+      expect(scrollBy.mock.calls.filter(([arg]) => typeof arg === "object")).toHaveLength(1);
+    });
+
+    it("does not scroll at all when there is no page to land on", async () => {
+      await openAt();
+      await waitFor(() => expect(screen.getAllByRole("group")).toHaveLength(3));
+
+      expect(scrollBy).not.toHaveBeenCalled();
+    });
   });
 
-  it("draws nothing when there is no page to scroll to", async () => {
-    render(
-      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
-    );
+  describe("at lg, inside the contained pane", () => {
+    it("brings the pane to rest below the header, then scrolls the pane to the region", async () => {
+      // The one stub answers every query, reduced motion included.
+      mediaQueryAt(true);
+      const windowScrollBy = vi.fn();
+      vi.stubGlobal("scrollBy", windowScrollBy);
+      const reader = await openReader();
+      const paneScrollBy = vi.fn();
+      reader.area.scrollBy = paneScrollBy;
 
-    await waitFor(() => expect(screen.getAllByRole("group")).toHaveLength(3));
-    for (const page of screen.getAllByRole("group")) {
-      expect(page.scrollIntoView).not.toHaveBeenCalled();
-    }
+      // The pane is 400px down; it rests at 126px, under the header and the
+      // view switch. Its toolbar ends at 444px, its scroll area at 1000px.
+      vi.spyOn(reader.pane, "getBoundingClientRect").mockReturnValue(box(400, 600));
+      vi.spyOn(reader.toolbar, "getBoundingClientRect").mockReturnValue(box(400, 44));
+      vi.spyOn(reader.area, "getBoundingClientRect").mockReturnValue(box(444, 556));
+      placePages([
+        { top: 460, height: 1000 },
+        { top: 1476, height: 1000 },
+        { top: 2492, height: 1000 },
+      ]);
+
+      follow(reader.rerender, PASSAGE_LOW);
+
+      await waitFor(() => expect(windowScrollBy).toHaveBeenCalledWith({ top: 400 - 126, behavior: "auto" }));
+      // The region starts at 1476 + 850 = 2326; it lands 48px below the
+      // pane's toolbar, measured in the pane, so the window's own scroll
+      // (which moves both) does not change it.
+      expect(paneScrollBy).toHaveBeenCalledWith({ top: 2326 - 444 - 48, behavior: "auto" });
+    });
   });
 });
 
@@ -265,11 +408,22 @@ describe("accessibility", () => {
  */
 function measurePaneAs(width: number) {
   const watching = new Set<Element>();
+  const observers = new Set<{ report: (width: number) => void }>();
   vi.stubGlobal(
     "ResizeObserver",
     class {
       private readonly targets = new Set<Element>();
-      constructor(private readonly callback: ResizeObserverCallback) {}
+      constructor(private readonly callback: ResizeObserverCallback) {
+        observers.add(this);
+      }
+      report(next: number) {
+        this.targets.forEach((target) =>
+          this.callback(
+            [{ target, contentRect: { width: next } } as unknown as ResizeObserverEntry],
+            this as unknown as ResizeObserver,
+          ),
+        );
+      }
       observe(target: Element) {
         this.targets.add(target);
         watching.add(target);
@@ -289,7 +443,10 @@ function measurePaneAs(width: number) {
     },
   );
   /** The elements some observer is still watching. */
-  return watching;
+  return Object.assign(watching, {
+    /** The pane is now `next` wide, as when a scrollbar appears beside it. */
+    resizeTo: (next: number) => observers.forEach((observer) => observer.report(next)),
+  });
 }
 
 /**
@@ -311,13 +468,16 @@ function mediaQueryAt(initiallyMatches: boolean) {
   };
 }
 
+/** A box `height` tall whose top is at `top`, as jsdom never measures one. */
+function box(top: number, height: number) {
+  return { top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+}
+
 /** Gives each page a box, since jsdom lays nothing out. */
 function placePages(boxes: { top: number; height: number }[]) {
-  boxes.forEach((box, i) => {
+  boxes.forEach(({ top, height }, i) => {
     const page = screen.getByRole("group", { name: `Page ${i + 1}` });
-    vi.spyOn(page, "getBoundingClientRect").mockImplementation(
-      () => ({ top: box.top, bottom: box.top + box.height, height: box.height, left: 0, right: 0, width: 0, x: 0, y: box.top, toJSON: () => ({}) }) as DOMRect,
-    );
+    vi.spyOn(page, "getBoundingClientRect").mockImplementation(() => box(top, height));
   });
 }
 

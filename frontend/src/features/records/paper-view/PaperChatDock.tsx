@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
@@ -32,8 +32,17 @@ function readDock(): DockMode {
  * for it. Only the floating mode overlays.
  */
 export function usePaperChat() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
   const [dock, setDock] = useState<DockMode>(readDock);
+  // Below `lg`, where the docked panel is a bottom sheet over the paper, a
+  // followed citation tucks it away to a bar (IR-354). Opening or closing
+  // the panel always starts it unminimized.
+  const [minimized, setMinimized] = useState(false);
+
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    setMinimized(false);
+  };
 
   const setDockMode = (mode: DockMode) => {
     setDock(mode);
@@ -44,7 +53,7 @@ export function usePaperChat() {
     }
   };
 
-  return { open, setOpen, dock, setDockMode };
+  return { open, setOpen, dock, setDockMode, minimized, setMinimized };
 }
 
 /** Closed-state affordance. Floats clear of the content in every dock mode. */
@@ -84,6 +93,15 @@ interface PaperChatPanelProps {
    * IRIS is always docked left (IR-372); a menu with one choice is no menu.
    */
   canChangePosition?: boolean;
+  /**
+   * Tucked away to a bar, so the paper under the bottom sheet can be read
+   * (IR-354). The conversation stays mounted, and where the transcript was
+   * scrolled to comes back with it, so the reader returns to the answer
+   * they followed a citation from.
+   */
+  minimized?: boolean;
+  /** Activating the minimized bar. */
+  onRestore?: () => void;
   /** Positioning is the caller's job — the panel only styles its own interior. */
   className?: string;
 }
@@ -104,6 +122,8 @@ export function PaperChatPanel({
   onDockChange,
   onClose,
   canChangePosition = true,
+  minimized = false,
+  onRestore,
   className,
 }: PaperChatPanelProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -114,6 +134,7 @@ export function PaperChatPanel({
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const { streaming, ask } = useAskStream();
 
@@ -145,6 +166,13 @@ export function PaperChatPanel({
     const transcript = transcriptRef.current;
     if (transcript) transcript.scrollTop = transcript.scrollHeight;
   }, [messages, busy, streaming]);
+
+  // A hidden transcript has no scroll position of its own to keep, so the
+  // last one seen is put back when the panel is restored, before it paints.
+  useLayoutEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!minimized && transcript) transcript.scrollTop = transcriptScrollTop.current;
+  }, [minimized]);
 
   const send = async () => {
     const question = input.trim();
@@ -179,9 +207,29 @@ export function PaperChatPanel({
       )}
       aria-label="Paper Chat"
     >
+      {/* The minimized bar (IR-354): what this is, and one tap back to it.
+          Its visible label is part of its accessible name (WCAG 2.5.3). */}
+      {minimized && (
+        <button
+          type="button"
+          onClick={onRestore}
+          aria-label="Show Paper Chat"
+          className="flex items-center gap-3 w-full min-h-14 px-4 py-2 text-left hover:bg-stone-50 transition-colors duration-200"
+        >
+          <span className="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0" aria-hidden>
+            <AskIrisMark className="w-5 h-5 text-brand" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-md font-semibold text-stone-900 leading-tight">Paper Chat</span>
+            <span className="block text-2xs text-stone-500 truncate">Back to the answer</span>
+          </span>
+          <i className="fas fa-chevron-up text-xs text-stone-500" aria-hidden />
+        </button>
+      )}
+
       {/* Header: what this is (labelled AI, always), which paper, and
           what the answers are drawn from (IR-356). */}
-      <div className="shrink-0 border-b border-stone-200">
+      <div className="shrink-0 border-b border-stone-200" hidden={minimized}>
         <div className="flex items-center gap-3 px-4 pt-3 pb-2">
           <span className="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0" aria-hidden>
             <AskIrisMark className="w-5 h-5 text-brand" />
@@ -267,7 +315,13 @@ export function PaperChatPanel({
       </div>
 
       {/* Transcript */}
-      <div ref={transcriptRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-5 bg-stone-50/60">
+      <div
+        ref={transcriptRef}
+        hidden={minimized}
+        // Only while shown: hiding it is not the reader scrolling it.
+        onScroll={minimized ? undefined : (e) => { transcriptScrollTop.current = e.currentTarget.scrollTop; }}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-5 bg-stone-50/60"
+      >
         {ready && messages.length === 0 && (
           <div className="py-4 text-center">
             <AskIrisEmblem className="w-12 h-12 mx-auto mb-3" />
@@ -300,7 +354,7 @@ export function PaperChatPanel({
       </div>
 
       {/* Composer */}
-      <div className="shrink-0 border-t border-stone-200 bg-white p-3">
+      <div className="shrink-0 border-t border-stone-200 bg-white p-3" hidden={minimized}>
         <div className="flex items-end gap-2 rounded-2xl bg-stone-50 ring-1 ring-stone-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand/40 pl-3.5 pr-1.5 py-1.5 transition-colors duration-200">
           <textarea
             ref={composerRef}
@@ -358,6 +412,15 @@ export const DOCKED_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[22rem]`;
  * 22rem transcript beside a full-width paper read as cramped.
  */
 export const PAPER_TAB_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[26rem] xl:w-[30rem]`;
+
+/**
+ * A minimized bottom sheet (IR-354): a bar along the bottom of the screen,
+ * no taller than it needs, so a followed citation's passage is not under
+ * it. Only ever below `lg`; at `lg` the docked panel is a column that
+ * covers nothing, and is never minimized.
+ */
+export const MINIMIZED_SHEET_CLASS =
+  "fixed inset-x-0 bottom-0 z-40 rounded-t-2xl shadow-card-md";
 
 /** Positioning for the floating panel — deliberately overlays the page. */
 export const FLOATING_PANEL_CLASS =

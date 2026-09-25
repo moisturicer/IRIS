@@ -21,6 +21,9 @@ export const VIEW_SWITCH_TOP = "top-[66px]";
 /** Panes: 12px below the switch (66 + 48 + 12). */
 export const PANE_TOP = "lg:top-[126px]";
 
+/** `PANE_TOP` as a number, for the reader to scroll its pane to (IR-354). */
+export const PANE_TOP_PX = 126;
+
 /** The viewport less everything above a pane and the 28px bottom padding. */
 export const PANE_HEIGHT = "lg:h-[calc(100vh-154px)]";
 export const PANE_MAX_HEIGHT = "lg:max-h-[calc(100vh-154px)]";
@@ -29,8 +32,7 @@ export const PANE_MAX_HEIGHT = "lg:max-h-[calc(100vh-154px)]";
 export const READER_TOOLBAR_TOP = "top-[122px]";
 
 /**
- * Where a page scrolled to comes to rest: below `lg`, clear of the header,
- * the switch and the sticky toolbar (whose 44px controls end it ~180px
- * down); inside the pane, just below the pane's own toolbar.
+ * `READER_TOOLBAR_TOP` as a number: below `lg`, a citation lands under
+ * where the toolbar rests once stuck, not where it happens to be (IR-354).
  */
-export const PAGE_SCROLL_MARGIN = "scroll-mt-[188px] lg:scroll-mt-4";
+export const READER_TOOLBAR_TOP_PX = 122;

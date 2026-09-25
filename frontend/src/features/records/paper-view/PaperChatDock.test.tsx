@@ -9,6 +9,7 @@
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -265,6 +266,73 @@ describe("accessibility", () => {
       <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
     );
     await waitFor(() => expect(findOrCreateForRecord).toHaveBeenCalled());
+
+    await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * Below `lg` the docked panel is a bottom sheet over the paper. Following a
+ * citation from it minimizes it to a bar, so the passage it lands on is not
+ * underneath it (IR-354); the page decides when, the panel how.
+ */
+describe("minimized to a bar while the reader reads a citation (IR-354)", () => {
+  const ANSWER = "It concludes rainfall gauges predict flooding well.";
+
+  beforeEach(() => {
+    findOrCreateForRecord.mockResolvedValue({
+      data: conversation({
+        turns: [
+          {
+            id: 1, question: "What does this paper conclude?",
+            resolved_question: null,
+            answer: ANSWER,
+            message: null, state: "generative", degraded: false, widened: false,
+            created_at: "2026-09-20T00:00:00.000Z", citations: [],
+          },
+        ],
+      }),
+    });
+  });
+
+  /** The page's side of it: minimized until the bar is activated. */
+  function MinimizedPanel() {
+    const [minimized, setMinimized] = useState(true);
+    return (
+      <PaperChatPanel
+        record={record}
+        dock="right"
+        onDockChange={noop}
+        onClose={noop}
+        minimized={minimized}
+        onRestore={() => setMinimized(false)}
+      />
+    );
+  }
+
+  it("shows only a named bar, with the conversation and the composer out of the way", async () => {
+    renderScreen(<MinimizedPanel />);
+
+    expect(await screen.findByRole("button", { name: "Show Paper Chat" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(ANSWER)).not.toBeVisible());
+    expect(screen.queryByRole("textbox", { name: "Ask about this paper" })).not.toBeInTheDocument();
+  });
+
+  it("restores on activation, with the answer the reader came from and no second fetch", async () => {
+    renderScreen(<MinimizedPanel />);
+    await waitFor(() => expect(screen.getByText(ANSWER)).not.toBeVisible());
+
+    await userEvent.click(screen.getByRole("button", { name: "Show Paper Chat" }));
+
+    expect(screen.getByText(ANSWER)).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show Paper Chat" })).not.toBeInTheDocument();
+    expect(findOrCreateForRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no serious or critical accessibility violations while minimized", async () => {
+    const { container } = renderScreen(<MinimizedPanel />);
+    await screen.findByRole("button", { name: "Show Paper Chat" });
 
     await expectNoBlockingA11yViolations(container);
   });

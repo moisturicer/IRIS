@@ -41,6 +41,7 @@ import type { User } from "@/types/auth";
 import type { RecordDetail } from "@/types/records";
 
 import { DOCK_KEY } from "./PaperChatDock";
+import { CONTAINED_LAYOUT_QUERY } from "./paneLayout";
 import PaperViewPage from "./PaperViewPage";
 
 const RECORD_ID = 7;
@@ -680,5 +681,104 @@ describe("sharing the paper (IR-356)", () => {
 
     expect(await screen.findByRole("button", { name: /couldn.t copy/i })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/copy it from the address bar/i);
+  });
+});
+
+/**
+ * Following a citation from Paper Chat (IR-354). Below `lg` the docked chat
+ * is a bottom sheet over the paper, so following a citation minimizes it,
+ * and the passage lands where the reader can see it. At `lg` it is a column
+ * beside the paper and covers nothing, so it stays as it is.
+ */
+describe("following a citation from Paper Chat (IR-354)", () => {
+  const citation = {
+    marker: 1,
+    chunk_id: 11,
+    record_id: RECORD_ID,
+    record_title: record.title,
+    page: 12,
+    text: "the network reduced mean absolute error by twelve per cent",
+    context_path: [record.title, "Results"],
+    regions: [{ page: 12, left: 0.1, top: 0.85, right: 0.6, bottom: 0.9 }],
+  };
+  const CITED = { name: `Open ${record.title} at page 12` };
+
+  beforeEach(async () => {
+    shownRecord = record;
+    signInAs(99, "Student");
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          id: 42, title: "", record: RECORD_ID, record_title: record.title, turn_count: 1,
+          created_at: "2026-09-20T00:00:00.000Z", updated_at: "2026-09-20T00:00:00.000Z",
+          turns: [
+            {
+              id: 1, question: "How much did the error fall?", resolved_question: null,
+              answer: "By twelve per cent [1].", message: null, state: "generative",
+              degraded: false, widened: false, created_at: "2026-09-20T00:00:00.000Z",
+              citations: [citation],
+            },
+          ],
+        },
+      } as never),
+    );
+  });
+
+  afterEach(async () => {
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(() => new Promise(() => {}));
+    vi.unstubAllGlobals();
+  });
+
+  async function followCitationFromChat() {
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Ask IRIS" }));
+    await userEvent.click(await screen.findByRole("link", CITED));
+    await screen.findByText(/open at page 12, 1 region\(s\)/i);
+  }
+
+  it("minimizes the sheet below lg, and restores it with the answer still there", async () => {
+    await followCitationFromChat();
+
+    const bar = await screen.findByRole("button", { name: "Show Paper Chat" });
+    expect(screen.queryByRole("textbox", { name: "Ask about this paper" })).not.toBeInTheDocument();
+
+    await userEvent.click(bar);
+
+    expect(screen.getByRole("link", CITED)).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
+  });
+
+  function atLg() {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === CONTAINED_LAYOUT_QUERY,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  }
+
+  it("leaves the docked column as it is at lg, where it covers nothing", async () => {
+    atLg();
+
+    await followCitationFromChat();
+
+    expect(screen.queryByRole("button", { name: "Show Paper Chat" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
+  });
+
+  it("keeps the passage highlighted when the chat is closed and opened again", async () => {
+    atLg();
+    await followCitationFromChat();
+
+    await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
+    expect(screen.getByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+    await screen.findByRole("complementary", { name: "Paper Chat" });
+    expect(screen.getByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
   });
 });

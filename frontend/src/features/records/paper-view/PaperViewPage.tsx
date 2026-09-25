@@ -5,6 +5,7 @@ import { reviewsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button, Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { citedPage, type CitationNavigationState } from "@/lib/citedPage";
@@ -24,13 +25,14 @@ import {
   type DockMode,
   DOCKED_PANEL_CLASS,
   FLOATING_PANEL_CLASS,
+  MINIMIZED_SHEET_CLASS,
   PAPER_TAB_PANEL_CLASS,
 } from "./PaperChatDock";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
-import { PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
+import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
@@ -352,12 +354,22 @@ export default function PaperViewPage() {
   // route only changes its `:id`/query, not its element) switching tabs too.
   const [tab, setTab] = useState<PaperViewTab>(openAtPage != null ? "paper" : "abstract");
 
+  // Below `lg` the docked chat is a bottom sheet over the paper; at `lg` it
+  // is a column beside it (IR-352).
+  const contained = useMediaQuery(CONTAINED_LAYOUT_QUERY);
+
   useEffect(() => {
-    if (openAtPage != null) setTab("paper");
+    if (openAtPage == null) return;
+    setTab("paper");
+    // A citation followed while the chat is a bottom sheet would land its
+    // passage under the sheet, so the sheet tucks away to a bar (IR-354).
+    if (chat.open && !contained) chat.setMinimized(true);
     // `location.key` is unique per navigation, including a second click on
     // the very citation already open -- without it in the dependency list,
     // clicking the same marker twice would not re-fire this effect to
-    // re-scroll and re-flash the highlight.
+    // re-scroll and re-flash the highlight. The chat's state is read, not a
+    // trigger: opening the chat is not following a citation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAtPage, location.key]);
 
   useEffect(() => {
@@ -500,6 +512,16 @@ export default function PaperViewPage() {
   const onPaperTab = tab === "paper";
   const dock: DockMode = onPaperTab ? "right" : chat.dock;
   const chatDocked = chat.open && dock !== "floating";
+  // Never at `lg`, where there is no sheet to tuck away: widening the window
+  // brings the column back whole.
+  const chatMinimized = chat.minimized && chatDocked && !contained;
+  const chatPanelClass = chatMinimized
+    ? MINIMIZED_SHEET_CLASS
+    : onPaperTab
+      ? PAPER_TAB_PANEL_CLASS
+      : chatDocked
+        ? DOCKED_PANEL_CLASS
+        : FLOATING_PANEL_CLASS;
   const showRail = !onPaperTab && !chatDocked;
   const highlightRegions: Region[] =
     navCitation && navCitation.record_id === record.id && "regions" in navCitation
@@ -856,13 +878,9 @@ export default function PaperViewPage() {
           onDockChange={chat.setDockMode}
           onClose={() => chat.setOpen(false)}
           canChangePosition={!onPaperTab}
-          className={
-            onPaperTab
-              ? PAPER_TAB_PANEL_CLASS
-              : dock === "floating"
-                ? FLOATING_PANEL_CLASS
-                : DOCKED_PANEL_CLASS
-          }
+          minimized={chatMinimized}
+          onRestore={() => chat.setMinimized(false)}
+          className={chatPanelClass}
         />
       ) : (
         // On the Paper tab the way back sits in the reader's toolbar instead,
