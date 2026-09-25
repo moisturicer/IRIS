@@ -14,7 +14,8 @@ import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { act, fireEvent, render, screen, userEvent, waitFor } from "@/test/render";
+import { act, fireEvent, render, screen, userEvent, waitFor, within } from "@/test/render";
+import type { TextRun } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 
 import { PaperPdfReader } from "./PaperPdfReader";
@@ -26,9 +27,13 @@ vi.mock("@/api/records", () => ({
 
 const loadPdfDocument = vi.fn();
 const renderPageToCanvas = vi.fn();
+const pageText = vi.fn();
+const renderTextLayer = vi.fn();
 vi.mock("@/lib/pdf", () => ({
   loadPdfDocument: (...args: unknown[]) => loadPdfDocument(...(args as [])),
   renderPageToCanvas: (...args: unknown[]) => renderPageToCanvas(...(args as [])),
+  pageText: (...args: unknown[]) => pageText(...(args as [])),
+  renderTextLayer: (...args: unknown[]) => renderTextLayer(...(args as [])),
   // A 300x400 page at scale 1, like pdf.js's viewport arithmetic.
   pageSize: (_page: unknown, scale: number) => ({ width: 300 * scale, height: 400 * scale }),
 }));
@@ -41,6 +46,28 @@ vi.mock("@/lib/utils", async (importOriginal) => ({
 
 function fakePage(pageNumber: number) {
   return { pageNumber };
+}
+
+/** Each fake page's text, as `pageText` would extract it (IR-353). */
+let paperText: TextRun[][] = [];
+
+/** A run on its own line, `top` of the way down its page. */
+function line(str: string, top: number): TextRun {
+  return { str, eol: true, top, bottom: top + 0.02 };
+}
+
+/**
+ * pdf.js's text layer, as far as the reader relies on it: one span per run,
+ * in order, drawn into the container it is given.
+ */
+function fakeTextLayer(page: { pageNumber: number }, container: HTMLElement) {
+  const spans = (paperText[page.pageNumber - 1] ?? []).map((run) => {
+    const span = document.createElement("span");
+    span.textContent = run.str;
+    return span;
+  });
+  container.append(...spans);
+  return { promise: Promise.resolve(), update: vi.fn(), cancel: vi.fn(), spans: () => spans };
 }
 
 function fakeDocument(numPages: number) {
@@ -69,6 +96,11 @@ beforeEach(() => {
     promise: Promise.resolve(),
     cancel: vi.fn(),
   });
+  paperText = [[], [], []];
+  pageText.mockImplementation((page: { pageNumber: number }) =>
+    Promise.resolve(paperText[page.pageNumber - 1] ?? []),
+  );
+  renderTextLayer.mockImplementation(fakeTextLayer);
 });
 
 // ResizeObserver and scrollBy are stubbed per test; none may leak into the next.
@@ -633,5 +665,252 @@ describe("the paper as a scrollable region (IR-352)", () => {
 
     const region = await screen.findByRole("region", { name: "Paper, 3 pages" });
     expect(region).toHaveAttribute("tabindex", "0");
+  });
+});
+
+/**
+ * Find in this paper (IR-353): the open PDF's own text, searched in the
+ * browser. The text layer and the extracted text are `lib/pdf`'s, mocked
+ * above; what is under test is the reader's find around them.
+ */
+describe("find in this paper (IR-353)", () => {
+  const PAPER: TextRun[][] = [
+    [line("Vision-language-action models", 0.1), line("for Robot control.", 0.13)],
+    [line("Nothing to see here.", 0.2)],
+    [line("A robot arm, and another ROBOT.", 0.5)],
+  ];
+
+  async function openPaper() {
+    paperText = PAPER;
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 3");
+  }
+
+  async function openFind() {
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    const input = await screen.findByRole("searchbox", { name: "Find in this paper" });
+    await waitFor(() => expect(input).toHaveFocus());
+    return input;
+  }
+
+  /** Find's match status, which is announced as it changes. */
+  const findStatus = () => within(screen.getByRole("search")).getByRole("status");
+
+  /** The words marked as matches on a page, and which one is current. */
+  function marksOn(pageNumber: number) {
+    const page = screen.getByRole("group", { name: `Page ${pageNumber}` });
+    return Array.from(page.querySelectorAll("mark")).map((mark) => ({
+      text: mark.textContent,
+      current: mark.classList.contains("find-hit-current"),
+    }));
+  }
+
+  /** The reader's toolbar: what holds the Download control. */
+  const toolbar = () => screen.getByRole("button", { name: "Download" }).parentElement as HTMLElement;
+
+  it("is a find of its own in the reader's toolbar, apart from the header's search", async () => {
+    await openPaper();
+    const input = await openFind();
+
+    expect(within(screen.getByRole("search")).getByRole("searchbox")).toBe(input);
+    expect(input).toHaveAttribute("placeholder", "Find in this paper");
+    expect(screen.getByRole("button", { name: "Find in this paper" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("opens on Ctrl+F or Cmd+F while the reader has focus", async () => {
+    await openPaper();
+    const paper = screen.getByRole("region", { name: "Paper, 3 pages" });
+
+    paper.focus();
+    fireEvent.keyDown(paper, { key: "f", ctrlKey: true });
+    await waitFor(() => expect(screen.getByRole("searchbox", { name: "Find in this paper" })).toHaveFocus());
+
+    await userEvent.keyboard("{Escape}");
+    fireEvent.keyDown(paper, { key: "f", metaKey: true });
+    expect(await screen.findByRole("searchbox", { name: "Find in this paper" })).toBeInTheDocument();
+  });
+
+  it("counts every match on every page, whatever its case", async () => {
+    await openPaper();
+    await userEvent.type(await openFind(), "robot");
+
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+    expect(marksOn(1)).toEqual([{ text: "Robot", current: true }]);
+    expect(marksOn(2)).toEqual([]);
+    expect(marksOn(3)).toEqual([
+      { text: "robot", current: false },
+      { text: "ROBOT", current: false },
+    ]);
+  });
+
+  it("moves to the next match on Enter and back on Shift+Enter, wrapping at the ends", async () => {
+    await openPaper();
+    await userEvent.type(await openFind(), "robot");
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+
+    await userEvent.keyboard("{Enter}");
+    expect(findStatus()).toHaveTextContent("2 of 3");
+    expect(marksOn(3)[0].current).toBe(true);
+
+    await userEvent.keyboard("{Enter}{Enter}");
+    expect(findStatus()).toHaveTextContent("1 of 3");
+
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(findStatus()).toHaveTextContent("3 of 3");
+    expect(marksOn(3)[1].current).toBe(true);
+  });
+
+  it("moves with the next and previous controls too", async () => {
+    await openPaper();
+    await userEvent.type(await openFind(), "robot");
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Next match" }));
+    expect(findStatus()).toHaveTextContent("2 of 3");
+    await userEvent.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(findStatus()).toHaveTextContent("1 of 3");
+  });
+
+  it("finds a phrase that runs over a line's end", async () => {
+    await openPaper();
+    await userEvent.type(await openFind(), "models for robot");
+
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 1"));
+    expect(marksOn(1).map((mark) => mark.text)).toEqual(["models", "for Robot"]);
+  });
+
+  it("says so when nothing matches", async () => {
+    await openPaper();
+    await userEvent.type(await openFind(), "quantum");
+
+    await waitFor(() => expect(findStatus()).toHaveTextContent("No matches"));
+    expect(screen.getByRole("button", { name: "Next match" })).toBeDisabled();
+  });
+
+  it("says a scanned paper has no searchable text, rather than that nothing matches", async () => {
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 3");
+    await openFind();
+
+    await waitFor(() => expect(findStatus()).toHaveTextContent("This paper has no searchable text"));
+    // Nothing to step through, so the textbox keeps the row to itself.
+    expect(screen.queryByRole("button", { name: "Next match" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previous match" })).not.toBeInTheDocument();
+  });
+
+  it("takes typing before every page's text is in, and fills in the count as it arrives", async () => {
+    let releasePage3: (runs: TextRun[]) => void = () => {};
+    paperText = PAPER;
+    pageText.mockImplementation((page: { pageNumber: number }) =>
+      page.pageNumber === 3
+        ? new Promise<TextRun[]>((resolve) => {
+            releasePage3 = resolve;
+          })
+        : Promise.resolve(PAPER[page.pageNumber - 1]),
+    );
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 3");
+
+    await userEvent.type(await openFind(), "robot");
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 1…"));
+
+    await act(async () => releasePage3(PAPER[2]));
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+  });
+
+  it("scrolls a match out of view to rest below the header and the toolbar", async () => {
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    await openPaper();
+    const input = await openFind();
+    // Below lg the window scrolls. Page 3 is 1000px tall, 2516px down; the
+    // toolbar, with find open inside it, is 96px tall once stuck at 122px.
+    placePages([
+      { top: 484, height: 1000 },
+      { top: 1500, height: 1000 },
+      { top: 2516, height: 1000 },
+    ]);
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(122, 96));
+
+    await userEvent.type(input, "arm");
+
+    // Page 3's line is half way down: 2516 + 500 = 3016. It lands 48px of
+    // context below the toolbar, at once rather than smoothly.
+    await waitFor(() =>
+      expect(scrollBy).toHaveBeenCalledWith({ top: 3016 - (122 + 96) - 48, behavior: "auto" }),
+    );
+  });
+
+  it("leaves a match already in view where it is", async () => {
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    await openPaper();
+    const input = await openFind();
+    // Page 1 fills the view: its first line is at 300 + 100 = 400px.
+    placePages([
+      { top: 300, height: 1000 },
+      { top: 1316, height: 1000 },
+      { top: 2332, height: 1000 },
+    ]);
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(122, 96));
+
+    await userEvent.type(input, "vision");
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 1"));
+
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it("closes on Esc, clearing its highlights and returning focus", async () => {
+    await openPaper();
+    await userEvent.type(await openFind(), "robot");
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("search")).not.toBeInTheDocument();
+    expect([1, 2, 3].flatMap(marksOn)).toEqual([]);
+    expect(screen.getByRole("button", { name: "Find in this paper" })).toHaveFocus();
+  });
+
+  it("returns focus to the paper when it was opened from there", async () => {
+    await openPaper();
+    const paper = screen.getByRole("region", { name: "Paper, 3 pages" });
+    paper.focus();
+    fireEvent.keyDown(paper, { key: "f", ctrlKey: true });
+    await waitFor(() => expect(screen.getByRole("searchbox")).toHaveFocus());
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(paper).toHaveFocus();
+  });
+
+  it("draws the page's text as a layer, with a citation's highlight still over it", async () => {
+    paperText = PAPER;
+    const regions: Region[] = [{ page: 3, left: 0.1, top: 0.5, right: 0.9, bottom: 0.52 }];
+    render(<PaperPdfReader recordId={7} scrollToPage={3} highlightRegions={regions} navKey="a" />);
+    const page3 = await screen.findByRole("group", { name: "Page 3" });
+
+    // The text is in the page, so it can be selected and copied.
+    expect(await within(page3).findByText("A robot arm, and another ROBOT.")).toBeInTheDocument();
+
+    await userEvent.type(await openFind(), "robot");
+    await waitFor(() => expect(marksOn(3)).toHaveLength(2));
+    // The overlay is the page's last layer, so it draws above the text. It
+    // is `aria-hidden` (CitationOverlay.tsx), so no accessible query
+    // reaches it; this is scoped to the page found accessibly above.
+    expect(page3.lastElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(page3.lastElementChild?.children).toHaveLength(1);
+  });
+
+  it("has no serious or critical violations with find open and matches marked", async () => {
+    paperText = PAPER;
+    const { container } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+    await screen.findByText("Page 1 / 3");
+    await userEvent.type(await openFind(), "robot");
+    await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+
+    await expectNoBlockingA11yViolations(container);
   });
 });

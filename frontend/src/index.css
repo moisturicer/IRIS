@@ -50,3 +50,73 @@
     border-radius: 3px;
   }
 }
+
+/* A PDF page's text layer (IR-353): pdf.js's `TextLayer` draws the page's
+   text as transparent spans over its canvas, which is what makes the text
+   selectable and what find highlights. These are the rules from pdf.js's own
+   `web/pdf_viewer.css` that the layer needs, not the whole 6,000-line viewer
+   stylesheet. `--total-scale-factor` is set by each page's box
+   (PaperPdfReader.tsx); pdf.js sets `--min-font-size` and each span's
+   `--font-height`, `--scale-x` and `--rotate` itself. */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+  display: contents;
+}
+
+.textLayer ::selection {
+  background: rgb(107 15 18 / 0.25);
+  color: transparent;
+}
+
+/* Find's matches (IR-353), marked inside the spans so they follow the text
+   at any zoom. Yellow, then orange for the current one, as a browser's find
+   marks them -- apart from a citation's maroon-ringed passage, which draws
+   above the text layer and stays visible over them. */
+.textLayer mark.find-hit {
+  position: static;
+  color: transparent;
+  background-color: rgb(250 204 21 / 0.4);
+  border-radius: 2px;
+}
+
+.textLayer mark.find-hit-current {
+  background-color: rgb(234 88 12 / 0.45);
+  outline: 2px solid rgb(234 88 12 / 0.85);
+  outline-offset: 1px;
+}
