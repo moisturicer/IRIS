@@ -1,3 +1,4 @@
+import { TONES } from "@/components/ui/statusTones";
 import { cn, pipelineLabel } from "@/lib/utils";
 import type { PipelineStatus } from "@/lib/constants";
 import type { WorkflowState } from "@/types/records";
@@ -6,14 +7,10 @@ import type { WorkflowState } from "@/types/records";
  * A record's workflow state, as a chip (IR-259).
  *
  * The words are the API's (`workflow_state_label`); only the tone is chosen
- * here, keyed by `workflow_state`. Four tones, in the IRIS palette of white,
- * grey, black and maroon (IR-356). Colour is never the only signal: every
- * chip carries its label.
+ * here, keyed by `workflow_state`, from the four shared status tones (IR-356,
+ * IR-358). Colour is never the only signal: every chip carries its label.
  */
-const QUIET     = "bg-stone-100 text-stone-700 ring-1 ring-stone-200"; // not yet with a reviewer
-const ACTIVE    = "bg-brand-50 text-brand ring-1 ring-brand-200";     // with a reviewer, moving
-const ATTENTION = "bg-brand text-white";                              // stopped: someone must act
-const SETTLED   = "bg-stone-900 text-white";                          // finished
+const { quiet: QUIET, active: ACTIVE, attention: ATTENTION, settled: SETTLED } = TONES;
 
 const WORKFLOW_COLORS: Record<string, string> = {
   draft:                 QUIET,
