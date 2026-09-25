@@ -174,3 +174,23 @@ The inventory is worth nothing without these.
 | `StatusBadge` | Revision requested / rejected / pending delete carry an icon (return arrow / ban / bin) as well as a tone and label |
 | `AskIrisEmblem` and the Ask IRIS line icons | Amber and green accents replaced by maroon shades and `currentColor`; the "IRIS AI" label marks AI content |
 
+## IR-372 additions (2026-09-25)
+
+**The Paper tab is the paper and Ask IRIS, nothing else.** Decided with the project lead; it supersedes IR-351's rule for the Paper tab only.
+
+| Layout | Paper tab | Abstract tab (unchanged) |
+|---|---|---|
+| Width | Full content width, with no centred `max-w-6xl` column | Centred `max-w-6xl` |
+| Right rail (tracker, governance, documents) | Never rendered | Shown while chat floats or is closed; hidden while docked |
+| Paper Chat position | Always docked **right**; no "Panel position" menu | Dock left / Dock right / Floating, remembered per browser |
+| Paper Chat width at `lg` / `xl` | 26rem / 30rem | 22rem |
+| Reopening a closed chat | "Ask IRIS" button at the start of the reader toolbar | Floating "Ask about this paper" launcher |
+
+The Paper tab overrides the stored dock choice but never overwrites it, so the Abstract tab gets it back. Switching tabs keeps an open chat mounted, so a conversation or a streaming answer survives it. Below `lg` the docked chat stays a bottom sheet: there is no room for two columns.
+
+| Component | Change |
+|---|---|
+| `PaperChatPanel` | `canChangePosition` prop hides the position menu |
+| `PaperPdfReader` | `toolbarStart` slot, rendered first in the toolbar |
+| `PaperChatDock` | `PAPER_TAB_PANEL_CLASS`: the wider docked geometry above |
+

@@ -30,6 +30,7 @@
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 
@@ -190,11 +191,14 @@ vi.mock("./PaperPdfReader", () => ({
   PaperPdfReader: ({
     scrollToPage,
     highlightRegions,
+    toolbarStart,
   }: {
     scrollToPage: number | null;
     highlightRegions: unknown[];
+    toolbarStart?: ReactNode;
   }) => (
     <div>
+      {toolbarStart}
       Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
       highlight
     </div>
@@ -537,6 +541,106 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
     await openChatDocked("right");
     await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
     expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
+  });
+});
+
+// The Paper tab is the paper and Ask IRIS docked right, full width, nothing
+// else (IR-372, decided with the project lead 2026-09-25). The Abstract tab
+// keeps IR-351's rule above.
+describe("the Paper tab (IR-372)", () => {
+  const RAIL = { name: "Institutional Governance" };
+  const REOPEN = { name: "Ask IRIS" };
+
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+  });
+
+  afterEach(() => localStorage.removeItem(DOCK_KEY));
+
+  async function openPaperTab(storedDock?: "left" | "right" | "floating") {
+    if (storedDock) localStorage.setItem(DOCK_KEY, storedDock);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+    await screen.findByText(/paper reader open/i);
+  }
+
+  it("shows no rail while the chat is closed", async () => {
+    await openPaperTab("floating");
+    expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
+  });
+
+  it("offers Ask IRIS from the reader's toolbar, not a floating button over the paper", async () => {
+    await openPaperTab("floating");
+    expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", REOPEN)).toBeInTheDocument();
+  });
+
+  it.each(["left", "right", "floating"] as const)(
+    "opens the chat docked, with no rail and no way to move it, whatever was stored (%s)",
+    async (stored) => {
+      await openPaperTab(stored);
+      await userEvent.click(screen.getByRole("button", REOPEN));
+
+      expect(await screen.findByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Panel position" })).not.toBeInTheDocument();
+      // The reader's own choice is left alone for the Abstract tab.
+      expect(localStorage.getItem(DOCK_KEY)).toBe(stored);
+    },
+  );
+
+  it("leaves the paper full width once the chat is closed, with the toolbar control back", async () => {
+    await openPaperTab();
+    await userEvent.click(screen.getByRole("button", REOPEN));
+    await userEvent.click(await screen.findByRole("button", { name: "Close Paper Chat" }));
+
+    expect(screen.queryByRole("complementary", { name: "Paper Chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", REOPEN)).toBeInTheDocument();
+  });
+
+  it("gives the Abstract tab back its own layout, rail and floating chat included", async () => {
+    await openPaperTab("floating");
+    await userEvent.click(screen.getByRole("tab", { name: "Abstract" }));
+
+    expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
+    await screen.findByRole("complementary", { name: "Paper Chat" });
+    expect(screen.getByRole("button", { name: "Panel position" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
+  });
+
+  it("keeps an open chat's conversation when the reader switches tabs", async () => {
+    const { aiApi } = await import("@/api/ai");
+    const findOrCreate = vi.mocked(aiApi.conversations.findOrCreateForRecord);
+    findOrCreate.mockClear();
+
+    localStorage.setItem(DOCK_KEY, "right");
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
+    await screen.findByRole("complementary", { name: "Paper Chat" });
+
+    await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Abstract" }));
+
+    expect(screen.getByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+    expect(findOrCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no serious or critical accessibility violations with the chat open", async () => {
+    const { container } = await (async () => {
+      const view = renderPaperView();
+      await waitForRecord(record.title);
+      await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+      await screen.findByText(/paper reader open/i);
+      await userEvent.click(screen.getByRole("button", REOPEN));
+      await screen.findByRole("complementary", { name: "Paper Chat" });
+      return view;
+    })();
+    await expectNoBlockingA11yViolations(container);
   });
 });
 
