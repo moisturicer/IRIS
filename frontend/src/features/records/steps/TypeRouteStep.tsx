@@ -31,6 +31,8 @@ import type { RecordType } from "@/types/records";
 import { routeForTypeName } from "@/lib/submissionRoutes";
 import type { RecordFormValues } from "../recordFormSchema";
 import { cn } from "@/lib/utils";
+import { FieldError } from "./FieldError";
+import { LOAD_ERROR } from "./fieldClasses";
 
 export function TypeRouteStep() {
   const { register, watch, formState: { errors } } = useFormContext<RecordFormValues>();
@@ -51,12 +53,13 @@ export function TypeRouteStep() {
   return (
     <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="min-w-0 lg:flex-1">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-3">
           Step 1 of 3 · Type determines who reviews first
         </p>
 
         {loadError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700 mb-4">
+          <div className={cn(LOAD_ERROR, "mb-4")}>
+            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
             Failed to load record types. Please refresh the page and try again.
           </div>
         )}
@@ -113,7 +116,7 @@ export function TypeRouteStep() {
                           ))}
                         </span>
                         {r.hasConditionalOffices && (
-                          <span className="block text-[11px] text-stone-400 mt-1.5">
+                          <span className="block text-[11px] text-stone-500 mt-1.5">
                             Which offices review it in between depends on what you tell us next.
                           </span>
                         )}
@@ -125,14 +128,12 @@ export function TypeRouteStep() {
             </div>
           </fieldset>
         )}
-        {errors.record_type && (
-          <p className="text-[12px] text-red-500 mt-2">{errors.record_type.message}</p>
-        )}
+        {errors.record_type && <FieldError>{errors.record_type.message}</FieldError>}
       </div>
 
       <aside className="mt-5 lg:mt-0 lg:w-72 lg:shrink-0 space-y-4">
         <div className="bg-white border border-stone-200 rounded-xl p-4">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-2">
             What you'll need
           </h3>
           <p className="text-[12px] text-stone-600 leading-relaxed">
@@ -142,9 +143,14 @@ export function TypeRouteStep() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-[12px] font-bold text-amber-800">Data Privacy consent</p>
-          <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
+        {/* An advisory, so soft maroon, headed by a glyph and its own words
+            rather than carried by the tone (IR-360). */}
+        <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+          <p className="flex items-center gap-1.5 text-[12px] font-bold text-brand">
+            <i className="fas fa-shield-halved" aria-hidden />
+            Data Privacy consent
+          </p>
+          <p className="text-[11px] text-stone-700 mt-1 leading-relaxed">
             Required at step 3. Full text is readable in place, not a click-through.
           </p>
         </div>

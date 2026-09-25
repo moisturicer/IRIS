@@ -88,32 +88,37 @@ export default function EditRecordPage() {
       <div className="max-w-3xl">
         <PageHeader title="Edit Record" description="Update the details of this research record." />
 
-        {/* Step indicator */}
+        {/* Step indicator. Done, current and upcoming differ by more than colour
+            (IR-360): a done step has a check and says so to a screen reader, the
+            current one is filled maroon and aria-current, and an upcoming one is
+            its number in an outline. */}
         <div className="flex gap-0 mb-8">
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center">
               <button
                 type="button"
                 onClick={() => i < step && setStep(i)}
-                className={`flex items-center gap-2 text-[13px] font-medium
-                  ${i === step ? "text-[#6B0F12]" : i < step ? "text-green-600 cursor-pointer" : "text-gray-500"}`}
+                aria-current={i === step ? "step" : undefined}
+                className={`flex items-center gap-2 text-[13px]
+                  ${i === step ? "text-brand font-semibold" : i < step ? "text-stone-900 font-medium cursor-pointer" : "text-stone-500 font-medium"}`}
               >
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold
-                  ${i === step ? "bg-[#6B0F12] text-white" : i < step ? "bg-green-600 text-white" : "bg-gray-200 text-gray-500"}`}
+                  ${i === step ? "bg-brand text-white" : i < step ? "bg-stone-900 text-white" : "border border-stone-300 text-stone-600"}`}
                 >
                   {i < step ? <i className="fa fa-check text-[10px]" aria-hidden /> : i + 1}
                 </span>
                 {label}
+                {i < step && <span className="sr-only">, completed</span>}
               </button>
               {i < STEPS.length - 1 && (
-                <span className="mx-3 text-gray-300 text-[11px]"><i className="fa fa-chevron-right" aria-hidden /></span>
+                <span className="mx-3 text-stone-300 text-[11px]"><i className="fa fa-chevron-right" aria-hidden /></span>
               )}
             </div>
           ))}
         </div>
 
         {/* Step content */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-stone-200 p-6">
           {step === 0 && <TitleAbstractStep />}
           {step === 1 && <RecordDetailsStep />}
           {step === 2 && (

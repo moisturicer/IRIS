@@ -35,7 +35,7 @@ export function DpaConsentGate({ accepted, onAcceptedChange, onViewTerms }: DpaC
           type="checkbox"
           checked={accepted}
           onChange={(e) => onAcceptedChange(e.target.checked)}
-          className="mt-1 w-4 h-4 rounded border-stone-300 text-brand focus:ring-brand cursor-pointer"
+          className="mt-1 w-4 h-4 rounded border-stone-300 text-brand accent-brand focus:ring-brand cursor-pointer"
         />
         <span className="text-[12px] text-stone-700 leading-relaxed group-hover:text-stone-900">
           {DPA_CHECKBOX_LABEL}
