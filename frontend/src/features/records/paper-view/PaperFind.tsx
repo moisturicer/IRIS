@@ -48,6 +48,7 @@ export const PaperFind = forwardRef<HTMLInputElement, PaperFindProps>(function P
   inputRef,
 ) {
   const found = status.kind === "found";
+  const noText = status.kind === "no-text";
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
@@ -62,7 +63,11 @@ export const PaperFind = forwardRef<HTMLInputElement, PaperFindProps>(function P
   };
 
   return (
-    <div role="search" aria-label="Find in this paper" className="flex basis-full items-center gap-1 pt-1">
+    <div
+      role="search"
+      aria-label="Find in this paper"
+      className="flex flex-wrap basis-full items-center gap-x-1 gap-y-0.5 pt-1"
+    >
       <div className="relative flex-1 min-w-0">
         <i
           className="fas fa-magnifying-glass pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-2xs text-stone-400"
@@ -81,18 +86,29 @@ export const PaperFind = forwardRef<HTMLInputElement, PaperFindProps>(function P
           className="w-full h-11 lg:h-8 rounded-lg border border-stone-200 bg-white pl-7 pr-2 text-sm text-stone-800 placeholder:text-stone-400 focus:border-brand/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 [&::-webkit-search-cancel-button]:hidden"
         />
       </div>
+      {/* "This paper has no searchable text" takes a line of its own under
+          the textbox, and there is nothing to step through: beside it, at
+          360px, it squeezed the textbox to 38px. */}
       <span
         role="status"
-        className="shrink-0 min-w-[4.5rem] max-w-[12rem] text-right text-2xs font-semibold text-stone-500 tabular-nums"
+        className={
+          noText
+            ? "order-last basis-full pb-0.5 pl-1 text-2xs font-semibold text-stone-500"
+            : "shrink-0 min-w-[3.5rem] text-right text-2xs font-semibold text-stone-500 tabular-nums"
+        }
       >
         {statusText(status)}
       </span>
-      <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!found} aria-label="Previous match">
-        <i className="fas fa-chevron-up" aria-hidden />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={onNext} disabled={!found} aria-label="Next match">
-        <i className="fas fa-chevron-down" aria-hidden />
-      </Button>
+      {!noText && (
+        <>
+          <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!found} aria-label="Previous match">
+            <i className="fas fa-chevron-up" aria-hidden />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onNext} disabled={!found} aria-label="Next match">
+            <i className="fas fa-chevron-down" aria-hidden />
+          </Button>
+        </>
+      )}
       <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close find">
         <i className="fas fa-xmark" aria-hidden />
       </Button>

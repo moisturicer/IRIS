@@ -793,6 +793,9 @@ describe("find in this paper (IR-353)", () => {
     await openFind();
 
     await waitFor(() => expect(findStatus()).toHaveTextContent("This paper has no searchable text"));
+    // Nothing to step through, so the textbox keeps the row to itself.
+    expect(screen.queryByRole("button", { name: "Next match" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previous match" })).not.toBeInTheDocument();
   });
 
   it("takes typing before every page's text is in, and fills in the count as it arrives", async () => {
