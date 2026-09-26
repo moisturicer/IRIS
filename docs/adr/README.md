@@ -33,7 +33,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [021](021-reviewer-directed-routing.md) | Intake, specialist review, and reviewer-directed routing | **Accepted** — 2026-09-15 · partly built (IR-255) · **partially superseded by [032](032-adviser-first-review-and-office-reviewer-pools.md)** | Architecture · Security · **Research** |
 | [022](022-explicit-document-requests.md) | Explicit document requests, distinct from resubmission | **Accepted** — 2026-09-15 · not yet built (IR-262/263) | Architecture · Scope |
 | [023](023-migrate-on-container-boot.md) | Compose containers migrate on boot, unconditionally | **Accepted** — 2026-09-21 | Deployment · Reliability |
-| [032](032-adviser-first-review-and-office-reviewer-pools.md) | Adviser-first review, office reviewer pools, record versions and lineage, one capability-driven Paper View | **Accepted** — 2026-09-26 (IR-373) · partially supersedes 021, 029 §3–§4, 018 · not yet built | Architecture · Security · **Research** |
+| [032](032-adviser-first-review-and-office-reviewer-pools.md) | Adviser-first review, office reviewer pools, record versions and lineage, one capability-driven Paper View | **Accepted** — 2026-09-26 (IR-373) · **amended 2026-09-26 (§8, §10; IR-374)** · partially supersedes 021, 029 §3–§4, 018 · not yet built | Architecture · Security · **Research** |
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 

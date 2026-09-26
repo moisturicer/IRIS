@@ -12,6 +12,14 @@
 4. one continuation per Proposal (§6);
 5. the author takes part in the review discussion (§7).
 
+**Amended 2026-09-26 (same day, project lead, IR-374 design session): §8 and §10.**
+
+- **§8:** a Discoverable Proposal is listed only while `in_review`. Acceptance ends its listing and its collaboration matching.
+- **§8:** the "Looking for" `collaboration_note` is dropped.
+- **§10:** Ask IRIS is not part of Review mode.
+
+Details are in the *Amendment* notes under §8 and §10. The original text is kept for the record.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -218,6 +226,13 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
 
 **This is a second read path, on purpose.** The CLAUDE.md rule is "visibility is one predicate used everywhere, so a citation can never point at an unreadable record". `visible_to()` stays that single predicate for **reading a record**. `Record.objects.discoverable_proposals()` grants something narrower, a **summary card**, and only through `ProposalSummarySerializer`, which has no file, version or review fields. The rule's purpose still holds, because nothing that cites or opens a record reads the summary path. Tests pin both halves (§12).
 
+**Amendment, 2026-09-26 (project lead):**
+
+1. **A Discoverable Proposal is listed only while `in_review`.** An Adviser's acceptance (`approved`) takes it off Discover and out of collaboration matching, because an accepted proposal is no longer open for collaboration. This replaces "while it is `in_review` or `approved`" above.
+2. **No `collaboration_note`.** The "Looking for" field is dropped from the model, Publish, Edit details and the summary. The summary is title, abstract, classification, authors' names and the *Proposal · In development* label.
+3. **Closing collaboration early** is done by switching the Proposal back to Private. There is no separate toggle.
+4. **The Discoverable control's own text is the consent:** *"Other IRIS users can see your title, abstract and names, and IRIS's AI will compare your proposal with other open proposals to suggest collaborators."* It covers both visibility and AI matching, and remains subject to IR-250's disclosure policy. The matching rules are amended in ADR-029.
+
 **ADR-029's consent is this setting.** Marking a Proposal Discoverable is the explicit, separate consent ADR-029 §3 required. It is never inferred from `dpa_accepted`. It also covers ADR-029's collaboration matching, so there is one opt-in, not two.
 
 ### 9. Review queues: **To review · In review · Done**
@@ -251,7 +266,7 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 |---|---|---|
 | **Reading** | Anyone who can read the record | Paper, abstract, Cite, Save, public discussion, lineage links |
 | **Author** | Owners | Reading, plus the version picker, **New version** (when a revision is requested), the Action Required panel (ADR-022), **Continue as…** (on an accepted Proposal), visibility, and the review timeline read/reply |
-| **Review** | Seat holders, after **Open review** | The paper beside the review timeline, the floating Ask IRIS dock, the party status strip (Adviser ✓ · ITSO ● · IERC ● · KTTO — · RDCO ○), and an action bar built from `capabilities` |
+| **Review** | Seat holders, after **Open review** | The paper beside the review timeline (*amended 2026-09-26: no Ask IRIS here; it stays on the Paper tab, IR-372*), the party status strip (Adviser ✓ · ITSO ● · IERC ● · KTTO — · RDCO ○), and an action bar built from `capabilities` |
 | **Summary** | Strangers on a Discoverable Proposal | The §8 summary and public discussion. No PDF. |
 
 **The party status strip** follows ADR-021 §14, with two changes. The Intake row is gone. The RDCO row reads **"Not required"** on a record no office was routed to, instead of "awaiting".
@@ -301,7 +316,7 @@ Each rule above has a test at the REST seam Lee confirmed for IR-255:
 The migration is additive first, following ADR-021 §7's expand/contract plan.
 
 - **New tables:** `ReviewerSeat`, `RecordVersion`, `ReviewComment`, `PublicComment`.
-- **New fields:** `Record.derived_from`, `proposal_visibility`, `collaboration_note`, `User.is_office_coordinator`, `Review.version`.
+- **New fields:** `Record.derived_from`, `proposal_visibility`, `User.is_office_coordinator`, `Review.version`. (`collaboration_note` was dropped by the 2026-09-26 amendment to §8.)
 
 **The backfill:**
 

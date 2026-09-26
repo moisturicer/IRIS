@@ -8,6 +8,8 @@
 > the larger disclosure §4 said would need its own consent. The manuscript stays unreadable and
 > `visible_to()` is still not widened. Matching (§1, §2, §5–§7) is unchanged.
 
+> **Amended 2026-09-26 (project lead, IR-374 design session).** It follows ADR-032 §8 as amended, and it replaces the parts of §3, §4 and §6 noted below. See *Amendment, 2026-09-26* at the end of §7.
+
 **Accepted** — 2026-09-19.
 
 **Depends on** IR-281 for record-level vectors. Nothing here can be built before those exist.
@@ -88,6 +90,20 @@ Delivery uses the existing notification machinery, which already models sender, 
 ### 7. The existing `similar/` endpoint migrates onto this
 
 `GET /records/<id>/similar/` moves from keyword matching to record-vector similarity, and stops calling the module IR-285 deletes.
+
+### Amendment, 2026-09-26
+
+Settled by the project lead, in the IR-374 design session. The plan in one line: an AI compares open proposals, and when similarity is high **both students are notified**. Students can also browse Discover's Proposals section themselves. **The collaboration itself happens between the students, outside IRIS, and is out of scope.**
+
+1. **Consent (replaces §3's separate opt-in).** It is ADR-032's **Discoverable** setting. Its text names the AI comparison explicitly, so one consent covers visibility and matching, and IR-250's disclosure policy still applies to sending text to the embedding vendor.
+2. **Who is matched.** A pair is matched only when **both** Proposals are open: `in_review` and Discoverable. Accepted, rejected, private and draft Proposals never match. **Matching is institution-wide,** across all departments and colleges.
+3. **When (extends §6).** At submission as Discoverable, **and** when an in-review Proposal is switched from Private to Discoverable. The owner's list is still recomputed on view.
+4. **The notification (replaces §4's identity-only rule).** *"Your proposal is similar to \<title\> by \<names\>"*, linking to that Proposal's Discover summary. This reveals nothing Discover does not already show, because both Proposals are Discoverable.
+5. **Volume.** A newcomer is notified about its **top 3** matches above the threshold at most, and each of those owners gets one notification. **A pair is never notified twice,** including after a Private/Discoverable flip.
+6. **Where matches are seen later.** A **"Similar open proposals"** list on the owner's own Proposal (Paper View → Overview), visible to that owner only. There are no counts on Discover cards.
+7. **Threshold.** A configurable setting, tuned by the AI track against real proposals once indexing is unblocked (IR-250). It is not fixed in advance.
+8. **Adviser duplicate view (kept, re-scoped from intake).** When an Adviser reviews a Proposal, they see similar Proposals **institution-wide, including private and accepted ones**. Staff may already read them, so this discloses nothing new. It never notifies students.
+9. **Novelty check (kept, §2).** It is shown on the owner's own Proposal as **"Related published research"**, and reads only published work. Its priority stays below collaboration matching.
 
 ## Alternatives Considered
 
