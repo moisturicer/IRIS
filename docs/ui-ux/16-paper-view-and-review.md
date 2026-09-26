@@ -4,6 +4,15 @@
 
 The decisions behind this are [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md). This page covers **structure only**: which regions exist, what each mode shows, and what each action is called. Visual design goes through `/ui` and the `anti-ui-slop` skill when each screen is built, within the IRIS tokens (IR-357).
 
+**Amended 2026-09-26 (IR-374 design session):**
+
+- Ask IRIS is **not** part of Review mode; it stays on the Paper tab (IR-372).
+- The "Looking for" note is dropped.
+- A Discoverable Proposal is listed only while in review.
+- Proposal cards carry no similarity count.
+
+The frontend implementation plan is [`../frontend_redesign_spec.md`](../frontend_redesign_spec.md).
+
 **Superseded by this page:**
 
 - [07 — Review & Clearance](07-review-clearance.md) §3 (the queue) and §5 (queue specification).
@@ -27,8 +36,8 @@ The frontend asks **"what can this user do with this record?"** It never asks "w
 |---|---|---|
 | **Reading** | The user can read the record | Header · Paper · Abstract · Cite / Save · Lineage · Public discussion |
 | **Author** | The user owns the record | Reading + Version picker · Action Required panel · Review timeline (read / reply) · **New version** · **Continue as…** · Visibility |
-| **Review** | The user holds a seat on the record and has pressed **Open review** | Paper (left) · Review timeline (right) · Ask IRIS as a floating dock · Party status strip · Action bar |
-| **Summary** | A stranger opens a Discoverable Proposal | Title · Abstract · Classification · Authors · "Looking for" · Proposal label · Public discussion. **No PDF.** |
+| **Review** | The user holds a seat on the record and has pressed **Open review** | Paper (left) · Review timeline (right) · Party status strip · Action bar. **No Ask IRIS**: to ask about the paper, the reviewer switches to the Paper tab, where the conversation persists |
+| **Summary** | A stranger opens a Discoverable Proposal that is still in review | Title · Abstract · Classification · Authors · Proposal label · Public discussion. **No PDF.** |
 
 **Before Open review,** a seat holder sees Reading mode plus one primary action, **Open review**. Opening is recorded (`opened_at`) and moves the record from *To review* to *In review*.
 
@@ -72,7 +81,7 @@ Choosing an older version swaps the manuscript and shows a banner: *"You are vie
 │                              │  ◦ v2 submitted                      │
 │                              │  ✓ Adviser accepted · routed to      │
 │                              │    ITSO, IERC — "possible IP"        │
-│                  [Ask IRIS]  │  💬 comment box                      │
+│                              │  💬 comment box                      │
 ├──────────────────────────────┴──────────────────────────────────────┤
 │ ACTION BAR — only the capabilities this user has                    │
 └─────────────────────────────────────────────────────────────────────┘
@@ -190,15 +199,16 @@ Your proposal was accepted.
 [Continue as Thesis]   [Continue as Project]
 ```
 
-It opens the submission wizard pre-filled from the Proposal, as a new draft. Afterwards the Proposal header shows *"Continued as Thesis #456 →"*.
+It opens the Publish dialog on the new child draft, pre-filled from the Proposal. Afterwards the Proposal header shows *"Continued as Thesis #456 →"*.
 
 **Visibility.** Proposals only:
 
 ```
 ○ Private        Only you, your Adviser and your reviewers can see it.
-● Discoverable   Other IRIS users can find the title and abstract to
-                 collaborate. The full proposal stays private.
-Looking for      [ An ML collaborator; someone with clinical data   ]
+● Discoverable   Other IRIS users can see your title, abstract and names,
+                 and IRIS's AI will compare your proposal with other open
+                 proposals to suggest collaborators. The full proposal stays
+                 private. It stops being listed once your Adviser accepts it.
 ```
 
 ---
@@ -210,9 +220,9 @@ There are two sections, and each is shown as a separate tab:
 - **Research.** Published Thesis / Research and Projects. Unchanged.
 - **Proposals.** Discoverable Proposals.
 
-Proposal cards carry the **Proposal · In development** label, the "Looking for" line, and **View proposal**, which opens Summary mode.
+Proposal cards carry the **Proposal · In development** label and **View proposal**, which opens Summary mode. Only Proposals still in review are listed.
 
-**Similar proposals** (ADR-029) appear on the card only once matching exists. A count must not appear before the feature behind it does.
+**No similarity counts on cards.** Matches are shown only to a Proposal's owner, as a "Similar open proposals" list on their own Proposal (ADR-029 amendment, 2026-09-26).
 
 ---
 

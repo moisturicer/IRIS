@@ -1,6 +1,6 @@
 # Frontend redesign for the settled workflow — specification (IR-374)
 
-**Status: APPROVED by the project lead — 2026-09-26, after one reconciliation pass (§0, Appendices J–L).** Tracked on [IR-374](https://citiris.atlassian.net/browse/IR-374). **Its subtasks are not yet created, and Appendix J's changes to existing tickets are not yet applied.** Three decisions remain open (§7.1 items 1, 5, 7).
+**Status: APPROVED by the project lead — 2026-09-26, after one reconciliation pass (§0, Appendices J–L).** Tracked on [IR-374](https://citiris.atlassian.net/browse/IR-374). **Its subtasks are not yet created, and Appendix J's changes to existing tickets are not yet applied.** All §7.1 decisions are settled (§7.3 records the 2026-09-26 design session).
 
 **Governing decisions:**
 
@@ -160,7 +160,7 @@ The visual language set on Paper View by IR-356 becomes the whole product's:
 28. As an author, I want to close the dialog and find my unfinished submission under Drafts in My Library, so that I can finish later.
 29. As an author, I want to reopen a draft into the same dialog at the step I left, so that nothing I entered is lost.
 30. As an author, I want a success screen naming who will review my work, with "Open paper" and "Publish another", so that I know what happens next.
-31. As an author submitting a Proposal, I want to choose Private or Discoverable, and add a "Looking for" note, so that I decide whether others can find my idea (once supported by the backend).
+31. As an author submitting a Proposal, I want to choose Private or Discoverable, told plainly that Discoverable shows my title, abstract and name and lets IRIS's AI suggest collaborators, so that I decide whether others can find my idea (once supported by the backend).
 32. As an author, I don't want to be asked for ethics forms, patent searches or similarity reports at submission, so that I'm only asked for them if a reviewer actually needs them.
 
 ### My Library (everyone; research sections for authors)
@@ -191,7 +191,7 @@ The visual language set on Paper View by IR-356 becomes the whole product's:
 53. As an owner, I want the Files section to list my manuscript and every supporting document, with upload, replace and download, so that files live with the record rather than on a separate page.
 54. As a participant, I want the Review section to show the whole history of the review as one timeline (who routed it where and why, each finding, each request, each version), so that the review reads like a pull request, not a set of forms.
 55. As a reviewer, I want to open the review with one button and then see the paper and the review timeline side by side, so that I review while reading.
-56. As a reviewer, I want to switch the side pane between the review and Ask IRIS, so that I can question the paper without leaving the review.
+56. As a reviewer, I want to switch to the Paper tab to ask Ask IRIS about the paper, and come back to the review where I left it, so that questioning the paper never loses my review.
 57. As a reviewer, I want only the actions I'm allowed to take right now in an action bar, so that I'm never offered something the server will refuse.
 58. As a reviewer, I want terminal actions (reject, publish) to ask for confirmation and state the consequence, so that I can't end someone's work by accident.
 59. As a reviewer, I want disabled actions to say why (for example "Waiting for the author's revision"), so that I understand the state.
@@ -376,7 +376,7 @@ At `sm` and above it is a centred dialog up to 720 px wide. Below `sm` it is a f
 
 - A read-only summary grouped as *Manuscript · Details · Hints*, each with an **Edit** link back to its step.
 - The data-privacy consent, reusing `DpaConsentInline`.
-- For a Proposal, once the backend supports it: a **Visibility** choice (Private · Discoverable) and the "Looking for" note.
+- For a Proposal, once the backend supports it: a **Visibility** choice (Private · Discoverable), with the consent text from ADR-032 §8 as amended. There is no "Looking for" note.
 - **Submit** calls the existing submit action with the consent flag.
 
 **Success.** The dialog body becomes a confirmation:
@@ -476,7 +476,9 @@ A polite live region announces the result.
 
 **The right rail on Overview** keeps the facts, the governance block and, for participants only, the party status strip (Adviser ✓ · ITSO ● · …) from the tracker.
 
-**Open design question — to validate against IR-356 and IR-372, not to decide here.** Doc 16 put Ask IRIS as a *floating* dock in Review mode. IR-372 has since removed floating mode from the Paper tab, and three panes (paper, timeline, chat) do not fit, as IR-350 measured. **Candidate:** the Review section's right pane is one pane with a segmented switch, Review | Ask IRIS, the same width as IR-352's docked chat and reusing its pane geometry.
+**Decided 2026-09-26: Ask IRIS is not in the Review section.** The Review section is two panes: the paper, and the review pane with the action bar. A reviewer who wants to ask about the paper switches to the Paper tab, where IR-372's layout is unchanged and the conversation persists across tabs. This avoids any conflict with IR-356's chat header and IR-372's rule. It can be revisited if pilot reviewers ask for it. The analysis that led here is kept below.
+
+*Background:* doc 16 put Ask IRIS as a *floating* dock in Review mode. IR-372 has since removed floating mode from the Paper tab, and three panes (paper, timeline, chat) do not fit, as IR-350 measured. **Candidate:** the Review section's right pane is one pane with a segmented switch, Review | Ask IRIS, the same width as IR-352's docked chat and reusing its pane geometry.
 
 **What must be checked first:**
 
@@ -484,7 +486,7 @@ A polite live region announces the result.
 - IR-372's rule that the chat docks right, full width, applies to the Paper tab only. It must be decided whether the Review section inherits it.
 - IR-354's citation landing must hold in the new pane.
 
-Until the project lead decides, with a mode-by-mode layout preview (the method that settled IR-372), F6 builds the Review pane only and leaves the Ask IRIS placement open.
+*(Superseded by the decision above.)*
 
 **What goes:**
 
@@ -641,7 +643,7 @@ All four need ADR-032 backend that does not exist yet (Appendix D). The frontend
 | **Lineage** | the header's lineage slot; *Continue as…* on My Library cards and in the Overview action row of an accepted Proposal |
 | **Review comments** | the timeline composer |
 | **Public discussion** | the bottom of Overview, visually separate: a different surface, the heading "Public discussion", and never inside the Review pane |
-| **Discoverable Proposals** | Discover's Proposals tab; Summary mode in Paper View; the Visibility choice in Publish step 3 and in Edit details |
+| **Discoverable Proposals** | Discover's Proposals tab (in-review Proposals only); Summary mode in Paper View; the Visibility choice in Publish step 3 and in Edit details; the owner-only "Similar open proposals" and "Related published research" lists on the owner's Overview |
 
 **Until each ships, its slot renders nothing.** It never shows an empty or fake state. For example, no "v1" when versions don't exist, and no "0 comments".
 
@@ -755,6 +757,37 @@ It never asserts internal state, hook calls or component structure. It is writte
    - or the summary shows a contact action without names.
 
    This blocks the Discoverable ticket's UI, not the rest of the spec.
+
+### 7.3 Design-session decisions (project lead, 2026-09-26)
+
+**Closing §7.1:**
+
+- **Item 1.** The Adviser's confirmation reads *"Publish without specialist review?"*, with the body from ui-ux/16, and shows the IP, ethics and commercialisation hints the author flagged. Students see no advance warning.
+- **Item 5.** Ask IRIS is not in the Review section (§4.6).
+- **Item 7.** Authors' names are shown on a Discoverable Proposal. The Discoverable text itself is the consent, and it names the AI comparison.
+
+**New in the session:**
+
+- **Q4.** Abandoned Publish drafts stay in My Library → Drafts, with Continue and Delete; there is no cleanup job.
+- **Q5.** B1 is built in the records app, with Jive as reviewer.
+- **Q12–Q13.** The "Looking for" note is dropped. A Discoverable Proposal is listed only while in review, and acceptance ends listing and matching. Private is the only early close.
+- **Q15–Q23.** The matching rules live in ADR-029's 2026-09-26 amendment:
+  - both proposals must be open;
+  - matching is institution-wide;
+  - it runs on submission and when an in-review Proposal becomes Discoverable;
+  - the notification carries the title, names and a link;
+  - a newcomer is notified about its top 3 matches at most, once per pair;
+  - an owner-only list shows matches later;
+  - the threshold is tuned by the AI track;
+  - the Adviser duplicate view is kept, institution-wide;
+  - the novelty check is kept.
+- **Q9.** IR-141 is closed as superseded by F5.
+- **Q10.** IR-162 moves under IR-146, and IR-149 closes with a pointer to IR-374.
+- **Q6 and Q11.** Every ticket is created at once after this PR merges:
+  - IR-374 subtasks titled `F0 ·` / `B1 ·`;
+  - ADR-032 tickets numbered `20 ·` to `26 ·` under IR-255;
+  - no assignees;
+  - `ready-for-agent` only where nothing blocks the ticket.
 
 ### 7.2 Things this spec corrects in the repository's own record
 
@@ -1179,7 +1212,7 @@ It never asserts internal state, hook calls or component structure. It is writte
   - *Request document* from the bar (ADR-022, already on the new model);
   - the secondary "Record a decision (current form)" link to the untouched `EvaluationPage` until IR-260;
   - the `/review/:id/evaluate` route is **kept**;
-  - the Review pane's Ask IRIS placement per the §7.1 item 5 decision, and not before it.
+  - no Ask IRIS in the Review section (§4.6, decided); a visible *Ask about this paper* link switches to the Paper tab.
 - **AC:**
   - the timeline lists routing, reviews and findings, resubmission requests and document requests in order, with actor and party, from the tracker only;
   - no Intake entry is rendered as current, and historical entries show the server's label;
@@ -1188,7 +1221,7 @@ It never asserts internal state, hook calls or component structure. It is writte
   - a button slot accepts an action dialog from IR-261/269–273 without F6 changes (demonstrated with *Request document*);
   - below `lg` the paper stacks above the pane with a sticky action bar;
   - verified at the four viewports.
-- **Depends:** F5, and §7.1 item 5 for the pane layout.
+- **Depends:** F5.
 - **Not in F6:** every ADR-032 decision action (IR-261, 269, 270, 271, 272, 273 add their own button and dialog into this bar), and deleting `EvaluationPage` (IR-274).
 
 ### F12 · Responsive and accessibility verification, and NFR evidence
@@ -1362,8 +1395,8 @@ The ADR-032 vertical tickets are created later, per the hold recorded on IR-255.
 | **IR-353** Find in paper (Done) | Find UI in the reader chrome | — | It comes free wherever the reader renders; no work |
 | **IR-354** Citation lands on the passage | `citationLandingDelta`, first-region landing, the below-`lg` sheet behaviour | Any new pane mode the Review section adds | F6 adds a test that a citation landing in the Review section clears the header and the pane (IR-354's helper, not a new one) |
 | **IR-355** Cross-paper citation keeps the conversation (To Do) | Pinning, the header "Chatting about X", release triggers, the ADR-026 §9 amendment (Jive reviews) | F5 restructures `PaperViewPage` sections, which touches the same mount path | **Land IR-355 before F5**, or F5 carries its regression test. F5 must not reintroduce the `LoadingSkeleton` unmount that IR-355 fixes |
-| **IR-356** Editorial visual redesign | The Paper View visual language: serif titles, header block, Abstract reading column, chat panel design (AI label, scope toggle in the header, composer, starter questions) | F0 extends the *tokens* app-wide; F5 rebuilds the header *structure* (sections, slots) | F5 keeps IR-356's visual treatment and only adds structure. The Review/Ask IRIS pane question (§7.1 item 5) is validated against IR-356's chat header first |
-| **IR-372** Paper tab = reader + Ask IRIS docked right, full width | The Paper tab's layout rule and the dock preference behaviour | Overview (was Abstract), Review and Files sections | The Paper section is unchanged. Whether the Review section inherits "docked right, no floating" is the §7.1 item 5 decision. Correct the card's stale "left" wording |
+| **IR-356** Editorial visual redesign | The Paper View visual language: serif titles, header block, Abstract reading column, chat panel design (AI label, scope toggle in the header, composer, starter questions) | F0 extends the *tokens* app-wide; F5 rebuilds the header *structure* (sections, slots) | F5 keeps IR-356's visual treatment and only adds structure. Ask IRIS stays out of the Review section (§4.6), so IR-356's chat design is untouched |
+| **IR-372** Paper tab = reader + Ask IRIS docked right, full width | The Paper tab's layout rule and the dock preference behaviour | Overview (was Abstract), Review and Files sections | The Paper section is unchanged, and the Review section has no chat, so IR-372's rule is not stretched. Correct the card's stale "left" wording |
 
 **Net:** the redesign adds sections and slots *around* the IR-350 family's work and changes none of its behaviour. No reader or chat ticket is duplicated.
 
