@@ -519,7 +519,9 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # `EmbeddingSpace` row (ADR-015); what the columns are wide enough for is
 # `apps.ai.models.VECTOR_COLUMN_DIMENSIONS`, which a migration and a test tie
 # to that row.
-OPENAI_API_KEY         = config("OPENAI_API_KEY", default="")          # FR-M4: GPT-4.1-mini LLM inference + embedding API
+# OPENAI_API_KEY was removed by IR-319: nothing under backend/ read it. The
+# `openai` package stays (see requirements/base.txt) as the SDK for every
+# OpenAI-compatible vendor, keyed by LLM_API_KEY below, not this setting.
 # ANTHROPIC_API_KEY and AI_LLM_MODEL were removed by ADR-021. Anthropic is not
 # used, and a setting nothing reads is the defect this codebase keeps finding
 # (REDIS_URL in IR-132, EXTRACTION_TIMEOUT in the compose comments). The
