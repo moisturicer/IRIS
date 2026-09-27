@@ -364,6 +364,26 @@ def _wrap(config: LLMProviderConfig) -> LLMProvider:
     return CircuitBreakingLLMProvider(retrying, breaker=breaker_for(config.key))
 
 
+def cross_vendor_fallback_config() -> Optional[LLMProviderConfig]:
+    """The `LLM_FALLBACK_*` provider, or `None` when nothing opted in.
+
+    A second *vendor*, which is the half of this module ADR-008 still refuses
+    (see the module docstring) and which a later IR-375 ticket removes. Named
+    rather than inlined so the one caller that must keep honouring it
+    meanwhile -- the `answer` Profile (IR-378) -- reads the same settings
+    through the same rule instead of a second copy of it.
+    """
+    from django.conf import settings
+
+    if not getattr(settings, "LLM_FALLBACK_API_KEY", ""):
+        return None
+    return LLMProviderConfig(
+        base_url=getattr(settings, "LLM_FALLBACK_BASE_URL", None),
+        api_key=getattr(settings, "LLM_FALLBACK_API_KEY", None),
+        model=getattr(settings, "LLM_FALLBACK_MODEL", None),
+    )
+
+
 def _configured_providers() -> list[LLMProviderConfig]:
     """The provider list `LLM_*`/`LLM_FALLBACK_*` describe.
 
@@ -381,14 +401,9 @@ def _configured_providers() -> list[LLMProviderConfig]:
             model=getattr(settings, "LLM_MODEL", None),
         )
     ]
-    if getattr(settings, "LLM_FALLBACK_API_KEY", ""):
-        configs.append(
-            LLMProviderConfig(
-                base_url=getattr(settings, "LLM_FALLBACK_BASE_URL", None),
-                api_key=getattr(settings, "LLM_FALLBACK_API_KEY", None),
-                model=getattr(settings, "LLM_FALLBACK_MODEL", None),
-            )
-        )
+    fallback = cross_vendor_fallback_config()
+    if fallback is not None:
+        configs.append(fallback)
     return configs
 
 
