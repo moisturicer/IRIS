@@ -387,6 +387,33 @@ def _configured_providers() -> list[LLMProviderConfig]:
     return configs
 
 
+def any_provider_reachable() -> bool:
+    """Whether at least one configured provider's breaker is not open
+    (IR-252).
+
+    Reads breaker state only -- it never calls a vendor to answer this. A
+    breaker only opens after real `generate()` calls actually failed against
+    it (`CircuitBreakingLLMProvider`), so this is the process's own memory of
+    which configured providers have been observed to work, not a guess from
+    a key string. With a fallback configured, one working provider is enough
+    -- `FallbackLLMProvider` would still reach it, so only every configured
+    provider being open means nothing would answer.
+
+    Lives here rather than in `apps/ai/composition.py`, which used to read
+    `breaker_for` and `_configured_providers` directly: this module already
+    owns the breaker registry and the provider list, and a second module
+    walking both is the "second copy of that knowledge" the composition
+    root's own docstring warns against -- just one layer removed from the
+    setting itself.
+    """
+    from apps.ai.resilience.circuit import CircuitState
+
+    return any(
+        breaker_for(config.key).state is not CircuitState.OPEN
+        for config in _configured_providers()
+    )
+
+
 def build_resilient_llm(
     configs: Optional[Sequence[LLMProviderConfig]] = None,
 ) -> LLMProvider:

@@ -39,6 +39,10 @@ from .corpus import (
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 
+def _raise_404():
+    raise RuntimeError("404 - the model does not exist or you do not have access to it.")
+
+
 # -- answering from inside the papers -----------------------------------------
 
 
@@ -351,6 +355,46 @@ class StatusTests:
             body = client_for(stranger).get(reverse("ai-status")).json()
 
         assert body["indexed_records"] == 0
+
+    def test_status_is_not_generative_once_the_configured_vendor_has_tripped_the_breaker(
+        self, settings, client_for
+    ):
+        """IR-252: a key that is present but pointed at a vendor that keeps
+        404ing must not be reported as `generative: true` -- that is exactly
+        the shape of the original bug (a withdrawn model id, a key that
+        looked fine). `is_configured()` only ever asked "is there a key
+        string", so this drives the real (non-injected) composition root,
+        trips the breaker IR-321 already keeps for that provider the same way
+        `CircuitBreakingLLMProvider` would after five real failures, and
+        checks that `/status/` notices."""
+        from apps.ai.composition import CompositionRoot
+        from apps.ai.resilience.circuit import CircuitState
+        from apps.ai.resilience.llm import reset_llm_breakers
+
+        settings.LLM_API_KEY = "present-but-wrong"
+        settings.LLM_BASE_URL = "https://example.test/v1"
+        settings.LLM_MODEL = "a-withdrawn-model"
+        settings.LLM_FALLBACK_API_KEY = ""
+
+        reset_llm_breakers()
+        try:
+            # Same registry key `generation_configured()` will look up, via
+            # the same path `test_composition_llm.py` uses to reach a
+            # breaker: building the real (non-fake) provider stack, which
+            # reaches no network until `generate()` is called.
+            breaker = CompositionRoot().llm()._breaker  # noqa: SLF001
+            for _ in range(5):
+                with pytest.raises(RuntimeError):
+                    breaker.call(_raise_404)
+            assert breaker.state is CircuitState.OPEN
+
+            reader = make_user("reader@cit.edu")
+            with use_composition_root(CompositionRoot()):
+                body = client_for(reader).get(reverse("ai-status")).json()
+
+            assert body["generative"] is False
+        finally:
+            reset_llm_breakers()
 
 
 class CompositionRootTests:
