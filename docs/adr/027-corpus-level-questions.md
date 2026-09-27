@@ -8,6 +8,8 @@
 
 **Depends on [ADR-023](023-retrieval-quality-evaluation.md)** for its evaluation structure, and on [IR-153](https://citiris.atlassian.net)'s visibility guarantee for its security posture.
 
+**Amended — 2026-09-28 (IR-392).** Routing gains a fourth outcome, **listing**, in §9. The reader-facing vocabulary — a **Listing question**, and alongside it **Retry** and **Reader feedback**, which [ADR-026](026-conversational-retrieval-and-memory.md) §12-§15 settle — is in `CONTEXT.md`.
+
 ## Context
 
 Three questions people want to ask Ask IRIS cannot be answered by retrieval, no matter how good retrieval gets:
@@ -122,7 +124,7 @@ Constrained, it writes: *"Materials Engineering — 8 records 2020–2022, 1 sin
 A question must reach the Lens or the Retriever, and getting that wrong produces a confidently irrelevant answer.
 
 1. **Deterministic patterns** settle unambiguous phrasings. On those cases a pattern is *more* accurate than a classifier, which could only introduce error. Free, and it removes the easy cases from the classifier's load.
-2. **A small-model classifier** decides the rest: corpus question, passage question, or both. This is a deliberate per-question cost, accepted for accuracy.
+2. **A small-model classifier** decides the rest: corpus question, passage question, **listing** (§9), or both. This is a deliberate per-question cost, accepted for accuracy. The same call also flags a question as multi-part, which is what [ADR-026](026-conversational-retrieval-and-memory.md) §14 settles — one classification of one question along two axes, not a second call.
 3. **The routing decision is shown to the reader and is overridable.** This is what actually delivers accuracy. No classifier is perfect; what decides whether a misroute *hurts* is whether it is visible. A silent wrong route is a confidently irrelevant answer with no explanation; a visible one is a single click to correct. The same principle as the Resolved question in [ADR-026](026-conversational-retrieval-and-memory.md).
 
 **Routing decisions are logged**, because routing accuracy is otherwise unmeasurable.
@@ -146,6 +148,21 @@ Independently, a **dated snapshot is retained** for written work. A landscape cl
 
 A gap has no ground truth, so there is no recall@10 analogue. Separating these keeps a provable claim apart from an interpretive one.
 
+### 9. A Listing question returns Records, and the model may describe the list but never extend it
+
+*"Which theses are about solar panels?"* is neither a passage question nor a landscape question. It asks for **the papers themselves** — a **Listing question** (`CONTEXT.md`). Answered by retrieval it produces a paragraph synthesised from a handful of passages, which is the wrong shape and, worse, silently incomplete. Answered by the Lens of §1 it produces counts, when the reader asked for titles.
+
+So **listing is a routing outcome of its own** (§5), alongside corpus, passage and both.
+
+- **A listing is answered from a catalogue search**, the same search Discover uses — not from passage retrieval and not from an aggregate.
+- **`visible_to(user)` is applied before ranking**, never after. Filtering after ranking lets the number of results, or their absence from a page, reveal that Records exist which the asker may not see — the inference leak §3 and Security Impact are about, in its list-shaped form.
+- **The model may describe the returned list and may never extend it.** It may group, order the reader's attention, or say what the papers have in common. It may not add a paper, a title, an author or a year that is not in the returned rows, and it may not comment on work elsewhere in the field.
+
+That last rule is **§4 applied to Records instead of counts** — *the Lens computes, the model reports*. The failure it prevents is the same one: a model asked "which theses are about solar panels?" will helpfully name plausible-sounding institutional theses that do not exist, and a fabricated title is indistinguishable from a real one to the reader who asked.
+
+**A separate ADR for listings was considered and rejected.** The guard a listing needs is already written down here: §4's computes-then-reports rule, and §3's visibility-before-aggregation rule. A second ADR would restate both in slightly different words, and the two would then drift — the one thing the source-of-truth hierarchy exists to prevent. A listing is a fourth outcome of this ADR's routing, so it belongs in this ADR.
+
+
 ## Alternatives Considered
 
 **Widen `Retriever` to answer corpus questions.** Rejected. The return shapes differ fundamentally — passages versus aggregates — so one interface serving both becomes a switch statement wearing an interface, and shallow. The retriever stays deep and the Lens sits beside it.
@@ -157,6 +174,14 @@ A gap has no ground truth, so there is no recall@10 analogue. Separating these k
 **Whole-corpus aggregates.** Rejected: leaks the existence of Records the asker may not see, contradicting IR-153.
 
 **Whole-corpus aggregates under a suppression threshold.** Not adopted, and explicitly left as the route to revisit if catalogue-only trends are too weak. It needs its own security argument.
+
+**Answering a Listing question with ordinary passage retrieval.** Rejected — it returns a paragraph where the reader asked for papers, and it is silently incomplete: nothing in the answer says that a paper matching the question was left out because its passages ranked below the cut-off.
+
+**A separate ADR for Listing questions.** Rejected — the guard a listing needs is already §4's (the Lens computes, the model reports) and §3's (visibility applied before aggregation). A second ADR would restate both and then drift out of step with this one.
+
+**Filtering a listing by visibility after ranking.** Rejected: result counts and gaps in a ranked page leak the existence of Records the asker may not see, which is the same inference failure §3 closes for counts.
+
+**Letting the model add papers it knows of to a returned list.** Rejected — a fabricated thesis title reads exactly like a real one, and the list is the whole answer, so there is nothing for the reader to check it against.
 
 **Letting the model write freely from retrieved aggregates.** Rejected. It reads better and there is no way to distinguish a computed claim from an invented one, so the failure is invisible.
 
@@ -215,4 +240,4 @@ FR-M4 — stable label only, per the frozen-SRS rule.
 
 ## Related Tasks
 
-IR-278 (corpus — gates the interpretive evaluation tier), ADR-023 (evaluation structure), IR-296 (question resolution, deliberately kept separate from routing).
+IR-278 (corpus — gates the interpretive evaluation tier), ADR-023 (evaluation structure), IR-296 (question resolution, deliberately kept separate from routing). **IR-392** adds §9; **IR-400** builds the listing outcome, under IR-390.
