@@ -2,13 +2,19 @@
 
 ## Status
 
-Accepted — 2026-09-01 · **amended 2026-09-28 (IR-376)**
+Accepted — 2026-09-01 · **amended 2026-09-28 (IR-376, IR-391)**
 
 **Amended — 2026-09-28 (IR-376): model fallback inside one vendor account is
-permitted; cross-vendor failover remains rejected.** See §Amendment below. This
-narrows one sentence of the Decision — *"no secondary provider"* — and nothing
-else. Every other rule here, including the degraded-mode behaviour table and
-*"never a fabricated answer"*, is untouched.
+permitted; cross-vendor failover remains rejected.** See §Amendment — IR-376
+below. This narrows one sentence of the Decision — *"no secondary provider"* —
+and nothing else. Every other rule here, including the degraded-mode behaviour
+table and *"never a fabricated answer"*, is untouched.
+
+**Amended — 2026-09-28 (IR-391): full-text search now has two jobs.** It
+remains the outage fallback this ADR chose, and it additionally runs on the
+normal path as a retrieval signal. See §Amendment — IR-391 below and
+[ADR-033](033-hybrid-retrieval-and-passage-selection.md). Nothing in the
+degraded-mode table changes.
 
 ## Context
 
@@ -114,13 +120,42 @@ Demonstrating a designed degradation is a stronger defence answer than an AI fea
 
 **Risk.** Silent degradation. If the banner is missing or unclear, users may believe semantic search is working and draw conclusions from keyword results — which would contaminate usability evaluation data. The visible-state requirement is part of the acceptance criteria, not a nicety.
 
+## Amendment — 2026-09-28 (IR-391): full-text search has a second job
+
+**What changes.** This ADR chose FTS as the **fallback** — the thing that runs
+when the vendor is unreachable. That job is unchanged. What is added is a
+second one: FTS also runs **on the normal path**, alongside vector search, as
+one of two retrieval signals whose results are merged before reranking.
+
+**Why.** Dense embeddings blur exactly the queries an institutional repository
+receives most — an exact identifier, a surname, an instrument name, an
+uncommon acronym. FTS answers those well, and in this codebase it already
+searches chunks through the same `visible_to(user)` predicate as the vector
+path. Reaching it only through a failure path meant the system's best tool for
+a common query shape was available only when something was broken.
+
+**What does not change.**
+
+* The degraded-mode behaviour table above, unaltered. When the vendor is down,
+  FTS is what remains — now as the sole signal rather than one of two.
+* *Never a fabricated answer.* Hybrid retrieval widens the candidate set; it
+  does not change what happens when generation is unavailable.
+* Degraded mode has **no relevance cut-off**, because there is no reranker
+  score to threshold — [ADR-033](033-hybrid-retrieval-and-passage-selection.md) §3.
+
+**Design, reasoning and rejected alternatives:**
+[ADR-033](033-hybrid-retrieval-and-passage-selection.md) (fusion by rank
+position, the database-maintained chunk keyword index, the relevance cut-off,
+passage selection, and the rule that every technique ships off until a harness
+run shows it helps). Not restated here.
+
 ## MVP Impact
 
 **MVP Required, P1.** ~0.5 dev-days.
 
 ## SaaS Impact
 
-Per-instance under ADR-005: one institution's provider outage or exhausted quota cannot affect another's.
+Per-instance under [ADR-005](005-instance-per-tenant.md): one institution's provider outage or exhausted quota cannot affect another's.
 
 ## Security Impact
 
@@ -136,7 +171,7 @@ The degradation test is a named system-test scenario (`V-10`) and evidence of re
 
 ## Related Requirements
 
-FR-M3-02 (FTS indexing) · FR-M4-01 (RAG chatbot) · NFR-R2 (failure recovery) · NFR-P3 (see ADR-011).
+FR-M3-02 (FTS indexing) · FR-M4-01 (RAG chatbot) · NFR-R2 (failure recovery) · NFR-P3 (see [ADR-011](011-evaluation-framework.md)).
 
 ## Related Tasks
 

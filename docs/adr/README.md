@@ -18,7 +18,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [004](004-restart-all-comparison-mode.md) | Restart-all as a configurable comparison policy | Accepted | **Research evaluation** |
 | [005](005-instance-per-tenant.md) | Instance-per-tenant rather than pooled multi-tenancy | Accepted | SaaS · Security |
 | [007](007-pgvector-vector-store.md) | pgvector as the vector store | Accepted | Architecture · Deployment |
-| [008](008-ai-degradation-to-fts.md) | Graceful degradation to PostgreSQL FTS — no local model, ever | Accepted · **amended 2026-09-28 (IR-376)** | Reliability |
+| [008](008-ai-degradation-to-fts.md) | Graceful degradation to PostgreSQL FTS — no local model, ever | Accepted · **amended 2026-09-28 (IR-376: same-vendor model fallback; IR-391: FTS also runs on the normal path as a retrieval signal)** | Reliability |
 | [009](009-authorization-model.md) | Authorization model and `is_staff` semantics | Accepted | **Security** |
 | [010](010-deployment-topology.md) | Five-service topology and interim VPS deployment | Accepted · **amended by 014** | Deployment |
 | [011](011-evaluation-framework.md) | ISO 9241-11 as the evaluation spine | Accepted · **amended 2026-09-10** | Research |
@@ -35,6 +35,10 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [022](022-explicit-document-requests.md) | Explicit document requests, distinct from resubmission | **Accepted** — 2026-09-15 · not yet built (IR-262/263) | Architecture · Scope |
 | [023](023-migrate-on-container-boot.md) | Compose containers migrate on boot, unconditionally | **Accepted** — 2026-09-21 | Deployment · Reliability |
 | [032](032-adviser-first-review-and-office-reviewer-pools.md) | Adviser-first review, office reviewer pools, record versions and lineage, one capability-driven Paper View | **Accepted** — 2026-09-26 (IR-373) · **amended 2026-09-26 (§8, §10; IR-374)** · partially supersedes 021, 029 §3–§4, 018 · not yet built | Architecture · Security · **Research** |
+| [023-retrieval](023-retrieval-quality-evaluation.md) | Retrieval quality is measured separately from the ISO 9241-11 spine | **Accepted** — 2026-09-17 · **amended 2026-09-28 (IR-391: label format, two measures, one change at a time, manual command)** | Research |
+| [033](033-hybrid-retrieval-and-passage-selection.md) | Hybrid retrieval and passage selection — rank fusion, a database-maintained chunk keyword index, a relevance cut-off, passage selection, every technique off until measured | **Accepted** — 2026-09-28 (IR-391) · amends [008](008-ai-degradation-to-fts.md) and [023-retrieval](023-retrieval-quality-evaluation.md) · not yet built | Architecture · **Research** · Security |
+
+**ADR-033 takes the next free number.** 024–031 exist as files but were never added to this index; 033 is free under both the files on disk and this table. It is the IR-390 spec's written basis, and it cites ADRs **by filename** throughout because of the duplicate numbers noted above.
 
 **Duplicate ADR numbers — known, not fixed here.** Two files claim 021 (`021-reviewer-directed-routing.md` and `021-openai-compatible-inference-provider.md`) and two claim 023 (`023-migrate-on-container-boot.md` and `023-retrieval-quality-evaluation.md`). A bare "ADR-021" is therefore ambiguous, and this index links the inference one as `021-inference` until the collision is resolved. Renumbering touches every cross-reference in the tree, so it is deliberately left to a separate chore — **IR-403** — rather than folded into IR-376. Noted 2026-09-28.
 
