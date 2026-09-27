@@ -229,12 +229,28 @@ class CompositionRoot:
         default one asks the adapter, which is the only thing that knows which
         setting configures it -- reading ``LLM_API_KEY`` here would be a second
         copy of that knowledge, and the copy is what goes stale.
+
+        **Configured is not reachable (IR-252).** A key that is present but
+        wrong, expired, or pointed at a withdrawn model id used to report
+        ``True`` here regardless -- this asked the adapter whether it *has* a
+        key, never whether the vendor behind it has ever answered. What
+        distinguishes the two without a live probe on every status request is
+        ``apps.ai.resilience.llm.any_provider_reachable``, which reads the
+        breaker state IR-321 already keeps for each configured provider: one
+        has tripped only after real ``generate()`` calls actually failed
+        against it, so an open breaker is evidence the vendor is down, not a
+        guess.
         """
         from apps.ai.providers.openai_compatible import is_configured
 
         if self._llm is not None:
             return True
-        return is_configured()
+        if not is_configured():
+            return False
+
+        from apps.ai.resilience.llm import any_provider_reachable
+
+        return any_provider_reachable()
 
     # -- the stack ----------------------------------------------------------
 
