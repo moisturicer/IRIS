@@ -38,11 +38,13 @@ way around a fail-closed gate is to supply the missing fact.
 ``OpenAICompatibleAdapter`` -- ``apps.ai.resilience.llm.build_resilient_llm``
 wraps it in retry and circuit-breaking, driven by the ``ErrorKind`` IR-320
 attaches to the failure. It can also fall over to a second configured
-provider, which is a recorded contradiction rather than a quiet extension:
-ADR-008 rejected "a secondary LLM provider for failover" by name, and
-ADR-021 restates "one provider per environment" -- built anyway per IR-321's
-own acceptance criteria, and off by default (``LLM_FALLBACK_API_KEY`` unset).
-See ``apps/ai/resilience/llm.py``'s module docstring for the full reasoning.
+provider. IR-321 recorded that as a contradiction with ADR-008 and ADR-021;
+**IR-376 resolved it in the ADRs** (both amended 2026-09-28): a fallback list of
+models inside *one* vendor account is permitted, the vendor is now chosen per
+Inference task rather than per environment, and **cross-vendor failover stays
+rejected** -- so the cross-vendor path here is the part that goes, under
+IR-375. Still off by default (``LLM_FALLBACK_API_KEY`` unset). See
+``apps/ai/resilience/llm.py``'s module docstring.
 
 **What is deliberately not wired here yet.** The query-vector cache needs an
 ``EmbeddingSpace`` id at construction time -- which would make building a root

@@ -33,22 +33,27 @@ provider's own identity, the same shape `rate_limit.py` uses Redis for across
 replicas -- here the state only has to survive across requests in one process,
 so a plain dict guarded by a lock is enough.
 
-**The contradiction this ticket carries, recorded rather than reconciled**
-(CLAUDE.md's source-of-truth rule). `FallbackLLMProvider` and
-`build_resilient_llm`'s multi-config path exist because IR-321's acceptance
-criteria ask for a Groq-primary/OpenRouter-fallback provider list.
-[ADR-008](../../../../docs/adr/008-ai-degradation-to-fts.md) explicitly
-rejected exactly this: *"A secondary LLM provider for failover ... a second
-API key, a second data-governance question, a second cost line and a second
-integration to test."*
-[ADR-021](../../../../docs/adr/021-openai-compatible-inference-provider.md)
-restates it: *"This is one provider per environment, selected by
-configuration"* -- not two providers live at once. Built anyway, per an
-explicit decision to implement as specced and flag the conflict for a human to
-resolve (amend ADR-008, or revert this half of IR-321). Kept off by default:
+**The contradiction IR-321 recorded here is resolved (IR-376).** It was that
+`FallbackLLMProvider` and `build_resilient_llm`'s multi-config path implement a
+Groq-primary/OpenRouter-fallback list, which
+[ADR-008](../../../../docs/adr/008-ai-degradation-to-fts.md) rejected by name
+and [ADR-021](../../../../docs/adr/021-openai-compatible-inference-provider.md)
+restated as *"one provider per environment"*. Both ADRs were amended on
+2026-09-28:
+
+* ADR-008 §Amendment permits a **fallback list of models inside one vendor
+  account** -- same `base_url`, same `api_key`, a different `model` -- and
+  confirms **cross-vendor failover stays rejected**.
+* ADR-021 §Amendment replaces "one provider per environment" with **one adapter
+  per protocol, vendor chosen per Inference task**. Two vendors configured for
+  two different tasks is not failover.
+
+So the same-vendor half of what this module does is now sanctioned, and the
+**cross-vendor half is what goes** -- its removal is an implementation ticket
+under IR-375, not a docs change. Until then it stays off by default:
 `LLM_FALLBACK_API_KEY` is empty in every `.env.example` and in
-`config/settings/base.py`, so a deployment that does not opt in runs exactly
-the single-provider policy ADR-021 describes today.
+`config/settings/base.py`, so a deployment that does not opt in never crosses a
+vendor boundary.
 """
 
 from __future__ import annotations
