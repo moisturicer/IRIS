@@ -197,6 +197,10 @@ class GroundedAnswerService:
             logger.warning("answer generation unavailable: %s", exc)
             return self._unavailable_answer(retrieved, sources)
 
+        if _produced_nothing(raw):
+            logger.warning("answer generation produced no text")
+            return self._unavailable_answer(retrieved, sources)
+
         text, citations = parse_citations(raw, sources)
         _warn_if_citations_went_missing(raw, text, citations)
         return self._grounded_answer(retrieved, sources, text, citations)
@@ -233,7 +237,10 @@ class GroundedAnswerService:
         from -- so leaked reasoning can corrupt neither.
 
         `on_interrupted` (IR-328) fires from `finally`, once, only when no
-        `Done` was reached -- cause-agnostic to why.
+        `Done` was reached -- cause-agnostic to why, but not when no answer
+        text had arrived yet (IR-377): there is nothing to preserve, and a
+        Turn whose answer is blank is the bug this reads as unavailable
+        everywhere else.
         """
         completed = False
         retrieved = None
@@ -292,6 +299,14 @@ class GroundedAnswerService:
 
             yield from classified(*leak_filter.flush())
 
+            if _produced_nothing(raw_parts):
+                logger.warning("answer generation produced no text")
+                completed = True
+                yield Done(
+                    self._unavailable_answer(retrieved, sources, had_reasoning)
+                )
+                return
+
             raw, text, citations = _parse(raw_parts, sources)
             _warn_if_citations_went_missing(raw, text, citations)
             yield CitationsResolved(citations=citations)
@@ -300,7 +315,13 @@ class GroundedAnswerService:
                 self._grounded_answer(retrieved, sources, text, citations, had_reasoning)
             )
         finally:
-            if not completed and on_interrupted is not None:
+            # A cutoff before any text has nothing to preserve, and storing
+            # it would be the same blank Turn by another route (IR-377).
+            if (
+                not completed
+                and on_interrupted is not None
+                and not _produced_nothing(raw_parts)
+            ):
                 on_interrupted(
                     self._partial_answer(retrieved, sources, raw_parts, had_reasoning)
                 )
@@ -348,6 +369,20 @@ class GroundedAnswerService:
         return getattr(self._llm, "last_model_used", None) or getattr(
             self._llm, "model", None
         )
+
+
+def _produced_nothing(raw: str | Sequence[str]) -> bool:
+    """Whether the model wrote no answer at all (IR-377) -- one whole
+    reply, or a stream's accumulated parts.
+
+    One predicate for both paths, because the two disagreeing is the bug:
+    `generate()` raising on an empty message while a stream of pure
+    reasoning was saved as a Turn whose answer was blank -- a reply that
+    looked real and was not there. Reasoning does not count as text here,
+    and neither does `<think>`-leaked reasoning: `ThinkTagFilter` has
+    already taken both out of the buffer this reads.
+    """
+    return not "".join(raw).strip()
 
 
 def _parse(

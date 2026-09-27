@@ -136,6 +136,34 @@ class _CutOffLLM(LLMProvider):
         raise RuntimeError("connection reset")
 
 
+def silent_llm():
+    """A model that reasons and then says nothing (IR-377).
+
+    Both paths are scripted, because the point of this fake is that they
+    must agree: `generate()` returns whitespace, `stream()` yields a
+    reasoning channel and never a text one.
+    """
+    return ScriptedLLM(
+        reply="   \n",
+        stream_deltas=[
+            StreamDelta(reasoning="Weighing the sources. "),
+            StreamDelta(reasoning="Nothing conclusive."),
+        ],
+    )
+
+
+class _SilentCutOffLLM(LLMProvider):
+    """A stream that reasons, then drops, having written no answer
+    (IR-377) -- the cutoff case with nothing to preserve."""
+
+    def generate(self, system, user):
+        raise NotImplementedError("this fake only exercises the streaming path")
+
+    def stream(self, system, user):
+        yield StreamDelta(reasoning="Weighing the sources. ")
+        raise RuntimeError("connection reset")
+
+
 def root_with(embedder=None, llm=None, resolver=None):
     """A root whose vendors are fakes and whose disclosure gate allows.
 
