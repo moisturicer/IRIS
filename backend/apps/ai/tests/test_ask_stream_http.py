@@ -22,11 +22,13 @@ from .corpus import (
     FLOOD_TEXT,
     _BrokenLLM,
     _CutOffLLM,
+    _SilentCutOffLLM,
     ask,
     ask_stream,
     make_record,
     make_user,
     root_with,
+    silent_llm,
 )
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
@@ -350,6 +352,152 @@ class ReasoningTests:
         turn = Turn.objects.get(conversation=conversation)
         assert turn.had_reasoning is True
         assert "secret train of thought" not in turn.answer
+
+
+class EmptyAnswerTests:
+    """A stream that produces no answer text is the unavailable state
+    (IR-377) -- never a Turn whose answer is blank.
+
+    Reported from live use: a reasoning model spent its whole response
+    thinking, emitted nothing on the text channel, and IRIS stored that as
+    an answer. The transcript then showed a reply that was not there.
+    """
+
+    def test_a_reasoning_only_stream_is_unavailable_not_an_empty_answer(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        with use_composition_root(root_with(embedder=embedder, llm=silent_llm())):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        done = dict(events)["done"]
+        assert done["mode"] == "unavailable"
+        assert done["degraded"] is True
+        assert done["had_reasoning"] is True
+        assert done["citations"] == []
+        # ADR-008: retrieval worked, so the reader still gets the passages.
+        assert [s["id"] for s in done["sources"]] == [flood.pk]
+
+    def test_a_stream_empty_on_both_channels_is_the_same_state(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        llm = ScriptedLLM(stream_deltas=[])
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        done = dict(events)["done"]
+        assert done["mode"] == "unavailable"
+        assert done["had_reasoning"] is False
+
+    def test_a_response_that_is_entirely_leaked_reasoning_is_unavailable(
+        self, embedder, space, client_for
+    ):
+        """The `<think>` filter reclassifies the whole response out of the
+        text channel, which leaves nothing behind -- the same empty answer
+        by another route."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        llm = ScriptedLLM(
+            stream_deltas=[StreamDelta(text="<think>still weighing it</think>")]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        done = dict(events)["done"]
+        assert done["mode"] == "unavailable"
+        assert done["had_reasoning"] is True
+
+    def test_no_blank_turn_is_stored_on_either_path(
+        self, embedder, space, client_for
+    ):
+        """The parity claim: `/ask/` and `/ask/stream/` agree on what counts
+        as the model producing nothing, and neither writes a blank Turn."""
+        from apps.ai.models import Conversation, Turn
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        conversation = Conversation.objects.create(user=reader)
+
+        with use_composition_root(root_with(embedder=embedder, llm=silent_llm())):
+            body = ask(
+                client_for(reader), FLOOD_QUESTION, conversation_id=conversation.pk
+            ).json()
+            _parse_sse(
+                ask_stream(
+                    client_for(reader), FLOOD_QUESTION, conversation_id=conversation.pk
+                )
+            )
+
+        assert body["mode"] == "unavailable"
+        # ADR-008 again, on the synchronous half of the parity claim.
+        assert body["sources"]
+        turns = list(Turn.objects.filter(conversation=conversation))
+        assert len(turns) == 2
+        assert {turn.state for turn in turns} == {"unavailable"}
+        assert all(turn.answer.strip() for turn in turns)
+
+    def test_a_cutoff_before_any_text_stores_nothing_rather_than_a_blank_turn(
+        self, embedder, space, client_for
+    ):
+        """IR-328 persists an interrupted stream as a `partial` Turn -- but
+        one with no answer text at all is the same blank reply by another
+        route, so there is nothing worth keeping."""
+        from apps.ai.models import Conversation, Turn
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        conversation = Conversation.objects.create(user=reader)
+
+        with use_composition_root(
+            root_with(embedder=embedder, llm=_SilentCutOffLLM())
+        ):
+            response = ask_stream(
+                client_for(reader), FLOOD_QUESTION, conversation_id=conversation.pk
+            )
+            with pytest.raises(RuntimeError):
+                b"".join(response.streaming_content)
+
+        assert not Turn.objects.filter(conversation=conversation).exists()
+
+    def test_text_arriving_after_reasoning_still_stores_a_complete_answer(
+        self, embedder, space, client_for
+    ):
+        """The normal case for a reasoning model, unaffected."""
+        from apps.ai.models import Conversation, Turn
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+        conversation = Conversation.objects.create(user=reader)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(reasoning="Weighing the sources."),
+                StreamDelta(text="Rainfall gauges feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(
+                ask_stream(
+                    client_for(reader), FLOOD_QUESTION, conversation_id=conversation.pk
+                )
+            )
+
+        assert dict(events)["done"]["mode"] == "generative"
+        turn = Turn.objects.get(conversation=conversation)
+        assert turn.answer == "Rainfall gauges feed the model [1]."
+        assert turn.state == "generated"
 
 
 class VisibilityTests:

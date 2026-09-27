@@ -319,7 +319,9 @@ class ChatStreamView(APIView):
     there are no readable sources to answer from.
 
     **A stream that never reaches `done` still persists (IR-328)** -- as a
-    Turn with `state` `partial`, via `persist_partial` below.
+    Turn with `state` `partial`, via `persist_partial` below. Unless it cut
+    off before any answer text arrived (IR-377), in which case nothing is
+    stored: a Turn whose answer is blank reads as a reply that is not there.
 
     **This stays a plain synchronous view.** Retrieval, the disclosure gate,
     memory recall and persistence are the exact same synchronous calls
