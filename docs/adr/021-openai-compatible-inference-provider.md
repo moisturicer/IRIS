@@ -12,12 +12,20 @@ vendor. The reasoning is worked through at length in
 called Anthropic, chosen in code rather than in a decision record. **Anthropic
 is not used.**
 
+**Amended — 2026-09-28 (IR-376).** The rule *"one provider per environment,
+selected by configuration"* is **superseded**. It is replaced by **one adapter
+per protocol, vendor chosen per Inference task**: see §Amendment below. The
+sanctioned vendors are unchanged — Groq and OpenRouter, and no others.
+
 **Does not contradict [ADR-008](008-ai-degradation-to-fts.md).** That ADR
 rejected *"a secondary LLM provider for failover"* — two providers live at once
-for resilience. This is one provider per environment, selected by
-configuration. ADR-008's degraded-mode rule is untouched: when the provider is
-unavailable the answer is replaced by an explicit unavailable state and never
-by a fabricated one.
+for resilience, one covering for the other's outage. Choosing a different
+vendor for a different task is not failover: each task has exactly one vendor,
+and no vendor covers for another. ADR-008 was amended the same day (2026-09-28,
+IR-376) to permit **model fallback inside one vendor account** and to confirm
+that cross-vendor failover stays rejected. Its degraded-mode rule is untouched:
+when the provider is unavailable the answer is replaced by an explicit
+unavailable state and never by a fabricated one.
 
 **Extends [ADR-006](006-minimum-rag-pipeline.md)**, which excluded "multiple
 LLM providers" from the MVP without naming the one provider it assumed.
@@ -55,10 +63,16 @@ and a model string. One adapter per vendor would be five near-identical files
 that drift; one adapter per *protocol* makes switching vendors a `.env` change
 with no new code.
 
-| Environment | Provider | Why |
-|---|---|---|
-| **Development** | **Groq** | Free tier, generous limits, and genuinely fast — latency is its selling point |
-| **Production** | **OpenRouter** | One key across dozens of models; a `:free` lane at no cost and pass-through pricing on the paid one |
+The two sanctioned vendors, and what each is good for:
+
+| Vendor | Why |
+|---|---|
+| **Groq** | Free tier, generous limits, and genuinely fast — latency is its selling point |
+| **OpenRouter** | One key across dozens of models; a `:free` lane at no cost and pass-through pricing on the paid one |
+
+*Originally this table bound Groq to development and OpenRouter to production —
+one provider per environment. The §Amendment below replaces that binding; the
+vendors and their reasons are unchanged.*
 
 `OpenAICompatibleAdapter` is the only `LLMProvider` adapter IRIS needs. It
 takes `base_url`, `api_key` and `model`, and `openai>=1.30` — already declared
@@ -67,6 +81,55 @@ takes `base_url`, `api_key` and `model`, and `openai>=1.30` — already declared
 **An unrecognised configuration raises.** No silent fall-through to a mock or
 a local adapter: a typo in a model or base URL must fail loudly, for the same
 reason the chunker registry refuses an unknown strategy id.
+
+## Amendment — 2026-09-28 (IR-376): the vendor is chosen per task, not per environment
+
+**What this supersedes.** The original text said *"This is one provider per
+environment, selected by configuration"* and bound Groq to development and
+OpenRouter to production. That sentence and that binding are superseded. The
+rule is now:
+
+> **One adapter per protocol. The vendor and model are chosen per Inference
+> task.**
+
+So `resolve` may sit on Groq while `answer` uses OpenRouter, in the same
+deployment, at the same time.
+
+**Why.** The environment binding assumed every generative call in IRIS is the
+same kind of call. It is not. IRIS has distinct Inference tasks with different
+shapes — a short, latency-critical rewrite of a follow-up question is not the
+same work as synthesising a cited answer over a dozen passages, and the model
+that is right for one is wrong for the other. Latency matters most where a
+person is waiting on a step they did not ask for; quality matters most on the
+output they read. Binding both to one vendor forces a single compromise on
+both, and the only way to tune one was to retune the other.
+
+Nothing about the adapter changes, which is the point of keying on the protocol
+rather than the vendor: a per-task vendor is a per-task `base_url`, `api_key`
+and `model`, resolved from configuration, through the same
+`OpenAICompatibleAdapter`. No new adapter, no new dependency, no new wire
+format.
+
+**What is still refused.**
+
+* **No vendor outside Groq and OpenRouter.** Per-task choice selects among the
+  sanctioned pair. It is not an opening for a third account.
+* **No cross-vendor failover.** A task's vendor is its vendor. When that vendor
+  is down, the task degrades per ADR-008 — it does not silently re-run against
+  the other one. Two vendors being configured for two *different* tasks does
+  not make either a standby for the other.
+* **No silent fall-through.** An unrecognised task, vendor, base URL or model
+  still raises. Per-task configuration multiplies the number of things that can
+  be mistyped, which makes the original loud-failure rule more important, not
+  less.
+* **The disclosure gate is unchanged.** It decides what may reach any vendor,
+  per task or not.
+
+**Consequence.** Configuration grows from one provider triple to one per task,
+and a deployment that configures none of them must still start and degrade
+honestly rather than boot into a broken generative path. The task set itself is
+closed and defined outside this ADR — see IR-375 (*Spec: Inference tasks and
+Profiles*) and IR-378 (*C · Profile and the closed Inference task set*).
 
 ## Consequences
 

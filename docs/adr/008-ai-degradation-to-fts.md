@@ -2,7 +2,13 @@
 
 ## Status
 
-Accepted — 2026-09-01
+Accepted — 2026-09-01 · **amended 2026-09-28 (IR-376)**
+
+**Amended — 2026-09-28 (IR-376): model fallback inside one vendor account is
+permitted; cross-vendor failover remains rejected.** See §Amendment below. This
+narrows one sentence of the Decision — *"no secondary provider"* — and nothing
+else. Every other rule here, including the degraded-mode behaviour table and
+*"never a fabricated answer"*, is untouched.
 
 ## Context
 
@@ -27,15 +33,60 @@ Behaviour by failure mode:
 | Celery or Redis unavailable | Uploads still succeed; extraction and embedding queue. Record submission and the entire workflow are unaffected |
 | Rate limit or credit exhausted | Same as provider unavailable, with a distinct operator-facing log |
 
-**No second AI implementation is built.** There is no local fallback model, no secondary provider, no cached-answer service. FTS is the fallback.
+**No second AI implementation is built.** There is no local fallback model, no secondary provider, no cached-answer service. FTS is the fallback. *(Amended 2026-09-28 — "no secondary provider" now means no secondary **vendor**; a fallback model list inside the one configured account is permitted. See §Amendment.)*
 
 The degraded path is **demonstrated deliberately** as a resilience test during system testing (`V-10`), not discovered in production.
 
 The core workflow — submission, routing, clearance, resubmission, publication, audit — has **no AI dependency at all** and must continue to function with every AI component down.
 
+## Amendment — 2026-09-28 (IR-376): model fallback within one vendor, not across vendors
+
+**What this supersedes.** One clause of the Decision: *"no secondary provider."*
+Read literally it also forbade trying a second **model** on the same account,
+which was never the risk the clause was written about. The amended rule:
+
+> **A fallback list of models inside one vendor account is permitted. Failover
+> to a second vendor is not.**
+
+**Why the distinction holds.** Everything this ADR rejected a secondary
+provider *for* is about the account, not the model string: a second API key, a
+second data-governance question (a second company receiving IRIS text), a
+second cost line, a second integration to test. Naming a second model on the
+account already configured adds none of them. It is one more value in an
+existing `.env`, over the same wire protocol, to the same company under the
+same terms, on the same bill — and it covers the failure that is actually
+common on a free or shared lane: one model being rate-limited, deprecated or
+capacity-starved while the account itself is fine.
+
+Cross-vendor failover stays rejected for exactly the original reasons, which
+this amendment does not weaken. Note that **two vendors configured for two
+different Inference tasks is not failover** — see
+[ADR-021](021-openai-compatible-inference-provider.md) §Amendment
+(2026-09-28), which makes the vendor a per-task choice. Each task has one
+vendor and no vendor stands in for another.
+
+**Bounds.**
+
+* The fallback list is within **one** account: same `base_url`, same
+  `api_key`, a different `model`.
+* When every model on the list fails, the answer degrades per the table above —
+  an explicit unavailable state, never a fabricated answer. The list changes
+  how often degradation is reached; it does not change what degradation is.
+* This permits nothing about *which* vendors are sanctioned. ADR-021 decides
+  that.
+
+**What this closes.** IR-321 (*Wire the resilience decorators around
+`LLMProvider`, and add a model fallback list*) built a cross-vendor
+`FallbackLLMProvider` and recorded the contradiction openly in
+`apps/ai/resilience/llm.py`'s module docstring and in `apps/ai/composition.py`'s,
+rather than reconciling it quietly. This amendment resolves the docs half: the
+same-vendor model list is now sanctioned, and the cross-vendor path is
+confirmed as the part that goes. Removing it is an implementation ticket under
+IR-375, not this amendment.
+
 ## Alternatives Considered
 
-**A secondary LLM provider for failover.** Rejected. A second provider means a second API key, a second data-governance question, a second cost line and a second integration to test — for a supporting capability, against a 3-day RAG budget.
+**A secondary LLM provider for failover.** Rejected — and **still rejected** after the 2026-09-28 amendment. A second provider means a second API key, a second data-governance question, a second cost line and a second integration to test — for a supporting capability, against a 3-day RAG budget.
 
 **A local fallback model (Ollama or similar).** Rejected. Needs a GPU for usable latency; adds a service and several GB of weights. This is building a second AI system to insure the first.
 

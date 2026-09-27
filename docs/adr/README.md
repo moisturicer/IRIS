@@ -18,7 +18,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [004](004-restart-all-comparison-mode.md) | Restart-all as a configurable comparison policy | Accepted | **Research evaluation** |
 | [005](005-instance-per-tenant.md) | Instance-per-tenant rather than pooled multi-tenancy | Accepted | SaaS · Security |
 | [007](007-pgvector-vector-store.md) | pgvector as the vector store | Accepted | Architecture · Deployment |
-| [008](008-ai-degradation-to-fts.md) | Graceful degradation to PostgreSQL FTS — no local model, ever | Accepted | Reliability |
+| [008](008-ai-degradation-to-fts.md) | Graceful degradation to PostgreSQL FTS — no local model, ever | Accepted · **amended 2026-09-28 (IR-376)** | Reliability |
 | [009](009-authorization-model.md) | Authorization model and `is_staff` semantics | Accepted | **Security** |
 | [010](010-deployment-topology.md) | Five-service topology and interim VPS deployment | Accepted · **amended by 014** | Deployment |
 | [011](011-evaluation-framework.md) | ISO 9241-11 as the evaluation spine | Accepted · **amended 2026-09-10** | Research |
@@ -31,9 +31,12 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [019](019-persisted-unified-conversation-history.md) | Persisted conversation history, unified across Ask IRIS and Paper Chat | Accepted | Architecture · **Research** |
 | [020](020-per-record-assessment-brief.md) | The IRIS Assessment Brief — per-record decision support at intake | **Accepted** — 2026-09-10 | Scope · Security · **Research** |
 | [021](021-reviewer-directed-routing.md) | Intake, specialist review, and reviewer-directed routing | **Accepted** — 2026-09-15 · partly built (IR-255) · **partially superseded by [032](032-adviser-first-review-and-office-reviewer-pools.md)** | Architecture · Security · **Research** |
+| [021-inference](021-openai-compatible-inference-provider.md) | Groq and OpenRouter behind one OpenAI-compatible adapter | **Accepted** — 2026-09-15 · **amended 2026-09-28 (IR-376: vendor chosen per Inference task, superseding "one provider per environment")** | Architecture · Cost |
 | [022](022-explicit-document-requests.md) | Explicit document requests, distinct from resubmission | **Accepted** — 2026-09-15 · not yet built (IR-262/263) | Architecture · Scope |
 | [023](023-migrate-on-container-boot.md) | Compose containers migrate on boot, unconditionally | **Accepted** — 2026-09-21 | Deployment · Reliability |
 | [032](032-adviser-first-review-and-office-reviewer-pools.md) | Adviser-first review, office reviewer pools, record versions and lineage, one capability-driven Paper View | **Accepted** — 2026-09-26 (IR-373) · **amended 2026-09-26 (§8, §10; IR-374)** · partially supersedes 021, 029 §3–§4, 018 · not yet built | Architecture · Security · **Research** |
+
+**Duplicate ADR numbers — known, not fixed here.** Two files claim 021 (`021-reviewer-directed-routing.md` and `021-openai-compatible-inference-provider.md`) and two claim 023 (`023-migrate-on-container-boot.md` and `023-retrieval-quality-evaluation.md`). A bare "ADR-021" is therefore ambiguous, and this index links the inference one as `021-inference` until the collision is resolved. Renumbering touches every cross-reference in the tree, so it is deliberately left to a separate chore — **IR-403** — rather than folded into IR-376. Noted 2026-09-28.
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 

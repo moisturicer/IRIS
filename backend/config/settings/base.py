@@ -397,13 +397,11 @@ LLM_REASONING_EFFORT = config("LLM_REASONING_EFFORT", default="")
 # which switches to this provider when the primary's failure is rate-limit,
 # network or timeout shaped.
 #
-# This is a recorded contradiction, not a quiet extension: ADR-008 rejected
-# "a secondary LLM provider for failover" by name -- a second API key, a
-# second data-governance question, a second cost line -- and ADR-021 restates
-# it as "one provider per environment". Built anyway, per IR-321's explicit
-# acceptance criteria and an explicit decision to implement it and flag the
-# conflict for a human to resolve (amend ADR-008, or revert this half of the
-# ticket) rather than resolve it unilaterally. See apps/ai/resilience/llm.py.
+# IR-321 recorded this as a contradiction with ADR-008 and ADR-021. IR-376
+# resolved it: both were amended 2026-09-28 to permit a fallback list of models
+# inside ONE vendor account, with cross-vendor failover still rejected and the
+# vendor now chosen per Inference task. A second vendor here is therefore the
+# part that goes, under IR-375. See apps/ai/resilience/llm.py.
 LLM_FALLBACK_BASE_URL = config("LLM_FALLBACK_BASE_URL", default="")
 LLM_FALLBACK_API_KEY  = config("LLM_FALLBACK_API_KEY", default="")
 LLM_FALLBACK_MODEL    = config("LLM_FALLBACK_MODEL", default="")
