@@ -52,6 +52,7 @@ from .events import (
     TextDelta,
 )
 from .reasoning import ThinkTagFilter
+from .selection import SourceSelection
 
 logger = logging.getLogger(__name__)
 
@@ -90,16 +91,13 @@ class GroundedAnswerService:
         self._policy_enabled = policy_enabled
         self._max_sources = max_sources
         self._memory = memory
+        # The same value the eval harness measures its final set with (IR-133).
+        self._selection = SourceSelection(
+            permits=permits, policy_enabled=policy_enabled, max_sources=max_sources
+        )
 
     def _disclosable(self, chunks: Sequence[RetrievedChunk]) -> list[RetrievedChunk]:
-        if not self._policy_enabled:
-            return list(chunks)
-
-        records = Record.objects.filter(
-            pk__in={c.record_id for c in chunks}
-        ).in_bulk()
-        allowed = {rid for rid, rec in records.items() if self._permits(rec)}
-        return [c for c in chunks if c.record_id in allowed]
+        return self._selection.disclosable(chunks)
 
     @property
     def _dialect(self) -> VendorDialect:
@@ -118,10 +116,12 @@ class GroundedAnswerService:
         ``answer_stream`` must never disagree about, since it is where
         IR-129's visibility guarantee lives. Shared rather than duplicated
         (IR-326 code review) so a fix here reaches both.
+
+        The gate-and-cap half is `SourceSelection`, so the eval harness can
+        measure what the model received without calling a model (IR-394).
         """
         retrieved = self._retriever.retrieve(question, user, limit=self._max_sources)
-        sources = self._disclosable(retrieved.passages)[: self._max_sources]
-        return retrieved, sources
+        return retrieved, self._selection.apply(retrieved.passages)
 
     def _recall(self, retrieved, conversation, history) -> Sequence["Turn"]:
         if self._memory is None or conversation is None:
