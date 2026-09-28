@@ -18,7 +18,6 @@ pytestmark = pytest.mark.django_required
 @pytest.fixture(autouse=True)
 def _resolution_on(settings):
     settings.AI_QUESTION_RESOLUTION_ENABLED = True
-    settings.LLM_FALLBACK_API_KEY = ""
 
 
 def _adapter(resolver):

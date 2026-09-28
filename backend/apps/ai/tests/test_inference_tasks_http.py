@@ -33,18 +33,22 @@ def _clean_breaker_registry():
 class _RecordingVendor:
     """Stands in for `openai.OpenAI`, recording what it was asked for."""
 
-    def __init__(self):
-        self.calls: list[dict] = []
-        self.credentials: list[tuple] = []
-
     def __call__(self, *, api_key, base_url=None):
         self.credentials.append((api_key, base_url))
         return SimpleNamespace(
             chat=SimpleNamespace(completions=SimpleNamespace(create=self._create))
         )
 
+    def __init__(self, failing=None):
+        self.calls: list[dict] = []
+        self.credentials: list[tuple] = []
+        self._failing = failing or {}
+
     def _create(self, **kwargs):
         self.calls.append(kwargs)
+        failure = self._failing.get(kwargs["model"])
+        if failure is not None:
+            raise failure
         message = SimpleNamespace(content="Rainfall gauges feed the model [1].")
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
@@ -79,7 +83,6 @@ class AnswerTaskTests:
         settings.LLM_ANSWER_MODEL = "the-answer-model"
         settings.LLM_ANSWER_API_KEY = "answer-key"
         settings.LLM_ANSWER_VENDOR = "openrouter"
-        settings.LLM_FALLBACK_API_KEY = ""
         # What the flat settings say must not win once the task is configured.
         settings.LLM_MODEL = "the-old-flat-model"
 
@@ -103,7 +106,6 @@ class AnswerTaskTests:
         settings.LLM_ANSWER_MODEL = ""
         settings.LLM_ANSWER_API_KEY = ""
         settings.LLM_ANSWER_VENDOR = ""
-        settings.LLM_FALLBACK_API_KEY = ""
         settings.LLM_MODEL = "the-old-flat-model"
         settings.LLM_API_KEY = "flat-key"
         settings.LLM_BASE_URL = "https://flat.test/v1"
@@ -153,3 +155,44 @@ class AnswerTaskTests:
 
         with pytest.raises(UnknownInferenceTask):
             CompositionRoot().llm_for("answers")
+
+
+class ExhaustingTheFallbackListTests:
+    """IR-385: what a reader sees when every model on the account fails."""
+
+    def test_the_answer_is_unavailable_and_the_sources_are_still_returned(
+        self, settings, monkeypatch, embedder, space, client_for
+    ):
+        """ADR-008's rule survives the fallback list: no model, no answer,
+        and retrieval's passages are still handed over so a reader can read
+        them themselves. Nothing is tried at a second vendor -- there is no
+        longer one to try."""
+        import openai
+
+        rate_limited = RuntimeError("rate limit exceeded")
+        vendor = _RecordingVendor(
+            failing={"first-model": rate_limited, "second-model": rate_limited}
+        )
+        monkeypatch.setattr(openai, "OpenAI", vendor)
+
+        settings.LLM_ANSWER_MODEL = "first-model"
+        settings.LLM_ANSWER_FALLBACK_MODELS = "second-model"
+        settings.LLM_ANSWER_API_KEY = "one-account-key"
+
+        reader = make_user("reader@cit.edu")
+        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                            embedder=embedder, space=space)
+
+        with use_composition_root(_root(embedder)):
+            body = ask(client_for(reader), FLOOD_QUESTION).json()
+
+        assert body["answer"] is None
+        assert body["mode"] == "unavailable"
+        assert [source["id"] for source in body["sources"]] == [flood.pk]
+        assert [call["model"] for call in vendor.calls] == [
+            "first-model",
+            "second-model",
+        ]
+        assert set(vendor.credentials) == {
+            ("one-account-key", "https://api.groq.com/openai/v1")
+        }

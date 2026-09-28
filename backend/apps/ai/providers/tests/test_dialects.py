@@ -190,7 +190,7 @@ class _RecordingDialect(VendorDialect):
 
     name = "recording"
 
-    def request_extras(self, reasoning_effort):
+    def request_extras(self, reasoning_effort, models=()):
         return {"extra_body": {"seen": reasoning_effort}}
 
     def read_text(self, delta):

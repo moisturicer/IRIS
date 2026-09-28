@@ -39,11 +39,6 @@ def _clean_breaker_registry():
     reset_llm_breakers()
 
 
-@pytest.fixture(autouse=True)
-def _no_cross_vendor_fallback(settings):
-    settings.LLM_FALLBACK_API_KEY = ""
-
-
 class ClosedTaskSetTests:
     def test_the_set_is_exactly_four_named_tasks(self):
         assert [task.value for task in InferenceTask] == [

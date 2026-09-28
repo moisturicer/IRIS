@@ -26,7 +26,7 @@ failure it hides.
 
 from __future__ import annotations
 
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Optional, Sequence
 
 from django.conf import settings
 
@@ -108,6 +108,7 @@ class OpenAICompatibleAdapter:
         temperature: Optional[float] = None,
         reasoning_effort: Optional[str] = None,
         dialect: Optional[VendorDialect] = None,
+        fallback_models: Sequence[str] = (),
     ) -> None:
         self._base_url = base_url
         self._api_key = api_key
@@ -115,6 +116,10 @@ class OpenAICompatibleAdapter:
         self._client = client
         self._temperature = temperature
         self._reasoning_effort = reasoning_effort
+        # Only ever set for a vendor whose dialect resolves a model list
+        # itself (IR-385); for every other vendor the list is walked a layer
+        # up, by `FallbackLLMProvider`, one request per model.
+        self._fallback_models = tuple(fallback_models)
         # Groq's, when nobody said otherwise -- which is what this adapter
         # sent unconditionally before dialects existed (IR-382).
         self.dialect: VendorDialect = dialect or DEFAULT_DIALECT
@@ -124,6 +129,19 @@ class OpenAICompatibleAdapter:
     @property
     def model(self) -> str:
         return self._model or getattr(settings, "LLM_MODEL", "")
+
+    @property
+    def models(self) -> tuple[str, ...]:
+        """The ordered model list to offer a dialect, or nothing.
+
+        Empty unless this adapter was given fallback models: one model is not
+        a fallback list, and offering it would put a multi-model field on
+        every request that has nothing to fall back to. Same vendor account
+        throughout when it is non-empty (ADR-008 §Amendment).
+        """
+        if not self._fallback_models:
+            return ()
+        return (self.model, *self._fallback_models)
 
     def _resolved_reasoning_effort(self) -> str:
         """The effort to send, or `""` to send no reasoning configuration.
@@ -175,6 +193,10 @@ class OpenAICompatibleAdapter:
             else getattr(settings, "LLM_TEMPERATURE", 0.1)
         )
 
+        extra = self.dialect.request_extras(
+            self._resolved_reasoning_effort(), self.models
+        )
+
         try:
             response = client.chat.completions.create(
                 model=self.model,
@@ -183,6 +205,7 @@ class OpenAICompatibleAdapter:
                     {"role": "user", "content": user},
                 ],
                 temperature=temperature,
+                **extra,
             )
         except LLMUnavailable:
             raise
@@ -219,7 +242,9 @@ class OpenAICompatibleAdapter:
             if self._temperature is not None
             else getattr(settings, "LLM_TEMPERATURE", 0.1)
         )
-        extra = self.dialect.request_extras(self._resolved_reasoning_effort())
+        extra = self.dialect.request_extras(
+            self._resolved_reasoning_effort(), self.models
+        )
 
         try:
             chunks = client.chat.completions.create(

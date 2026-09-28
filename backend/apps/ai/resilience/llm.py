@@ -33,9 +33,9 @@ provider's own identity, the same shape `rate_limit.py` uses Redis for across
 replicas -- here the state only has to survive across requests in one process,
 so a plain dict guarded by a lock is enough.
 
-**The contradiction IR-321 recorded here is resolved (IR-376).** It was that
-`FallbackLLMProvider` and `build_resilient_llm`'s multi-config path implement a
-Groq-primary/OpenRouter-fallback list, which
+**The contradiction IR-321 recorded here is gone (IR-376, then IR-385).** It
+was that `FallbackLLMProvider` and `build_resilient_llm`'s multi-config path
+implemented a Groq-primary/OpenRouter-fallback list, which
 [ADR-008](../../../../docs/adr/008-ai-degradation-to-fts.md) rejected by name
 and [ADR-021](../../../../docs/adr/021-openai-compatible-inference-provider.md)
 restated as *"one provider per environment"*. Both ADRs were amended on
@@ -48,12 +48,13 @@ restated as *"one provider per environment"*. Both ADRs were amended on
   per protocol, vendor chosen per Inference task**. Two vendors configured for
   two different tasks is not failover.
 
-So the same-vendor half of what this module does is now sanctioned, and the
-**cross-vendor half is what goes** -- its removal is an implementation ticket
-under IR-375, not a docs change. Until then it stays off by default:
-`LLM_FALLBACK_API_KEY` is empty in every `.env.example` and in
-`config/settings/base.py`, so a deployment that does not opt in never crosses a
-vendor boundary.
+IR-385 made the code match: the `LLM_FALLBACK_*` second vendor is **deleted,
+not disabled** -- the settings and the config they built are gone, so there is
+no longer a switch a deployment could throw to cross a vendor boundary. What
+is left is a list of models on one account, which is what
+`FallbackLLMProvider` walks, and only for a vendor whose dialect does not
+resolve the list itself (`VendorDialect.resolves_fallback` -- OpenRouter does,
+so IRIS makes one request there rather than looping).
 """
 
 from __future__ import annotations
@@ -87,7 +88,7 @@ _GIVE_UP_ON_RETRY = (
     ErrorKind.UNKNOWN,
 )
 
-#: Worth trying the next configured provider for -- the same three kinds
+#: Worth trying the next model in the list for -- the same three kinds
 #: `composition._vendor_failures` degrades retrieval on, for the same reason:
 #: each means *this vendor*, not *the question*, is the problem. `auth` and
 #: `context_overflow` are deliberately absent -- see the module docstring.
@@ -95,7 +96,11 @@ _SWITCH_KINDS = (ErrorKind.RATE_LIMIT, ErrorKind.NETWORK, ErrorKind.TIMEOUT)
 
 
 def is_switchable_failure(exc: BaseException) -> bool:
-    """Whether `FallbackLLMProvider` should try the next provider for `exc`.
+    """Whether `FallbackLLMProvider` should try the next model for `exc`.
+
+    A kind another model cannot fix -- `auth`, `context_overflow`, `unknown`
+    -- stops the walk rather than spending the rest of the list on a failure
+    that repeats identically (ADR-008 §Amendment).
 
     An open circuit always qualifies -- the breaker itself already decided
     this provider is down -- without needing a `.kind` to read.
@@ -236,8 +241,14 @@ class CircuitBreakingLLMProvider(LLMProvider):
 
 
 class FallbackLLMProvider(LLMProvider):
-    """Tries each provider in order, switching to the next on a switch-worthy
+    """Tries each model in order, switching to the next on a switch-worthy
     failure (IR-321) and giving up immediately on any other.
+
+    **Every entry is the same vendor account** (ADR-008 §Amendment, IR-385):
+    one `base_url` and one `api_key`, differing only in `model`. Exhausting
+    the list raises the last failure, which the answer path turns into the
+    explicit unavailable state with sources still returned -- it never
+    reaches a second vendor, because there is no longer one to reach.
 
     **The model that answered is recorded on `last_model_used`.** ADR-023's
     recall measurement assumes one model per evaluation run; a silent
@@ -372,6 +383,10 @@ class LLMProviderConfig:
     #: takes the default, which is what every caller sent before dialects
     #: existed -- so an unset vendor is unchanged behaviour, not a gap.
     vendor: Optional[str] = None
+    #: The rest of the model list, for a vendor that resolves it itself in
+    #: one request (IR-385). Empty for a vendor IRIS loops for, where each
+    #: model is its own config with its own breaker.
+    fallback_models: tuple[str, ...] = ()
 
     @property
     def key(self) -> str:
@@ -388,52 +403,29 @@ def _wrap(config: LLMProviderConfig) -> LLMProvider:
         model=config.model or None,
         reasoning_effort=config.reasoning_effort,
         dialect=dialect_for(config.vendor),
+        fallback_models=config.fallback_models,
     )
     retrying = RetryingLLMProvider(adapter)
     return CircuitBreakingLLMProvider(retrying, breaker=breaker_for(config.key))
 
 
-def cross_vendor_fallback_config() -> Optional[LLMProviderConfig]:
-    """The `LLM_FALLBACK_*` provider, or `None` when nothing opted in.
-
-    A second *vendor*, which is the half of this module ADR-008 still refuses
-    (see the module docstring) and which a later IR-375 ticket removes. Named
-    rather than inlined so the one caller that must keep honouring it
-    meanwhile -- the `answer` Profile (IR-378) -- reads the same settings
-    through the same rule instead of a second copy of it.
-    """
-    from django.conf import settings
-
-    if not getattr(settings, "LLM_FALLBACK_API_KEY", ""):
-        return None
-    return LLMProviderConfig(
-        base_url=getattr(settings, "LLM_FALLBACK_BASE_URL", None),
-        api_key=getattr(settings, "LLM_FALLBACK_API_KEY", None),
-        model=getattr(settings, "LLM_FALLBACK_MODEL", None),
-    )
-
-
 def _configured_providers() -> list[LLMProviderConfig]:
-    """The provider list `LLM_*`/`LLM_FALLBACK_*` describe.
+    """The one provider the flat `LLM_*` settings describe.
 
-    The fallback entry is included only when `LLM_FALLBACK_API_KEY` is set --
-    the same signal ADR-008 itself names ("a second API key") for what makes
-    this a second provider rather than a typo'd first one. Unset, this
-    returns exactly the one config every deployment already reads today.
+    One, not a list: the `LLM_FALLBACK_*` second vendor was deleted in
+    IR-385, so the flat settings describe a single account again. A model
+    list is per Inference task now (`LLM_<TASK>_FALLBACK_MODELS`), resolved
+    in `apps/ai/inference/providers.py` rather than read from here.
     """
     from django.conf import settings
 
-    configs = [
+    return [
         LLMProviderConfig(
             base_url=getattr(settings, "LLM_BASE_URL", None),
             api_key=getattr(settings, "LLM_API_KEY", None),
             model=getattr(settings, "LLM_MODEL", None),
         )
     ]
-    fallback = cross_vendor_fallback_config()
-    if fallback is not None:
-        configs.append(fallback)
-    return configs
 
 
 def any_provider_reachable() -> bool:
@@ -444,9 +436,8 @@ def any_provider_reachable() -> bool:
     breaker only opens after real `generate()` calls actually failed against
     it (`CircuitBreakingLLMProvider`), so this is the process's own memory of
     which configured providers have been observed to work, not a guess from
-    a key string. With a fallback configured, one working provider is enough
-    -- `FallbackLLMProvider` would still reach it, so only every configured
-    provider being open means nothing would answer.
+    a key string. One config since IR-385 deleted the cross-vendor entry,
+    so this reads that provider's own breaker.
 
     Lives here rather than in `apps/ai/composition.py`, which used to read
     `breaker_for` and `_configured_providers` directly: this module already

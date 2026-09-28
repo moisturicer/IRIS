@@ -1,28 +1,36 @@
-"""Building the `LLMProvider` a Profile describes (IR-378).
+"""Building the `LLMProvider` a Profile describes (IR-378, IR-385).
 
 One adapter per protocol (ADR-021), so a Profile is a `base_url`, an
 `api_key` and a model list -- and the list is walked by the same resilience
 stack `CompositionRoot.llm()` already used, not by a second one.
 
-**The cross-vendor entry is still appended for `answer`, and only there.**
-`LLM_FALLBACK_API_KEY` configures a second *vendor*, which ADR-008 refuses;
-its removal is a later ticket under IR-375, and dropping it here instead would
-change the behaviour of a deployment that opted in, which this ticket promises
-not to do.
+**Who walks the list depends on the vendor** (IR-385). Both routes stay inside
+one account, which is the only kind of fallback ADR-008 §Amendment permits:
+
+* a vendor with no native multi-model field -- Groq -- is looped here: one
+  config, one adapter and one circuit breaker per model, wrapped in
+  `FallbackLLMProvider`, which moves to the next model only on a failure
+  another model could fix (`network`, `timeout`, `rate_limit`);
+* a vendor that resolves the list itself -- OpenRouter, which declares
+  `VendorDialect.resolves_fallback` -- gets **one** config carrying the whole
+  list, sent as the native `models` field. Looping there would send a second
+  request for a fallback the vendor already performed.
+
+**Cross-vendor failover is gone, not switched off** (IR-385). The
+`LLM_FALLBACK_*` second vendor IR-321 shipped -- a second key, a second
+company receiving IRIS text -- was the contradiction ADR-008 recorded by name.
+Its settings and the config they built are deleted, so a Profile's fallback
+list is the only fallback there is.
 """
 
 from __future__ import annotations
 
+from apps.ai.providers.dialects import dialect_for
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
-from apps.ai.resilience.llm import (
-    LLMProviderConfig,
-    build_resilient_llm,
-    cross_vendor_fallback_config,
-)
+from apps.ai.resilience.llm import LLMProviderConfig, build_resilient_llm
 
 from .profiles import Profile
-from .tasks import InferenceTask
 
 
 def build_profile_llm(profile: Profile) -> LLMProvider:
@@ -40,20 +48,19 @@ def build_profile_llm(profile: Profile) -> LLMProvider:
     # either way. `None` keeps the inherited setting for the tasks that do.
     reasoning_effort = None if profile.reasoning_visible else ""
 
-    configs = [
-        LLMProviderConfig(
+    def config(model: str, fallback_models: tuple[str, ...] = ()) -> LLMProviderConfig:
+        return LLMProviderConfig(
             base_url=profile.base_url,
             api_key=profile.api_key,
             model=model,
             reasoning_effort=reasoning_effort,
             vendor=profile.vendor.value,
+            fallback_models=fallback_models,
         )
-        for model in profile.models
-    ]
 
-    if profile.task is InferenceTask.ANSWER:
-        legacy = cross_vendor_fallback_config()
-        if legacy is not None:
-            configs.append(legacy)
+    if dialect_for(profile.vendor.value).resolves_fallback:
+        configs = [config(profile.model, profile.fallback_models)]
+    else:
+        configs = [config(model) for model in profile.models]
 
     return build_resilient_llm(configs)
