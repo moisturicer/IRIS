@@ -19,8 +19,9 @@ time and give each vendor its own place for transport bugs to diverge.
 **Groq is the default, deliberately.** An adapter built with no dialect gets
 Groq's, which is exactly what `openai_compatible.py` sent before this module
 existed -- so this refactor is invisible to every existing caller. OpenRouter
-is reached through the same default until IR-384 gives it its own dialect;
-that is today's behaviour, not an endorsement of it.
+now has its own dialect too (IR-384): its own reasoning shape, a data policy
+sent on every request, and the native `models` field its fallback ticket
+(IR-385) consumes -- see `OpenRouterDialect` below.
 """
 
 from __future__ import annotations
@@ -40,12 +41,29 @@ class VendorDialect(ABC):
     #: package, and the reverse would close the loop.
     name: str = ""
 
+    #: Whether this vendor tries a model list itself, through a native
+    #: request field, rather than IRIS looping a separate request per model
+    #: (IR-384). False for every dialect until one claims otherwise: it is
+    #: what every vendor does today, and what a dialect with no opinion on
+    #: fallback should keep doing. `apps/ai/inference/providers.py` still
+    #: loops for a dialect that leaves this False -- switching that off for a
+    #: dialect that says True is IR-385's, not this one's.
+    resolves_fallback: bool = False
+
     @abstractmethod
-    def request_extras(self, reasoning_effort: str) -> dict[str, Any]:
+    def request_extras(
+        self, reasoning_effort: str, models: tuple[str, ...] = ()
+    ) -> dict[str, Any]:
         """Extra keyword arguments for `chat.completions.create`.
 
         Empty when the vendor needs nothing beyond the common fields, which
         is the whole non-reasoning case.
+
+        `models` is a Profile's full ordered model list (primary, then its
+        fallbacks) -- offered to every dialect for a uniform call site, but
+        only meaningful to one that sets `resolves_fallback`. A dialect with
+        no native multi-model field ignores it, the same as it ignores any
+        other request shape it has no opinion on.
         """
 
     def read_text(self, delta: Any) -> str:
@@ -103,7 +121,9 @@ class GroqDialect(VendorDialect):
 
     name = "groq"
 
-    def request_extras(self, reasoning_effort: str) -> dict[str, Any]:
+    def request_extras(
+        self, reasoning_effort: str, models: tuple[str, ...] = ()
+    ) -> dict[str, Any]:
         """`reasoning_effort` and `include_reasoning`, or nothing.
 
         A Groq extension the `openai` SDK does not type, so it travels in
@@ -112,6 +132,10 @@ class GroqDialect(VendorDialect):
         `delta.content` (IR-327). Sent only when an effort is configured --
         an unset effort means no reasoning configuration at all, not a
         default one.
+
+        `models` is accepted, and ignored: Groq has no native multi-model
+        field, so `resolves_fallback` stays False and IRIS keeps looping a
+        request per model for this vendor (IR-384).
         """
         if not reasoning_effort:
             return {}
@@ -128,22 +152,79 @@ class GroqDialect(VendorDialect):
 
 GROQ = GroqDialect()
 
+
+class OpenRouterDialect(VendorDialect):
+    """OpenRouter: many models behind one account, so its dialect owns a
+    request shape Groq's does not need (IR-384, ADR-021 §Amendment).
+
+    No citation-marker normalisation here, unlike Groq's: that habit belongs
+    to the specific model behind a vendor account, and OpenRouter routes to
+    whichever one a deployment names. Nobody has observed what any of them
+    do, so there is nothing to encode yet -- inventing a marker habit on a
+    guess is the mistake `VendorDialect.normalize_citation_markers` already
+    warns against.
+    """
+
+    name = "openrouter"
+
+    #: OpenRouter tries `models` itself, in one request, in order -- see
+    #: `request_extras`. IR-385 is what stops `apps/ai/inference/providers.py`
+    #: looping a request per model once this is true.
+    resolves_fallback = True
+
+    def request_extras(
+        self, reasoning_effort: str, models: tuple[str, ...] = ()
+    ) -> dict[str, Any]:
+        """The data policy on every request, reasoning in OpenRouter's own
+        shape, and the native fallback field when a Profile has one.
+
+        The data policy is unconditional -- it is not part of the
+        reasoning branch below, because it applies "uniformly", per the
+        ticket this dialect exists for, not only when reasoning is asked
+        for. `"deny"` excludes any provider behind OpenRouter that would
+        retain what it is sent to train on, rather than merely asking one
+        not to.
+
+        Reasoning does not stay silent the way Groq's does on an unset
+        effort: a model reached through OpenRouter may reason unprompted,
+        so a task with hidden Reasoning (IR-380) must say `exclude` rather
+        than simply not asking -- an absent parameter is not a promise a
+        model reasons only when told to, the way it is for Groq's own
+        extension.
+        """
+        extra_body: dict[str, Any] = {
+            "provider": {"data_collection": "deny"},
+            "reasoning": (
+                {"effort": reasoning_effort} if reasoning_effort else {"exclude": True}
+            ),
+        }
+        if models:
+            # The Profile's model is already `model` on the outer request
+            # (sent unconditionally by the adapter); `models` is the full
+            # ordered list OpenRouter reads to resolve fallback on its own
+            # side, in the one request, rather than IRIS looping (IR-385).
+            extra_body["models"] = list(models)
+        return {"extra_body": extra_body}
+
+
+OPENROUTER = OpenRouterDialect()
+
 #: What an adapter built with no dialect uses. Groq's, because Groq is the
 #: default vendor and because this is what the adapter sent unconditionally
 #: before dialects existed -- see the module docstring.
 DEFAULT_DIALECT: VendorDialect = GROQ
 
-_DIALECTS: dict[str, VendorDialect] = {GROQ.name: GROQ}
+_DIALECTS: dict[str, VendorDialect] = {GROQ.name: GROQ, OPENROUTER.name: OPENROUTER}
 
 
 def dialect_for(vendor: str | None) -> VendorDialect:
     """The dialect for `vendor`, or the default when it has none yet.
 
     Non-raising, unlike `profiles.vendor()`: a base URL is also how a
-    self-hosted vLLM or Ollama is reached, and OpenRouter has no dialect of
-    its own until IR-384. Both reach the default, which is the vendor-neutral
-    request every one of them already receives -- refusing them here would
-    break deployments this refactor promised not to touch.
+    self-hosted vLLM or Ollama is reached, and neither has a dialect of its
+    own. Both reach the default, which is the vendor-neutral request every
+    one of them already receives -- refusing them here would break
+    deployments this refactor promised not to touch.
     """
     if not vendor:
         return DEFAULT_DIALECT

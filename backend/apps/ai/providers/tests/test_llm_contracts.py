@@ -15,6 +15,7 @@ import httpx
 import openai
 import pytest
 
+from apps.ai.providers.dialects import OPENROUTER
 from apps.ai.providers.errors import ErrorKind
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.openai_compatible import (
@@ -366,3 +367,15 @@ class VendorFailureClassificationTests:
         with pytest.raises(LLMUnavailable) as excinfo:
             OpenAICompatibleAdapter().generate(system="s", user="u")
         assert excinfo.value.kind == ErrorKind.AUTH
+
+    def test_a_rate_limit_is_classified_the_same_way_behind_openrouters_dialect(self):
+        """Classification reads the `openai` SDK's exception hierarchy, not
+        the dialect -- OpenRouter speaks the same wire protocol (ADR-021), so
+        its failures are classified exactly as Groq's are (IR-384)."""
+        exc = _status_error(openai.RateLimitError, 429, message="slow down", body=None)
+        client = _FakeClient(fail=exc)
+        with pytest.raises(LLMUnavailable) as excinfo:
+            OpenAICompatibleAdapter(client=client, dialect=OPENROUTER).generate(
+                system="s", user="u"
+            )
+        assert excinfo.value.kind == ErrorKind.RATE_LIMIT
