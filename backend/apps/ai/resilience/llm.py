@@ -346,6 +346,9 @@ class LLMProviderConfig:
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     model: Optional[str] = None
+    #: `None` inherits `LLM_REASONING_EFFORT`; `""` sends no reasoning
+    #: configuration at all (IR-380).
+    reasoning_effort: Optional[str] = None
 
     @property
     def key(self) -> str:
@@ -359,6 +362,7 @@ def _wrap(config: LLMProviderConfig) -> LLMProvider:
         base_url=config.base_url or None,
         api_key=config.api_key or None,
         model=config.model or None,
+        reasoning_effort=config.reasoning_effort,
     )
     retrying = RetryingLLMProvider(adapter)
     return CircuitBreakingLLMProvider(retrying, breaker=breaker_for(config.key))
