@@ -8,6 +8,7 @@ from typing import Optional
 import pytest
 
 from apps.ai.answers.citations import parse_citations
+from apps.ai.citation_markers import MARKER
 from apps.ai.providers.dialects import (
     DEFAULT_DIALECT,
     GROQ,
@@ -203,3 +204,18 @@ class TestTheAdapterDelegatesToItsDialect:
         ).generate(system="s", user="u")
 
         assert text == "Yes [1]."
+
+
+class TestTheGrammarIsSharedWithTheParser:
+    def test_the_dialect_and_the_parser_read_the_same_marker_grammar(self):
+        """One definition, not two that agree today (IR-382 code review).
+
+        The bracket set and the suffix bound were each widened after a live
+        failure. Two copies is two places for the next widening to reach only
+        one of -- and a dialect that normalised a marker the parser no longer
+        matched would drop the citation silently, which is the exact failure
+        both widenings were for.
+        """
+        from apps.ai.answers import citations
+
+        assert citations._MARKER is MARKER  # noqa: SLF001

@@ -29,6 +29,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import Any
 
+from apps.ai.citation_markers import MARKER, numbers_in
+
 
 class VendorDialect(ABC):
     """How one vendor's requests are shaped and its responses read."""
@@ -79,30 +81,21 @@ class VendorDialect(ABC):
 #: suffix -- `【1†L1-L5】`. Each resolves to the same source the prompt
 #: numbered; only the characters around the digits differ.
 #:
-#: The suffix run excludes **every** bracket character, opening as well as
-#: closing, and is bounded. On an unclosed marker a greedy suffix runs across
-#: the prose to the next closing bracket, so `A【1†L1-L5 and more 【2】` would
-#: collapse to `A[1]` -- the model's own sentence deleted and a genuine
-#: marker swallowed. A real suffix is under ten characters, so 64 is generous.
+#: The grammar itself lives in `apps/ai/citation_markers.py`, shared with the
+#: parser that reads markers back. One definition rather than two that agree
+#: today: the suffix bound and the bracket set were both widened after a live
+#: failure, and a copy that missed either widening would normalise a marker
+#: into a form the parser then dropped.
 #:
 #: `_MARKER` in `apps/ai/answers/citations.py` matches these variants too, and
 #: stays that way: it is the net for any provider reached without a dialect,
 #: and it is where the parser's own correctness is tested. This normalises
 #: *before* parsing so what is stored, logged and read back is canonical
 #: rather than whatever the model happened to type.
-_NUMBERS = r"\d+(?:\s*,\s*\d+)*"
-_SUFFIX = r"[^\[\]【】［］]{0,64}"
-_VARIANT_MARKER = re.compile(
-    rf"\[\s*({_NUMBERS})\s*{_SUFFIX}\]"
-    rf"|【\s*({_NUMBERS})\s*{_SUFFIX}】"
-    rf"|［\s*({_NUMBERS})\s*{_SUFFIX}］"
-)
 
 
 def _canonical(match: re.Match) -> str:
-    digits = next(group for group in match.groups() if group is not None)
-    numbers = [n for n in digits.replace(" ", "").split(",") if n]
-    return "".join(f"[{int(n)}]" for n in numbers)
+    return "".join(f"[{n}]" for n in numbers_in(match))
 
 
 class GroqDialect(VendorDialect):
@@ -130,7 +123,7 @@ class GroqDialect(VendorDialect):
         }
 
     def normalize_citation_markers(self, text: str) -> str:
-        return _VARIANT_MARKER.sub(_canonical, text)
+        return MARKER.sub(_canonical, text)
 
 
 GROQ = GroqDialect()
