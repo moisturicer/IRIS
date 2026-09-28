@@ -80,8 +80,18 @@ class UnknownTaskNameTests:
             "LLM_FALLBACK_BASE_URL",
             "LLM_FALLBACK_API_KEY",
             "LLM_FALLBACK_MODEL",
-            "LLM_RESOLUTION_MODEL",
         ]) == ()
+
+    def test_the_retired_resolution_namespace_is_refused_with_its_rename(self):
+        """IR-383 moved resolution onto the `resolve` task. A leftover
+        `LLM_RESOLUTION_MODEL` configures nothing, and the value it most
+        likely still holds is the withdrawn model that broke every
+        follow-up -- so it is a refusal naming the replacement, not a
+        reserved segment that is quietly ignored."""
+        (problem,) = unknown_task_problems(["LLM_RESOLUTION_MODEL"])
+
+        assert "LLM_RESOLUTION_MODEL" in problem
+        assert "LLM_RESOLVE_MODEL" in problem
 
     def test_a_variable_outside_the_llm_namespace_is_ignored(self):
         assert unknown_task_problems(["VOYAGE_API_KEY", "DEBUG"]) == ()

@@ -118,6 +118,25 @@ export function ScopeNotice() {
   );
 }
 
+/**
+ * What retrieval actually searched with, when a follow-up was rewritten
+ * into a standalone question (IR-296, wired to its own model in IR-383).
+ *
+ * Never hidden: a rewrite that gets the subject wrong changes what was
+ * asked, and a reader who cannot see it has no way to tell that from a bad
+ * answer. Shown live and on replay, like every other notice here.
+ */
+export function ResolvedQuestionNotice({ question }: { question: string }) {
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-xs text-stone-500">
+      <i className="fas fa-arrow-turn-down text-2xs mt-0.5" aria-hidden />
+      <span>
+        Searched for: <span className="italic text-stone-600">{question}</span>
+      </span>
+    </p>
+  );
+}
+
 /** Shown when a stream never reached its terminal event (IR-328/329) --
  *  the text above is whatever arrived before the cutoff, live or replayed. */
 export function PartialAnswerNotice() {

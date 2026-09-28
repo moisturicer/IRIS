@@ -275,3 +275,66 @@ class BuildingTheProviderTests:
         with pytest.raises(LLMUnavailable) as raised:
             build_profile_llm(profile_for(InferenceTask.SUMMARY))
         assert "LLM_SUMMARY_MODEL" in str(raised.value)
+
+
+class ResolveProfileTests:
+    """`resolve` reaches its own model over the flat vendor account (IR-383).
+
+    The task that rewrites a follow-up into a standalone question. Unlike
+    `summary` it is not off by default -- resolution has shipped since IR-296
+    and a deployment that configures nothing must keep getting it -- so it
+    ships a model and inherits the flat account the old `LLM_RESOLUTION_MODEL`
+    shared.
+    """
+
+    def test_it_ships_a_model_that_exists_at_the_vendor(self, settings):
+        """Verified with a real Groq call during IR-383: the previous default,
+        `llama-3.1-8b-instant`, 404s."""
+        assert profile_for(InferenceTask.RESOLVE).model == "openai/gpt-oss-20b"
+        assert settings.LLM_RESOLVE_MODEL == "openai/gpt-oss-20b"
+
+    def test_its_model_is_independent_of_the_answer_one(self, settings):
+        settings.LLM_ANSWER_MODEL = "answer-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_RESOLVE_MODEL = "resolve-model"
+
+        assert profile_for(InferenceTask.RESOLVE).model == "resolve-model"
+        assert profile_for(InferenceTask.ANSWER).model == "answer-model"
+
+    def test_it_inherits_the_flat_vendor_account_but_never_the_flat_model(
+        self, settings
+    ):
+        settings.LLM_BASE_URL = "https://one-vendor.test/v1"
+        settings.LLM_API_KEY = "flat-key"
+        settings.LLM_MODEL = "flat-model"
+        settings.LLM_RESOLVE_MODEL = "resolve-model"
+
+        profile = profile_for(InferenceTask.RESOLVE)
+
+        assert profile.base_url == "https://one-vendor.test/v1"
+        assert profile.api_key == "flat-key"
+        assert profile.model == "resolve-model"
+        assert model_variables("resolve") == ("LLM_RESOLVE_MODEL",)
+        assert api_key_variables("resolve") == (
+            "LLM_RESOLVE_API_KEY",
+            "LLM_API_KEY",
+        )
+
+    def test_naming_a_vendor_stops_it_carrying_the_flat_key_there(self, settings):
+        settings.LLM_RESOLVE_VENDOR = "openrouter"
+        settings.LLM_API_KEY = "groq-key"
+
+        profile = profile_for(InferenceTask.RESOLVE)
+
+        assert profile.vendor is Vendor.OPENROUTER
+        assert profile.api_key == ""
+        assert api_key_variables("resolve") == ("LLM_RESOLVE_API_KEY",)
+
+    def test_it_sends_no_reasoning_configuration(self, settings):
+        settings.LLM_REASONING_EFFORT = "high"
+        settings.LLM_RESOLVE_API_KEY = "k"
+
+        provider = build_profile_llm(profile_for(InferenceTask.RESOLVE))
+
+        adapter = provider._provider._provider  # noqa: SLF001
+        assert adapter._reasoning_effort == ""  # noqa: SLF001

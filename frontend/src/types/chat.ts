@@ -38,6 +38,13 @@ export interface ChatMessage {
    */
   widened?:   boolean;
   /**
+   * The standalone question retrieval actually searched with, when this
+   * reply answered a rewritten follow-up (IR-296/IR-383). Undefined when
+   * resolution did not run or changed nothing -- the reader then saw
+   * exactly what they typed searched.
+   */
+  resolvedQuestion?: string | null;
+  /**
    * True when the stream that produced this reply never reached its
    * terminal event — the connection dropped, the vendor timed out, the
    * server restarted (IR-328) — so `content` is whatever text arrived

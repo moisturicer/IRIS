@@ -223,6 +223,12 @@ class CompositionRoot:
         Built with the default Django cache rather than deferred like the
         query-vector cache: resolution caching needs no ``EmbeddingSpace``
         id, so there is no equivalent reason to leave it unwired.
+
+        The model comes from the ``resolve`` Inference task as of IR-383,
+        not from a second ``LLM_RESOLUTION_MODEL`` namespace -- so a
+        withdrawn model is caught by the startup check (IR-379) rather than
+        by a reader's follow-up. An unconfigured task means no rewriter,
+        which the caller already treats as "search with what was typed".
         """
         if self._resolver is None:
             from django.conf import settings
@@ -232,15 +238,16 @@ class CompositionRoot:
 
             from django.core.cache import cache
 
-            from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
+            from apps.ai.inference import InferenceTask
+            from apps.ai.providers.openai_compatible import LLMUnavailable
             from apps.ai.resolution import QuestionResolver
 
-            self._resolver = QuestionResolver(
-                llm=OpenAICompatibleAdapter(
-                    model=getattr(settings, "LLM_RESOLUTION_MODEL", None) or None
-                ),
-                cache=cache,
-            )
+            try:
+                llm = self.llm_for(InferenceTask.RESOLVE)
+            except LLMUnavailable:
+                return None
+
+            self._resolver = QuestionResolver(llm=llm, cache=cache)
         return self._resolver
 
     def memory(self) -> Optional["ConversationMemory"]:

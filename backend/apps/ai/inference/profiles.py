@@ -114,12 +114,20 @@ def _fallback_models(prefix: str) -> tuple[str, ...]:
     return tuple(model.strip() for model in raw.split(",") if model.strip())
 
 
-#: What each task falls back to when its own settings say nothing. Only
-#: The setting *names* `answer` inherits when its own are unset -- the other
-#: three tasks are off until configured, rather than silently sharing the
-#: answer model. Keys, not values: they are read through `_setting` below.
+#: The setting *names* a task inherits when its own are unset. Keys, not
+#: values: they are read through `_setting` below.
+#:
+#: `answer` inherits all three, so a deployment that sets none of the
+#: per-task variables behaves exactly as it did before Profiles existed.
+#: `resolve` inherits the vendor account and **not** the model (IR-383): it
+#: has shipped since IR-296 over the flat account, so it must keep working
+#: with no new configuration, but borrowing the *answer* model would send
+#: every follow-up rewrite to the expensive one. Its own model ships as a
+#: default instead. `summary` and `describe_figure` inherit nothing and are
+#: off until configured.
 _INHERITED_KEYS = {
     InferenceTask.ANSWER: ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"),
+    InferenceTask.RESOLVE: ("LLM_BASE_URL", "LLM_API_KEY", ""),
 }
 
 

@@ -430,16 +430,17 @@ LLM_ANSWER_FALLBACK_MODELS = config("LLM_ANSWER_FALLBACK_MODELS", default="")
 # watching it work. The others cost less without it.
 LLM_ANSWER_REASONING = config("LLM_ANSWER_REASONING", default=True, cast=bool)
 
-# RECORDED CONTRADICTION, not reconciled here (CLAUDE.md §Source-of-truth
-# hierarchy): LLM_RESOLUTION_MODEL below is what `CompositionRoot.resolver()`
-# actually reads today (IR-296), while these configure the `resolve` Profile
-# that no caller reaches yet. Two live namespaces for one Inference task. The
-# resolve-wiring ticket under IR-375 collapses them; until then the block
-# below is the one that changes behaviour.
+# Question resolution runs here as of IR-383, and the old LLM_RESOLUTION_MODEL
+# namespace is gone -- the contradiction recorded here is resolved, not
+# reconciled silently. Unlike the other per-task blocks this one ships a model:
+# resolution has shipped since IR-296 over the flat vendor account, so a
+# deployment that configures nothing keeps getting it. The default is checked
+# against the vendor -- the previous one, `llama-3.1-8b-instant`, was
+# withdrawn and 404s, which is the bug this ticket fixes.
 LLM_RESOLVE_VENDOR   = config("LLM_RESOLVE_VENDOR", default="")
 LLM_RESOLVE_BASE_URL = config("LLM_RESOLVE_BASE_URL", default="")
 LLM_RESOLVE_API_KEY  = config("LLM_RESOLVE_API_KEY", default="")
-LLM_RESOLVE_MODEL    = config("LLM_RESOLVE_MODEL", default="")
+LLM_RESOLVE_MODEL    = config("LLM_RESOLVE_MODEL", default="openai/gpt-oss-20b")
 LLM_RESOLVE_FALLBACK_MODELS = config("LLM_RESOLVE_FALLBACK_MODELS", default="")
 LLM_RESOLVE_REASONING = config("LLM_RESOLVE_REASONING", default=False, cast=bool)
 
@@ -468,22 +469,14 @@ LLM_DESCRIBE_FIGURE_REASONING = config(
 # "what about its limitations?" has no subject on its own -- retrieval finds
 # every paper's future-work section. When a Conversation has history, this
 # configures the model that rewrites the question into one that stands alone,
-# before retrieval runs. Separate from LLM_MODEL because rewriting is an easy
-# task and does not need the model that writes answers; shares LLM_BASE_URL
-# and LLM_API_KEY, since it is the same vendor account and ADR-021's
-# one-adapter shape only needs a second model string.
+# before retrieval runs. The model itself is the `resolve` Profile above
+# (LLM_RESOLVE_MODEL) as of IR-383 -- only the on/off switch lives here.
 #
 # Independently switchable, so retrieval quality with and without it is
 # measurable under ADR-023 -- the point of putting each enhancement technique
 # behind its own switch rather than shipping it as an unconditional change.
 AI_QUESTION_RESOLUTION_ENABLED = config(
     "AI_QUESTION_RESOLUTION_ENABLED", default=True, cast=bool
-)
-# Superseded in principle by the `resolve` Profile above (LLM_RESOLVE_MODEL),
-# which nothing calls yet -- see the recorded contradiction there. This is
-# still the setting resolution reads.
-LLM_RESOLUTION_MODEL = config(
-    "LLM_RESOLUTION_MODEL", default="llama-3.1-8b-instant"
 )
 
 # ---- Conversation memory (IR-297, ADR-026 Decision 6) -------------------

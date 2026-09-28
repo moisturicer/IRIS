@@ -118,6 +118,28 @@ describe("a cited answer", () => {
     expect(screen.queryByText(/Searched all papers/i)).toBeNull();
   });
 
+  it("shows the standalone question a follow-up was rewritten into (IR-383)", () => {
+    renderScreen(
+      <ChatMessageBubble
+        message={assistantMessage({
+          resolvedQuestion: "What are the limitations of the Mananga flood study?",
+        })}
+      />,
+    );
+
+    // Never hidden: a rewrite that gets the subject wrong changes what was
+    // asked, and the reader is the only one who can tell.
+    expect(
+      screen.getByText(/What are the limitations of the Mananga flood study\?/i),
+    ).toBeTruthy();
+  });
+
+  it("says nothing about a rewrite when the question was searched as typed", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage()} />);
+
+    expect(screen.queryByText(/Searched for:/i)).toBeNull();
+  });
+
   it("says when the reply was cut off before it finished (IR-328)", () => {
     renderScreen(<ChatMessageBubble message={assistantMessage({ partial: true })} />);
 

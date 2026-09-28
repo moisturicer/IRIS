@@ -3,7 +3,12 @@ import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { CopyButton } from "./CopyButton";
-import { DegradedNotice, PartialAnswerNotice, ScopeNotice } from "./PassageQuote";
+import {
+  DegradedNotice,
+  PartialAnswerNotice,
+  ResolvedQuestionNotice,
+  ScopeNotice,
+} from "./PassageQuote";
 import "highlight.js/styles/github.min.css";
 
 interface ChatMessageBubbleProps {
@@ -71,6 +76,9 @@ export function ChatMessageBubble({ message, compact = false }: ChatMessageBubbl
           />
         )}
 
+        {!isUser && message.resolvedQuestion && (
+          <ResolvedQuestionNotice question={message.resolvedQuestion} />
+        )}
         {!isUser && message.degraded && <DegradedNotice subject="answer" />}
         {!isUser && message.widened && <ScopeNotice />}
         {!isUser && message.partial && <PartialAnswerNotice />}
