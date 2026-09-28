@@ -6,17 +6,22 @@ class AiConfig(AppConfig):
     name = "apps.ai"
 
     def ready(self):
-        """Startup checks for the development disclosure bypass (IR-317).
+        """Startup checks for the AI configuration (IR-317, IR-379).
 
-        Here rather than in a settings module because it must hold whichever
+        Here rather than in a settings module because they must hold whichever
         settings module is loaded: the dangerous combination is `DEBUG=False`
         with the bypass set, and a check that lives only in `production.py`
-        misses the deployment that reached `DEBUG=False` another way.
+        misses the deployment that reached `DEBUG=False` another way. It also
+        puts both on every entry point -- `runserver`, gunicorn, a Celery
+        worker and `manage.py check` alike -- so a deploy fails rather than a
+        reader's question.
         """
+        from apps.ai.inference import verify_inference_configuration
         from apps.ai.policy.bypass import (
             install_bypass_if_enabled,
             verify_bypass_configuration,
         )
 
         verify_bypass_configuration()
+        verify_inference_configuration()
         install_bypass_if_enabled()

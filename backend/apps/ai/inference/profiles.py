@@ -136,29 +136,70 @@ def _vendor_at(base_url: str) -> Optional[Vendor]:
     return None
 
 
+def _inherited_model_key(task: InferenceTask) -> str:
+    """The flat model setting ``task`` falls back to, if any.
+
+    Unconditional, unlike the base URL and the key: naming a vendor says where
+    a task runs, not that it has stopped being configured. A model inherited
+    at a named vendor with no key of its own is a startup refusal (IR-379),
+    not a task that quietly reads as off.
+    """
+    return _INHERITED_KEYS.get(task, ("", "", ""))[2]
+
+
+def _inherited_keys(task: InferenceTask) -> tuple[str, str, str]:
+    """The flat setting names ``task`` falls back to, if it is allowed to.
+
+    A named vendor outranks the inherited flat settings, for the key as well
+    as the URL: a task moved to OpenRouter must neither keep pointing at Groq
+    because ``LLM_BASE_URL`` says so, nor carry the Groq key there. The flat
+    settings describe one vendor, so inheriting half of them is how a request
+    ends up at one vendor authenticated for another.
+
+    One function rather than the same condition written at each reader: a
+    startup refusal names the variable that would supply the key (IR-379), and
+    a second copy of this rule desyncing would make it name the wrong one.
+    """
+    if _setting(f"{task.settings_prefix}_VENDOR"):
+        return ("", "", "")
+    return _INHERITED_KEYS.get(task, ("", "", ""))
+
+
+def api_key_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
+    """Where ``task``'s key may be set, in the order ``profile_for`` reads them."""
+    task = inference_task(task)
+    own = f"{task.settings_prefix}_API_KEY"
+    _, inherited, _ = _inherited_keys(task)
+    return (own, inherited) if inherited else (own,)
+
+
+def model_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
+    """Where ``task``'s model may be set, in the order ``profile_for`` reads them.
+
+    The pair to ``api_key_variables``, and read against the environment rather
+    than settings: a startup refusal asks whether the *operator* configured
+    this task (IR-379), and `LLM_MODEL` ships with a default, so a resolved
+    model does not mean anyone chose one.
+    """
+    task = inference_task(task)
+    own = f"{task.settings_prefix}_MODEL"
+    inherited = _inherited_model_key(task)
+    return (own, inherited) if inherited else (own,)
+
+
 def profile_for(task: Union[InferenceTask, str]) -> Profile:
     """Resolve ``task``'s Profile from settings. Never cached, never eager."""
     task = inference_task(task)
     prefix = task.settings_prefix
-    inherited_base_url, inherited_api_key, inherited_model = _INHERITED_KEYS.get(
-        task, ("", "", "")
-    )
+    # Already empty when a vendor is named, which is what stops half the flat
+    # settings being inherited -- see `_inherited_keys`.
+    inherited_base_url, inherited_api_key, _ = _inherited_keys(task)
 
     named_vendor = _setting(f"{prefix}_VENDOR")
-    model = _setting(f"{prefix}_MODEL") or _setting(inherited_model)
+    model = _setting(f"{prefix}_MODEL") or _setting(_inherited_model_key(task))
 
-    # A named vendor outranks the inherited flat settings, for the key as well
-    # as the URL: a task moved to OpenRouter must neither keep pointing at
-    # Groq because LLM_BASE_URL says so, nor carry the Groq key there. The
-    # flat settings describe one vendor, so inheriting half of them is how a
-    # request ends up at one vendor authenticated for another.
-    inherit = "" if named_vendor else "inherit"
-    base_url = _setting(f"{prefix}_BASE_URL") or (
-        _setting(inherited_base_url) if inherit else ""
-    )
-    api_key = _setting(f"{prefix}_API_KEY") or (
-        _setting(inherited_api_key) if inherit else ""
-    )
+    base_url = _setting(f"{prefix}_BASE_URL") or _setting(inherited_base_url)
+    api_key = _setting(f"{prefix}_API_KEY") or _setting(inherited_api_key)
 
     # Named, else read off whichever URL was resolved, else Groq -- the
     # first-class default. Inferring rather than assuming Groq: IR-382 selects
