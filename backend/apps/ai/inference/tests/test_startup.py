@@ -174,11 +174,19 @@ class WhereATypoLivesTests:
 
     def test_a_dotenv_variable_is_seen(self, monkeypatch):
         """Reached through the repository python-decouple already parsed, so
-        there is no second opinion about quoting or comments."""
+        there is no second opinion about quoting or comments.
+
+        The repository this session actually loaded is not assumed: CI has no
+        ``backend/.env``, so decouple falls back to ``RepositoryEmpty``, which
+        carries no ``.data`` at all. Substituting a fake one covers both --
+        this session's own repository is never mutated.
+        """
         from decouple import config
 
-        repository = config.config.repository
-        monkeypatch.setitem(repository.data, "LLM_ANWSER_MODEL", "some-model")
+        class FakeRepository:
+            data = {"LLM_ANWSER_MODEL": "some-model"}
+
+        monkeypatch.setattr(config.config, "repository", FakeRepository())
 
         assert "LLM_ANWSER_MODEL" in configured_environment()
 
