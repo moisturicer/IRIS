@@ -101,12 +101,20 @@ class Turn(models.Model):
     question that still matched nothing outside its own paper would otherwise
     look identical to one that was never widened at all.
 
-    `had_reasoning` is a structural fact, never the reasoning text itself
-    (IR-327): whether the model produced any reasoning while answering this
-    Turn, over the streaming path's dedicated channel or leaked into the text
-    channel and caught there. Reasoning content is never stored -- only
-    `answer_stream`'s narration ever sees it, and it is discarded once the
-    stream ends.
+    `reasoning` is the model's working, stored (IR-381) with the same
+    lifetime as the Turn: no expiry of its own, gone when the Conversation is
+    deleted. A separate column from `answer` because the two are separate
+    channels and must stay that way -- nothing here was scanned for citation
+    markers, and nothing here is an answer a reader may quote. Blank whenever
+    no reasoning arrived, which includes every Turn from the non-streaming
+    path and every task whose Profile has reasoning off.
+
+    `had_reasoning` is the structural fact IR-327 stored while the text was
+    still discarded: whether the model produced any reasoning at all, over
+    the streaming path's dedicated channel or leaked into the text channel
+    and caught there. Redundant now, and kept: a Turn written before IR-381
+    has the flag and no text, so the flag is what keeps those apart from a
+    Turn that never reasoned.
     """
 
     conversation = models.ForeignKey(
@@ -119,6 +127,7 @@ class Turn(models.Model):
     degraded = models.BooleanField(default=False)
     widened = models.BooleanField(default=False)
     had_reasoning = models.BooleanField(default=False)
+    reasoning = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -42,6 +42,52 @@ Both surfaced building IR-295 (part A) and are named here because CLAUDE.md §So
 
 **One amendment to §Decision that IR-294 makes deliberately, not a divergence.** §Decision says a stored citation keeps "record id only". IR-294 §A stored citation is a pointer widens that to record id, chunk id and page — still never the passage text — preserving the intent (a stored message must never hold enough to reconstruct content from a Record that has since become restricted) while letting history show the same quote a fresh answer does. IR-295 stores those pointers; **re-resolving them into quotes is IR-299**, and until then a pointer into a Record the reader can no longer see is dropped from the response rather than rendered.
 
+## Amendment — 2026-09-29 (IR-381): a Turn stores the model's reasoning
+
+**What this supersedes.** IR-327 shipped the reasoning channel on the decision
+that reasoning is *shown live and never stored* — `Turn.had_reasoning` recorded
+that it happened, and the text was discarded once the stream ended. The spec
+behind IR-375 said the same in its User Story #5 ("I want Reasoning to
+disappear once the answer is written"). **That decision is reversed.** A Turn
+now carries `reasoning` (migration 0016), a text column with the same lifetime
+as the Turn itself: no expiry of its own, deleted when the Conversation is
+deleted, exactly as `answer` and `question` already are.
+
+**Why.** Discarding it made the working visible only to whoever happened to be
+watching the stream. A reader reviewing a past answer — which is the entire
+point of persisting conversations — had no way to see what produced it, and
+neither did anyone evaluating retrieval quality against ADR-023. The reason to
+discard it was to stop reasoning being read as a cited answer, and a panel
+**collapsed by default** already does that: a reader has to choose to open it,
+which the answer text flowing above it never requires.
+
+**What is unchanged, and must stay unchanged.** IR-327's separation is the
+guarantee, not the discarding:
+
+* `reasoning` is a **different column** from `answer`. Nothing is joined, and
+  the stream accumulates the two in separate buffers.
+* Reasoning is **never scanned for citation markers**. A citation-shaped marker
+  inside reasoning resolves to nothing because `parse_citations` never sees it.
+* A `<think>...</think>` block leaked into the text channel is reclassified as
+  reasoning first, so the leak path stores reasoning as reasoning and never as
+  an answer.
+* No new visibility rule. Reasoning belongs to a Turn in a Conversation that
+  already belongs to exactly one user, and the panel is available to every
+  authenticated reader of their own conversation with no role restriction.
+
+**`had_reasoning` stays.** It is redundant now and it is kept: a Turn written
+before this amendment has the flag and no text, and the flag is the only thing
+that distinguishes those from a Turn that never reasoned. Nothing is
+backfilled, because there is nothing to backfill.
+
+**Consequence.** Transcripts grow by the size of the reasoning a model emits,
+which for a reasoning model can exceed the answer. That is storage the team
+accepts in exchange for an inspectable answer; a retention rule, if one is ever
+wanted, is a later decision and not this one. Reasoning is still requested
+per-task — only `answer` has it on, and a task whose Profile switches it off
+sends no reasoning configuration at all and stores nothing (ADR-021
+§Amendment).
+
 ## Alternatives Considered
 
 **Persist Ask IRIS only, leave Paper Chat as-is.** Rejected. It ships the illusion that Paper Chat has been fixed when it hasn't — a user who asks a follow-up in Paper Chat still loses it on panel close, while the same action in Ask IRIS now survives. Two different reliability guarantees for what looks, to a user, like the same feature.

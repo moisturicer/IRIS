@@ -166,10 +166,20 @@ class GroundedAnswer:
     model: Optional[str] = None
 
     #: Whether the model produced any reasoning while answering (IR-327) --
-    #: a structural fact, never the reasoning text itself. Always ``False``
-    #: from ``answer()``: only ``answer_stream()`` requests a reasoning
-    #: channel at all.
+    #: a structural fact. Redundant now that `reasoning` carries the text
+    #: (IR-381), and kept because a stored Turn written before then has the
+    #: flag and no text. Always ``False`` from ``answer()``: only
+    #: ``answer_stream()`` requests a reasoning channel at all.
     had_reasoning: bool = False
+
+    #: The reasoning the model produced, as it arrived (IR-381). Accumulated
+    #: on its own channel and never joined into ``text``: nothing here is
+    #: scanned for citation markers, and nothing here is part of the answer a
+    #: reader may quote. Stored alongside the Turn with the same lifetime, so
+    #: reopening a transcript can show the working that produced it. Empty
+    #: from ``answer()``, which requests no reasoning channel, and empty for
+    #: any task whose Profile has reasoning switched off.
+    reasoning: str = ""
 
     @property
     def is_grounded(self) -> bool:

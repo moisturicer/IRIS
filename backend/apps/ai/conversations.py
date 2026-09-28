@@ -56,8 +56,10 @@ def record_turn(
     a widened question that still matched nothing outside its own paper must
     still say it was widened.
 
-    ``answer.had_reasoning`` (IR-327) is stored as the structural flag it is
-    -- never the reasoning text, which `answer_stream` already discarded.
+    ``answer.reasoning`` (IR-381) is stored as its own column, never folded
+    into ``answer``: the two arrived on separate channels and a reopened
+    transcript must keep them apart. ``answer.had_reasoning`` (IR-327) is
+    stored beside it, redundant and kept -- see `Turn`.
     """
     turn = Turn.objects.create(
         conversation=conversation,
@@ -68,6 +70,7 @@ def record_turn(
         degraded=answer.degraded,
         widened=widened,
         had_reasoning=answer.had_reasoning,
+        reasoning=answer.reasoning,
     )
     TurnCitation.objects.bulk_create(
         TurnCitation(
@@ -146,6 +149,10 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
             "degraded": turn.degraded,
             "widened": turn.widened,
             "had_reasoning": turn.had_reasoning,
+            # The working behind the answer (IR-381), for the collapsed panel
+            # the transcript reopens with. `None` rather than `""` so a client
+            # need not distinguish "no reasoning" from an empty string.
+            "reasoning": turn.reasoning or None,
             # Orthogonal to `state` (stays "generative") -- a cut-off
             # stream is still an answer, not `unavailable` (IR-328/329).
             "partial": turn.state == PARTIAL,

@@ -10,7 +10,9 @@ import type { StreamingState } from "../hooks/useAskStream";
 import { StreamStatusLine, statusLineText } from "./StreamStatusLine";
 
 function state(overrides: Partial<StreamingState> = {}): StreamingState {
-  return { stage: "searching", foundInfo: null, text: "", citations: [], ...overrides };
+  return {
+    stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [], ...overrides,
+  };
 }
 
 describe("statusLineText", () => {

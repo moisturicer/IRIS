@@ -16,6 +16,13 @@ export interface StreamingState {
   foundInfo: { passageCount: number; recordCount: number } | null;
   /** The raw, still-unresolved answer text accumulated so far. */
   text:      string;
+  /**
+   * The model's reasoning accumulated so far (IR-381), on its own channel.
+   * Never joined into `text`: only `text` is scanned for citation markers and
+   * only `text` becomes the stored answer. Empty until a `reasoning_delta`
+   * arrives, which for a task with reasoning switched off is never.
+   */
+  reasoning: string;
   /** Populated once `citations_resolved` arrives, empty until then. */
   citations: ChatCitation[];
 }
@@ -44,16 +51,20 @@ export function useAskStream() {
   const ask = useCallback(
     async (question: string, options: AskStreamOptions = {}): Promise<AskStreamResult> => {
       let text = "";
+      let reasoning = "";
       let citations: ChatCitation[] = [];
       let sawAnyEvent = false;
 
-      setStreaming({ stage: "searching", foundInfo: null, text: "", citations: [] });
+      setStreaming({ stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [] });
 
       const finishPartial = (): AskStreamResult => {
         setStreaming(null);
         return {
           message: newChatMessage("assistant", text || INTERRUPTED_TEXT, {
             citations,
+            // Whatever working arrived before the cutoff is still worth
+            // showing -- the server stored the same text on the Turn.
+            reasoning: reasoning || null,
             partial: true,
           }),
           conversationId: options.conversationId ?? null,
@@ -80,8 +91,23 @@ export function useAskStream() {
                   }
                 : s,
             );
-          } else if (event === "generation_started" || event === "reasoning_delta") {
+          } else if (event === "generation_started") {
             setStreaming((s) => (s && s.stage !== "answering" ? { ...s, stage: "thinking" } : s));
+          } else if (event === "reasoning_delta") {
+            reasoning += payload.text as string;
+            const snapshot = reasoning;
+            setStreaming((s) =>
+              s
+                ? {
+                    ...s,
+                    // Reasoning arriving while the answer is already writing
+                    // must not pull the stage back -- the answer is the thing
+                    // on screen by then.
+                    stage:     s.stage === "answering" ? s.stage : "thinking",
+                    reasoning: snapshot,
+                  }
+                : s,
+            );
           } else if (event === "text_delta") {
             text += payload.text as string;
             const snapshot = text;
@@ -97,6 +123,10 @@ export function useAskStream() {
               degraded:  payload.degraded as boolean,
               widened:   payload.widened as boolean,
               resolvedQuestion: payload.resolved_question as string | null,
+              // The server's joined text, not the deltas this hook
+              // accumulated: one source, so a reopened Turn and a watched
+              // one render the same panel (IR-381).
+              reasoning: (payload.reasoning as string | null) ?? (reasoning || null),
             });
             setStreaming(null);
             return {

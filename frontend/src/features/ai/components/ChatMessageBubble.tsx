@@ -9,6 +9,7 @@ import {
   ResolvedQuestionNotice,
   ScopeNotice,
 } from "./PassageQuote";
+import { ReasoningPanel } from "./ReasoningPanel";
 import "highlight.js/styles/github.min.css";
 
 interface ChatMessageBubbleProps {
@@ -82,6 +83,12 @@ export function ChatMessageBubble({ message, compact = false }: ChatMessageBubbl
         {!isUser && message.degraded && <DegradedNotice subject="answer" />}
         {!isUser && message.widened && <ScopeNotice />}
         {!isUser && message.partial && <PartialAnswerNotice />}
+
+        {/* Collapsed by default here too (IR-381) -- a reopened transcript
+            reads the same as one just finished streaming. */}
+        {!isUser && message.reasoning && (
+          <ReasoningPanel reasoning={message.reasoning} compact={compact} />
+        )}
 
         {!isUser && (
           <div className="mt-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">

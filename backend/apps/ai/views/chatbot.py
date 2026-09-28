@@ -280,11 +280,15 @@ class ChatQueryView(APIView):
                 # Whether this answer left its Conversation's Record scope
                 # (IR-298) -- always false with no scope to have left.
                 "widened": prepared.widened,
-                # Whether the model produced any reasoning (IR-327) -- never
-                # the reasoning text itself, which is never sent. Always
-                # false here: `answer()` calls `generate()`, not `stream()`,
-                # so this endpoint never requests a reasoning channel at all.
+                # Whether the model produced any reasoning (IR-327), and the
+                # reasoning itself (IR-381). Always false and always `None`
+                # here: `answer()` calls `generate()`, not `stream()`, so this
+                # endpoint never requests a reasoning channel at all. Sent
+                # anyway, because the two endpoints' bodies are the same shape
+                # by contract -- a client must end up in an identical state
+                # whichever one it called.
                 "had_reasoning": answer.had_reasoning,
+                "reasoning": answer.reasoning or None,
             }
         )
 
@@ -311,8 +315,11 @@ class ChatStreamView(APIView):
     sent it on), `citations_resolved`, `done` (the same
     `answer`/`citations`/`sources`/`mode`/`degraded`/`widened`/`had_reasoning`
     shape `ChatQueryView` returns, so a client ends up in an identical state
-    either way -- `had_reasoning` records only *that* reasoning happened,
-    never the reasoning text, which is discarded once the stream ends). A
+    either way -- plus `reasoning`, the same text the `reasoning_delta`
+    events already carried, sent once at the end so a client that joined
+    late, or reopens this Turn later, reads it from one place; IR-327's
+    separation holds throughout, reasoning is never part of `answer` and is
+    never scanned for citation markers). A
     memory recall (IR-297) gets no event of its own -- folded silently into
     retrieval, matching the synchronous path's own ordering.
     `generation_started` and every event after it are skipped outright when
@@ -410,6 +417,7 @@ class ChatStreamView(APIView):
                             "degraded": answer.degraded,
                             "widened": prepared.widened,
                             "had_reasoning": answer.had_reasoning,
+                            "reasoning": answer.reasoning or None,
                         },
                     )
                 else:

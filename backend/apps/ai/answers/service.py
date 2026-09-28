@@ -136,7 +136,7 @@ class GroundedAnswerService:
 
     @staticmethod
     def _unavailable_answer(
-        retrieved, sources: Sequence[RetrievedChunk], had_reasoning: bool = False
+        retrieved, sources: Sequence[RetrievedChunk], reasoning: str = ""
     ) -> GroundedAnswer:
         # Degraded whatever retrieval did: the reader is getting sources
         # instead of an answer, which is exactly what the flag exists to
@@ -149,7 +149,8 @@ class GroundedAnswerService:
             sources=tuple(sources),
             query_vector=retrieved.query_vector,
             embedding_space_id=retrieved.embedding_space_id,
-            had_reasoning=had_reasoning,
+            had_reasoning=bool(reasoning),
+            reasoning=reasoning,
         )
 
     def _grounded_answer(
@@ -158,7 +159,7 @@ class GroundedAnswerService:
         sources: Sequence[RetrievedChunk],
         text: str,
         citations,
-        had_reasoning: bool = False,
+        reasoning: str = "",
     ) -> GroundedAnswer:
         return GroundedAnswer(
             text=text,
@@ -168,7 +169,8 @@ class GroundedAnswerService:
             query_vector=retrieved.query_vector,
             embedding_space_id=retrieved.embedding_space_id,
             model=self._model_that_answered(),
-            had_reasoning=had_reasoning,
+            had_reasoning=bool(reasoning),
+            reasoning=reasoning,
         )
 
     def answer(
@@ -234,7 +236,10 @@ class GroundedAnswerService:
         is reasoning by content, not by which field it arrived in. Only what
         the filter classifies as text ever reaches ``raw_parts`` -- the
         buffer citation parsing and the stored ``Turn.answer`` are built
-        from -- so leaked reasoning can corrupt neither.
+        from -- so leaked reasoning can corrupt neither. Reasoning
+        accumulates in its own buffer and rides out on ``Done.answer``'s
+        ``reasoning`` (IR-381), which is what a reopened transcript reads:
+        the text is kept, on the separate channel it arrived on.
 
         `on_interrupted` (IR-328) fires from `finally`, once, only when no
         `Done` was reached -- cause-agnostic to why, but not when no answer
@@ -246,7 +251,7 @@ class GroundedAnswerService:
         retrieved = None
         sources: list[RetrievedChunk] = []
         raw_parts: list[str] = []
-        had_reasoning = False
+        reasoning_parts: list[str] = []
         try:
             yield RetrievalStarted()
             retrieved, sources = self._retrieve_and_gate(question, user)
@@ -268,13 +273,17 @@ class GroundedAnswerService:
                 """One `(text, reasoning)` pair, as whichever events it implies --
                 shared by every source of a pair: the vendor's own `reasoning`
                 field, and `ThinkTagFilter`'s split of `.text`, mid-stream or on
-                `flush()`. `had_reasoning` and `raw_parts` are this method's own
-                state, so this closes over them rather than returning something
-                the caller would just apply right back.
+                `flush()`. `reasoning_parts` and `raw_parts` are this method's
+                own state, so this closes over them rather than returning
+                something the caller would just apply right back.
+
+                The two buffers never cross: `reasoning_parts` is what the
+                panel and the stored Turn read (IR-381), `raw_parts` is what
+                citation parsing and `Turn.answer` read, and a part lands in
+                exactly one of them.
                 """
-                nonlocal had_reasoning
                 if reasoning_part:
-                    had_reasoning = True
+                    reasoning_parts.append(reasoning_part)
                     yield ReasoningDelta(text=reasoning_part)
                 if text_part:
                     raw_parts.append(text_part)
@@ -294,7 +303,11 @@ class GroundedAnswerService:
             except (LLMUnavailable, CircuitOpen) as exc:
                 logger.warning("answer generation unavailable: %s", exc)
                 completed = True
-                yield Done(self._unavailable_answer(retrieved, sources, had_reasoning))
+                yield Done(
+                    self._unavailable_answer(
+                        retrieved, sources, "".join(reasoning_parts)
+                    )
+                )
                 return
 
             yield from classified(*leak_filter.flush())
@@ -303,7 +316,9 @@ class GroundedAnswerService:
                 logger.warning("answer generation produced no text")
                 completed = True
                 yield Done(
-                    self._unavailable_answer(retrieved, sources, had_reasoning)
+                    self._unavailable_answer(
+                        retrieved, sources, "".join(reasoning_parts)
+                    )
                 )
                 return
 
@@ -312,7 +327,9 @@ class GroundedAnswerService:
             yield CitationsResolved(citations=citations)
             completed = True
             yield Done(
-                self._grounded_answer(retrieved, sources, text, citations, had_reasoning)
+                self._grounded_answer(
+                    retrieved, sources, text, citations, "".join(reasoning_parts)
+                )
             )
         finally:
             # A cutoff before any text has nothing to preserve, and storing
@@ -323,7 +340,9 @@ class GroundedAnswerService:
                 and not _produced_nothing(raw_parts)
             ):
                 on_interrupted(
-                    self._partial_answer(retrieved, sources, raw_parts, had_reasoning)
+                    self._partial_answer(
+                        retrieved, sources, raw_parts, "".join(reasoning_parts)
+                    )
                 )
 
     @staticmethod
@@ -331,7 +350,7 @@ class GroundedAnswerService:
         retrieved,
         sources: Sequence[RetrievedChunk],
         raw_parts: Sequence[str],
-        had_reasoning: bool,
+        reasoning: str,
     ) -> GroundedAnswer:
         """Whatever text and sources had accumulated when the stream cut off
         (IR-328). Citation parsing runs once, same as a clean completion; no
@@ -351,7 +370,8 @@ class GroundedAnswerService:
             embedding_space_id=(
                 None if retrieved is None else retrieved.embedding_space_id
             ),
-            had_reasoning=had_reasoning,
+            had_reasoning=bool(reasoning),
+            reasoning=reasoning,
         )
 
     def _model_that_answered(self) -> Optional[str]:

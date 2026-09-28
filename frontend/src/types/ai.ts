@@ -196,6 +196,12 @@ export interface ConversationTurn {
    * — a real response always sends it.
    */
   partial?:           boolean;
+  /**
+   * The reasoning stored with this Turn (IR-381), `null` when none was.
+   * Optional only so fixtures predating the field still type-check — a real
+   * response always sends it.
+   */
+  reasoning?:         string | null;
 }
 
 /** A Conversation without its Turns — the shape a sidebar lists (IR-295). */
