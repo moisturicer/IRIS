@@ -9,6 +9,12 @@ different paper that happens to match the title.
 So: scoped to the record, generated once, stored, and invalidated only by the
 thing that can actually change the answer — a re-chunk of the record, or a
 change to the prompt here.
+
+**On its own model as of IR-380.** Summarising is not the interactive job
+answering is: nobody watches it stream, so it runs as the ``summary``
+Inference task, with its own Profile and no reasoning configuration. The
+task is off until ``LLM_SUMMARY_MODEL`` is set — an unconfigured one reports
+``unavailable`` rather than quietly spending the answer path's model.
 """
 
 from __future__ import annotations
@@ -100,10 +106,24 @@ def overview_for(record: Record, user) -> dict:
 def _generate(record: Record, user):
     """One scoped answer, or ``None`` when it was not a generative one."""
     from apps.ai.answers.citations import GENERATED
+    from apps.ai.inference import InferenceTask
+    from apps.ai.providers.openai_compatible import LLMUnavailable
 
-    service = composition_root().answer_service(
-        max_sources=OVERVIEW_TOP_K, record=record
-    )
+    try:
+        service = composition_root().answer_service(
+            max_sources=OVERVIEW_TOP_K, record=record, task=InferenceTask.SUMMARY
+        )
+    except LLMUnavailable:
+        # The `summary` task has no model configured, so this deployment has
+        # switched the overview off (IR-380). The same unavailable state an
+        # outage produces: nothing is stored, and the next view tries again.
+        logger.info(
+            "overview not generated for record %s: the summary task is not "
+            "configured (set LLM_SUMMARY_MODEL)",
+            record.pk,
+        )
+        return None
+
     answer = service.answer(f"{record.title}. {_QUESTION}", user)
     if answer.state != GENERATED or not answer.text:
         logger.info(

@@ -114,6 +114,17 @@ class OpenAICompatibleAdapter:
     def model(self) -> str:
         return self._model or getattr(settings, "LLM_MODEL", "")
 
+    def _resolved_reasoning_effort(self) -> str:
+        """The effort to send, or `""` to send no reasoning configuration.
+
+        `None` means "nothing said here", so the flat setting applies; an
+        explicit `""` is a caller switching reasoning off for this adapter,
+        which is how a Profile with hidden Reasoning is built (IR-380).
+        """
+        if self._reasoning_effort is not None:
+            return self._reasoning_effort
+        return getattr(settings, "LLM_REASONING_EFFORT", "") or ""
+
     def _resolved_key(self) -> str:
         key = self._api_key or getattr(settings, "LLM_API_KEY", "")
         if not key:
@@ -200,11 +211,7 @@ class OpenAICompatibleAdapter:
             if self._temperature is not None
             else getattr(settings, "LLM_TEMPERATURE", 0.1)
         )
-        reasoning_effort = (
-            self._reasoning_effort
-            if self._reasoning_effort is not None
-            else getattr(settings, "LLM_REASONING_EFFORT", "")
-        )
+        reasoning_effort = self._resolved_reasoning_effort()
 
         extra: dict = {}
         if reasoning_effort:

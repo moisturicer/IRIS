@@ -34,9 +34,18 @@ def build_profile_llm(profile: Profile) -> LLMProvider:
             "there is no shared default to fall through to (ADR-021)."
         )
 
+    # A task whose Reasoning is not shown sends no reasoning configuration at
+    # all (IR-380), rather than inheriting `LLM_REASONING_EFFORT`: there is no
+    # live-typing moment to show the working in, and the tokens are paid for
+    # either way. `None` keeps the inherited setting for the tasks that do.
+    reasoning_effort = None if profile.reasoning_visible else ""
+
     configs = [
         LLMProviderConfig(
-            base_url=profile.base_url, api_key=profile.api_key, model=model
+            base_url=profile.base_url,
+            api_key=profile.api_key,
+            model=model,
+            reasoning_effort=reasoning_effort,
         )
         for model in profile.models
     ]

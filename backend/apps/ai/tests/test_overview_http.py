@@ -142,6 +142,105 @@ class UnavailableIsNeverCachedTests:
         assert response.json()["state"] == "ready"
 
 
+class SummaryRunsAsItsOwnInferenceTaskTests:
+    """IR-380: the overview stops borrowing the answer path's model.
+
+    Driven through the endpoint rather than at `overview_for`, because the
+    property that matters is which model a page view actually reaches.
+    """
+
+    @pytest.fixture
+    def built_configs(self, monkeypatch):
+        """The `LLMProviderConfig`s each `build_profile_llm` call produced.
+
+        A root with no injected provider resolves a Profile for real; only the
+        last step -- wrapping the configs in adapters that would open a socket
+        -- is replaced.
+        """
+        from apps.ai.inference import providers as inference_providers
+
+        captured = []
+
+        def _capture(configs):
+            captured.extend(configs)
+            return ScriptedLLM(reply="A methodology summary [1].")
+
+        monkeypatch.setattr(
+            inference_providers, "build_resilient_llm", _capture
+        )
+        return captured
+
+    def _profiled_root(self, embedder):
+        from apps.ai.composition import CompositionRoot
+        from apps.ai.providers.fakes import ScriptedReranker
+
+        return CompositionRoot(
+            embedder=embedder,
+            reranker=ScriptedReranker(),
+            permits=lambda record: True,
+        )
+
+    def test_the_overview_reaches_the_summary_model_not_the_answer_one(
+        self, embedder, space, client_for, settings, built_configs
+    ):
+        settings.LLM_ANSWER_MODEL = "answer-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_SUMMARY_MODEL = "summary-model"
+        settings.LLM_SUMMARY_API_KEY = "k"
+
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+
+        with use_composition_root(self._profiled_root(embedder)):
+            response = _overview(client_for(make_user("reader@cit.edu")), record.pk)
+
+        assert response.status_code == 200
+        assert [config.model for config in built_configs] == ["summary-model"]
+
+    def test_the_summary_request_carries_no_reasoning_configuration(
+        self, embedder, space, client_for, settings, built_configs
+    ):
+        settings.LLM_SUMMARY_MODEL = "summary-model"
+        settings.LLM_SUMMARY_API_KEY = "k"
+        settings.LLM_SUMMARY_REASONING = False
+        settings.LLM_REASONING_EFFORT = "high"
+
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+
+        with use_composition_root(self._profiled_root(embedder)):
+            _overview(client_for(make_user("reader@cit.edu")), record.pk)
+
+        assert [config.reasoning_effort for config in built_configs] == [""]
+
+    def test_an_unconfigured_summary_task_is_unavailable_not_an_error(
+        self, embedder, space, client_for, settings, built_configs
+    ):
+        """No `LLM_SUMMARY_MODEL` switches the overview off, rather than
+        falling through to the answer model (ADR-021's no-silent-fall-through
+        rule). The same state an outage produces, and stored no more than it.
+
+        `answer` is left configured and its provider would have answered
+        happily, so a summary that borrowed it would read `ready` here."""
+        settings.LLM_MODEL = "flat-model"
+        settings.LLM_API_KEY = "k"
+        settings.LLM_SUMMARY_MODEL = ""
+
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+
+        with use_composition_root(self._profiled_root(embedder)):
+            response = _overview(client_for(make_user("reader@cit.edu")), record.pk)
+
+        assert response.status_code == 200
+        assert response.json()["state"] == "unavailable"
+        assert built_configs == []
+        assert not RecordOverview.objects.filter(record=record).exists()
+
+
 class VisibilityTests:
     def test_a_reader_without_access_gets_404(self, embedder, space, client_for):
         owner = make_user("owner@cit.edu")

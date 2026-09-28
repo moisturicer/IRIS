@@ -197,6 +197,48 @@ class BuildingTheProviderTests:
             assert adapter._base_url == "https://one-vendor.test/v1"  # noqa: SLF001
             assert adapter._api_key == "k"  # noqa: SLF001
 
+    def test_a_task_whose_reasoning_is_hidden_sends_no_reasoning_config(
+        self, settings
+    ):
+        """IR-380: `""` is "send nothing", distinct from `None`, which would
+        inherit `LLM_REASONING_EFFORT` from the flat settings."""
+        settings.LLM_REASONING_EFFORT = "high"
+        settings.LLM_SUMMARY_MODEL = "summary-model"
+        settings.LLM_SUMMARY_API_KEY = "k"
+        settings.LLM_SUMMARY_REASONING = False
+
+        provider = build_profile_llm(profile_for(InferenceTask.SUMMARY))
+
+        adapter = provider._provider._provider  # noqa: SLF001
+        assert adapter._reasoning_effort == ""  # noqa: SLF001
+
+    def test_a_task_whose_reasoning_is_shown_keeps_the_inherited_effort(
+        self, settings
+    ):
+        settings.LLM_REASONING_EFFORT = "high"
+        settings.LLM_ANSWER_MODEL = "answer-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_ANSWER_REASONING = True
+
+        provider = build_profile_llm(profile_for(InferenceTask.ANSWER))
+
+        adapter = provider._provider._provider  # noqa: SLF001
+        assert adapter._reasoning_effort is None  # noqa: SLF001
+        assert adapter._resolved_reasoning_effort() == "high"  # noqa: SLF001
+
+    def test_summary_builds_on_its_own_model_not_the_answer_one(self, settings):
+        settings.LLM_ANSWER_MODEL = "answer-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_SUMMARY_MODEL = "summary-model"
+        settings.LLM_SUMMARY_API_KEY = "k"
+
+        assert build_profile_llm(profile_for(InferenceTask.SUMMARY)).model == (
+            "summary-model"
+        )
+        assert build_profile_llm(profile_for(InferenceTask.ANSWER)).model == (
+            "answer-model"
+        )
+
     def test_an_unconfigured_task_raises_rather_than_borrowing_a_model(
         self, settings
     ):

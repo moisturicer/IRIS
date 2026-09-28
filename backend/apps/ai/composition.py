@@ -319,13 +319,23 @@ class CompositionRoot:
         )
 
     def answer_service(
-        self, max_sources: int, record: Optional[Record] = None
+        self,
+        max_sources: int,
+        record: Optional[Record] = None,
+        task: "InferenceTask | str | None" = None,
     ) -> GroundedAnswerService:
+        """A grounded-answer service reaching the model for ``task``.
+
+        ``task`` is a call-time argument for the same reason ``record`` is:
+        the AI Overview and Ask IRIS both want a grounded answer over the same
+        stack, but on their own models (IR-380). It defaults to ``ANSWER`` so
+        every caller written before Inference tasks keeps its model.
+        """
         from apps.ai.inference import InferenceTask
 
         return GroundedAnswerService(
             retriever=self.retriever(record=record),
-            llm=self.llm_for(InferenceTask.ANSWER),
+            llm=self.llm_for(task if task is not None else InferenceTask.ANSWER),
             permits=self._permits,
             policy_enabled=self._policy_enabled,
             max_sources=max_sources,
