@@ -223,8 +223,8 @@ def dialect_for(vendor: str | None) -> VendorDialect:
     Non-raising, unlike `profiles.vendor()`: a base URL is also how a
     self-hosted vLLM or Ollama is reached, and neither has a dialect of its
     own. Both reach the default, which is the vendor-neutral request every
-    one of them already receives -- refusing them here would
-    break deployments this refactor promised not to touch.
+    one of them already receives -- refusing them here would break
+    deployments this refactor promised not to touch.
     """
     if not vendor:
         return DEFAULT_DIALECT
