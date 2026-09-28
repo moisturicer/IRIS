@@ -96,6 +96,7 @@ export function useAskStream() {
               sources:   payload.sources as ChatMessage["sources"],
               degraded:  payload.degraded as boolean,
               widened:   payload.widened as boolean,
+              resolvedQuestion: payload.resolved_question as string | null,
             });
             setStreaming(null);
             return {

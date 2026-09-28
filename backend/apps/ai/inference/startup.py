@@ -53,11 +53,18 @@ PROFILE_SUFFIXES = (
     "REASONING",
 )
 
-#: Segments that are not task names. These predate per-task configuration and
-#: still configure real things -- `LLM_FALLBACK_MODEL` is IR-321's cross-vendor
-#: entry and `LLM_RESOLUTION_MODEL` is what resolution actually reads today.
-#: Reading either as a task would refuse a correctly configured deployment.
-RESERVED_SEGMENTS = frozenset({"FALLBACK", "RESOLUTION"})
+#: Segments that are not task names. `LLM_FALLBACK_MODEL` predates per-task
+#: configuration and still configures IR-321's cross-vendor entry, so reading
+#: it as a task named `fallback` would refuse a correctly configured
+#: deployment.
+RESERVED_SEGMENTS = frozenset({"FALLBACK"})
+
+#: Segments that *were* reserved and are not any more, and what replaced them.
+#: A refusal here is the point: IR-383 moved resolution onto the `resolve`
+#: Profile, so a leftover `LLM_RESOLUTION_MODEL` now configures nothing -- and
+#: the value it most likely still holds is the withdrawn model that made
+#: every follow-up fail. Silently ignoring it would reproduce that bug.
+RENAMED_SEGMENTS = {"RESOLUTION": "LLM_RESOLVE_MODEL"}
 
 _PREFIX = "LLM_"
 
@@ -104,7 +111,6 @@ def unknown_task_problems(names: Iterable[str]) -> tuple[str, ...]:
     One problem per mistyped segment rather than per variable: a typo repeated
     across a task's four variables is one mistake.
     """
-    known = ", ".join(task.value for task in InferenceTask)
     offenders: dict[str, str] = {}
 
     for name in names:
@@ -116,11 +122,29 @@ def unknown_task_problems(names: Iterable[str]) -> tuple[str, ...]:
         offenders.setdefault(segment, name)
 
     return tuple(
+        _unknown_task_problem(segment, name)
+        for segment, name in sorted(offenders.items())
+    )
+
+
+def _unknown_task_problem(segment: str, name: str) -> str:
+    known = ", ".join(task.value for task in InferenceTask)
+    replacement = RENAMED_SEGMENTS.get(segment)
+    if replacement:
+        # Naming the replacement rather than the whole set: this variable was
+        # correct configuration until a named ticket moved it, so the operator
+        # needs a rename, not a lesson about the task set.
+        return (
+            f"{name} no longer configures anything: question resolution moved "
+            f"onto the `resolve` Inference task in IR-383. Move its value to "
+            f"{replacement} and remove {name}. Leaving it set is how a "
+            f"withdrawn model survives a redeploy and fails every follow-up."
+        )
+    return (
         f"{name} configures {segment.lower()!r}, which is not an Inference "
         f"task. The set is closed and lives in code: {known}. Fix the name or "
         f"remove the variable -- it currently configures nothing, so the "
         f"feature it looks like it enables is off."
-        for segment, name in sorted(offenders.items())
     )
 
 
