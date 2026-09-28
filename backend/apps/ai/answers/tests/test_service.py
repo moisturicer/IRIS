@@ -355,6 +355,32 @@ class _StreamingLLM(LLMProvider):
         yield from self._deltas
 
 
+class DialectNormalisationTests:
+    """A vendor's marker variants reach parsing canonical (IR-382)."""
+
+    def test_a_variant_marker_split_across_deltas_still_resolves(self, reader):
+        """Normalisation runs on the joined text, not on each delta: split
+        as `【1` + `†L1-L5】` neither half is a marker on its own."""
+        record = make_record("Tilapia Study")
+        llm = _StreamingLLM(
+            [
+                StreamDelta(text="Sampling was weekly 【1"),
+                StreamDelta(text="†L1-L5】."),
+            ]
+        )
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]), llm, permits=lambda r: True
+        )
+
+        answer = [
+            e for e in service.answer_stream("how often?", reader)
+            if isinstance(e, Done)
+        ][0].answer
+
+        assert answer.text == "Sampling was weekly [1]."
+        assert [c.record_id for c in answer.citations] == [record.pk]
+
+
 class _BreaksMidStream(LLMProvider):
     """A vendor that answers, then fails partway through -- so a caller
     reading `answer_stream` can see the deltas already sent are not

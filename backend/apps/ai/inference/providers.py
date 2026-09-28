@@ -46,6 +46,7 @@ def build_profile_llm(profile: Profile) -> LLMProvider:
             api_key=profile.api_key,
             model=model,
             reasoning_effort=reasoning_effort,
+            vendor=profile.vendor.value,
         )
         for model in profile.models
     ]

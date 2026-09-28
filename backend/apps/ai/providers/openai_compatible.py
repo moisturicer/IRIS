@@ -7,6 +7,12 @@ where this makes switching Groq for OpenRouter a `.env` change with no new code.
 
 Groq in development, OpenRouter in production, per ADR-021.
 
+**Where they differ, a dialect says so** (IR-382, `dialects.py`). Extra request
+fields, the attribute a reasoning token arrives on, and the citation markers
+the models behind a vendor habitually emit are one collaborator's knowledge,
+injected here. The transport below -- the HTTP call, the error classification,
+the streaming loop -- is written once and names no vendor.
+
 **No silent fall-through.** An absent key raises rather than degrading to a
 mock or a local model -- the failure mode ADR-021 records the previous
 `if/else` provider factory for, and the same rule the chunker registry applies
@@ -24,6 +30,7 @@ from typing import Any, Iterator, Optional
 
 from django.conf import settings
 
+from .dialects import DEFAULT_DIALECT, VendorDialect
 from .errors import ClassifiedError, ErrorKind, classify_message, classify_status_code
 from .ports import StreamDelta
 
@@ -100,6 +107,7 @@ class OpenAICompatibleAdapter:
         client: Any = None,
         temperature: Optional[float] = None,
         reasoning_effort: Optional[str] = None,
+        dialect: Optional[VendorDialect] = None,
     ) -> None:
         self._base_url = base_url
         self._api_key = api_key
@@ -107,6 +115,9 @@ class OpenAICompatibleAdapter:
         self._client = client
         self._temperature = temperature
         self._reasoning_effort = reasoning_effort
+        # Groq's, when nobody said otherwise -- which is what this adapter
+        # sent unconditionally before dialects existed (IR-382).
+        self.dialect: VendorDialect = dialect or DEFAULT_DIALECT
 
     # -- configuration ------------------------------------------------------
 
@@ -190,19 +201,16 @@ class OpenAICompatibleAdapter:
             # An empty string would render as an answer with no content and no
             # indication that anything went wrong.
             raise LLMUnavailable("the model returned an empty message")
-        return content
+        return self.dialect.normalize_citation_markers(content)
 
     def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
         """Genuine streaming (IR-325), for a model reachable behind this
         adapter's vendor account.
 
-        ``reasoning_effort`` -- unset by default -- is sent only when
-        configured, as a Groq/``openai/gpt-oss-120b`` extension the ``openai``
-        SDK does not type, alongside ``include_reasoning`` so a reasoning
-        model's thinking arrives as its own ``delta.reasoning`` channel
-        instead of being interleaved into ``delta.content``. A vendor that
-        does not recognise it (any non-reasoning OpenAI-compatible model)
-        simply never populates ``StreamDelta.reasoning``.
+        What a request carries beyond the common fields, and which attribute
+        a reasoning token arrives on, are the dialect's to say (IR-382). The
+        loop itself -- opening the stream, classifying a failure, refusing an
+        empty response -- is written once and knows no vendor.
         """
         client = self._client or self._build_client()
 
@@ -211,14 +219,7 @@ class OpenAICompatibleAdapter:
             if self._temperature is not None
             else getattr(settings, "LLM_TEMPERATURE", 0.1)
         )
-        reasoning_effort = self._resolved_reasoning_effort()
-
-        extra: dict = {}
-        if reasoning_effort:
-            extra["extra_body"] = {
-                "reasoning_effort": reasoning_effort,
-                "include_reasoning": True,
-            }
+        extra = self.dialect.request_extras(self._resolved_reasoning_effort())
 
         try:
             chunks = client.chat.completions.create(
@@ -246,12 +247,8 @@ class OpenAICompatibleAdapter:
                 if not choices:
                     continue
                 delta = choices[0].delta
-                text = getattr(delta, "content", None) or ""
-                reasoning = (
-                    getattr(delta, "reasoning", None)
-                    or getattr(delta, "reasoning_content", None)
-                    or ""
-                )
+                text = self.dialect.read_text(delta)
+                reasoning = self.dialect.read_reasoning(delta)
                 if not text and not reasoning:
                     continue
                 received_any = True
