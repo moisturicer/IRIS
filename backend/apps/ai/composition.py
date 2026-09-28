@@ -71,6 +71,7 @@ from apps.ai.retrieval.two_stage import TwoStageRetriever
 from apps.records.models import Record
 
 if TYPE_CHECKING:
+    from apps.ai.inference import InferenceTask
     from apps.ai.memory import ConversationMemory
     from apps.ai.resolution import QuestionResolver
 
@@ -131,6 +132,8 @@ class CompositionRoot:
         self._embedder = embedder
         self._reranker = reranker
         self._llm = llm
+        self._default_llm: Optional[LLMProvider] = None
+        self._task_llms: dict["InferenceTask", LLMProvider] = {}
         self._resolver = resolver
         self._memory = memory
         self._permits = permits
@@ -157,15 +160,54 @@ class CompositionRoot:
         return self._reranker
 
     def llm(self) -> LLMProvider:
-        if self._llm is None:
+        """The single provider every caller used before Inference tasks.
+
+        Kept working while callers move to ``llm_for`` one at a time (IR-378
+        is the expand half); the final IR-375 ticket deletes it.
+        """
+        if self._llm is not None:
+            # An injected provider (a fake, in every test) bypasses the
+            # resilience wrapping, same as before.
+            return self._llm
+        if self._default_llm is None:
             from apps.ai.resilience.llm import build_resilient_llm
 
             # Retry, circuit-breaking and an optional configured fallback
             # (IR-321) -- see this module's and `resilience/llm.py`'s
-            # docstrings. An injected `self._llm` (a fake, in every test)
-            # bypasses all of it, same as before.
-            self._llm = build_resilient_llm()
-        return self._llm
+            # docstrings. Cached apart from `self._llm` deliberately: that
+            # attribute means "a caller injected this", and writing a
+            # lazily-built provider into it would make a root that had once
+            # been asked for `llm()` return the flat provider for *every*
+            # task -- including an unconfigured one that must raise.
+            self._default_llm = build_resilient_llm()
+        return self._default_llm
+
+    def llm_for(self, task: "InferenceTask | str") -> LLMProvider:
+        """The provider for one named Inference task (IR-378).
+
+        The per-task half of ``llm()``, which stays in place until the last
+        caller has moved off it (expand, then contract). A task name that is
+        not one of the four raises rather than resolving to a default, and an
+        injected ``self._llm`` bypasses Profile resolution entirely -- the
+        property every fake-driven test in ``test_ask_http.py`` depends on.
+
+        Profiles are resolved here rather than in ``__init__`` for the reason
+        the class docstring gives: a root must be constructible on a machine
+        with no vendor account. One provider per task is cached on the root,
+        so two calls in one request do not build two adapters; the circuit
+        state that must outlive the request lives in ``breaker_for``.
+        """
+        from apps.ai.inference import build_profile_llm, inference_task, profile_for
+
+        if self._llm is not None:
+            return self._llm
+
+        resolved = inference_task(task)
+        provider = self._task_llms.get(resolved)
+        if provider is None:
+            provider = build_profile_llm(profile_for(resolved))
+            self._task_llms[resolved] = provider
+        return provider
 
     def resolver(self) -> Optional["QuestionResolver"]:
         """The follow-up rewriter, or ``None`` when resolution is switched off.
@@ -279,9 +321,11 @@ class CompositionRoot:
     def answer_service(
         self, max_sources: int, record: Optional[Record] = None
     ) -> GroundedAnswerService:
+        from apps.ai.inference import InferenceTask
+
         return GroundedAnswerService(
             retriever=self.retriever(record=record),
-            llm=self.llm(),
+            llm=self.llm_for(InferenceTask.ANSWER),
             permits=self._permits,
             policy_enabled=self._policy_enabled,
             max_sources=max_sources,

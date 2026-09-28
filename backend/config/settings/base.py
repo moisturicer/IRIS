@@ -406,6 +406,63 @@ LLM_FALLBACK_BASE_URL = config("LLM_FALLBACK_BASE_URL", default="")
 LLM_FALLBACK_API_KEY  = config("LLM_FALLBACK_API_KEY", default="")
 LLM_FALLBACK_MODEL    = config("LLM_FALLBACK_MODEL", default="")
 
+# ---- Inference tasks and Profiles (IR-378, ADR-021 §Amendment) -----------
+#
+# One Profile per Inference task: vendor, model, ordered same-vendor fallback
+# models, and whether its Reasoning is shown. The vendor is chosen per task,
+# not per environment -- so `resolve` can sit on Groq while `answer` uses
+# OpenRouter. Resolved by apps.ai.inference.profiles; VENDOR accepts "groq"
+# or "openrouter" and nothing else.
+#
+# Empty means "inherit": `answer` falls back to the flat LLM_* keys above, so
+# a deployment that sets none of these behaves exactly as it does today. The
+# other three tasks are simply off until given a model, which is how a
+# Groq-only developer runs IRIS with one key.
+#
+# FALLBACK_MODELS is a comma-separated list of models at the SAME vendor
+# account (ADR-008 §Amendment); a second vendor is not a fallback.
+LLM_ANSWER_VENDOR   = config("LLM_ANSWER_VENDOR", default="")
+LLM_ANSWER_BASE_URL = config("LLM_ANSWER_BASE_URL", default="")
+LLM_ANSWER_API_KEY  = config("LLM_ANSWER_API_KEY", default="")
+LLM_ANSWER_MODEL    = config("LLM_ANSWER_MODEL", default="")
+LLM_ANSWER_FALLBACK_MODELS = config("LLM_ANSWER_FALLBACK_MODELS", default="")
+# Reasoning is shown for `answer` alone: it is the only task with a reader
+# watching it work. The others cost less without it.
+LLM_ANSWER_REASONING = config("LLM_ANSWER_REASONING", default=True, cast=bool)
+
+# RECORDED CONTRADICTION, not reconciled here (CLAUDE.md §Source-of-truth
+# hierarchy): LLM_RESOLUTION_MODEL below is what `CompositionRoot.resolver()`
+# actually reads today (IR-296), while these configure the `resolve` Profile
+# that no caller reaches yet. Two live namespaces for one Inference task. The
+# resolve-wiring ticket under IR-375 collapses them; until then the block
+# below is the one that changes behaviour.
+LLM_RESOLVE_VENDOR   = config("LLM_RESOLVE_VENDOR", default="")
+LLM_RESOLVE_BASE_URL = config("LLM_RESOLVE_BASE_URL", default="")
+LLM_RESOLVE_API_KEY  = config("LLM_RESOLVE_API_KEY", default="")
+LLM_RESOLVE_MODEL    = config("LLM_RESOLVE_MODEL", default="")
+LLM_RESOLVE_FALLBACK_MODELS = config("LLM_RESOLVE_FALLBACK_MODELS", default="")
+LLM_RESOLVE_REASONING = config("LLM_RESOLVE_REASONING", default=False, cast=bool)
+
+LLM_SUMMARY_VENDOR   = config("LLM_SUMMARY_VENDOR", default="")
+LLM_SUMMARY_BASE_URL = config("LLM_SUMMARY_BASE_URL", default="")
+LLM_SUMMARY_API_KEY  = config("LLM_SUMMARY_API_KEY", default="")
+LLM_SUMMARY_MODEL    = config("LLM_SUMMARY_MODEL", default="")
+LLM_SUMMARY_FALLBACK_MODELS = config("LLM_SUMMARY_FALLBACK_MODELS", default="")
+LLM_SUMMARY_REASONING = config("LLM_SUMMARY_REASONING", default=False, cast=bool)
+
+# Declared but unused: describe_figure's implementation is its own spec, and
+# reserving the keys here keeps the task set closed rather than growing later.
+LLM_DESCRIBE_FIGURE_VENDOR   = config("LLM_DESCRIBE_FIGURE_VENDOR", default="")
+LLM_DESCRIBE_FIGURE_BASE_URL = config("LLM_DESCRIBE_FIGURE_BASE_URL", default="")
+LLM_DESCRIBE_FIGURE_API_KEY  = config("LLM_DESCRIBE_FIGURE_API_KEY", default="")
+LLM_DESCRIBE_FIGURE_MODEL    = config("LLM_DESCRIBE_FIGURE_MODEL", default="")
+LLM_DESCRIBE_FIGURE_FALLBACK_MODELS = config(
+    "LLM_DESCRIBE_FIGURE_FALLBACK_MODELS", default=""
+)
+LLM_DESCRIBE_FIGURE_REASONING = config(
+    "LLM_DESCRIBE_FIGURE_REASONING", default=False, cast=bool
+)
+
 # ---- Question resolution (IR-296, ADR-026 Decisions 1 and 8) -------------
 #
 # "what about its limitations?" has no subject on its own -- retrieval finds
@@ -422,6 +479,9 @@ LLM_FALLBACK_MODEL    = config("LLM_FALLBACK_MODEL", default="")
 AI_QUESTION_RESOLUTION_ENABLED = config(
     "AI_QUESTION_RESOLUTION_ENABLED", default=True, cast=bool
 )
+# Superseded in principle by the `resolve` Profile above (LLM_RESOLVE_MODEL),
+# which nothing calls yet -- see the recorded contradiction there. This is
+# still the setting resolution reads.
 LLM_RESOLUTION_MODEL = config(
     "LLM_RESOLUTION_MODEL", default="llama-3.1-8b-instant"
 )
