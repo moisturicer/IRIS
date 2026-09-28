@@ -389,22 +389,12 @@ LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
 # into delta.content. A vendor that doesn't recognise it ignores it.
 LLM_REASONING_EFFORT = config("LLM_REASONING_EFFORT", default="")
 
-# ---- Inference provider fallback (IR-321) --------------------------------
-#
-# Optional, and empty by default -- a deployment that sets nothing here runs
-# exactly the single-provider policy the block above describes. Setting
-# LLM_FALLBACK_API_KEY opts into apps.ai.resilience.llm.FallbackLLMProvider,
-# which switches to this provider when the primary's failure is rate-limit,
-# network or timeout shaped.
-#
-# IR-321 recorded this as a contradiction with ADR-008 and ADR-021. IR-376
-# resolved it: both were amended 2026-09-28 to permit a fallback list of models
-# inside ONE vendor account, with cross-vendor failover still rejected and the
-# vendor now chosen per Inference task. A second vendor here is therefore the
-# part that goes, under IR-375. See apps/ai/resilience/llm.py.
-LLM_FALLBACK_BASE_URL = config("LLM_FALLBACK_BASE_URL", default="")
-LLM_FALLBACK_API_KEY  = config("LLM_FALLBACK_API_KEY", default="")
-LLM_FALLBACK_MODEL    = config("LLM_FALLBACK_MODEL", default="")
+# The LLM_FALLBACK_* second vendor IR-321 added is deleted, not disabled
+# (IR-385). ADR-008 rejected a second vendor by name, and ADR-021 chooses the
+# vendor per Inference task; what replaces it is LLM_<TASK>_FALLBACK_MODELS
+# below -- an ordered model list on the account a task already uses. Setting
+# any LLM_FALLBACK_* variable now refuses startup, which is deliberate: the
+# value it carries is a second vendor's key.
 
 # ---- Inference tasks and Profiles (IR-378, ADR-021 §Amendment) -----------
 #

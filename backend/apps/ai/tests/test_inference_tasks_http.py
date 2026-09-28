@@ -79,7 +79,6 @@ class AnswerTaskTests:
         settings.LLM_ANSWER_MODEL = "the-answer-model"
         settings.LLM_ANSWER_API_KEY = "answer-key"
         settings.LLM_ANSWER_VENDOR = "openrouter"
-        settings.LLM_FALLBACK_API_KEY = ""
         # What the flat settings say must not win once the task is configured.
         settings.LLM_MODEL = "the-old-flat-model"
 
@@ -103,7 +102,6 @@ class AnswerTaskTests:
         settings.LLM_ANSWER_MODEL = ""
         settings.LLM_ANSWER_API_KEY = ""
         settings.LLM_ANSWER_VENDOR = ""
-        settings.LLM_FALLBACK_API_KEY = ""
         settings.LLM_MODEL = "the-old-flat-model"
         settings.LLM_API_KEY = "flat-key"
         settings.LLM_BASE_URL = "https://flat.test/v1"

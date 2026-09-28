@@ -67,20 +67,30 @@ class UnknownTaskNameTests:
 
         assert unknown_task_problems(names) == ()
 
-    def test_the_flat_and_legacy_llm_variables_are_not_task_names(self):
-        """These predate per-task configuration and still configure real
-        things: reading `LLM_FALLBACK_MODEL` as a task named `fallback` would
-        refuse to start a deployment that is correctly configured."""
+    def test_the_flat_llm_variables_are_not_task_names(self):
+        """These predate per-task configuration and still configure the one
+        account the flat settings describe."""
         assert unknown_task_problems([
             "LLM_BASE_URL",
             "LLM_API_KEY",
             "LLM_MODEL",
             "LLM_TEMPERATURE",
             "LLM_REASONING_EFFORT",
+        ]) == ()
+
+    def test_the_retired_cross_vendor_namespace_is_refused(self):
+        """IR-385 deleted the second vendor, so `LLM_FALLBACK_API_KEY` is a
+        key for a vendor nothing will call. It was a reserved segment while
+        it still worked; now it is a refusal naming what replaced it."""
+        problems = unknown_task_problems([
             "LLM_FALLBACK_BASE_URL",
             "LLM_FALLBACK_API_KEY",
             "LLM_FALLBACK_MODEL",
-        ]) == ()
+        ])
+
+        (problem,) = problems
+        assert "LLM_<TASK>_FALLBACK_MODELS" in problem
+        assert "LLM_FALLBACK_BASE_URL" in problem
 
     def test_the_retired_resolution_namespace_is_refused_with_its_rename(self):
         """IR-383 moved resolution onto the `resolve` task. A leftover

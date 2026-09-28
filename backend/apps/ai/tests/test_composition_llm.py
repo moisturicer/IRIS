@@ -12,7 +12,6 @@ from apps.ai.composition import CompositionRoot
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.resilience.llm import (
     CircuitBreakingLLMProvider,
-    FallbackLLMProvider,
     reset_llm_breakers,
 )
 
@@ -24,11 +23,6 @@ def _clean_breaker_registry():
     reset_llm_breakers()
     yield
     reset_llm_breakers()
-
-
-@pytest.fixture(autouse=True)
-def _no_fallback_by_default(settings):
-    settings.LLM_FALLBACK_API_KEY = ""
 
 
 class DefaultWiringTests:
@@ -44,11 +38,18 @@ class DefaultWiringTests:
         fake = ScriptedLLM()
         assert CompositionRoot(llm=fake).llm() is fake
 
-    def test_a_configured_fallback_composes_a_second_provider(self, settings):
+    def test_the_flat_settings_can_no_longer_configure_a_second_vendor(
+        self, settings
+    ):
+        """IR-385 deleted `LLM_FALLBACK_*`. Setting it is not a second
+        provider any more -- it is nothing, which is what "deleted, not
+        disabled" has to mean at this seam."""
         settings.LLM_API_KEY = "k1"
         settings.LLM_FALLBACK_API_KEY = "k2"
+
         provider = CompositionRoot().llm()
-        assert isinstance(provider, FallbackLLMProvider)
+
+        assert isinstance(provider, CircuitBreakingLLMProvider)
 
 
 class BreakerPersistenceTests:

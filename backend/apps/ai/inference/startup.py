@@ -53,18 +53,29 @@ PROFILE_SUFFIXES = (
     "REASONING",
 )
 
-#: Segments that are not task names. `LLM_FALLBACK_MODEL` predates per-task
-#: configuration and still configures IR-321's cross-vendor entry, so reading
-#: it as a task named `fallback` would refuse a correctly configured
-#: deployment.
-RESERVED_SEGMENTS = frozenset({"FALLBACK"})
-
-#: Segments that *were* reserved and are not any more, and what replaced them.
-#: A refusal here is the point: IR-383 moved resolution onto the `resolve`
-#: Profile, so a leftover `LLM_RESOLUTION_MODEL` now configures nothing -- and
-#: the value it most likely still holds is the withdrawn model that made
-#: every follow-up fail. Silently ignoring it would reproduce that bug.
-RENAMED_SEGMENTS = {"RESOLUTION": "LLM_RESOLVE_MODEL"}
+#: Segments that no longer configure anything, and what to do instead. A
+#: refusal is the point in both cases: the value such a variable still holds
+#: is the one that caused the failure its replacement exists to fix, and
+#: ignoring it silently would let that survive a redeploy.
+#:
+#: `FALLBACK` was reserved until IR-385 -- it configured IR-321's cross-vendor
+#: entry, which is now deleted rather than disabled, so a key left here buys a
+#: second vendor nothing and only looks like insurance.
+RENAMED_SEGMENTS = {
+    "RESOLUTION": (
+        "question resolution moved onto the `resolve` Inference task in "
+        "IR-383. Move its value to LLM_RESOLVE_MODEL and remove {name}. "
+        "Leaving it set is how a withdrawn model survives a redeploy and "
+        "fails every follow-up."
+    ),
+    "FALLBACK": (
+        "cross-vendor failover was removed in IR-385, which ADR-008 rejects "
+        "a second vendor for. A fallback list is per Inference task now: put "
+        "its models in LLM_<TASK>_FALLBACK_MODELS, on the account that task "
+        "already reaches, and remove {name}. Leaving it set reads as a "
+        "second vendor still being tried; none is."
+    ),
+}
 
 _PREFIX = "LLM_"
 
@@ -115,7 +126,7 @@ def unknown_task_problems(names: Iterable[str]) -> tuple[str, ...]:
 
     for name in names:
         segment = _task_segment(name)
-        if segment is None or segment in RESERVED_SEGMENTS:
+        if segment is None:
             continue
         if segment.lower() in {task.value for task in InferenceTask}:
             continue
@@ -129,17 +140,12 @@ def unknown_task_problems(names: Iterable[str]) -> tuple[str, ...]:
 
 def _unknown_task_problem(segment: str, name: str) -> str:
     known = ", ".join(task.value for task in InferenceTask)
-    replacement = RENAMED_SEGMENTS.get(segment)
-    if replacement:
+    retired = RENAMED_SEGMENTS.get(segment)
+    if retired:
         # Naming the replacement rather than the whole set: this variable was
         # correct configuration until a named ticket moved it, so the operator
         # needs a rename, not a lesson about the task set.
-        return (
-            f"{name} no longer configures anything: question resolution moved "
-            f"onto the `resolve` Inference task in IR-383. Move its value to "
-            f"{replacement} and remove {name}. Leaving it set is how a "
-            f"withdrawn model survives a redeploy and fails every follow-up."
-        )
+        return f"{name} no longer configures anything: " + retired.format(name=name)
     return (
         f"{name} configures {segment.lower()!r}, which is not an Inference "
         f"task. The set is closed and lives in code: {known}. Fix the name or "

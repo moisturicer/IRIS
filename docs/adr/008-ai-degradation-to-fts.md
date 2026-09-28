@@ -85,10 +85,12 @@ vendor and no vendor stands in for another.
 `LLMProvider`, and add a model fallback list*) built a cross-vendor
 `FallbackLLMProvider` and recorded the contradiction openly in
 `apps/ai/resilience/llm.py`'s module docstring and in `apps/ai/composition.py`'s,
-rather than reconciling it quietly. This amendment resolves the docs half: the
-same-vendor model list is now sanctioned, and the cross-vendor path is
-confirmed as the part that goes. Removing it is an implementation ticket under
-IR-375, not this amendment.
+rather than reconciling it quietly. This amendment resolved the docs half: the
+same-vendor model list is sanctioned, and the cross-vendor path was confirmed
+as the part that goes. **IR-385 closed the code half on 2026-09-29** — the
+`LLM_FALLBACK_*` settings and the provider they configured are deleted, and
+setting one of them now refuses startup, so there is no second vendor left to
+reach.
 
 ## Alternatives Considered
 

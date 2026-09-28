@@ -374,7 +374,6 @@ class StatusTests:
         settings.LLM_API_KEY = "present-but-wrong"
         settings.LLM_BASE_URL = "https://example.test/v1"
         settings.LLM_MODEL = "a-withdrawn-model"
-        settings.LLM_FALLBACK_API_KEY = ""
 
         reset_llm_breakers()
         try:

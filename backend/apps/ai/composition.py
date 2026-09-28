@@ -37,14 +37,16 @@ way around a fail-closed gate is to supply the missing fact.
 **The LLM seam is resilient as of IR-321.** ``llm()`` no longer returns a bare
 ``OpenAICompatibleAdapter`` -- ``apps.ai.resilience.llm.build_resilient_llm``
 wraps it in retry and circuit-breaking, driven by the ``ErrorKind`` IR-320
-attaches to the failure. It can also fall over to a second configured
-provider. IR-321 recorded that as a contradiction with ADR-008 and ADR-021;
-**IR-376 resolved it in the ADRs** (both amended 2026-09-28): a fallback list of
-models inside *one* vendor account is permitted, the vendor is now chosen per
+attaches to the failure. It could also fall over to a second configured
+*vendor*, which IR-321 recorded as a contradiction with ADR-008 and ADR-021.
+**IR-376 resolved it in the ADRs** (both amended 2026-09-28): a fallback list
+of models inside *one* vendor account is permitted, the vendor is chosen per
 Inference task rather than per environment, and **cross-vendor failover stays
-rejected** -- so the cross-vendor path here is the part that goes, under
-IR-375. Still off by default (``LLM_FALLBACK_API_KEY`` unset). See
-``apps/ai/resilience/llm.py``'s module docstring.
+rejected**. **IR-385 made the code match** -- the ``LLM_FALLBACK_*`` provider
+is deleted, so the only fallback a root can build is an ordered model list on
+one account, and exhausting it produces the explicit unavailable state with
+sources still returned (ADR-008). See ``apps/ai/resilience/llm.py``'s module
+docstring.
 
 **What is deliberately not wired here yet.** The query-vector cache needs an
 ``EmbeddingSpace`` id at construction time -- which would make building a root
@@ -172,8 +174,9 @@ class CompositionRoot:
         if self._default_llm is None:
             from apps.ai.resilience.llm import build_resilient_llm
 
-            # Retry, circuit-breaking and an optional configured fallback
-            # (IR-321) -- see this module's and `resilience/llm.py`'s
+            # Retry and circuit-breaking around the one provider the flat
+            # settings describe (IR-321; its cross-vendor fallback went in
+            # IR-385) -- see this module's and `resilience/llm.py`'s
             # docstrings. Cached apart from `self._llm` deliberately: that
             # attribute means "a caller injected this", and writing a
             # lazily-built provider into it would make a root that had once
