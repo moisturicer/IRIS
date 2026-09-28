@@ -15,8 +15,10 @@ from apps.ai.inference import (
     UnknownInferenceTask,
     UnknownVendor,
     Vendor,
+    api_key_variables,
     build_profile_llm,
     inference_task,
+    model_variables,
     profile_for,
 )
 from apps.ai.providers.openai_compatible import LLMUnavailable
@@ -169,6 +171,33 @@ class ProfileResolutionTests:
         assert profile_for(InferenceTask.ANSWER).reasoning_visible is True
         assert profile_for(InferenceTask.RESOLVE).reasoning_visible is False
         assert profile_for(InferenceTask.SUMMARY).reasoning_visible is False
+
+
+class WhereASettingMayBeSetTests:
+    """What a startup refusal names (IR-379). The same inheritance rule
+    `profile_for` applies, asked as a question rather than resolved -- so a
+    refusal cannot name a variable the task would not have read."""
+
+    def test_answer_may_take_either_the_task_or_the_flat_variable(self, settings):
+        settings.LLM_ANSWER_VENDOR = ""
+
+        assert api_key_variables("answer") == ("LLM_ANSWER_API_KEY", "LLM_API_KEY")
+        assert model_variables("answer") == ("LLM_ANSWER_MODEL", "LLM_MODEL")
+
+    def test_a_named_vendor_removes_the_inherited_key_but_not_the_model(
+        self, settings
+    ):
+        """Naming a vendor says where a task runs, not that it stopped being
+        configured -- so an inherited model at a named vendor with no key of
+        its own is still a refusal rather than a task reading as off."""
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+
+        assert api_key_variables("answer") == ("LLM_ANSWER_API_KEY",)
+        assert model_variables("answer") == ("LLM_ANSWER_MODEL", "LLM_MODEL")
+
+    def test_another_task_has_only_its_own_variables(self):
+        assert api_key_variables("summary") == ("LLM_SUMMARY_API_KEY",)
+        assert model_variables("summary") == ("LLM_SUMMARY_MODEL",)
 
 
 class BuildingTheProviderTests:
