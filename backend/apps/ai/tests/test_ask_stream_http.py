@@ -327,9 +327,14 @@ class ReasoningTests:
         assert not any(name == "reasoning_delta" for name, _ in events)
         assert dict(events)["done"]["had_reasoning"] is False
 
-    def test_a_stored_turn_records_had_reasoning_without_the_reasoning_text(
+    def test_a_stored_turn_keeps_the_reasoning_text_out_of_the_answer(
         self, embedder, space, client_for
     ):
+        """IR-381 reverses IR-327's "never stored": the reasoning text is now
+        persisted, on its own column. This test asserted it was absent
+        entirely; the assertion it keeps is the one that still matters -- the
+        two channels stay separate columns, and nothing reasoned leaks into
+        the answer a reader may quote."""
         from apps.ai.models import Conversation, Turn
 
         reader = make_user("reader@cit.edu")
@@ -338,7 +343,7 @@ class ReasoningTests:
 
         llm = ScriptedLLM(
             stream_deltas=[
-                StreamDelta(reasoning="a secret train of thought"),
+                StreamDelta(reasoning="weighing the rainfall gauges"),
                 StreamDelta(text="Rainfall gauges feed the model [1]."),
             ]
         )
@@ -351,7 +356,105 @@ class ReasoningTests:
 
         turn = Turn.objects.get(conversation=conversation)
         assert turn.had_reasoning is True
-        assert "secret train of thought" not in turn.answer
+        assert turn.reasoning == "weighing the rainfall gauges"
+        assert "weighing the rainfall gauges" not in turn.answer
+
+    def test_the_done_event_carries_the_whole_reasoning_text(
+        self, embedder, space, client_for
+    ):
+        """The deltas are the live channel; `done.reasoning` is the same text
+        joined, so a client that reopens the Turn later and one that watched
+        it stream show the panel the same content (IR-381)."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(reasoning="Checking the sources. "),
+                StreamDelta(text="Rainfall gauges "),
+                StreamDelta(reasoning="Looks right."),
+                StreamDelta(text="feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        done = dict(events)["done"]
+        assert done["reasoning"] == "Checking the sources. Looks right."
+        assert "Checking the sources" not in done["answer"]
+
+    def test_no_reasoning_sends_no_reasoning_text(
+        self, embedder, space, client_for
+    ):
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+
+        llm = ScriptedLLM(stream_deltas=[StreamDelta(text="Rainfall gauges feed it [1].")])
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(ask_stream(client_for(reader), FLOOD_QUESTION))
+
+        assert dict(events)["done"]["reasoning"] is None
+
+    def test_leaked_think_reasoning_is_stored_as_reasoning_not_as_answer(
+        self, embedder, space, client_for
+    ):
+        """A `<think>` block caught in the text channel is routed to the panel
+        and stored on `reasoning`, never on `answer` (IR-381)."""
+        from apps.ai.models import Conversation, Turn
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+        conversation = Conversation.objects.create(user=reader)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(text="<think>leaked working</think>"),
+                StreamDelta(text="Rainfall gauges feed the model [1]."),
+            ]
+        )
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            events = _parse_sse(
+                ask_stream(
+                    client_for(reader), FLOOD_QUESTION, conversation_id=conversation.pk
+                )
+            )
+
+        assert dict(events)["done"]["reasoning"] == "leaked working"
+        turn = Turn.objects.get(conversation=conversation)
+        assert turn.reasoning == "leaked working"
+        assert turn.answer == "Rainfall gauges feed the model [1]."
+
+    def test_reopening_a_conversation_returns_the_stored_reasoning(
+        self, embedder, space, client_for
+    ):
+        """The transcript endpoint, which is what a reopened Conversation
+        reads -- the panel must be there to collapse (IR-381)."""
+        from apps.ai.models import Conversation
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+        conversation = Conversation.objects.create(user=reader)
+
+        llm = ScriptedLLM(
+            stream_deltas=[
+                StreamDelta(reasoning="weighing the rainfall gauges"),
+                StreamDelta(text="Rainfall gauges feed the model [1]."),
+            ]
+        )
+        client = client_for(reader)
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            _parse_sse(
+                ask_stream(client, FLOOD_QUESTION, conversation_id=conversation.pk)
+            )
+
+        detail = client.get(
+            reverse("ai-conversation-detail", args=[conversation.pk])
+        )
+        assert detail.status_code == 200
+        turn = detail.data["turns"][0]
+        assert turn["reasoning"] == "weighing the rainfall gauges"
+        assert turn["had_reasoning"] is True
+        assert "weighing" not in turn["answer"]
 
 
 class EmptyAnswerTests:

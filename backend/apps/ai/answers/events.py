@@ -55,7 +55,10 @@ class ReasoningDelta(AnswerEvent):
     the defensive `<think>...</think>` split in `apps/ai/answers/reasoning.py`
     for the known leak into the text channel. Never concatenated into the
     answer, never scanned for citation markers, never persisted as
-    `Turn.answer` -- only whether any arrived is recorded, on `Turn.had_reasoning`.
+    `Turn.answer`. Its text *is* persisted, on `Turn.reasoning` (IR-381) --
+    a different column with a different reader: a collapsed panel beside the
+    answer, never the answer itself. `Turn.had_reasoning` survives alongside
+    it for the Turns written before the text was stored.
     """
 
     text: str

@@ -9,6 +9,7 @@
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -150,6 +151,22 @@ describe("a cited answer", () => {
     renderScreen(<ChatMessageBubble message={assistantMessage()} />);
 
     expect(screen.queryByText(/cut off before it finished/i)).toBeNull();
+  });
+
+  it("keeps a replayed reply's reasoning collapsed until the reader opens it (IR-381)", async () => {
+    const working = "The gauges are named in the Methods section, so I will cite that.";
+    renderScreen(<ChatMessageBubble message={assistantMessage({ reasoning: working })} />);
+
+    expect(screen.queryByText(working)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /reasoning/i }));
+    expect(screen.getByRole("region", { name: "Reasoning" }).textContent).toBe(working);
+  });
+
+  it("offers no reasoning panel on a reply that stored none", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage()} />);
+
+    expect(screen.queryByRole("button", { name: /reasoning/i })).toBeNull();
   });
 
   it("has no serious or critical accessibility violations", async () => {

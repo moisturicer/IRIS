@@ -40,6 +40,10 @@ _Avoid_: Image (the rendering of a Figure, not the Figure itself), picture (the 
 One exchange in a [[Conversation]] — a question and the answer it produced, kept together. The unit IRIS remembers: a Turn is what gets stored, searched when an older part of the conversation becomes relevant again, and returned whole when it does. A question without its answer is half a Turn, not a Turn.
 _Avoid_: Message (one half of a Turn — correct for the stored row, wrong for the thing being recalled), exchange, round, prompt.
 
+**Reasoning**:
+The model's working on its way to an answer, arriving on its own channel and kept there. Stored with its [[Turn]] and shown in a panel that is collapsed by default, so a reader opens it by choice — which is what keeps it from being read as the answer. Never part of the answer text, never quotable, and never scanned for citation markers: a citation-shaped marker inside Reasoning points at nothing because nothing looks for it there. Requested per Inference task; only answering asks for it.
+_Avoid_: Thinking or chain of thought (the vendor's words, and both suggest the panel is the reasoning rather than a record of it), explanation (what an answer gives a reader; Reasoning is not addressed to them), justification (claims the answer follows from it).
+
 **Resolved question**:
 The self-contained question IRIS actually searches with, worked out from what the reader typed plus the earlier Turns of the Conversation. "What about its limitations?" resolves to "What are the limitations of *[paper]*?". Distinct from what the reader typed, and shown to them — a Resolved question that gets the subject wrong changes what was asked, so it is never hidden.
 _Avoid_: Rewrite or rewritten query (names the mechanism, not the thing), expanded query (a different technique — expansion adds phrasings, resolution supplies a missing subject), the question (ambiguous once the two differ).

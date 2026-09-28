@@ -89,6 +89,119 @@ describe("a complete stream", () => {
   });
 });
 
+describe("the reasoning channel (IR-381)", () => {
+  it("accumulates reasoning deltas separately from the answer text", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "retrieval_started", data: {} };
+        yield { event: "retrieval_finished", data: { passage_count: 1, record_count: 1, degraded: false } };
+        yield { event: "generation_started", data: {} };
+        yield { event: "reasoning_delta", data: { text: "Checking the sources. " } };
+        yield { event: "reasoning_delta", data: { text: "Looks right." } };
+        await gate;
+        yield { event: "text_delta", data: { text: "Rainfall gauges feed the model." } };
+        yield {
+          event: "done",
+          data: {
+            answer: "Rainfall gauges feed the model.", citations: [], sources: [],
+            message: null, mode: "generative", degraded: false, conversation_id: 9,
+            resolved_question: null, widened: false, had_reasoning: true,
+            reasoning: "Checking the sources. Looks right.",
+          },
+        };
+      })(),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.ask("What predicts flooding?", { conversationId: 9 }); });
+
+    await waitFor(() =>
+      expect(result.current.streaming?.reasoning).toBe("Checking the sources. Looks right."),
+    );
+    expect(result.current.streaming?.text).toBe("");
+    expect(result.current.streaming?.stage).toBe("thinking");
+
+    release();
+    const outcome = await pending as { message: { content: string; reasoning?: string | null } };
+
+    expect(outcome.message.reasoning).toBe("Checking the sources. Looks right.");
+    expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
+  });
+
+  it("does not pull the stage back to thinking once the answer is writing", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "retrieval_started", data: {} };
+        yield { event: "generation_started", data: {} };
+        yield { event: "text_delta", data: { text: "Rainfall gauges " } };
+        yield { event: "reasoning_delta", data: { text: "second thoughts" } };
+        await gate;
+        yield { event: "text_delta", data: { text: "feed the model." } };
+      })(),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.ask("anything"); });
+
+    await waitFor(() => expect(result.current.streaming?.reasoning).toBe("second thoughts"));
+    expect(result.current.streaming?.stage).toBe("answering");
+
+    release();
+    await pending;
+  });
+
+  it("carries no reasoning when the model produced none", async () => {
+    askStream.mockReturnValue(
+      eventsOf(
+        { event: "retrieval_started", data: {} },
+        { event: "text_delta", data: { text: "Rainfall gauges feed the model." } },
+        {
+          event: "done",
+          data: {
+            answer: "Rainfall gauges feed the model.", citations: [], sources: [],
+            message: null, mode: "generative", degraded: false, conversation_id: null,
+            resolved_question: null, widened: false, had_reasoning: false, reasoning: null,
+          },
+        },
+      ),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+
+    const outcome = await act(() => result.current.ask("anything"));
+
+    expect(outcome.message.reasoning).toBeNull();
+  });
+
+  it("keeps the reasoning that arrived before an interrupted stream cut off", async () => {
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "retrieval_started", data: {} };
+        yield { event: "reasoning_delta", data: { text: "half a thought" } };
+        yield { event: "text_delta", data: { text: "Rainfall gauges" } };
+        throw new Error("connection reset");
+      })(),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+
+    const outcome = await act(() => result.current.ask("anything"));
+
+    expect(outcome.message.partial).toBe(true);
+    expect(outcome.message.reasoning).toBe("half a thought");
+  });
+});
+
 describe("an interrupted stream (IR-328)", () => {
   it("keeps the partial text and citations rather than raising an error", async () => {
     askStream.mockReturnValue(

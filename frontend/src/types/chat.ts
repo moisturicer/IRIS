@@ -51,5 +51,13 @@ export interface ChatMessage {
    * before the cutoff, not the model's complete answer (IR-329).
    */
   partial?:   boolean;
+  /**
+   * The model's working behind this reply (IR-381), shown in a panel that is
+   * collapsed by default and never folded into `content` — the two arrived on
+   * separate channels and only `content` was scanned for citation markers.
+   * Undefined when the model reasoned nothing, or when the task that answered
+   * has reasoning switched off in its Profile.
+   */
+  reasoning?: string | null;
   createdAt:  string;
 }

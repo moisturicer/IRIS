@@ -5,6 +5,7 @@
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -14,7 +15,9 @@ import type { StreamingState } from "../hooks/useAskStream";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
 
 function state(overrides: Partial<StreamingState> = {}): StreamingState {
-  return { stage: "searching", foundInfo: null, text: "", citations: [], ...overrides };
+  return {
+    stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [], ...overrides,
+  };
 }
 
 describe("a still-streaming reply", () => {
@@ -43,6 +46,31 @@ describe("a still-streaming reply", () => {
 
     expect(screen.queryByText(/\[1\]/)).toBeNull();
     expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("offers the reasoning collapsed while the answer is still writing", async () => {
+    renderScreen(
+      <StreamingMessageBubble
+        state={state({
+          stage: "answering",
+          text: "Rainfall gauges feed the model.",
+          reasoning: "The gauges are named in the Methods section.",
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(/named in the Methods section/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /reasoning/i }));
+    expect(screen.getByRole("region", { name: "Reasoning" }).textContent).toBe(
+      "The gauges are named in the Methods section.",
+    );
+  });
+
+  it("offers no reasoning panel when none arrived", () => {
+    renderScreen(<StreamingMessageBubble state={state({ stage: "thinking" })} />);
+
+    expect(screen.queryByRole("button", { name: /reasoning/i })).toBeNull();
   });
 
   it("has no serious or critical accessibility violations", async () => {

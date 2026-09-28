@@ -2,10 +2,13 @@ import { cn } from "@/lib/utils";
 import type { StreamingState } from "../hooks/useAskStream";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
+import { ReasoningPanel } from "./ReasoningPanel";
 import { StreamStatusLine } from "./StreamStatusLine";
 
-/** The reply while still streaming (IR-329) -- status line, then text
- *  rendering progressively. Swapped for `ChatMessageBubble` on finish.
+/** The reply while still streaming (IR-329) -- status line, the collapsed
+ *  reasoning panel (IR-381), then text rendering progressively. Swapped for
+ *  `ChatMessageBubble` on finish, which renders the same panel from the
+ *  stored text, so the swap is not where the panel disappears.
  *  No card/border -- matches the finished bubble's plain-text flow.
  *  `compact` matches `ChatMessageBubble`'s Paper Chat density (IR-356). */
 export function StreamingMessageBubble({
@@ -28,6 +31,8 @@ export function StreamingMessageBubble({
 
       <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
         <StreamStatusLine state={state} />
+
+        <ReasoningPanel reasoning={state.reasoning} streaming compact={compact} />
 
         {state.text && (
           <CitationText
