@@ -124,6 +124,16 @@ class FullTextFallbackTests:
         make_record("Thesis", reader, ["weekly pond sampling"])
         assert FullTextRetriever().retrieve("   ", reader).passages == ()
 
+    def test_a_passage_holding_some_of_the_question_still_matches(self, reader):
+        """Pins `rank > 0` against the `@@` rewrite IR-393 rejected: `@@` on
+        `plainto_tsquery` demands every term, and would silently narrow the
+        fallback."""
+        make_record("Thesis", reader, ["weekly pond measurements"])
+
+        found = FullTextRetriever().retrieve("pond sampling", reader)
+
+        assert [p.content for p in found.passages] == ["weekly pond measurements"]
+
     def test_a_record_scoped_fallback_never_leaves_that_record(self, reader):
         """A Paper Chat answer must stay scoped even when the vendor is down
         (IR-298) -- the degraded path is not a way to widen by accident."""
