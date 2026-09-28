@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Sequence
 
+from apps.ai.citation_markers import MARKER, numbers_in
 from apps.ai.regions import Region
 from apps.ai.resolution import turn_qa_lines
 from apps.ai.retrieval.ports import RetrievedChunk
@@ -26,47 +27,17 @@ from apps.ai.retrieval.ports import RetrievedChunk
 if TYPE_CHECKING:
     from apps.ai.models import Turn
 
-#: Inline markers: [1], [2]. Also matches [1, 2] and [1][2], which models
-#: produce whether or not the prompt asks for them.
+#: The marker grammar lives in `apps/ai/citation_markers.py`, shared with the
+#: dialect that normalises a vendor's variants before parsing runs (IR-382).
+#: Aliased rather than re-declared: both were the same three-branch pattern,
+#: widened twice after live failures, and two copies is two places for the
+#: next widening to reach only one of.
 #:
-#: The bracket class is wider than the prompt asks for because a model is not
-#: bound by it. gpt-oss-120b, the configured default, answers with the CJK
-#: lenticular form -- `【1】` -- and against an ASCII-only pattern every
-#: citation silently failed to resolve: zero citations, `is_grounded` false,
-#: and the raw marker left sitting in the rendered text. Fullwidth brackets
-#: appear for the same reason. `keep` re-emits `[n]`, so whatever comes in,
-#: what a reader sees is canonical.
-#:
-#: Three balanced alternatives rather than one wide opening class and one wide
-#: closing class: the cheap version also matches `[1】` and `【1]`, which no
-#: model produces and which a reader would have to squint at to call a
-#: citation. Each branch captures the digits, so exactly one group is ever
-#: populated -- `keep` takes whichever that is.
-#:
-#: `_SUFFIX` tolerates trailing content between the number and the close --
-#: observed live, 2026-09-20: gpt-oss-120b sometimes appends an OpenAI-style
-#: file/line-range suffix to a lenticular marker, `【1†L1-L5】` rather than
-#: `【1】`. Against the pattern with no suffix allowance, every citation in an
-#: answer using that form resolved to nothing: zero citations, and the raw
-#: marker left sitting in the text a reader sees.
-#:
-#: **Every bracket character is excluded, opening as well as closing, and the
-#: length is bounded.** Excluding only the closing brackets is the obvious
-#: version and it is wrong: on an unclosed marker the suffix runs straight
-#: across the prose to the next close, so
-#: `A【1†L1-L5 and more prose 【2】` resolved to `A[1]` -- the model's own
-#: words deleted from what the reader sees, and the genuine `【2】` swallowed.
-#: Dropping a citation is this module's stated failure direction; eating a
-#: sentence is not. A real suffix is under ten characters (`†L13-L16`), so 64
-#: is generous even for a filename-bearing variant while keeping the damage
-#: from any pathological input bounded.
-_NUMBERS = r"\d+(?:\s*,\s*\d+)*"
-_SUFFIX = r"[^\[\]【】［］]{0,64}"
-_MARKER = re.compile(
-    rf"\[\s*({_NUMBERS})\s*{_SUFFIX}\]"
-    rf"|【\s*({_NUMBERS})\s*{_SUFFIX}】"
-    rf"|［\s*({_NUMBERS})\s*{_SUFFIX}］"
-)
+#: Still matched here, not only normalised upstream: this is the net for any
+#: provider reached without a dialect, and where the parser's own correctness
+#: is tested. `keep` re-emits `[n]`, so whatever comes in, what a reader sees
+#: is canonical.
+_MARKER = MARKER
 
 #: **This instruction is noise reduction, not enforcement.** It already said
 #: "cite as [1], [2]" when the model emitted `【1】` (IR-131), and again when it
@@ -244,10 +215,7 @@ def parse_citations(
     seen: set[int] = set()
 
     def keep(match: re.Match) -> str:
-        # Exactly one alternative in `_MARKER` matched, so exactly one group is
-        # non-None; which bracket style it came from does not matter past here.
-        digits = next(g for g in match.groups() if g is not None)
-        numbers = [int(n) for n in digits.replace(" ", "").split(",")]
+        numbers = numbers_in(match)
         valid = [n for n in numbers if 1 <= n <= len(chunks)]
         for number in valid:
             if number in seen:
@@ -303,10 +271,11 @@ def parse_citations(
 #: The run after the separator excludes **opening** brackets as well as
 #: closing ones. With only closers excluded, `Yes (1) and <2>.` matched once,
 #: as `(1) and <2>` -- one marker's suffix reaching across the prose to
-#: swallow the next, which is the same mistake `_SUFFIX` above was corrected
-#: for. A suffix must not be able to reach past where the next marker starts.
+#: swallow the next, which is the same mistake `citation_markers.SUFFIX` was
+#: corrected for. A suffix must not be able to reach past where the next
+#: marker starts.
 #:
-#: The bound is far looser than `_SUFFIX`'s 64 **on purpose**. A marker whose
+#: The bound is far looser than `SUFFIX`'s 64 **on purpose**. A marker whose
 #: suffix is too long for `_MARKER` is precisely a case this needs to report,
 #: so a bound at or below the strict one would go blind exactly where it is
 #: most needed.

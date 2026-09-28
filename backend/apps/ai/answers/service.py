@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from apps.ai.memory import ConversationMemory
     from apps.ai.models import Conversation, Turn
 
+from apps.ai.providers.dialects import DEFAULT_DIALECT, VendorDialect
+
 from .citations import (
     NO_SOURCES,
     PARTIAL,
@@ -98,6 +100,16 @@ class GroundedAnswerService:
         ).in_bulk()
         allowed = {rid for rid, rec in records.items() if self._permits(rec)}
         return [c for c in chunks if c.record_id in allowed]
+
+    @property
+    def _dialect(self) -> VendorDialect:
+        """The vendor dialect behind the configured provider (IR-382).
+
+        Read off the provider rather than configured here: a fake has no
+        vendor, and the default it falls back to normalises nothing, so a
+        test double is unaffected by this at all.
+        """
+        return getattr(self._llm, "dialect", DEFAULT_DIALECT)
 
     def _retrieve_and_gate(
         self, question: str, user
@@ -307,7 +319,7 @@ class GroundedAnswerService:
                 )
                 return
 
-            raw, text, citations = _parse(raw_parts, sources)
+            raw, text, citations = _parse(raw_parts, sources, self._dialect)
             _warn_if_citations_went_missing(raw, text, citations)
             yield CitationsResolved(citations=citations)
             completed = True
@@ -326,8 +338,8 @@ class GroundedAnswerService:
                     self._partial_answer(retrieved, sources, raw_parts, had_reasoning)
                 )
 
-    @staticmethod
     def _partial_answer(
+        self,
         retrieved,
         sources: Sequence[RetrievedChunk],
         raw_parts: Sequence[str],
@@ -340,7 +352,7 @@ class GroundedAnswerService:
         call `_unavailable_answer` makes: completeness is unknown, which
         alone is reason to weigh the answer carefully.
         """
-        _, text, citations = _parse(raw_parts, sources)
+        _, text, citations = _parse(raw_parts, sources, self._dialect)
         return GroundedAnswer(
             text=text,
             citations=citations,
@@ -386,11 +398,18 @@ def _produced_nothing(raw: str | Sequence[str]) -> bool:
 
 
 def _parse(
-    raw_parts: Sequence[str], sources: Sequence[RetrievedChunk]
+    raw_parts: Sequence[str],
+    sources: Sequence[RetrievedChunk],
+    dialect: VendorDialect = DEFAULT_DIALECT,
 ) -> tuple[str, str, tuple]:
     """Join and citation-parse a stream's text, once. Shared by a clean
-    completion and `_partial_answer` (IR-328), so the two never drift."""
-    raw = "".join(raw_parts)
+    completion and `_partial_answer` (IR-328), so the two never drift.
+
+    The dialect normalises the vendor's marker variants first (IR-382) --
+    here rather than on each delta, because a marker split across two deltas
+    would be normalised as two fragments and match neither.
+    """
+    raw = dialect.normalize_citation_markers("".join(raw_parts))
     text, citations = parse_citations(raw, sources)
     return raw, text, citations
 

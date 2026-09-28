@@ -63,6 +63,7 @@ import threading
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterator, Optional, Sequence, Tuple
 
+from apps.ai.providers.dialects import DEFAULT_DIALECT, VendorDialect
 from apps.ai.providers.errors import ErrorKind
 from apps.ai.providers.ports import LLMProvider, StreamDelta
 
@@ -159,6 +160,10 @@ class RetryingLLMProvider(LLMProvider):
     def model(self) -> str:
         return getattr(self._provider, "model", "unknown")
 
+    @property
+    def dialect(self) -> VendorDialect:
+        return getattr(self._provider, "dialect", DEFAULT_DIALECT)
+
     def generate(self, system: str, user: str) -> str:
         kwargs = {} if self._sleep is None else {"sleep": self._sleep}
         return retry_with_backoff(
@@ -207,6 +212,10 @@ class CircuitBreakingLLMProvider(LLMProvider):
     def model(self) -> str:
         return getattr(self._provider, "model", "unknown")
 
+    @property
+    def dialect(self) -> VendorDialect:
+        return getattr(self._provider, "dialect", DEFAULT_DIALECT)
+
     def generate(self, system: str, user: str) -> str:
         return self._breaker.call(lambda: self._provider.generate(system, user))
 
@@ -252,6 +261,16 @@ class FallbackLLMProvider(LLMProvider):
     @property
     def model(self) -> str:
         return self.last_model_used or getattr(self._providers[0], "model", "unknown")
+
+    @property
+    def dialect(self) -> VendorDialect:
+        """The dialect of whichever provider is next to be tried.
+
+        The list is same-vendor (ADR-008 §Amendment), so every entry agrees;
+        the first is read rather than the one that last answered so this is
+        the same before any call as after one.
+        """
+        return getattr(self._providers[0], "dialect", DEFAULT_DIALECT)
 
     def generate(self, system: str, user: str) -> str:
         failure: Optional[BaseException] = None
@@ -349,6 +368,10 @@ class LLMProviderConfig:
     #: `None` inherits `LLM_REASONING_EFFORT`; `""` sends no reasoning
     #: configuration at all (IR-380).
     reasoning_effort: Optional[str] = None
+    #: Which vendor dialect shapes this provider's requests (IR-382). `None`
+    #: takes the default, which is what every caller sent before dialects
+    #: existed -- so an unset vendor is unchanged behaviour, not a gap.
+    vendor: Optional[str] = None
 
     @property
     def key(self) -> str:
@@ -356,6 +379,7 @@ class LLMProviderConfig:
 
 
 def _wrap(config: LLMProviderConfig) -> LLMProvider:
+    from apps.ai.providers.dialects import dialect_for
     from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
 
     adapter = OpenAICompatibleAdapter(
@@ -363,6 +387,7 @@ def _wrap(config: LLMProviderConfig) -> LLMProvider:
         api_key=config.api_key or None,
         model=config.model or None,
         reasoning_effort=config.reasoning_effort,
+        dialect=dialect_for(config.vendor),
     )
     retrying = RetryingLLMProvider(adapter)
     return CircuitBreakingLLMProvider(retrying, breaker=breaker_for(config.key))
