@@ -21,6 +21,7 @@ from apps.ai.inference import (
     model_variables,
     profile_for,
 )
+from apps.ai.providers.dialects import GROQ, OPENROUTER
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.resilience.llm import (
     CircuitBreakingLLMProvider,
@@ -275,6 +276,36 @@ class BuildingTheProviderTests:
         with pytest.raises(LLMUnavailable) as raised:
             build_profile_llm(profile_for(InferenceTask.SUMMARY))
         assert "LLM_SUMMARY_MODEL" in str(raised.value)
+
+    def test_a_task_named_at_openrouter_gets_openrouters_dialect(self, settings):
+        """Pointing a task at OpenRouter is configuration alone (IR-384) --
+        no adapter, provider, or dialect code changes for it to take effect."""
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+        settings.LLM_ANSWER_MODEL = "openrouter-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+
+        provider = build_profile_llm(profile_for(InferenceTask.ANSWER))
+
+        adapter = provider._provider._provider  # noqa: SLF001
+        assert adapter.dialect is OPENROUTER
+
+    def test_two_tasks_at_different_vendors_each_reach_their_own_dialect(
+        self, settings
+    ):
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+        settings.LLM_ANSWER_MODEL = "answer-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_RESOLVE_VENDOR = "groq"
+        settings.LLM_RESOLVE_MODEL = "resolve-model"
+        settings.LLM_RESOLVE_API_KEY = "k"
+
+        answer_provider = build_profile_llm(profile_for(InferenceTask.ANSWER))
+        resolve_provider = build_profile_llm(profile_for(InferenceTask.RESOLVE))
+
+        answer_adapter = answer_provider._provider._provider  # noqa: SLF001
+        resolve_adapter = resolve_provider._provider._provider  # noqa: SLF001
+        assert answer_adapter.dialect is OPENROUTER
+        assert resolve_adapter.dialect is GROQ
 
 
 class ResolveProfileTests:

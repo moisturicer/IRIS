@@ -12,7 +12,9 @@ from apps.ai.citation_markers import MARKER
 from apps.ai.providers.dialects import (
     DEFAULT_DIALECT,
     GROQ,
+    OPENROUTER,
     GroqDialect,
+    OpenRouterDialect,
     VendorDialect,
     dialect_for,
 )
@@ -41,6 +43,60 @@ class TestGroqRequestShaping:
         """Not a default effort -- a task with hidden Reasoning pays for no
         reasoning tokens (IR-380)."""
         assert GROQ.request_extras("") == {}
+
+
+class TestOpenRouterRequestShaping:
+    def test_the_data_policy_is_sent_regardless_of_reasoning(self):
+        """Uniform across tasks (ADR-021 Amendment): a request with no
+        reasoning configured still must not train the vendor on it."""
+        assert OPENROUTER.request_extras("")["extra_body"]["provider"] == {
+            "data_collection": "deny"
+        }
+
+    def test_an_effort_is_sent_in_openrouters_own_shape(self):
+        assert OPENROUTER.request_extras("high")["extra_body"]["reasoning"] == {
+            "effort": "high"
+        }
+
+    def test_an_unset_effort_excludes_reasoning_rather_than_saying_nothing(self):
+        """Unlike Groq: a model reached through OpenRouter may reason
+        unprompted, so a task with hidden Reasoning (IR-380) must say
+        `exclude` rather than simply omitting a parameter."""
+        assert OPENROUTER.request_extras("")["extra_body"]["reasoning"] == {
+            "exclude": True
+        }
+
+    def test_no_models_field_when_theres_only_one_model(self):
+        assert "models" not in OPENROUTER.request_extras("")["extra_body"]
+
+    def test_a_fallback_list_populates_the_native_models_field(self):
+        extras = OPENROUTER.request_extras("", models=("first", "second", "third"))
+
+        assert extras["extra_body"]["models"] == ["first", "second", "third"]
+
+    def test_resolves_fallback_is_true(self):
+        """What tells `apps/ai/inference/providers.py` (IR-385) this vendor
+        tries its model list itself rather than needing IRIS to loop."""
+        assert OPENROUTER.resolves_fallback is True
+
+    def test_groq_does_not_resolve_fallback(self):
+        assert GROQ.resolves_fallback is False
+
+    def test_groq_ignores_a_models_argument(self):
+        """Groq has no native multi-model field; passing one changes
+        nothing about the request it shapes."""
+        assert GROQ.request_extras("high", models=("a", "b")) == {
+            "extra_body": {"reasoning_effort": "high", "include_reasoning": True}
+        }
+
+
+class TestOpenRouterCitationMarkers:
+    def test_no_marker_habit_is_assumed(self):
+        """OpenRouter routes to whichever model a deployment names; nobody
+        has observed what any of them do, so nothing is rewritten on a
+        guess (matches `VendorDialect`'s own default)."""
+        raw = "Yes 【1†L1-L5】."
+        assert OPENROUTER.normalize_citation_markers(raw) == raw
 
 
 class TestReadingAStreamedDelta:
@@ -110,15 +166,22 @@ class TestChoosingADialect:
     def test_groq_is_selected_by_name(self):
         assert isinstance(dialect_for("groq"), GroqDialect)
 
+    def test_openrouter_is_selected_by_name(self):
+        assert isinstance(dialect_for("openrouter"), OpenRouterDialect)
+
     @pytest.mark.parametrize("vendor", ["GROQ", " groq "])
     def test_the_name_is_matched_case_and_space_insensitively(self, vendor):
         assert dialect_for(vendor) is GROQ
 
-    @pytest.mark.parametrize("vendor", [None, "", "openrouter", "a-self-hosted-vllm"])
+    @pytest.mark.parametrize("vendor", ["OPENROUTER", " openrouter "])
+    def test_openrouters_name_is_matched_case_and_space_insensitively(self, vendor):
+        assert dialect_for(vendor) is OPENROUTER
+
+    @pytest.mark.parametrize("vendor", [None, "", "a-self-hosted-vllm"])
     def test_a_vendor_with_no_dialect_of_its_own_gets_the_default(self, vendor):
-        """Non-raising by design: OpenRouter's dialect is IR-384, and a base
-        URL is also how a self-hosted model is reached. Refusing here would
-        break deployments this refactor promised not to touch."""
+        """Non-raising by design: a base URL is also how a self-hosted vLLM
+        or Ollama is reached. Refusing here would break deployments this
+        refactor promised not to touch."""
         assert dialect_for(vendor) is DEFAULT_DIALECT
 
 
