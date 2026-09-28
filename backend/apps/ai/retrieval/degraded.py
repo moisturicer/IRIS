@@ -23,8 +23,10 @@ from __future__ import annotations
 import logging
 from typing import Callable, Optional
 
-from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.contrib.postgres.search import SearchQuery, SearchRank
+from django.db.models import F
 
+from apps.ai.keyword_index import CONFIG
 from apps.ai.models.chunk import DocumentChunk
 from apps.ai.regions import normalized_regions
 from apps.ai.resilience.circuit import CircuitOpen
@@ -53,10 +55,16 @@ def is_vendor_unavailable(exc: BaseException) -> bool:
 class FullTextRetriever(Retriever):
     """Chunk-level FTS, visibility-filtered exactly like the vector path.
 
-    Builds the search vector at query time rather than storing one:
-    `Record.search_vector` is maintained for records, chunks have no equivalent
-    column, and adding one is a migration and an index this path does not
-    justify -- it runs only while the vendor is down.
+    Reads `DocumentChunk.search_vector`, the stored column a trigger keeps
+    current (IR-393, ADR-033 §2), instead of building one per chunk per query.
+    The query is otherwise unchanged, and so are the answers.
+
+    `rank > 0` is kept rather than the `@@` match the GIN index could answer,
+    because they are not the same predicate: `ts_rank` does not consult `@@`,
+    so it scores a passage holding *some* of a multi-word question's terms
+    while `@@` on `plainto_tsquery` demands all of them. On the development
+    corpus, "pond sampling" returned 20 passages under `rank > 0` and none
+    under `@@`. The index is here for the hybrid retrieval that follows.
 
     ``record``, like `TwoStageRetriever`'s, narrows the search to one Record
     (IR-298) -- constructed by the composition root, not threaded through
@@ -75,8 +83,7 @@ class FullTextRetriever(Retriever):
         if self._record is not None:
             visible = visible.filter(pk=self._record.pk)
         visible = visible.values("pk")
-        query = SearchQuery(question, config="english")
-        vector = SearchVector("content", config="english")
+        query = SearchQuery(question, config=CONFIG)
 
         rows = (
             DocumentChunk.objects.filter(
@@ -84,7 +91,7 @@ class FullTextRetriever(Retriever):
                 chunk_set__is_active=True,
                 deleted_at__isnull=True,
             )
-            .annotate(rank=SearchRank(vector, query))
+            .annotate(rank=SearchRank(F("search_vector"), query))
             .filter(rank__gt=0)
             .select_related("record", "chunk_set")
             .order_by("-rank")[:limit]

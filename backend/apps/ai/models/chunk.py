@@ -15,6 +15,8 @@ have created it from.
 """
 
 from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from pgvector.django import HnswIndex, VectorField
 
@@ -89,6 +91,9 @@ class DocumentChunk(models.Model):
     # own set is no longer active. Hard-deleting instead would discard the
     # vector that makes the *next* re-chunk cheap.
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    # Keyword index over `content`, written by a database trigger and never
+    # by this model (IR-393, ADR-033 §2). See `apps.ai.keyword_index`.
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         constraints = [
@@ -100,6 +105,7 @@ class DocumentChunk(models.Model):
             # Stage 2 of retrieval filters candidate chunks by record, then
             # orders by sequence for neighbour expansion.
             models.Index(fields=["record", "sequence"], name="ai_chunk_record_seq_idx"),
+            GinIndex(fields=["search_vector"], name="ai_chunk_search_gin_idx"),
         ]
 
     def __str__(self) -> str:
