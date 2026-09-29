@@ -106,6 +106,14 @@ ALLOWED = {
     # action method names (`as_view({"get": "approved"})`), not stored values.
     # They are the router's vocabulary, not the workflow's.
     "reviews/urls.py",
+    # (IR-406) The Publish dialog's prefill state -- pending/ready/failed/
+    # unsupported, from the IR-374 spec §4.5 -- is the manuscript *extraction's*
+    # status restated for one client, the same ingestion vocabulary as
+    # `PdfExtraction.STATUS`, which core.enums deliberately excludes. Its
+    # "pending" collides with RequestStatus.PENDING and means something
+    # unrelated: Docling has not finished reading a PDF, not a person's
+    # request awaiting a decision. Same shape as the embedding_space.py entry.
+    "records/metadata_suggestions.py",
 }
 
 

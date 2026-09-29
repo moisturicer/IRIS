@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
@@ -388,6 +388,25 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         return Response(tracker_payload(self.get_object(), request.user))
+
+    @action(detail=True, methods=["get"], url_path="metadata-suggestions")
+    def metadata_suggestions(self, request, pk=None):
+        """
+        GET /records/<id>/metadata-suggestions/ -- the manuscript's own title
+        and abstract, offered to the Publish dialog (IR-406; IR-374 spec §4.5).
+
+        **Owner-only.** `get_object()` applies `visible_to()`, which also lets
+        office staff, the assigned adviser and -- on a published record --
+        every signed-in user read the record. None of them is publishing it,
+        and the suggestions are the manuscript's own text, so a reader who is
+        not an owner gets the same 404 as a missing record (IR-153).
+        """
+        from .metadata_suggestions import metadata_suggestions
+
+        record = self.get_object()
+        if not record.owners.filter(user=request.user).exists():
+            raise Http404
+        return Response(metadata_suggestions(record))
 
     @action(detail=True, methods=["get", "post"], url_path="document-requests")
     def document_requests(self, request, pk=None):
