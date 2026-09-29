@@ -266,9 +266,8 @@ class BreakerRegistryTests:
 
 class BuildTaskLLMTests:
     """`build_task_llm` is what an Inference task's Profile is built with
-    instead of `build_resilient_llm` (IR-386): one breaker for the whole
-    model list, keyed on the caller's own scope rather than on any one
-    model's identity.
+    (IR-386): one breaker for the whole model list, keyed on the caller's own
+    scope rather than on any one model's identity.
     """
 
     def test_a_single_config_is_wrapped_in_one_breaker(self):
