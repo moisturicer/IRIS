@@ -34,19 +34,17 @@ assert anything at all, and a reader of those tests could otherwise conclude
 the shipped configuration answers questions. Nothing here works around it: the
 way around a fail-closed gate is to supply the missing fact.
 
-**The LLM seam is resilient as of IR-321.** ``llm()`` no longer returns a bare
-``OpenAICompatibleAdapter`` -- ``apps.ai.resilience.llm.build_resilient_llm``
-wraps it in retry and circuit-breaking, driven by the ``ErrorKind`` IR-320
-attaches to the failure. It could also fall over to a second configured
-*vendor*, which IR-321 recorded as a contradiction with ADR-008 and ADR-021.
-**IR-376 resolved it in the ADRs** (both amended 2026-09-28): a fallback list
-of models inside *one* vendor account is permitted, the vendor is chosen per
-Inference task rather than per environment, and **cross-vendor failover stays
-rejected**. **IR-385 made the code match** -- the ``LLM_FALLBACK_*`` provider
-is deleted, so the only fallback a root can build is an ordered model list on
-one account, and exhausting it produces the explicit unavailable state with
-sources still returned (ADR-008). See ``apps/ai/resilience/llm.py``'s module
-docstring.
+**The LLM seam is resilient (IR-321) and tasked (IR-388).**
+``llm_for(task)`` is the only way to reach a model -- ``llm()``, the untasked
+accessor every caller used before Inference tasks existed, is deleted, not
+merely deprecated. ``apps.ai.inference.build_profile_llm`` wraps the adapter
+in retry and circuit-breaking, driven by the ``ErrorKind`` IR-320 attaches to
+the failure, and walks a same-vendor fallback list when a task's Profile
+names one. **Cross-vendor failover is refused, not merely unconfigured**
+(IR-385) -- there is no second vendor account anywhere in this module, under
+ADR-021 §Amendment's "vendor chosen per Inference task" rule. See
+``apps/ai/resilience/llm.py``'s and ``apps/ai/inference/providers.py``'s
+module docstrings.
 
 **What is deliberately not wired here yet.** The query-vector cache needs an
 ``EmbeddingSpace`` id at construction time -- which would make building a root
@@ -135,7 +133,6 @@ class CompositionRoot:
         self._embedder = embedder
         self._reranker = reranker
         self._llm = llm
-        self._default_llm: Optional[LLMProvider] = None
         self._task_llms: dict["InferenceTask", LLMProvider] = {}
         self._resolver = resolver
         self._memory = memory
@@ -162,38 +159,15 @@ class CompositionRoot:
             self._reranker = VoyageReranker()
         return self._reranker
 
-    def llm(self) -> LLMProvider:
-        """The single provider every caller used before Inference tasks.
-
-        Kept working while callers move to ``llm_for`` one at a time (IR-378
-        is the expand half); the final IR-375 ticket deletes it.
-        """
-        if self._llm is not None:
-            # An injected provider (a fake, in every test) bypasses the
-            # resilience wrapping, same as before.
-            return self._llm
-        if self._default_llm is None:
-            from apps.ai.resilience.llm import build_resilient_llm
-
-            # Retry and circuit-breaking around the one provider the flat
-            # settings describe (IR-321; its cross-vendor fallback went in
-            # IR-385) -- see this module's and `resilience/llm.py`'s
-            # docstrings. Cached apart from `self._llm` deliberately: that
-            # attribute means "a caller injected this", and writing a
-            # lazily-built provider into it would make a root that had once
-            # been asked for `llm()` return the flat provider for *every*
-            # task -- including an unconfigured one that must raise.
-            self._default_llm = build_resilient_llm()
-        return self._default_llm
-
     def llm_for(self, task: "InferenceTask | str") -> LLMProvider:
         """The provider for one named Inference task (IR-378).
 
-        The per-task half of ``llm()``, which stays in place until the last
-        caller has moved off it (expand, then contract). A task name that is
-        not one of the four raises rather than resolving to a default, and an
-        injected ``self._llm`` bypasses Profile resolution entirely -- the
-        property every fake-driven test in ``test_ask_http.py`` depends on.
+        The only way to reach a model -- ``llm()``, the untasked accessor
+        every caller used before Inference tasks existed, is deleted
+        (IR-388). A task name that is not one of the four raises rather than
+        resolving to a default, and an injected ``self._llm`` bypasses
+        Profile resolution entirely -- the property every fake-driven test in
+        ``test_ask_http.py`` depends on.
 
         Profiles are resolved here rather than in ``__init__`` for the reason
         the class docstring gives: a root must be constructible on a machine
@@ -302,8 +276,8 @@ class CompositionRoot:
         key, never whether the vendor behind it has ever answered. What
         distinguishes the two without a live probe on every status request is
         ``apps.ai.resilience.llm.any_provider_reachable``, which reads the
-        breaker state IR-321 already keeps for each configured provider: one
-        has tripped only after real ``generate()`` calls actually failed
+        ``answer`` task's own breaker state (IR-321, keyed as IR-386 keys it):
+        it has tripped only after real ``generate()`` calls actually failed
         against it, so an open breaker is evidence the vendor is down, not a
         guess.
         """

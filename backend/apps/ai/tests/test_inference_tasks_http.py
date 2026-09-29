@@ -160,16 +160,12 @@ class AnswerTaskTests:
         assert root.llm_for(InferenceTask.ANSWER) is fake
         assert root.llm_for("summary") is fake
 
-    def test_asking_for_llm_first_does_not_make_every_task_configured(
+    def test_asking_for_one_task_first_does_not_make_another_configured(
         self, settings
     ):
-        """`llm()` caches apart from the injection slot `llm_for` reads.
-
-        Sharing one attribute would mean a root that had been asked for
-        `llm()` returned the flat provider for *every* task, including an
-        unconfigured one that must raise -- the old accessor silently
-        answering for tasks nobody configured, which is the opposite of what
-        the expand half is for.
+        """Each task's provider is cached under its own key in
+        `_task_llms` -- resolving `answer` first must not make an
+        unconfigured `summary` raise anything other than its own refusal.
         """
         from apps.ai.providers.openai_compatible import LLMUnavailable
 
@@ -177,7 +173,7 @@ class AnswerTaskTests:
         settings.LLM_SUMMARY_MODEL = ""
         root = CompositionRoot()
 
-        root.llm()
+        root.llm_for(InferenceTask.ANSWER)
 
         with pytest.raises(LLMUnavailable):
             root.llm_for(InferenceTask.SUMMARY)

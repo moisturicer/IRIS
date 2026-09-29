@@ -368,6 +368,7 @@ class StatusTests:
         `CircuitBreakingLLMProvider` would after five real failures, and
         checks that `/status/` notices."""
         from apps.ai.composition import CompositionRoot
+        from apps.ai.inference import InferenceTask
         from apps.ai.resilience.circuit import CircuitState
         from apps.ai.resilience.llm import reset_llm_breakers
 
@@ -380,8 +381,12 @@ class StatusTests:
             # Same registry key `generation_configured()` will look up, via
             # the same path `test_composition_llm.py` uses to reach a
             # breaker: building the real (non-fake) provider stack, which
-            # reaches no network until `generate()` is called.
-            breaker = CompositionRoot().llm()._breaker  # noqa: SLF001
+            # reaches no network until `generate()` is called. `answer`
+            # inherits the flat settings above, so this is the same provider
+            # `generation_configured()` checks. One level in: `llm_for` wraps
+            # the resilient provider in `CompletionLoggingLLMProvider`
+            # (IR-387), the completion-record decorator, not the breaker.
+            breaker = CompositionRoot().llm_for(InferenceTask.ANSWER)._provider._breaker  # noqa: SLF001
             for _ in range(5):
                 with pytest.raises(RuntimeError):
                     breaker.call(_raise_404)
