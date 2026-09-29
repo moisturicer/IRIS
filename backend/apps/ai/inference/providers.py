@@ -1,4 +1,4 @@
-"""Building the `LLMProvider` a Profile describes (IR-378, IR-385).
+"""Building the `LLMProvider` a Profile describes (IR-378, IR-385, IR-386).
 
 One adapter per protocol (ADR-021), so a Profile is a `base_url`, an
 `api_key` and a model list -- and the list is walked by the same resilience
@@ -8,9 +8,9 @@ stack `CompositionRoot.llm()` already used, not by a second one.
 one account, which is the only kind of fallback ADR-008 §Amendment permits:
 
 * a vendor with no native multi-model field -- Groq -- is looped here: one
-  config, one adapter and one circuit breaker per model, wrapped in
-  `FallbackLLMProvider`, which moves to the next model only on a failure
-  another model could fix (`network`, `timeout`, `rate_limit`);
+  config per model, wrapped in `FallbackLLMProvider`, which moves to the next
+  model only on a failure another model could fix (`network`, `timeout`,
+  `rate_limit`);
 * a vendor that resolves the list itself -- OpenRouter, which declares
   `VendorDialect.resolves_fallback` -- gets **one** config carrying the whole
   list, sent as the native `models` field. Looping there would send a second
@@ -21,6 +21,14 @@ one account, which is the only kind of fallback ADR-008 §Amendment permits:
 company receiving IRIS text -- was the contradiction ADR-008 recorded by name.
 Its settings and the config they built are deleted, so a Profile's fallback
 list is the only fallback there is.
+
+**One circuit breaker for the whole list, keyed on the task (IR-386).**
+`build_task_llm`, not `build_resilient_llm`: the latter gives every config its
+own breaker keyed on `base_url::model`, which would let two tasks sharing a
+vendor and model share a breaker too -- a busy `summary` tripping it would
+stop `answer` for a reason that has nothing to do with answering. Keying on
+`profile.task.breaker_key` instead means each task's breaker only opens once
+every model in *its own* list has failed a call, not on the first one.
 """
 
 from __future__ import annotations
@@ -28,7 +36,7 @@ from __future__ import annotations
 from apps.ai.providers.dialects import dialect_for
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
-from apps.ai.resilience.llm import LLMProviderConfig, build_resilient_llm
+from apps.ai.resilience.llm import LLMProviderConfig, build_task_llm
 
 from .profiles import Profile
 
@@ -63,4 +71,4 @@ def build_profile_llm(profile: Profile) -> LLMProvider:
     else:
         configs = [config(model) for model in profile.models]
 
-    return build_resilient_llm(configs)
+    return build_task_llm(configs, breaker_key=profile.task.breaker_key)

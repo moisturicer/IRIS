@@ -161,12 +161,12 @@ class SummaryRunsAsItsOwnInferenceTaskTests:
 
         captured = []
 
-        def _capture(configs):
+        def _capture(configs, breaker_key):
             captured.extend(configs)
             return ScriptedLLM(reply="A methodology summary [1].")
 
         monkeypatch.setattr(
-            inference_providers, "build_resilient_llm", _capture
+            inference_providers, "build_task_llm", _capture
         )
         return captured
 

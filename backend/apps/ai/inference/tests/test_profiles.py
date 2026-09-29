@@ -214,11 +214,16 @@ class BuildingTheProviderTests:
 
         provider = build_profile_llm(profile_for(InferenceTask.ANSWER))
 
-        assert isinstance(provider, FallbackLLMProvider)
+        # One breaker for the whole list (IR-386), not one per model -- so
+        # the fallback sits *under* the breaker rather than each candidate
+        # carrying its own.
+        assert isinstance(provider, CircuitBreakingLLMProvider)
+        fallback = provider._provider  # noqa: SLF001
+        assert isinstance(fallback, FallbackLLMProvider)
         # Same account throughout -- a fallback here is a model, not a vendor
         # (ADR-008 §Amendment).
-        for candidate in provider._providers:  # noqa: SLF001
-            adapter = candidate._provider._provider  # noqa: SLF001
+        for candidate in fallback._providers:  # noqa: SLF001
+            adapter = candidate._provider  # noqa: SLF001
             assert adapter._base_url == "https://one-vendor.test/v1"  # noqa: SLF001
             assert adapter._api_key == "k"  # noqa: SLF001
 
@@ -301,6 +306,36 @@ class BuildingTheProviderTests:
         resolve_adapter = resolve_provider._provider._provider  # noqa: SLF001
         assert answer_adapter.dialect is OPENROUTER
         assert resolve_adapter.dialect is GROQ
+
+
+class PerTaskCircuitBreakerTests:
+    """Each Inference task gets its own breaker, even at the same vendor and
+    model (IR-386) -- the scenario the ticket names: a batchy `summary` run
+    hitting a rate limit must not stop `answer` from working."""
+
+    def test_two_tasks_at_the_same_vendor_and_model_keep_separate_breakers(
+        self, settings
+    ):
+        settings.LLM_ANSWER_MODEL = "shared-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_ANSWER_BASE_URL = "https://one-vendor.test/v1"
+        settings.LLM_SUMMARY_MODEL = "shared-model"
+        settings.LLM_SUMMARY_API_KEY = "k"
+        settings.LLM_SUMMARY_BASE_URL = "https://one-vendor.test/v1"
+
+        answer_provider = build_profile_llm(profile_for(InferenceTask.ANSWER))
+        summary_provider = build_profile_llm(profile_for(InferenceTask.SUMMARY))
+
+        assert answer_provider._breaker is not summary_provider._breaker  # noqa: SLF001
+
+    def test_the_same_task_reuses_its_own_breaker_across_calls(self, settings):
+        settings.LLM_ANSWER_MODEL = "m"
+        settings.LLM_ANSWER_API_KEY = "k"
+
+        first = build_profile_llm(profile_for(InferenceTask.ANSWER))
+        second = build_profile_llm(profile_for(InferenceTask.ANSWER))
+
+        assert first._breaker is second._breaker  # noqa: SLF001
 
 
 class ResolveProfileTests:

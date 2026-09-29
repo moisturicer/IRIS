@@ -55,6 +55,16 @@ is left is a list of models on one account, which is what
 `FallbackLLMProvider` walks, and only for a vendor whose dialect does not
 resolve the list itself (`VendorDialect.resolves_fallback` -- OpenRouter does,
 so IRIS makes one request there rather than looping).
+
+**One breaker per Inference task, not per model (IR-386).** `_wrap` keys a
+breaker on `LLMProviderConfig.key` (`base_url::model`), which is right for the
+flat, task-less settings `build_resilient_llm` still serves, but would let two
+Inference tasks pointed at the same vendor and model share a breaker --
+`summary` hitting a rate limit would then also stop `answer`, for a reason
+that has nothing to do with answering. `build_task_llm` is what
+`apps/ai/inference/providers.py` uses instead: one breaker around a whole
+task's model list, keyed on the task rather than on any one model in it, so
+exhausting the list is what opens it rather than the first model's failure.
 """
 
 from __future__ import annotations
@@ -220,6 +230,25 @@ class CircuitBreakingLLMProvider(LLMProvider):
     @property
     def dialect(self) -> VendorDialect:
         return getattr(self._provider, "dialect", DEFAULT_DIALECT)
+
+    @property
+    def last_model_used(self) -> Optional[str]:
+        """Proxies `FallbackLLMProvider.last_model_used` (IR-387).
+
+        `build_task_llm` (IR-386) puts this breaker *around* a task's whole
+        `FallbackLLMProvider`, not inside it one model at a time, so a
+        completion record reading `.last_model_used` off the provider
+        `CompositionRoot.llm_for` hands out needs it to reach one level in --
+        the same reason `.model` and `.dialect` above already proxy. `None`
+        for a lone provider underneath, which never had this attribute.
+        """
+        return getattr(self._provider, "last_model_used", None)
+
+    @property
+    def last_attempted_model(self) -> Optional[str]:
+        """Proxies `FallbackLLMProvider.last_attempted_model` (IR-387) --
+        see `last_model_used` above for why this breaker must forward it."""
+        return getattr(self._provider, "last_attempted_model", None)
 
     def generate(self, system: str, user: str) -> str:
         return self._breaker.call(lambda: self._provider.generate(system, user))
@@ -404,7 +433,14 @@ class LLMProviderConfig:
         return f"{self.base_url or ''}::{self.model or ''}"
 
 
-def _wrap(config: LLMProviderConfig) -> LLMProvider:
+def _build_retrying(config: LLMProviderConfig) -> LLMProvider:
+    """The adapter `config` describes, retried but not yet circuit-broken.
+
+    Where the breaker goes is the caller's decision: `_wrap` puts one around
+    each legacy config below, `build_task_llm` puts one around a whole
+    Inference task's model list instead (IR-386). Both start from this same
+    unbroken candidate rather than duplicating the adapter construction.
+    """
     from apps.ai.providers.dialects import dialect_for
     from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
 
@@ -416,8 +452,44 @@ def _wrap(config: LLMProviderConfig) -> LLMProvider:
         dialect=dialect_for(config.vendor),
         fallback_models=config.fallback_models,
     )
-    retrying = RetryingLLMProvider(adapter)
-    return CircuitBreakingLLMProvider(retrying, breaker=breaker_for(config.key))
+    return RetryingLLMProvider(adapter)
+
+
+def _wrap(config: LLMProviderConfig) -> LLMProvider:
+    return CircuitBreakingLLMProvider(
+        _build_retrying(config), breaker=breaker_for(config.key)
+    )
+
+
+def build_task_llm(
+    configs: Sequence[LLMProviderConfig], breaker_key: str
+) -> LLMProvider:
+    """Every candidate in `configs` retried individually, combined into a
+    `FallbackLLMProvider` when there is more than one, under **one** circuit
+    breaker for the whole list, keyed by `breaker_key` (IR-386).
+
+    This is what an Inference task's model list is built with instead of
+    `build_resilient_llm`: that function gives every config its own breaker
+    (`_wrap`), which is right for the flat, task-less `LLM_*` settings it
+    still serves, but wrong for a Profile's fallback list, where a switch
+    inside `FallbackLLMProvider` would otherwise trip the *first* model's
+    breaker on a failure the list as a whole recovered from. Here the breaker
+    sees a failure only when `combined` itself raises -- every candidate in
+    one call having raised, or there being nothing left to switch to -- so
+    exhausting the list is what counts against it, not one model along the
+    way.
+
+    `breaker_key` also stops two Inference tasks pointed at the same vendor
+    and model from sharing a breaker: `_wrap`'s key is the model's own
+    identity (`base_url::model`), which cannot tell two tasks apart when
+    both happen to name the same one.
+    """
+    if not configs:
+        raise ValueError("build_task_llm needs at least one provider config")
+
+    candidates = [_build_retrying(config) for config in configs]
+    combined = candidates[0] if len(candidates) == 1 else FallbackLLMProvider(candidates)
+    return CircuitBreakingLLMProvider(combined, breaker=breaker_for(breaker_key))
 
 
 def _configured_providers() -> list[LLMProviderConfig]:
