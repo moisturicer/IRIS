@@ -276,8 +276,8 @@ class CompositionRoot:
         key, never whether the vendor behind it has ever answered. What
         distinguishes the two without a live probe on every status request is
         ``apps.ai.resilience.llm.any_provider_reachable``, which reads the
-        breaker state IR-321 already keeps for each configured provider: one
-        has tripped only after real ``generate()`` calls actually failed
+        ``answer`` task's own breaker state (IR-321, keyed as IR-386 keys it):
+        it has tripped only after real ``generate()`` calls actually failed
         against it, so an open breaker is evidence the vendor is down, not a
         guess.
         """

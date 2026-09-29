@@ -490,11 +490,12 @@ def build_task_llm(
 def _configured_providers() -> list[LLMProviderConfig]:
     """The one provider the flat `LLM_*` settings describe.
 
-    Read only by `any_provider_reachable()` below -- the `answer` Profile
-    inherits these settings (`apps/ai/inference/profiles.py`), so this is
-    still the account most deployments actually reach, even though nothing
-    here builds a client from it any more (IR-388 deleted the untasked `llm()`
-    accessor that used to).
+    One, not a list: the `LLM_FALLBACK_*` second vendor was deleted in
+    IR-385, so the flat settings describe a single account again
+    (`apps/ai/inference/tests/test_fallback.py`'s own check on this). Not
+    read by `any_provider_reachable()` below any more (IR-388) -- see that
+    function's docstring for why a config here is the wrong key to check a
+    breaker against.
     """
     from django.conf import settings
 
@@ -508,26 +509,27 @@ def _configured_providers() -> list[LLMProviderConfig]:
 
 
 def any_provider_reachable() -> bool:
-    """Whether at least one configured provider's breaker is not open
-    (IR-252).
+    """Whether the `answer` task's breaker is not open (IR-252).
 
     Reads breaker state only -- it never calls a vendor to answer this. A
     breaker only opens after real `generate()` calls actually failed against
     it (`CircuitBreakingLLMProvider`), so this is the process's own memory of
-    which configured providers have been observed to work, not a guess from
-    a key string. One config since IR-385 deleted the cross-vendor entry,
-    so this reads that provider's own breaker.
+    whether the account has been observed to work, not a guess from a key
+    string.
 
-    Lives here rather than in `apps/ai/composition.py`, which used to read
-    `breaker_for` and `_configured_providers` directly: this module already
-    owns the breaker registry and the provider list, and a second module
-    walking both is the "second copy of that knowledge" the composition
-    root's own docstring warns against -- just one layer removed from the
-    setting itself.
+    **Keyed on the Inference task, not on `LLMProviderConfig.key` (IR-388).**
+    `build_task_llm` (IR-386) put the breaker every production call actually
+    trips behind `InferenceTask.breaker_key` -- `"inference-task::answer"` --
+    not behind `base_url::model`. Reading `_configured_providers()`'s key
+    here, as this function did until IR-388 deleted the untasked `llm()`
+    accessor that was the last thing tripping *that* breaker, would check a
+    breaker nothing production ever opens: `generation_configured()` would
+    report `True` forever, regardless of real failures -- IR-252's bug,
+    reopened by a different route. `answer` is hardcoded rather than passed
+    in because this is what `/status/`'s `generative` field has always meant:
+    whether Ask IRIS, specifically, would answer.
     """
+    from apps.ai.inference.tasks import InferenceTask
     from apps.ai.resilience.circuit import CircuitState
 
-    return any(
-        breaker_for(config.key).state is not CircuitState.OPEN
-        for config in _configured_providers()
-    )
+    return breaker_for(InferenceTask.ANSWER.breaker_key).state is not CircuitState.OPEN
