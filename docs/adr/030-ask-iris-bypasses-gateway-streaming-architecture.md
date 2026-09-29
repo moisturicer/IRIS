@@ -67,6 +67,10 @@ The gateway's justification was always the async/streaming shape of LLM calls (A
 
 ADR-014's six preconditions are all met and a deliberate decision is made to route chat generation through the deployed gateway instead of in-process — at that point this ADR would be superseded, not amended, per this project's ADR discipline.
 
+## Amendment — 2026-09-29 (IR-388): the seam's name, not its architecture
+
+The 2026-09-22 audit above cites `CompositionRoot.llm()` (`backend/apps/ai/composition.py:157-166` at the time) as the in-process LLM seam. IR-388 deleted that accessor — every caller now reaches a model through `llm_for(task)`, one Inference task at a time (IR-375/IR-378). The architecture this ADR records is unchanged: the seam is still in-process, still `LLMProvider`-shaped, and still never calls the gateway. Only the accessor's name and the line numbers citing it are stale; a reader following this audit to the code should read `llm_for(task)` for `llm()`.
+
 ## MVP Impact
 
 None. This corrects the record and sets direction for IR-323's streaming subtasks; it changes no shipped behavior by itself.

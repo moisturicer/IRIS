@@ -19,7 +19,6 @@ from apps.ai.resilience.llm import (
     LLMProviderConfig,
     RetryingLLMProvider,
     breaker_for,
-    build_resilient_llm,
     build_task_llm,
     is_switchable_failure,
     reset_llm_breakers,
@@ -248,7 +247,7 @@ class BreakerRegistryTests:
 
     def test_state_survives_a_fresh_composition_root(self):
         """`composition_root()` builds a new `CompositionRoot()` per request
-        when nothing is installed -- a breaker built inside `llm()` would
+        when nothing is installed -- a breaker built inside `llm_for()` would
         never accumulate a failure past that one request. The registry is
         what makes the failure count below actually add up."""
         llm = _ScriptedLLM(kind=ErrorKind.NETWORK, fail_times=None)
@@ -263,27 +262,6 @@ class BreakerRegistryTests:
         provider = CircuitBreakingLLMProvider(llm, breaker=breaker_for("shared-key"))
         with pytest.raises(CircuitOpen):
             provider.generate("s", "u")
-
-
-class BuildResilientLLMTests:
-    def test_a_single_config_is_wrapped_but_not_fallback_composed(self):
-        provider = build_resilient_llm(
-            [LLMProviderConfig(base_url="https://a.test", api_key="k", model="m")]
-        )
-        assert isinstance(provider, CircuitBreakingLLMProvider)
-
-    def test_more_than_one_config_composes_a_fallback(self):
-        provider = build_resilient_llm(
-            [
-                LLMProviderConfig(base_url="https://a.test", api_key="k1", model="a"),
-                LLMProviderConfig(base_url="https://b.test", api_key="k2", model="b"),
-            ]
-        )
-        assert isinstance(provider, FallbackLLMProvider)
-
-    def test_it_refuses_an_empty_config_list(self):
-        with pytest.raises(ValueError):
-            build_resilient_llm([])
 
 
 class BuildTaskLLMTests:

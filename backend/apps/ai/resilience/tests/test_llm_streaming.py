@@ -111,7 +111,7 @@ class DeltasSurviveTheDecoratorsTests:
 
     def test_the_whole_configured_stack_keeps_them_separate(self):
         """Retry inside circuit-breaking inside fallback — the shape
-        `build_resilient_llm` composes."""
+        `build_task_llm` composes."""
         llm = _StreamingLLM()
         stack = FallbackLLMProvider(
             [CircuitBreakingLLMProvider(RetryingLLMProvider(llm, sleep=_Sleeper()))]

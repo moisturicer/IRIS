@@ -2,7 +2,7 @@
 
 One adapter per protocol (ADR-021), so a Profile is a `base_url`, an
 `api_key` and a model list -- and the list is walked by the same resilience
-stack `CompositionRoot.llm()` already used, not by a second one.
+stack every task shares, `apps.ai.resilience.llm.build_task_llm`.
 
 **Who walks the list depends on the vendor** (IR-385). Both routes stay inside
 one account, which is the only kind of fallback ADR-008 §Amendment permits:
@@ -23,12 +23,12 @@ Its settings and the config they built are deleted, so a Profile's fallback
 list is the only fallback there is.
 
 **One circuit breaker for the whole list, keyed on the task (IR-386).**
-`build_task_llm`, not `build_resilient_llm`: the latter gives every config its
-own breaker keyed on `base_url::model`, which would let two tasks sharing a
-vendor and model share a breaker too -- a busy `summary` tripping it would
-stop `answer` for a reason that has nothing to do with answering. Keying on
-`profile.task.breaker_key` instead means each task's breaker only opens once
-every model in *its own* list has failed a call, not on the first one.
+`build_task_llm`, not a per-model breaker: the latter would let two tasks
+sharing a vendor and model share a breaker too -- a busy `summary` tripping
+it would stop `answer` for a reason that has nothing to do with answering.
+Keying on `profile.task.breaker_key` instead means each task's breaker only
+opens once every model in *its own* list has failed a call, not on the first
+one.
 """
 
 from __future__ import annotations
