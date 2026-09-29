@@ -4,6 +4,7 @@ from datetime import timedelta
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
+from apps.ai.extraction.docling_client import TABLE_MODES as _DOCLING_TABLE_MODES
 from .validation import missing_required, non_blank
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -583,10 +584,12 @@ DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int
 # meaningful share of the corpus is scanned submissions with no text layer at
 # all, and ADR-016 dropped the fallback extractor that used to cover that case.
 DOCLING_DO_OCR = config("DOCLING_DO_OCR", default=True, cast=bool)
+# TABLE_MODES lives on the extractor, not here, so there is one definition of
+# what docling-serve accepts rather than two that can silently disagree.
 DOCLING_TABLE_MODE = config("DOCLING_TABLE_MODE", default="accurate")
-if DOCLING_TABLE_MODE not in ("accurate", "fast"):
+if DOCLING_TABLE_MODE not in _DOCLING_TABLE_MODES:
     raise ImproperlyConfigured(
-        f"DOCLING_TABLE_MODE must be 'accurate' or 'fast', got {DOCLING_TABLE_MODE!r}."
+        f"DOCLING_TABLE_MODE must be one of {_DOCLING_TABLE_MODES!r}, got {DOCLING_TABLE_MODE!r}."
     )
 DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=True, cast=bool)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing

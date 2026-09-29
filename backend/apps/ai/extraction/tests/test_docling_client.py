@@ -132,6 +132,21 @@ def test_an_unrecognised_table_mode_is_rejected():
         DoclingExtractor(BASE_URL, table_mode="thorough")
 
 
+def test_do_formula_enrichment_is_configurable():
+    """An equation-dense paper can make this the dominant extraction cost
+    (IR-367 ticket comment, 2026-09-30) — a deployment needs to be able to
+    turn it off the same way it can turn off do_ocr."""
+    seen = {}
+
+    def handler(request):
+        seen["body"] = request.content.decode("utf-8", "replace")
+        return httpx.Response(200, json={"document": {"json_content": _DOCUMENT}})
+
+    _extractor(handler, do_formula_enrichment=False).extract(b"pdf", filename="thesis.pdf")
+
+    assert re.search(r'name="do_formula_enrichment"\r?\n\r?\nfalse', seen["body"])
+
+
 def test_it_asks_for_formula_enrichment():
     """ADR-025: without this, an equation returns as whatever the text layer
     held — mangled glyphs or nothing — rather than as LaTeX."""
