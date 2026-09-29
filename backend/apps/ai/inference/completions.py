@@ -76,14 +76,31 @@ class CompletionLoggingLLMProvider(LLMProvider):
         return getattr(self._provider, "dialect", DEFAULT_DIALECT)
 
     def _model_used(self) -> str:
-        """Which model answered, or was last tried when every one failed.
+        """Which model answered a clean call.
 
-        `last_model_used` exists only on `FallbackLLMProvider`; for a lone
-        provider, or before any call has run, `.model` is the only model
-        there ever was.
+        `last_model_used` exists only on `FallbackLLMProvider`, and only
+        once a call has actually returned; for a lone provider, or before
+        any call has run, `.model` is the only model there ever was.
         """
         return getattr(self._provider, "last_model_used", None) or getattr(
             self._provider, "model", self._profile.model
+        )
+
+    def _model_attempted(self) -> str:
+        """Which model raised the failure just caught.
+
+        `FallbackLLMProvider.last_model_used` is set only on success
+        (`resilience/llm.py`'s own docstring) -- on total exhaustion it is
+        stale or unset, which would blame the model configured first for a
+        failure a *later* model in the list actually raised.
+        `last_attempted_model` is set before every attempt, so it names the
+        model whose exception this record is describing, the same
+        distinction `error_kind` already makes explicit.
+        """
+        return (
+            getattr(self._provider, "last_attempted_model", None)
+            or getattr(self._provider, "last_model_used", None)
+            or getattr(self._provider, "model", self._profile.model)
         )
 
     @staticmethod
@@ -121,7 +138,7 @@ class CompletionLoggingLLMProvider(LLMProvider):
             text = self._provider.generate(system, user)
         except Exception as exc:
             self._record(
-                model=self._model_used(),
+                model=self._model_attempted(),
                 reasoning_present=False,
                 error_kind=self._error_kind(exc),
             )
@@ -140,7 +157,7 @@ class CompletionLoggingLLMProvider(LLMProvider):
                 yield delta
         except Exception as exc:
             self._record(
-                model=self._model_used(),
+                model=self._model_attempted(),
                 reasoning_present=reasoning_present,
                 error_kind=self._error_kind(exc),
             )

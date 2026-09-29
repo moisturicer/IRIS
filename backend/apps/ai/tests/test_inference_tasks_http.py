@@ -279,3 +279,38 @@ class CompletionLoggingWiredThroughLlmForTests:
         assert len(records) == 1
         assert records[0].model == "second-model"
         assert records[0].fallback_fired is True
+
+    def test_exhausting_the_fallback_list_names_the_last_model_tried(
+        self, completion_logs, settings, monkeypatch, embedder, space, client_for
+    ):
+        """When every model on the account fails, the record must not blame
+        the one configured first -- `FallbackLLMProvider.last_model_used`
+        is set only on success, so the record has to be built from
+        `last_attempted_model` instead for this to be right."""
+        import openai
+
+        rate_limited = RuntimeError("rate limit exceeded")
+        vendor = _RecordingVendor(
+            failing={"first-model": rate_limited, "second-model": rate_limited}
+        )
+        monkeypatch.setattr(openai, "OpenAI", vendor)
+
+        settings.LLM_ANSWER_MODEL = "first-model"
+        settings.LLM_ANSWER_FALLBACK_MODELS = "second-model"
+        settings.LLM_ANSWER_API_KEY = "one-account-key"
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        with use_composition_root(_root(embedder)):
+            body = ask(client_for(reader), FLOOD_QUESTION).json()
+
+        assert body["mode"] == "unavailable"
+        records = [
+            r for r in completion_logs.records if r.name == COMPLETION_LOGGER
+        ]
+        assert len(records) == 1
+        assert records[0].model == "second-model"
+        assert records[0].fallback_fired is True
+        assert records[0].error_kind == "rate_limit"

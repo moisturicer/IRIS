@@ -185,6 +185,33 @@ class FallbackLLMProviderTests:
         with pytest.raises(ValueError):
             FallbackLLMProvider([])
 
+    def test_last_attempted_model_names_the_one_that_answered(self):
+        """On success, the last attempt and the answering model agree --
+        `last_attempted_model` is not a second, diverging source of truth
+        for this case, only for the one `last_model_used` cannot cover."""
+        primary = _ScriptedLLM(model="primary")
+        provider = FallbackLLMProvider([primary])
+
+        provider.generate("s", "u")
+
+        assert provider.last_attempted_model == "primary"
+        assert provider.last_attempted_model == provider.last_model_used
+
+    def test_last_attempted_model_survives_total_exhaustion(self):
+        """`last_model_used` is set only on success (see the class
+        docstring), so it cannot name the model an exhausted list's failure
+        belongs to -- IR-387 needs exactly that for a completion record
+        built from the exception."""
+        primary = _ScriptedLLM(model="primary", kind=ErrorKind.NETWORK, fail_times=None)
+        fallback = _ScriptedLLM(model="fallback", kind=ErrorKind.NETWORK, fail_times=None)
+        provider = FallbackLLMProvider([primary, fallback])
+
+        with pytest.raises(LLMUnavailable):
+            provider.generate("s", "u")
+
+        assert provider.last_attempted_model == "fallback"
+        assert provider.last_model_used is None
+
 
 class BreakerRegistryTests:
     def test_the_same_key_returns_the_same_breaker(self):

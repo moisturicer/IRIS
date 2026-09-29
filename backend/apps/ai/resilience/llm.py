@@ -256,6 +256,14 @@ class FallbackLLMProvider(LLMProvider):
     assumption cannot survive undetected, so a caller reads which model
     actually produced the answer rather than assuming it was the first one
     configured.
+
+    **`last_attempted_model` is the pair to it for a call that never
+    answered at all** (IR-387). `last_model_used` is set only on success --
+    on total exhaustion it stays whatever it was before this call, which is
+    the wrong model to blame for the failure that just propagated. This is
+    set before every attempt, success or not, so a caller building a
+    completion record from the exception can still name the model whose
+    failure it is reporting.
     """
 
     def __init__(
@@ -268,6 +276,7 @@ class FallbackLLMProvider(LLMProvider):
         self._providers = list(providers)
         self._switch_on = switch_on
         self.last_model_used: Optional[str] = None
+        self.last_attempted_model: Optional[str] = None
 
     @property
     def model(self) -> str:
@@ -286,6 +295,7 @@ class FallbackLLMProvider(LLMProvider):
     def generate(self, system: str, user: str) -> str:
         failure: Optional[BaseException] = None
         for provider in self._providers:
+            self.last_attempted_model = getattr(provider, "model", None)
             try:
                 text = provider.generate(system, user)
             except Exception as exc:
@@ -294,7 +304,7 @@ class FallbackLLMProvider(LLMProvider):
                 failure = exc
                 self._log_switch(provider, exc)
                 continue
-            self.last_model_used = getattr(provider, "model", None)
+            self.last_model_used = self.last_attempted_model
             return text
         # Every provider raised and every raise was switch-worthy, or there
         # was exactly one provider -- either way `failure` was set on the
@@ -312,6 +322,7 @@ class FallbackLLMProvider(LLMProvider):
         """
         failure: Optional[BaseException] = None
         for provider in self._providers:
+            self.last_attempted_model = getattr(provider, "model", None)
             try:
                 opened = _open_stream(lambda p=provider: p.stream(system, user))
             except Exception as exc:
@@ -320,7 +331,7 @@ class FallbackLLMProvider(LLMProvider):
                 failure = exc
                 self._log_switch(provider, exc)
                 continue
-            self.last_model_used = getattr(provider, "model", None)
+            self.last_model_used = self.last_attempted_model
             yield from _yield_from_opened(opened)
             return
         assert failure is not None

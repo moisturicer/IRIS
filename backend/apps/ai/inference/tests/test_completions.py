@@ -176,6 +176,33 @@ class FallbackFiredTests:
         assert record.model == "second"
         assert record.fallback_fired is True
 
+    def test_exhausting_the_list_names_the_last_model_tried_not_the_first(
+        self, caplog
+    ):
+        """`FallbackLLMProvider.last_model_used` is set only on success, so a
+        call where every model failed cannot be read through it -- that
+        would report the model configured first as the one whose failure
+        this record describes, when it was actually the last one tried
+        (IR-387: 'the model actually used ... not the one configured
+        first' applies to a failed call too, not only a successful one)."""
+        caplog.set_level("INFO", logger=LOGGER_NAME)
+        first = _ScriptedLLM(
+            model="first", failure=LLMUnavailable("down", kind=ErrorKind.RATE_LIMIT)
+        )
+        second = _ScriptedLLM(
+            model="second", failure=LLMUnavailable("also down", kind=ErrorKind.RATE_LIMIT)
+        )
+        inner = FallbackLLMProvider([first, second])
+        llm = CompletionLoggingLLMProvider(inner, _profile("first", ("second",)))
+
+        with pytest.raises(LLMUnavailable):
+            llm.generate(system="s", user="u")
+
+        record = _log(caplog)
+        assert record.model == "second"
+        assert record.fallback_fired is True
+        assert record.error_kind == ErrorKind.RATE_LIMIT.value
+
 
 class StreamTests:
     def test_reasoning_arriving_on_any_delta_is_reported(self, caplog):
