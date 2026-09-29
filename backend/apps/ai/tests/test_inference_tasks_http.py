@@ -196,3 +196,37 @@ class ExhaustingTheFallbackListTests:
         assert set(vendor.credentials) == {
             ("one-account-key", "https://api.groq.com/openai/v1")
         }
+
+
+class AnOpenTaskBreakerStillDegradesTests:
+    """IR-386's acceptance criterion in its own terms: an open breaker must
+    still produce the unavailable state with sources, at the same HTTP
+    boundary, once it is the *task's* breaker (not a model's) that trips."""
+
+    def test_the_answer_tasks_own_breaker_opening_degrades_the_next_request(
+        self, settings, vendor, embedder, space, client_for
+    ):
+        from apps.ai.resilience.llm import breaker_for
+
+        settings.LLM_ANSWER_MODEL = "the-answer-model"
+        settings.LLM_ANSWER_API_KEY = "answer-key"
+        vendor._failing["the-answer-model"] = RuntimeError("rate limit exceeded")
+
+        breaker = breaker_for(InferenceTask.ANSWER.breaker_key)
+        breaker._failure_threshold = 1  # noqa: SLF001 -- test-only
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        with use_composition_root(_root(embedder)):
+            first = ask(client_for(reader), FLOOD_QUESTION).json()
+            # The breaker is open now -- a second request must not reach the
+            # vendor again, only the task's own model list already did.
+            second = ask(client_for(reader), FLOOD_QUESTION).json()
+
+        for body in (first, second):
+            assert body["answer"] is None
+            assert body["mode"] == "unavailable"
+            assert body["sources"], "sources must still be returned (ADR-008)"
+        assert len(vendor.calls) == 1
