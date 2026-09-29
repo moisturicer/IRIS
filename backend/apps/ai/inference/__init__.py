@@ -1,5 +1,6 @@
 """Inference tasks and their Profiles (IR-378)."""
 
+from .completions import CompletionLoggingLLMProvider
 from .profiles import (
     DataPolicy,
     Profile,
@@ -18,6 +19,7 @@ from .startup import (
 from .tasks import InferenceTask, UnknownInferenceTask, inference_task
 
 __all__ = [
+    "CompletionLoggingLLMProvider",
     "DataPolicy",
     "InferenceTask",
     "Profile",

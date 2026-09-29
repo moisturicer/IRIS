@@ -21,8 +21,9 @@ def _resolution_on(settings):
 
 
 def _adapter(resolver):
-    """The OpenAI-compatible adapter under the resilience wrapping."""
-    return resolver._llm._provider._provider  # noqa: SLF001
+    """The OpenAI-compatible adapter under the completion-logging and
+    resilience wrapping (IR-387 adds the outermost layer)."""
+    return resolver._llm._provider._provider._provider  # noqa: SLF001
 
 
 class ResolverModelTests:

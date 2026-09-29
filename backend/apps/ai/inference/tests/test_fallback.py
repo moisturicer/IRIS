@@ -161,6 +161,29 @@ class GroqWalksTheListItselfTests:
             ("one-account-key", "https://api.groq.com/openai/v1")
         }
 
+    def test_last_attempted_model_names_the_last_one_tried_through_the_breaker(
+        self, settings, monkeypatch
+    ):
+        """IR-387's completion record reads `last_attempted_model` off
+        whatever `build_profile_llm` returns -- which is the outer
+        `CircuitBreakingLLMProvider` since IR-386, not the
+        `FallbackLLMProvider` underneath it. `last_model_used` alone would
+        report `None` here (it is set only on success), and the model that
+        answered fell back to `providers[0]` -- "first" -- which would
+        blame the wrong model for a failure "second" actually raised."""
+        _vendor(
+            monkeypatch,
+            failing={"first": _rate_limited(), "second": _rate_limited()},
+        )
+        llm = _answer_llm(settings, "groq", "first", "second")
+
+        with pytest.raises(LLMUnavailable):
+            llm.generate(system="s", user="u")
+
+        assert isinstance(llm, CircuitBreakingLLMProvider)
+        assert llm.last_attempted_model == "second"
+        assert llm.last_model_used is None
+
 
 class OpenRouterResolvesTheListItselfTests:
     """OpenRouter reads the whole list from one request, so IRIS does not

@@ -125,6 +125,31 @@ class CircuitBreakingLLMProviderTests:
         # was never asked.
         assert llm.calls == 2
 
+    def test_it_proxies_last_model_used_and_last_attempted_model(self):
+        """`build_task_llm` (IR-386) puts this breaker *around* a task's
+        whole `FallbackLLMProvider` rather than inside it one model at a
+        time, so a completion record (IR-387) reading these off whatever
+        `CompositionRoot.llm_for` hands out needs them to reach one level
+        in -- the same reason `.model` and `.dialect` already do."""
+        primary = _ScriptedLLM(model="primary", kind=ErrorKind.RATE_LIMIT, fail_times=None)
+        spare = _ScriptedLLM(model="spare")
+        inner = FallbackLLMProvider([primary, spare])
+        provider = CircuitBreakingLLMProvider(inner, breaker=CircuitBreaker())
+
+        assert provider.generate("s", "u") == "answer from spare"
+
+        assert provider.last_model_used == "spare"
+        assert provider.last_attempted_model == "spare"
+
+    def test_last_model_used_is_none_for_a_lone_provider(self):
+        """The single-model shape `build_task_llm` returns when a Profile
+        has no fallback list -- nothing underneath ever had this
+        attribute, so the proxy must not invent a value."""
+        provider = CircuitBreakingLLMProvider(_ScriptedLLM(), breaker=CircuitBreaker())
+
+        assert provider.last_model_used is None
+        assert provider.last_attempted_model is None
+
 
 class SwitchableFailureTests:
     def test_rate_limit_network_and_timeout_are_switchable(self):
@@ -185,6 +210,33 @@ class FallbackLLMProviderTests:
     def test_it_needs_at_least_one_provider(self):
         with pytest.raises(ValueError):
             FallbackLLMProvider([])
+
+    def test_last_attempted_model_names_the_one_that_answered(self):
+        """On success, the last attempt and the answering model agree --
+        `last_attempted_model` is not a second, diverging source of truth
+        for this case, only for the one `last_model_used` cannot cover."""
+        primary = _ScriptedLLM(model="primary")
+        provider = FallbackLLMProvider([primary])
+
+        provider.generate("s", "u")
+
+        assert provider.last_attempted_model == "primary"
+        assert provider.last_attempted_model == provider.last_model_used
+
+    def test_last_attempted_model_survives_total_exhaustion(self):
+        """`last_model_used` is set only on success (see the class
+        docstring), so it cannot name the model an exhausted list's failure
+        belongs to -- IR-387 needs exactly that for a completion record
+        built from the exception."""
+        primary = _ScriptedLLM(model="primary", kind=ErrorKind.NETWORK, fail_times=None)
+        fallback = _ScriptedLLM(model="fallback", kind=ErrorKind.NETWORK, fail_times=None)
+        provider = FallbackLLMProvider([primary, fallback])
+
+        with pytest.raises(LLMUnavailable):
+            provider.generate("s", "u")
+
+        assert provider.last_attempted_model == "fallback"
+        assert provider.last_model_used is None
 
 
 class BreakerRegistryTests:

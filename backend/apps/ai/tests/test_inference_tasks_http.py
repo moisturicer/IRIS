@@ -9,12 +9,14 @@ request the adapter built.
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import pytest
 
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.inference import InferenceTask
+from apps.ai.inference.completions import LOGGER_NAME as COMPLETION_LOGGER
 from apps.ai.providers.fakes import ScriptedReranker
 from apps.ai.resilience.llm import reset_llm_breakers
 
@@ -28,6 +30,36 @@ def _clean_breaker_registry():
     reset_llm_breakers()
     yield
     reset_llm_breakers()
+
+
+@pytest.fixture
+def completion_logs(caplog):
+    """`caplog`, actually wired to the completion logger (IR-387).
+
+    `apps` sets `propagate: False` in `config/settings/base.py`, so records
+    logged under it never reach the root logger caplog captures at by
+    default.
+
+    This toggles `apps`'s own propagation back on for the test rather than
+    attaching `caplog.handler` directly to the completion logger (the older
+    fixture shape `apps/ai/answers/tests/test_service.py`'s `service_logs`
+    uses): pytest 9 changed `caplog` to auto-attach its handler to every
+    *non-propagating* logger it finds -- `apps` included -- specifically to
+    fix this exact problem, so a manual attachment here would
+    double-deliver every record under pytest 9 while still being required
+    for pytest 8, which has no such fix. Restoring propagation instead
+    works unchanged on both: the record reaches root -- where caplog
+    always attaches -- exactly once either way. A caller reads
+    `caplog.records` as usual once the test body has run.
+    """
+    apps_logger = logging.getLogger("apps")
+    original_propagate = apps_logger.propagate
+    apps_logger.propagate = True
+    caplog.set_level(logging.INFO, logger=COMPLETION_LOGGER)
+    try:
+        yield caplog
+    finally:
+        apps_logger.propagate = original_propagate
 
 
 class _RecordingVendor:
@@ -196,6 +228,103 @@ class ExhaustingTheFallbackListTests:
         assert set(vendor.credentials) == {
             ("one-account-key", "https://api.groq.com/openai/v1")
         }
+
+
+class CompletionLoggingWiredThroughLlmForTests:
+    """IR-387: `llm_for` is the one seam every production caller reaches a
+    task's model through, so wiring the completion logger there (rather than
+    into `build_profile_llm` itself, which existing tests assert returns a
+    bare `FallbackLLMProvider`) means the whole HTTP path gets one record per
+    call for free."""
+
+    def test_a_real_answer_call_emits_a_completion_record(
+        self, completion_logs, settings, vendor, embedder, space, client_for
+    ):
+        settings.LLM_ANSWER_MODEL = "the-answer-model"
+        settings.LLM_ANSWER_API_KEY = "answer-key"
+        settings.LLM_ANSWER_VENDOR = "groq"
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        with use_composition_root(_root(embedder)):
+            ask(client_for(reader), FLOOD_QUESTION)
+
+        records = [
+            r for r in completion_logs.records if r.name == COMPLETION_LOGGER
+        ]
+        assert len(records) == 1
+        assert records[0].inference_task == "answer"
+        assert records[0].vendor == "groq"
+        assert records[0].model == "the-answer-model"
+        assert records[0].fallback_fired is False
+        assert records[0].error_kind is None
+
+    def test_a_fallback_that_fires_is_named_in_the_record(
+        self, completion_logs, settings, monkeypatch, embedder, space, client_for
+    ):
+        """The record's `model` is the one that actually answered, not the
+        one configured first -- the same guarantee `last_model_used` gives
+        `answers/service.py` (IR-385)."""
+        import openai
+
+        rate_limited = RuntimeError("rate limit exceeded")
+        vendor = _RecordingVendor(failing={"first-model": rate_limited})
+        monkeypatch.setattr(openai, "OpenAI", vendor)
+
+        settings.LLM_ANSWER_MODEL = "first-model"
+        settings.LLM_ANSWER_FALLBACK_MODELS = "second-model"
+        settings.LLM_ANSWER_API_KEY = "one-account-key"
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        with use_composition_root(_root(embedder)):
+            ask(client_for(reader), FLOOD_QUESTION)
+
+        records = [
+            r for r in completion_logs.records if r.name == COMPLETION_LOGGER
+        ]
+        assert len(records) == 1
+        assert records[0].model == "second-model"
+        assert records[0].fallback_fired is True
+
+    def test_exhausting_the_fallback_list_names_the_last_model_tried(
+        self, completion_logs, settings, monkeypatch, embedder, space, client_for
+    ):
+        """When every model on the account fails, the record must not blame
+        the one configured first -- `FallbackLLMProvider.last_model_used`
+        is set only on success, so the record has to be built from
+        `last_attempted_model` instead for this to be right."""
+        import openai
+
+        rate_limited = RuntimeError("rate limit exceeded")
+        vendor = _RecordingVendor(
+            failing={"first-model": rate_limited, "second-model": rate_limited}
+        )
+        monkeypatch.setattr(openai, "OpenAI", vendor)
+
+        settings.LLM_ANSWER_MODEL = "first-model"
+        settings.LLM_ANSWER_FALLBACK_MODELS = "second-model"
+        settings.LLM_ANSWER_API_KEY = "one-account-key"
+
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT,
+                    embedder=embedder, space=space)
+
+        with use_composition_root(_root(embedder)):
+            body = ask(client_for(reader), FLOOD_QUESTION).json()
+
+        assert body["mode"] == "unavailable"
+        records = [
+            r for r in completion_logs.records if r.name == COMPLETION_LOGGER
+        ]
+        assert len(records) == 1
+        assert records[0].model == "second-model"
+        assert records[0].fallback_fired is True
+        assert records[0].error_kind == "rate_limit"
 
 
 class AnOpenTaskBreakerStillDegradesTests:
