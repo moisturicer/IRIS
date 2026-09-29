@@ -39,22 +39,24 @@ EXTRACTOR_NAME = "docling"
 
 _CONVERT_PATH = "/v1/convert/file"
 
-# OCR is on because a meaningful share of the corpus is scanned submissions,
-# and Docling's own OCR is the reason ADR-016 could drop a separate OCR
-# fallback library. Accurate table structure is on because theses are full of
-# tables and a table read as prose retrieves as noise. Formula enrichment is
-# on so an equation returns as LaTeX rather than mangled text-layer glyphs
-# (ADR-025). Images are off: the citation overlay draws regions over the real
-# PDF, so a rendered picture would be megabytes of derived asset nothing
-# reads.
-_CONVERT_OPTIONS: dict[str, Any] = {
-    "to_formats": ["json"],
-    "do_ocr": "true",
-    "do_table_structure": "true",
-    "table_mode": "accurate",
-    "do_formula_enrichment": "true",
-    "include_images": "false",
-}
+# do_ocr, table_mode and do_formula_enrichment are IR-367/DOCLING_* settings,
+# not constants here — a CPU-only deployment bulk-loading born-digital PDFs
+# (an exact text layer already) pays for RapidOCR and accurate table/formula
+# passes it gets no benefit from. Defaults below match what this dict used to
+# hardcode, so an unconfigured deployment behaves exactly as before. Images
+# stay off unconditionally: the citation overlay draws regions over the real
+# PDF, so a rendered picture would be megabytes of derived asset nothing reads.
+_DEFAULT_DO_OCR = True
+_DEFAULT_TABLE_MODE = "accurate"
+_DEFAULT_DO_FORMULA_ENRICHMENT = True
+
+TABLE_MODES = ("accurate", "fast")
+
+
+def _bool_str(value: bool) -> str:
+    """docling-serve reads its multipart booleans as the strings "true"/"false"."""
+    return "true" if value else "false"
+
 
 # Statuses docling-serve can report on a conversion it nonetheless returned
 # a 200 for. Anything not listed here is treated as usable — "partial_success"
@@ -87,10 +89,24 @@ class DoclingExtractor:
         *,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         client: Optional[httpx.Client] = None,
+        do_ocr: bool = _DEFAULT_DO_OCR,
+        table_mode: str = _DEFAULT_TABLE_MODE,
+        do_formula_enrichment: bool = _DEFAULT_DO_FORMULA_ENRICHMENT,
     ):
+        if table_mode not in TABLE_MODES:
+            raise ValueError(f"table_mode must be one of {TABLE_MODES!r}, got {table_mode!r}")
+
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._client = client
+        self._convert_options: dict[str, Any] = {
+            "to_formats": ["json"],
+            "do_ocr": _bool_str(do_ocr),
+            "do_table_structure": "true",
+            "table_mode": table_mode,
+            "do_formula_enrichment": _bool_str(do_formula_enrichment),
+            "include_images": "false",
+        }
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument:
         payload = self._convert(pdf_bytes, filename=filename)
@@ -131,7 +147,7 @@ class DoclingExtractor:
 
     def _post(self, client: httpx.Client, url: str, files: dict) -> httpx.Response:
         return client.post(
-            url, files=files, data=_CONVERT_OPTIONS, timeout=self._timeouts()
+            url, files=files, data=self._convert_options, timeout=self._timeouts()
         )
 
     def _timeouts(self) -> httpx.Timeout:

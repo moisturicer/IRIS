@@ -572,6 +572,23 @@ DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:500
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.
 DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)
+# IR-367: these three were a hardcoded dict on every conversion, so a CPU-only
+# deployment paid RapidOCR plus accurate table/formula passes even on a
+# born-digital PDF whose text layer is already exact. Defaults keep today's
+# behaviour — measurement on the dev stack did not produce a reliable,
+# reproducible win from changing any of them (see the IR-367 ticket comments:
+# repeat runs of the identical option set varied by over 30x, which tracks to
+# docling-serve's own worker/model-loading state under
+# DOCLING_SERVE_CONCURRENCY, not to these flags). OCR stays on because a
+# meaningful share of the corpus is scanned submissions with no text layer at
+# all, and ADR-016 dropped the fallback extractor that used to cover that case.
+DOCLING_DO_OCR = config("DOCLING_DO_OCR", default=True, cast=bool)
+DOCLING_TABLE_MODE = config("DOCLING_TABLE_MODE", default="accurate")
+if DOCLING_TABLE_MODE not in ("accurate", "fast"):
+    raise ImproperlyConfigured(
+        f"DOCLING_TABLE_MODE must be 'accurate' or 'fast', got {DOCLING_TABLE_MODE!r}."
+    )
+DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=True, cast=bool)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process

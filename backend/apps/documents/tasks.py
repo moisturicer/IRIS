@@ -42,6 +42,9 @@ def _build_extractor():
     return DoclingExtractor(
         settings.DOCLING_API_URL,
         timeout=settings.DOCLING_TIMEOUT_SECONDS,
+        do_ocr=settings.DOCLING_DO_OCR,
+        table_mode=settings.DOCLING_TABLE_MODE,
+        do_formula_enrichment=settings.DOCLING_DO_FORMULA_ENRICHMENT,
     )
 
 

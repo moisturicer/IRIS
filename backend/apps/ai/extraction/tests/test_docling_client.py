@@ -9,6 +9,7 @@ No container, no Django, no database — so these run everywhere the suite does.
 """
 
 import json
+import re
 
 import httpx
 import pytest
@@ -74,10 +75,13 @@ def test_it_posts_the_pdf_to_the_convert_endpoint():
     assert b'filename="thesis.pdf"' in seen["body"]
 
 
-def test_it_asks_for_ocr_tables_and_structured_output():
-    """Each of these is a decision, not a default: OCR is why scanned theses
-    work at all, accurate tables are why a table does not retrieve as prose,
-    and json is the only format this pipeline reads."""
+def test_it_asks_for_ocr_tables_and_structured_output_by_default():
+    """Each of these is a decision, not a hardcoded default: OCR is why
+    scanned theses work at all, accurate tables are why a table does not
+    retrieve as prose, and json is the only format this pipeline reads.
+    IR-367 made do_ocr and table_mode configurable — this asserts the
+    unconfigured (default-constructed) client still behaves exactly as
+    before."""
     seen = {}
 
     def handler(request):
@@ -87,10 +91,45 @@ def test_it_asks_for_ocr_tables_and_structured_output():
     _extractor(handler).extract(b"pdf", filename="thesis.pdf")
 
     body = seen["body"]
-    assert "do_ocr" in body and "true" in body
+    assert 'name="do_ocr"' in body and "true" in body
     assert "do_table_structure" in body
-    assert "accurate" in body
+    assert 'name="table_mode"' in body and "accurate" in body
     assert "json" in body
+
+
+def test_do_ocr_is_configurable():
+    """A CPU-only deployment bulk-loading born-digital PDFs pays for RapidOCR
+    it gets no benefit from unless this can be turned off."""
+    seen = {}
+
+    def handler(request):
+        seen["body"] = request.content.decode("utf-8", "replace")
+        return httpx.Response(200, json={"document": {"json_content": _DOCUMENT}})
+
+    _extractor(handler, do_ocr=False).extract(b"pdf", filename="thesis.pdf")
+
+    assert 'name="do_ocr"' in seen["body"]
+    assert re.search(r'name="do_ocr"\r?\n\r?\nfalse', seen["body"])
+
+
+def test_table_mode_is_configurable():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = request.content.decode("utf-8", "replace")
+        return httpx.Response(200, json={"document": {"json_content": _DOCUMENT}})
+
+    _extractor(handler, table_mode="fast").extract(b"pdf", filename="thesis.pdf")
+
+    assert re.search(r'name="table_mode"\r?\n\r?\nfast', seen["body"])
+
+
+def test_an_unrecognised_table_mode_is_rejected():
+    """The two docling-serve accepts are "accurate" and "fast" — anything
+    else would be silently forwarded and rejected by the service instead of
+    caught at construction."""
+    with pytest.raises(ValueError, match="table_mode"):
+        DoclingExtractor(BASE_URL, table_mode="thorough")
 
 
 def test_it_asks_for_formula_enrichment():
