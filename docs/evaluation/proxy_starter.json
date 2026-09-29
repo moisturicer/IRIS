@@ -1,0 +1,248 @@
+{
+  "name": "proxy-starter",
+  "tier": "proxy",
+  "corpus": "docs/corpus (20 openly-licensed arXiv papers, 4 categories)",
+  "notes": "ADR-023 tier 1: an engineering gate. A number from this set decides whether a retrieval switch earns its place and is NEVER cited as a finding about CIT-U research. One question per paper is a starting point, not a target -- fifty is ADR-023's number, and a question may expect passages from more than one paper. Fill `question` and `quote`, delete the `category` key if you like, and run with --dry-run after every few. Leave a slot as TODO and pass --drop-incomplete to measure what is labelled so far.",
+  "questions": [
+    {
+      "id": "q01",
+      "category": "active learning",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q02",
+      "category": "active learning",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q03",
+      "category": "active learning",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q04",
+      "category": "active learning",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q05",
+      "category": "active learning",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Towards Active Cross-View Object Geo-Localization",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q06",
+      "category": "audio-and-speech-processing",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q07",
+      "category": "audio-and-speech-processing",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q08",
+      "category": "audio-and-speech-processing",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q09",
+      "category": "audio-and-speech-processing",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "category": "audio-and-speech-processing",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q11",
+      "category": "econometrics",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q12",
+      "category": "econometrics",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Cosine metric as a structural economic similarity measure",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q13",
+      "category": "econometrics",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Noise-adjusted turnover in estimated networks",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q14",
+      "category": "econometrics",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Stable Policy Learning",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q15",
+      "category": "econometrics",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q16",
+      "category": "hardware-architecture",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q17",
+      "category": "hardware-architecture",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q18",
+      "category": "hardware-architecture",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q19",
+      "category": "hardware-architecture",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "q20",
+      "category": "hardware-architecture",
+      "question": "TODO",
+      "expected": [
+        {
+          "record": "Nested Parallel von Neumann Architecture and Nested BSP",
+          "page": null,
+          "quote": "TODO"
+        }
+      ]
+    }
+  ]
+}

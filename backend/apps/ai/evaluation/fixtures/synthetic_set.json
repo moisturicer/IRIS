@@ -1,0 +1,30 @@
+{
+  "name": "synthetic",
+  "tier": "synthetic",
+  "corpus": "apps/ai/tests/corpus.py",
+  "notes": "IR-133's demoability criterion: the harness must run against a small labelled set before the real one exists. This is that set. It is labelled against the two-record corpus the HTTP-boundary tests build, so it proves the harness works and nothing about any real corpus.",
+  "questions": [
+    {
+      "id": "flood",
+      "question": "which model was trained on rainfall gauge readings to anticipate flooding?",
+      "expected": [
+        {
+          "record": "Flood prediction in the Mananga catchment",
+          "page": 4,
+          "quote": "rainfall gauge data to predict flooding"
+        }
+      ]
+    },
+    {
+      "id": "ponds",
+      "question": "how were the brackish water fish ponds sampled?",
+      "expected": [
+        {
+          "record": "Tilapia pond sampling",
+          "page": 4,
+          "quote": "tilapia ponds stocked in brackish water"
+        }
+      ]
+    }
+  ]
+}

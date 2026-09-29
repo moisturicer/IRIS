@@ -60,6 +60,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Callable, Optional
 
+from apps.ai.answers.selection import SourceSelection
 from apps.ai.answers.service import GroundedAnswerService
 from apps.ai.providers.ports import EmbeddingProvider, LLMProvider, Reranker
 from apps.ai.retrieval.degraded import (
@@ -326,6 +327,40 @@ class CompositionRoot:
             ),
             fallback=FullTextRetriever(record=record),
             degrade_on=_vendor_failures(),
+        )
+
+    def without_reranking(self) -> "CompositionRoot":
+        """The same root with reranking switched off (IR-133).
+
+        A `NoOpReranker`, not a stack with the decorator removed: the
+        disclosure gate lives inside `RerankingRetriever`, so dropping the
+        decorator would drop the gate as well, and the comparison would be
+        measuring two changes. A no-op transmits nothing, so the gate has
+        nothing to do -- which is the honest meaning of "reranking off".
+
+        A shallow copy, so a field added to this class is carried over without
+        anyone having to remember this method.
+        """
+        import copy
+
+        from apps.ai.providers.noop import NoOpReranker
+
+        variant = copy.copy(self)
+        variant._reranker = NoOpReranker()
+        return variant
+
+    def source_selection(self, max_sources: int) -> SourceSelection:
+        """What the model would be given, out of what retrieval returned.
+
+        Here rather than only inside `GroundedAnswerService` so the eval
+        harness can measure the final set without a configured model (IR-394):
+        this root knows the gate, and asking for an answer service to learn it
+        would demand a vendor key for a retrieval measurement.
+        """
+        return SourceSelection(
+            permits=self._permits,
+            policy_enabled=self._policy_enabled,
+            max_sources=max_sources,
         )
 
     def answer_service(

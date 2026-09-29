@@ -147,6 +147,28 @@ python manage.py promote_embedding_space --space N --check   # is this space rea
                                    # Drop --check to promote. Refuses while any active chunk lacks a
                                    # vector in that space and names the short records. Nothing
                                    # promotes automatically
+python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)
+                                   # The retrieval eval harness. --dry-run costs nothing and calls no
+                                   # vendor: it checks that every label resolves against this database,
+                                   # which is what a labeller runs between questions. Drop it and pass
+                                   # --user EMAIL for a real run — retrieval filters by
+                                   # visible_to(user), so the user is part of what is measured.
+                                   # Reports TWO numbers per configuration (ADR-023 §Amendment):
+                                   # recall@10 over what retrieval returned, and recall over the final
+                                   # set the model was given. Runs with and without reranking by
+                                   # default and prints the delta; --reranking on|off picks one.
+                                   # --drop-incomplete measures a partly-labelled set and names what
+                                   # it skipped. Writes docs/evaluation/runs/<stamp>-<set>.json.
+                                   # MANUAL ONLY, never CI — a real run spends Voyage credits.
+                                   # Labels are Record + page + quote, never chunk ids. Question sets:
+                                   # apps/ai/evaluation/fixtures/synthetic_set.json (committed, run by
+                                   # the suite) and docs/evaluation/proxy_starter.json (20 slots
+                                   # awaiting human labelling). Guide: docs/evaluation/README.md.
+                                   # Verified 2026-09-29: --dry-run against the dev database resolved
+                                   # a real label and named a wrong one, exiting non-zero. No recall
+                                   # number exists for any corpus yet — the labelled set is human work
+                                   # in progress, the corpus has no Voyage vectors, and the disclosure
+                                   # gate refuses every record until IR-250 (use IR-317's bypass)
 
 # Docker  (repo root)
 python scripts/setup_env.py         # REQUIRED first (IR-154): creates the repo-root .env Compose
@@ -201,6 +223,17 @@ When applicable: tests added and **executed with evidence** · traceability upda
 Human review remains the approval gate. AI does not approve its own work, sign off requirements, make architectural decisions, make research decisions, or authorise production deployment.
 
 **Jira status is bookkeeping, not sign-off — AI may transition it.** Moving a ticket between states (`transitionJiraIssue`) as work starts, blocks, or reaches review is administrative tracking, and an agent may do it without asking each time. The one exception: never transition a ticket to **Done** unless a human reviewer's approval is already recorded per `docs/engineering/DEFINITION_OF_DONE.md` §4 — that is the sign-off this section still reserves for a person.
+
+## Explanation style
+
+When explaining architecture, design decisions, or implementation details to the user, default to this mode:
+
+1. **Provide context** — state *why* something exists and what problem it solves before describing how it works.
+2. **Use concrete examples** — show a real command, a snippet, or a scenario rather than speaking only in abstractions.
+3. **Plain language first** — assume the reader has superficial familiarity with the architecture, not deep recall. Define terms on first use; don't expect someone to hold the full Architecture table in their head.
+4. **Benefits and drawbacks for every option** — when presenting a choice or explaining a design trade-off, explicitly list what you gain and what you give up. Never present one path as self-evidently correct without saying what it costs.
+
+This is the team's standing preference, not a per-session request. Apply it unless the user explicitly asks for a terser or more advanced register.
 
 ## Agent skills
 
