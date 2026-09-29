@@ -201,7 +201,12 @@ class CompositionRoot:
         so two calls in one request do not build two adapters; the circuit
         state that must outlive the request lives in ``breaker_for``.
         """
-        from apps.ai.inference import build_profile_llm, inference_task, profile_for
+        from apps.ai.inference import (
+            CompletionLoggingLLMProvider,
+            build_profile_llm,
+            inference_task,
+            profile_for,
+        )
 
         if self._llm is not None:
             return self._llm
@@ -209,7 +214,13 @@ class CompositionRoot:
         resolved = inference_task(task)
         provider = self._task_llms.get(resolved)
         if provider is None:
-            provider = build_profile_llm(profile_for(resolved))
+            profile = profile_for(resolved)
+            # Wrapped here, not inside `build_profile_llm` -- that function's
+            # return value is asserted directly by existing tests (a bare
+            # `FallbackLLMProvider`), and this is the one seam every
+            # production caller reaches a task's model through anyway
+            # (IR-387).
+            provider = CompletionLoggingLLMProvider(build_profile_llm(profile), profile)
             self._task_llms[resolved] = provider
         return provider
 
