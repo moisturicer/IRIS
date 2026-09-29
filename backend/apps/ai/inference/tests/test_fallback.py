@@ -19,7 +19,11 @@ import pytest
 
 from apps.ai.inference import InferenceTask, build_profile_llm, profile_for
 from apps.ai.providers.openai_compatible import LLMUnavailable
-from apps.ai.resilience.llm import FallbackLLMProvider, reset_llm_breakers
+from apps.ai.resilience.llm import (
+    CircuitBreakingLLMProvider,
+    FallbackLLMProvider,
+    reset_llm_breakers,
+)
 
 pytestmark = pytest.mark.django_required
 
@@ -105,8 +109,13 @@ class GroqWalksTheListItselfTests:
 
         llm.generate(system="s", user="u")
 
-        assert isinstance(llm, FallbackLLMProvider)
-        assert llm.last_model_used == "second"
+        # One breaker for the whole list sits above it now (IR-386), so the
+        # `FallbackLLMProvider` that actually walked the models is one level
+        # down.
+        assert isinstance(llm, CircuitBreakingLLMProvider)
+        fallback = llm._provider  # noqa: SLF001
+        assert isinstance(fallback, FallbackLLMProvider)
+        assert fallback.last_model_used == "second"
         assert llm.model == "second"
 
     def test_a_failure_another_model_cannot_fix_stops_the_walk(

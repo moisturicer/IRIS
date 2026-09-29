@@ -33,6 +33,17 @@ class InferenceTask(Enum):
         """The settings namespace for this task, e.g. ``LLM_ANSWER``."""
         return f"LLM_{self.name}"
 
+    @property
+    def breaker_key(self) -> str:
+        """This task's key into the circuit breaker registry (IR-386).
+
+        A task's own namespace, distinct from `LLMProviderConfig.key`'s
+        `base_url::model` -- two tasks pointed at the same vendor and model
+        would otherwise share a breaker, so one task's rate limiting could
+        stop an unrelated task from answering.
+        """
+        return f"inference-task::{self.value}"
+
 
 class UnknownInferenceTask(ValueError):
     """A name that is not one of the four."""

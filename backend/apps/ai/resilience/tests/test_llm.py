@@ -20,6 +20,7 @@ from apps.ai.resilience.llm import (
     RetryingLLMProvider,
     breaker_for,
     build_resilient_llm,
+    build_task_llm,
     is_switchable_failure,
     reset_llm_breakers,
 )
@@ -231,3 +232,141 @@ class BuildResilientLLMTests:
     def test_it_refuses_an_empty_config_list(self):
         with pytest.raises(ValueError):
             build_resilient_llm([])
+
+
+class BuildTaskLLMTests:
+    """`build_task_llm` is what an Inference task's Profile is built with
+    instead of `build_resilient_llm` (IR-386): one breaker for the whole
+    model list, keyed on the caller's own scope rather than on any one
+    model's identity.
+    """
+
+    def test_a_single_config_is_wrapped_in_one_breaker(self):
+        provider = build_task_llm(
+            [LLMProviderConfig(base_url="https://a.test", api_key="k", model="m")],
+            breaker_key="task:one",
+        )
+
+        assert isinstance(provider, CircuitBreakingLLMProvider)
+        # Not double-wrapped: a single model has no fallback list to sit
+        # under the breaker, so it is the retrying candidate directly.
+        assert isinstance(provider._provider, RetryingLLMProvider)  # noqa: SLF001
+
+    def test_more_than_one_config_puts_the_fallback_under_the_breaker(self):
+        provider = build_task_llm(
+            [
+                LLMProviderConfig(base_url="https://a.test", api_key="k", model="a"),
+                LLMProviderConfig(base_url="https://a.test", api_key="k", model="b"),
+            ],
+            breaker_key="task:two",
+        )
+
+        assert isinstance(provider, CircuitBreakingLLMProvider)
+        assert isinstance(provider._provider, FallbackLLMProvider)  # noqa: SLF001
+
+    def test_it_refuses_an_empty_config_list(self):
+        with pytest.raises(ValueError):
+            build_task_llm([], breaker_key="task:empty")
+
+    def test_the_same_breaker_key_is_reused_across_builds(self):
+        config = [LLMProviderConfig(base_url="https://a.test", api_key="k", model="m")]
+
+        first = build_task_llm(config, breaker_key="task:shared")
+        second = build_task_llm(config, breaker_key="task:shared")
+
+        assert first._breaker is second._breaker  # noqa: SLF001
+
+    def test_two_breaker_keys_stay_independent_even_at_the_same_model(self):
+        """The scenario IR-386 names: two tasks configured identically at the
+        same vendor and model must not end up sharing a breaker."""
+        config = [LLMProviderConfig(base_url="https://a.test", api_key="k", model="m")]
+
+        answer = build_task_llm(config, breaker_key="task:answer")
+        summary = build_task_llm(config, breaker_key="task:summary")
+
+        assert answer._breaker is not summary._breaker  # noqa: SLF001
+
+
+class FallbackExhaustionOpensTheBreakerTests:
+    """The breaker built around a fallback list only sees a failure when the
+    whole list is exhausted -- not when the first model in it fails and a
+    later one answers (IR-386's "not the first model's failure" rule).
+    """
+
+    def test_one_models_failure_with_a_working_fallback_does_not_open_it(self):
+        primary = _ScriptedLLM(model="primary", kind=ErrorKind.RATE_LIMIT, fail_times=None)
+        spare = _ScriptedLLM(model="spare")
+        breaker = CircuitBreaker(failure_threshold=1)
+        provider = CircuitBreakingLLMProvider(
+            FallbackLLMProvider([primary, spare]), breaker=breaker
+        )
+
+        # The list answered, via the spare -- one switch-worthy failure
+        # inside it is not a failure of the call as a whole.
+        assert provider.generate("s", "u") == "answer from spare"
+        assert provider.generate("s", "u") == "answer from spare"
+
+    def test_exhausting_every_model_counts_as_one_failure_toward_the_breaker(self):
+        primary = _ScriptedLLM(model="primary", kind=ErrorKind.NETWORK, fail_times=None)
+        spare = _ScriptedLLM(model="spare", kind=ErrorKind.NETWORK, fail_times=None)
+        breaker = CircuitBreaker(failure_threshold=2)
+        provider = CircuitBreakingLLMProvider(
+            FallbackLLMProvider([primary, spare]), breaker=breaker
+        )
+
+        for _ in range(2):
+            with pytest.raises(LLMUnavailable):
+                provider.generate("s", "u")
+
+        # Two exhausted attempts crossed the threshold -- a third is refused
+        # outright, without either model being asked again.
+        with pytest.raises(CircuitOpen):
+            provider.generate("s", "u")
+
+
+class OneTasksBreakerLeavesAnotherUntouchedTests:
+    """The acceptance criterion in its own terms: tripping one task's breaker
+    must not refuse another task's calls, even against the same fake vendor
+    behaviour (IR-386)."""
+
+    def test_an_open_breaker_on_one_key_does_not_affect_another(self):
+        down = _ScriptedLLM(kind=ErrorKind.NETWORK, fail_times=None)
+        healthy = _ScriptedLLM(model="healthy")
+
+        answer_breaker = breaker_for("task:answer")
+        answer_breaker._failure_threshold = 1  # noqa: SLF001 -- test-only
+        summary_breaker = breaker_for("task:summary")
+
+        answer_provider = CircuitBreakingLLMProvider(down, breaker=answer_breaker)
+        summary_provider = CircuitBreakingLLMProvider(healthy, breaker=summary_breaker)
+
+        with pytest.raises(LLMUnavailable):
+            answer_provider.generate("s", "u")
+        # `answer`'s breaker is now open.
+        with pytest.raises(CircuitOpen):
+            answer_provider.generate("s", "u")
+
+        # `summary`, sharing nothing but the process, is unaffected.
+        assert summary_provider.generate("s", "u") == "answer from healthy"
+
+    def test_reset_clears_every_tasks_breaker_not_just_one(self):
+        """`reset_llm_breakers` is a blanket clear of the whole registry
+        (see its own docstring) -- it needs no per-task awareness to already
+        cover task-keyed breakers, but a regression that scoped it to one
+        namespace would leak state between tests, so this pins the promise
+        down explicitly."""
+        for key in ("task:answer", "task:summary"):
+            breaker = breaker_for(key)
+            breaker._failure_threshold = 1  # noqa: SLF001
+            provider = CircuitBreakingLLMProvider(
+                _ScriptedLLM(kind=ErrorKind.NETWORK, fail_times=None), breaker=breaker
+            )
+            with pytest.raises(LLMUnavailable):
+                provider.generate("s", "u")
+            with pytest.raises(CircuitOpen):
+                provider.generate("s", "u")
+
+        reset_llm_breakers()
+
+        for key in ("task:answer", "task:summary"):
+            assert breaker_for(key).state.value == "closed"
