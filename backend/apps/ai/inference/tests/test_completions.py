@@ -13,7 +13,11 @@ from typing import Iterator
 
 import pytest
 
-from apps.ai.inference.completions import CIRCUIT_OPEN, CompletionLoggingLLMProvider
+from apps.ai.inference.completions import (
+    CIRCUIT_OPEN,
+    LOGGER_NAME,
+    CompletionLoggingLLMProvider,
+)
 from apps.ai.inference.profiles import DataPolicy, Profile, Vendor
 from apps.ai.inference.tasks import InferenceTask
 from apps.ai.providers.errors import ErrorKind
@@ -21,8 +25,6 @@ from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider, StreamDelta
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.resilience.llm import FallbackLLMProvider
-
-LOGGER_NAME = "apps.ai.inference.completions"
 
 
 #: `apps` sets `propagate: False` in `config/settings/base.py`, so records

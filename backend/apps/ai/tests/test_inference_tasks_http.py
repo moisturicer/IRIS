@@ -16,14 +16,13 @@ import pytest
 
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.inference import InferenceTask
+from apps.ai.inference.completions import LOGGER_NAME as COMPLETION_LOGGER
 from apps.ai.providers.fakes import ScriptedReranker
 from apps.ai.resilience.llm import reset_llm_breakers
 
 from .corpus import FLOOD_QUESTION, FLOOD_TEXT, ask, make_record, make_user
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
-
-COMPLETION_LOGGER = "apps.ai.inference.completions"
 
 
 @pytest.fixture(autouse=True)

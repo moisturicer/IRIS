@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 from typing import Iterator, Optional
 
+from apps.ai.providers.dialects import DEFAULT_DIALECT, VendorDialect
 from apps.ai.providers.ports import LLMProvider, StreamDelta
 from apps.ai.resilience.circuit import CircuitOpen
 
@@ -71,9 +72,7 @@ class CompletionLoggingLLMProvider(LLMProvider):
         return getattr(self._provider, "model", self._profile.model)
 
     @property
-    def dialect(self):
-        from apps.ai.providers.dialects import DEFAULT_DIALECT
-
+    def dialect(self) -> VendorDialect:
         return getattr(self._provider, "dialect", DEFAULT_DIALECT)
 
     def _model_used(self) -> str:
