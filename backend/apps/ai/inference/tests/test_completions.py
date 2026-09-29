@@ -28,18 +28,30 @@ from apps.ai.resilience.llm import FallbackLLMProvider
 
 
 #: `apps` sets `propagate: False` in `config/settings/base.py`, so records
-#: never reach the root logger `caplog` attaches to by default -- the handler
-#: has to go on this module's own logger (the same fixture shape
-#: `apps/ai/answers/tests/test_service.py` uses for the same reason).
+#: logged under it never reach the root logger caplog captures at by default.
+#:
+#: This toggles `apps`'s own propagation back on for the test, rather than
+#: attaching `caplog.handler` directly to this module's logger (the older
+#: fixture shape `apps/ai/answers/tests/test_service.py` uses): pytest 9
+#: changed `caplog` to auto-attach its handler to every *non-propagating*
+#: logger it finds -- `apps` included -- specifically to fix this exact
+#: problem, so a manual attachment here would double-deliver every record
+#: under pytest 9 while still being required for pytest 8, which has no such
+#: fix. Restoring propagation instead works unchanged on both: the record
+#: reaches root -- where caplog always attaches -- exactly once either way.
+_APPS_LOGGER = "apps"
+
+
 @pytest.fixture(autouse=True)
 def _wire_caplog_to_the_completion_logger(caplog):
-    logger = logging.getLogger(LOGGER_NAME)
-    logger.addHandler(caplog.handler)
+    apps_logger = logging.getLogger(_APPS_LOGGER)
+    original_propagate = apps_logger.propagate
+    apps_logger.propagate = True
     caplog.set_level(logging.INFO, logger=LOGGER_NAME)
     try:
         yield
     finally:
-        logger.removeHandler(caplog.handler)
+        apps_logger.propagate = original_propagate
 
 
 def _profile(model: str = "first", fallback_models: tuple[str, ...] = ()) -> Profile:

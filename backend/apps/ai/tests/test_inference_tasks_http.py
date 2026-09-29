@@ -37,18 +37,29 @@ def completion_logs(caplog):
     """`caplog`, actually wired to the completion logger (IR-387).
 
     `apps` sets `propagate: False` in `config/settings/base.py`, so records
-    never reach the root logger `caplog` attaches to by default -- see
-    `apps/ai/answers/tests/test_service.py`'s `service_logs` fixture for the
-    same fix on the same problem. A caller reads `caplog.records` as usual
-    once the test body has run; this only wires the handler up.
+    logged under it never reach the root logger caplog captures at by
+    default.
+
+    This toggles `apps`'s own propagation back on for the test rather than
+    attaching `caplog.handler` directly to the completion logger (the older
+    fixture shape `apps/ai/answers/tests/test_service.py`'s `service_logs`
+    uses): pytest 9 changed `caplog` to auto-attach its handler to every
+    *non-propagating* logger it finds -- `apps` included -- specifically to
+    fix this exact problem, so a manual attachment here would
+    double-deliver every record under pytest 9 while still being required
+    for pytest 8, which has no such fix. Restoring propagation instead
+    works unchanged on both: the record reaches root -- where caplog
+    always attaches -- exactly once either way. A caller reads
+    `caplog.records` as usual once the test body has run.
     """
-    logger = logging.getLogger(COMPLETION_LOGGER)
-    logger.addHandler(caplog.handler)
+    apps_logger = logging.getLogger("apps")
+    original_propagate = apps_logger.propagate
+    apps_logger.propagate = True
     caplog.set_level(logging.INFO, logger=COMPLETION_LOGGER)
     try:
         yield caplog
     finally:
-        logger.removeHandler(caplog.handler)
+        apps_logger.propagate = original_propagate
 
 
 class _RecordingVendor:
