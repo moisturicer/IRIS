@@ -14,27 +14,34 @@ import os
 import re
 from typing import Optional
 
+from django.db import models
+
 from apps.ai.chunking.document import HEADING, PAGE_FOOTER, PAGE_HEADER, NormalizedDocument
 from apps.ai.extraction.serialization import document_from_json
 from apps.documents.models import DocumentKind, PdfExtraction
 
 SOURCE = "pdf_structure"
 
-PENDING = "pending"
-READY = "ready"
-FAILED = "failed"
-UNSUPPORTED = "unsupported"
 
-# ``PdfExtraction.STATUS`` in the Publish dialog's vocabulary. A retrying
-# extraction reads ``failed`` between attempts (``_run_extraction`` saves the
-# failure before Celery retries it); the dialog then shows its neutral line,
-# which spec §4.5 accepts, because prefill is assistance.
-_STATE_BY_STATUS = {
-    "queued": PENDING,
-    "running": PENDING,
-    "done": READY,
-    "failed": FAILED,
-}
+class SuggestionState(models.TextChoices):
+    """The prefill's state, as the Publish dialog branches on it (spec §4.5).
+
+    The manuscript extraction's status restated for one client -- ingestion
+    vocabulary, like ``PdfExtraction.STATUS``, and deliberately not in
+    ``core.enums`` (see its "What is not here" note).
+    """
+
+    PENDING = "pending", "Pending"
+    READY = "ready", "Ready"
+    FAILED = "failed", "Failed"
+    UNSUPPORTED = "unsupported", "Unsupported"
+
+
+# Queued or running is still being read; done is readable; anything else --
+# ``failed``, or a status added to ``PdfExtraction.STATUS`` later -- is
+# treated as a failure, which the dialog shows as its neutral line.
+_READING = frozenset({"queued", "running"})
+_READ = "done"
 
 _ABSTRACT_HEADING = "abstract"
 
@@ -43,34 +50,45 @@ _ABSTRACT_HEADING = "abstract"
 _PAGE_FURNITURE = frozenset({PAGE_HEADER, PAGE_FOOTER})
 
 
-def metadata_suggestions(record) -> dict:
+def suggestions_payload(record) -> dict:
     """The payload for ``GET /records/<id>/metadata-suggestions/``.
 
-    ``state`` is the extraction's status in the Publish dialog's terms
-    (spec §4.5): ``pending`` while Docling is queued or running, ``ready``
-    once the structure is stored (a scanned PDF with no text layer is
-    ``ready`` with nulls), ``failed`` when extraction failed, and
+    ``state`` is ``pending`` while Docling is queued or running, ``ready``
+    once a structure is stored, ``failed`` when extraction failed, and
     ``unsupported`` when there is no manuscript extraction to read at all.
-    Suggestions are only ever read from a ``ready`` structure.
+    Suggestions are only ever read from a ``ready`` structure; a ready one
+    with no title or *Abstract* heading gives nulls.
+
+    **Two known gaps, recorded rather than hidden.** A retrying extraction
+    reads ``failed`` between attempts (``_run_extraction`` saves the failure
+    before Celery retries it), and the dialog stops polling on ``failed``, so
+    a retry that later succeeds offers no chips. And an image-only scan is
+    stored as ``failed`` (the extractor raises ``EmptyExtraction``), not as
+    the ``ready``-with-nulls spec §4.5 describes -- the dialog shows its
+    neutral line for it rather than nothing. Both are for the spec's owner.
     """
     extraction = PdfExtraction.objects.filter(
         record=record, kind=DocumentKind.MANUSCRIPT
     ).first()
     state = _state(extraction)
     suggestions = {"title": None, "abstract": None}
-    if state == READY:
+    if state == SuggestionState.READY:
         document = document_from_json(extraction.structure or {})
         suggestions = {
             "title": _title(document, record.abstract_file.name),
             "abstract": _abstract(document),
         }
-    return {"state": state, "suggestions": suggestions, "source": SOURCE}
+    return {"state": state.value, "suggestions": suggestions, "source": SOURCE}
 
 
-def _state(extraction: Optional[PdfExtraction]) -> str:
+def _state(extraction: Optional[PdfExtraction]) -> SuggestionState:
     if extraction is None:
-        return UNSUPPORTED
-    return _STATE_BY_STATUS[extraction.status]
+        return SuggestionState.UNSUPPORTED
+    if extraction.status in _READING:
+        return SuggestionState.PENDING
+    if extraction.status == _READ:
+        return SuggestionState.READY
+    return SuggestionState.FAILED
 
 
 def _title(document: NormalizedDocument, stored_name: str) -> Optional[str]:

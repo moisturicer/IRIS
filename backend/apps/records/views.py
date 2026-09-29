@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
@@ -104,6 +104,15 @@ class RecordViewSet(viewsets.ModelViewSet):
             # can read it on other grounds -- an Adviser can author records, so
             # may *own* a Proposal someone else advises.
             qs = qs.filter(adviser=self.request.user)
+
+        if self.action == "metadata_suggestions":
+            # The Publish dialog's prefill is the manuscript's own text, offered
+            # to the person publishing it (IR-406; IR-374 spec Appendix D:
+            # "the owner through visible_to(), with a 404 otherwise").
+            # visible_to() also admits office staff, the assigned adviser and,
+            # on a published record, every signed-in user; narrowing here makes
+            # their refusal the same 404 as a missing record.
+            qs = qs.filter(owners__user=self.request.user)
 
         if self.action == "list":
             # Discover is a public catalogue, not an authorization boundary, so
@@ -395,18 +404,12 @@ class RecordViewSet(viewsets.ModelViewSet):
         GET /records/<id>/metadata-suggestions/ -- the manuscript's own title
         and abstract, offered to the Publish dialog (IR-406; IR-374 spec §4.5).
 
-        **Owner-only.** `get_object()` applies `visible_to()`, which also lets
-        office staff, the assigned adviser and -- on a published record --
-        every signed-in user read the record. None of them is publishing it,
-        and the suggestions are the manuscript's own text, so a reader who is
-        not an owner gets the same 404 as a missing record (IR-153).
+        **Owner-only**, through `get_queryset()`: anyone else gets the same
+        404 as a missing record (IR-153).
         """
-        from .metadata_suggestions import metadata_suggestions
+        from .metadata_suggestions import suggestions_payload
 
-        record = self.get_object()
-        if not record.owners.filter(user=request.user).exists():
-            raise Http404
-        return Response(metadata_suggestions(record))
+        return Response(suggestions_payload(self.get_object()))
 
     @action(detail=True, methods=["get", "post"], url_path="document-requests")
     def document_requests(self, request, pk=None):

@@ -149,7 +149,7 @@ class MetadataSuggestionsTests(APITestCase):
 
         self.assertIsNone(response.data["suggestions"]["title"])
 
-    def test_a_scanned_pdf_with_no_text_is_ready_with_no_suggestions(self):
+    def test_a_read_structure_with_no_title_or_abstract_offers_nothing(self):
         self._extraction(structure=_structure(""))
 
         response = self._get(self.owner)
@@ -254,6 +254,22 @@ class MetadataSuggestionsAccessTests(APITestCase):
         response = self._get(make_user("stranger@cit.edu", "Student"))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_refusal_reads_exactly_like_a_missing_record(self):
+        """Status and body both (IR-153): a reader who may see the record but
+        is not its owner must not learn from the response that it exists."""
+        reader = make_user("rdco@cit.edu", "RDCO")
+        self.client.force_authenticate(reader)
+
+        refused = self.client.get(
+            reverse("record-metadata-suggestions", args=[self.record.id])
+        )
+        missing = self.client.get(
+            reverse("record-metadata-suggestions", args=[self.record.id + 999])
+        )
+
+        self.assertEqual(refused.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(refused.json(), missing.json())
 
     def test_readers_who_are_not_owners_get_404(self):
         """Each of these may read the record, so `visible_to()` alone would
