@@ -22,7 +22,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional, Sequence
 
 from .labels import QuestionSet
-from .techniques import changes as _changes
+from .techniques import ResolvedTechniques
 from .techniques import resolve as _resolve
 
 
@@ -46,11 +46,11 @@ class RunConfig:
     max_sources: int = 8
     name: Optional[str] = None
     baseline: Optional[str] = None
-    techniques: dict[str, dict[str, Any]] = field(default_factory=_resolve)
+    techniques: ResolvedTechniques = field(default_factory=_resolve)
 
     @property
     def changed_techniques(self) -> tuple[str, ...]:
-        return _changes(self.techniques)
+        return self.techniques.changes
 
     @property
     def label(self) -> str:
@@ -61,7 +61,11 @@ class RunConfig:
         return f"{base}+{','.join(moved)}" if moved else base
 
     def as_dict(self) -> dict[str, Any]:
-        return {**asdict(self), "label": self.label}
+        return {
+            **asdict(self),
+            "techniques": self.techniques.as_dict(),
+            "label": self.label,
+        }
 
 
 @dataclass(frozen=True)

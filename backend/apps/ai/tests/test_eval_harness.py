@@ -286,3 +286,25 @@ def test_listing_the_techniques_needs_no_question_set_and_no_user(capsys):
     out = capsys.readouterr().out
     assert "AI_RETRIEVAL_FUSION_ENABLED" in out
     assert "not built yet" in out
+
+
+def test_the_results_file_pins_the_question_set_by_content_not_only_by_path(
+    corpus, reader, embedder, tmp_path, monkeypatch
+):
+    """A re-labelled set at the same path must not reproduce as the same run."""
+    monkeypatch.setattr(
+        "apps.ai.management.commands.eval_retrieval.composition_root",
+        lambda: _root(embedder),
+    )
+    call_command(
+        "eval_retrieval",
+        questions=str(SYNTHETIC_SET),
+        user=reader.email,
+        reranking="on",
+        out=str(tmp_path),
+    )
+
+    written = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    digest = written["runs"][0]["provenance"]["question_set_sha256"]
+    assert len(digest) == 64
+    assert digest != "0" * 64

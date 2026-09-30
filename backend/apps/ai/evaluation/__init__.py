@@ -23,6 +23,7 @@ from .labels import (
 from .report import EvalReport, QuestionOutcome, RunConfig, compare
 from .techniques import (
     TECHNIQUES,
+    ResolvedTechniques,
     Technique,
     TechniqueError,
     parse_override,
@@ -34,6 +35,7 @@ from .validation import check_question_set, render_checks
 __all__ = [
     "EvalReport",
     "TECHNIQUES",
+    "ResolvedTechniques",
     "Technique",
     "TechniqueError",
     "Label",

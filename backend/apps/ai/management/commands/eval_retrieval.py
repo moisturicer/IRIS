@@ -24,6 +24,7 @@ Results are written to `docs/evaluation/runs/` so a number quoted in the thesis
 can be traced back to the configuration that produced it.
 """
 
+import hashlib
 import json
 import os
 import subprocess
@@ -72,6 +73,19 @@ def _git_commit() -> str:
             timeout=5,
         ).stdout.strip() or "unknown"
     except Exception:
+        return "unknown"
+
+
+def _question_set_digest(path) -> str:
+    """The set by content, not only by path (IR-394).
+
+    A path reproduces the wrong run once the file behind it is re-labelled,
+    and re-labelling is normal while a question set is human work in
+    progress.
+    """
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
         return "unknown"
 
 
@@ -198,6 +212,7 @@ class Command(BaseCommand):
         provenance = {
             "git_commit": _git_commit(),
             "question_set_path": question_set.source,
+            "question_set_sha256": _question_set_digest(question_set.source),
             "retrieved_as": user.email,
             "disclosure_bypass": bool(
                 getattr(settings, "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", False)
@@ -250,7 +265,7 @@ class Command(BaseCommand):
             resolved = resolve_techniques(parse_override(text) for text in asked)
         except TechniqueError as exc:
             raise CommandError(str(exc))
-        moved = [name for name, state in resolved.items() if state["overridden"]]
+        moved = resolved.moved
         if len(moved) > 1:
             self.stdout.write(
                 self.style.WARNING(

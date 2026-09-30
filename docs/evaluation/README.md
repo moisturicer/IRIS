@@ -120,8 +120,10 @@ stack. `manage.py seed_demo` creates `<role>@cit.edu` logins.
 
 Every run writes `docs/evaluation/runs/<timestamp>-<set>.json` holding its
 configuration, both measures, per-question outcomes and provenance (git commit,
-embedding space, the embedder and reranker actually used). That file is how a
-figure in the thesis gets traced back to the run that produced it.
+embedding space, the embedder and reranker actually used, and the question
+set's SHA-256 as well as its path — a set is re-labelled while it is human work
+in progress, so the path alone would reproduce the wrong run). That file is how
+a figure in the thesis gets traced back to the run that produced it.
 
 The command usually runs in the backend container, which has no git, so pass
 the commit from the host or the results file records `unknown`:
@@ -169,7 +171,14 @@ differently, one line in that file changes.
 
 Moving two switches in one run is allowed and warned about loudly, because
 "one change at a time" is a rule about runs that code cannot enforce — fusion
-without keyword retrieval is one technique in two settings.
+without keyword retrieval is one technique in two settings. That reading of
+ADR-023 is written down as a divergence note in
+[ADR-023](../adr/023-retrieval-quality-evaluation.md) and **awaits a human
+decision**; the discipline holds by convention meanwhile.
+
+A moved switch is spelled the same way in the results file as on the command
+line (`fusion=on`, not `fusion=True`), so a configuration can be copied
+straight out of a run file back into a command.
 
 ### Rules that come from the ADR, not from taste
 

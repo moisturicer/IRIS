@@ -24,7 +24,6 @@ from apps.ai.evaluation.techniques import (
     TECHNIQUES,
     Technique,
     TechniqueError,
-    applied,
     parse_override,
     render_registry,
     resolve,
@@ -105,9 +104,10 @@ def test_an_override_is_recorded_as_an_override():
 
 
 @override_settings(AI_RETRIEVAL_FUSION_ENABLED=False)
-def test_the_configuration_says_how_many_switches_moved():
-    assert techniques.changes(resolve([("fusion", True)])) == ("fusion=True",)
-    assert techniques.changes(resolve()) == ()
+def test_the_results_file_spells_a_switch_the_way_the_cli_does():
+    assert resolve([("fusion", True)]).changes == ("fusion=on",)
+    assert resolve([("fusion", True)]).moved == ("fusion",)
+    assert resolve().changes == ()
 
 
 # -- overrides ---------------------------------------------------------------
@@ -152,7 +152,7 @@ def test_an_applied_override_is_what_the_stack_reads():
     from django.conf import settings
 
     resolved = resolve([("fusion", True)])
-    with applied(resolved):
+    with resolved.applied():
         assert settings.AI_RETRIEVAL_FUSION_ENABLED is True
     assert settings.AI_RETRIEVAL_FUSION_ENABLED is False
 
@@ -160,7 +160,7 @@ def test_an_applied_override_is_what_the_stack_reads():
 def test_applying_a_baseline_changes_no_setting():
     from django.conf import settings
 
-    with applied(resolve()):
+    with resolve().applied():
         assert not hasattr(settings, "AI_RETRIEVAL_FUSION_ENABLED")
 
 
@@ -243,4 +243,4 @@ def test_a_run_applies_the_override_before_retrieval_is_built(monkeypatch):
 def test_the_configuration_label_names_the_switch_that_moved():
     config = RunConfig(techniques=resolve([("fusion", False)]))
 
-    assert "fusion=False" in config.label
+    assert "fusion=off" in config.label

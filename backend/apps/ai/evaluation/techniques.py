@@ -1,34 +1,25 @@
 """The switches a run can move, and what it records about them (IR-394).
 
 ADR-033 §5 puts six techniques behind six settings, each defaulting to today's
-behaviour, and says a default moves only on a harness run. That makes the
-harness the gate on all six, so the configuration surface belongs here rather
+behaviour, and a default moves only on a run of this harness. That makes the
+harness the gate on all six, so the configuration surface lives here rather
 than accreting one flag per technique ticket.
 
-Three rules hold this together:
+Two properties carry the weight. Every run records all six at the values it
+used, because a results file that omits a switch cannot be compared with a
+later one that moved it. And a technique is "built" only when its setting is
+really present in `django.conf.settings` -- never because this file names it --
+so asking for one meanwhile is refused rather than recorded as measured.
 
-- **Every technique is recorded on every run**, at the value the run actually
-  used, including the ones whose setting does not exist yet. A results file
-  that omits a switch cannot be compared against a later one.
-- **A technique that is not implemented yet cannot be overridden.** Asking for
-  fusion before fusion exists would produce a baseline number under a results
-  file claiming to have measured fusion -- the one failure this registry is
-  here to make impossible.
-- **The setting names are the registry's guess until each ticket lands.** A
-  name is resolved against `django.conf.settings` at run time, so a technique
-  is "implemented" when its setting is really there, never because this file
-  says so. When a ticket names its setting differently, one line changes here.
-
-`applied()` uses `override_settings` rather than writing to the settings
-object: it restores on the way out and emits `setting_changed`, so anything
-caching a value off a setting is invalidated the way it is in tests.
+The setting names are this file's guess until each ticket lands one; when a
+ticket names its setting differently, one line here changes.
 """
 
 from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Iterator, Optional
 
 from django.conf import settings
 from django.test import override_settings
@@ -36,6 +27,13 @@ from django.test import override_settings
 
 class TechniqueError(Exception):
     """A run asked for a technique that is unknown, unbuilt, or misspelled."""
+
+
+def _spell(value: Any) -> str:
+    """One vocabulary for a switch, so the CLI and the results file agree."""
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    return str(value)
 
 
 @dataclass(frozen=True)
@@ -70,9 +68,7 @@ class Technique:
         try:
             return int(text) if self.kind == "int" else float(text)
         except ValueError:
-            raise TechniqueError(
-                f"{self.name} takes {'a whole number' if self.kind == 'int' else 'a number'}, not {raw!r}"
-            )
+            raise TechniqueError(f"{self.name} takes a number, not {raw!r}")
 
 
 TECHNIQUES: tuple[Technique, ...] = (
@@ -138,9 +134,9 @@ def technique(name: str) -> Technique:
 def parse_override(text: str) -> tuple[str, Any]:
     """``"fusion=on"`` to ``("fusion", True)``, refusing what cannot be run.
 
-    An unbuilt technique is refused here rather than at apply time, so the
-    command stops before it spends a vendor credit on a run that would have
-    measured the baseline under another name.
+    An unbuilt technique is refused here rather than at apply time, so a run
+    stops before spending a vendor credit on what would measure the baseline
+    under another name.
     """
     name, _, raw = text.partition("=")
     name = name.strip()
@@ -159,56 +155,91 @@ def parse_override(text: str) -> tuple[str, Any]:
     return found.name, found.parse(raw)
 
 
+@dataclass(frozen=True)
+class ResolvedTechniques:
+    """Every technique at the value one run used. Serializes as it records.
+
+    A value rather than a bare mapping so the run, the report and the command
+    all ask it the same questions instead of reaching into its keys.
+    """
+
+    states: tuple[tuple[str, dict[str, Any]], ...] = ()
+
+    @property
+    def moved(self) -> tuple[str, ...]:
+        """The names this run changed from the deployment's own settings."""
+        return tuple(name for name, state in self.states if state["overridden"])
+
+    @property
+    def changes(self) -> tuple[str, ...]:
+        """What moved, spelled as the CLI spells it.
+
+        ADR-023 §Amendment's "one change at a time" is reported rather than
+        capped: it is a rule about runs, not one code can enforce, since
+        fusion without keyword retrieval is one technique in two settings.
+        See that ADR's IR-394 divergence note.
+        """
+        return tuple(
+            f"{name}={_spell(state['value'])}"
+            for name, state in self.states
+            if state["overridden"]
+        )
+
+    @contextmanager
+    def applied(self) -> Iterator[None]:
+        """Run the block with the overridden settings in place, then restore.
+
+        `override_settings` rather than writing to the settings object: it
+        restores on the way out and emits `setting_changed`, so anything
+        caching a value off a setting is invalidated the way it is in tests.
+        """
+        changed = {
+            state["setting"]: state["value"]
+            for _, state in self.states
+            if state["overridden"]
+        }
+        if not changed:
+            yield
+            return
+        with override_settings(**changed):
+            yield
+
+    def as_dict(self) -> dict[str, dict[str, Any]]:
+        return dict(self.states)
+
+    def __getitem__(self, name: str) -> dict[str, Any]:
+        return self.as_dict()[name]
+
+    def __iter__(self):
+        return iter(name for name, _ in self.states)
+
+    def __len__(self) -> int:
+        return len(self.states)
+
+
 def resolve(
     overrides: Optional[Iterable[tuple[str, Any]]] = None,
-) -> dict[str, dict[str, Any]]:
-    """Every technique, at the value this run will use, ready to serialize."""
+) -> ResolvedTechniques:
+    """Every technique, at the value this run will use."""
     asked = dict(overrides or ())
-    unknown = set(asked) - {t.name for t in TECHNIQUES}
-    if unknown:
-        raise TechniqueError(f"no technique named {sorted(unknown)[0]!r}")
+    for name in asked:
+        technique(name)
 
-    resolved: dict[str, dict[str, Any]] = {}
-    for item in TECHNIQUES:
-        overridden = item.name in asked
-        resolved[item.name] = {
-            "setting": item.setting,
-            "value": asked[item.name] if overridden else item.value,
-            "implemented": item.implemented,
-            "overridden": overridden,
-            "ticket": item.ticket,
-        }
-    return resolved
-
-
-def changes(resolved: dict[str, dict[str, Any]]) -> tuple[str, ...]:
-    """What this run changed from the deployment's own configuration.
-
-    ADR-023 §Amendment's "one change at a time" is a rule about runs, not a
-    thing code can enforce -- fusion without keyword retrieval is one
-    technique in two settings. So this reports the count rather than capping
-    it, and the command says so out loud when more than one moved.
-    """
-    return tuple(
-        f"{name}={state['value']}"
-        for name, state in resolved.items()
-        if state["overridden"]
+    return ResolvedTechniques(
+        states=tuple(
+            (
+                item.name,
+                {
+                    "setting": item.setting,
+                    "value": asked[item.name] if item.name in asked else item.value,
+                    "implemented": item.implemented,
+                    "overridden": item.name in asked,
+                    "ticket": item.ticket,
+                },
+            )
+            for item in TECHNIQUES
+        )
     )
-
-
-@contextmanager
-def applied(resolved: dict[str, dict[str, Any]]):
-    """Run the block with the overridden settings in place, then restore."""
-    changed = {
-        state["setting"]: state["value"]
-        for state in resolved.values()
-        if state["overridden"]
-    }
-    if not changed:
-        yield
-        return
-    with override_settings(**changed):
-        yield
 
 
 def render_registry() -> str:
@@ -218,7 +249,7 @@ def render_registry() -> str:
         "-" * 80,
     ]
     for item in TECHNIQUES:
-        state = f"{item.value}" if item.implemented else "not built yet"
+        state = _spell(item.value) if item.implemented else "not built yet"
         lines.append(
             f"{item.name:<19} {item.setting:<32} {state:<14} {item.ticket} ({item.adr})"
         )
