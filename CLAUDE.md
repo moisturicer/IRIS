@@ -162,13 +162,16 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
                                    # MANUAL ONLY, never CI — a real run spends Voyage credits.
                                    # Labels are Record + page + quote, never chunk ids. Question sets:
                                    # apps/ai/evaluation/fixtures/synthetic_set.json (committed, run by
-                                   # the suite) and docs/evaluation/proxy_starter.json (20 slots
-                                   # awaiting human labelling). Guide: docs/evaluation/README.md.
-                                   # Verified 2026-09-29: --dry-run against the dev database resolved
-                                   # a real label and named a wrong one, exiting non-zero. No recall
-                                   # number exists for any corpus yet — the labelled set is human work
-                                   # in progress, the corpus has no Voyage vectors, and the disclosure
-                                   # gate refuses every record until IR-250 (use IR-317's bypass)
+                                   # the suite) and docs/evaluation/proxy_starter.json (34 labelled
+                                   # questions over the 40-paper arXiv proxy corpus). Guide:
+                                   # docs/evaluation/README.md.
+                                   # First baseline 2026-09-30 (proxy tier, 28 questions on the 20
+                                   # papers fully embedded at the time): recall@10 0.661 without
+                                   # reranking, 0.786 with; final-set 0.625 / 0.750. Run file in
+                                   # docs/evaluation/runs/. Never cite it as a finding about CIT-U
+                                   # research. The disclosure gate refuses every record until
+                                   # IR-250 (use IR-317's bypass); 7 long papers cannot be embedded
+                                   # until IR-423 windows them under voyage-context-4's 32k limit
 
 # Docker  (repo root)
 python scripts/setup_env.py         # REQUIRED first (IR-154): creates the repo-root .env Compose
