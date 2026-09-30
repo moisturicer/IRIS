@@ -104,3 +104,36 @@ def batch_documents_by_token_budget(
     if current:
         batches.append(current)
     return batches
+
+
+#: The most tokens one contextualized *document* may carry (IR-423). Under
+#: ``voyage-context-4``'s 32,000-token window with room to spare (~6%): the
+#: estimator counts a text's own tokens and not the wrapping Voyage adds around
+#: each chunk, and a document over the window is a 400 -- "contextualized chunk
+#: embeddings do not support truncation" -- not a truncated success. Also below
+#: the request budget in ``voyage.py`` so a window always fits a request alone.
+EMBED_WINDOW_TOKENS = 30_000
+
+
+def window_for_embedding(
+    texts: Sequence[str],
+    budget: int | None = None,
+    estimate: Callable[[str], int] = estimate_tokens,
+) -> list[list[str]]:
+    """Cut one document's chunk texts into consecutive windows that each fit
+    the model's context window (IR-423).
+
+    The same rule as ``batch_by_token_budget`` -- consecutive, order preserved,
+    nothing dropped, one oversized chunk left alone for the vendor to reject --
+    named for what it decides here. **The trade-off is real and belongs on the
+    record:** a chunk is contextualized only against its own window, so chunks
+    either side of a window boundary no longer see each other. That is inherent
+    to the model's limit; the alternative is no vectors at all. A paper that
+    fits in one window is unchanged.
+
+    The budget is read at call time, so a test (or a future setting) can move
+    it without rebinding a default.
+    """
+    return batch_by_token_budget(
+        texts, EMBED_WINDOW_TOKENS if budget is None else budget, estimate
+    )
