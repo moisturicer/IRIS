@@ -2,7 +2,10 @@ import type { ComponentPropsWithoutRef } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
 import { citationHref, citationNavigationState, hasCitationQuote, openCitationLabel } from "@/lib/citedPage";
 
@@ -109,9 +112,12 @@ export function CitationText({ text, citations, streaming = false, className }: 
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{ a: CitationLink }}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeHighlight, rehypeKatex]}
+        // IRIS supplies no image addresses (ADR-025, IR-292), so an image here
+        // is one the model invented. Rendered, it reads as a figure that failed
+        // to load. The backend strips these; this covers what is already stored.
+        components={{ a: CitationLink, img: () => null }}
         urlTransform={urlTransform}
       >
         {toMarkdownLinks(text, streaming)}

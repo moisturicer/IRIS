@@ -38,6 +38,7 @@ from .citations import (
     UNAVAILABLE,
     GroundedAnswer,
     build_prompt,
+    images_in,
     parse_citations,
     unresolved_marker_candidates,
 )
@@ -211,12 +212,15 @@ class GroundedAnswerService:
             logger.warning("answer generation unavailable: %s", exc)
             return self._unavailable_answer(retrieved, sources)
 
+        raw = _without_leaked_reasoning(raw)
+
         if _produced_nothing(raw):
             logger.warning("answer generation produced no text")
             return self._unavailable_answer(retrieved, sources)
 
         text, citations = parse_citations(raw, sources)
         _warn_if_citations_went_missing(raw, text, citations)
+        _warn_if_images_were_stripped(raw)
         return self._grounded_answer(retrieved, sources, text, citations)
 
     def answer_stream(
@@ -336,6 +340,7 @@ class GroundedAnswerService:
 
             raw, text, citations = _parse(raw_parts, sources, self._dialect)
             _warn_if_citations_went_missing(raw, text, citations)
+            _warn_if_images_were_stripped(raw)
             yield CitationsResolved(citations=citations)
             completed = True
             yield Done(
@@ -432,6 +437,54 @@ def _parse(
     raw = dialect.normalize_citation_markers("".join(raw_parts))
     text, citations = parse_citations(raw, sources)
     return raw, text, citations
+
+
+def _without_leaked_reasoning(raw: str) -> str:
+    """``raw`` with any `<think>` span taken out (IR-428).
+
+    **The streaming path has had this since IR-327; this one never did.**
+    `answer()` reads `generate()`, which returns text and nothing else -- the
+    port has no reasoning channel -- so a model that puts its working in the
+    text channel had it stored verbatim as the answer. The AI Overview runs on
+    exactly this path.
+
+    IRIS does not ask for reasoning on any task that reaches here, which makes
+    this unlikely rather than impossible: `OpenRouterDialect.request_extras`
+    says it plainly -- an absent parameter is not a promise that a model
+    reasons only when told to. Running the same filter both paths already use
+    costs one pass over a string and removes the question.
+
+    The reasoning is discarded, not returned. Nothing on this path has
+    anywhere to put it: an overview is not a Turn, and `GroundedAnswer`'s
+    `reasoning` is filled only by a stream that requested the channel.
+    """
+    leak_filter = ThinkTagFilter()
+    text, _ = leak_filter.feed(raw)
+    tail, _ = leak_filter.flush()
+    return text + tail
+
+
+def _warn_if_images_were_stripped(raw: str) -> None:
+    """Say something when the model wrote an image (IR-428).
+
+    Stripping is silent by design -- `parse_citations` is pure and reports
+    nothing -- so without this the model could drift into illustrating every
+    answer and the only symptom would be sentences that read slightly oddly.
+    That is how both citation-format drifts went unnoticed until someone read
+    a transcript by hand, and this is the log line that costs instead.
+
+    Worth watching for a second reason: when IR-292 and IR-293 ship, the rule
+    becomes "no image the system did not hand you", and how often a model
+    reaches for one is exactly what says whether that is worth building next.
+    """
+    images = images_in(raw)
+    if images:
+        logger.warning(
+            "answer contained %d image(s), which were stripped -- IRIS supplies "
+            "no image addresses, so these were invented: %s",
+            len(images),
+            list(images[:5]),
+        )
 
 
 def _warn_if_citations_went_missing(raw: str, text: str, citations: Sequence) -> None:

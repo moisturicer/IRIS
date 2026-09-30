@@ -90,3 +90,51 @@ describe("a still-streaming message's markers", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 });
+
+// jsdom's getComputedStyle throws on MathML elements, so `getByRole("math")`
+// cannot be used. KaTeX keeps the TeX source in an <annotation> inside its
+// MathML, which is found by text instead.
+const tex = (source: string) => screen.getByText(source, { selector: "annotation" });
+
+describe("mathematics in an answer (IR-429)", () => {
+  it("renders inline LaTeX as mathematics, not source", () => {
+    renderScreen(<CitationText text="The loss uses $x_i$ per sample." citations={[]} />);
+
+    expect(tex("x_i")).toBeTruthy();
+    expect(screen.queryByText(/\$x_i\$/)).toBeNull();
+  });
+
+  it("renders displayed LaTeX as mathematics", () => {
+    const { container } = renderScreen(
+      <CitationText text={"Energy is\n\n$$\nE = mc^2\n$$\n\nas known."} citations={[]} />,
+    );
+
+    expect(tex("E = mc^2")).toBeTruthy();
+    expect(container.querySelector(".katex-display")).not.toBeNull();
+  });
+
+  it("leaves a citation chip working beside mathematics", () => {
+    renderScreen(<CitationText text="Gauges feed $f(x)$ [1]." citations={[citation]} />);
+
+    expect(tex("f(x)")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Open Flood Prediction/i })).toBeTruthy();
+  });
+
+  it("passes axe with mathematics on the page", async () => {
+    const { container } = renderScreen(<CitationText text="Uses $x_i$ here." citations={[]} />);
+
+    await expectNoBlockingA11yViolations(container);
+  });
+});
+
+describe("an image in an answer (IR-429)", () => {
+  it("renders no image element for Markdown image syntax", () => {
+    renderScreen(
+      <CitationText text="Accuracy rose ![Figure 3](https://x.test/f3.png) after tuning." citations={[]} />,
+    );
+
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(document.querySelector("img")).toBeNull();
+    expect(screen.getByText(/Accuracy rose/)).toBeTruthy();
+  });
+});

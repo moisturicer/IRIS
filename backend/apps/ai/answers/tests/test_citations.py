@@ -341,3 +341,75 @@ class UnresolvedMarkerDetectionTests:
         """Stated in the docstring rather than discovered later: a marker that
         does not lead with its number is invisible to this."""
         assert unresolved_marker_candidates("Yes [ref:1].") == ()
+
+
+class PresentationContractTests:
+    """The prompt carries the formatting contract (IR-426). Only the presence
+    of the instruction can be asserted -- compliance cannot."""
+
+    def test_it_asks_for_markdown(self):
+        from apps.ai.answers.citations import SYSTEM_PROMPT
+
+        assert "Markdown" in SYSTEM_PROMPT
+
+    def test_it_asks_for_mathematics_as_dollar_delimited_latex(self):
+        from apps.ai.answers.citations import SYSTEM_PROMPT
+
+        assert "LaTeX" in SYSTEM_PROMPT
+        assert "$$" in SYSTEM_PROMPT
+
+    def test_it_forbids_images_links_and_urls(self):
+        from apps.ai.answers.citations import SYSTEM_PROMPT
+
+        assert "Never write an image, a link, or a URL" in SYSTEM_PROMPT
+
+    def test_structure_has_thresholds_and_a_ban_on_decoration(self):
+        from apps.ai.answers.citations import SYSTEM_PROMPT
+
+        assert "two or more distinct points" in SYSTEM_PROMPT
+        assert "three or more things" in SYSTEM_PROMPT
+        assert "as decoration" in SYSTEM_PROMPT
+
+    def test_every_grounding_clause_survives_verbatim(self):
+        from apps.ai.answers.citations import GROUNDING_RULES, SYSTEM_PROMPT
+
+        assert SYSTEM_PROMPT.startswith(GROUNDING_RULES)
+        assert "Answer ONLY from the numbered sources" in SYSTEM_PROMPT
+        assert "Never invent a title, author, finding or number" in SYSTEM_PROMPT
+
+
+class ImageStrippingTests:
+    """An image the model composed is removed before it is stored (IR-428)."""
+
+    def test_an_inline_image_is_removed_and_the_sentence_kept(self):
+        text, _ = parse_citations(
+            "Accuracy rose ![Figure 3](https://x.test/f3.png) after tuning [1].",
+            [chunk(1)],
+        )
+        assert "![" not in text and "x.test" not in text
+        assert "Accuracy rose" in text and "after tuning" in text
+
+    def test_a_reference_style_image_is_removed(self):
+        text, _ = parse_citations("See ![fig][f3] here.", [chunk(1)])
+        assert "![" not in text
+        assert "See" in text and "here." in text
+
+    def test_a_citation_marker_is_not_mistaken_for_an_image(self):
+        text, citations = parse_citations("It works [1] and again [1][2].", [chunk(1), chunk(2)])
+        assert [c.marker for c in citations] == [1, 2]
+        assert "[1]" in text and "[2]" in text
+
+    def test_a_marker_next_to_an_image_still_resolves(self):
+        text, citations = parse_citations("Shown ![a](u) [1].", [chunk(1)])
+        assert [c.marker for c in citations] == [1]
+        assert "[1]" in text
+
+    def test_a_plain_link_is_left_alone(self):
+        text, _ = parse_citations("See [the docs](https://x.test).", [chunk(1)])
+        assert "[the docs](https://x.test)" in text
+
+    def test_images_in_reports_what_it_found(self):
+        from apps.ai.answers.citations import images_in
+
+        assert images_in("a ![x](u) b ![y][r]") == ("![x](u)", "![y][r]")
+        assert images_in("no image [1]") == ()

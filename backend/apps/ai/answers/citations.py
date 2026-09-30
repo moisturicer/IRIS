@@ -46,7 +46,7 @@ _MARKER = MARKER
 #: `answers/service.py`, are what actually hold the line. Tightening the
 #: wording here is worth a little -- it costs nothing and may lower the rate --
 #: but it is never grounds for narrowing `_MARKER` back down.
-SYSTEM_PROMPT = (
+GROUNDING_RULES = (
     "You are IRIS, the research assistant for Cebu Institute of Technology - "
     "University.\n"
     "Answer ONLY from the numbered sources below. Cite them inline as [1], [2], "
@@ -59,6 +59,46 @@ SYSTEM_PROMPT = (
     "guessing.\n"
     "Never invent a title, author, finding or number. Be concise and factual."
 )
+
+#: How an answer is **presented** -- kept apart from the grounding rules above
+#: because the two fail differently (IR-426). A broken grounding rule is a
+#: fabrication; a broken presentation rule is an ugly answer. Separating them
+#: also lets a test pin one without pinning the other's wording.
+#:
+#: **Thresholds, not taste.** "Use headings where helpful" puts a heading on a
+#: one-line answer, because a model handed a formatting instruction applies it.
+#: The numbers are what make the rule decidable, and the closing prohibition is
+#: the half that stops structure becoming decoration.
+#:
+#: **The no-image rule is load-bearing, and temporary.** IRIS has no image
+#: addresses to give: ADR-025 renders a Figure by cropping the source PDF on
+#: request, and that endpoint does not exist yet (IR-292, IR-293). A model
+#: asked about a figure invents a URL, and a broken image reads to a reader as
+#: a figure IRIS had and failed to load -- the same "looks like evidence"
+#: failure that makes an unresolvable citation marker worse than no marker.
+#: When IR-293 ships this becomes "no image the system did not hand you".
+#:
+#: Like the bracket grammar above, this is a nudge and not a guarantee. What
+#: holds the line is `strip_images` below, and a renderer that draws no image.
+PRESENTATION_RULES = (
+    "Format your answer as GitHub-flavoured Markdown.\n"
+    "Use short paragraphs. Use a '## ' heading only when the answer covers two "
+    "or more distinct points; never put a heading on a one-paragraph answer. "
+    "Use a bullet list for parallel items, and a Markdown table only when "
+    "comparing three or more things across the same attributes.\n"
+    "Write mathematics as LaTeX: $x_i$ inline, and $$...$$ on its own lines "
+    "for a displayed equation. If a source quotes an equation, reproduce it as "
+    "LaTeX rather than describing it in words.\n"
+    "When a source passage is a figure caption or a table, say so in the "
+    "sentence (Figure 3 reports..., Table 2 lists...) and cite it, so the "
+    "reader can open that page.\n"
+    "Never write an image, a link, or a URL of any kind: you have no image or "
+    "page addresses, and one you compose will be broken.\n"
+    "Never use a heading, a list, or a table as decoration. If prose says it "
+    "in one sentence, write the sentence."
+)
+
+SYSTEM_PROMPT = GROUNDING_RULES + "\n" + PRESENTATION_RULES
 
 
 @dataclass(frozen=True)
@@ -207,6 +247,46 @@ def build_prompt(
     return "\n".join(lines).strip()
 
 
+#: Markdown image syntax, inline and reference style (IR-428).
+#:
+#: The leading `!` is what keeps this off a citation: `[1]` is a link at most,
+#: never an image, so no marker can match here. Titles (`![a](u "t")`) are
+#: inside the parentheses and go with it.
+#:
+#: Raw `<img>` is not matched and does not need to be: the renderer parses no
+#: raw HTML, so an `<img>` tag reaches a reader as visible text rather than as
+#: a broken picture. That is ugly, not misleading, and widening this to chase
+#: it would risk eating prose that merely mentions a tag.
+_IMAGE = re.compile(
+    r"!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])"
+)
+
+
+def images_in(answer: str) -> tuple[str, ...]:
+    """The image syntax ``answer`` contains, for a caller that wants to report
+    it. Pure, like `unresolved_marker_candidates`: it neither logs nor decides.
+    """
+    return tuple(match.group(0) for match in _IMAGE.finditer(answer))
+
+
+def strip_images(answer: str) -> str:
+    """``answer`` with any Markdown image removed.
+
+    **Why an image is stripped rather than rendered.** IRIS hands the model no
+    image addresses -- ADR-025 renders a Figure by cropping the source PDF on
+    request, and that endpoint is unbuilt (IR-292, IR-293). So an image in an
+    answer is a URL the model composed, and what a reader sees is a broken
+    picture where a figure should be: indistinguishable from IRIS having the
+    figure and failing to load it. That is the same reasoning `parse_citations`
+    gives for dropping a marker that resolves to nothing -- it looks like
+    evidence -- and it gets the same treatment.
+
+    The alt text goes with it. Keeping it would leave a bare caption floating
+    in the prose with nothing to caption.
+    """
+    return _IMAGE.sub("", answer)
+
+
 def parse_citations(
     answer: str, chunks: Sequence[RetrievedChunk]
 ) -> tuple[str, tuple[Citation, ...]]:
@@ -220,7 +300,17 @@ def parse_citations(
     invent [7] when handed four sources, and rendering it would show a reader
     a citation that points at nothing, which reads as evidence. Dropping it
     leaves the sentence, which is still supported by whatever else it cites.
+
+    **Markdown images are dropped for the same reason** (IR-428) -- see
+    `strip_images`. Done here rather than at one call site so that every
+    caller is covered: the answer path, the stream's partial answer, and the
+    AI Overview all arrive through this function.
     """
+    # Images first: an invented one is removed before markers are read, so a
+    # citation inside an image's alt text cannot resolve and then have its
+    # marker stranded when the image around it goes (IR-428).
+    answer = strip_images(answer)
+
     resolved: list[Citation] = []
     seen: set[int] = set()
 

@@ -12,6 +12,7 @@ no database, no network, no clock, no randomness.
 
 from typing import Any, Iterable
 
+from .document import FORMULA
 from .tokens import count_tokens
 
 Piece = tuple[str, Any]
@@ -19,6 +20,27 @@ Piece = tuple[str, Any]
 #: How every stage joins the parts of a window back into one string. Shared
 #: so that what gets *counted* and what gets *emitted* cannot drift apart.
 JOIN = " "
+
+
+def reader_form(text: str, element: Any) -> str:
+    """``text`` as a reader should see it, which differs only for a formula
+    (IR-427): a standalone `FORMULA` element is wrapped as displayed LaTeX.
+
+    Applied to ``content`` and never to ``text``, so the vector and every hash
+    are unchanged. A fragment of a split formula is left bare -- half an
+    expression in delimiters renders as an error, where bare it is merely
+    source. A formula the extractor already delimited is left alone.
+    """
+    if getattr(element, "kind", None) != FORMULA or text != element.text:
+        return text
+    if "$" in text:
+        return text
+    return f"\n\n$$\n{text.strip()}\n$$\n\n"
+
+
+def reader_content(window: list[Piece]) -> str:
+    """A window's pieces joined into reader-facing content."""
+    return JOIN.join(reader_form(text, element) for text, element in window).strip()
 
 
 def assembled(parts: Iterable[str]) -> str:
