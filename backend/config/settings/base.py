@@ -498,6 +498,17 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
     "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
 )
 
+# ---- Vector scan depth (IR-440) -------------------------------------------
+#
+# pgvector's HNSW index visits `hnsw.ef_search` rows (its default is 40) and
+# applies a query's WHERE clause afterwards, so a filtered vector query could
+# never return more than 40 rows and the reranker never saw its 100. Applied
+# per transaction around both stages of `TwoStageRetriever`. Measured on the
+# proxy corpus: recall@10 with reranking 0.683 at 40, 0.798 at 100, 0.885 at
+# 200, flat beyond it. pgvector accepts 1..1000. A fixed depth goes stale as
+# the corpus grows; iterative scan (pgvector 0.8) is the durable answer.
+AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in

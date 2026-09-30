@@ -231,3 +231,56 @@ class ResultShapeTests:
         assert result.source_page == 1
         assert result.context_path == ("Tilapia Feed Study",)
         assert result.chunk_id
+
+
+class ScanDepthTests:
+    """A filtered vector query returns as many rows as `limit` asks for (IR-440).
+
+    pgvector's HNSW index scans `hnsw.ef_search` rows (40 by default) and only
+    then applies the WHERE filter, so without a raised depth no query can ever
+    return more than 40 rows, whatever `limit` is.
+    """
+
+    @pytest.fixture
+    def index_is_used(self):
+        """On a small table the planner avoids the HNSW index, which has the
+        scan depth and so hides the cap. Forbid the alternatives (a sequential
+        scan, and a sort over a join) for this transaction."""
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL enable_seqscan = off")
+            cursor.execute("SET LOCAL enable_sort = off")
+
+    def test_a_limit_above_forty_is_reached(
+        self, embedder, space, reader, index_is_used, settings
+    ):
+        # HNSW is approximate and rolled-back rows from earlier tests still
+        # sit in the graph using up slots, so take the maximum depth for
+        # headroom and assert "more than 40", not an exact count.
+        settings.AI_HNSW_EF_SEARCH = 1000
+        record = published_record("Thesis", reader, embedder)
+        add_chunks(record, space, embedder, [f"passage number {i}" for i in range(60)])
+
+        found = TwoStageRetriever(embedder).retrieve("passage", reader, limit=100)
+
+        assert len(found.passages) > 40
+
+    def test_the_depth_is_a_setting(
+        self, embedder, space, reader, index_is_used, settings
+    ):
+        settings.AI_HNSW_EF_SEARCH = 10
+        record = published_record("Thesis", reader, embedder)
+        add_chunks(record, space, embedder, [f"passage number {i}" for i in range(60)])
+
+        found = TwoStageRetriever(embedder).retrieve("passage", reader, limit=100)
+
+        assert len(found.passages) < 20
+
+    def test_the_depth_is_clamped_to_what_pgvector_accepts(self, settings):
+        from apps.ai.retrieval.scan_depth import configured_depth
+
+        settings.AI_HNSW_EF_SEARCH = 5000
+        assert configured_depth() == 1000
+        settings.AI_HNSW_EF_SEARCH = 0
+        assert configured_depth() == 1

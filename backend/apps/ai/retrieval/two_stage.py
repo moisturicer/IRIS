@@ -34,6 +34,7 @@ from apps.ai.regions import normalized_regions
 from apps.records.models import Record
 
 from .ports import VECTOR, RetrievalResult, RetrievedChunk, Retriever
+from .scan_depth import scan_depth
 
 #: Stage 1 keeps this many records. ADR-013's sizing: a few dozen records is
 #: roughly a thousand chunks, which is a cheap stage-2 search.
@@ -81,42 +82,45 @@ class TwoStageRetriever(Retriever):
 
         query_vector = self._embedder.embed_query(question)
 
-        # -- Stage 1: candidate records, visibility-filtered before scoring --
-        visible_records = Record.objects.visible_to(user)
-        if self._record is not None:
-            # Scoped to one Record (IR-298): still through `visible_to`, not
-            # instead of it -- a Conversation's Record may have stopped being
-            # readable since it was scoped, and this is the same fail-closed
-            # check every other retrieval path applies.
-            visible_records = visible_records.filter(pk=self._record.pk)
-        visible_records = visible_records.values("pk")
-        candidate_ids = list(
-            RecordEmbedding.objects.filter(record__in=visible_records)
-            .order_by(CosineDistance("embedding", query_vector))
-            .values_list("record_id", flat=True)[: self._record_candidates]
-        )
-        if not candidate_ids:
-            return RetrievalResult(
-                mode=VECTOR, embedding_space_id=space.pk, query_vector=query_vector
+        # One transaction and one scan depth for both stages, and the rows are
+        # read inside it: a lazy queryset run later gets pgvector's default 40.
+        with scan_depth():
+            # -- Stage 1: candidate records, visibility-filtered before scoring --
+            visible_records = Record.objects.visible_to(user)
+            if self._record is not None:
+                # Scoped to one Record (IR-298): still through `visible_to`, not
+                # instead of it -- a Conversation's Record may have stopped being
+                # readable since it was scoped, and this is the same fail-closed
+                # check every other retrieval path applies.
+                visible_records = visible_records.filter(pk=self._record.pk)
+            visible_records = visible_records.values("pk")
+            candidate_ids = list(
+                RecordEmbedding.objects.filter(record__in=visible_records)
+                .order_by(CosineDistance("embedding", query_vector))
+                .values_list("record_id", flat=True)[: self._record_candidates]
             )
+            if not candidate_ids:
+                return RetrievalResult(
+                    mode=VECTOR, embedding_space_id=space.pk, query_vector=query_vector
+                )
 
-        # -- Stage 2: chunks within those records only --
-        distance = CosineDistance("embedding", query_vector)
-        rows = (
-            ChunkEmbedding.objects.filter(
-                space=space,
-                # `DocumentChunk` carries a denormalized `record` FK, so this
-                # narrows without joining through the chunk set.
-                chunk__record_id__in=candidate_ids,
-                chunk__chunk_set__is_active=True,
-                chunk__deleted_at__isnull=True,
+            # -- Stage 2: chunks within those records only --
+            distance = CosineDistance("embedding", query_vector)
+            rows = list(
+                ChunkEmbedding.objects.filter(
+                    space=space,
+                    # `DocumentChunk` carries a denormalized `record` FK, so this
+                    # narrows without joining through the chunk set.
+                    chunk__record_id__in=candidate_ids,
+                    chunk__chunk_set__is_active=True,
+                    chunk__deleted_at__isnull=True,
+                )
+                # `chunk_set` for its `page_sizes`, which is what turns a
+                # chunk's stored rectangles into drawable ones (IR-334).
+                .select_related("chunk", "chunk__record", "chunk__chunk_set")
+                .annotate(distance=distance)
+                .order_by("distance")[:limit]
             )
-            # `chunk_set` for its `page_sizes`, which is what turns a
-            # chunk's stored rectangles into drawable ones (IR-334).
-            .select_related("chunk", "chunk__record", "chunk__chunk_set")
-            .annotate(distance=distance)
-            .order_by("distance")[:limit]
-        )
 
         return RetrievalResult(
             passages=tuple(
