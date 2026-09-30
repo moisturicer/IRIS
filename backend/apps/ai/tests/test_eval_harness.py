@@ -270,13 +270,20 @@ def test_the_command_records_the_technique_configuration_in_the_results_file(
 
 def test_the_command_refuses_a_technique_that_is_not_built_yet(corpus, reader):
     """Measuring the baseline under a results file claiming otherwise is the
-    one failure the registry exists to prevent."""
-    with pytest.raises(CommandError, match="IR-395"):
+    one failure the registry exists to prevent.
+
+    Named on `relevance_cut_off` rather than `fusion`: this test was written
+    against fusion while nothing implemented it, and IR-395 landed
+    `AI_RETRIEVAL_FUSION_ENABLED`, so fusion is now a technique the harness
+    can really run. The property is about an *unbuilt* technique, so it moved
+    to one that still is (IR-396) rather than being deleted.
+    """
+    with pytest.raises(CommandError, match="IR-396"):
         call_command(
             "eval_retrieval",
             questions=str(SYNTHETIC_SET),
             user=reader.email,
-            techniques=["fusion=on"],
+            techniques=["relevance_cut_off=0.3"],
         )
 
 

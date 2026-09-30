@@ -36,6 +36,7 @@ from apps.ai.models.chunk import ChunkSet, DocumentChunk
 from apps.ai.providers.noop import NoOpReranker
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.retrieval.degraded import DegradableRetriever, FullTextRetriever
+from apps.ai.retrieval.fusion import KeywordFusionRetriever
 from apps.ai.retrieval.ports import (
     FULL_TEXT,
     VECTOR,
@@ -241,6 +242,14 @@ DECORATORS = {
     "DegradableRetriever": lambda inner: DegradableRetriever(inner),
     "RerankingRetriever": lambda inner: RerankingRetriever(
         inner, reranker=NoOpReranker(), policy_enabled=False
+    ),
+    # Given a degraded inner result this one passes it straight through
+    # rather than fusing (IR-395): the inner result already *is* full-text
+    # search, so a second keyword query would add a query and no candidates.
+    # It still has to arrive at the top carrying the flag, which is what the
+    # contract below asserts.
+    "KeywordFusionRetriever": lambda inner: KeywordFusionRetriever(
+        inner, keyword=_Fixed(RetrievalResult())
     ),
 }
 

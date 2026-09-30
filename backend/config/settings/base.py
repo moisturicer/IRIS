@@ -478,6 +478,26 @@ AI_CONVERSATION_MEMORY_ENABLED = config(
     "AI_CONVERSATION_MEMORY_ENABLED", default=True, cast=bool
 )
 
+# ---- Hybrid retrieval (IR-395, ADR-033 §1-2) ----------------------------
+#
+# Two halves of one technique, in two settings because ADR-033 §1 (merge the
+# keyword and vector lists by rank) and §2 (the keyword index participates in
+# retrieval at all) are two decisions. Neither does anything alone, and
+# `apps/ai/evaluation/techniques.py` says so: fusion is one technique in two
+# settings, so a run moves both together.
+#
+# **Both default off**, so an upgrade changes nothing: retrieval stays
+# vector-only on the healthy path and full-text search keeps only its ADR-008
+# outage job. ADR-033 §5 moves a default only once a run of the ADR-023
+# harness shows the change helps, and that run is IR-402's -- not this
+# ticket's, whatever its own numbers say.
+AI_KEYWORD_RETRIEVAL_ENABLED = config(
+    "AI_KEYWORD_RETRIEVAL_ENABLED", default=False, cast=bool
+)
+AI_RETRIEVAL_FUSION_ENABLED = config(
+    "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
+)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in
