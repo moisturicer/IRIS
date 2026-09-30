@@ -163,6 +163,43 @@ class LoadCorpusTests(_LoadsCorpus):
 
         self.assertEqual(Record.objects.count(), 1)
 
+    def test_a_title_past_the_old_100_char_ceiling_loads_without_crashing(self):
+        """A real 145-char arXiv filename used to crash the whole run (IR-422)."""
+        long_stem = "The_2MIG_isolated_AGNs_--_4_XQdGoDX._" + "Linking_hot-dust_reverberation" * 3
+        _write(self.root, "astrophysics", f"{long_stem}.pdf")
+
+        self.load(str(self.root))
+
+        self.assertEqual(Record.objects.count(), 1)
+        record = Record.objects.get(classification__name="astrophysics")
+        self.assertEqual(record.title, long_stem)
+
+    def test_a_storage_failure_is_skipped_per_record_not_fatal_to_the_batch(self):
+        """A per-record storage failure is skipped like a non-PDF file, not fatal (IR-422)."""
+        from django.core.exceptions import SuspiciousFileOperation
+
+        from apps.records.management.commands.load_corpus import Command
+
+        _write(self.root, "econometrics", "Bad Paper.pdf")
+        _write(self.root, "econometrics", "Good Paper.pdf")
+        out = StringIO()
+
+        original_load_one = Command._load_one
+
+        def flaky_load_one(self, path, title, classification, record_type, owner):
+            if title == "Bad Paper":
+                raise SuspiciousFileOperation("refusing Bad Paper.pdf")
+            return original_load_one(self, path, title, classification, record_type, owner)
+
+        with patch.object(Command, "_load_one", flaky_load_one):
+            with patch("apps.documents.tasks.extract_manuscript_text.delay"):
+                with self.captureOnCommitCallbacks(execute=True):
+                    call_command("load_corpus", str(self.root), force=True, stdout=out)
+
+        self.assertEqual(Record.objects.filter(title="Good Paper").count(), 1)
+        self.assertEqual(Record.objects.filter(title="Bad Paper").count(), 0)
+        self.assertIn("failed to load", out.getvalue())
+
     def test_rerunning_does_not_duplicate_records(self):
         _write(self.root, "econometrics", "Paper.pdf")
         self.load(str(self.root))

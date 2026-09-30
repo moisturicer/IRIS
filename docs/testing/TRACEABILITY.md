@@ -87,6 +87,18 @@
 
 ## Open defects
 
+### IR-422: a long paper title crashed record creation (FR-M2-01) — FIXED
+
+`Record.abstract_file` was declared with no `max_length` override, so Django's `FileField` default of 100 applied — a ceiling on the whole stored path (`abstracts/<name>.pdf`), not the filename alone. `load_corpus` (IR-313) and the ordinary submission path both derived the stored filename directly from the source filename or title with no truncation, so any title with a stem over roughly 90 characters crashed with `SuspiciousFileOperation` instead of saving. Found loading a 20-paper astrophysics corpus for the IR-133/IR-394 retrieval eval: 6 of 20 real arXiv filenames (145-149 characters) hit this and aborted the whole `load_corpus` run at the first offender.
+
+**Fix.** `abstract_file_path` (`apps/records/models.py`) replaces the bare `upload_to="abstracts/"` string: the stored name is now a random UUID plus the original extension, so the title's length and any filesystem-hostile characters (`--`, runs of `.`) never reach storage. `max_length` is raised to 255 (migration `records.0013`) for headroom regardless. `load_corpus` also now catches `SuspiciousFileOperation` per-record and reports it like a non-PDF file rather than aborting the batch, as defense in depth for the same class of storage-layer failure. `download_service.resolve_record_download_file` was updated to rebuild the download's suggested filename from `record.title` rather than reading it back off the now-random stored path, avoiding a UX regression (a meaningless UUID filename on download).
+
+**Test.** `apps/records/tests.py::LongManuscriptFilenameTests` posts a manuscript with a 145-char filename stem (matching the reproduction) through the real API and asserts a 201 and a correctly-saved file, rather than only inspecting the field definition. `apps/records/test_load_corpus.py::test_a_title_past_the_old_100_char_ceiling_loads_without_crashing` proves the same at the point the bug was found — a bulk load. `test_a_storage_failure_is_skipped_per_record_not_fatal_to_the_batch` proves the per-record catch independently of the model fix.
+
+Evidence, 2026-09-30, local: `python manage.py test apps.records apps.documents apps.ai` — **252 passed**.
+
+---
+
 ### IR-233: a resubmission refused by the upload guard looks like the Record went back to declined (FR-M5-01)
 
 **Reproduced 2026-09-15** against the report's own Record (seed_demo's `[DEMO] Declined by IERC, ITSO and KTTO preserved`, id 38 in the dev database). The backend log shows the owner's first `POST /api/v1/reviews/resubmit/` returning **400** with a 77-byte body. That is exactly `{"detail":"Please upload at least one updated document before resubmitting."}`. The Record stayed `declined`, and the paper view kept showing the IERC decline twice: once in the clearance track and once in the review history. After an upload, the second resubmission succeeded, leaving `parallel_review`, IERC `pending`, and ITSO and KTTO `cleared` with `preserved: true`. **The clearance-aware transition itself works.**
