@@ -113,6 +113,23 @@ python manage.py eval_retrieval --questions ... --user staff@cit.edu \
     --reranking on -k 20 --no-write
 ```
 
+One of ADR-033 §5's switches, against the same baseline:
+
+```bash
+# What is switchable, and which of the six are built:
+python manage.py eval_retrieval --list-techniques
+
+# Baseline first, then the candidate. Same commit, same set, same --user.
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json     --user iris-student@cit.edu
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json     --user iris-student@cit.edu     --technique keyword_retrieval=on --technique fusion=on
+```
+
+Every run records all six switches at the values it used, so two results files
+are comparable. Asking for a switch whose setting does not exist yet is refused
+rather than recorded as measured. Hybrid retrieval is two settings for one
+technique, which is why the pair above moves together and why the command warns
+that two switches moved — see ADR-023's IR-394 divergence note.
+
 `--user` is required and is part of what is measured: retrieval filters by
 `Record.objects.visible_to(user)`, so a run reports what *that* user can
 retrieve. An anonymous user can read nothing and would score zero on a working

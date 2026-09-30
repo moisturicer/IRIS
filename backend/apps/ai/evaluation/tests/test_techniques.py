@@ -75,11 +75,32 @@ def test_the_registry_renders_for_an_operator_choosing_a_run():
 
 
 def test_a_technique_whose_setting_does_not_exist_yet_is_recorded_as_such():
-    fusion = resolve()["fusion"]
+    """Driven by whichever techniques are still unbuilt, not by naming one.
 
-    assert fusion["implemented"] is False
-    assert fusion["value"] is None
-    assert fusion["setting"] == "AI_RETRIEVAL_FUSION_ENABLED"
+    It named `fusion` while nothing implemented it, and IR-395 landed
+    `AI_RETRIEVAL_FUSION_ENABLED`. Naming the next unbuilt technique instead
+    would only move the same breakage to IR-396, so the property is asserted
+    over whatever is unbuilt today -- and stops asserting anything once all six
+    are built, which is the point at which it has nothing left to say.
+    """
+    absent = Technique(
+        name="not-a-technique",
+        setting="AI_NO_SUCH_SETTING_EXISTS",
+        kind="bool",
+        adr="ADR-033",
+        ticket="IR-000",
+    )
+    assert absent.implemented is False
+    assert absent.value is None
+
+    # And over whatever of the real six is still unbuilt, which is what the
+    # registry actually reports today.
+    resolved = resolve()
+    for item in (t for t in TECHNIQUES if not t.implemented):
+        state = resolved[item.name]
+        assert state["implemented"] is False
+        assert state["value"] is None
+        assert state["setting"] == item.setting
 
 
 @override_settings(AI_RETRIEVAL_FUSION_ENABLED=True)
@@ -137,11 +158,25 @@ def test_an_override_with_no_value_is_refused():
 
 
 def test_overriding_a_technique_that_does_not_exist_yet_is_refused():
-    """The whole point: a run must not report a technique it never applied."""
-    with pytest.raises(TechniqueError) as exc:
-        parse_override("fusion=on")
+    """The whole point: a run must not report a technique it never applied.
 
-    assert "IR-395" in str(exc.value)
+    Over whatever is unbuilt, for the reason the recording test above gives.
+    The refusal must name the ticket that lands it, so an operator reads what
+    to wait for rather than "unknown option".
+    """
+    unbuilt = [t for t in TECHNIQUES if not t.implemented]
+    assert unbuilt, (
+        "every ADR-033 technique is now built, so this can no longer refuse "
+        "one. Delete it deliberately rather than letting it skip and assert "
+        "nothing."
+    )
+
+    for item in unbuilt:
+        value = "on" if item.kind == "bool" else "1"
+        with pytest.raises(TechniqueError) as exc:
+            parse_override(f"{item.name}={value}")
+
+        assert item.ticket in str(exc.value)
 
 
 # -- applying them -----------------------------------------------------------
@@ -157,11 +192,20 @@ def test_an_applied_override_is_what_the_stack_reads():
     assert settings.AI_RETRIEVAL_FUSION_ENABLED is False
 
 
+@override_settings(AI_RETRIEVAL_FUSION_ENABLED=False)
 def test_applying_a_baseline_changes_no_setting():
+    """A baseline resolves every technique to what the deployment already
+    says, so entering its block moves nothing.
+
+    Asserted on the value rather than on the setting's absence: it used to
+    read `not hasattr(...)`, which held only while nothing implemented fusion,
+    and IR-395 landed `AI_RETRIEVAL_FUSION_ENABLED`. The property was never
+    about the attribute existing.
+    """
     from django.conf import settings
 
     with resolve().applied():
-        assert not hasattr(settings, "AI_RETRIEVAL_FUSION_ENABLED")
+        assert settings.AI_RETRIEVAL_FUSION_ENABLED is False
 
 
 # -- a run under an override -------------------------------------------------
