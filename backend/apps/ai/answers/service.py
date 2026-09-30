@@ -440,23 +440,9 @@ def _parse(
 
 
 def _without_leaked_reasoning(raw: str) -> str:
-    """``raw`` with any `<think>` span taken out (IR-428).
-
-    **The streaming path has had this since IR-327; this one never did.**
-    `answer()` reads `generate()`, which returns text and nothing else -- the
-    port has no reasoning channel -- so a model that puts its working in the
-    text channel had it stored verbatim as the answer. The AI Overview runs on
-    exactly this path.
-
-    IRIS does not ask for reasoning on any task that reaches here, which makes
-    this unlikely rather than impossible: `OpenRouterDialect.request_extras`
-    says it plainly -- an absent parameter is not a promise that a model
-    reasons only when told to. Running the same filter both paths already use
-    costs one pass over a string and removes the question.
-
-    The reasoning is discarded, not returned. Nothing on this path has
-    anywhere to put it: an overview is not a Turn, and `GroundedAnswer`'s
-    `reasoning` is filled only by a stream that requested the channel.
+    """``raw`` with any `<think>` span removed. The non-streaming path had no
+    such filter (IR-428 "Image syntax never survives into a stored answer").
+    The reasoning is discarded: an overview is not a Turn.
     """
     leak_filter = ThinkTagFilter()
     text, _ = leak_filter.feed(raw)
@@ -465,18 +451,7 @@ def _without_leaked_reasoning(raw: str) -> str:
 
 
 def _warn_if_images_were_stripped(raw: str) -> None:
-    """Say something when the model wrote an image (IR-428).
-
-    Stripping is silent by design -- `parse_citations` is pure and reports
-    nothing -- so without this the model could drift into illustrating every
-    answer and the only symptom would be sentences that read slightly oddly.
-    That is how both citation-format drifts went unnoticed until someone read
-    a transcript by hand, and this is the log line that costs instead.
-
-    Worth watching for a second reason: when IR-292 and IR-293 ship, the rule
-    becomes "no image the system did not hand you", and how often a model
-    reaches for one is exactly what says whether that is worth building next.
-    """
+    """Log when the model wrote an image; stripping is otherwise silent."""
     images = images_in(raw)
     if images:
         logger.warning(

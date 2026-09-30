@@ -60,26 +60,11 @@ GROUNDING_RULES = (
     "Never invent a title, author, finding or number. Be concise and factual."
 )
 
-#: How an answer is **presented** -- kept apart from the grounding rules above
-#: because the two fail differently (IR-426). A broken grounding rule is a
-#: fabrication; a broken presentation rule is an ugly answer. Separating them
-#: also lets a test pin one without pinning the other's wording.
-#:
-#: **Thresholds, not taste.** "Use headings where helpful" puts a heading on a
-#: one-line answer, because a model handed a formatting instruction applies it.
-#: The numbers are what make the rule decidable, and the closing prohibition is
-#: the half that stops structure becoming decoration.
-#:
-#: **The no-image rule is load-bearing, and temporary.** IRIS has no image
-#: addresses to give: ADR-025 renders a Figure by cropping the source PDF on
-#: request, and that endpoint does not exist yet (IR-292, IR-293). A model
-#: asked about a figure invents a URL, and a broken image reads to a reader as
-#: a figure IRIS had and failed to load -- the same "looks like evidence"
-#: failure that makes an unresolvable citation marker worse than no marker.
-#: When IR-293 ships this becomes "no image the system did not hand you".
-#:
-#: Like the bracket grammar above, this is a nudge and not a guarantee. What
-#: holds the line is `strip_images` below, and a renderer that draws no image.
+#: Presentation rules, kept apart from grounding: a broken grounding rule is a
+#: fabrication, a broken presentation rule is an ugly answer. Thresholds, not
+#: taste, so a one-line answer gets no heading. The no-image rule stays until
+#: figure cropping exists (IR-293 "Figures appear in Ask IRIS answers"); a
+#: nudge only -- `strip_images` is what holds the line.
 PRESENTATION_RULES = (
     "Format your answer as GitHub-flavoured Markdown.\n"
     "Use short paragraphs. Use a '## ' heading only when the answer covers two "
@@ -247,42 +232,23 @@ def build_prompt(
     return "\n".join(lines).strip()
 
 
-#: Markdown image syntax, inline and reference style (IR-428).
-#:
-#: The leading `!` is what keeps this off a citation: `[1]` is a link at most,
-#: never an image, so no marker can match here. Titles (`![a](u "t")`) are
-#: inside the parentheses and go with it.
-#:
-#: Raw `<img>` is not matched and does not need to be: the renderer parses no
-#: raw HTML, so an `<img>` tag reaches a reader as visible text rather than as
-#: a broken picture. That is ugly, not misleading, and widening this to chase
-#: it would risk eating prose that merely mentions a tag.
+#: Markdown image syntax, inline and reference style. The leading `!` keeps it
+#: off citation markers. Raw `<img>` is not matched: the renderer shows it as text.
 _IMAGE = re.compile(
     r"!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])"
 )
 
 
 def images_in(answer: str) -> tuple[str, ...]:
-    """The image syntax ``answer`` contains, for a caller that wants to report
-    it. Pure, like `unresolved_marker_candidates`: it neither logs nor decides.
-    """
+    """The image syntax ``answer`` contains. Pure: it neither logs nor decides."""
     return tuple(match.group(0) for match in _IMAGE.finditer(answer))
 
 
 def strip_images(answer: str) -> str:
-    """``answer`` with any Markdown image removed.
+    """``answer`` without Markdown images, alt text included.
 
-    **Why an image is stripped rather than rendered.** IRIS hands the model no
-    image addresses -- ADR-025 renders a Figure by cropping the source PDF on
-    request, and that endpoint is unbuilt (IR-292, IR-293). So an image in an
-    answer is a URL the model composed, and what a reader sees is a broken
-    picture where a figure should be: indistinguishable from IRIS having the
-    figure and failing to load it. That is the same reasoning `parse_citations`
-    gives for dropping a marker that resolves to nothing -- it looks like
-    evidence -- and it gets the same treatment.
-
-    The alt text goes with it. Keeping it would leave a bare caption floating
-    in the prose with nothing to caption.
+    IRIS hands the model no image addresses (IR-292 "Figure crop endpoint"), so
+    any image is an invented URL that reads as a figure that failed to load.
     """
     return _IMAGE.sub("", answer)
 
@@ -301,14 +267,10 @@ def parse_citations(
     a citation that points at nothing, which reads as evidence. Dropping it
     leaves the sentence, which is still supported by whatever else it cites.
 
-    **Markdown images are dropped for the same reason** (IR-428) -- see
-    `strip_images`. Done here rather than at one call site so that every
-    caller is covered: the answer path, the stream's partial answer, and the
-    AI Overview all arrive through this function.
+    Markdown images are dropped too (see `strip_images`), here so every caller
+    is covered: answers, streams and the AI Overview.
     """
-    # Images first: an invented one is removed before markers are read, so a
-    # citation inside an image's alt text cannot resolve and then have its
-    # marker stranded when the image around it goes (IR-428).
+    # Before markers are read, so a marker in alt text cannot resolve and strand.
     answer = strip_images(answer)
 
     resolved: list[Citation] = []

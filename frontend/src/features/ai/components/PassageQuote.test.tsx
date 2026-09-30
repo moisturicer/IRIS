@@ -10,9 +10,12 @@ import { PassageQuote } from "./PassageQuote";
 
 describe("a quoted passage", () => {
   it("renders a displayed formula as mathematics", () => {
-    renderScreen(<PassageQuote text={"The loss is\n\n$$\nL = x_i\n$$\n\nwhere x is input."} />);
+    const { container } = renderScreen(
+      <PassageQuote text={"The loss is\n\n$$\nL = x_i\n$$\n\nwhere x is input."} />,
+    );
 
     expect(screen.getByText("L = x_i", { selector: "annotation" })).toBeTruthy();
+    expect(container.querySelector(".katex-display")).not.toBeNull();
     expect(screen.getByText(/The loss is/)).toBeTruthy();
     expect(screen.getByText(/where x is input\./)).toBeTruthy();
   });

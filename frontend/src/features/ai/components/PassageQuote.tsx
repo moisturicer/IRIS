@@ -21,20 +21,15 @@ import { citationHref, citationNavigationState, openCitationLabel } from "@/lib/
 
 const DISPLAY_MATH = /\$\$([\s\S]+?)\$\$/g;
 
-/**
- * A passage's text with its `$$...$$` formulas rendered (IR-429).
- *
- * Not run through Markdown: a passage is a paper's own words, and `*`, `#` or
- * `_` in it are not formatting. Only the delimiters chunk assembly wrote
- * (IR-427) are acted on. A formula KaTeX cannot parse stays as source.
- */
+/** A passage's `$$...$$` formulas rendered; not run through Markdown. */
 function withMathRendered(text: string) {
   const parts: React.ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(DISPLAY_MATH)) {
     const start = match.index ?? 0;
     if (start > last) parts.push(text.slice(last, start));
-    const html = katex.renderToString(match[1].trim(), { throwOnError: false, displayMode: false });
+    // KaTeX output; `trust` is off by default.
+    const html = katex.renderToString(match[1].trim(), { throwOnError: false, displayMode: true });
     parts.push(<span key={start} dangerouslySetInnerHTML={{ __html: html }} />);
     last = start + match[0].length;
   }

@@ -114,9 +114,7 @@ export function CitationText({ text, citations, streaming = false, className }: 
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeHighlight, rehypeKatex]}
-        // IRIS supplies no image addresses (ADR-025, IR-292), so an image here
-        // is one the model invented. Rendered, it reads as a figure that failed
-        // to load. The backend strips these; this covers what is already stored.
+        // A model-invented image would look like a figure that failed to load.
         components={{ a: CitationLink, img: () => null }}
         urlTransform={urlTransform}
       >

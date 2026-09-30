@@ -23,13 +23,10 @@ JOIN = " "
 
 
 def reader_form(text: str, element: Any) -> str:
-    """``text`` as a reader should see it, which differs only for a formula
-    (IR-427): a standalone `FORMULA` element is wrapped as displayed LaTeX.
-
-    Applied to ``content`` and never to ``text``, so the vector and every hash
-    are unchanged. A fragment of a split formula is left bare -- half an
-    expression in delimiters renders as an error, where bare it is merely
-    source. A formula the extractor already delimited is left alone.
+    """``text`` as a reader sees it: a whole `FORMULA` element as displayed LaTeX
+    (IR-427 "Formulas are delimited where the element kind is known").
+    Content only, never ``text``. Fragments and already-delimited formulas are
+    left alone.
     """
     if getattr(element, "kind", None) != FORMULA or text != element.text:
         return text
