@@ -5,8 +5,9 @@ tiers never conflated, labels that survive re-chunking, two measures per run,
 one change at a time, and a manual command rather than CI.
 
 `labels` is the question-set format, `harness` is a run, `report` is what a run
-produces, `validation` is the pre-flight a labeller uses. Only `validation`
-touches the database outside a run.
+produces, `techniques` is ADR-033 §5's switches a run can move, and
+`validation` is the pre-flight a labeller uses. Only `validation` touches the
+database outside a run.
 """
 
 from .harness import run, run_both
@@ -20,10 +21,21 @@ from .labels import (
     parse_question_set,
 )
 from .report import EvalReport, QuestionOutcome, RunConfig, compare
+from .techniques import (
+    TECHNIQUES,
+    Technique,
+    TechniqueError,
+    parse_override,
+    render_registry,
+)
+from .techniques import resolve as resolve_techniques
 from .validation import check_question_set, render_checks
 
 __all__ = [
     "EvalReport",
+    "TECHNIQUES",
+    "Technique",
+    "TechniqueError",
     "Label",
     "Question",
     "QuestionOutcome",
@@ -35,7 +47,10 @@ __all__ = [
     "load_question_set",
     "normalize",
     "parse_question_set",
+    "parse_override",
     "render_checks",
+    "render_registry",
+    "resolve_techniques",
     "run",
     "run_both",
 ]

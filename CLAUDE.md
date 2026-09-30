@@ -153,6 +153,12 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
                                    # which is what a labeller runs between questions. Drop it and pass
                                    # --user EMAIL for a real run — retrieval filters by
                                    # visible_to(user), so the user is part of what is measured.
+                                   # --list-techniques prints ADR-033 §5's six switches, their
+                                   # settings and whether each exists in this deployment yet
+                                   # (none does); --technique NAME=on|off|<n> moves one for a run
+                                   # and every run file records all six (IR-394). Asking for a
+                                   # switch whose setting does not exist yet is refused, naming the
+                                   # ticket that lands it — IR-395/396/397; IR-402 moves defaults.
                                    # Reports TWO numbers per configuration (ADR-023 §Amendment):
                                    # recall@10 over what retrieval returned, and recall over the final
                                    # set the model was given. Runs with and without reranking by
