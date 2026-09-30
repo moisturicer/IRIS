@@ -134,6 +134,7 @@ def index_record(self, record_id: int, *, force: bool = False):
         refused=summary.refused or chunks.refused,
         reason=summary.reason or chunks.reason,
         partial_context=chunks.partial_context,
+        windows=chunks.windows,
     )
     _finish_job(job, combined)
     return combined.as_dict() | {

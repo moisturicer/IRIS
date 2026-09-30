@@ -38,6 +38,7 @@ from typing import Any, Callable, Optional, Sequence
 from django.core.exceptions import ImproperlyConfigured
 
 from apps.ai.policy.disclosure import Decision
+from apps.ai.providers.batching import window_for_embedding
 from apps.ai.providers.ports import EmbeddingProvider
 
 #: What a caller may inject in place of the gate. A ``Decision`` rather than a
@@ -82,6 +83,11 @@ class EmbeddingOutcome:
     #: a re-chunk needs to know which it is looking at.
     partial_context: bool = False
 
+    #: How many documents the record's chunks were presented as (IR-423). One
+    #: for a paper that fits voyage-context-4's window; more for a long one,
+    #: whose chunks are then contextualized within their window only.
+    windows: int = 1
+
     @property
     def spent_a_vendor_call(self) -> bool:
         return self.embedded > 0
@@ -101,6 +107,7 @@ class EmbeddingOutcome:
             "refused": self.refused,
             "reason": self.reason,
             "partial_context": self.partial_context,
+            "windows": self.windows,
         }
 
 
@@ -301,10 +308,12 @@ def embed_active_chunk_set(
 ) -> EmbeddingOutcome:
     """Embed the chunks of ``record_id``'s active chunk set that lack a vector.
 
-    The chunks go to the provider **as one document**, which is the whole
-    reason ``embed_document_chunks`` exists: ``voyage-context-4`` embeds a
-    chunk with its siblings in view, so "this reduced error by 12%" keeps
-    hold of what "this" was.
+    The chunks go to the provider **as one document** when they fit the
+    model's window, which is the whole reason ``embed_document_chunks``
+    exists: ``voyage-context-4`` embeds a chunk with its siblings in view, so
+    "this reduced error by 12%" keeps hold of what "this" was. A paper longer
+    than the window is sent as consecutive windows (IR-423), and a chunk then
+    sees only the siblings in its own window.
 
     One honest limit. When only some chunks are pending — an incremental
     re-chunk — only those are sent, so their context is the changed passages
@@ -333,7 +342,14 @@ def embed_active_chunk_set(
             record_id=record_id, space_id=space.id, refused=True, reason=str(exc)
         )
 
-    vectors = provider.embed_document_chunks([chunk_texts(chunks)])[0]
+    # A long paper cannot go as one document: voyage-context-4 rejects one over
+    # its window and does not truncate (IR-423). Each window is its own document.
+    windows = window_for_embedding(chunk_texts(chunks))
+    vectors = [
+        vector
+        for group in provider.embed_document_chunks(windows)
+        for vector in group
+    ]
     if len(vectors) != len(chunks):
         raise ValueError(
             f"The provider returned {len(vectors)} vectors for {len(chunks)} "
@@ -356,6 +372,7 @@ def embed_active_chunk_set(
         embedded=len(chunks),
         skipped=max(total - len(chunks), 0),
         partial_context=len(chunks) < total,
+        windows=len(windows),
     )
 
 

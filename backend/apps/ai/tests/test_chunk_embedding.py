@@ -33,7 +33,7 @@ from apps.ai.models import (
     EmbeddingSpaceState,
     RecordEmbedding,
 )
-from apps.ai.models.chunk import ChunkEmbedding
+from apps.ai.models.chunk import ChunkEmbedding, DocumentChunk
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.repositories import DjangoChunkRepository
 from apps.records.models import Record
@@ -396,3 +396,76 @@ class RecordSummaryTests:
         assert provider.flat_calls == []
         assert (outcome.embedded, outcome.skipped) == (0, 1)
 
+
+
+class LongDocumentWindowTests:
+    """IR-423. A paper over voyage-context-4's 32k-token window used to be sent
+    as one document and rejected with a 400, so it got no vectors at all. It is
+    now presented as consecutive windows, each its own document."""
+
+    def _long_record(self, chunks=60, words=700):
+        record = _disclosable_record()
+        _with_chunks(record, *[f"c{i} " + "word " * words for i in range(chunks)])
+        return record
+
+    def test_a_paper_over_the_window_is_sent_as_several_documents(self):
+        record = self._long_record()  # ~42,000 tokens
+        provider = _CountingEmbedder()
+
+        embed_active_chunk_set(record.id, provider=provider)
+
+        (call,) = provider.grouped_calls
+        assert len(call) > 1
+
+    def test_no_document_sent_exceeds_the_window(self):
+        from apps.ai.providers.batching import EMBED_WINDOW_TOKENS, estimate_tokens
+
+        record = self._long_record()
+        provider = _CountingEmbedder()
+
+        embed_active_chunk_set(record.id, provider=provider)
+
+        for document in provider.grouped_calls[0]:
+            assert sum(estimate_tokens(t) for t in document) <= EMBED_WINDOW_TOKENS
+
+    def test_every_chunk_gets_exactly_one_vector(self, space):
+        record = self._long_record()
+
+        outcome = embed_active_chunk_set(record.id, provider=_CountingEmbedder())
+
+        assert outcome.embedded == 60
+        rows = ChunkEmbedding.objects.filter(chunk__record=record, space=space)
+        assert rows.count() == 60
+        assert rows.values("chunk_id").distinct().count() == 60
+
+    def test_vectors_stay_attached_to_the_right_chunk_across_windows(self, space):
+        """Order is the whole invariant: vectors are matched positionally, so a
+        window boundary that shifted one would attach a vector to the wrong
+        passage and look completely normal."""
+        record = self._long_record()
+        provider = _CountingEmbedder()
+
+        embed_active_chunk_set(record.id, provider=provider)
+
+        for chunk in DocumentChunk.objects.filter(record=record):
+            expected = provider.embed_documents([chunk.text])[0]
+            row = ChunkEmbedding.objects.get(chunk=chunk, space=space)
+            assert list(row.embedding) == pytest.approx(expected)
+
+    def test_the_outcome_reports_how_many_windows_were_needed(self):
+        record = self._long_record()
+
+        outcome = embed_active_chunk_set(record.id, provider=_CountingEmbedder())
+
+        assert outcome.windows > 1
+        assert outcome.as_dict()["windows"] == outcome.windows
+
+    def test_a_short_paper_is_still_one_document_and_one_window(self):
+        record = _disclosable_record()
+        _with_chunks(record, "alpha", "beta")
+        provider = _CountingEmbedder()
+
+        outcome = embed_active_chunk_set(record.id, provider=provider)
+
+        assert provider.grouped_calls == [[["alpha", "beta"]]]
+        assert outcome.windows == 1

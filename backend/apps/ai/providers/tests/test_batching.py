@@ -2,10 +2,13 @@
 
 import pytest
 
+from apps.ai.providers import batching
 from apps.ai.providers.batching import (
+    EMBED_WINDOW_TOKENS,
     batch_by_token_budget,
     batch_documents_by_token_budget,
     estimate_tokens,
+    window_for_embedding,
 )
 
 
@@ -105,3 +108,61 @@ class DocumentBatchingTests:
     def test_a_non_positive_budget_is_rejected(self):
         with pytest.raises(ValueError):
             batch_documents_by_token_budget([["alpha"]], budget=0)
+
+
+class EmbeddingWindowTests:
+    """IR-423. voyage-context-4 rejects a document over 32,000 tokens and does
+    not truncate, so a long paper has to be presented as several documents.
+    Which chunks share a window is a decision about what the vectors mean, so
+    it is made here and asserted here, not left to the adapter (which
+    deliberately refuses to split a document)."""
+
+    def test_the_window_sits_under_the_vendor_cap_with_headroom(self):
+        from apps.ai.providers.voyage import _EMBED_TOKEN_BUDGET, _VENDOR_TOKEN_CAP
+
+        assert EMBED_WINDOW_TOKENS < _EMBED_TOKEN_BUDGET < _VENDOR_TOKEN_CAP
+
+    def test_a_short_document_is_a_single_window(self):
+        assert window_for_embedding(["a b", "c d"]) == [["a b", "c d"]]
+
+    def test_a_long_document_becomes_consecutive_windows_in_order(self):
+        texts = ["w " * 400 for _ in range(10)]  # ~400 tokens each
+
+        windows = window_for_embedding(texts, budget=1_000)
+
+        assert len(windows) > 1
+        assert [t for window in windows for t in window] == texts
+
+    def test_no_window_exceeds_the_budget(self):
+        texts = ["w " * 300 for _ in range(25)]
+
+        windows = window_for_embedding(texts, budget=1_000)
+
+        for window in windows:
+            assert sum(estimate_tokens(t) for t in window) <= 1_000
+
+    def test_a_document_just_under_the_budget_is_not_split(self):
+        texts = ["w " * 100 for _ in range(9)]  # ~900 tokens
+
+        assert len(window_for_embedding(texts, budget=1_000)) == 1
+
+    def test_a_document_just_over_the_budget_is_split_in_two(self):
+        texts = ["w " * 100 for _ in range(11)]  # ~1,100 tokens
+
+        assert len(window_for_embedding(texts, budget=1_000)) == 2
+
+    def test_a_single_chunk_over_the_budget_stays_alone_for_the_vendor_to_reject(self):
+        texts = ["small", "w " * 2_000, "small"]
+
+        windows = window_for_embedding(texts, budget=1_000)
+
+        assert ["w " * 2_000] in windows
+        assert [t for window in windows for t in window] == texts
+
+    def test_the_default_budget_is_read_at_call_time(self, monkeypatch):
+        monkeypatch.setattr(batching, "EMBED_WINDOW_TOKENS", 50)
+
+        assert len(window_for_embedding(["w " * 40, "w " * 40])) == 2
+
+    def test_no_chunks_means_no_windows(self):
+        assert window_for_embedding([]) == []
