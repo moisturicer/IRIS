@@ -6,8 +6,6 @@ the caller sets from the host has to win, and "unknown" has to remain the
 honest answer when nothing can say.
 """
 
-import subprocess
-
 import pytest
 
 from apps.ai.management.commands import eval_retrieval
