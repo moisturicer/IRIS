@@ -170,8 +170,8 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
                                    # with; final-set 0.558 / 0.663. Run files in
                                    # docs/evaluation/runs/. Never cite it as a finding about CIT-U
                                    # research. The disclosure gate refuses every record until
-                                   # # IR-250 (use IR-317's bypass); 7 long papers cannot be embedded
-                                   # until IR-423 windows them under voyage-context-4's 32k limit
+                                   # IR-250 (use IR-317's bypass). Long papers are embedded in
+                                   # windows under voyage-context-4's 32k limit (IR-423)
 
 # Docker  (repo root)
 python scripts/setup_env.py         # REQUIRED first (IR-154): creates the repo-root .env Compose
