@@ -498,6 +498,10 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
     "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
 )
 
+# ---- Vector scan depth (IR-440) ---------------------------------------
+# pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
+AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in

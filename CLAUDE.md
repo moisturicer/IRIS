@@ -171,6 +171,11 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
                                    # the suite) and docs/evaluation/proxy_starter.json (52 labelled
                                    # questions over the 40-paper arXiv proxy corpus). Guide:
                                    # docs/evaluation/README.md.
+                                   # **The baseline below was measured under pgvector's 40-row
+                                   # scan cap (IR-440). Current (depth 200, 2026-09-30, run
+                                   # 20260930-182254): recall@10 0.712 without reranking, 0.885
+                                   # with; final-set 0.673 / 0.846. Fusion adds almost nothing
+                                   # on top (0.894 / 0.875).**
                                    # Baseline 2026-09-30 (proxy tier, all 52 questions, all 40
                                    # papers embedded): recall@10 0.596 without reranking, 0.683
                                    # with; final-set 0.558 / 0.663. Run files in
