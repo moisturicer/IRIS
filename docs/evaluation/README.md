@@ -123,6 +123,17 @@ configuration, both measures, per-question outcomes and provenance (git commit,
 embedding space, the embedder and reranker actually used). That file is how a
 figure in the thesis gets traced back to the run that produced it.
 
+The command usually runs in the backend container, which has no git, so pass
+the commit from the host or the results file records `unknown`:
+
+```bash
+docker compose exec -e IRIS_GIT_COMMIT="$(git describe --always --dirty)" backend     python manage.py eval_retrieval --questions ... --user iris-student@cit.edu
+```
+
+`--dirty` marks a run made from a modified tree, so it cannot pass for the
+commit it started from. Run from the host with no variable set, the command asks
+git itself.
+
 ### Rules that come from the ADR, not from taste
 
 - **Manual only, never CI.** A run embeds every question and reranks every

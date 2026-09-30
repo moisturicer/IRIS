@@ -18,6 +18,7 @@ can be traced back to the configuration that produced it.
 """
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -41,9 +42,20 @@ DEFAULT_OUT = Path("docs") / "evaluation" / "runs"
 
 
 def _git_commit() -> str:
+    """The commit this run's code came from, for the results file (IR-394).
+
+    ``IRIS_GIT_COMMIT`` wins when set: the command normally runs in a
+    container that has no git, so the caller passes it from the host with
+    ``-e IRIS_GIT_COMMIT=$(git describe --always --dirty)``. Otherwise git is
+    asked, with ``--dirty`` so a run from a modified tree does not read as the
+    commit it started from. "unknown" is the answer when nothing can say.
+    """
+    given = os.environ.get("IRIS_GIT_COMMIT", "").strip()
+    if given:
+        return given
     try:
         return subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", "describe", "--always", "--dirty"],
             capture_output=True,
             text=True,
             timeout=5,
