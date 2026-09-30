@@ -431,6 +431,227 @@
           "quote": "obtain the black hole mass from the MgII flux and the continuum luminosity"
         }
       ]
+    },
+    {
+      "id": "q35",
+      "kind": "mechanism",
+      "question": "how do they show that the ultraviolet glow of the sky tracks how much dust dims starlight?",
+      "expected": [
+        {
+          "record": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
+          "page": 2,
+          "quote": "surface brightness is correlated with the reddening from Planck Collaboration"
+        }
+      ]
+    },
+    {
+      "id": "q36",
+      "kind": "mechanism",
+      "question": "instead of describing a dark-matter halo by its density, what do they describe it by?",
+      "expected": [
+        {
+          "record": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
+          "page": 2,
+          "quote": "the gravitational field is directly parametrized in terms of the enclosed mass profile"
+        }
+      ]
+    },
+    {
+      "id": "q37",
+      "kind": "exact-term",
+      "question": "by how much did the total light reaching the instrument grow in the L band on the test star?",
+      "expected": [
+        {
+          "record": "MATISSE in the era of GRAVITY+",
+          "page": 4,
+          "quote": "increases by a factor of 1.3 to 1.4 depending on the telescope"
+        }
+      ]
+    },
+    {
+      "id": "q38",
+      "kind": "mechanism",
+      "question": "why use a middle resolution rather than the coarsest one for these early galaxies?",
+      "expected": [
+        {
+          "record": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
+          "page": 2,
+          "quote": "providing the ideal trade-off between spectral resolution and sensitivity"
+        }
+      ]
+    },
+    {
+      "id": "q39",
+      "kind": "exact-term",
+      "question": "how many galaxies were used to build the map of where galaxies cluster on the sky?",
+      "expected": [
+        {
+          "record": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+          "page": 3,
+          "quote": "projected galaxy density map from the sky distribution of the full parent sample of 84 HAEs"
+        }
+      ]
+    },
+    {
+      "id": "q40",
+      "kind": "mechanism",
+      "question": "why pick galaxies with no close companions when studying an active nucleus?",
+      "expected": [
+        {
+          "record": "The 2MIG isolated AGNs 4 Hot-dust reverberation and BLR scales",
+          "page": 2,
+          "quote": "selected to minimise the influence of comparable neighbours and strong ongoing tidal interactions"
+        }
+      ]
+    },
+    {
+      "id": "q41",
+      "kind": "mechanism",
+      "question": "how do they remove the distortion the upper atmosphere adds to the polarisation measurements?",
+      "expected": [
+        {
+          "record": "ViCTORIA project M49 region in the Virgo cluster in polarisation",
+          "page": 3,
+          "quote": "correcting them scan-by-scan for the ionospheric RM with Spinifex and DP3"
+        }
+      ]
+    },
+    {
+      "id": "q42",
+      "kind": "exact-term",
+      "question": "which two solvers did they implement, one for easy equations and one for hard ones?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 2,
+          "quote": "explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P"
+        }
+      ]
+    },
+    {
+      "id": "q43",
+      "kind": "mechanism",
+      "question": "what does choosing a Gaussian or Lorentzian damping shape quietly assume about how galaxies move?",
+      "expected": [
+        {
+          "record": "Can Fingers of God be Resummed",
+          "page": 6,
+          "quote": "imply specific relations among the cumulants of the virial velocities of galaxies"
+        }
+      ]
+    },
+    {
+      "id": "q44",
+      "kind": "mechanism",
+      "question": "how do they connect simulated binary populations to what a radio telescope would actually detect?",
+      "expected": [
+        {
+          "record": "Empirical Galactic neutron star black hole merger rate StarTrack",
+          "page": 1,
+          "quote": "combine the results from binary population synthesis codes with PsrPopPy"
+        }
+      ]
+    },
+    {
+      "id": "q45",
+      "kind": "near-duplicate",
+      "question": "why does the heavier dark-matter state survive long enough to show up in X-ray data?",
+      "expected": [
+        {
+          "record": "Freeze-in of anapole and charge-radius inelastic dark matter",
+          "page": 2,
+          "quote": "the excited DM component is long-lived, since it decays to two or three photons"
+        }
+      ]
+    },
+    {
+      "id": "q46",
+      "kind": "near-duplicate",
+      "question": "what changes how a rare high-energy event in a dark-matter detector should be read?",
+      "expected": [
+        {
+          "record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+          "page": 5,
+          "quote": "the interpretation of high energy recoil events in direct detection experiments can depend sensitively on the underlying astrophysical inputs"
+        }
+      ]
+    },
+    {
+      "id": "q47",
+      "kind": "mechanism",
+      "question": "how is the handedness imbalance of the hot gluon bath defined in practice?",
+      "expected": [
+        {
+          "record": "Gauge Backreaction in Standard Model Warm Inflation",
+          "page": 8,
+          "quote": "measuring the occupation-number difference between the two transverse helicities of hard gluonic quasiparticles"
+        }
+      ]
+    },
+    {
+      "id": "q48",
+      "kind": "mechanism",
+      "question": "can a bump in the early density fluctuations explain why so many bright young galaxies are seen?",
+      "expected": [
+        {
+          "record": "Localized Enhancements of the Primordial Power Spectrum",
+          "page": 2,
+          "quote": "whether a localized primordial feature can increase the abundance of the dark-matter halos capable of hosting UV-bright galaxies"
+        }
+      ]
+    },
+    {
+      "id": "q49",
+      "kind": "mechanism",
+      "question": "what are the two competing pictures for where these small carbon molecules come from?",
+      "expected": [
+        {
+          "record": "The abundance and emission of PAHs from the local to early Universe",
+          "page": 2,
+          "quote": "PAHs are produced by the collisional fragmentation of larger carbonaceous grains"
+        }
+      ]
+    },
+    {
+      "id": "q50",
+      "kind": "mechanism",
+      "question": "how does this approach treat regions larger than the horizon?",
+      "expected": [
+        {
+          "record": "The separate universe approach with non minimal coupling to gravity",
+          "page": 10,
+          "quote": "describe the universe at these scales as an ensemble of homogeneous and isotropic patches"
+        }
+      ]
+    },
+    {
+      "id": "q51",
+      "kind": "mechanism",
+      "question": "how were the halos split into two groups to test shape-dependent selection?",
+      "expected": [
+        {
+          "record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest",
+          "page": 6,
+          "quote": "whose shape in the observed direction (taken to be the x-axis) is below the median size"
+        }
+      ]
+    },
+    {
+      "id": "q52",
+      "kind": "cross-paper",
+      "question": "which papers present a new simulation tool rather than a new observation?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 2,
+          "quote": "We implement two GPU-accelerated automatically differentiable ODE solvers optimised for massive ensembles"
+        },
+        {
+          "record": "The abundance and emission of PAHs from the local to early Universe",
+          "page": 3,
+          "quote": "the first large-volume cosmological simulation of galaxy evolution, based on a semi-analytic model"
+        }
+      ]
     }
   ]
 }
