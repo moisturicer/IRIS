@@ -1,3 +1,6 @@
+import uuid
+from pathlib import Path
+
 from django.db import models
 from django.contrib.postgres.search import SearchVectorField
 from django.contrib.postgres.indexes import GinIndex
@@ -56,6 +59,13 @@ class BudgetType(models.Model):
 class CollaborationType(models.Model):
     name = models.CharField(max_length=100, unique=True)
     def __str__(self): return self.name
+
+
+def abstract_file_path(instance, filename: str) -> str:
+    # Ignores the filename beyond its extension -- a long title overflowed
+    # the old max_length here (IR-422); a random name sidesteps that.
+    ext = Path(filename).suffix.lower()
+    return f"abstracts/{uuid.uuid4().hex}{ext}"
 
 
 # ---- Core record --------------------------------------------------------
@@ -132,7 +142,9 @@ class Record(models.Model):
     year_accomplished  = models.PositiveIntegerField(null=True, blank=True)
     year_completed     = models.PositiveIntegerField(null=True, blank=True)
     abstract           = models.TextField(blank=True)
-    abstract_file      = models.FileField(upload_to="abstracts/", null=True, blank=True)
+    abstract_file      = models.FileField(
+        upload_to=abstract_file_path, max_length=255, null=True, blank=True
+    )
     classification     = models.ForeignKey(
         Classification, on_delete=models.SET_NULL, null=True, blank=True, related_name="records"
     )

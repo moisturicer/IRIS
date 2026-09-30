@@ -354,6 +354,52 @@ class ManuscriptExtractionTriggerTests(APITestCase):
         mock_delay.assert_not_called()
 
 
+class LongManuscriptFilenameTests(APITestCase):
+    """A title well past the old 100-char max_length round-trips via the real API (IR-422)."""
+
+    def setUp(self):
+        self.record_type = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        self.owner = make_user("owner@cit.edu", "Student")
+        self.client.force_authenticate(self.owner)
+
+    def test_a_filename_past_the_old_100_char_ceiling_is_saved_without_error(self):
+        from unittest.mock import patch
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        long_stem = "A" * 145  # matches the reproduction's 145-149 char real filenames
+        file = SimpleUploadedFile(f"{long_stem}.pdf", b"%PDF-1.7 fake bytes", content_type="application/pdf")
+
+        with patch("apps.documents.tasks.extract_manuscript_text.delay"):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse("record-list"),
+                    {"title": long_stem, "abstract_file": file},
+                    format="multipart",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        record = Record.objects.get(id=response.data["id"])
+        self.assertLessEqual(len(record.abstract_file.name), 255)
+        self.assertEqual(record.abstract_file.read(), b"%PDF-1.7 fake bytes")
+
+    def test_the_download_name_is_rebuilt_from_the_title_not_the_random_stored_name(self):
+        from django.core.files.base import ContentFile
+
+        from .download_service import resolve_record_download_file
+
+        record = Record.objects.create(
+            title="A Very Long Real Paper Title" * 3, record_type=self.record_type, added_by=self.owner,
+        )
+        record.abstract_file.save("ignored.pdf", ContentFile(b"%PDF-1.7 fake bytes"), save=True)
+
+        _, filename = resolve_record_download_file(record)
+
+        self.assertTrue(filename.startswith("A Very Long Real Paper Title"))
+        self.assertTrue(filename.endswith(".pdf"))
+        self.assertNotIn(record.abstract_file.name.rsplit("/", 1)[-1].split(".")[0], filename)
+
+
 class RecordVisibilityTests(APITestCase):
     """
     IR-153: `RecordViewSet.get_queryset()` filtered only on `list`, so every

@@ -1,7 +1,18 @@
 """Resolve record files for approved download requests."""
+import re
+from pathlib import Path
+
 from django.http import FileResponse
 
 from apps.documents.models import RecordUpload
+
+
+def _manuscript_download_name(record) -> str:
+    # abstract_file's stored name is random, not the title (IR-422) -- rebuild
+    # a readable download name instead of reading it back off the stored path.
+    ext = Path(record.abstract_file.name).suffix or ".pdf"
+    title = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", record.title or "download").strip() or "download"
+    return f"{title[:150]}{ext}"
 
 
 def has_record_download_file(record) -> bool:
@@ -23,8 +34,7 @@ def resolve_record_download_file(record):
     Watermarking is not applied here — see download_service TODO when SRS requires it.
     """
     if record.abstract_file:
-        name = record.abstract_file.name.split("/")[-1]
-        return record.abstract_file.open("rb"), name
+        return record.abstract_file.open("rb"), _manuscript_download_name(record)
 
     upload = (
         RecordUpload.objects.filter(record=record)

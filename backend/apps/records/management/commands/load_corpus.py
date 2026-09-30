@@ -28,7 +28,8 @@ visible by default, so Ask IRIS retrieval can find what gets loaded.
 Idempotent by title within a category: a PDF whose filename (minus
 extension) already names a Record under that Classification is skipped, not
 re-created. A non-PDF file in a category folder is skipped with a message,
-not a failure.
+not a failure. A file whose storage path Django refuses to write (IR-422)
+is skipped the same way, per-record, rather than aborting the whole run.
 
 Needs Docling and a worker on the ``extraction`` queue to actually complete;
 chunking is queued automatically after
@@ -41,6 +42,7 @@ Refuses to run with ``DEBUG`` off unless ``--force``, matching ``seed_demo``.
 from pathlib import Path
 
 from django.conf import settings
+from django.core.exceptions import SuspiciousFileOperation
 from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -111,7 +113,7 @@ class Command(BaseCommand):
             else RecordType.objects.get_or_create(name=options["record_type"])[0]
         )
 
-        created = skipped_existing = skipped_non_pdf = queued = 0
+        created = skipped_existing = skipped_non_pdf = skipped_error = queued = 0
         for category_dir in categories:
             classification = self._classification_for(category_dir.name)
             for path in sorted(category_dir.iterdir()):
@@ -134,7 +136,16 @@ class Command(BaseCommand):
                     queued += 1
                     continue
 
-                record = self._load_one(path, title, classification, record_type, owner)
+                try:
+                    record = self._load_one(path, title, classification, record_type, owner)
+                except SuspiciousFileOperation as exc:
+                    # A storage path Django refuses to write -- per-record,
+                    # not fatal to the batch (IR-422).
+                    self.stdout.write(self.style.WARNING(
+                        f"  ! [{category_dir.name}] {title[:70]} (skipped: {exc})"
+                    ))
+                    skipped_error += 1
+                    continue
                 self.stdout.write(
                     f"  + [{category_dir.name}] {title[:70]} -> record {record.id}, extraction queued"
                 )
@@ -146,7 +157,8 @@ class Command(BaseCommand):
         queued_verb = "would be queued" if self.dry_run else "queued"
         self.stdout.write(self.style.SUCCESS(
             f"{verb} {created} record(s); {skipped_existing} already existed; "
-            f"{skipped_non_pdf} non-PDF file(s) skipped; {queued} extraction(s) {queued_verb}."
+            f"{skipped_non_pdf} non-PDF file(s) skipped; {skipped_error} file(s) failed to load; "
+            f"{queued} extraction(s) {queued_verb}."
         ))
 
     def _classification_for(self, name: str):
