@@ -24,6 +24,7 @@ from typing import Any, Optional, Sequence
 
 from .labels import Question, QuestionSet, hits
 from .report import EvalReport, QuestionOutcome, RunConfig
+from .techniques import ResolvedTechniques, resolve
 
 
 def _outcome(
@@ -87,31 +88,32 @@ def run(
     user* can retrieve. An anonymous user can read nothing and would score
     zero on a working stack.
     """
-    active = root if config.reranking else root.without_reranking()
-    retriever = active.retriever()
-    selection = active.source_selection(config.max_sources)
     limit = max(config.retrieval_limit, config.max_sources)
-
     outcomes: list[QuestionOutcome] = []
     spaces: set[int] = set()
     modes: set[str] = set()
-    for question in question_set.questions:
-        result = retriever.retrieve(question.question, user, limit=limit)
-        passages = list(result.passages)
-        final = selection.apply(passages)
-        if result.embedding_space_id is not None:
-            spaces.add(result.embedding_space_id)
-        if result.mode:
-            modes.add(result.mode)
-        outcomes.append(
-            _outcome(
-                question,
-                passages[: config.retrieval_limit],
-                final,
-                degraded=result.degraded,
-                mode=result.mode,
+
+    with config.techniques.applied():
+        active = root if config.reranking else root.without_reranking()
+        retriever = active.retriever()
+        selection = active.source_selection(config.max_sources)
+        for question in question_set.questions:
+            result = retriever.retrieve(question.question, user, limit=limit)
+            passages = list(result.passages)
+            final = selection.apply(passages)
+            if result.embedding_space_id is not None:
+                spaces.add(result.embedding_space_id)
+            if result.mode:
+                modes.add(result.mode)
+            outcomes.append(
+                _outcome(
+                    question,
+                    passages[: config.retrieval_limit],
+                    final,
+                    degraded=result.degraded,
+                    mode=result.mode,
+                )
             )
-        )
 
     return EvalReport(
         question_set=question_set,
@@ -124,6 +126,7 @@ def run(
             "embedder": type(active.embedder()).__name__,
             "reranker": type(active.reranker()).__name__,
             "retrieved_with_limit": limit,
+            "techniques_moved": list(config.changed_techniques),
             **(provenance or {}),
         },
     )
@@ -136,6 +139,7 @@ def run_both(
     user,
     retrieval_limit: int = 10,
     max_sources: int = 8,
+    techniques: Optional[ResolvedTechniques] = None,
     provenance: Optional[dict[str, Any]] = None,
 ) -> list[EvalReport]:
     """The with-and-without-reranking comparison IR-133 asks for.
@@ -149,6 +153,7 @@ def run_both(
             question_set,
             RunConfig(
                 reranking=reranking,
+                techniques=techniques if techniques is not None else resolve(),
                 retrieval_limit=retrieval_limit,
                 max_sources=max_sources,
                 baseline=None if not reranking else "no-reranking",
