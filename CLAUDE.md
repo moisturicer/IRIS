@@ -162,13 +162,16 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
                                    # MANUAL ONLY, never CI — a real run spends Voyage credits.
                                    # Labels are Record + page + quote, never chunk ids. Question sets:
                                    # apps/ai/evaluation/fixtures/synthetic_set.json (committed, run by
-                                   # the suite) and docs/evaluation/proxy_starter.json (20 slots
-                                   # awaiting human labelling). Guide: docs/evaluation/README.md.
-                                   # Verified 2026-09-29: --dry-run against the dev database resolved
-                                   # a real label and named a wrong one, exiting non-zero. No recall
-                                   # number exists for any corpus yet — the labelled set is human work
-                                   # in progress, the corpus has no Voyage vectors, and the disclosure
-                                   # gate refuses every record until IR-250 (use IR-317's bypass)
+                                   # the suite) and docs/evaluation/proxy_starter.json (52 labelled
+                                   # questions over the 40-paper arXiv proxy corpus). Guide:
+                                   # docs/evaluation/README.md.
+                                   # Baseline 2026-09-30 (proxy tier, all 52 questions, all 40
+                                   # papers embedded): recall@10 0.596 without reranking, 0.683
+                                   # with; final-set 0.558 / 0.663. Run files in
+                                   # docs/evaluation/runs/. Never cite it as a finding about CIT-U
+                                   # research. The disclosure gate refuses every record until
+                                   # IR-250 (use IR-317's bypass). Long papers are embedded in
+                                   # windows under voyage-context-4's 32k limit (IR-423)
 
 # Docker  (repo root)
 python scripts/setup_env.py         # REQUIRED first (IR-154): creates the repo-root .env Compose

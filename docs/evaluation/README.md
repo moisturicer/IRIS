@@ -62,8 +62,10 @@ holding it. There is a test for exactly this:
 
 ## How to label — the procedure
 
-Start from [`proxy_starter.json`](proxy_starter.json), which already has one slot
-per paper in `docs/corpus/` with the title filled in.
+Extend [`proxy_starter.json`](proxy_starter.json). It already holds labelled
+questions (each tagged with a `kind`: `mechanism`, `exact-term`, `near-duplicate`
+or `cross-paper`); add new ones after the last id. A question whose paper has no
+vectors yet cannot be measured, so check `backfill_embeddings --dry-run` first.
 
 For each question:
 
