@@ -82,8 +82,7 @@ class TwoStageRetriever(Retriever):
 
         query_vector = self._embedder.embed_query(question)
 
-        # One transaction and one scan depth for both stages, and the rows are
-        # read inside it: a lazy queryset run later gets pgvector's default 40.
+        # Both stages and their row reads share one scan depth (IR-440).
         with scan_depth():
             # -- Stage 1: candidate records, visibility-filtered before scoring --
             visible_records = Record.objects.visible_to(user)

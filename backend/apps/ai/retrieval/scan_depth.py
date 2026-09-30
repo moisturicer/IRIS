@@ -1,14 +1,10 @@
-"""How deep pgvector's HNSW index scans for a filtered query (IR-440).
+"""HNSW scan depth for filtered vector queries (IR-440).
 
-The index visits `hnsw.ef_search` rows (pgvector's default is 40) and only then
-applies the WHERE clause. A query filtered to a few records therefore returns
-at most 40 rows however large its LIMIT, and the reranker's recall limit of 100
-was never reached.
+pgvector scans `hnsw.ef_search` rows (default 40), then applies the WHERE
+clause, so a filtered query returns at most 40 rows whatever its LIMIT.
 
-`SET LOCAL` semantics via `set_config(..., true)`: the value lasts for the
-enclosing transaction only, so it is safe behind PgBouncer in transaction mode
-where a session-level SET would leak into another client. It is also accepted
-before the pgvector library has loaded in the session, which `SET` is not.
+`set_config(..., true)` is transaction-local, so it is safe behind PgBouncer
+transaction mode, and it works before the pgvector library has loaded.
 """
 
 from __future__ import annotations
@@ -18,22 +14,20 @@ from contextlib import contextmanager
 from django.conf import settings
 from django.db import connection, transaction
 
-#: pgvector refuses values outside 1..1000.
+#: pgvector accepts 1..1000.
 MAX_EF_SEARCH = 1000
-DEFAULT_EF_SEARCH = 200
 
 
 def configured_depth() -> int:
-    depth = int(getattr(settings, "AI_HNSW_EF_SEARCH", DEFAULT_EF_SEARCH))
-    return max(1, min(depth, MAX_EF_SEARCH))
+    return max(1, min(int(settings.AI_HNSW_EF_SEARCH), MAX_EF_SEARCH))
 
 
 @contextmanager
 def scan_depth():
-    """Run the vector queries inside the block at the configured scan depth.
+    """Run vector queries at the configured depth.
 
-    Evaluate querysets inside the block: a lazy one evaluated after it runs at
-    pgvector's default.
+    Evaluate querysets inside the block; a lazy one run later uses 40. Inside
+    an outer transaction the depth lasts until that transaction ends.
     """
     with transaction.atomic():
         with connection.cursor() as cursor:

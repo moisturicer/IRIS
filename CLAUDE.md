@@ -171,6 +171,9 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
                                    # the suite) and docs/evaluation/proxy_starter.json (52 labelled
                                    # questions over the 40-paper arXiv proxy corpus). Guide:
                                    # docs/evaluation/README.md.
+                                   # **Measured under pgvector's 40-row scan cap (IR-440), so
+                                   # retrieval never saw more than 40 candidates; IR-440 raises
+                                   # the depth and the re-baseline is pending.**
                                    # Baseline 2026-09-30 (proxy tier, all 52 questions, all 40
                                    # papers embedded): recall@10 0.596 without reranking, 0.683
                                    # with; final-set 0.558 / 0.663. Run files in
