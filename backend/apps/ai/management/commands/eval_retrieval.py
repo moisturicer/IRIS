@@ -169,6 +169,7 @@ class Command(BaseCommand):
     # -- the command --------------------------------------------------------
 
     def handle(self, *args, **options):
+        self._widen_stream_encoding()
         if options["list_techniques"]:
             self.stdout.write(render_registry())
             return
@@ -230,18 +231,48 @@ class Command(BaseCommand):
             self.stdout.write(report.render())
             reports.append(report)
 
+        # Written before the comparison is printed, not after. A paid run's
+        # evidence must not depend on the console being able to render it: on
+        # Windows the default `cp1252` stdout raised `UnicodeEncodeError` on
+        # the comparison table's delta sign and took the results file down with
+        # it, after every credit had already been spent. `_writing_to_stdout`
+        # fixes the rendering; this ordering makes the file independent of it.
+        path = None
+        if not options["no_write"]:
+            path = self._write(reports, question_set, Path(options["out"]))
+
         if len(reports) > 1:
             self.stdout.write("")
             self.stdout.write(compare(reports))
 
         self._warn_about_empty_final_sets(reports)
 
-        if not options["no_write"]:
-            path = self._write(reports, question_set, Path(options["out"]))
+        if path is not None:
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
 
     # -- pieces -------------------------------------------------------------
+
+    def _widen_stream_encoding(self):
+        """Let the report print where the console's encoding cannot hold it.
+
+        The comparison table spells its delta with a real sign and a Windows
+        console defaults to `cp1252`, so a paid run printed both configurations
+        and then died. Widened here rather than narrowing the report to ASCII
+        for the narrowest console. `errors="replace"` keeps a run alive; a
+        stream with no `reconfigure` (a captured `StringIO`) is left alone.
+        """
+        for stream in (self.stdout, self.stderr):
+            underlying = getattr(stream, "_out", None)
+            reconfigure = getattr(underlying, "reconfigure", None)
+            if reconfigure is None:
+                continue
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                # A stream that will not be reconfigured is not a reason to
+                # refuse a run; the file is written either way.
+                pass
 
     def _user(self, email):
         if not email:
