@@ -10,6 +10,8 @@
 
 **Amended — 2026-09-28 (IR-392), under [ADR-013](013-chunk-level-rag-pipeline.md)'s thesis-critical RAG scope.** Four additions, all reader-facing: §12 Retry, §13 what the model is allowed to see of a Conversation's own failures, §14 where the multi-part flag of §2 comes from — which **closes the open question §2 left**, explicitly rather than by quiet insertion — and §15 feedback privacy as an addition to §11. The vocabulary for **Retry**, **Reader feedback** and a **Listing question** is `CONTEXT.md`; the listing routing outcome those questions reach is in [ADR-027](027-corpus-level-questions.md) §9.
 
+**Amended — 2026-10-02 (IR-444), under [ADR-013](013-chunk-level-rag-pipeline.md)'s thesis-critical RAG scope.** Two reversals, both traced to one observed failure: §8's back-reference word check is struck, so resolution runs on every follow-up, and §7's question-only embedding becomes question *and* answer, which is no longer free. §6 is unchanged. See §Amendment — 2026-10-02 below, and the [ADR-015](015-voyage-embedding-and-reranking.md) note it requires.
+
 ## Context
 
 ADR-019 states that the backend "loads and extends the real message history for both retrieval and LLM synthesis". That sentence admits two readings which behave completely differently, and nothing records which was meant.
@@ -79,7 +81,9 @@ Recent turns go into the prompt verbatim. Older turns are **retrievable**: the c
 
 This needs no new infrastructure. A conversation's turns are a small corpus, and IRIS already has an embedding provider, a vector store, a reranker and a retriever. Current research also finds that dense retrieval with filtering — **without** knowledge graphs or agentic memory managers — matches far more elaborate systems while using shorter contexts, so the simple form is chosen deliberately rather than as a first step toward a graph.
 
-### 7. Only questions are embedded, and their vectors cost nothing extra
+### 7. ~~Only questions are embedded, and their vectors cost nothing extra~~ Questions and answers are both embedded; only the question's vector is free
+
+> **Superseded 2026-10-02 (IR-444).** The answer is embedded too, and that is a real cost. The headline and the "answer recall for free" claim below no longer hold; see §Amendment — 2026-10-02, §7.
 
 **A turn is indexed by its question and returned whole.** Answer recall is preserved without embedding answers, because a question and its answer are a pair.
 
@@ -87,16 +91,16 @@ The cost property that makes this free: **the memory vector and the search vecto
 
 Embedding answers would be a genuine extra call on every turn, for recall that indexing questions already provides.
 
-### 8. A turn adds no cost unless it actually needs rewriting
+### 8. ~~A turn adds no cost unless it actually needs rewriting~~ A follow-up always resolves; the cache and the small model bound the cost
 
 The rewrite is the only new per-turn cost, and it is avoided wherever it does nothing:
 
 - **Skipped on the first turn** — there is no history to resolve against.
-- **Skipped when the question carries no back-reference**, decided by a cheap word check rather than a model call. The failure is soft: a missed back-reference retrieves on the raw question, exactly as today.
+- ~~**Skipped when the question carries no back-reference**, decided by a cheap word check rather than a model call. The failure is soft: a missed back-reference retrieves on the raw question, exactly as today.~~ **Struck 2026-10-02 (IR-444).** The failure is not soft; see §Amendment — 2026-10-02, §8.
 - **Performed by a small model**, configured separately from the answering model. Rewriting is an easy task and does not need the model that writes answers.
 - **Cached**, keyed like query embeddings already are — same question and same history yield the same rewrite.
 
-Most turns therefore cost what they cost today.
+~~Most turns therefore cost what they cost today.~~ No longer true as of 2026-10-02; see §Amendment — 2026-10-02, §8.
 
 ### 9. Paper Chat filters to its Record, with an explicit control to widen
 
@@ -161,6 +165,56 @@ How a flagged question is then answered:
 - **Feedback is never a ranking input.** It changes no retrieval score and no ordering. It is evidence for [ADR-023](023-retrieval-quality-evaluation.md)'s measurement, read by people. Letting a handful of votes on a small institutional corpus steer ranking would make retrieval quality drift in a way no measurement could attribute, and would make gaming it trivial.
 
 
+## Amendment — 2026-10-02 (IR-444): resolution runs on every follow-up, and a Turn's answer is embedded too
+
+### Evidence
+
+[ADR-023](023-retrieval-quality-evaluation.md)'s rule is that a change of this kind cites what was observed, so the observation comes first. It is quoted from IR-443, where it was traced. A reader asked a cosmology question and got a good grounded answer. They then typed **"give me a longer explanation"** and were told *"The supplied sources do not contain any information about the separate-universe approach."* In order:
+
+1. `has_back_reference` (`apps/ai/resolution.py`) found no pronoun in "give me a longer explanation", so resolution was skipped with no model call. That is §8's word check doing exactly what it was written to do.
+2. Retrieval therefore searched the literal string `give me a longer explanation`, which sits nowhere near a cosmology paper in embedding space, and returned arbitrary passages.
+3. The answering model had the previous Turn in its `Conversation so far:` block but is grounded to the numbered `Sources:`, so it correctly refused.
+4. That refusal became Turn 2 and entered every later prompt verbatim — the bias §13 exists to prevent. §13 was decided under IR-392 and implemented nowhere; IR-448 implements it and is not part of this amendment.
+
+Steps 1 and 2 are what this amendment decides. The Turn 3 / Turn 20 example under §7 below is a **constructed illustration**, not an observation, and is labelled as one.
+
+### §8 — the word check is struck; resolution runs on every follow-up
+
+§8 said a missed back-reference is a soft failure that "retrieves on the raw question, exactly as today". **That was wrong, and the transcript above is the proof.** A missed back-reference does not leave retrieval working on a slightly worse question. It leaves retrieval working on text that was never meant to be a search query: "give me a longer explanation" has no topic in it at all, so the vector search returns arbitrary passages and the reader gets a confident-sounding refusal over unrelated sources. That is worse than a weak answer, because nothing about it looks like the retrieval's fault.
+
+Widening the list does not fix this. The failing question contains no referring word to add, and any list is incomplete in exactly the cases a reader reaches for (see §Alternatives Considered).
+
+What this changes:
+
+- **Resolution runs on every follow-up.** The word check is deleted.
+- **Unchanged:** it is still skipped on the first Turn, where there is no history to resolve against; the result is still cached under the key §8 describes; and a failed rewrite still falls back to the raw question (§1's guard).
+- **Cost control moves entirely to the cache plus the small model.** §8's closing sentence — "Most turns therefore cost what they cost today" — is no longer true. Every follow-up that misses the cache now costs one small-model call. That is the price of the fix, stated here rather than discovered on an invoice, and it makes §Consequences' "a second, smaller model must be configurable" load-bearing rather than a nicety.
+
+### §7 — question and answer are both embedded, and that is no longer free
+
+§7 held that "a turn is indexed by its question and returned whole", and that answer recall is "preserved without embedding answers, because a question and its answer are a pair". That was an assumption and was never measured. It fails when an answer states a fact its question never names. *Illustration (constructed):* ask "what does the paper conclude?" at Turn 3 and "what was that figure for the Jordan frame bound?" at Turn 20. Recall cannot find Turn 3, because its **question** contains neither "Jordan" nor "bound".
+
+1. **The answer is embedded as a second vector per Turn per Embedding Space.** The Turn is still returned whole; either vector can now reach it.
+2. **This costs one embedding call per Turn and is no longer free.** §7's headline claim has to change, not only its scope. The *question* vector remains free, being the retrieval vector reused. The *answer* vector is a real vendor call on every Turn that has an answer.
+3. **Both vectors are stored under `input_type="query"`.** `ConversationMemory.recall` is a single `ORDER BY distance`. Storing questions as `query` and answers as `document` would rank two non-comparable distance scales in one list, and would leave IR-446's distance cut-off impossible to set. `query` is the shared type because the question vector is the retrieval vector reused; moving questions to `document` would cost two paid calls per Turn instead of one.
+
+**This choice is provisional.** It is a single-list shortcut, not a claim that answers are queries. If it measures badly under [ADR-023](023-retrieval-quality-evaluation.md)'s with-and-without discipline, the fallback is **two ranked lists** — questions embedded as `query`, answers as `document` — merged by rank position in the shape of IR-395's `fuse_by_rank` (not yet on `main`), which compares rank and never raw distance. That costs a second search per recall and is the reason it is not the starting point.
+
+**Exposure, named as §Security Impact's practice requires.** Voyage now receives the text of generated answers, which it did not before. Those answers are derived only from passages that already passed the disclosure gate, and Voyage already holds the text of every chunk those passages came from, so this adds no new class of source material. It does add a new class of *input*, and §SaaS Impact's space-migration rule now covers two vectors per Turn, not one.
+
+### §6 — unchanged, and no summary tier is authorised
+
+**§6 stands as written.** Memory is retrieval over verbatim Turns, and its rejection of summarisation is untouched. Nothing in this amendment is an opening for a summary tier of any kind. Embedding the answer is what makes retrieval-over-Turns deliver what §6 claimed for it: before this, a Turn was findable only through the question that happened to open it.
+
+### The verbatim window — no number here to change
+
+§6 says only that "recent turns go into the prompt verbatim" and names no count. **This ADR contains no fixed Turn count for the window, so nothing in it changes.** The fixed count lives in code, and IR-449 replaces it with a token budget without needing an ADR amendment to do so.
+
+### ADR-015 rule 3 — a note, not a change
+
+[ADR-015](015-voyage-embedding-and-reranking.md) rule 3 (`embed_documents` and `embed_query` are separate methods, not a flag) is **unchanged**; this amendment adds no flag. A note under rule 3 now records that sending stored answer text through `embed_query` is deliberate, so a later reader does not "fix" it as a bug.
+
+
 ## Alternatives Considered
 
 **Retrieve on the raw question and give history only to the answering model.** Cheapest, and it does not fix the problem the feature exists for: retrieval still sees "what about its limitations?" and finds nothing useful, so the model writes a fluent answer from bad sources. Rejected.
@@ -173,7 +227,7 @@ How a flagged question is then answered:
 
 **Entity-extraction or graph-based agentic memory.** Rejected as disproportionate. Those systems target months-long personal-assistant histories; an IRIS conversation is research Q&A on a bounded topic. Current research reports the graph-free variant matching the elaborate ones anyway.
 
-**Embedding questions and answers both.** Rejected on cost once it was clear that indexing the question and returning the whole turn preserves answer recall for free.
+**Embedding questions and answers both.** Rejected on cost once it was clear that indexing the question and returning the whole turn preserves answer recall for free. **Reversed 2026-10-02 (IR-444):** the answer is embedded after all, because that recall was an unmeasured assumption; see §Amendment — 2026-10-02, §7.
 
 **Storing the full Passage text in history.** Rejected — the precise leak ADR-019 exists to prevent.
 
@@ -195,15 +249,19 @@ How a flagged question is then answered:
 
 **Migrating existing browser-local conversations.** Rejected. They are demo and testing conversations against a corpus of 4,910 stub files; migration code for data with no value is cost without benefit. The sidebar emptying is surfaced with a notice rather than left unexplained.
 
+**Widening or replacing the back-reference word list (added 2026-10-02, IR-444).** Rejected. The observed failure contained no referring word at all, so no list reaches it, and every list is incomplete in the cases a reader actually reaches for. A cheaper check that fails *silently and into a refusal* is not cheaper than a cached small-model call that cannot miss.
+
+**Overflow-triggered summarisation of older Turns (added 2026-10-02, IR-444).** Rejected, with the call count against the token size as the reasoning. A summary reduces tokens *per call* and adds a model call of its own, while the cost concern on this path is the *number* of calls. The history handed to the model is already hard-bounded at the source (`MAX_HISTORY_TURNS`), so an overflow trigger would never fire. It also fails §6's objection unchanged: the detail a summary drops is the detail a reader later asks about. The bounded-prompt benefit worth having comes from IR-449's token budget, which costs zero model calls.
+
 ## Decision Rationale
 
-The through-line is that **the expensive, elaborate options are not the good ones here**. Rewriting is mandatory and cheap. Memory-by-retrieval is stronger than summarisation *and* simpler. The memory vector is free because it already exists. Multi-query is the one genuinely promising technique being held back, and it is held back for the reason ADR-023 was written to enforce — there is no measurement yet, and a small corpus plus an existing reranker makes its benefit here genuinely uncertain.
+The through-line is that **the expensive, elaborate options are not the good ones here**. Rewriting is mandatory and cheap. Memory-by-retrieval is stronger than summarisation *and* simpler. The question's memory vector is free because it already exists (the answer's, added 2026-10-02, is not). Multi-query is the one genuinely promising technique being held back, and it is held back for the reason ADR-023 was written to enforce — there is no measurement yet, and a small corpus plus an existing reranker makes its benefit here genuinely uncertain.
 
 ## Consequences
 
 - The 2,000-character question limit stops being load-bearing and is retained as a plain abuse guard. The conversations it currently breaks past ~five turns are fixed as a side effect; this should be reported as a fix, not left silent.
 - A second, smaller model must be configurable for rewriting. Only one inference model is configured today.
-- Turns carry a vector, under the active Embedding Space, with the same cross-space hazards — a vector stored under a retired space must never be compared against a current one.
+- Turns carry two vectors since 2026-10-02 (question and answer), each under the active Embedding Space, with the same cross-space hazards — a vector stored under a retired space must never be compared against a current one.
 - A new object-level permission surface, as ADR-019 anticipated, now with an explicit staff exclusion.
 - Frontend chat storage is retired; the local conversation shape and its question-concatenation helper go with it.
 - Each enhancement technique must be independently switchable, or ADR-023's comparison cannot be run.
@@ -214,7 +272,7 @@ Not MVP-required; ADR-001's Semester 2 boundary stands. This is current-phase RA
 
 ## SaaS Impact
 
-Conversation data is per-instance under [ADR-005](005-instance-per-tenant.md). Memory vectors live in the same Embedding Space as the corpus, so a space migration must re-embed turns or drop their vectors — a conversation whose vectors are dropped degrades to recent-turns-only, which is acceptable and must not be silent.
+Conversation data is per-instance under [ADR-005](005-instance-per-tenant.md). Memory vectors (two per Turn since 2026-10-02, question and answer) live in the same Embedding Space as the corpus, so a space migration must re-embed turns or drop their vectors — a conversation whose vectors are dropped degrades to recent-turns-only, which is acceptable and must not be silent.
 
 ## Security Impact
 
@@ -224,7 +282,7 @@ Three positions, deliberately recorded:
 
 **Stored citations are pointers, never text.** ADR-019's guarantee, re-expressed against the predicate IRIS actually uses.
 
-**Embedding turns adds no new exposure class, but does increase footprint.** A question is already sent to the vendor on every search, and an answer contains only passages that already passed the disclosure gate to be generated. What changes is that these vectors are now *stored* rather than computed and dropped. That is a conscious trade and is named here rather than buried in a ticket.
+**Embedding turns adds no new exposure class, but does increase footprint.** A question is already sent to the vendor on every search, and an answer contains only passages that already passed the disclosure gate to be generated. What changes is that these vectors are now *stored* rather than computed and dropped. That is a conscious trade and is named here rather than buried in a ticket. **Amended 2026-10-02 (IR-444):** answer text is now also sent to Voyage for embedding — a new class of input, though derived only from gated passages; see §Amendment — 2026-10-02, §7.
 
 ## Deployment Impact
 
@@ -242,4 +300,4 @@ Conversational memory and history, as named in ADR-019 — unlabeled by an FR- i
 
 ## Related Tasks
 
-IR-283, IR-284 (citation objects and the visibility predicate this depends on), IR-278 and ADR-023 (the corpus and measurement that gate multi-query), IR-243 (same deferral discipline). **IR-392** adds §12-§15 and closes §2's open question; **IR-398** (Retry), **IR-399** (multi-part questions) and **IR-401** (reader feedback) build them, all under IR-390.
+IR-283, IR-284 (citation objects and the visibility predicate this depends on), IR-278 and ADR-023 (the corpus and measurement that gate multi-query), IR-243 (same deferral discipline). **IR-392** adds §12-§15 and closes §2's open question; **IR-398** (Retry), **IR-399** (multi-part questions) and **IR-401** (reader feedback) build them, all under IR-390. **IR-444** amends §7 and §8 and notes ADR-015 rule 3; the code follows under IR-443 — **IR-445** (resolution on every follow-up), **IR-446** (recall distance cut-off), **IR-447** (answer vector), **IR-448** (failed and refused Turns leave history) and **IR-449** (token-budget window).
