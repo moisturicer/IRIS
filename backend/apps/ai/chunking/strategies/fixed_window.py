@@ -13,7 +13,7 @@ lists; that is the whole point.
 
 from ..document import NormalizedDocument
 from ..hashing import chunkset_hash
-from ..packing import Piece, pack_pieces
+from ..packing import Piece, pack_pieces, reader_content
 from ..regions import regions_for
 from ..registry import register_chunker
 from ..text_splitting import grapheme_safe_split, split_into_token_groups
@@ -72,19 +72,19 @@ class FixedWindowChunker:
     ) -> tuple[Chunk, ...]:
         chunks: list[Chunk] = []
         for sequence, window in enumerate(windows):
-            content = " ".join(text for text, _ in window)
+            text = " ".join(text for text, _ in window)
             elements = [element for _, element in window]
             pages = [e.page for e in elements if getattr(e, "page", None) is not None]
             bboxes = regions_for(elements)
             chunks.append(
                 Chunk(
-                    # The context path is applied by a decorator, not here, so
-                    # text equals content at this layer.
-                    text=content,
-                    content=content,
+                    # The context path is applied by a decorator, not here.
+                    # Content differs from text only by a formula's delimiters.
+                    text=text,
+                    content=reader_content(window),
                     context_path=(),
                     sequence=sequence,
-                    token_count=count_tokens(content),
+                    token_count=count_tokens(text),
                     source_page=pages[0] if pages else None,
                     element_kinds=frozenset(e.kind for e in elements),
                     bboxes=bboxes,

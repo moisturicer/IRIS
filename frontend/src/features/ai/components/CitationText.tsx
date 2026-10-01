@@ -2,7 +2,10 @@ import type { ComponentPropsWithoutRef } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
 import { citationHref, citationNavigationState, hasCitationQuote, openCitationLabel } from "@/lib/citedPage";
 
@@ -109,9 +112,10 @@ export function CitationText({ text, citations, streaming = false, className }: 
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{ a: CitationLink }}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeHighlight, rehypeKatex]}
+        // A model-invented image would look like a figure that failed to load.
+        components={{ a: CitationLink, img: () => null }}
         urlTransform={urlTransform}
       >
         {toMarkdownLinks(text, streaming)}

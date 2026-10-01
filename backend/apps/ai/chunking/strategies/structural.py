@@ -41,7 +41,7 @@ from ..document import (
     NormalizedDocument,
 )
 from ..hashing import chunkset_hash
-from ..packing import Piece, assembled_fits, pack_pieces
+from ..packing import Piece, assembled_fits, pack_pieces, reader_content
 from ..regions import dedupe_regions, regions_for
 from ..registry import register_chunker
 from ..text_splitting import (
@@ -217,16 +217,16 @@ def _split_structurally(
 
 
 def _window_to_chunk(window: list[Piece]) -> Chunk:
-    content = " ".join(text for text, _ in window)
+    text = " ".join(text for text, _ in window)
     elements = [element for _, element in window]
     pages = [e.page for e in elements if e.page is not None]
     bboxes = regions_for(elements)
     return Chunk(
-        text=content,
-        content=content,
+        text=text,
+        content=reader_content(window),
         context_path=(),
         sequence=0,  # reassigned once the full chunk set is known
-        token_count=count_tokens(content),
+        token_count=count_tokens(text),
         source_page=pages[0] if pages else None,
         element_kinds=frozenset(e.kind for e in elements),
         bboxes=bboxes,
@@ -363,6 +363,7 @@ def _combine(chunks: list[Chunk]) -> Chunk:
     accumulated the same way whichever pass does the joining -- a chunk that
     loses a region loses the ability to be cited.
     """
+    text = " ".join(c.text for c in chunks)
     content = " ".join(c.content for c in chunks)
     pages = [c.source_page for c in chunks if c.source_page is not None]
     kinds: frozenset[str] = frozenset()
@@ -371,11 +372,11 @@ def _combine(chunks: list[Chunk]) -> Chunk:
         kinds |= c.element_kinds
         bboxes.extend(c.bboxes)
     return Chunk(
-        text=content,
+        text=text,
         content=content,
         context_path=chunks[0].context_path,
         sequence=0,
-        token_count=count_tokens(content),
+        token_count=count_tokens(text),
         source_page=pages[0] if pages else None,
         element_kinds=kinds,
         bboxes=dedupe_regions(bboxes),
@@ -440,7 +441,7 @@ def _fold_into(
     """
     for first in range(len(pending)):
         candidate = _combine([*pending[first:], chunk])
-        if _fits(candidate.content, options.max_tokens):
+        if _fits(candidate.text, options.max_tokens):
             return [*pending[:first], candidate]
     return [*pending, chunk]
 
@@ -465,10 +466,10 @@ def _merge_short_siblings(chunks: list[Chunk], options: ChunkingOptions) -> list
     pending = chunks[0]
 
     for nxt in chunks[1:]:
-        combined_content = pending.content + " " + nxt.content
+        combined_text = pending.text + " " + nxt.text
         if (
             pending.token_count < floor
-            and count_tokens(combined_content) <= options.max_tokens
+            and count_tokens(combined_text) <= options.max_tokens
         ):
             pending = _combine([pending, nxt])
         else:

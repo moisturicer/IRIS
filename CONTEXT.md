@@ -13,12 +13,12 @@ A persisted, multi-turn Ask IRIS chat thread, owned by exactly one `User`. Optio
 _Avoid_: Chat, session, thread (used loosely elsewhere in the codebase for unrelated things), Paper Chat (a UI surface/preset scope, not a distinct data concept).
 
 **Ask IRIS**:
-The product name for IRIS's retrieval-augmented chat/search feature (`apps/ai`, `POST /api/v1/ai/ask/`). Retrieval is always grounded in the real record corpus; synthesis is generative when an LLM provider is configured, else extractive (quotes sources, says so).
+The product name for IRIS's retrieval-augmented chat/search feature (`apps/ai`, `POST /api/v1/ai/ask/`). Retrieval is always grounded in the real record corpus. Synthesis is generative when an LLM provider is configured; when none is reachable the answer is replaced by an explicit unavailable state and the sources are still returned (ADR-008). There is no extractive fallback — the one that composed an answer out of the sources was deleted in IR-285.
 _Avoid_: RAG chat, chatbot (fine in casual conversation, but "Ask IRIS" is the product-facing name used in the UI and should be used in specs/tickets too).
 
-**AI Summary**:
-A short, AI-generated summary of a Record's content, cached per active `ChunkSet` and shown to users (e.g. on a record's detail page). Deliberately distinct from **Abstract** (below) — the two must never be presented as interchangeable.
-_Avoid_: Summary alone (ambiguous next to Abstract), DocumentSummary (the internal model/table name — fine in code, not in UI copy or specs aimed at a reader).
+**AI Overview**:
+An AI-generated account of a Record's content, grounded in that Record's own passages and cached per active `ChunkSet`. Shown on the record's detail page. Deliberately distinct from **Abstract** (below) — the Abstract is what the author wrote, the AI Overview is what IRIS derived, and the two must never be presented as interchangeable.
+_Avoid_: AI Summary (the earlier name for this, now retired — the code, the API field and the UI all say Overview), Summary alone (ambiguous next to Abstract), DocumentSummary (an internal name that no longer matches the model).
 
 **Abstract**:
 The author-submitted summary of a Record, provided at submission time. Existed before AI Summary; not generated, not cached, not related to the chunk pipeline.
@@ -35,6 +35,10 @@ _Avoid_: Chunk (the internal retrieval unit — correct in code, wrong in UI cop
 **Figure**:
 A picture inside a Record's document — a chart, diagram, schematic or photograph — identified by the page and the rectangle it occupies rather than by any text it contains. Distinct from its **caption**, which is the text labelling it and is read as ordinary prose, and from a [[Passage]], which is quoted text a reader can check. A Figure is shown to a reader; it is not quoted, and IRIS makes no claim about what it depicts.
 _Avoid_: Image (the rendering of a Figure, not the Figure itself), picture (the extractor's word), diagram or chart (kinds of Figure, not synonyms for it), figure caption used to mean the Figure.
+
+**Formula**:
+Mathematical notation recovered from a Record as LaTeX, shown to a reader rendered. Delimited as displayed math in a chunk's `content` and never in its `text`, so the vector is unaffected. Retrieved through its surrounding prose, never by the notation: "search by equation" is not a capability (ADR-025 §Amendment — 2026-10-01).
+_Avoid_: Equation (one kind of Formula), math (ambiguous with the rendering), symbol.
 
 **Turn**:
 One exchange in a [[Conversation]] — a question and the answer it produced, kept together. The unit IRIS remembers: a Turn is what gets stored, searched when an older part of the conversation becomes relevant again, and returned whole when it does. A question without its answer is half a Turn, not a Turn.

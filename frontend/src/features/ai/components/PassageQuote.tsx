@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import type { ChatCitation, Citation } from "@/types/ai";
 import { citationHref, citationNavigationState, openCitationLabel } from "@/lib/citedPage";
 
@@ -17,6 +19,25 @@ import { citationHref, citationNavigationState, openCitationLabel } from "@/lib/
  * trench coat, and the next surface adds a fourth flag.
  */
 
+const DISPLAY_MATH = /\$\$([\s\S]+?)\$\$/g;
+
+/** A passage's `$$...$$` formulas rendered; not run through Markdown. */
+function withMathRendered(text: string) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(DISPLAY_MATH)) {
+    const start = match.index ?? 0;
+    if (start > last) parts.push(text.slice(last, start));
+    // KaTeX output; `trust` is off by default.
+    const html = katex.renderToString(match[1].trim(), { throwOnError: false, displayMode: true });
+    parts.push(<span key={start} dangerouslySetInnerHTML={{ __html: html }} />);
+    last = start + match[0].length;
+  }
+  if (last === 0) return text;
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
 /**
  * The quoted text itself.
  *
@@ -34,7 +55,7 @@ export function PassageQuote({ text, className = "" }: { text: string; className
         className
       }
     >
-      {text}
+      {withMathRendered(text)}
     </blockquote>
   );
 }
