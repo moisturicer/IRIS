@@ -40,7 +40,11 @@ export function DiscoverRecordCard({
   const [starred, setStarred] = useState(() => isStarred(record.id));
   const [expanded, setExpanded] = useState(false);
 
-  const badges = metaBadges(record);
+  // Kind of work leads, field of research follows (IR-452). Ordered here, not
+  // in metaBadges, so Library and Workspace keep their own order.
+  const badges = metaBadges(record).sort(
+    (a, b) => Number(b.tone === "type") - Number(a.tone === "type"),
+  );
   const abstract = record.abstract?.trim() ?? "";
   // Only offer to expand when there is meaningfully more than the clamp shows.
   const hasMoreToRead = abstract.length > 260;
@@ -78,7 +82,10 @@ export function DiscoverRecordCard({
               <span
                 key={badge.label}
                 className={cn(
-                  "px-2.5 py-0.5 rounded-full text-[12px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
+                  "py-0.5 rounded-full text-[12px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
+                  // The topic is plain text, so it takes no side padding: its first
+                  // letter then starts on the title's own left edge.
+                  badge.tone === "topic" ? "px-0" : "px-2.5",
                   BADGE_TONE_CLASS[badge.tone],
                 )}
               >
