@@ -413,3 +413,24 @@ class ImageStrippingTests:
 
         assert images_in("a ![x](u) b ![y][r]") == ("![x](u)", "![y][r]")
         assert images_in("no image [1]") == ()
+
+
+class MathDelimiterTests:
+    """The model writes LaTeX-style delimiters whatever the prompt says; the
+    renderer reads only `$` and `$$`, so they are converted (IR-427)."""
+
+    def test_inline_parens_become_dollar_math(self):
+        text, _ = parse_citations(r"Here \(n_h\) is the imbalance [1].", [chunk(1)])
+        assert "$n_h$" in text and r"\(" not in text
+
+    def test_display_brackets_become_double_dollar_math(self):
+        text, _ = parse_citations("Defined as\n" + r"\[" + "\nx = y\n" + r"\]" + "\nso [1].", [chunk(1)])
+        assert "$$\nx = y\n$$" in text and r"\[" not in text
+
+    def test_dollar_math_is_left_alone(self):
+        text, _ = parse_citations("Inline $x_i$ and\n$$\ny\n$$ [1].", [chunk(1)])
+        assert "$x_i$" in text and "$$\ny\n$$" in text
+
+    def test_a_citation_marker_is_not_mistaken_for_math(self):
+        _, citations = parse_citations("Both [1] and [2].", [chunk(1), chunk(2)])
+        assert [c.marker for c in citations] == [1, 2]

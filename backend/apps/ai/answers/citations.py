@@ -253,6 +253,18 @@ def strip_images(answer: str) -> str:
     return _IMAGE.sub("", answer)
 
 
+#: The model writes `\(..\)` and `\[..\]` whatever the prompt asks for; the
+#: renderer reads only `$` and `$$`. Converted here, as images are stripped.
+_DISPLAY_MATH = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
+_INLINE_MATH = re.compile(r"\\\((.+?)\\\)", re.DOTALL)
+
+
+def normalize_math(answer: str) -> str:
+    """``answer`` with LaTeX-style delimiters rewritten as `$..$` and `$$..$$`."""
+    answer = _DISPLAY_MATH.sub(lambda m: "\n$$\n" + m.group(1).strip() + "\n$$\n", answer)
+    return _INLINE_MATH.sub(lambda m: "$" + m.group(1).strip() + "$", answer)
+
+
 def parse_citations(
     answer: str, chunks: Sequence[RetrievedChunk]
 ) -> tuple[str, tuple[Citation, ...]]:
@@ -271,7 +283,7 @@ def parse_citations(
     is covered: answers, streams and the AI Overview.
     """
     # Before markers are read, so a marker in alt text cannot resolve and strand.
-    answer = strip_images(answer)
+    answer = normalize_math(strip_images(answer))
 
     resolved: list[Citation] = []
     seen: set[int] = set()
