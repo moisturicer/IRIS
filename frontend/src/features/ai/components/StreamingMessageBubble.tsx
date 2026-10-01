@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import type { StreamingState } from "../hooks/useAskStream";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
+import { ANSWER_MARKDOWN } from "./markdownStyle";
 import { ReasoningPanel } from "./ReasoningPanel";
 import { StreamStatusLine } from "./StreamStatusLine";
 
@@ -39,7 +40,7 @@ export function StreamingMessageBubble({
             text={state.text}
             citations={state.citations}
             streaming
-            className="chat-markdown prose prose-sm max-w-none prose-p:my-1.5"
+            className={ANSWER_MARKDOWN}
           />
         )}
       </div>

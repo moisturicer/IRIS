@@ -46,7 +46,7 @@ _MARKER = MARKER
 #: `answers/service.py`, are what actually hold the line. Tightening the
 #: wording here is worth a little -- it costs nothing and may lower the rate --
 #: but it is never grounds for narrowing `_MARKER` back down.
-SYSTEM_PROMPT = (
+GROUNDING_RULES = (
     "You are IRIS, the research assistant for Cebu Institute of Technology - "
     "University.\n"
     "Answer ONLY from the numbered sources below. Cite them inline as [1], [2], "
@@ -59,6 +59,31 @@ SYSTEM_PROMPT = (
     "guessing.\n"
     "Never invent a title, author, finding or number. Be concise and factual."
 )
+
+#: Presentation rules, kept apart from grounding: a broken grounding rule is a
+#: fabrication, a broken presentation rule is an ugly answer. Thresholds, not
+#: taste, so a one-line answer gets no heading. The no-image rule stays until
+#: figure cropping exists (IR-293 "Figures appear in Ask IRIS answers"); a
+#: nudge only -- `strip_images` is what holds the line.
+PRESENTATION_RULES = (
+    "Format your answer as GitHub-flavoured Markdown.\n"
+    "Use short paragraphs. Use a '## ' heading only when the answer covers two "
+    "or more distinct points; never put a heading on a one-paragraph answer. "
+    "Use a bullet list for parallel items, and a Markdown table only when "
+    "comparing three or more things across the same attributes.\n"
+    "Write mathematics as LaTeX: $x_i$ inline, and $$...$$ on its own lines "
+    "for a displayed equation. If a source quotes an equation, reproduce it as "
+    "LaTeX rather than describing it in words.\n"
+    "When a source passage is a figure caption or a table, say so in the "
+    "sentence (Figure 3 reports..., Table 2 lists...) and cite it, so the "
+    "reader can open that page.\n"
+    "Never write an image, a link, or a URL of any kind: you have no image or "
+    "page addresses, and one you compose will be broken.\n"
+    "Never use a heading, a list, or a table as decoration. If prose says it "
+    "in one sentence, write the sentence."
+)
+
+SYSTEM_PROMPT = GROUNDING_RULES + "\n" + PRESENTATION_RULES
 
 
 @dataclass(frozen=True)
@@ -207,6 +232,39 @@ def build_prompt(
     return "\n".join(lines).strip()
 
 
+#: Markdown image syntax, inline and reference style. The leading `!` keeps it
+#: off citation markers. Raw `<img>` is not matched: the renderer shows it as text.
+_IMAGE = re.compile(
+    r"!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])"
+)
+
+
+def images_in(answer: str) -> tuple[str, ...]:
+    """The image syntax ``answer`` contains. Pure: it neither logs nor decides."""
+    return tuple(match.group(0) for match in _IMAGE.finditer(answer))
+
+
+def strip_images(answer: str) -> str:
+    """``answer`` without Markdown images, alt text included.
+
+    IRIS hands the model no image addresses (IR-292 "Figure crop endpoint"), so
+    any image is an invented URL that reads as a figure that failed to load.
+    """
+    return _IMAGE.sub("", answer)
+
+
+#: The model writes `\(..\)` and `\[..\]` whatever the prompt asks for; the
+#: renderer reads only `$` and `$$`. Converted here, as images are stripped.
+_DISPLAY_MATH = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
+_INLINE_MATH = re.compile(r"\\\((.+?)\\\)", re.DOTALL)
+
+
+def normalize_math(answer: str) -> str:
+    """``answer`` with LaTeX-style delimiters rewritten as `$..$` and `$$..$$`."""
+    answer = _DISPLAY_MATH.sub(lambda m: "\n$$\n" + m.group(1).strip() + "\n$$\n", answer)
+    return _INLINE_MATH.sub(lambda m: "$" + m.group(1).strip() + "$", answer)
+
+
 def parse_citations(
     answer: str, chunks: Sequence[RetrievedChunk]
 ) -> tuple[str, tuple[Citation, ...]]:
@@ -220,7 +278,13 @@ def parse_citations(
     invent [7] when handed four sources, and rendering it would show a reader
     a citation that points at nothing, which reads as evidence. Dropping it
     leaves the sentence, which is still supported by whatever else it cites.
+
+    Markdown images are dropped too (see `strip_images`), here so every caller
+    is covered: answers, streams and the AI Overview.
     """
+    # Before markers are read, so a marker in alt text cannot resolve and strand.
+    answer = normalize_math(strip_images(answer))
+
     resolved: list[Citation] = []
     seen: set[int] = set()
 

@@ -22,6 +22,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional, Sequence
 
 from .labels import QuestionSet
+from .techniques import ResolvedTechniques
+from .techniques import resolve as _resolve
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,12 @@ class RunConfig:
     ``retrieval_limit`` is the k in recall@k — 10, per ADR-023. ``max_sources``
     is how many passages the model is given, and is the answer service's own
     default unless a run says otherwise.
+
+    ``techniques`` is ADR-033 §5's six switches at the values this run used.
+    It defaults to this deployment's own settings, so *every* run records all
+    six — unbuilt ones included, because a results file that omits a switch
+    cannot be compared with a later one that moved it. A run moving one passes
+    `techniques.resolve([(name, value)])`.
     """
 
     reranking: bool = True
@@ -38,13 +46,26 @@ class RunConfig:
     max_sources: int = 8
     name: Optional[str] = None
     baseline: Optional[str] = None
+    techniques: ResolvedTechniques = field(default_factory=_resolve)
+
+    @property
+    def changed_techniques(self) -> tuple[str, ...]:
+        return self.techniques.changes
 
     @property
     def label(self) -> str:
-        return self.name or ("with-reranking" if self.reranking else "no-reranking")
+        if self.name:
+            return self.name
+        base = "with-reranking" if self.reranking else "no-reranking"
+        moved = self.changed_techniques
+        return f"{base}+{','.join(moved)}" if moved else base
 
     def as_dict(self) -> dict[str, Any]:
-        return {**asdict(self), "label": self.label}
+        return {
+            **asdict(self),
+            "techniques": self.techniques.as_dict(),
+            "label": self.label,
+        }
 
 
 @dataclass(frozen=True)
@@ -157,6 +178,13 @@ class EvalReport:
             f"Configuration: {self.config.label} "
             f"(reranking={'on' if self.config.reranking else 'off'}, "
             f"k={self.k}, max_sources={self.config.max_sources})",
+            "Techniques: "
+            + (
+                ", ".join(self.config.changed_techniques)
+                + " — everything else at this deployment's own setting"
+                if self.config.changed_techniques
+                else "none moved (ADR-033 §5 defaults)"
+            ),
             "",
             f"  recall@{self.k}          {self.retrieval_recall:.3f}"
             f"   (micro {self.micro_retrieval_recall:.3f})",

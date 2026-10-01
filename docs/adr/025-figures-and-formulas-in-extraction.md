@@ -131,3 +131,15 @@ FR-M3-01, FR-M4 — stable labels only, per the frozen-SRS rule.
 ## Related Tasks
 
 IR-107, IR-113, IR-245 (produced the region data this finally consumes), IR-243 (token counter, still deferred), IR-284 (citation objects — blocks the answer-side half), IR-278 (corpus — sets the deadline for landing extraction changes cheaply).
+
+## Amendment — 2026-10-01 (IR-424): the answer path forbids model-authored images, and formulas are delimited in chunk content
+
+**Status of this amendment.** Amends the answer-side consequences of this ADR; the decisions above (crop from the source PDF, formula enrichment, no picture description) are unchanged.
+
+1. **The answer path forbids model-authored images until the crop endpoint exists.** IRIS has no image addresses to give the model (IR-292, IR-293 are unbuilt), so an image in an answer is a URL the model composed, and a broken image reads as a figure IRIS had and failed to load. Enforced three ways: the prompt forbids images, links and URLs; `parse_citations` strips Markdown image syntax and `GroundedAnswerService` logs a warning naming what was stripped (so a stored `Turn.answer` and `RecordOverview.text` are clean); `CitationText` renders no `img` element (so anything already stored is also clean).
+2. **Formulas are delimited where the element kind is still known.** A standalone `FORMULA` element is wrapped as displayed LaTeX (`$$ ... $$`) when chunk `content` is assembled (`apps/ai/chunking/packing.py`, `reader_form`). `content` only, never `text`: `text_hash` and `chunkset_hash` are unchanged, so no vector is re-embedded. Existing rows gain the delimiters only when re-chunked. A fragment of a split formula, and a formula the extractor already delimited, are left as they are.
+3. **This reverses when IR-293 ships.** The rule becomes "no image the system did not hand you", not "no image". The expectation is recorded here so the reversal is not a surprise.
+4. **"Search by equation" is not a capability this buys.** A formula is retrieved through its surrounding prose, never by the notation.
+
+Related: IR-424 (IR-426, IR-427, IR-428, IR-429, IR-430).
+
