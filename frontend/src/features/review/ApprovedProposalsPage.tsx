@@ -60,7 +60,7 @@ export default function ApprovedProposalsPage() {
             message="All proposals have been completed or none have been approved yet."
           />
         ) : (
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[14px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Title</th>
@@ -95,13 +95,13 @@ export default function ApprovedProposalsPage() {
                           type="button"
                           onClick={() => handleComplete(r.id)}
                           disabled={completing === r.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-[12px] font-semibold hover:bg-emerald-800 transition-colors disabled:opacity-60 whitespace-nowrap"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-[13px] font-semibold hover:bg-emerald-800 transition-colors disabled:opacity-60 whitespace-nowrap"
                         >
-                          <i className="fas fa-check-circle text-[11px]" aria-hidden />
+                          <i className="fas fa-check-circle text-[12px]" aria-hidden />
                           {completing === r.id ? "Marking..." : "Mark as Completed"}
                         </button>
                         {errors[r.id] && (
-                          <p className="text-[11px] text-red-500">{errors[r.id]}</p>
+                          <p className="text-[12px] text-red-500">{errors[r.id]}</p>
                         )}
                       </div>
                     </td>

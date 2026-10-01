@@ -31,7 +31,7 @@ export function PeerClearanceStrip({ peers }: { peers: PeerClearance[] }) {
   if (peers.length === 0) {
     // A sequential stage (Adviser, RDCO) has no peers by definition. Saying so
     // beats an empty gap the reader has to interpret.
-    return <span className="text-[11px] text-stone-400">No parallel offices</span>;
+    return <span className="text-[12px] text-stone-400">No parallel offices</span>;
   }
 
   return (
@@ -42,7 +42,7 @@ export function PeerClearanceStrip({ peers }: { peers: PeerClearance[] }) {
           <li key={p.office}>
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold",
+                "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-semibold",
                 meta.className,
               )}
               title={`${p.office_label}: ${p.status_label}`}

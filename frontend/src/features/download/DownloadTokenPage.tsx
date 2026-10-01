@@ -76,11 +76,11 @@ export default function DownloadTokenPage() {
         <h1 className="text-[18px] font-bold text-gray-900 mb-2">
           {state === "loading" ? "Downloading" : state === "success" ? "Download ready" : "Download failed"}
         </h1>
-        <p className="text-[13px] text-gray-600 leading-relaxed">{message}</p>
+        <p className="text-[14px] text-gray-600 leading-relaxed">{message}</p>
 
         <Link
           to="/"
-          className="inline-block mt-6 text-[13px] font-semibold text-[#6B0F12] hover:underline"
+          className="inline-block mt-6 text-[14px] font-semibold text-[#6B0F12] hover:underline"
         >
           Back to Discover
         </Link>

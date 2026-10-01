@@ -27,8 +27,8 @@ export function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-        <h3 className="text-[15px] font-bold text-stone-900 mb-2">{title}</h3>
-        <p className="text-[13px] text-stone-600 mb-6">{message}</p>
+        <h3 className="text-[16px] font-bold text-stone-900 mb-2">{title}</h3>
+        <p className="text-[14px] text-stone-600 mb-6">{message}</p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={confirming}>
             Cancel

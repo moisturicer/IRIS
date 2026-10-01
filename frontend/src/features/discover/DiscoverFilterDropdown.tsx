@@ -85,11 +85,11 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
             : "bg-white text-stone-700 border-stone-200 hover:border-stone-300",
         )}
       >
-        {icon && <i className={cn("fas", icon, "text-[10px] shrink-0")} aria-hidden />}
+        {icon && <i className={cn("fas", icon, "text-[11px] shrink-0")} aria-hidden />}
         <span className="truncate">{isActive && activeLabel ? activeLabel : label}</span>
 
         {props.multi && props.selected.length > 0 && (
-          <span className="min-w-[16px] h-4 px-1 shrink-0 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="min-w-[16px] h-4 px-1 shrink-0 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
             {props.selected.length}
           </span>
         )}
@@ -105,9 +105,9 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
           className="absolute left-0 top-full mt-1.5 w-60 max-h-64 overflow-y-auto bg-white rounded-lg shadow-card-md border border-slate-200 py-1.5 z-50"
         >
           {loading ? (
-            <p className="px-3 py-2 text-[12px] text-slate-400">Loading…</p>
+            <p className="px-3 py-2 text-[13px] text-slate-400">Loading…</p>
           ) : options.length === 0 ? (
-            <p className="px-3 py-2 text-[12px] text-slate-400">
+            <p className="px-3 py-2 text-[13px] text-slate-400">
               {emptyHint ?? "No options available."}
             </p>
           ) : (
@@ -134,10 +134,10 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
                       setOpen(false);
                     }
                   }}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] text-slate-700 hover:bg-slate-50 transition text-left"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[13px] text-slate-700 hover:bg-slate-50 transition text-left"
                 >
                   <span className="truncate">{option.label}</span>
-                  {selected && <i className="fas fa-check text-brand text-[11px] shrink-0" aria-hidden />}
+                  {selected && <i className="fas fa-check text-brand text-[12px] shrink-0" aria-hidden />}
                 </button>
               );
             })
@@ -148,7 +148,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
               <button
                 type="button"
                 onClick={() => props.onChange([])}
-                className="w-full px-3 py-1.5 text-left text-[12px] font-semibold text-slate-500 hover:text-brand transition"
+                className="w-full px-3 py-1.5 text-left text-[13px] font-semibold text-slate-500 hover:text-brand transition"
               >
                 Clear selection
               </button>

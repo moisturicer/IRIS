@@ -142,7 +142,7 @@ export default function UserListPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          leading={<i className="fa fa-search text-[13px]" aria-hidden />}
+          leading={<i className="fa fa-search text-[14px]" aria-hidden />}
           className="max-w-xs"
         />
         <Button variant="secondary" size="sm" onClick={handleSearch}>Filter</Button>
@@ -182,15 +182,15 @@ export default function UserListPage() {
         title="Change Role"
       >
         <div className="flex flex-col gap-4">
-          <p className="text-[13px] text-gray-600">
+          <p className="text-[14px] text-gray-600">
             Changing role for <strong>{roleTarget?.email}</strong>.
           </p>
           <div>
-            <label className="text-[13px] font-medium text-gray-700 block mb-1">New Role</label>
+            <label className="text-[14px] font-medium text-gray-700 block mb-1">New Role</label>
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] outline-none
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[14px] outline-none
                 focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12]"
             >
               {["Student","Adviser","KTTO","RDCO","ITSO","IERC"].map((r) => (

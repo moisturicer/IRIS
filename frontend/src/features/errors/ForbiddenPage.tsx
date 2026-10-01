@@ -20,8 +20,8 @@ function DiagnosticBadge({
     <span
       className={
         isRequired
-          ? "inline-block px-3 py-1 rounded-md border border-red-400 bg-white text-red-600 text-[12px] font-mono font-semibold tracking-wide"
-          : "inline-block px-3 py-1 rounded-md bg-gray-100 text-gray-700 text-[12px] font-mono font-semibold tracking-wide"
+          ? "inline-block px-3 py-1 rounded-md border border-red-400 bg-white text-red-600 text-[13px] font-mono font-semibold tracking-wide"
+          : "inline-block px-3 py-1 rounded-md bg-gray-100 text-gray-700 text-[13px] font-mono font-semibold tracking-wide"
       }
     >
       {code}
@@ -51,21 +51,21 @@ export function ForbiddenPage({ requiredRoles }: ForbiddenPageProps) {
       <h1 className="text-[26px] font-bold text-gray-900 tracking-tight mb-3">
         HTTP 403: Access Forbidden
       </h1>
-      <p className="text-[14px] text-gray-500 max-w-md mb-8 leading-relaxed">
+      <p className="text-[15px] text-gray-500 max-w-md mb-8 leading-relaxed">
         You do not have the required role-based permissions to access this workflow tier.
       </p>
 
       {/* RBAC diagnostic */}
       <div className="w-full max-w-lg border border-dashed border-gray-300 rounded-xl bg-gray-50/80 px-6 py-5 text-left mb-8">
-        <p className="text-[13px] font-bold text-gray-800 mb-4">Security &amp; RBAC Diagnostic:</p>
+        <p className="text-[14px] font-bold text-gray-800 mb-4">Security &amp; RBAC Diagnostic:</p>
 
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <span className="text-[13px] text-gray-600">Authenticated Role:</span>
+          <span className="text-[14px] text-gray-600">Authenticated Role:</span>
           <DiagnosticBadge code={authenticatedCode} variant="authenticated" />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <span className="text-[13px] text-gray-600">Required Role:</span>
+          <span className="text-[14px] text-gray-600">Required Role:</span>
           <div className="flex flex-wrap gap-2 justify-end">
             {requiredCodes.map((code) => (
               <DiagnosticBadge key={code} code={code} variant="required" />
@@ -73,14 +73,14 @@ export function ForbiddenPage({ requiredRoles }: ForbiddenPageProps) {
           </div>
         </div>
 
-        <p className="text-[12px] text-amber-700 font-medium">
+        <p className="text-[13px] text-amber-700 font-medium">
           Note: Access violation attempt logged in AuditLog.
         </p>
       </div>
 
       <Link
         to="/"
-        className="inline-flex items-center justify-center px-8 py-3 rounded-lg bg-brand text-white text-[14px] font-semibold hover:bg-brand-light transition-colors shadow-sm"
+        className="inline-flex items-center justify-center px-8 py-3 rounded-lg bg-brand text-white text-[15px] font-semibold hover:bg-brand-light transition-colors shadow-sm"
       >
         Return to Safe Dashboard
       </Link>

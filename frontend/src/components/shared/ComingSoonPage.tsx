@@ -23,13 +23,13 @@ export function ComingSoonPage({
         <div className="w-14 h-14 rounded-full bg-stone-50 border border-stone-100 flex items-center justify-center mb-5">
           <i className={`fas ${icon} text-2xl text-stone-400`} aria-hidden />
         </div>
-        <span className="px-3 py-1 bg-stone-100 text-stone-700 text-[11px] font-bold rounded-full border border-stone-200 uppercase tracking-wider mb-4">
+        <span className="px-3 py-1 bg-stone-100 text-stone-700 text-[12px] font-bold rounded-full border border-stone-200 uppercase tracking-wider mb-4">
           Coming Soon
         </span>
-        <p className="text-[13px] text-stone-500 leading-relaxed max-w-sm">{description}</p>
+        <p className="text-[14px] text-stone-500 leading-relaxed max-w-sm">{description}</p>
         <Link
           to={backTo}
-          className="mt-6 text-[13px] font-semibold text-brand hover:underline"
+          className="mt-6 text-[14px] font-semibold text-brand hover:underline"
         >
           ← {backLabel}
         </Link>

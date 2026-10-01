@@ -192,13 +192,13 @@ export default function EvaluationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Record info */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
-          <p className="text-[13px] font-semibold text-gray-800">Record Details</p>
+          <p className="text-[14px] font-semibold text-gray-800">Record Details</p>
 
           <div className="flex items-center gap-2">
             <StatusBadge status={record.pipeline_status} />
           </div>
 
-          <div className="text-[13px] text-gray-600 space-y-1">
+          <div className="text-[14px] text-gray-600 space-y-1">
             <p><strong>Title:</strong> {record.title}</p>
             <p><strong>Type:</strong> {record.record_type ?? "-"}</p>
             <p><strong>Year:</strong> {record.year_accomplished ?? "-"}</p>
@@ -206,18 +206,18 @@ export default function EvaluationPage() {
 
           {record.abstract && (
             <div>
-              <p className="text-[12px] font-semibold text-gray-700 mb-1">Abstract</p>
-              <p className="text-[13px] text-gray-500 leading-relaxed line-clamp-6">
+              <p className="text-[13px] font-semibold text-gray-700 mb-1">Abstract</p>
+              <p className="text-[14px] text-gray-500 leading-relaxed line-clamp-6">
                 {record.abstract}
               </p>
             </div>
           )}
 
           <div>
-            <p className="text-[12px] font-semibold text-gray-700 mb-1">Authors</p>
+            <p className="text-[13px] font-semibold text-gray-700 mb-1">Authors</p>
             <div className="flex flex-wrap gap-1.5">
               {record.authors.map((a) => (
-                <span key={a.id} className="px-2 py-0.5 bg-gray-100 rounded text-[12px] text-gray-700">
+                <span key={a.id} className="px-2 py-0.5 bg-gray-100 rounded text-[13px] text-gray-700">
                   {a.name}
                 </span>
               ))}
@@ -251,16 +251,16 @@ export default function EvaluationPage() {
                 reload and an expired session all used to lose the comment too. */}
             <Link
               to={`/records/${id}/documents`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#6B0F12] text-white text-[12px] font-semibold hover:bg-[#7d1215] transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#6B0F12] text-white text-[13px] font-semibold hover:bg-[#7d1215] transition-colors"
             >
-              <i className="fas fa-folder-open text-[11px]" aria-hidden />
+              <i className="fas fa-folder-open text-[12px]" aria-hidden />
               View &amp; Attach Documents
             </Link>
             <Link
               to={`/records/${id}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              <i className="fas fa-external-link-alt text-[11px]" aria-hidden />
+              <i className="fas fa-external-link-alt text-[12px]" aria-hidden />
               Record Detail
             </Link>
           </div>
@@ -274,19 +274,19 @@ export default function EvaluationPage() {
         {/* Review form */}
         <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <div>
-            <p className="text-[13px] font-semibold text-gray-800">Your Decision</p>
+            <p className="text-[14px] font-semibold text-gray-800">Your Decision</p>
             {/* At parallel_review, approving records ONE office's clearance --
                 not the record's approval. Saying so is the difference between
                 a reviewer knowing what they just did and assuming they
                 published it (IR-143). Server-supplied label (IR-139). */}
             {record.your_office_label ? (
-              <p className="mt-1 text-[12px] text-gray-600">
+              <p className="mt-1 text-[13px] text-gray-600">
                 You are recording{" "}
                 <strong className="text-gray-900">{record.your_office_label} clearance</strong> for
                 this record. The other offices decide separately.
               </p>
             ) : (
-              <p className="mt-1 text-[12px] text-gray-600">
+              <p className="mt-1 text-[13px] text-gray-600">
                 This decision moves the record on from{" "}
                 <strong className="text-gray-900">{record.stage_label}</strong>.
               </p>
@@ -314,11 +314,11 @@ export default function EvaluationPage() {
                   {/* Icon *and* word. Colour alone fails for the ~8% of men
                       with a colour vision deficiency, and these three options
                       are green/amber/red -- the worst possible triple. */}
-                  <p className={`text-[13px] font-semibold flex items-center gap-1.5 ${opt.color}`}>
-                    <i className={`fas ${opt.icon} text-[11px]`} aria-hidden />
+                  <p className={`text-[14px] font-semibold flex items-center gap-1.5 ${opt.color}`}>
+                    <i className={`fas ${opt.icon} text-[12px]`} aria-hidden />
                     {opt.label}
                   </p>
-                  <p className="text-[12px] text-gray-500 mt-0.5">{opt.description}</p>
+                  <p className="text-[13px] text-gray-500 mt-0.5">{opt.description}</p>
                 </div>
               </label>
             ))}
@@ -326,7 +326,7 @@ export default function EvaluationPage() {
 
           {/* Comment */}
           <div>
-            <label className="block text-[12px] font-semibold text-gray-700 mb-1">
+            <label className="block text-[13px] font-semibold text-gray-700 mb-1">
               Comment{" "}
               <span className={commentRequired ? "text-red-500" : "text-gray-500"}>
                 {commentRequired ? "(required)" : "(optional)"}
@@ -342,13 +342,13 @@ export default function EvaluationPage() {
                     ? "Explain what needs to be revised or why the record is being rejected..."
                     : "Explain what needs to be revised..."
               }
-              className="w-full border border-gray-200 rounded-lg p-3 text-[13px] resize-y focus:outline-none focus:border-[#6B0F12]"
+              className="w-full border border-gray-200 rounded-lg p-3 text-[14px] resize-y focus:outline-none focus:border-[#6B0F12]"
             />
           </div>
 
           {/* Rejection confirmation warning */}
           {selectedStatus === "rejected" && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
               <strong>This action is permanent.</strong> Rejecting a record removes it from the
               pipeline and prevents the owner from resubmitting. Make sure a comment explains
               the reason clearly.
@@ -356,21 +356,21 @@ export default function EvaluationPage() {
           )}
 
           {error && (
-            <p className="text-[12px] text-red-500">{error}</p>
+            <p className="text-[13px] text-red-500">{error}</p>
           )}
 
           <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex-1 border border-gray-200 rounded-lg py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-50"
+              className="flex-1 border border-gray-200 rounded-lg py-2 text-[14px] font-semibold text-gray-600 hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 bg-[#6B0F12] text-white rounded-lg py-2 text-[13px] font-semibold hover:bg-[#7d1215] disabled:opacity-60"
+              className="flex-1 bg-[#6B0F12] text-white rounded-lg py-2 text-[14px] font-semibold hover:bg-[#7d1215] disabled:opacity-60"
             >
               {isSubmitting ? "Submitting..." : "Submit Decision"}
             </button>

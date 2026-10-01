@@ -71,7 +71,7 @@ export default function AccessRequestsPage() {
       />
 
       {lastLink && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-100 rounded-xl text-[12px] text-green-900">
+        <div className="mb-4 p-4 bg-green-50 border border-green-100 rounded-xl text-[13px] text-green-900">
           <p className="font-semibold mb-1">Latest approved download link (24h)</p>
           <a href={lastLink} className="break-all text-[#6B0F12] hover:underline">{lastLink}</a>
         </div>
@@ -80,12 +80,12 @@ export default function AccessRequestsPage() {
       {loading ? (
         <Skeleton />
       ) : requests.length === 0 ? (
-        <div className="text-[13px] text-gray-500 py-10 text-center bg-white rounded-xl border border-gray-200">
+        <div className="text-[14px] text-gray-500 py-10 text-center bg-white rounded-xl border border-gray-200">
           No pending download requests.
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[14px]">
             <thead className="bg-gray-50 text-left text-gray-600">
               <tr>
                 <th className="px-4 py-3 font-semibold">Record</th>
@@ -101,7 +101,7 @@ export default function AccessRequestsPage() {
                   <td className="px-4 py-3 text-gray-600">
                     {req.requested_by_name ?? "—"}
                     {req.requested_by_email && (
-                      <span className="block text-[11px] text-gray-500">{req.requested_by_email}</span>
+                      <span className="block text-[12px] text-gray-500">{req.requested_by_email}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{formatDate(req.created_at)}</td>

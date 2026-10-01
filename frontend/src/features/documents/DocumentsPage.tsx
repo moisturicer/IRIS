@@ -32,12 +32,12 @@ function PdfViewer({ blobUrl, filename, onClose }: PdfViewerProps) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="flex items-center justify-between px-4 py-3 bg-gray-900 text-white flex-shrink-0">
-        <span className="text-[13px] font-medium truncate max-w-[80%]">{filename}</span>
+        <span className="text-[14px] font-medium truncate max-w-[80%]">{filename}</span>
         <div className="flex items-center gap-3 ml-4">
           <a
             href={blobUrl}
             download={filename}
-            className="text-gray-300 hover:text-white text-[12px] flex items-center gap-1.5"
+            className="text-gray-300 hover:text-white text-[13px] flex items-center gap-1.5"
           >
             <i className="fas fa-download" aria-hidden /> Download
           </a>
@@ -123,8 +123,8 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[15px] font-bold text-gray-900">Document Access PIN</p>
-            <p className="text-[12px] text-gray-500 mt-0.5">
+            <p className="text-[16px] font-bold text-gray-900">Document Access PIN</p>
+            <p className="text-[13px] text-gray-500 mt-0.5">
               A one-time PIN will be emailed to you for verified access.
             </p>
           </div>
@@ -141,18 +141,18 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
         {/* Step: Request */}
         {step === "request" && (
           <div className="space-y-4">
-            <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-[13px] text-gray-700">
+            <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-[14px] text-gray-700">
               A PIN will be sent to:
               <span className="font-semibold ml-1">{userEmail}</span>
             </div>
             {errorMsg && (
-              <p className="text-[12px] text-red-500">{errorMsg}</p>
+              <p className="text-[13px] text-red-500">{errorMsg}</p>
             )}
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 border border-gray-200 rounded-lg py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-50"
+                className="flex-1 border border-gray-200 rounded-lg py-2 text-[14px] font-semibold text-gray-600 hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -160,7 +160,7 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
                 type="button"
                 onClick={handleSend}
                 disabled={busy}
-                className="flex-1 bg-[#6B0F12] text-white rounded-lg py-2 text-[13px] font-semibold hover:bg-[#7d1215] disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex-1 bg-[#6B0F12] text-white rounded-lg py-2 text-[14px] font-semibold hover:bg-[#7d1215] disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {busy ? <><Spinner size="sm" /> Sending…</> : "Send PIN"}
               </button>
@@ -171,12 +171,12 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
         {/* Step: Enter PIN */}
         {step === "enter" && (
           <div className="space-y-4">
-            <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-[13px] text-green-700">
+            <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-[14px] text-green-700">
               <i className="fas fa-check-circle mr-1.5" aria-hidden />
               PIN sent to <strong>{userEmail}</strong>. Check your inbox.
             </div>
             <div>
-              <label className="block text-[12px] font-semibold text-gray-700 mb-1">
+              <label className="block text-[13px] font-semibold text-gray-700 mb-1">
                 Enter PIN
               </label>
               <input
@@ -187,17 +187,17 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
                 placeholder="e.g. A3BX29"
                 maxLength={10}
                 autoFocus
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[14px] font-mono tracking-widest text-center focus:outline-none focus:border-[#6B0F12]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-[15px] font-mono tracking-widest text-center focus:outline-none focus:border-[#6B0F12]"
               />
             </div>
             {errorMsg && (
-              <p className="text-[12px] text-red-500">{errorMsg}</p>
+              <p className="text-[13px] text-red-500">{errorMsg}</p>
             )}
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => { setStep("request"); setPinInput(""); setErrorMsg(null); }}
-                className="flex-1 border border-gray-200 rounded-lg py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-50"
+                className="flex-1 border border-gray-200 rounded-lg py-2 text-[14px] font-semibold text-gray-600 hover:bg-gray-50"
               >
                 Resend
               </button>
@@ -205,7 +205,7 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
                 type="button"
                 onClick={handleVerify}
                 disabled={busy}
-                className="flex-1 bg-[#6B0F12] text-white rounded-lg py-2 text-[13px] font-semibold hover:bg-[#7d1215] disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex-1 bg-[#6B0F12] text-white rounded-lg py-2 text-[14px] font-semibold hover:bg-[#7d1215] disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {busy ? <><Spinner size="sm" /> Verifying…</> : "Verify"}
               </button>
@@ -222,15 +222,15 @@ function AuthPinModal({ recordId, userEmail, onClose }: AuthPinModalProps) {
               </div>
             </div>
             <div>
-              <p className="text-[14px] font-semibold text-gray-900">Access Verified</p>
-              <p className="text-[13px] text-gray-500 mt-1">
+              <p className="text-[15px] font-semibold text-gray-900">Access Verified</p>
+              <p className="text-[14px] text-gray-500 mt-1">
                 Your identity has been confirmed. You may now access the documents.
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="w-full bg-[#6B0F12] text-white rounded-lg py-2 text-[13px] font-semibold hover:bg-[#7d1215]"
+              className="w-full bg-[#6B0F12] text-white rounded-lg py-2 text-[14px] font-semibold hover:bg-[#7d1215]"
             >
               Close
             </button>
@@ -477,9 +477,9 @@ export default function DocumentsPage() {
         actions={
           <Link
             to={`/records/${recordId}`}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            <i className="fas fa-arrow-left text-[11px]" aria-hidden />
+            <i className="fas fa-arrow-left text-[12px]" aria-hidden />
             Back to Record
           </Link>
         }
@@ -489,18 +489,18 @@ export default function DocumentsPage() {
       {canPin && (
         <div className="mb-4 px-5 py-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-4">
           <div>
-            <p className="text-[13px] font-semibold text-blue-800">
+            <p className="text-[14px] font-semibold text-blue-800">
               <i className="fas fa-lock mr-1.5" aria-hidden />
               Verified access
             </p>
-            <p className="text-[12px] text-blue-600 mt-0.5">
+            <p className="text-[13px] text-blue-600 mt-0.5">
               Request a one-time PIN to confirm your identity and access these documents.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowPin(true)}
-            className="flex-shrink-0 px-4 py-2 bg-blue-700 text-white text-[12px] font-semibold rounded-lg hover:bg-blue-800 transition-colors"
+            className="flex-shrink-0 px-4 py-2 bg-blue-700 text-white text-[13px] font-semibold rounded-lg hover:bg-blue-800 transition-colors"
           >
             Request Access PIN
           </button>
@@ -518,7 +518,7 @@ export default function DocumentsPage() {
             <div key={slot.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                  <p className="text-[14px] font-semibold text-gray-900">{slot.name}</p>
+                  <p className="text-[15px] font-semibold text-gray-900">{slot.name}</p>
                   {slot.is_required && (
                     <Badge variant="danger" className="mt-1">Required</Badge>
                   )}
@@ -542,10 +542,10 @@ export default function DocumentsPage() {
                 {/* Version history */}
                 {slot.uploads.length > 0 ? (
                   <div className={canUpload ? "mt-4" : ""}>
-                    <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
                       Version History
                     </p>
-                    <table className="w-full text-[12px]">
+                    <table className="w-full text-[13px]">
                       <thead>
                         <tr className="border-b border-gray-100">
                           <th className="text-left py-1.5 text-gray-500 font-medium">Version</th>
@@ -572,7 +572,7 @@ export default function DocumentsPage() {
                                   type="button"
                                   disabled={busyUploadId === upload.id}
                                   onClick={() => handleViewUpload(upload)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[12px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                                   title="View in browser"
                                 >
                                   {busyUploadId === upload.id ? <Spinner size="sm" /> : <i className="fas fa-eye" aria-hidden />}
@@ -582,7 +582,7 @@ export default function DocumentsPage() {
                                   type="button"
                                   disabled={busyUploadId === upload.id}
                                   onClick={() => handleDownloadUpload(upload)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[12px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                                   title="Download file"
                                 >
                                   {busyUploadId === upload.id ? <Spinner size="sm" /> : <i className="fas fa-download" aria-hidden />}
@@ -593,7 +593,7 @@ export default function DocumentsPage() {
                                     type="button"
                                     disabled={deletingUpload === upload.id}
                                     onClick={() => handleDeleteUpload(upload.id)}
-                                    className="text-gray-500 hover:text-red-500 text-[12px] disabled:opacity-40 transition-colors"
+                                    className="text-gray-500 hover:text-red-500 text-[13px] disabled:opacity-40 transition-colors"
                                     title="Remove this version"
                                   >
                                     {deletingUpload === upload.id
@@ -611,7 +611,7 @@ export default function DocumentsPage() {
                   </div>
                 ) : (
                   !canUpload && (
-                    <p className="text-[13px] text-gray-500 text-center py-4">
+                    <p className="text-[14px] text-gray-500 text-center py-4">
                       No files uploaded yet.
                     </p>
                   )
@@ -628,11 +628,11 @@ export default function DocumentsPage() {
       <div className="mt-6 bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <p className="text-[14px] font-semibold text-gray-900">
+            <p className="text-[15px] font-semibold text-gray-900">
               <i className="fas fa-paperclip mr-1.5 text-gray-500" aria-hidden />
               Supplementary Attachments
             </p>
-            <p className="text-[12px] text-gray-500 mt-0.5">
+            <p className="text-[13px] text-gray-500 mt-0.5">
               Additional files attached by staff (any file type).
             </p>
           </div>
@@ -650,7 +650,7 @@ export default function DocumentsPage() {
                 type="button"
                 disabled={miscUploading}
                 onClick={() => miscInputRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-2 bg-[#6B0F12] text-white rounded-lg text-[12px] font-semibold hover:bg-[#7d1215] disabled:opacity-60 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 bg-[#6B0F12] text-white rounded-lg text-[13px] font-semibold hover:bg-[#7d1215] disabled:opacity-60 transition-colors"
               >
                 {miscUploading
                   ? <><Spinner size="sm" /> Uploading…</>
@@ -663,18 +663,18 @@ export default function DocumentsPage() {
 
         <div className="p-5">
           {miscFiles.length === 0 ? (
-            <p className="text-[13px] text-gray-500 text-center py-4">
+            <p className="text-[14px] text-gray-500 text-center py-4">
               {isStaff
                 ? "No supplementary files yet. Use the button above to attach one."
                 : "No supplementary attachments have been added."}
             </p>
           ) : (
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left py-1.5 text-gray-500 font-medium text-[12px]">Filename</th>
-                  <th className="text-left py-1.5 text-gray-500 font-medium text-[12px]">Uploaded By</th>
-                  <th className="text-left py-1.5 text-gray-500 font-medium text-[12px]">Date</th>
+                  <th className="text-left py-1.5 text-gray-500 font-medium text-[13px]">Filename</th>
+                  <th className="text-left py-1.5 text-gray-500 font-medium text-[13px]">Uploaded By</th>
+                  <th className="text-left py-1.5 text-gray-500 font-medium text-[13px]">Date</th>
                   <th />
                 </tr>
               </thead>
@@ -687,14 +687,14 @@ export default function DocumentsPage() {
                     <tr key={f.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-2 pr-3">
                         <div className="flex items-center gap-2">
-                          <i className="fas fa-file text-gray-500 text-[12px]" aria-hidden />
-                          <span className="truncate max-w-[240px] text-[13px] text-gray-700">{f.filename}</span>
+                          <i className="fas fa-file text-gray-500 text-[13px]" aria-hidden />
+                          <span className="truncate max-w-[240px] text-[14px] text-gray-700">{f.filename}</span>
                         </div>
                       </td>
-                      <td className="py-2 text-gray-600 pr-3 text-[12px]">
+                      <td className="py-2 text-gray-600 pr-3 text-[13px]">
                         {f.uploaded_by_name ?? "—"}
                       </td>
-                      <td className="py-2 text-gray-500 pr-3 text-[12px]">
+                      <td className="py-2 text-gray-500 pr-3 text-[13px]">
                         {formatDate(f.created_at)}
                       </td>
                       <td className="py-2 text-right">
@@ -704,7 +704,7 @@ export default function DocumentsPage() {
                               type="button"
                               disabled={busy}
                               onClick={() => handleViewFile(f)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[12px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                               title="View in browser"
                             >
                               {busy ? <Spinner size="sm" /> : <i className="fas fa-eye" aria-hidden />}
@@ -715,7 +715,7 @@ export default function DocumentsPage() {
                             type="button"
                             disabled={busy}
                             onClick={() => handleDownloadFile(f)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[11px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-[12px] font-medium text-gray-700 disabled:opacity-40 transition-colors"
                             title="Download file"
                           >
                             {busy ? <Spinner size="sm" /> : <i className="fas fa-download" aria-hidden />}
@@ -726,7 +726,7 @@ export default function DocumentsPage() {
                               type="button"
                               disabled={deletingFile === f.id}
                               onClick={() => handleDeleteFile(f)}
-                              className="text-gray-500 hover:text-red-500 text-[12px] disabled:opacity-40 transition-colors"
+                              className="text-gray-500 hover:text-red-500 text-[13px] disabled:opacity-40 transition-colors"
                               title="Remove attachment"
                             >
                               {deletingFile === f.id
@@ -750,24 +750,24 @@ export default function DocumentsPage() {
       {canUpload && record?.pipeline_status === "declined" && (
         <div className="mt-6 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-4">
           <div>
-            <p className="text-[13px] font-semibold text-amber-800">
+            <p className="text-[14px] font-semibold text-amber-800">
               <i className="fas fa-redo mr-1.5" aria-hidden />
               Ready to resubmit?
             </p>
-            <p className="text-[12px] text-amber-700 mt-0.5">
+            <p className="text-[13px] text-amber-700 mt-0.5">
               Upload your revised documents above, then click Resubmit to send the record back for review.
             </p>
             {resubmitError && (
-              <p className="text-[12px] text-red-600 mt-1">{resubmitError}</p>
+              <p className="text-[13px] text-red-600 mt-1">{resubmitError}</p>
             )}
           </div>
           <button
             type="button"
             onClick={handleResubmit}
             disabled={resubmitting}
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-[12px] font-semibold hover:bg-amber-700 transition-colors disabled:opacity-60"
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-[13px] font-semibold hover:bg-amber-700 transition-colors disabled:opacity-60"
           >
-            <i className="fas fa-redo text-[11px]" aria-hidden />
+            <i className="fas fa-redo text-[12px]" aria-hidden />
             {resubmitting ? "Resubmitting..." : "Resubmit for Review"}
           </button>
         </div>

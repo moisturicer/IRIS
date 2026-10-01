@@ -116,7 +116,7 @@ export function RecordDetailsStep() {
           {isProposal ? (
             <span className="text-brand">*</span>
           ) : (
-            <span className="text-stone-500 font-normal text-[12px]">
+            <span className="text-stone-500 font-normal text-[13px]">
               {selectedTypeName ? "(optional for this record type)" : "(select record type first)"}
             </span>
           )}
@@ -135,7 +135,7 @@ export function RecordDetailsStep() {
         </select>
         {errors.adviser && <FieldError>{errors.adviser.message}</FieldError>}
         {isProposal && (
-          <p className="text-[11px] text-stone-500 mt-0.5">
+          <p className="text-[12px] text-stone-500 mt-0.5">
             Proposal records must have an assigned adviser before submission.
           </p>
         )}
@@ -152,13 +152,13 @@ export function RecordDetailsStep() {
             onChange={(e) => setAuthorInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAuthor())}
             placeholder="Type author name and press Enter or Add"
-            className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-[13px] text-stone-900 outline-none
+            className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-[14px] text-stone-900 outline-none
               placeholder:text-stone-500 focus:border-brand focus:ring-1 focus:ring-brand"
           />
           <button
             type="button"
             onClick={addAuthor}
-            className="px-3 py-2 bg-stone-100 rounded-lg text-[13px] text-stone-700 hover:bg-stone-200"
+            className="px-3 py-2 bg-stone-100 rounded-lg text-[14px] text-stone-700 hover:bg-stone-200"
           >
             Add
           </button>
@@ -170,7 +170,7 @@ export function RecordDetailsStep() {
             {authors.map((a, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-100 rounded-full text-[12px] text-stone-700"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-100 rounded-full text-[13px] text-stone-700"
               >
                 {a}
                 <button
@@ -179,7 +179,7 @@ export function RecordDetailsStep() {
                   className="text-stone-500 hover:text-stone-900"
                   aria-label={`Remove author ${a}`}
                 >
-                  <i className="fa fa-times text-[10px]" aria-hidden />
+                  <i className="fa fa-times text-[11px]" aria-hidden />
                 </button>
               </span>
             ))}

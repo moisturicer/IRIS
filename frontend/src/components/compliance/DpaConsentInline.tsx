@@ -23,12 +23,12 @@ export function DpaConsentInline({ accepted, onAcceptedChange }: DpaConsentInlin
   return (
     <section className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
       <div className="flex items-start gap-2.5 mb-3">
-        <i className="fas fa-scale-balanced text-brand text-[14px] mt-0.5" aria-hidden />
+        <i className="fas fa-scale-balanced text-brand text-[15px] mt-0.5" aria-hidden />
         <div>
-          <h3 className="text-[13px] font-bold text-stone-900">
+          <h3 className="text-[14px] font-bold text-stone-900">
             Institutional Consent &amp; Compliance Statements
           </h3>
-          <p className="text-[12px] text-stone-500 mt-0.5">
+          <p className="text-[13px] text-stone-500 mt-0.5">
             Data Privacy &amp; Research Integrity Agreement — RA 10173.
           </p>
         </div>
@@ -39,16 +39,16 @@ export function DpaConsentInline({ accepted, onAcceptedChange }: DpaConsentInlin
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-controls={textId}
-        className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:underline"
+        className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:underline"
       >
-        <i className={`fas fa-chevron-${expanded ? "up" : "down"} text-[10px]`} aria-hidden />
+        <i className={`fas fa-chevron-${expanded ? "up" : "down"} text-[11px]`} aria-hidden />
         {expanded ? "Hide full DPA terms" : "View DPA terms · expand"}
       </button>
 
       {expanded && (
         <div
           id={textId}
-          className="mb-3 max-h-64 overflow-y-auto rounded-lg border border-stone-200 bg-white p-3.5 text-[12px] text-stone-600 leading-relaxed space-y-3"
+          className="mb-3 max-h-64 overflow-y-auto rounded-lg border border-stone-200 bg-white p-3.5 text-[13px] text-stone-600 leading-relaxed space-y-3"
         >
           {DPA_SECTIONS.map((section) => (
             <div key={section.title}>
@@ -74,7 +74,7 @@ export function DpaConsentInline({ accepted, onAcceptedChange }: DpaConsentInlin
           aria-describedby={`${textId}-label`}
           className="mt-0.5 w-4 h-4 rounded border-stone-300 text-brand accent-brand focus:ring-brand cursor-pointer"
         />
-        <span id={`${textId}-label`} className="text-[12px] text-stone-700 leading-relaxed group-hover:text-stone-900">
+        <span id={`${textId}-label`} className="text-[13px] text-stone-700 leading-relaxed group-hover:text-stone-900">
           {DPA_CHECKBOX_LABEL}
         </span>
       </label>

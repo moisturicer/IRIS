@@ -43,13 +43,15 @@ export default {
       },
 
       fontSize: {
-        // Keep consistent with the 13px base used across components
-        "2xs": ["11px", { lineHeight: "16px" }],
-        xs:   ["12px", { lineHeight: "16px" }],
-        sm:   ["13px", { lineHeight: "20px" }],
-        base: ["14px", { lineHeight: "20px" }],
-        md:   ["15px", { lineHeight: "22px" }],
-        lg:   ["16px", { lineHeight: "24px" }],
+        // Raised one step in IR-452; components carry the same sizes inline,
+        // so the two move together or the app renders at two scales.
+        "3xs": ["11px", { lineHeight: "15px" }],
+        "2xs": ["12px", { lineHeight: "17px" }],
+        xs:   ["13px", { lineHeight: "18px" }],
+        sm:   ["14px", { lineHeight: "21px" }],
+        base: ["15px", { lineHeight: "22px" }],
+        md:   ["16px", { lineHeight: "24px" }],
+        lg:   ["17px", { lineHeight: "26px" }],
       },
 
       borderRadius: {
@@ -73,45 +75,112 @@ export default {
 
       // Answer Markdown (IR-450). Used with `prose-sm`, whose 14px base is
       // the repo's `base` size; only colours and structure are set here.
-      typography: ({ theme }) => ({
-        DEFAULT: {
-          css: {
-            color: theme("colors.stone.700"),
-            maxWidth: "none",
-            "h1, h2, h3, h4": { color: theme("colors.stone.900"), fontWeight: "600" },
-            strong: { color: theme("colors.stone.900") },
-            "ul > li::marker, ol > li::marker": { color: theme("colors.stone.400") },
-            blockquote: {
-              fontStyle: "normal",
-              fontWeight: "400",
-              color: theme("colors.stone.600"),
-              borderLeftColor: theme("colors.gold.DEFAULT"),
-            },
-            "blockquote p:first-of-type::before": { content: "none" },
-            "blockquote p:last-of-type::after": { content: "none" },
-            "code::before": { content: "none" },
-            "code::after": { content: "none" },
-            code: {
-              color: theme("colors.brand.DEFAULT"),
-              backgroundColor: theme("colors.gray.100"),
-              borderRadius: "0.25rem",
-              padding: "0.125rem 0.25rem",
-              fontWeight: "500",
-            },
-            table: { width: "100%" },
-            "thead th": {
-              color: theme("colors.stone.900"),
-              backgroundColor: theme("colors.stone.50"),
-              fontWeight: "600",
-            },
-            "th, td": {
-              border: `1px solid ${theme("colors.stone.200")}`,
-              padding: "0.375rem 0.625rem",
-            },
-            "thead, tbody tr": { borderBottomWidth: "0" },
+      // Answer Markdown (IR-450/451/452). Used with `prose-base`, whose 16px
+      // base is a reading size; the interface around it stays on its own scale.
+      typography: ({ theme }) => {
+        // Typography zeroes the outer padding of the first and last cell so a
+        // prose table lines up with the text column. A bordered table needs it
+        // back, or the first column sits flush against its own border. These
+        // keys match the plugin's exactly so the values merge in place.
+        const cells = {
+          "thead th": {
+            paddingTop: "0.4rem",
+            paddingBottom: "0.4rem",
+            paddingInlineStart: "0.7rem",
+            paddingInlineEnd: "0.7rem",
           },
-        },
-      }),
+          "thead th:first-child": { paddingInlineStart: "0.7rem" },
+          "thead th:last-child": { paddingInlineEnd: "0.7rem" },
+          "tbody td, tfoot td": {
+            paddingTop: "0.4rem",
+            paddingBottom: "0.4rem",
+            paddingInlineStart: "0.7rem",
+            paddingInlineEnd: "0.7rem",
+          },
+          "tbody td:first-child, tfoot td:first-child": { paddingInlineStart: "0.7rem" },
+          "tbody td:last-child, tfoot td:last-child": { paddingInlineEnd: "0.7rem" },
+        };
+
+        // Every gap roughly halved, and a heading's own space moved above it:
+        // symmetric margins leave a heading floating between two sections
+        // instead of sitting with the text it introduces (IR-452).
+        const rhythm = {
+          h1: { marginBottom: "0.25em" },
+          h2: { marginTop: "1.2em", marginBottom: "0.25em" },
+          h3: { marginTop: "1em", marginBottom: "0.2em" },
+          h4: { marginTop: "1em", marginBottom: "0.2em" },
+          "h1 + *, h2 + *, h3 + *, h4 + *": { marginTop: "0" },
+          p: { marginTop: "0.7em", marginBottom: "0.7em" },
+          "ul, ol": { marginTop: "0.7em", marginBottom: "0.7em" },
+          "li": { marginTop: "0.2em", marginBottom: "0.2em" },
+          blockquote: { marginTop: "0.9em", marginBottom: "0.9em" },
+          pre: { marginTop: "0.9em", marginBottom: "0.9em" },
+          hr: { marginTop: "1.2em", marginBottom: "1.2em" },
+        };
+
+        // `prose-base` restates sizes, cell padding and every one of these
+        // margins after DEFAULT, so anything set here has to be repeated
+        // there or the later rule wins on source order.
+        const restated = {
+          table: { width: "100%", fontSize: "0.95em", lineHeight: "1.6", marginTop: "1em", marginBottom: "1em" },
+          ...rhythm,
+          ...cells,
+        };
+
+        return {
+          DEFAULT: {
+            css: {
+              color: theme("colors.stone.700"),
+              maxWidth: "none",
+              "h1, h2, h3, h4": {
+                color: theme("colors.brand.DEFAULT"),
+                // The same face the paper view gives a title (IR-356).
+                fontFamily: theme("fontFamily.display").join(", "),
+                // Only EB Garamond 600 is loaded; see main.tsx.
+                fontWeight: "600",
+              },
+              // A rule under the top two levels is what makes a section start
+              // read as one, rather than as a bold line in the prose.
+              "h1, h2": {
+                borderBottom: `1px solid ${theme("colors.stone.200")}`,
+                paddingBottom: "0.25em",
+              },
+              // A model-written `---` under a heading repeats the rule the
+              // heading already draws, and spends 3em of blank page doing it.
+              "h1 + hr, h2 + hr": { display: "none" },
+              // Whatever follows a rule starts against it, not a line later.
+              "hr + *": { marginTop: "0" },
+              strong: { color: theme("colors.stone.900") },
+              "ul > li::marker, ol > li::marker": { color: theme("colors.stone.400") },
+              blockquote: {
+                fontStyle: "normal",
+                fontWeight: "400",
+                color: theme("colors.stone.600"),
+                borderLeftColor: theme("colors.gold.DEFAULT"),
+              },
+              "blockquote p:first-of-type::before": { content: "none" },
+              "blockquote p:last-of-type::after": { content: "none" },
+              "code::before": { content: "none" },
+              "code::after": { content: "none" },
+              code: {
+                color: theme("colors.brand.DEFAULT"),
+                backgroundColor: theme("colors.gray.100"),
+                borderRadius: "0.25rem",
+                padding: "0.125rem 0.25rem",
+                fontWeight: "500",
+              },
+              // Typography ships tables at 0.875em, which is the least legible
+              // thing in an answer; `restated` below raises it.
+              "tbody tr:nth-child(even)": { backgroundColor: theme("colors.stone.50") },
+              "thead th": { color: theme("colors.stone.900"), backgroundColor: theme("colors.stone.50"), fontWeight: "600" },
+              "th, td": { border: `1px solid ${theme("colors.stone.200")}` },
+              "thead, tbody tr": { borderBottomWidth: "0" },
+              ...restated,
+            },
+          },
+          base: { css: restated },
+        };
+      },
 
       keyframes: {
         "fade-in-up": {

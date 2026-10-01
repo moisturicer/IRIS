@@ -97,7 +97,7 @@ export default function EmailVerifyPage() {
         <div className="relative z-10">
           <img src={irisLogo} alt="IRIS" className="h-14 w-14 object-contain" />
 
-          <p className="mt-5 text-[11px] font-semibold tracking-[0.12em] text-gold uppercase leading-snug max-w-[280px]">
+          <p className="mt-5 text-[12px] font-semibold tracking-[0.12em] text-gold uppercase leading-snug max-w-[280px]">
             Cebu Institute of Technology – University
           </p>
 
@@ -108,19 +108,19 @@ export default function EmailVerifyPage() {
             </span>
           </h1>
 
-          <p className="mt-5 text-[14px] text-brand/90 leading-relaxed max-w-md">
+          <p className="mt-5 text-[15px] text-brand/90 leading-relaxed max-w-md">
             Email verification protects your research records and ensures only authorized
             CIT-U members can access the IRIS digital vault.
           </p>
 
           <blockquote className="mt-8 pl-5 border-l-4 border-gold max-w-md">
-            <p className="font-serif italic text-[14px] text-brand leading-relaxed">
+            <p className="font-serif italic text-[15px] text-brand leading-relaxed">
               &ldquo;One verified identity, one trusted gateway to your intellectual property.&rdquo;
             </p>
           </blockquote>
         </div>
 
-        <p className="relative z-10 text-[11px] text-gray-500 mt-10 lg:mt-0">
+        <p className="relative z-10 text-[12px] text-gray-500 mt-10 lg:mt-0">
           © 2026 Cebu Institute of Technology - University
         </p>
       </div>
@@ -134,12 +134,12 @@ export default function EmailVerifyPage() {
           </div>
 
           <h2 className="text-[28px] font-bold text-gray-900">{titles[status]}</h2>
-          <p className="mt-2 text-[14px] text-gray-500 leading-relaxed mb-8">
+          <p className="mt-2 text-[15px] text-gray-500 leading-relaxed mb-8">
             {subtitles[status]}
           </p>
 
           {status === "loading" && (
-            <p className="text-[13px] text-gray-500">
+            <p className="text-[14px] text-gray-500">
               This usually takes only a moment…
             </p>
           )}
@@ -147,7 +147,7 @@ export default function EmailVerifyPage() {
           {status === "success" && (
             <Link
               to="/login"
-              className="inline-flex w-full items-center justify-center py-3.5 rounded-lg text-[15px] font-semibold text-white
+              className="inline-flex w-full items-center justify-center py-3.5 rounded-lg text-[16px] font-semibold text-white
                 bg-gold hover:bg-gold-dark transition-colors"
             >
               Sign In
@@ -158,14 +158,14 @@ export default function EmailVerifyPage() {
             <div className="flex flex-col gap-3">
               <Link
                 to="/signup"
-                className="inline-flex w-full items-center justify-center py-3.5 rounded-lg text-[15px] font-semibold text-white
+                className="inline-flex w-full items-center justify-center py-3.5 rounded-lg text-[16px] font-semibold text-white
                   bg-gold hover:bg-gold-dark transition-colors"
               >
                 Register Again
               </Link>
               <Link
                 to="/login"
-                className="inline-flex w-full items-center justify-center py-3 rounded-lg text-[14px] font-semibold text-brand
+                className="inline-flex w-full items-center justify-center py-3 rounded-lg text-[15px] font-semibold text-brand
                   border border-gray-300 hover:bg-gray-50 transition-colors"
               >
                 Sign In
@@ -175,7 +175,7 @@ export default function EmailVerifyPage() {
 
           {status !== "loading" && (
             <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-              <p className="text-[14px] text-gray-500">
+              <p className="text-[15px] text-gray-500">
                 {status === "success" ? (
                   <>
                     Need a new account?{" "}

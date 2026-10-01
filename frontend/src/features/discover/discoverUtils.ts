@@ -126,7 +126,7 @@ export interface MetaBadge {
 
 export const BADGE_TONE_CLASS: Record<BadgeTone, string> = {
   // Field of research — outlined, uppercase, the quietest but most frequent
-  topic:      "border border-brand-200 text-brand bg-white uppercase tracking-wider text-[10px]",
+  topic:      "text-brand bg-white uppercase tracking-wider text-[11px]",
   // Kind of work (Thesis / Project / Proposal) — solid dark, high contrast
   type:       "bg-slate-900 text-white",
   // Pill colour matches its icon so the two never disagree

@@ -23,7 +23,7 @@ const VARIANT_CLASSES: Record<BadgeVariant, string> = {
 export function Badge({ variant = "default", children, className = "" }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium
         ${VARIANT_CLASSES[variant]} ${className}`}
     >
       {children}

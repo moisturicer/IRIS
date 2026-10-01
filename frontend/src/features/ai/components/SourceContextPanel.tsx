@@ -47,8 +47,8 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
       <div className="w-[min(100vw,320px)] sm:w-[300px] flex flex-col h-full">
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60 bg-white">
         <div>
-          <h2 className="text-[13px] font-bold text-stone-800">Referenced passages</h2>
-          <p className="text-[11px] text-stone-500 mt-0.5">
+          <h2 className="text-[14px] font-bold text-stone-800">Referenced passages</h2>
+          <p className="text-[12px] text-stone-500 mt-0.5">
             The exact text behind the latest answer
           </p>
         </div>
@@ -58,13 +58,13 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
           className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
           aria-label="Hide sources panel"
         >
-          <i className="fas fa-xmark text-[13px]" aria-hidden />
+          <i className="fas fa-xmark text-[14px]" aria-hidden />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5">
         {citations.length === 0 && (
-          <p className="text-[13px] text-stone-500 text-center py-8 px-2">
+          <p className="text-[14px] text-stone-500 text-center py-8 px-2">
             Ask a question to see the passages IRIS used in its answer.
           </p>
         )}
@@ -79,18 +79,18 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
               className="pb-2.5 border-b border-stone-100 last:border-b-0 last:pb-0"
             >
               <div className="flex items-start justify-between gap-2">
-                <h3 className="text-[13px] font-semibold text-stone-900 leading-snug line-clamp-2">
+                <h3 className="text-[14px] font-semibold text-stone-900 leading-snug line-clamp-2">
                   <span aria-hidden className="text-[#6B0F12] mr-1">[{citation.marker}]</span>
                   {card?.title ?? (hasQuote ? citation.record_title : "Source")}
                 </h3>
                 {citation.page != null && (
-                  <span className="shrink-0 text-[10px] font-semibold text-stone-400">
+                  <span className="shrink-0 text-[11px] font-semibold text-stone-400">
                     Page {citation.page}
                   </span>
                 )}
               </div>
               {card?.authors && (
-                <p className="text-[11px] text-stone-500 mt-0.5 line-clamp-1">{card.authors}</p>
+                <p className="text-[12px] text-stone-500 mt-0.5 line-clamp-1">{card.authors}</p>
               )}
 
               {hasQuote && <PassageQuote text={citation.text} className="mt-1" />}

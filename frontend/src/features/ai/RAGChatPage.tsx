@@ -269,7 +269,7 @@ export default function RAGChatPage() {
           {legacyNotice.visible && (
             <div
               role="status"
-              className="shrink-0 flex items-start gap-2 px-4 py-2 bg-stone-50 border-b border-stone-200 text-[12px] text-stone-600"
+              className="shrink-0 flex items-start gap-2 px-4 py-2 bg-stone-50 border-b border-stone-200 text-[13px] text-stone-600"
             >
               <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
               <p className="flex-1">
@@ -283,7 +283,7 @@ export default function RAGChatPage() {
                 aria-label="Dismiss"
                 className="text-stone-400 hover:text-stone-700 shrink-0"
               >
-                <i className="fas fa-xmark text-[11px]" aria-hidden />
+                <i className="fas fa-xmark text-[12px]" aria-hidden />
               </button>
             </div>
           )}
@@ -291,7 +291,7 @@ export default function RAGChatPage() {
           {status?.disclosure_bypass && (
             <div
               role="status"
-              className="shrink-0 flex items-start gap-2 px-4 py-2 bg-rose-50 border-b border-rose-200 text-[12px] text-rose-900"
+              className="shrink-0 flex items-start gap-2 px-4 py-2 bg-rose-50 border-b border-rose-200 text-[13px] text-rose-900"
             >
               <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
               <p>
@@ -303,7 +303,7 @@ export default function RAGChatPage() {
           )}
 
           {status && !status.generative && (
-            <div className="shrink-0 flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[12px] text-amber-800">
+            <div className="shrink-0 flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[13px] text-amber-800">
               <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
               <p>
                 <strong>Retrieval-only mode.</strong> IRIS finds and ranks real passages, but no

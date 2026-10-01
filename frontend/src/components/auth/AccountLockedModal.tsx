@@ -57,7 +57,7 @@ export function AccountLockedModal({ open, onClose, unlockAt }: AccountLockedMod
         <h2 id="lockout-title" className="text-[20px] font-bold text-stone-900">
           Account Locked
         </h2>
-        <p className="mt-3 text-[14px] text-stone-600 leading-relaxed">
+        <p className="mt-3 text-[15px] text-stone-600 leading-relaxed">
           Too many failed login attempts. Please try again in{" "}
           <span className="font-bold text-brand tabular-nums">{formatCountdown(remaining)}</span>
         </p>
@@ -65,7 +65,7 @@ export function AccountLockedModal({ open, onClose, unlockAt }: AccountLockedMod
         <button
           type="button"
           onClick={onClose}
-          className="mt-8 w-full py-3 rounded-lg text-[14px] font-semibold text-stone-700
+          className="mt-8 w-full py-3 rounded-lg text-[15px] font-semibold text-stone-700
             bg-stone-100 hover:bg-stone-200 transition-colors"
         >
           Close

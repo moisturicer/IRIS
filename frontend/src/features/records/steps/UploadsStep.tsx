@@ -178,7 +178,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
     <div className="border border-stone-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-stone-50 border-b border-stone-200">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-stone-800">
+          <span className="text-[14px] font-semibold text-stone-800">
             Full Research Manuscript / Final Paper
           </span>
           {/* A requirement, not a failure: soft maroon, so it does not wear
@@ -195,8 +195,8 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
         ) : manuscript && !manuscript.error ? (
           <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg border border-stone-200">
             <i className="fa fa-file-pdf text-stone-500" aria-hidden />
-            <span className="text-[13px] text-stone-700 flex-1 truncate">{manuscript.file.name}</span>
-            <button type="button" onClick={removeManuscript} className="text-stone-500 hover:text-brand text-[12px]" aria-label="Remove manuscript">
+            <span className="text-[14px] text-stone-700 flex-1 truncate">{manuscript.file.name}</span>
+            <button type="button" onClick={removeManuscript} className="text-stone-500 hover:text-brand text-[13px]" aria-label="Remove manuscript">
               <i className="fa fa-times" aria-hidden />
             </button>
           </div>
@@ -219,7 +219,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
   return (
     <div className="flex flex-col gap-5">
       {!recordId && (
-        <div className="px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-[13px] text-stone-700">
+        <div className="px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-[14px] text-stone-700">
           <i className="fa fa-info-circle mr-2" aria-hidden />
           {hideSlots
             ? "Your manuscript is uploaded once the record is saved."
@@ -230,12 +230,12 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
       {manuscriptCard}
 
       {hideSlots ? (
-        <p className="text-[12px] text-stone-500 leading-relaxed">
+        <p className="text-[13px] text-stone-500 leading-relaxed">
           Other documents an office needs — an ethics clearance form, a similarity report — are
           requested once your disclosure is routed there, from this record's Documents page.
         </p>
       ) : slots.length === 0 ? (
-        <p className="text-[13px] text-stone-500 text-center py-4">
+        <p className="text-[14px] text-stone-500 text-center py-4">
           No additional documents are required for this type.
         </p>
       ) : (
@@ -247,7 +247,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
             <div key={slot.id} className="border border-stone-200 rounded-xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 bg-stone-50 border-b border-stone-200">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-semibold text-stone-800">{slot.name}</span>
+                  <span className="text-[14px] font-semibold text-stone-800">{slot.name}</span>
                   {/* Only mark what is genuinely required. Every slot used to
                       carry a badge, so an "Optional" one said nothing and a
                       "Required" one was false -- 37 of 41 slots claimed to be
@@ -269,7 +269,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                 ) : file && !file.error ? (
                   <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg border border-stone-200">
                     <i className="fa fa-file text-stone-500" aria-hidden />
-                    <span className="text-[13px] text-stone-700 flex-1 truncate">{file.file.name}</span>
+                    <span className="text-[14px] text-stone-700 flex-1 truncate">{file.file.name}</span>
                     <button
                       type="button"
                       onClick={() => setStaged((prev) => {
@@ -278,7 +278,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                         return next;
                       })}
                       aria-label={`Remove ${slot.name}`}
-                      className="text-stone-500 hover:text-brand text-[12px]"
+                      className="text-stone-500 hover:text-brand text-[13px]"
                     >
                       <i className="fa fa-times" aria-hidden />
                     </button>

@@ -72,7 +72,7 @@ export default function DeleteRequestsPage() {
       />
 
       {/* Danger notice */}
-      <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[13px] text-red-700 flex items-start gap-2">
+      <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[14px] text-red-700 flex items-start gap-2">
         <i className="fas fa-exclamation-triangle mt-0.5 flex-shrink-0" aria-hidden />
         <span>
           Approving a deletion <strong>permanently removes</strong> the record from the system.
@@ -88,7 +88,7 @@ export default function DeleteRequestsPage() {
             key={s}
             type="button"
             onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-[13px] font-semibold border transition-colors ${
               filterStatus === s
                 ? "bg-[#6B0F12] text-white border-[#6B0F12]"
                 : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
@@ -101,15 +101,15 @@ export default function DeleteRequestsPage() {
           type="button"
           onClick={load}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-gray-500 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-gray-500 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50"
         >
-          <i className={`fas fa-sync-alt text-[11px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[13px] text-red-700">
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[14px] text-red-700">
           {error}
         </div>
       )}
@@ -125,13 +125,13 @@ export default function DeleteRequestsPage() {
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
-            <span className="text-[12px] text-gray-500 font-medium">
+            <span className="text-[13px] text-gray-500 font-medium">
               {requests.length} request{requests.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-left">
                   <th className="px-4 py-3 font-semibold text-gray-600">Record</th>
@@ -156,20 +156,20 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800">{req.requested_by_name ?? "—"}</p>
-                      <p className="text-[11px] text-gray-500">{req.requested_by_email}</p>
+                      <p className="text-[12px] text-gray-500">{req.requested_by_email}</p>
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
                       {req.reason ? (
-                        <p className="text-gray-600 line-clamp-2 text-[12px]">{req.reason}</p>
+                        <p className="text-gray-600 line-clamp-2 text-[13px]">{req.reason}</p>
                       ) : (
-                        <span className="text-gray-500 italic text-[12px]">No reason given</span>
+                        <span className="text-gray-500 italic text-[13px]">No reason given</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                       {formatDate(req.created_at)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${STATUS_STYLES[req.status]}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold border ${STATUS_STYLES[req.status]}`}>
                         {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
                       </span>
                     </td>
@@ -179,7 +179,7 @@ export default function DeleteRequestsPage() {
                           type="button"
                           onClick={() => handleApprove(req)}
                           disabled={approving === req.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium
                             text-red-600 border border-red-200 rounded-lg hover:bg-red-50
                             disabled:opacity-50 transition-colors"
                         >
@@ -188,7 +188,7 @@ export default function DeleteRequestsPage() {
                             : <><i className="fas fa-trash-alt" aria-hidden /> Approve Deletion</>}
                         </button>
                       ) : (
-                        <span className="text-[12px] text-gray-500 italic">
+                        <span className="text-[13px] text-gray-500 italic">
                           {req.reviewed_at ? formatDate(req.reviewed_at) : "Processed"}
                         </span>
                       )}

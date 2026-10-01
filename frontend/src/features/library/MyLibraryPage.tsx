@@ -213,10 +213,10 @@ export default function MyLibraryPage() {
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
         <div>
           <h1 className="text-[20px] font-bold text-stone-900 flex items-center gap-2">
-            <i className="fas fa-bookmark text-[15px] text-brand" aria-hidden />
+            <i className="fas fa-bookmark text-[16px] text-brand" aria-hidden />
             My Library
           </h1>
-          <p className="text-[13px] text-stone-500 mt-1">
+          <p className="text-[14px] text-stone-500 mt-1">
             Saved research, likes and folders — stored in this browser only.
           </p>
         </div>
@@ -248,9 +248,9 @@ export default function MyLibraryPage() {
           <button
             type="button"
             onClick={() => setRailOpen(true)}
-            className="mb-4 lg:mb-0 lg:shrink-0 flex items-center gap-2 px-3 py-2 bg-white border border-stone-200 rounded-xl text-[13px] font-semibold text-stone-600 hover:border-stone-300"
+            className="mb-4 lg:mb-0 lg:shrink-0 flex items-center gap-2 px-3 py-2 bg-white border border-stone-200 rounded-xl text-[14px] font-semibold text-stone-600 hover:border-stone-300"
           >
-            <i className="fas fa-angles-right text-[12px] text-stone-400" aria-hidden />
+            <i className="fas fa-angles-right text-[13px] text-stone-400" aria-hidden />
             Folders
             <span className="text-stone-400 font-medium truncate max-w-[10rem]">{viewTitle}</span>
           </button>
@@ -260,22 +260,22 @@ export default function MyLibraryPage() {
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <div className="relative flex-1 min-w-[12rem]">
-              <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-stone-400" aria-hidden />
+              <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-stone-400" aria-hidden />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search all bookmarks and research…"
                 aria-label="Search your library"
-                className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-xl text-[13px] outline-none focus:border-brand/40 placeholder-stone-400"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-xl text-[14px] outline-none focus:border-brand/40 placeholder-stone-400"
               />
             </div>
 
-            <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+            <label className="flex items-center gap-1.5 text-[13px] text-stone-500">
               Sort
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortKey)}
-                className="bg-white border border-stone-200 rounded-lg px-2 py-1.5 text-[12px] text-stone-700 outline-none focus:border-brand/40"
+                className="bg-white border border-stone-200 rounded-lg px-2 py-1.5 text-[13px] text-stone-700 outline-none focus:border-brand/40"
               >
                 {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
                   <option key={key} value={key}>
@@ -298,7 +298,7 @@ export default function MyLibraryPage() {
                     layout === mode ? "bg-brand-50 text-brand" : "text-stone-400 hover:text-stone-600",
                   )}
                 >
-                  <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-[12px]")} aria-hidden />
+                  <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-[13px]")} aria-hidden />
                 </button>
               ))}
             </div>
@@ -306,9 +306,9 @@ export default function MyLibraryPage() {
 
           {/* Section heading */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <h2 className="text-[15px] font-bold text-stone-900">
+            <h2 className="text-[16px] font-bold text-stone-900">
               {viewTitle}
-              <span className="ml-2 text-[12px] font-medium text-stone-400">
+              <span className="ml-2 text-[13px] font-medium text-stone-400">
                 {loading ? "loading…" : `${visible.length} record${visible.length === 1 ? "" : "s"}`}
               </span>
             </h2>
@@ -320,7 +320,7 @@ export default function MyLibraryPage() {
                   clearReadingHistory();
                   setHistory([]);
                 }}
-                className="text-[12px] font-semibold text-stone-500 hover:text-brand"
+                className="text-[13px] font-semibold text-stone-500 hover:text-brand"
               >
                 Clear history
               </button>
@@ -330,20 +330,20 @@ export default function MyLibraryPage() {
           {/* Bulk bar — only appears once a selection exists */}
           {selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-3 px-3 py-2 bg-brand-50 border border-brand-200 rounded-xl">
-              <span className="text-[12px] font-semibold text-brand">
+              <span className="text-[13px] font-semibold text-brand">
                 {selected.size} selected
               </span>
               <button
                 type="button"
                 onClick={() => handleRemove([...selected])}
-                className="ml-auto px-2.5 py-1 rounded-lg bg-white border border-brand-200 text-[12px] font-semibold text-brand hover:bg-brand-50"
+                className="ml-auto px-2.5 py-1 rounded-lg bg-white border border-brand-200 text-[13px] font-semibold text-brand hover:bg-brand-50"
               >
                 {view.kind === "starred" ? "Unlike" : "Remove from library"}
               </button>
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
-                className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-stone-500 hover:text-stone-700"
+                className="px-2.5 py-1 rounded-lg text-[13px] font-semibold text-stone-500 hover:text-stone-700"
               >
                 Clear
               </button>
@@ -351,7 +351,7 @@ export default function MyLibraryPage() {
           )}
 
           {unavailable > 0 && !loading && !failed && (
-            <p className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-800">
+            <p className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[13px] text-amber-800">
               <i className="fas fa-eye-slash mr-1.5" aria-hidden />
               {unavailable} saved {unavailable === 1 ? "record is" : "records are"} no longer
               available to you — {unavailable === 1 ? "it may have" : "they may have"} been
@@ -374,14 +374,14 @@ export default function MyLibraryPage() {
           ) : failed ? (
             <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center">
               <i className="fas fa-plug-circle-xmark text-[22px] text-stone-300 mb-3" aria-hidden />
-              <p className="text-[14px] font-semibold text-stone-700">Could not load your library</p>
-              <p className="text-[12px] text-stone-500 mt-1">
+              <p className="text-[15px] font-semibold text-stone-700">Could not load your library</p>
+              <p className="text-[13px] text-stone-500 mt-1">
                 Your saved records are still stored in this browser — only fetching them failed.
               </p>
               <button
                 type="button"
                 onClick={() => void load()}
-                className="mt-3 text-[12px] font-semibold text-brand hover:underline"
+                className="mt-3 text-[13px] font-semibold text-brand hover:underline"
               >
                 Try again
               </button>
@@ -393,10 +393,10 @@ export default function MyLibraryPage() {
                   "fas text-[22px] text-stone-300 mb-3",
                   query ? "fa-magnifying-glass" : "fa-folder-open",
                 )} aria-hidden />
-              <p className="text-[14px] font-semibold text-stone-700">
+              <p className="text-[15px] font-semibold text-stone-700">
                 {query ? "No matches in this folder" : emptyCopy().title}
               </p>
-              <p className="text-[12px] text-stone-500 mt-1">
+              <p className="text-[13px] text-stone-500 mt-1">
                 {query ? "Try a different title or author." : emptyCopy().message}
               </p>
             </div>

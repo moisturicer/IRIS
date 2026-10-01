@@ -102,13 +102,13 @@ export function Modal({ open, onClose, title, children, size = "max-w-lg" }: Mod
       >
         {title && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-            <h2 id={titleId} className="text-[15px] font-semibold text-gray-900">{title}</h2>
+            <h2 id={titleId} className="text-[16px] font-semibold text-gray-900">{title}</h2>
             <button
               onClick={onClose}
               className="p-1 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
               aria-label="Close"
             >
-              <i className="fa fa-times text-[14px]" aria-hidden />
+              <i className="fa fa-times text-[15px]" aria-hidden />
             </button>
           </div>
         )}

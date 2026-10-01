@@ -242,13 +242,13 @@ export default function DiscoverPage() {
         </button>
 
         <span className="w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
-          <i className="fas fa-compass text-[12px]" aria-hidden />
+          <i className="fas fa-compass text-[13px]" aria-hidden />
         </span>
         <div className="min-w-0">
-          <h1 className="text-[16px] font-bold text-stone-900 leading-tight truncate">
+          <h1 className="font-display text-[24px] font-semibold text-stone-900 leading-tight truncate">
             IRIS Discovery
           </h1>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 leading-tight">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 leading-tight">
             Institutional Knowledge Base
           </p>
         </div>
@@ -300,7 +300,7 @@ export default function DiscoverPage() {
                 type="button"
                 onClick={() => setView(tab.id)}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-colors",
+                  "px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-colors",
                   view === tab.id
                     ? "bg-white text-stone-900 shadow-card"
                     : "text-stone-500 hover:text-stone-900",
@@ -311,7 +311,7 @@ export default function DiscoverPage() {
             ))}
           </div>
 
-          <span className="ml-auto text-[12px] text-stone-400 font-medium whitespace-nowrap">
+          <span className="ml-auto text-[13px] text-stone-400 font-medium whitespace-nowrap">
             {loading ? "Loading…" : `${totalCount} record${totalCount === 1 ? "" : "s"}`}
           </span>
         </div>
@@ -360,7 +360,7 @@ export default function DiscoverPage() {
                   disabled={loadingMore}
                   className="px-5 py-2.5 rounded-full border border-stone-200 bg-white text-stone-700 hover:border-brand hover:text-brand text-xs font-bold transition disabled:opacity-60 flex items-center gap-2"
                 >
-                  {loadingMore ? <Spinner size="sm" /> : <i className="fas fa-arrow-down text-[10px]" aria-hidden />}
+                  {loadingMore ? <Spinner size="sm" /> : <i className="fas fa-arrow-down text-[11px]" aria-hidden />}
                   <span>{loadingMore ? "Loading…" : `Load more (${totalCount - records.length} left)`}</span>
                 </button>
               </div>
@@ -401,13 +401,13 @@ function EmptyState({
       >
         <i className={cn("fas", icon)} aria-hidden />
       </div>
-      <h3 className="text-[15px] font-bold text-stone-900">{title}</h3>
-      <p className="text-[13px] text-stone-500 mt-1 max-w-sm">{body}</p>
+      <h3 className="text-[16px] font-bold text-stone-900">{title}</h3>
+      <p className="text-[14px] text-stone-500 mt-1 max-w-sm">{body}</p>
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-4 px-4 py-2 bg-brand hover:bg-brand-light text-white text-[12px] font-bold rounded-lg transition"
+          className="mt-4 px-4 py-2 bg-brand hover:bg-brand-light text-white text-[13px] font-bold rounded-lg transition"
         >
           {action.label}
         </button>

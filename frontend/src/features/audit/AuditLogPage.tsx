@@ -30,7 +30,7 @@ const COLUMNS: ColumnDef<AuditEvent, unknown>[] = [
     header: "Time",
     accessorKey: "created_at",
     cell: ({ getValue }) => (
-      <span className="text-gray-500 text-[12px] whitespace-nowrap">
+      <span className="text-gray-500 text-[13px] whitespace-nowrap">
         {formatDate(getValue<string>())}
       </span>
     ),
@@ -66,7 +66,7 @@ const COLUMNS: ColumnDef<AuditEvent, unknown>[] = [
       const meta = getValue<Record<string, unknown>>();
       if (!meta || Object.keys(meta).length === 0) return <span className="text-gray-500">-</span>;
       return (
-        <span className="text-[12px] text-gray-500 font-mono truncate max-w-[180px] block">
+        <span className="text-[13px] text-gray-500 font-mono truncate max-w-[180px] block">
           {JSON.stringify(meta)}
         </span>
       );
@@ -112,13 +112,13 @@ export default function AuditLogPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          leading={<i className="fa fa-search text-[13px]" aria-hidden />}
+          leading={<i className="fa fa-search text-[14px]" aria-hidden />}
           className="max-w-xs"
         />
         <select
           value={eventType}
           onChange={(e) => { setEventType(e.target.value as AuditEventType | ""); setPage(1); }}
-          className="border border-gray-300 rounded-lg px-3 text-[13px] text-gray-700 outline-none
+          className="border border-gray-300 rounded-lg px-3 text-[14px] text-gray-700 outline-none
             focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12]"
         >
           <option value="">All events</option>

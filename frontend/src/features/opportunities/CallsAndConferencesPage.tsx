@@ -102,22 +102,22 @@ export function CallsAndConferencesPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
-                <i className="fas fa-bullhorn text-[10px]" aria-hidden />
+                <i className="fas fa-bullhorn text-[11px]" aria-hidden />
               </span>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-brand">
+              <span className="text-[12px] font-bold uppercase tracking-wider text-brand">
                 Institutional &amp; External Announcements
               </span>
             </div>
             <h1 className="text-2xl font-bold text-stone-900">Calls &amp; Conferences</h1>
-            <p className="text-[13px] text-stone-600 mt-1 max-w-2xl">
+            <p className="text-[14px] text-stone-600 mt-1 max-w-2xl">
               Internal research calls, upcoming conference deadlines, and competitive funding
               windows published by CIT-U offices and partner institutions.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 text-[12px] font-semibold rounded-lg border border-stone-200 px-3 py-2 shrink-0">
+          <div className="flex items-center gap-3 text-[13px] font-semibold rounded-lg border border-stone-200 px-3 py-2 shrink-0">
             <span className="flex items-center gap-1.5 text-stone-700">
-              <i className="fas fa-calendar-check text-brand text-[11px]" aria-hidden />
+              <i className="fas fa-calendar-check text-brand text-[12px]" aria-hidden />
               {activeCount} Active {activeCount === 1 ? "Call" : "Calls"}
             </span>
             <span className="w-px h-4 bg-stone-200" aria-hidden />
@@ -146,7 +146,7 @@ export function CallsAndConferencesPage() {
                   aria-selected={active}
                   onClick={() => setActiveType(tab.id)}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-colors",
+                    "px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-colors",
                     active
                       ? "bg-brand text-white"
                       : "text-stone-600 border border-stone-200 hover:bg-stone-50",
@@ -160,7 +160,7 @@ export function CallsAndConferencesPage() {
 
           <div className="relative ml-auto min-w-[200px] flex-1 sm:flex-none sm:w-[280px]">
             <i
-              className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-[11px]"
+              className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-[12px]"
               aria-hidden
             />
             <input
@@ -169,7 +169,7 @@ export function CallsAndConferencesPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search calls, keywords..."
               aria-label="Search calls and conferences"
-              className="w-full pl-8 pr-3 py-2 rounded-lg border border-stone-200 text-[12px]
+              className="w-full pl-8 pr-3 py-2 rounded-lg border border-stone-200 text-[13px]
                 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40"
             />
           </div>
@@ -192,17 +192,17 @@ export function CallsAndConferencesPage() {
       ) : error ? (
         <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
           <i className="fas fa-triangle-exclamation text-red-500 text-xl" aria-hidden />
-          <p className="text-[13px] text-stone-700 mt-2">{error}</p>
+          <p className="text-[14px] text-stone-700 mt-2">{error}</p>
         </div>
       ) : visible.length === 0 ? (
         <div className="bg-white rounded-xl border border-stone-200 p-10 text-center">
           <i className="fas fa-bullhorn text-stone-300 text-2xl" aria-hidden />
-          <p className="text-[13px] font-semibold text-stone-700 mt-3">
+          <p className="text-[14px] font-semibold text-stone-700 mt-3">
             {items.length === 0
               ? "No calls have been posted yet."
               : "Nothing matches these filters."}
           </p>
-          <p className="text-[12px] text-stone-500 mt-1">
+          <p className="text-[13px] text-stone-500 mt-1">
             {items.length === 0
               ? "RDCO, KTTO and advisers publish calls here as they open."
               : "Try a different type, or clear the search."}
@@ -211,7 +211,7 @@ export function CallsAndConferencesPage() {
             <button
               type="button"
               onClick={() => { setActiveType(null); setQuery(""); }}
-              className="mt-4 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold text-brand border border-brand-200 hover:bg-brand-50"
+              className="mt-4 px-3.5 py-1.5 rounded-lg text-[13px] font-semibold text-brand border border-brand-200 hover:bg-brand-50"
             >
               Clear filters
             </button>
@@ -259,7 +259,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
       <div className="flex items-center gap-2 flex-wrap">
         <span
           className={cn(
-            "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider",
+            "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider",
             o.is_closed ? "bg-stone-200 text-stone-600" : TYPE_BADGE_CLASS[o.opportunity_type],
           )}
         >
@@ -267,7 +267,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
         </span>
 
         {o.is_featured && !o.is_closed && (
-          <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-stone-900 text-white flex items-center gap-1">
+          <span className="px-2 py-1 rounded-md text-[11px] font-bold bg-stone-900 text-white flex items-center gap-1">
             <i className="fas fa-star text-[9px]" aria-hidden />
             Featured
           </span>
@@ -275,7 +275,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
 
         {o.source === "external" && (
           <span
-            className="px-2 py-1 rounded-md text-[10px] font-semibold border border-stone-200 text-stone-500"
+            className="px-2 py-1 rounded-md text-[11px] font-semibold border border-stone-200 text-stone-500"
             title="Published by an external body and reposted here"
           >
             External
@@ -284,16 +284,16 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
 
         <span
           className={cn(
-            "ml-auto px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5 shrink-0",
+            "ml-auto px-2.5 py-1 rounded-full text-[12px] font-semibold flex items-center gap-1.5 shrink-0",
             chip.className,
           )}
         >
-          <i className="far fa-clock text-[10px]" aria-hidden />
+          <i className="far fa-clock text-[11px]" aria-hidden />
           {chip.label}
         </span>
       </div>
 
-      <h2 className="text-[15px] font-bold text-stone-900 mt-3 leading-snug">{o.title}</h2>
+      <h2 className="text-[16px] font-bold text-stone-900 mt-3 leading-snug">{o.title}</h2>
 
       <dl className="mt-2.5 space-y-1.5">
         <MetaRow icon="fa-building-columns" label="Posting office">
@@ -310,7 +310,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
       </dl>
 
       {o.description && (
-        <p className="text-[12px] text-stone-600 leading-relaxed mt-3 line-clamp-3">
+        <p className="text-[13px] text-stone-600 leading-relaxed mt-3 line-clamp-3">
           {o.description}
         </p>
       )}
@@ -320,7 +320,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
           {o.tags.map((tag) => (
             <li
               key={tag}
-              className="px-2 py-0.5 rounded-md bg-stone-50 border border-stone-200 text-[10px] text-stone-500"
+              className="px-2 py-0.5 rounded-md bg-stone-50 border border-stone-200 text-[11px] text-stone-500"
             >
               #{tag}
             </li>
@@ -329,8 +329,8 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
       )}
 
       <footer className="flex items-center gap-2 mt-4 pt-3.5 border-t border-stone-100">
-        <span className="text-[11px] text-stone-500 flex items-center gap-1.5">
-          <i className="far fa-calendar text-[10px]" aria-hidden />
+        <span className="text-[12px] text-stone-500 flex items-center gap-1.5">
+          <i className="far fa-calendar text-[11px]" aria-hidden />
           Due: {formatDueDate(o.due_date)}
         </span>
 
@@ -346,7 +346,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
               saved ? "text-brand bg-brand-50" : "text-stone-400 hover:text-stone-700 hover:bg-stone-50",
             )}
           >
-            <i className={cn(saved ? "fas" : "far", "fa-bookmark text-[12px]")} aria-hidden />
+            <i className={cn(saved ? "fas" : "far", "fa-bookmark text-[13px]")} aria-hidden />
           </button>
 
           <button
@@ -359,7 +359,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
               hover:text-stone-700 hover:bg-stone-50 transition-colors disabled:opacity-50"
           >
             <i
-              className={cn(icsBusy ? "fas fa-spinner fa-spin" : "far fa-calendar-plus", "text-[12px]")}
+              className={cn(icsBusy ? "fas fa-spinner fa-spin" : "far fa-calendar-plus", "text-[13px]")}
               aria-hidden
             />
           </button>
@@ -370,7 +370,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                "px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ml-1",
+                "px-3.5 py-1.5 rounded-lg text-[13px] font-semibold transition-colors ml-1",
                 o.is_closed
                   ? "bg-stone-100 text-stone-500 hover:bg-stone-200"
                   : "bg-brand text-white hover:bg-brand-light",
@@ -382,7 +382,7 @@ function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownl
           ) : (
             // No link means the poster gave none — say so rather than render a
             // button that goes nowhere.
-            <span className="px-3 py-1.5 text-[11px] text-stone-400 ml-1">
+            <span className="px-3 py-1.5 text-[12px] text-stone-400 ml-1">
               Contact {o.posting_office.split("(")[0].trim()}
             </span>
           )}
@@ -396,8 +396,8 @@ function MetaRow({
   icon, label, children,
 }: { icon: string; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2 text-[12px] text-stone-600">
-      <i className={cn("fas", icon, "text-stone-400 text-[11px] mt-0.5 w-3.5 shrink-0")} aria-hidden />
+    <div className="flex items-start gap-2 text-[13px] text-stone-600">
+      <i className={cn("fas", icon, "text-stone-400 text-[12px] mt-0.5 w-3.5 shrink-0")} aria-hidden />
       <dt className="sr-only">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>

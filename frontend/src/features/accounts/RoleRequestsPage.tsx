@@ -61,12 +61,12 @@ export default function RoleRequestsPage() {
       ) : requests.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
           <i className="fas fa-check-circle text-[32px] text-green-400 mb-3 block" aria-hidden />
-          <p className="text-[14px] font-medium text-gray-700">All caught up!</p>
-          <p className="text-[12px] text-gray-500 mt-1">No pending role requests.</p>
+          <p className="text-[15px] font-medium text-gray-700">All caught up!</p>
+          <p className="text-[13px] text-gray-500 mt-1">No pending role requests.</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[14px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left px-5 py-3 font-semibold text-gray-600">User</th>
@@ -83,7 +83,7 @@ export default function RoleRequestsPage() {
                     <div className="font-medium text-gray-900">{req.user_name}</div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-[#6B0F12] border border-red-100">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-red-50 text-[#6B0F12] border border-red-100">
                       {req.role_name}
                     </span>
                   </td>

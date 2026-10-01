@@ -12,7 +12,7 @@ export function Breadcrumbs() {
 
   return (
     <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex flex-wrap items-center gap-1.5 text-[12px] text-gray-500">
+      <ol className="flex flex-wrap items-center gap-1.5 text-[13px] text-gray-500">
         <li>
           <Link to="/" className="hover:text-brand transition-colors font-medium">
             Home

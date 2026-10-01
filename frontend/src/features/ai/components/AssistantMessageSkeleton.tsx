@@ -8,7 +8,7 @@ export function AssistantMessageSkeleton() {
         <SynthesisIcon className="w-[18px] h-[18px]" spinning />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium text-stone-500 mb-2.5">
+        <p className="text-[14px] font-medium text-stone-500 mb-2.5">
           Searching the CIT-U repository…
         </p>
         <div className="space-y-2.5 animate-pulse motion-reduce:animate-none max-w-lg">

@@ -27,7 +27,7 @@ export function ChatToolbar({
       <button
         type="button"
         onClick={onToggleHistory}
-        className={`p-2 rounded-lg text-[12px] transition-colors
+        className={`p-2 rounded-lg text-[13px] transition-colors
           ${historyOpen
             ? "bg-stone-100 text-stone-800"
             : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
@@ -41,19 +41,19 @@ export function ChatToolbar({
       </button>
 
       <div className="min-w-0 flex-1 px-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 truncate">
+        <p className="text-[12px] font-semibold uppercase tracking-wider text-stone-400 truncate">
           Ask IRIS
         </p>
-        <p className="text-[14px] font-semibold text-stone-900 truncate">{sessionTitle}</p>
+        <p className="text-[15px] font-semibold text-stone-900 truncate">{sessionTitle}</p>
       </div>
 
       <button
         type="button"
         onClick={onNewChat}
-        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold
+        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold
           text-stone-600 hover:bg-stone-50 border border-stone-200"
       >
-        <i className="fas fa-plus text-[10px]" aria-hidden />
+        <i className="fas fa-plus text-[11px]" aria-hidden />
         New chat
       </button>
 
@@ -61,7 +61,7 @@ export function ChatToolbar({
         type="button"
         onClick={onToggleSources}
         disabled={!sourcesAvailable}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-colors
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold transition-colors
           ${sourcesOpen && sourcesAvailable
             ? "bg-[#6B0F12]/10 text-[#6B0F12] ring-1 ring-[#6B0F12]/20"
             : "text-stone-600 hover:bg-stone-50 border border-stone-200"
@@ -71,7 +71,7 @@ export function ChatToolbar({
         aria-label={sourcesOpen ? "Hide sources" : "Show sources"}
         title={sourcesAvailable ? (sourcesOpen ? "Hide sources" : "Show sources") : "Sources appear after IRIS responds"}
       >
-        <i className="fas fa-layer-group text-[11px]" aria-hidden />
+        <i className="fas fa-layer-group text-[12px]" aria-hidden />
         <span className="hidden sm:inline">Sources</span>
       </button>
 
