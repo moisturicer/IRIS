@@ -7,12 +7,13 @@ isn't a pure unit test. `test_memory_http.py` covers the HTTP boundary.
 import logging
 
 import pytest
+from django.test import override_settings
 
-from apps.ai.memory import ConversationMemory
+from apps.ai.memory import DEFAULT_MAX_RECALL_DISTANCE, ConversationMemory
 from apps.ai.models import Conversation, Turn, TurnEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 
-from .corpus import make_user
+from .corpus import FLOOD_QUESTION, POND_QUESTION, make_user
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -104,6 +105,55 @@ class RecallingRelevantTurnsTests:
         )
 
         assert recalled == []
+
+
+class RelevanceCutOffTests:
+    """IR-446: the four closest Turns are not automatically the relevant ones."""
+
+    def _a_pond_turn_and_a_flood_question(self, embedder, space):
+        """One Turn the question is not about, which a cut-off must drop."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        _turn(conversation, POND_QUESTION, space=space, embedder=embedder)
+        return conversation, embedder.embed_query(FLOOD_QUESTION)
+
+    @override_settings(AI_MEMORY_RECALL_MAX_DISTANCE=0.8)
+    def test_a_turn_beyond_the_cut_off_is_not_recalled(self, embedder, space):
+        conversation, query = self._a_pond_turn_and_a_flood_question(embedder, space)
+
+        assert ConversationMemory().recall(conversation, query, space.pk) == []
+
+    @override_settings(AI_MEMORY_RECALL_MAX_DISTANCE=0.8)
+    def test_a_turn_within_the_cut_off_is_recalled_unaffected(self, embedder, space):
+        conversation, query = self._a_pond_turn_and_a_flood_question(embedder, space)
+        flood_turn = _turn(conversation, FLOOD_QUESTION, space=space, embedder=embedder)
+
+        recalled = ConversationMemory().recall(conversation, query, space.pk)
+
+        assert [turn.pk for turn in recalled] == [flood_turn.pk]
+
+    def test_the_cut_off_is_read_per_request_not_bound_at_construction(
+        self, embedder, space
+    ):
+        conversation, query = self._a_pond_turn_and_a_flood_question(embedder, space)
+        memory = ConversationMemory()
+
+        with override_settings(AI_MEMORY_RECALL_MAX_DISTANCE=0.8):
+            assert memory.recall(conversation, query, space.pk) == []
+        with override_settings(AI_MEMORY_RECALL_MAX_DISTANCE=2.0):
+            assert len(memory.recall(conversation, query, space.pk)) == 1
+
+    @override_settings(AI_MEMORY_RECALL_MAX_DISTANCE=0)
+    def test_a_non_positive_cut_off_disables_it(self, embedder, space):
+        conversation, query = self._a_pond_turn_and_a_flood_question(embedder, space)
+
+        assert len(ConversationMemory().recall(conversation, query, space.pk)) == 1
+
+    def test_the_module_default_and_the_settings_default_do_not_drift(self):
+        """Two places hold 0.80 -- the code's fallback and the setting. The
+        setting is the one a deployment reads, so they must agree."""
+        from django.conf import settings
+
+        assert settings.AI_MEMORY_RECALL_MAX_DISTANCE == DEFAULT_MAX_RECALL_DISTANCE
 
 
 class SpaceIsolationTests:

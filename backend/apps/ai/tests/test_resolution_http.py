@@ -18,7 +18,7 @@ from django.test import override_settings
 from django.urls import reverse
 
 from apps.ai.composition import use_composition_root
-from apps.ai.providers.fakes import ScriptedLLM
+from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedLLM
 from apps.ai.resolution import QuestionResolver
 
 from .corpus import FLOOD_QUESTION, FLOOD_TEXT, _BrokenLLM, ask, make_record, make_user, root_with
@@ -121,6 +121,59 @@ class ResolvingAFollowUpTests:
         assert turns[-1]["resolved_question"] is None
 
 
+class _QuerySpy(DeterministicEmbeddingProvider):
+    """Records every query it is asked to embed -- what retrieval searched."""
+
+    def __init__(self, dimensions):
+        super().__init__(dimensions=dimensions)
+        self.queries = []
+
+    def embed_query(self, text):
+        self.queries.append(text)
+        return super().embed_query(text)
+
+
+class FollowUpWithNoPronounTests:
+    def test_give_me_a_longer_explanation_retrieves_on_the_resolved_subject(
+        self, space, client_for
+    ):
+        """The live failure behind IR-445 (IR-443). "give me a longer
+        explanation" has no word the old check knew, so it was sent to
+        retrieval as typed and drew a refusal over unrelated passages. The
+        resolved question, not the typed one, must be what retrieval searches.
+        """
+        embedder = _QuerySpy(dimensions=space.dimensions)
+        reader = make_user("reader@cit.edu")
+        flood = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+        make_record(
+            title="Tilapia Ponds",
+            text=POND_TEXT_WITH_LIMITATIONS,
+            embedder=embedder,
+            space=space,
+        )
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+        reply = (
+            "Can you give a more detailed explanation of the neural network "
+            "rainfall flooding catchment study?"
+        )
+        resolver = QuestionResolver(llm=ScriptedLLM(reply=reply), cache={})
+        typed = "give me a longer explanation"
+
+        with use_composition_root(root_with(embedder=embedder, resolver=resolver)):
+            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+            embedder.queries.clear()
+            follow_up = ask(client, typed, conversation_id=conversation_id)
+
+        body = follow_up.json()
+        assert body["resolved_question"] == reply
+        assert reply in embedder.queries
+        assert typed not in embedder.queries
+        assert [c["record_id"] for c in body["citations"]] == [flood.pk]
+
+
 class NoUnnecessaryCallTests:
     """The cost guarantees ADR-026 Decision 8 exists for, pinned by call
     count rather than only by output — a resolver that happened to return
@@ -145,14 +198,17 @@ class NoUnnecessaryCallTests:
         assert response.json()["resolved_question"] is None
         assert resolver_llm.calls == []
 
-    def test_a_self_contained_follow_up_makes_no_resolution_call(
+    def test_a_self_contained_follow_up_is_resolved_with_one_call(
         self, embedder, space, client_for
     ):
+        """Rewritten, not deleted (IR-445). It asserted no call for a
+        question with no back-reference; resolution now runs on every
+        follow-up, so the guarantee is one call, not zero."""
         reader = make_user("reader@cit.edu")
         make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
         client = client_for(reader)
         conversation_id = start(client).json()["id"]
-        resolver_llm = ScriptedLLM()
+        resolver_llm = ScriptedLLM(reply="Does the tilapia pond study mention oxygen control?")
         resolver = QuestionResolver(llm=resolver_llm, cache={})
 
         with use_composition_root(root_with(embedder=embedder, resolver=resolver)):
@@ -164,8 +220,7 @@ class NoUnnecessaryCallTests:
             )
 
         assert response.status_code == 200
-        assert response.json()["resolved_question"] is None
-        assert resolver_llm.calls == []
+        assert len(resolver_llm.calls) == 1
 
     def test_omitting_the_conversation_id_never_calls_the_resolver(
         self, embedder, space, client_for

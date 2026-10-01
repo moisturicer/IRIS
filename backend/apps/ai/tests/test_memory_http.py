@@ -13,12 +13,14 @@ from apps.ai.composition import use_composition_root
 from apps.ai.models import TurnEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedLLM
-from apps.ai.resolution import MAX_HISTORY_TURNS
+from apps.ai.resolution import MAX_HISTORY_TURNS, QuestionResolver
 
 from .corpus import (
     DIMENSIONS,
     FLOOD_QUESTION,
     FLOOD_TEXT,
+    POND_QUESTION,
+    POND_TEXT,
     _BrokenEmbedder,
     ask,
     make_record,
@@ -35,6 +37,18 @@ def conversation_url(pk):
 
 def start(client, **body):
     return client.post(reverse("ai-conversations"), body, format="json")
+
+
+def _resolving_to_the_flood_question():
+    """A resolver that rewrites a follow-up into a question about the flood
+    paper, so the Turn recall finds is genuinely relevant to it.
+
+    Needed since IR-446 put a distance floor under recall: with the default
+    `ScriptedLLM` reply standing in for a resolved question, the follow-up
+    searches for text about nothing in the Conversation, and a recall that
+    returned Turn 1 anyway would be the defect the floor exists to stop.
+    """
+    return QuestionResolver(llm=ScriptedLLM(reply=FLOOD_QUESTION), cache={})
 
 
 def _fill_past_the_recent_window(client, conversation_id):
@@ -66,8 +80,11 @@ class RemembersAcrossManyTurnsTests:
         client = client_for(reader)
         conversation_id = start(client).json()["id"]
         llm = ScriptedLLM()
+        root = root_with(
+            embedder=embedder, llm=llm, resolver=_resolving_to_the_flood_question()
+        )
 
-        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+        with use_composition_root(root):
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
             _fill_past_the_recent_window(client, conversation_id)
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
@@ -84,8 +101,11 @@ class RemembersAcrossManyTurnsTests:
         client = client_for(reader)
         conversation_id = start(client).json()["id"]
         llm = ScriptedLLM()
+        root = root_with(
+            embedder=embedder, llm=llm, resolver=_resolving_to_the_flood_question()
+        )
 
-        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+        with use_composition_root(root):
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
             _fill_past_the_recent_window(client, conversation_id)
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
@@ -102,8 +122,11 @@ class RemembersAcrossManyTurnsTests:
         client = client_for(reader)
         conversation_id = start(client).json()["id"]
         llm = ScriptedLLM(reply="The model rained on the catchment [1].")
+        root = root_with(
+            embedder=embedder, llm=llm, resolver=_resolving_to_the_flood_question()
+        )
 
-        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+        with use_composition_root(root):
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
             _fill_past_the_recent_window(client, conversation_id)
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
@@ -128,6 +151,76 @@ class RemembersAcrossManyTurnsTests:
         assert response.status_code == 200
         _system, prompt = llm.calls[-1]
         assert "Relevant earlier" not in prompt
+
+
+class RelevanceCutOffTests:
+    """IR-446: recall offers Turns as relevant, so it must stop offering
+    them when none are."""
+
+    def _conversation_about_flooding_then_a_question_about_ponds(
+        self, embedder, space, client_for, llm
+    ):
+        """Turn 1 is about flooding and has aged out; the follow-up resolves
+        to a pond question, which is about nothing in the Conversation."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+        make_record(title="Tilapia Ponds", text=POND_TEXT, embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+        resolver = QuestionResolver(llm=ScriptedLLM(reply=POND_QUESTION), cache={})
+        root = root_with(embedder=embedder, llm=llm, resolver=resolver)
+
+        with use_composition_root(root):
+            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+            _fill_past_the_recent_window(client, conversation_id)
+            response = ask(client, POND_QUESTION, conversation_id=conversation_id)
+        return response
+
+    def test_no_turn_clearing_the_cut_off_leaves_the_heading_out_entirely(
+        self, embedder, space, client_for
+    ):
+        llm = ScriptedLLM()
+
+        response = self._conversation_about_flooding_then_a_question_about_ponds(
+            embedder, space, client_for, llm
+        )
+
+        assert response.status_code == 200
+        _system, prompt = llm.calls[-1]
+        assert "Relevant earlier" not in prompt
+
+    @override_settings(AI_MEMORY_RECALL_MAX_DISTANCE=2.0)
+    def test_a_cut_off_loose_enough_to_admit_them_brings_the_heading_back(
+        self, embedder, space, client_for
+    ):
+        """Pins the cause: the heading was absent above because of the
+        cut-off, not because nothing was there to recall."""
+        llm = ScriptedLLM()
+
+        self._conversation_about_flooding_then_a_question_about_ponds(
+            embedder, space, client_for, llm
+        )
+
+        _system, prompt = llm.calls[-1]
+        assert "Relevant earlier in this conversation:" in prompt
+
+    def test_no_distance_reaches_the_reader(self, embedder, space, client_for):
+        """`apps/ai/presentation.py`'s rule: a score is never shown."""
+        reader = make_user("reader@cit.edu")
+        make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+        client = client_for(reader)
+        conversation_id = start(client).json()["id"]
+        root = root_with(embedder=embedder, resolver=_resolving_to_the_flood_question())
+
+        with use_composition_root(root):
+            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+            _fill_past_the_recent_window(client, conversation_id)
+            response = ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+
+        body = response.json()
+        assert "distance" not in str(body)
+        transcript = client.get(conversation_url(conversation_id)).json()
+        assert "distance" not in str(transcript)
 
 
 class BoundedPromptSizeTests:

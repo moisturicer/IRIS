@@ -15,18 +15,18 @@ a swappable collaborator on `CompositionRoot`, switched off independently of
 the others -- without being a second `Reranker`-shaped ABC no second adapter
 would ever implement.
 
-**Two guards keep most Turns free of this cost** (ADR-026 Decision 8):
-``has_back_reference`` decides without a model call whether resolution could
-possibly matter, and a failed model call falls back to the raw question
-rather than erroring. Both are cost guarantees, not correctness ones, and
-both fail soft in the direction of "answer with what was typed".
+Resolution runs on every follow-up (ADR-026 §8, amended 2026-10-02, IR-445).
+A word check used to skip it when the question held no pronoun, and that
+failed into a refusal: "give me a longer explanation" has no topic in it, so
+retrieval searched it as typed. What is left of cost control is the first-Turn
+skip, the cache, and the separately configured small model; a failed call
+falls back to the raw question rather than erroring.
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
-import re
 from typing import TYPE_CHECKING, MutableMapping, Optional, Sequence
 
 from apps.ai.providers.openai_compatible import LLMUnavailable
@@ -45,39 +45,12 @@ logger = logging.getLogger(__name__)
 #: resolution's.
 MAX_HISTORY_TURNS = 6
 
-#: The cheap word check that decides whether resolution runs at all. Not an
-#: attempt at grammatical correctness -- a false positive costs one
-#: avoidable model call, a false negative costs nothing new (the question
-#: retrieves on its own text, exactly as it would with no resolution at all)
-#: -- so the list is deliberately short and deliberately loose.
-_BACK_REFERENCE_WORDS = frozenset(
-    {
-        "it", "its", "it's", "this", "that", "these", "those",
-        "they", "them", "their", "theirs",
-        "he", "him", "his", "she", "her", "hers",
-    }
-)
-
-_WORD = re.compile(r"[a-z']+")
-
 RESOLUTION_SYSTEM_PROMPT = (
     "Rewrite the follow-up question as a standalone question, using the "
     "conversation so far to fill in what it refers to. Keep it a question. "
     "Output only the rewritten question and nothing else -- no preamble, no "
     "quotation marks, no explanation."
 )
-
-
-def has_back_reference(question: str) -> bool:
-    """Whether ``question`` contains a word that could refer back to something.
-
-    Decided by vocabulary, not a model call -- that is the whole point. A
-    missed back-reference is a soft failure: the question retrieves on its
-    own text, exactly as it would with no resolution at all.
-    """
-    return any(
-        word in _BACK_REFERENCE_WORDS for word in _WORD.findall(question.lower())
-    )
 
 
 def turn_qa_lines(turns: Sequence["Turn"]) -> list[str]:
@@ -143,11 +116,11 @@ class QuestionResolver:
         """The standalone question, or ``None`` to mean "use ``question`` as is".
 
         ``None`` covers three cases the caller does not need to tell apart:
-        no history to resolve against, no back-reference to resolve, and a
-        model call that failed. All three take the same fallback (ADR-026):
-        retrieve on the raw question, exactly as today.
+        no history to resolve against, an empty model reply, and a model call
+        that failed. All three take the same fallback (ADR-026): retrieve on
+        the raw question.
         """
-        if not turns or not has_back_reference(question):
+        if not turns:
             return None
 
         key = resolution_cache_key(question, turns) if self._cache is not None else None

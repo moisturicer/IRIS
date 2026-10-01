@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from apps.ai import resolution
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
@@ -20,7 +21,6 @@ from apps.ai.resolution import (
     MAX_HISTORY_TURNS,
     QuestionResolver,
     build_resolution_prompt,
-    has_back_reference,
     resolution_cache_key,
 )
 
@@ -41,45 +41,14 @@ class _BrokenLLM(LLMProvider):
         raise LLMUnavailable("vendor down")
 
 
-class BackReferenceTests:
-    @pytest.mark.parametrize(
-        "question",
-        [
-            "what about its limitations?",
-            "What does THIS mean?",
-            "did they replicate it elsewhere",
-            "how does hers compare",
-        ],
-    )
-    def test_a_pronoun_is_a_back_reference(self, question):
-        assert has_back_reference(question)
+class WordCheckRemovalTests:
+    """IR-445: the back-reference word check is deleted, not bypassed. A
+    follow-up with no listed pronoun skipped resolution and retrieved on text
+    that was never meant to be a search query (ADR-026 §8, as amended)."""
 
-    @pytest.mark.parametrize(
-        "question",
-        [
-            "what does the paper conclude?",
-            "neural network rainfall flooding catchment",
-            "",
-        ],
-    )
-    def test_a_self_contained_question_has_no_back_reference(self, question):
-        assert not has_back_reference(question)
-
-    def test_a_missed_back_reference_is_a_soft_failure_not_an_error(self):
-        """The word list is deliberately short and deliberately loose (see
-        the module docstring) — "here" is a genuine referring word it does
-        not cover. Missing it is exactly the soft failure the spec asks for:
-        `resolve` still returns cleanly, with no call made and no exception,
-        which is indistinguishable from an ordinary self-contained question."""
-        question = "does the same limitation apply here"
-        assert not has_back_reference(question)
-
-        llm = ScriptedLLM()
-        resolver = QuestionResolver(llm=llm, cache={})
-        turns = [_Turn(pk=1, question="What does the paper find?", answer="X.")]
-
-        assert resolver.resolve(question, turns) is None
-        assert llm.calls == []
+    def test_the_word_check_and_its_word_list_no_longer_exist(self):
+        assert not hasattr(resolution, "has_back_reference")
+        assert not hasattr(resolution, "_BACK_REFERENCE_WORDS")
 
 
 class PromptTests:
@@ -125,15 +94,45 @@ class ResolveTests:
         assert resolver.resolve("what about its limitations?", []) is None
         assert llm.calls == []
 
-    def test_a_self_contained_question_makes_no_call(self):
-        llm = ScriptedLLM()
+    @pytest.mark.parametrize(
+        "question",
+        [
+            "give me a longer explanation",
+            "expand on the second point",
+            "why does the Jordan frame matter",
+            "elaborate",
+            "what about in the Einstein frame",
+            "any criticism of the method",
+        ],
+    )
+    def test_a_follow_up_with_no_pronoun_is_resolved(self, question):
+        """The observed failure (IR-443): none of these contains a word the
+        old list knew, so none was ever sent to the resolver."""
+        llm = ScriptedLLM(reply="resolved")
+        resolver = QuestionResolver(llm=llm, cache={})
+        turns = [_Turn(pk=1, question="What is the separate-universe approach?", answer="X.")]
+
+        assert resolver.resolve(question, turns) == "resolved"
+        assert len(llm.calls) == 1
+
+    def test_a_self_contained_follow_up_is_resolved_too(self):
+        """Rewritten, not deleted (IR-445). This used to assert that a
+        question with no back-reference made no call; every follow-up now
+        costs one, which is the price ADR-026 §8's amendment accepts."""
+        llm = ScriptedLLM(reply="resolved")
         resolver = QuestionResolver(llm=llm, cache={})
         turns = [_Turn(pk=1, question="q", answer="a")]
 
-        assert resolver.resolve("what does the paper conclude?", turns) is None
-        assert llm.calls == []
+        assert resolver.resolve("what does the paper conclude?", turns) == "resolved"
+        assert len(llm.calls) == 1
 
-    def test_a_back_reference_with_history_calls_the_model_and_returns_its_reply(self):
+    def test_an_empty_model_reply_falls_back_to_none(self):
+        resolver = QuestionResolver(llm=ScriptedLLM(reply="   "), cache={})
+        turns = [_Turn(pk=1, question="q", answer="a")]
+
+        assert resolver.resolve("give me a longer explanation", turns) is None
+
+    def test_a_follow_up_with_history_calls_the_model_and_returns_its_reply(self):
         llm = ScriptedLLM(reply="What are the limitations of the flood paper?")
         resolver = QuestionResolver(llm=llm, cache={})
         turns = [
