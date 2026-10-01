@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Iterable, Optional, Sequence
 
+from django.conf import settings
 from pgvector.django import CosineDistance
 
 if TYPE_CHECKING:
@@ -21,10 +22,26 @@ logger = logging.getLogger(__name__)
 #: How many older Turns a recall pulls in alongside the verbatim window.
 MAX_RECALLED_TURNS = 4
 
+#: Cosine distance beyond which a Turn is not relevant enough to recall
+#: (IR-446). **Provisional**; the observed numbers it comes from, and the
+#: setting that overrides it, are in `config/settings/base.py`.
+DEFAULT_MAX_RECALL_DISTANCE = 0.80
+
+
+def _max_distance() -> float:
+    """The cut-off for this request. Non-positive disables it."""
+    return float(
+        getattr(settings, "AI_MEMORY_RECALL_MAX_DISTANCE", DEFAULT_MAX_RECALL_DISTANCE)
+    )
+
 
 class ConversationMemory:
     """Finds Turns from earlier in a Conversation relevant to the question
     just asked, using the vector already computed to search the corpus.
+
+    Relevant, not merely closest: a Turn beyond the configured cosine
+    distance is dropped, so the prompt never asserts relevance over the best
+    of a bad set (IR-446).
     """
 
     def __init__(self, limit: int = MAX_RECALLED_TURNS) -> None:
@@ -38,9 +55,10 @@ class ConversationMemory:
         exclude_ids: Iterable[int] = (),
     ) -> list["Turn"]:
         """Older Turns from ``conversation``, ranked by relevance to
-        ``query_vector``. Returns ``[]`` -- degrading to the recent window
-        the caller already has -- when there is no vector to compare
-        against, logged rather than raised.
+        ``query_vector``, and no further away than the cut-off. Returns
+        ``[]`` -- degrading to the recent window the caller already has --
+        when nothing is relevant enough, and likewise when there is no vector
+        to compare against, logged rather than raised.
         """
         if query_vector is None or space_id is None:
             logger.warning(
@@ -58,6 +76,8 @@ class ConversationMemory:
             .exclude(turn_id__in=list(exclude_ids))
             .select_related("turn")
             .annotate(distance=CosineDistance("embedding", query_vector))
-            .order_by("distance")[: self._limit]
         )
-        return [row.turn for row in rows]
+        cut_off = _max_distance()
+        if cut_off > 0:
+            rows = rows.filter(distance__lt=cut_off)
+        return [row.turn for row in rows.order_by("distance")[: self._limit]]

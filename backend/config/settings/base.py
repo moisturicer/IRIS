@@ -478,6 +478,35 @@ AI_CONVERSATION_MEMORY_ENABLED = config(
     "AI_CONVERSATION_MEMORY_ENABLED", default=True, cast=bool
 )
 
+# ---- Memory recall relevance (ADR-026 §6, ADR-027 §1c's shape; IR-446) --
+#
+# Recall offers its Turns to the model under the heading "Relevant earlier in
+# this conversation:", so closeness alone is not enough: without a floor the
+# four least-far Turns are presented as relevant even when none of them are.
+# Turns at or beyond this cosine distance are dropped; when none clear it the
+# heading does not appear at all. Non-positive disables the cut-off, the same
+# escape hatch AI_EMBEDDING_TOKEN_CEILING's 0 gives. Mirrored by
+# apps.ai.memory.DEFAULT_MAX_RECALL_DISTANCE, which a test holds to this value.
+#
+# PROVISIONAL, and measured rather than guessed -- real `voyage-context-4`
+# query vectors, 2026-10-02. The question pairs were written by hand, not
+# taken from Conversations a reader actually had: no corpus is indexed yet
+# (IR-250), so no real Conversation exists to read distances off. Treat the
+# separation below as indicative, not as a measurement of live traffic:
+#
+#   0.26   a reworded repeat of an earlier question
+#   0.48-0.52  Turns a reader calls plainly related
+#   0.62   same domain, different paper
+#   0.74   a method-level question across papers
+#   0.83-1.01  Turns a reader calls unrelated
+#
+# They separated on every pair tried, and 0.80 sits in the gap, deliberately
+# at its loose end: it keeps the weaker relations and drops the unrelated
+# ones. Retune against a real corpus once one is indexed (IR-250).
+AI_MEMORY_RECALL_MAX_DISTANCE = config(
+    "AI_MEMORY_RECALL_MAX_DISTANCE", default=0.80, cast=float
+)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in

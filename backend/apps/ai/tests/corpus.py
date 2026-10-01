@@ -32,6 +32,7 @@ FLOOD_TEXT = (
 POND_TEXT = "sampling procedure for tilapia ponds stocked in brackish water"
 
 FLOOD_QUESTION = "neural network rainfall flooding catchment"
+POND_QUESTION = "tilapia pond stocking brackish water"
 
 
 # -- the corpus ---------------------------------------------------------------
