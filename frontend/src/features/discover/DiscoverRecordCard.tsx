@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { RecordListItem } from "@/types/records";
 import { PaperSaveDropdown } from "./PaperSaveDropdown";
@@ -72,27 +72,40 @@ export function DiscoverRecordCard({
     >
       <div className="p-5">
         {/* Badge row — topic, kind, protection, programme flags */}
-        <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-start justify-between gap-3 mb-1">
           <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-            {badges.map((badge) => (
-              <span
-                key={badge.label}
-                className={cn(
-                  "py-0.5 rounded-full text-[12px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
-                  // The topic is plain text, so it takes no side padding: its first
-                  // letter then starts on the title's own left edge.
-                  badge.tone === "topic" ? "px-0" : "px-2.5",
-                  BADGE_TONE_CLASS[badge.tone],
-                )}
-              >
-                {badge.icon &&
-                  (() => {
-                    const Icon = BADGE_ICONS[badge.icon];
-                    return <Icon className="w-3 h-3 shrink-0" />;
-                  })()}
-                <span>{badge.label}</span>
-              </span>
-            ))}
+            {badges.map((badge, index) => {
+              // Topic and kind read as one line of plain text, told apart by
+              // colour and a separator, not by a pill. Only the flags keep one.
+              const plain = badge.tone === "topic" || badge.tone === "type";
+              return (
+                <Fragment key={badge.label}>
+                  {badge.tone === "type" && index > 0 && (
+                    <span className="text-slate-300 text-[12px]" aria-hidden>
+                      |
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "py-0.5 text-[12px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
+                      // No side padding on plain text: the first letter starts
+                      // on the title's own left edge.
+                      plain ? "px-0" : "px-2.5 rounded-full",
+                      badge.tone === "type"
+                        ? "text-slate-500 uppercase tracking-wider text-[11px]"
+                        : BADGE_TONE_CLASS[badge.tone],
+                    )}
+                  >
+                    {badge.icon &&
+                      (() => {
+                        const Icon = BADGE_ICONS[badge.icon];
+                        return <Icon className="w-3 h-3 shrink-0" />;
+                      })()}
+                    <span>{badge.label}</span>
+                  </span>
+                </Fragment>
+              );
+            })}
           </div>
 
           <span className="text-[12px] font-medium text-slate-400 shrink-0 whitespace-nowrap">
