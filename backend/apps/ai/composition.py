@@ -305,7 +305,7 @@ class CompositionRoot:
         """
         return DegradableRetriever(
             RerankingRetriever(
-                TwoStageRetriever(self.embedder(), record=record),
+                self._candidates(record),
                 reranker=self.reranker(),
                 policy_enabled=self._policy_enabled,
                 permits=self._permits,
@@ -313,6 +313,31 @@ class CompositionRoot:
             fallback=FullTextRetriever(record=record),
             degrade_on=_vendor_failures(),
         )
+
+    def _candidates(self, record: Optional[Record]) -> Retriever:
+        """What reranking is handed: the vector list, or the fused list.
+
+        Fusion goes *inside* `RerankingRetriever` (ADR-033 §1, IR-395), so the
+        merged set meets the disclosure gate and the reranker exactly as the
+        vector set does. Both settings must be on: ADR-033 §1 and §2 are two
+        decisions, but neither half is useful alone, and
+        `apps/ai/evaluation/techniques.py` says as much. Off by default, so an
+        upgrade changes nothing (ADR-033 §5); IR-402 moves the default.
+        """
+        from django.conf import settings
+
+        vector = TwoStageRetriever(self.embedder(), record=record)
+        if not (
+            getattr(settings, "AI_KEYWORD_RETRIEVAL_ENABLED", False)
+            and getattr(settings, "AI_RETRIEVAL_FUSION_ENABLED", False)
+        ):
+            return vector
+
+        from apps.ai.retrieval.fusion import KeywordFusionRetriever
+
+        # The same `FullTextRetriever` the outage path uses, scoped the same
+        # way, so `visible_to(user)` is one predicate on both paths.
+        return KeywordFusionRetriever(vector, keyword=FullTextRetriever(record=record))
 
     def without_reranking(self) -> "CompositionRoot":
         """The same root with reranking switched off (IR-133).
