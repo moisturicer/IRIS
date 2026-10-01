@@ -276,13 +276,13 @@ class ContextPathChunker:
 
         for chunk in inner_set.chunks:
             start = cursor
-            cursor = _advance_cursor(document_words, cursor, chunk.content.split())
+            cursor = _advance_cursor(document_words, cursor, chunk.text.split())
             path = _path_for_span(words_with_paths, start, cursor, last_path)
             last_path = path
 
             path = _truncate_middle(path, options.context_path_max_tokens)
             prefix = _PATH_SEPARATOR.join(path)
-            text = f"{prefix}\n\n{chunk.content}" if prefix else chunk.content
+            text = f"{prefix}\n\n{chunk.text}" if prefix else chunk.text
             decorated.append(replace(chunk, text=text, context_path=path))
 
         decorated_tuple = tuple(decorated)

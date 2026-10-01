@@ -290,6 +290,42 @@ class DriftTelemetryTests:
         assert "may have drifted to an unsupported format" in service_logs.text
         assert "(1)" in service_logs.text, "the unparsed shape is named, not just counted"
 
+    def test_a_fabricated_image_is_stripped_and_warned_about(self, reader, service_logs):
+        record = make_record("Thesis")
+        service = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _RecordingLLM("Sampling was weekly ![chart](https://x.test/c.png) [1]."),
+            permits=lambda r: True,
+        )
+
+        answer = service.answer("how often?", reader)
+
+        assert "![" not in answer.text and "x.test" not in answer.text
+        assert answer.is_grounded
+        assert "were stripped" in service_logs.text
+        assert "https://x.test/c.png" in service_logs.text
+
+    def test_a_clean_answer_does_not_warn_about_images(self, reader, service_logs):
+        record = make_record("Thesis")
+        GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _RecordingLLM("Sampling was weekly [1]."),
+            permits=lambda r: True,
+        ).answer("how often?", reader)
+
+        assert "stripped" not in service_logs.text
+
+    def test_reasoning_leaked_into_a_non_streaming_answer_is_removed(self, reader):
+        record = make_record("Thesis")
+        answer = GroundedAnswerService(
+            _FixedRetriever([chunk_for(record)]),
+            _RecordingLLM("<think>plan the reply</think>Sampling was weekly [1]."),
+            permits=lambda r: True,
+        ).answer("how often?", reader)
+
+        assert "plan the reply" not in answer.text and "<think>" not in answer.text
+        assert "Sampling was weekly" in answer.text
+
     def test_a_declining_answer_does_not_warn(self, reader, service_logs):
         """The one honest reason to cite nothing. The prompt explicitly asks
         for this, so alerting on it would train whoever reads the logs to stop
