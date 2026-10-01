@@ -147,6 +147,18 @@ python manage.py promote_embedding_space --space N --check   # is this space rea
                                    # Drop --check to promote. Refuses while any active chunk lacks a
                                    # vector in that space and names the short records. Nothing
                                    # promotes automatically
+python manage.py check_vector_index                      # is vector search finding what it
+                                   # should? (IR-442). Compares each HNSW index against an exact scan
+                                   # using stored vectors as probes, at AI_HNSW_EF_SEARCH depth, and
+                                   # exits non-zero below --min-recall (default 0.99). Calls no vendor,
+                                   # so it is free to run after any corpus load. --titles also asks the
+                                   # real retrieval stack about every published paper by name and needs
+                                   # --user EMAIL; that costs one query embedding per record, so it is
+                                   # opt-in and never CI. Verified 2026-10-01: chunk index 0.995, record index
+                                   # 1.000, and 40 of 40 titles found. It warns when the planner read no
+                                   # HNSW index, because that number says nothing about the index. A
+                                   # stored-vector probe is an easier question than a real query vector,
+                                   # which is why --titles exists as well
 python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)
                                    # The retrieval eval harness. --dry-run costs nothing and calls no
                                    # vendor: it checks that every label resolves against this database,
