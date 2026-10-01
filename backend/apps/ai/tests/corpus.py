@@ -176,9 +176,9 @@ def root_with(embedder=None, llm=None, resolver=None):
     `resolver` defaults to `None`, which is *not* "no resolution" — it falls
     through to `CompositionRoot`'s own settings-driven default, exactly as an
     unconfigured deployment would. No test here relies on that path actually
-    calling a model: every question in this corpus is pronoun-free, so
-    `has_back_reference` skips it regardless of what `resolver()` returns.
-    Tests exercising resolution itself pass one explicitly (IR-296).
+    calling a model. Resolution runs on every follow-up since IR-445, and with
+    no model reachable it falls back to the raw question, so a test that
+    asserts on resolution must pass a resolver explicitly, as those do.
     """
     return CompositionRoot(
         embedder=embedder,
