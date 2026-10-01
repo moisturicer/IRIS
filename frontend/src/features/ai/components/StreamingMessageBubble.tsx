@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import type { StreamingState } from "../hooks/useAskStream";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
-import { ANSWER_MARKDOWN } from "./markdownStyle";
+import { ANSWER_MARKDOWN } from "./answerLayout";
 import { ReasoningPanel } from "./ReasoningPanel";
 import { StreamStatusLine } from "./StreamStatusLine";
 

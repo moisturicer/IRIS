@@ -4,6 +4,7 @@ import type { StreamingState } from "../hooks/useAskStream";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
+import { CHAT_COLUMN } from "./answerLayout";
 import { AskIrisEmblem } from "./AskIrisIcons";
 
 interface ChatMessageListProps {
@@ -75,8 +76,8 @@ export function ChatMessageList({
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-6 bg-[#FBFCFD]">
-      {/* Centered column, matching ChatInput's own max-w-3xl mx-auto below it. */}
-      <div className="max-w-3xl mx-auto space-y-6">
+      {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
+      <div className={`${CHAT_COLUMN} space-y-6`}>
         {messages.map((m) => (
           <ChatMessageBubble key={m.id} message={m} />
         ))}
