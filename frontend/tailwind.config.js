@@ -101,11 +101,29 @@ export default {
           "tbody td:last-child, tfoot td:last-child": { paddingInlineEnd: "0.7rem" },
         };
 
-        // `prose-base` restates table size, cell padding and hr margins after
-        // DEFAULT, so anything they set has to be repeated there or it loses.
+        // Every gap roughly halved, and a heading's own space moved above it:
+        // symmetric margins leave a heading floating between two sections
+        // instead of sitting with the text it introduces (IR-452).
+        const rhythm = {
+          h1: { marginBottom: "0.25em" },
+          h2: { marginTop: "1.2em", marginBottom: "0.25em" },
+          h3: { marginTop: "1em", marginBottom: "0.2em" },
+          h4: { marginTop: "1em", marginBottom: "0.2em" },
+          "h1 + *, h2 + *, h3 + *, h4 + *": { marginTop: "0" },
+          p: { marginTop: "0.7em", marginBottom: "0.7em" },
+          "ul, ol": { marginTop: "0.7em", marginBottom: "0.7em" },
+          "li": { marginTop: "0.2em", marginBottom: "0.2em" },
+          blockquote: { marginTop: "0.9em", marginBottom: "0.9em" },
+          pre: { marginTop: "0.9em", marginBottom: "0.9em" },
+          hr: { marginTop: "1.2em", marginBottom: "1.2em" },
+        };
+
+        // `prose-base` restates sizes, cell padding and every one of these
+        // margins after DEFAULT, so anything set here has to be repeated
+        // there or the later rule wins on source order.
         const restated = {
-          table: { width: "100%", fontSize: "0.95em", lineHeight: "1.6" },
-          hr: { marginTop: "2em", marginBottom: "2em" },
+          table: { width: "100%", fontSize: "0.95em", lineHeight: "1.6", marginTop: "1em", marginBottom: "1em" },
+          ...rhythm,
           ...cells,
         };
 

@@ -245,7 +245,7 @@ export default function DiscoverPage() {
           <i className="fas fa-compass text-[13px]" aria-hidden />
         </span>
         <div className="min-w-0">
-          <h1 className="font-display text-[21px] font-semibold text-stone-900 leading-tight truncate">
+          <h1 className="font-display text-[24px] font-semibold text-stone-900 leading-tight truncate">
             IRIS Discovery
           </h1>
           <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 leading-tight">

@@ -124,6 +124,20 @@ describe("answer markdown typography", () => {
     expect(effective(rules, "h1, h2, h3, h4", "font-weight")).toBe("600");
   });
 
+  it("gives a heading more space above it than below it", async () => {
+    const rules = await rulesFor(ANSWER_MARKDOWN);
+    const em = (value: string | undefined) => Number(/([\d.]+)em/.exec(value ?? "")?.[1]);
+    for (const heading of ["h2", "h3"]) {
+      const above = em(effective(rules, heading, "margin-top"));
+      const below = em(effective(rules, heading, "margin-bottom"));
+      expect(above, `<${heading}> floats between sections instead of leading one`).toBeGreaterThan(
+        below,
+      );
+    }
+    // The block right after a heading starts against it, not a line later.
+    expect(effective(rules, "h1 + *, h2 + *, h3 + *, h4 + *", "margin-top")).toBe("0");
+  });
+
   it("sizes the chat column by the viewport, never a fixed width", () => {
     expect(CHAT_COLUMN).toContain("vw");
     expect(CHAT_COLUMN).not.toMatch(/\d+px/);

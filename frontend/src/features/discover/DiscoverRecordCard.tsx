@@ -78,7 +78,7 @@ export function DiscoverRecordCard({
               <span
                 key={badge.label}
                 className={cn(
-                  "px-2 py-0.5 rounded-md text-[12px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
+                  "px-2.5 py-0.5 rounded-full text-[12px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
                   BADGE_TONE_CLASS[badge.tone],
                 )}
               >
@@ -98,7 +98,7 @@ export function DiscoverRecordCard({
         </div>
 
         {/* Title — the primary action on the card */}
-        <h2 className="font-display text-[23px] font-semibold text-slate-900 leading-snug mb-1.5">
+        <h2 className="font-display text-[27px] font-semibold text-slate-900 leading-snug mb-1.5">
           <Link to={`/records/${record.id}`} className="hover:text-brand transition-colors">
             {highlightMatch(record.title, searchHighlight)}
           </Link>
