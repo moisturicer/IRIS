@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { CHAT_COLUMN } from "./answerLayout";
 
 interface ChatInputProps {
   onSend:    (text: string) => void;
@@ -33,7 +34,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
       onSubmit={handleSubmit}
       className="shrink-0 border-t border-stone-200/80 bg-white px-4 sm:px-6 py-4"
     >
-      <div className="flex gap-2 items-end max-w-3xl mx-auto">
+      <div className={`flex gap-2 items-end ${CHAT_COLUMN}`}>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -56,7 +57,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           <i className="fas fa-arrow-up text-[14px]" aria-hidden />
         </button>
       </div>
-      <p className="text-[11px] text-stone-400 text-center mt-2 max-w-3xl mx-auto">
+      <p className={`text-[11px] text-stone-400 text-center mt-2 ${CHAT_COLUMN}`}>
         Enter to send · Shift+Enter for new line · Verify answers using Sources
       </p>
     </form>

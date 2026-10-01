@@ -2,7 +2,7 @@ import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
-import { ANSWER_MARKDOWN } from "./markdownStyle";
+import { ANSWER_MARKDOWN } from "./answerLayout";
 import { CopyButton } from "./CopyButton";
 import {
   DegradedNotice,

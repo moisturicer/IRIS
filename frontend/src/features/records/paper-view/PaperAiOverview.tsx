@@ -4,7 +4,7 @@ import type { RecordOverviewResponse } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcons";
 import { CitationText } from "@/features/ai/components/CitationText";
-import { ANSWER_MARKDOWN } from "@/features/ai/components/markdownStyle";
+import { OVERVIEW_MARKDOWN } from "@/features/ai/components/answerLayout";
 import { DegradedNotice } from "@/features/ai/components/PassageQuote";
 import { RailHeading } from "./headings";
 
@@ -133,7 +133,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
           <CitationText
             text={overview.text}
             citations={overview.citations}
-            className={ANSWER_MARKDOWN}
+            className={OVERVIEW_MARKDOWN}
           />
 
           {overview.degraded && <DegradedNotice subject="summary" />}

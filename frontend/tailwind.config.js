@@ -78,7 +78,13 @@ export default {
           css: {
             color: theme("colors.stone.700"),
             maxWidth: "none",
-            "h1, h2, h3, h4": { color: theme("colors.stone.900"), fontWeight: "600" },
+            "h1, h2, h3, h4": { color: theme("colors.brand.DEFAULT"), fontWeight: "600" },
+            // A rule under the top two levels is what makes a section start
+            // read as one, rather than as a bold line in the prose.
+            "h1, h2": {
+              borderBottom: `1px solid ${theme("colors.stone.200")}`,
+              paddingBottom: "0.25em",
+            },
             strong: { color: theme("colors.stone.900") },
             "ul > li::marker, ol > li::marker": { color: theme("colors.stone.400") },
             blockquote: {
@@ -98,7 +104,10 @@ export default {
               padding: "0.125rem 0.25rem",
               fontWeight: "500",
             },
-            table: { width: "100%" },
+            // Typography ships tables at 0.857em, which lands at 12px and is
+            // the least legible thing in an answer.
+            table: { width: "100%", fontSize: "0.95em", lineHeight: "1.6" },
+            "tbody tr:nth-child(even)": { backgroundColor: theme("colors.stone.50") },
             "thead th": {
               color: theme("colors.stone.900"),
               backgroundColor: theme("colors.stone.50"),
@@ -111,6 +120,9 @@ export default {
             "thead, tbody tr": { borderBottomWidth: "0" },
           },
         },
+        // `prose-base` restates the table size after DEFAULT, so the override
+        // has to live here too or typography's 0.875em wins on the cascade.
+        base: { css: { table: { fontSize: "0.95em", lineHeight: "1.6" } } },
       }),
 
       keyframes: {
