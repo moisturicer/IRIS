@@ -40,11 +40,7 @@ export function DiscoverRecordCard({
   const [starred, setStarred] = useState(() => isStarred(record.id));
   const [expanded, setExpanded] = useState(false);
 
-  // Kind of work leads, field of research follows (IR-452). Ordered here, not
-  // in metaBadges, so Library and Workspace keep their own order.
-  const badges = metaBadges(record).sort(
-    (a, b) => Number(b.tone === "type") - Number(a.tone === "type"),
-  );
+  const badges = metaBadges(record);
   const abstract = record.abstract?.trim() ?? "";
   // Only offer to expand when there is meaningfully more than the clamp shows.
   const hasMoreToRead = abstract.length > 260;
