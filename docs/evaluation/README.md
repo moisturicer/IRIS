@@ -113,6 +113,23 @@ python manage.py eval_retrieval --questions ... --user staff@cit.edu \
     --reranking on -k 20 --no-write
 ```
 
+One of ADR-033 §5's switches, against the same baseline:
+
+```bash
+# What is switchable, and which of the six are built:
+python manage.py eval_retrieval --list-techniques
+
+# Baseline first, then the candidate. Same commit, same set, same --user.
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json     --user iris-student@cit.edu
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json     --user iris-student@cit.edu     --technique keyword_retrieval=on --technique fusion=on
+```
+
+Every run records all six switches at the values it used, so two results files
+are comparable. Asking for a switch whose setting does not exist yet is refused
+rather than recorded as measured. Hybrid retrieval is two settings for one
+technique, which is why the pair above moves together and why the command warns
+that two switches moved — see ADR-023's IR-394 divergence note.
+
 `--user` is required and is part of what is measured: retrieval filters by
 `Record.objects.visible_to(user)`, so a run reports what *that* user can
 retrieve. An anonymous user can read nothing and would score zero on a working
@@ -120,8 +137,65 @@ stack. `manage.py seed_demo` creates `<role>@cit.edu` logins.
 
 Every run writes `docs/evaluation/runs/<timestamp>-<set>.json` holding its
 configuration, both measures, per-question outcomes and provenance (git commit,
-embedding space, the embedder and reranker actually used). That file is how a
-figure in the thesis gets traced back to the run that produced it.
+embedding space, the embedder and reranker actually used, and the question
+set's SHA-256 as well as its path — a set is re-labelled while it is human work
+in progress, so the path alone would reproduce the wrong run). That file is how
+a figure in the thesis gets traced back to the run that produced it.
+
+The command usually runs in the backend container, which has no git, so pass
+the commit from the host or the results file records `unknown`:
+
+```bash
+docker compose exec -e IRIS_GIT_COMMIT="$(git describe --always --dirty)" backend     python manage.py eval_retrieval --questions ... --user iris-student@cit.edu
+```
+
+`--dirty` marks a run made from a modified tree, so it cannot pass for the
+commit it started from. Run from the host with no variable set, the command asks
+git itself.
+
+## The technique switches
+
+ADR-033 §5 puts six techniques behind six settings, each defaulting to today's
+behaviour, and a default moves only on a run of this harness. The harness
+therefore owns the configuration surface, and **every run records all six** at
+the values it used — a results file that omits a switch cannot be compared with
+a later one that moved it.
+
+```bash
+# What the switches are, and which of them exist in this deployment yet:
+python manage.py eval_retrieval --list-techniques
+
+# Move one for a run (once its ticket has landed it):
+python manage.py eval_retrieval --questions ... --user iris-student@cit.edu     --technique fusion=on
+```
+
+| Technique | Setting | Lands with |
+|---|---|---|
+| `fusion` | `AI_RETRIEVAL_FUSION_ENABLED` | IR-395 |
+| `keyword_retrieval` | `AI_KEYWORD_RETRIEVAL_ENABLED` | IR-395 |
+| `relevance_cut_off` | `AI_RELEVANCE_MIN_SCORE` | IR-396 |
+| `per_paper_cap` | `AI_MAX_PASSAGES_PER_RECORD` | IR-397 |
+| `neighbour_joining` | `AI_JOIN_ADJACENT_PASSAGES` | IR-397 |
+| `token_budget` | `AI_PASSAGE_TOKEN_BUDGET` | IR-397 |
+
+**None of those settings exists yet.** A technique counts as built when its
+setting is really present in `django.conf.settings`, never because the registry
+in `apps/ai/evaluation/techniques.py` names it — so asking for one meanwhile is
+**refused**, with the ticket that lands it. That refusal is the point of the
+registry: a run measuring the baseline, under a results file claiming to have
+measured fusion, is worse than no run at all. When a ticket names its setting
+differently, one line in that file changes.
+
+Moving two switches in one run is allowed and warned about loudly, because
+"one change at a time" is a rule about runs that code cannot enforce — fusion
+without keyword retrieval is one technique in two settings. That reading of
+ADR-023 is written down as a divergence note in
+[ADR-023](../adr/023-retrieval-quality-evaluation.md) and **awaits a human
+decision**; the discipline holds by convention meanwhile.
+
+A moved switch is spelled the same way in the results file as on the command
+line (`fusion=on`, not `fusion=True`), so a configuration can be copied
+straight out of a run file back into a command.
 
 ### Rules that come from the ADR, not from taste
 

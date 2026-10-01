@@ -17,9 +17,11 @@ from django.core.management import CommandError, call_command
 
 from apps.ai.composition import CompositionRoot
 from apps.ai.evaluation import (
+    TECHNIQUES,
     RunConfig,
     load_question_set,
     parse_question_set,
+    resolve_techniques,
     run,
     run_both,
 )
@@ -229,3 +231,87 @@ def test_dry_run_refuses_a_quote_that_is_in_no_chunk(corpus, tmp_path):
 def test_the_command_refuses_to_run_without_a_user(corpus):
     with pytest.raises(CommandError, match="--user is required"):
         call_command("eval_retrieval", questions=str(SYNTHETIC_SET))
+
+
+# -- the technique configuration (ADR-033 §5) --------------------------------
+
+
+def test_a_run_records_every_technique_even_the_unbuilt_ones(corpus, reader, embedder):
+    """A results file that omits a switch cannot be compared with a later one."""
+    config = RunConfig(techniques=resolve_techniques())
+    report = run(_root(embedder), load_question_set(SYNTHETIC_SET), config, user=reader)
+
+    recorded = report.as_dict()["config"]["techniques"]
+    assert set(recorded) == {t.name for t in TECHNIQUES}
+    assert recorded["fusion"]["ticket"] == "IR-395"
+    assert report.provenance["techniques_moved"] == []
+
+
+def test_the_command_records_the_technique_configuration_in_the_results_file(
+    corpus, reader, embedder, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.ai.management.commands.eval_retrieval.composition_root",
+        lambda: _root(embedder),
+    )
+    call_command(
+        "eval_retrieval",
+        questions=str(SYNTHETIC_SET),
+        user=reader.email,
+        reranking="on",
+        out=str(tmp_path),
+    )
+
+    written = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    assert set(written["runs"][0]["config"]["techniques"]) == {
+        t.name for t in TECHNIQUES
+    }
+
+
+def test_the_command_refuses_a_technique_that_is_not_built_yet(corpus, reader):
+    """Measuring the baseline under a results file claiming otherwise is the
+    one failure the registry exists to prevent.
+
+    Named on `relevance_cut_off` rather than `fusion`: this test was written
+    against fusion while nothing implemented it, and IR-395 landed
+    `AI_RETRIEVAL_FUSION_ENABLED`, so fusion is now a technique the harness
+    can really run. The property is about an *unbuilt* technique, so it moved
+    to one that still is (IR-396) rather than being deleted.
+    """
+    with pytest.raises(CommandError, match="IR-396"):
+        call_command(
+            "eval_retrieval",
+            questions=str(SYNTHETIC_SET),
+            user=reader.email,
+            techniques=["relevance_cut_off=0.3"],
+        )
+
+
+def test_listing_the_techniques_needs_no_question_set_and_no_user(capsys):
+    call_command("eval_retrieval", list_techniques=True)
+
+    out = capsys.readouterr().out
+    assert "AI_RETRIEVAL_FUSION_ENABLED" in out
+    assert "not built yet" in out
+
+
+def test_the_results_file_pins_the_question_set_by_content_not_only_by_path(
+    corpus, reader, embedder, tmp_path, monkeypatch
+):
+    """A re-labelled set at the same path must not reproduce as the same run."""
+    monkeypatch.setattr(
+        "apps.ai.management.commands.eval_retrieval.composition_root",
+        lambda: _root(embedder),
+    )
+    call_command(
+        "eval_retrieval",
+        questions=str(SYNTHETIC_SET),
+        user=reader.email,
+        reranking="on",
+        out=str(tmp_path),
+    )
+
+    written = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    digest = written["runs"][0]["provenance"]["question_set_sha256"]
+    assert len(digest) == 64
+    assert digest != "0" * 64

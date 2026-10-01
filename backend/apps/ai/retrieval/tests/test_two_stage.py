@@ -10,6 +10,7 @@ to change; the contract is question and user in, ranked permitted chunks out.
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.utils import timezone
 
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
@@ -17,6 +18,7 @@ from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
+from apps.ai.retrieval.scan_depth import configured_depth
 from apps.ai.retrieval.two_stage import TwoStageRetriever
 from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
@@ -231,3 +233,44 @@ class ResultShapeTests:
         assert result.source_page == 1
         assert result.context_path == ("Tilapia Feed Study",)
         assert result.chunk_id
+
+
+class ScanDepthTests:
+    """A filtered vector query can return more than 40 rows (IR-440)."""
+
+    @pytest.fixture
+    def index_is_used(self):
+        """Small tables dodge the HNSW index; forbid the alternatives."""
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL enable_seqscan = off")
+            cursor.execute("SET LOCAL enable_sort = off")
+
+    def test_a_limit_above_forty_is_reached(
+        self, embedder, space, reader, index_is_used, settings
+    ):
+        # Max depth for headroom: HNSW is approximate and rolled-back rows
+        # from earlier tests still take slots. Unset, this returns 41.
+        settings.AI_HNSW_EF_SEARCH = 1000
+        record = published_record("Thesis", reader, embedder)
+        add_chunks(record, space, embedder, [f"passage number {i}" for i in range(60)])
+
+        found = TwoStageRetriever(embedder).retrieve("passage", reader, limit=100)
+
+        assert len(found.passages) >= 55
+
+    def test_the_depth_is_a_setting(
+        self, embedder, space, reader, index_is_used, settings
+    ):
+        settings.AI_HNSW_EF_SEARCH = 10
+        record = published_record("Thesis", reader, embedder)
+        add_chunks(record, space, embedder, [f"passage number {i}" for i in range(60)])
+
+        found = TwoStageRetriever(embedder).retrieve("passage", reader, limit=100)
+
+        assert len(found.passages) < 20
+
+    def test_the_depth_is_clamped_to_what_pgvector_accepts(self, settings):
+        settings.AI_HNSW_EF_SEARCH = 5000
+        assert configured_depth() == 1000
+        settings.AI_HNSW_EF_SEARCH = 0
+        assert configured_depth() == 1

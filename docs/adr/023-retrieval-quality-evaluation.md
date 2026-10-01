@@ -114,6 +114,22 @@ is far too small to resolve, and the output would be an unattributable "the
 stack got better". One change, one before, one after, and a named reason to
 move a default.
 
+### Divergence — IR-394: the harness warns about two changes, it does not refuse them
+
+**Recorded, not decided.** "A run compares **exactly one** changed setting"
+(above) is stated as an absolute. `apps/ai/evaluation/techniques.py` permits a
+run to move more than one switch and **warns loudly** instead of refusing,
+because two of the six settings are one technique: ADR-033 §1–§2's fusion does
+nothing unless keyword retrieval also participates, so a code-enforced cap of
+one would make that technique unmeasurable.
+
+Per `CLAUDE.md`'s source-of-truth rule this contradiction is written down
+rather than silently reconciled. **It awaits a human decision**, which is
+either to ratify this reading (the rule governs what a run *means*, and a
+multi-switch run is attributable only when the switches are one technique) or
+to have the harness refuse and give fusion a single setting. Until then the
+discipline holds by convention, as it did before the switch existed.
+
 ### A run is a manual command, never CI
 
 The harness is a management command a person runs deliberately. It spends
