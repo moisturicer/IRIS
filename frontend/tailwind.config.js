@@ -73,57 +73,94 @@ export default {
 
       // Answer Markdown (IR-450). Used with `prose-sm`, whose 14px base is
       // the repo's `base` size; only colours and structure are set here.
-      typography: ({ theme }) => ({
-        DEFAULT: {
-          css: {
-            color: theme("colors.stone.700"),
-            maxWidth: "none",
-            "h1, h2, h3, h4": { color: theme("colors.brand.DEFAULT"), fontWeight: "600" },
-            // A rule under the top two levels is what makes a section start
-            // read as one, rather than as a bold line in the prose.
-            "h1, h2": {
-              borderBottom: `1px solid ${theme("colors.stone.200")}`,
-              paddingBottom: "0.25em",
-            },
-            strong: { color: theme("colors.stone.900") },
-            "ul > li::marker, ol > li::marker": { color: theme("colors.stone.400") },
-            blockquote: {
-              fontStyle: "normal",
-              fontWeight: "400",
-              color: theme("colors.stone.600"),
-              borderLeftColor: theme("colors.gold.DEFAULT"),
-            },
-            "blockquote p:first-of-type::before": { content: "none" },
-            "blockquote p:last-of-type::after": { content: "none" },
-            "code::before": { content: "none" },
-            "code::after": { content: "none" },
-            code: {
-              color: theme("colors.brand.DEFAULT"),
-              backgroundColor: theme("colors.gray.100"),
-              borderRadius: "0.25rem",
-              padding: "0.125rem 0.25rem",
-              fontWeight: "500",
-            },
-            // Typography ships tables at 0.857em, which lands at 12px and is
-            // the least legible thing in an answer.
-            table: { width: "100%", fontSize: "0.95em", lineHeight: "1.6" },
-            "tbody tr:nth-child(even)": { backgroundColor: theme("colors.stone.50") },
-            "thead th": {
-              color: theme("colors.stone.900"),
-              backgroundColor: theme("colors.stone.50"),
-              fontWeight: "600",
-            },
-            "th, td": {
-              border: `1px solid ${theme("colors.stone.200")}`,
-              padding: "0.375rem 0.625rem",
-            },
-            "thead, tbody tr": { borderBottomWidth: "0" },
+      // Answer Markdown (IR-450/451/452). Used with `prose-base`, whose 16px
+      // base is a reading size; the interface around it stays on its own scale.
+      typography: ({ theme }) => {
+        // Typography zeroes the outer padding of the first and last cell so a
+        // prose table lines up with the text column. A bordered table needs it
+        // back, or the first column sits flush against its own border. These
+        // keys match the plugin's exactly so the values merge in place.
+        const cells = {
+          "thead th": {
+            paddingTop: "0.4rem",
+            paddingBottom: "0.4rem",
+            paddingInlineStart: "0.7rem",
+            paddingInlineEnd: "0.7rem",
           },
-        },
-        // `prose-base` restates the table size after DEFAULT, so the override
-        // has to live here too or typography's 0.875em wins on the cascade.
-        base: { css: { table: { fontSize: "0.95em", lineHeight: "1.6" } } },
-      }),
+          "thead th:first-child": { paddingInlineStart: "0.7rem" },
+          "thead th:last-child": { paddingInlineEnd: "0.7rem" },
+          "tbody td, tfoot td": {
+            paddingTop: "0.4rem",
+            paddingBottom: "0.4rem",
+            paddingInlineStart: "0.7rem",
+            paddingInlineEnd: "0.7rem",
+          },
+          "tbody td:first-child, tfoot td:first-child": { paddingInlineStart: "0.7rem" },
+          "tbody td:last-child, tfoot td:last-child": { paddingInlineEnd: "0.7rem" },
+        };
+
+        // `prose-base` restates table size, cell padding and hr margins after
+        // DEFAULT, so anything they set has to be repeated there or it loses.
+        const restated = {
+          table: { width: "100%", fontSize: "0.95em", lineHeight: "1.6" },
+          hr: { marginTop: "2em", marginBottom: "2em" },
+          ...cells,
+        };
+
+        return {
+          DEFAULT: {
+            css: {
+              color: theme("colors.stone.700"),
+              maxWidth: "none",
+              "h1, h2, h3, h4": {
+                color: theme("colors.brand.DEFAULT"),
+                // The same face the paper view gives a title (IR-356).
+                fontFamily: theme("fontFamily.display").join(", "),
+                // Only EB Garamond 600 is loaded; see main.tsx.
+                fontWeight: "600",
+              },
+              // A rule under the top two levels is what makes a section start
+              // read as one, rather than as a bold line in the prose.
+              "h1, h2": {
+                borderBottom: `1px solid ${theme("colors.stone.200")}`,
+                paddingBottom: "0.25em",
+              },
+              // A model-written `---` under a heading repeats the rule the
+              // heading already draws, and spends 3em of blank page doing it.
+              "h1 + hr, h2 + hr": { display: "none" },
+              // Whatever follows a rule starts against it, not a line later.
+              "hr + *": { marginTop: "0" },
+              strong: { color: theme("colors.stone.900") },
+              "ul > li::marker, ol > li::marker": { color: theme("colors.stone.400") },
+              blockquote: {
+                fontStyle: "normal",
+                fontWeight: "400",
+                color: theme("colors.stone.600"),
+                borderLeftColor: theme("colors.gold.DEFAULT"),
+              },
+              "blockquote p:first-of-type::before": { content: "none" },
+              "blockquote p:last-of-type::after": { content: "none" },
+              "code::before": { content: "none" },
+              "code::after": { content: "none" },
+              code: {
+                color: theme("colors.brand.DEFAULT"),
+                backgroundColor: theme("colors.gray.100"),
+                borderRadius: "0.25rem",
+                padding: "0.125rem 0.25rem",
+                fontWeight: "500",
+              },
+              // Typography ships tables at 0.875em, which is the least legible
+              // thing in an answer; `restated` below raises it.
+              "tbody tr:nth-child(even)": { backgroundColor: theme("colors.stone.50") },
+              "thead th": { color: theme("colors.stone.900"), backgroundColor: theme("colors.stone.50"), fontWeight: "600" },
+              "th, td": { border: `1px solid ${theme("colors.stone.200")}` },
+              "thead, tbody tr": { borderBottomWidth: "0" },
+              ...restated,
+            },
+          },
+          base: { css: restated },
+        };
+      },
 
       keyframes: {
         "fade-in-up": {

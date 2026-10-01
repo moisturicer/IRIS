@@ -97,6 +97,33 @@ describe("answer markdown typography", () => {
     expect(size).toBeGreaterThanOrEqual(0.95);
   });
 
+  it("keeps the first and last table cells off their own borders", async () => {
+    const rules = await rulesFor(ANSWER_MARKDOWN);
+    const edges = [
+      ["thead th:first-child", "padding-inline-start"],
+      ["thead th:last-child", "padding-inline-end"],
+      ["tbody td:first-child, tfoot td:first-child", "padding-inline-start"],
+      ["tbody td:last-child, tfoot td:last-child", "padding-inline-end"],
+    ] as const;
+    for (const [element, property] of edges) {
+      expect(effective(rules, element, property), `<${element}> is flush`).not.toBe("0");
+    }
+  });
+
+  it("does not spend a blank page on a rule under a heading", async () => {
+    const rules = await rulesFor(ANSWER_MARKDOWN);
+    expect(effective(rules, "h1 + hr, h2 + hr", "display")).toBe("none");
+    expect(effective(rules, "hr + *", "margin-top")).toBe("0");
+  });
+
+  it("sets headings in the same face the paper view uses for a title", async () => {
+    const rules = await rulesFor(ANSWER_MARKDOWN);
+    const family = effective(rules, "h1, h2, h3, h4", "font-family");
+    expect(family).toContain("EB Garamond");
+    // Only weight 600 of EB Garamond is loaded; see main.tsx.
+    expect(effective(rules, "h1, h2, h3, h4", "font-weight")).toBe("600");
+  });
+
   it("sizes the chat column by the viewport, never a fixed width", () => {
     expect(CHAT_COLUMN).toContain("vw");
     expect(CHAT_COLUMN).not.toMatch(/\d+px/);
