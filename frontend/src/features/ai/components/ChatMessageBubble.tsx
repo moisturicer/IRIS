@@ -2,6 +2,7 @@ import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
+import { ANSWER_MARKDOWN } from "./markdownStyle";
 import { CopyButton } from "./CopyButton";
 import {
   DegradedNotice,
@@ -73,7 +74,7 @@ export function ChatMessageBubble({ message, compact = false }: ChatMessageBubbl
           <CitationText
             text={message.content}
             citations={message.citations ?? []}
-            className="chat-markdown prose prose-sm max-w-none prose-p:my-1.5 prose-pre:my-2 prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-code:text-brand prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none"
+            className={ANSWER_MARKDOWN}
           />
         )}
 

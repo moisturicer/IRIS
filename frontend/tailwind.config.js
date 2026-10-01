@@ -1,3 +1,5 @@
+import typography from "@tailwindcss/typography";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -69,6 +71,48 @@ export default {
         3: "3",
       },
 
+      // Answer Markdown (IR-450). Used with `prose-sm`, whose 14px base is
+      // the repo's `base` size; only colours and structure are set here.
+      typography: ({ theme }) => ({
+        DEFAULT: {
+          css: {
+            color: theme("colors.stone.700"),
+            maxWidth: "none",
+            "h1, h2, h3, h4": { color: theme("colors.stone.900"), fontWeight: "600" },
+            strong: { color: theme("colors.stone.900") },
+            "ul > li::marker, ol > li::marker": { color: theme("colors.stone.400") },
+            blockquote: {
+              fontStyle: "normal",
+              fontWeight: "400",
+              color: theme("colors.stone.600"),
+              borderLeftColor: theme("colors.gold.DEFAULT"),
+            },
+            "blockquote p:first-of-type::before": { content: "none" },
+            "blockquote p:last-of-type::after": { content: "none" },
+            "code::before": { content: "none" },
+            "code::after": { content: "none" },
+            code: {
+              color: theme("colors.brand.DEFAULT"),
+              backgroundColor: theme("colors.gray.100"),
+              borderRadius: "0.25rem",
+              padding: "0.125rem 0.25rem",
+              fontWeight: "500",
+            },
+            table: { width: "100%" },
+            "thead th": {
+              color: theme("colors.stone.900"),
+              backgroundColor: theme("colors.stone.50"),
+              fontWeight: "600",
+            },
+            "th, td": {
+              border: `1px solid ${theme("colors.stone.200")}`,
+              padding: "0.375rem 0.625rem",
+            },
+            "thead, tbody tr": { borderBottomWidth: "0" },
+          },
+        },
+      }),
+
       keyframes: {
         "fade-in-up": {
           "0%":   { opacity: "0", transform: "translateY(6px)" },
@@ -95,6 +139,9 @@ export default {
   },
 
   plugins: [
-    // TODO: add @tailwindcss/forms and @tailwindcss/typography if needed
+    // The `prose` classes on Ask IRIS answers and the AI Overview (IR-450).
+    // Without it they emit no CSS and Preflight flattens every heading,
+    // list and table. @tailwindcss/forms is still not needed.
+    typography,
   ],
 };
