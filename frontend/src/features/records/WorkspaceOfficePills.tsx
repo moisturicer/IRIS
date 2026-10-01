@@ -24,7 +24,7 @@ export function WorkspaceOfficePills({ clearances }: { clearances: RecordClearan
       {clearances.map((c) => (
         <span
           key={c.office}
-          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-stone-50 border border-stone-200 text-[11px] font-semibold text-stone-700"
+          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-stone-50 border border-stone-200 text-[12px] font-semibold text-stone-700"
         >
           <span className={cn("w-1.5 h-1.5 rounded-full", STATUS_DOT[c.status])} aria-hidden />
           {c.office_label}

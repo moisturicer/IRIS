@@ -196,7 +196,7 @@ export default function AddRecordPage() {
           }
         />
 
-        <p className="text-[12px] text-stone-500 mb-6 -mt-3">
+        <p className="text-[13px] text-stone-500 mb-6 -mt-3">
           <Link to="/workspace" className="hover:text-brand">My Workspace</Link>
           <span className="mx-1.5">/</span>
           <span className="text-stone-600 font-medium">New Disclosure</span>
@@ -215,13 +215,13 @@ export default function AddRecordPage() {
                 <div
                   aria-current={current ? "step" : undefined}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold transition-colors",
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors",
                     current ? "bg-brand text-white" : done ? "text-stone-900" : "text-stone-500",
                   )}
                 >
                   <span
                     className={cn(
-                      "w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold",
+                      "w-5 h-5 rounded-full flex items-center justify-center text-[12px] font-bold",
                       current ? "bg-white text-brand" : done ? "bg-stone-900 text-white" : "border border-stone-300 text-stone-600",
                     )}
                   >
@@ -268,7 +268,7 @@ export default function AddRecordPage() {
             </div>
 
             {submitError && (
-              <p className="mt-4 flex items-start gap-1.5 text-[13px] text-brand" role="alert">
+              <p className="mt-4 flex items-start gap-1.5 text-[14px] text-brand" role="alert">
                 <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
                 {submitError}
               </p>
@@ -296,12 +296,12 @@ export default function AddRecordPage() {
 
       <Modal open={confirmOpen} onClose={() => (submitting ? undefined : setConfirmOpen(false))} title="Submit this disclosure?">
         <div className="p-5">
-          <p className="text-[13px] text-stone-700 leading-relaxed">
+          <p className="text-[14px] text-stone-700 leading-relaxed">
             Submitting sends this to {route?.firstStage ?? "the first reviewer"}. You will not
             be able to edit it while it is under review.
           </p>
           {submitError && (
-            <p className="flex items-start gap-1.5 text-[13px] text-brand mt-3" role="alert">
+            <p className="flex items-start gap-1.5 text-[14px] text-brand mt-3" role="alert">
               <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
               {submitError}
             </p>

@@ -84,16 +84,16 @@ export function DiscoverFilterPanel({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-2 px-3.5 py-2 rounded-full border text-[13px] font-semibold transition",
+          "flex items-center gap-2 px-3.5 py-2 rounded-full border text-[14px] font-semibold transition",
           activeCount > 0
             ? "bg-brand-50 border-brand-200 text-brand"
             : "bg-white border-stone-200 text-stone-700 hover:border-stone-300",
         )}
       >
-        <i className="fas fa-sliders text-[12px]" aria-hidden />
+        <i className="fas fa-sliders text-[13px]" aria-hidden />
         <span>Filter</span>
         {activeCount > 0 && (
-          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
             {activeCount}
           </span>
         )}
@@ -103,14 +103,14 @@ export function DiscoverFilterPanel({
       {open && (
         <div className="absolute left-0 top-full mt-2 w-[min(92vw,26rem)] bg-white rounded-2xl shadow-card-md border border-stone-200 z-40">
           <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100">
-            <h3 className="text-[13px] font-bold text-stone-900">Refine results</h3>
+            <h3 className="text-[14px] font-bold text-stone-900">Refine results</h3>
             <button
               type="button"
               onClick={() => setOpen(false)}
               className="p-1 rounded-md text-stone-400 hover:text-stone-600 hover:bg-stone-100"
               aria-label="Close filters"
             >
-              <i className="fas fa-times text-[13px]" aria-hidden />
+              <i className="fas fa-times text-[14px]" aria-hidden />
             </button>
           </div>
 
@@ -169,14 +169,14 @@ export function DiscoverFilterPanel({
               type="button"
               onClick={onClear}
               disabled={activeCount === 0}
-              className="text-[12px] font-semibold text-stone-500 hover:text-brand disabled:opacity-40 transition"
+              className="text-[13px] font-semibold text-stone-500 hover:text-brand disabled:opacity-40 transition"
             >
               Clear all
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="px-4 py-1.5 rounded-lg bg-brand hover:bg-brand-light text-white text-[12px] font-bold transition"
+              className="px-4 py-1.5 rounded-lg bg-brand hover:bg-brand-light text-white text-[13px] font-bold transition"
             >
               Done
             </button>
@@ -190,7 +190,7 @@ export function DiscoverFilterPanel({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[12px] font-semibold text-stone-500 shrink-0">{label}</span>
+      <span className="text-[13px] font-semibold text-stone-500 shrink-0">{label}</span>
       {children}
     </div>
   );

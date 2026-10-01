@@ -32,7 +32,7 @@ export function ToastContainer() {
           <div
             key={t.id}
             className={`pointer-events-auto flex items-start gap-3 w-80 rounded-xl px-4 py-3 shadow-lg
-              text-[13px] ${kind.tone}`}
+              text-[14px] ${kind.tone}`}
           >
             <i className={`fa ${kind.icon} mt-0.5 shrink-0`} aria-hidden />
             <span className="sr-only">{kind.word}</span>
@@ -42,7 +42,7 @@ export function ToastContainer() {
               className={`shrink-0 ${kind.dismiss}`}
               aria-label="Dismiss"
             >
-              <i className="fa fa-times text-[12px]" aria-hidden />
+              <i className="fa fa-times text-[13px]" aria-hidden />
             </button>
           </div>
         );

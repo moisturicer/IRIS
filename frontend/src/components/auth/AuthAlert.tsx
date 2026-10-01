@@ -17,7 +17,7 @@ function AlertIcon({ variant }: { variant: AuthAlertVariant }) {
 
   return (
     <span
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px] font-bold ${bg}`}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${bg}`}
       aria-hidden
     >
       !
@@ -44,8 +44,8 @@ export function AuthAlert({ variant, title, children, onDismiss }: AuthAlertProp
       <div className="flex gap-3 pr-6">
         <AlertIcon variant={variant} />
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-bold">{title}</p>
-          <div className="mt-1 text-[13px] leading-relaxed">{children}</div>
+          <p className="text-[15px] font-bold">{title}</p>
+          <div className="mt-1 text-[14px] leading-relaxed">{children}</div>
         </div>
       </div>
     </div>

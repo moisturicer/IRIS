@@ -5,7 +5,7 @@
 
 /** A text control's box: stone at rest, maroon when invalid, as `Input` does it. */
 export function fieldClasses(invalid: boolean): string {
-  return `w-full border rounded-lg px-3 py-2 text-[13px] text-stone-900 outline-none transition-colors
+  return `w-full border rounded-lg px-3 py-2 text-[14px] text-stone-900 outline-none transition-colors
     placeholder:text-stone-500 disabled:bg-stone-50 disabled:text-stone-500
     ${invalid
       // Maroon is also the focus colour, so an invalid field keeps its maroon
@@ -15,7 +15,7 @@ export function fieldClasses(invalid: boolean): string {
 }
 
 /** A field's label. */
-export const LABEL = "block text-[13px] font-medium text-stone-700 mb-1";
+export const LABEL = "block text-[14px] font-medium text-stone-700 mb-1";
 
 /**
  * A checkbox in the palette. `accent-brand` colours the tick: with no
@@ -25,4 +25,4 @@ export const CHECKBOX = "w-4 h-4 rounded border-stone-300 text-brand accent-bran
 
 /** The load-failure notice at the top of a step: maroon, with a glyph. */
 export const LOAD_ERROR =
-  "flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-[13px] text-brand";
+  "flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-[14px] text-brand";

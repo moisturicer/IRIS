@@ -48,7 +48,7 @@ export function PendingApprovalPage() {
           <h1 className="text-[18px] font-bold text-gray-900">
             Account Pending Approval
           </h1>
-          <p className="text-[13px] text-gray-500 mt-1.5 leading-relaxed">
+          <p className="text-[14px] text-gray-500 mt-1.5 leading-relaxed">
             Your registration was received and your email has been verified.
             An administrator will review and approve your account shortly.
           </p>
@@ -57,30 +57,30 @@ export function PendingApprovalPage() {
         {/* User info */}
         {user && (
           <div className="w-full rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-left">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+            <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
               Registered as
             </p>
-            <p className="text-[13px] font-semibold text-gray-800">
+            <p className="text-[14px] font-semibold text-gray-800">
               {user.first_name} {user.last_name}
             </p>
-            <p className="text-[12px] text-gray-500">{user.email}</p>
+            <p className="text-[13px] text-gray-500">{user.email}</p>
           </div>
         )}
 
         {/* What to expect */}
         <div className="w-full text-left space-y-2">
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">
             What happens next
           </p>
-          <div className="flex items-start gap-2.5 text-[12px] text-gray-600">
+          <div className="flex items-start gap-2.5 text-[13px] text-gray-600">
             <i className="fas fa-envelope text-[#6B0F12] mt-0.5 w-4 flex-shrink-0" aria-hidden />
             <span>You will receive an email notification once your account is approved.</span>
           </div>
-          <div className="flex items-start gap-2.5 text-[12px] text-gray-600">
+          <div className="flex items-start gap-2.5 text-[13px] text-gray-600">
             <i className="fas fa-sign-in-alt text-[#6B0F12] mt-0.5 w-4 flex-shrink-0" aria-hidden />
             <span>After approval, log back in to access the full IRIS platform.</span>
           </div>
-          <div className="flex items-start gap-2.5 text-[12px] text-gray-600">
+          <div className="flex items-start gap-2.5 text-[13px] text-gray-600">
             <i className="fas fa-clock text-[#6B0F12] mt-0.5 w-4 flex-shrink-0" aria-hidden />
             <span>Approvals are typically processed within 1–2 business days.</span>
           </div>
@@ -90,13 +90,13 @@ export function PendingApprovalPage() {
         <button
           type="button"
           onClick={handleLogout}
-          className="mt-1 w-full py-2.5 rounded-lg border border-gray-200 text-[13px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+          className="mt-1 w-full py-2.5 rounded-lg border border-gray-200 text-[14px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
         >
           Sign out
         </button>
       </div>
 
-      <p className="mt-5 text-[11px] text-gray-500">
+      <p className="mt-5 text-[12px] text-gray-500">
         Questions? Contact the RDCO office or your department administrator.
       </p>
     </div>

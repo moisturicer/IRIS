@@ -35,10 +35,10 @@ export function DpaConsentModal({ open, onClose }: DpaConsentModalProps) {
         <div className="shrink-0 px-5 pt-5 pb-4 border-b border-gray-200">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#6B0F12]">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#6B0F12]">
                 {DPA_REGISTRY_TITLE}
               </p>
-              <h2 className="text-[15px] font-bold text-gray-900 mt-1 leading-snug">
+              <h2 className="text-[16px] font-bold text-gray-900 mt-1 leading-snug">
                 {DPA_REGISTRY_SUBTITLE}
               </h2>
             </div>
@@ -48,7 +48,7 @@ export function DpaConsentModal({ open, onClose }: DpaConsentModalProps) {
               className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-600 shrink-0"
               aria-label="Close"
             >
-              <i className="fa fa-times text-[14px]" aria-hidden />
+              <i className="fa fa-times text-[15px]" aria-hidden />
             </button>
           </div>
           <button
@@ -56,9 +56,9 @@ export function DpaConsentModal({ open, onClose }: DpaConsentModalProps) {
             onClick={handleCopy}
             disabled={copying}
             className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200
-              text-[12px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              text-[13px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
-            <i className="fas fa-copy text-[11px]" aria-hidden />
+            <i className="fas fa-copy text-[12px]" aria-hidden />
             {copying ? "Copying…" : "Copy content"}
           </button>
         </div>
@@ -66,16 +66,16 @@ export function DpaConsentModal({ open, onClose }: DpaConsentModalProps) {
         <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-5">
           {DPA_SECTIONS.map((section) => (
             <section key={section.title}>
-              <h3 className="text-[13px] font-bold text-gray-900">{section.title}</h3>
+              <h3 className="text-[14px] font-bold text-gray-900">{section.title}</h3>
               {"body" in section && section.body && (
-                <p className="text-[12px] text-gray-600 leading-relaxed mt-1.5">{section.body}</p>
+                <p className="text-[13px] text-gray-600 leading-relaxed mt-1.5">{section.body}</p>
               )}
               {"list" in section && section.list && (
                 <ul className="mt-2 space-y-2">
                   {section.list.map((item) => (
                     <li
                       key={item.slice(0, 40)}
-                      className="text-[12px] text-gray-600 leading-relaxed pl-3 border-l-2 border-[#6B0F12]/20"
+                      className="text-[13px] text-gray-600 leading-relaxed pl-3 border-l-2 border-[#6B0F12]/20"
                     >
                       {item}
                     </li>
@@ -90,7 +90,7 @@ export function DpaConsentModal({ open, onClose }: DpaConsentModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 rounded-lg bg-[#6B0F12] text-white text-[13px] font-semibold hover:bg-[#7d1215]"
+            className="w-full py-2.5 rounded-lg bg-[#6B0F12] text-white text-[14px] font-semibold hover:bg-[#7d1215]"
           >
             Close
           </button>

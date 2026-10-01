@@ -47,13 +47,13 @@ export function DownloadRequestModal({
   return (
     <Modal open={open} onClose={onClose} title="Request download access" size="max-w-md">
       <div className="space-y-4">
-        <p className="text-[13px] text-gray-600 leading-relaxed">
+        <p className="text-[14px] text-gray-600 leading-relaxed">
           You are requesting permission to download documents for{" "}
           <span className="font-semibold text-gray-900">{recordTitle}</span>.
           Staff will review your request. If approved, you will receive a secure download link
           valid for 24 hours.
         </p>
-        <p className="text-[12px] text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+        <p className="text-[13px] text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
           Downloads are for authorized use only. Do not redistribute approved files without
           permission.
         </p>
@@ -62,7 +62,7 @@ export function DownloadRequestModal({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-[13px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-[14px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -70,7 +70,7 @@ export function DownloadRequestModal({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white bg-[#6B0F12] hover:bg-[#7d1215] disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-[14px] font-semibold text-white bg-[#6B0F12] hover:bg-[#7d1215] disabled:opacity-50"
           >
             {submitting ? "Submitting…" : "Submit request"}
           </button>

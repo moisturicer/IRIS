@@ -56,10 +56,10 @@ export function FileUploadZone({
       `}
     >
       <i className="fa fa-cloud-upload-alt text-3xl text-stone-500" aria-hidden />
-      <p className="text-[13px] text-stone-600 font-medium">
+      <p className="text-[14px] text-stone-600 font-medium">
         Drag and drop here, or <span className="text-brand">browse</span>
       </p>
-      {hint && <p className="text-[12px] text-stone-500">{hint}</p>}
+      {hint && <p className="text-[13px] text-stone-500">{hint}</p>}
       <input
         ref={inputRef}
         type="file"

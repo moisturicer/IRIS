@@ -98,7 +98,7 @@ export function LibraryFolderRail({
               if (e.key === "Escape") setRenamingId(null);
             }}
             aria-label={`Rename ${collection.name}`}
-            className="w-full px-2.5 py-1.5 bg-white border border-brand/40 rounded-lg text-[13px] outline-none"
+            className="w-full px-2.5 py-1.5 bg-white border border-brand/40 rounded-lg text-[14px] outline-none"
           />
         </li>
       );
@@ -111,18 +111,18 @@ export function LibraryFolderRail({
           onClick={() => onViewChange({ kind: "folder", id: collection.id })}
           aria-current={active ? "true" : undefined}
           className={cn(
-            "w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-lg text-[13px] transition-colors text-left",
+            "w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-lg text-[14px] transition-colors text-left",
             active
               ? "bg-brand-50 text-brand font-semibold"
               : "text-stone-600 hover:bg-stone-50",
           )}
         >
           <i
-            className={cn("fas", icon, "text-[13px] shrink-0", active ? "text-brand" : "text-stone-400")} aria-hidden />
+            className={cn("fas", icon, "text-[14px] shrink-0", active ? "text-brand" : "text-stone-400")} aria-hidden />
           <span className="truncate flex-1">{collection.name}</span>
           <span
             className={cn(
-              "shrink-0 min-w-[20px] px-1.5 py-0.5 rounded text-[10px] font-bold text-center",
+              "shrink-0 min-w-[20px] px-1.5 py-0.5 rounded text-[11px] font-bold text-center",
               active ? "bg-white text-brand" : "bg-stone-100 text-stone-500",
               // The row's own controls take this space on hover.
               removable && "group-hover/folder:invisible",
@@ -144,7 +144,7 @@ export function LibraryFolderRail({
               title="Rename"
               className="p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-white"
             >
-              <i className="fas fa-pen text-[10px]" aria-hidden />
+              <i className="fas fa-pen text-[11px]" aria-hidden />
             </button>
             <button
               type="button"
@@ -153,7 +153,7 @@ export function LibraryFolderRail({
               title="Delete folder"
               className="p-1 rounded text-stone-400 hover:text-brand hover:bg-white"
             >
-              <i className="fas fa-trash text-[10px]" aria-hidden />
+              <i className="fas fa-trash text-[11px]" aria-hidden />
             </button>
           </span>
         )}
@@ -171,12 +171,12 @@ export function LibraryFolderRail({
   ) => {
     const inner = (
       <>
-        <i className={cn("fas", icon, "text-[13px] shrink-0", active ? "text-brand" : "text-stone-400")} aria-hidden />
+        <i className={cn("fas", icon, "text-[14px] shrink-0", active ? "text-brand" : "text-stone-400")} aria-hidden />
         <span className="flex-1 truncate">{label}</span>
         {count !== null && (
           <span
             className={cn(
-              "shrink-0 min-w-[20px] px-1.5 py-0.5 rounded text-[10px] font-bold text-center",
+              "shrink-0 min-w-[20px] px-1.5 py-0.5 rounded text-[11px] font-bold text-center",
               active ? "bg-white text-brand" : "bg-stone-100 text-stone-500",
             )}
           >
@@ -187,7 +187,7 @@ export function LibraryFolderRail({
     );
 
     const className = cn(
-      "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors text-left",
+      "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[14px] transition-colors text-left",
       active ? "bg-brand-50 text-brand font-semibold" : "text-stone-600 hover:bg-stone-50",
     );
 
@@ -205,7 +205,7 @@ export function LibraryFolderRail({
   return (
     <div className="flex flex-col h-full bg-white border border-stone-200 rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
-        <h2 className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
+        <h2 className="text-[12px] font-bold uppercase tracking-wider text-stone-400">
           Folders
           <span className="ml-1.5 text-stone-300">{collections.length}</span>
         </h2>
@@ -216,7 +216,7 @@ export function LibraryFolderRail({
           title="Hide folders"
           className="p-1.5 rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700"
         >
-          <i className="fas fa-angles-left text-[12px]" aria-hidden />
+          <i className="fas fa-angles-left text-[13px]" aria-hidden />
         </button>
       </div>
 
@@ -236,15 +236,15 @@ export function LibraryFolderRail({
             }}
             placeholder="Folder name…"
             aria-label="New folder name"
-            className="w-full px-3 py-2 bg-white border border-brand/40 rounded-lg text-[13px] outline-none placeholder-stone-400"
+            className="w-full px-3 py-2 bg-white border border-brand/40 rounded-lg text-[14px] outline-none placeholder-stone-400"
           />
         ) : (
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-brand-200 text-brand text-[13px] font-semibold hover:bg-brand-50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-brand-200 text-brand text-[14px] font-semibold hover:bg-brand-50 transition-colors"
           >
-            <i className="fas fa-folder-plus text-[12px]" aria-hidden />
+            <i className="fas fa-folder-plus text-[13px]" aria-hidden />
             New Folder
           </button>
         )}
@@ -257,11 +257,11 @@ export function LibraryFolderRail({
           )}
         </ul>
 
-        <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+        <p className="px-5 pt-4 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-stone-400">
           Custom topics
         </p>
         {topicFolders.length === 0 ? (
-          <p className="px-5 pb-2 text-[12px] text-stone-400 leading-snug">
+          <p className="px-5 pb-2 text-[13px] text-stone-400 leading-snug">
             No topic folders yet. Create one to group papers by theme.
           </p>
         ) : (

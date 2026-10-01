@@ -78,7 +78,7 @@ export function DiscoverRecordCard({
               <span
                 key={badge.label}
                 className={cn(
-                  "px-2 py-0.5 rounded-md text-[11px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
+                  "px-2 py-0.5 rounded-md text-[12px] font-bold leading-5 flex items-center gap-1 whitespace-nowrap",
                   BADGE_TONE_CLASS[badge.tone],
                 )}
               >
@@ -92,21 +92,21 @@ export function DiscoverRecordCard({
             ))}
           </div>
 
-          <span className="text-[11px] font-medium text-slate-400 shrink-0 whitespace-nowrap">
+          <span className="text-[12px] font-medium text-slate-400 shrink-0 whitespace-nowrap">
             CIT-U {recordYearLabel(record)}
           </span>
         </div>
 
         {/* Title — the primary action on the card */}
-        <h2 className="text-[17px] font-bold text-slate-900 leading-snug mb-1.5">
+        <h2 className="font-display text-[23px] font-semibold text-slate-900 leading-snug mb-1.5">
           <Link to={`/records/${record.id}`} className="hover:text-brand transition-colors">
             {highlightMatch(record.title, searchHighlight)}
           </Link>
         </h2>
 
         {/* Byline */}
-        <p className={cn("flex items-start gap-1.5 text-[12px] text-brand font-medium mb-2.5", !expanded && "truncate")}>
-          <i className="fas fa-user-group text-[10px] text-slate-300 mt-1 shrink-0" aria-hidden />
+        <p className={cn("flex items-start gap-1.5 text-[13px] text-brand font-medium mb-2.5", !expanded && "truncate")}>
+          <i className="fas fa-user-group text-[11px] text-slate-300 mt-1 shrink-0" aria-hidden />
           <span className={cn(!expanded && "truncate")}>
             {highlightMatch(formatAuthorList(record.authors), searchHighlight)}
           </span>
@@ -114,11 +114,11 @@ export function DiscoverRecordCard({
 
         {/* Abstract */}
         {abstract ? (
-          <p className={cn("text-[13px] text-slate-600 leading-relaxed", !expanded && "line-clamp-3")}>
+          <p className={cn("text-[14px] text-slate-600 leading-relaxed", !expanded && "line-clamp-3")}>
             {highlightMatch(abstract, searchHighlight)}
           </p>
         ) : (
-          <p className="text-[13px] text-slate-400 italic">No abstract provided.</p>
+          <p className="text-[14px] text-slate-400 italic">No abstract provided.</p>
         )}
 
         {hasMoreToRead && (
@@ -128,7 +128,7 @@ export function DiscoverRecordCard({
               e.stopPropagation();
               setExpanded((v) => !v);
             }}
-            className="mt-2 text-[12px] font-bold text-brand hover:underline flex items-center gap-1.5"
+            className="mt-2 text-[13px] font-bold text-brand hover:underline flex items-center gap-1.5"
           >
             <i className={cn("fas text-[9px]", expanded ? "fa-chevron-up" : "fa-chevron-down")} aria-hidden />
             <span>{expanded ? "Show less" : "Quick read"}</span>
@@ -138,19 +138,19 @@ export function DiscoverRecordCard({
 
       {/* Footer — passive stats left, actions right */}
       <div className="px-5 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4 text-[12px] text-slate-400 font-medium">
+        <div className="flex items-center gap-4 text-[13px] text-slate-400 font-medium">
           <span className="flex items-center gap-1.5" title="Times this record has been opened">
-            <i className="fas fa-eye text-[11px]" aria-hidden />
+            <i className="fas fa-eye text-[12px]" aria-hidden />
             <span>{record.access_count} views</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <i className="fas fa-file-lines text-[11px]" aria-hidden />
+            <i className="fas fa-file-lines text-[12px]" aria-hidden />
             <span>
               {record.file_count} file{record.file_count === 1 ? "" : "s"}
             </span>
           </span>
           <span className="hidden sm:flex items-center gap-1.5">
-            <i className="fas fa-calendar text-[11px]" aria-hidden />
+            <i className="fas fa-calendar text-[12px]" aria-hidden />
             <span>{recordYearLabel(record)}</span>
           </span>
         </div>
@@ -215,7 +215,7 @@ function IconButton({
           : "border-slate-200 text-slate-400 hover:text-brand hover:border-brand-200",
       )}
     >
-      <i className={cn(icon, "text-[12px]")} aria-hidden />
+      <i className={cn(icon, "text-[13px]")} aria-hidden />
     </button>
   );
 }

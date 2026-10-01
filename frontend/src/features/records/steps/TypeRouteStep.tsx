@@ -53,7 +53,7 @@ export function TypeRouteStep() {
   return (
     <div className="lg:flex lg:gap-6 lg:items-start">
       <div className="min-w-0 lg:flex-1">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-3">
+        <p className="text-[12px] font-bold uppercase tracking-wider text-stone-500 mb-3">
           Step 1 of 3 · Type determines who reviews first
         </p>
 
@@ -93,10 +93,10 @@ export function TypeRouteStep() {
                       {...register("record_type")}
                       className="absolute left-4 top-5 w-4 h-4 accent-brand"
                     />
-                    <span className="block text-[14px] font-bold text-stone-900">{rt.name}</span>
+                    <span className="block text-[15px] font-bold text-stone-900">{rt.name}</span>
                     {r && (
                       <>
-                        <span className="block text-[12px] text-stone-500 mt-0.5">{r.description}</span>
+                        <span className="block text-[13px] text-stone-500 mt-0.5">{r.description}</span>
                         <span className="flex flex-wrap items-center gap-1.5 mt-2.5">
                           {r.bookends.map((label, i) => (
                             <span key={label} className="flex items-center gap-1.5">
@@ -109,14 +109,14 @@ export function TypeRouteStep() {
                                   aria-hidden
                                 />
                               )}
-                              <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-stone-900 text-white">
+                              <span className="px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide bg-stone-900 text-white">
                                 {label}
                               </span>
                             </span>
                           ))}
                         </span>
                         {r.hasConditionalOffices && (
-                          <span className="block text-[11px] text-stone-500 mt-1.5">
+                          <span className="block text-[12px] text-stone-500 mt-1.5">
                             Which offices review it in between depends on what you tell us next.
                           </span>
                         )}
@@ -133,10 +133,10 @@ export function TypeRouteStep() {
 
       <aside className="mt-5 lg:mt-0 lg:w-72 lg:shrink-0 space-y-4">
         <div className="bg-white border border-stone-200 rounded-xl p-4">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-2">
+          <h3 className="text-[12px] font-bold uppercase tracking-wider text-stone-500 mb-2">
             What you'll need
           </h3>
-          <p className="text-[12px] text-stone-600 leading-relaxed">
+          <p className="text-[13px] text-stone-600 leading-relaxed">
             Just your manuscript (PDF, max 50 MB) to submit. Anything a specific office needs —
             an ethics clearance form, a similarity report — is requested once your disclosure is
             routed there, from this record's Documents page.
@@ -146,11 +146,11 @@ export function TypeRouteStep() {
         {/* An advisory, so soft maroon, headed by a glyph and its own words
             rather than carried by the tone (IR-360). */}
         <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
-          <p className="flex items-center gap-1.5 text-[12px] font-bold text-brand">
+          <p className="flex items-center gap-1.5 text-[13px] font-bold text-brand">
             <i className="fas fa-shield-halved" aria-hidden />
             Data Privacy consent
           </p>
-          <p className="text-[11px] text-stone-700 mt-1 leading-relaxed">
+          <p className="text-[12px] text-stone-700 mt-1 leading-relaxed">
             Required at step 3. Full text is readable in place, not a click-through.
           </p>
         </div>

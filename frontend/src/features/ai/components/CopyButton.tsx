@@ -25,10 +25,10 @@ export function CopyButton({ text, label }: CopyButtonProps) {
       type="button"
       onClick={handleCopy}
       aria-label={label}
-      className="inline-flex items-center gap-1.5 text-[12px] font-medium text-stone-400
+      className="inline-flex items-center gap-1.5 text-[13px] font-medium text-stone-400
         hover:text-stone-600 transition-colors duration-200"
     >
-      <i className={`fas ${copied ? "fa-check" : "fa-copy"} text-[11px]`} aria-hidden />
+      <i className={`fas ${copied ? "fa-check" : "fa-copy"} text-[12px]`} aria-hidden />
       {copied ? "Copied" : "Copy"}
     </button>
   );

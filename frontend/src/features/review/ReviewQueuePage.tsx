@@ -95,17 +95,17 @@ export default function ReviewQueuePage() {
               aria-selected={active}
               onClick={() => setFilter(f.key)}
               className={cn(
-                "flex items-center gap-2 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors",
+                "flex items-center gap-2 px-3 py-2 text-[14px] font-semibold border-b-2 -mb-px transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6B0F12] focus-visible:ring-offset-1",
                 active
                   ? "border-[#6B0F12] text-[#6B0F12]"
                   : "border-transparent text-stone-500 hover:text-stone-800 hover:border-stone-300",
               )}
             >
-              <i className={cn("fas", f.icon, "text-[11px]")} aria-hidden />
+              <i className={cn("fas", f.icon, "text-[12px]")} aria-hidden />
               {f.label}
               {active && !loading && (
-                <span className="ml-1 rounded-full bg-[#6B0F12]/10 px-1.5 text-[11px] font-bold tabular-nums">
+                <span className="ml-1 rounded-full bg-[#6B0F12]/10 px-1.5 text-[12px] font-bold tabular-nums">
                   {rows.length}
                 </span>
               )}
@@ -136,13 +136,13 @@ export default function ReviewQueuePage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Link
                       to={`/records/${r.id}`}
-                      className="text-[14px] font-bold text-[#6B0F12] hover:underline"
+                      className="text-[15px] font-bold text-[#6B0F12] hover:underline"
                     >
                       {r.title}
                     </Link>
                     {r.resubmitted && (
                       <span
-                        className="inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700"
+                        className="inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-bold text-indigo-700"
                         title={
                           r.resubmission_count === 1
                             ? "Resubmitted once after revisions"
@@ -155,7 +155,7 @@ export default function ReviewQueuePage() {
                     )}
                   </div>
 
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-500">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-stone-500">
                     {/* Server-worded: never map a stage key to English here. */}
                     <span className="font-semibold text-stone-700">{r.stage_label}</span>
                     <span aria-hidden>·</span>
@@ -167,7 +167,7 @@ export default function ReviewQueuePage() {
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
                       Other offices
                     </span>
                     <PeerClearanceStrip peers={r.peers} />
@@ -177,7 +177,7 @@ export default function ReviewQueuePage() {
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <Link
                     to={`/review/${r.id}/evaluate`}
-                    className="rounded-lg bg-[#6B0F12] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#7d1215] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6B0F12] focus-visible:ring-offset-2"
+                    className="rounded-lg bg-[#6B0F12] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#7d1215] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6B0F12] focus-visible:ring-offset-2"
                   >
                     {/* Naming the office is the point: at parallel_review this
                         records one office's clearance, not the record's
@@ -185,7 +185,7 @@ export default function ReviewQueuePage() {
                     {r.your_office_label ? `Record ${r.your_office_label} clearance` : "Open decision"}
                   </Link>
                   {r.your_office_label && (
-                    <span className="text-[10px] text-stone-400">
+                    <span className="text-[11px] text-stone-400">
                       You are {r.your_office_label}
                     </span>
                   )}

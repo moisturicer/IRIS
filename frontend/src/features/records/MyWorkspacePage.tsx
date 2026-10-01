@@ -113,9 +113,9 @@ export default function MyWorkspacePage() {
         actions={
           <Link
             to="/records/add"
-            className="inline-flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-brand-light transition-colors"
+            className="inline-flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg text-[14px] font-semibold hover:bg-brand-light transition-colors"
           >
-            <i className="fas fa-file-signature text-[12px]" aria-hidden />
+            <i className="fas fa-file-signature text-[13px]" aria-hidden />
             Submit Disclosure
           </Link>
         }
@@ -140,13 +140,13 @@ export default function MyWorkspacePage() {
             )}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{s.label}</span>
-              <i className={cn("fas", s.icon, "text-[13px]", s.danger && s.value > 0 ? "text-red-500" : "text-stone-300")} aria-hidden />
+              <span className="text-[12px] font-bold uppercase tracking-wider text-stone-400">{s.label}</span>
+              <i className={cn("fas", s.icon, "text-[14px]", s.danger && s.value > 0 ? "text-red-500" : "text-stone-300")} aria-hidden />
             </div>
             <p className={cn("text-[26px] font-bold leading-none", s.danger && s.value > 0 ? "text-red-600" : "text-stone-900")}>
               {s.value}
             </p>
-            <p className="text-[11px] text-stone-400 mt-1">{s.sub}</p>
+            <p className="text-[12px] text-stone-400 mt-1">{s.sub}</p>
           </div>
         ))}
       </div>
@@ -160,7 +160,7 @@ export default function MyWorkspacePage() {
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors whitespace-nowrap",
+                "px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-colors whitespace-nowrap",
                 tab === t.id ? "bg-brand text-white" : "text-stone-500 hover:bg-stone-50",
               )}
             >
@@ -169,13 +169,13 @@ export default function MyWorkspacePage() {
           ))}
         </div>
         <div className="relative flex-1 min-w-[12rem]">
-          <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-stone-400" aria-hidden />
+          <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-stone-400" aria-hidden />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by case #, title, office…"
             aria-label="Search your cases"
-            className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-xl text-[13px] outline-none focus:border-brand/40 placeholder-stone-400"
+            className="w-full pl-9 pr-3 py-2 bg-white border border-stone-200 rounded-xl text-[14px] outline-none focus:border-brand/40 placeholder-stone-400"
           />
         </div>
       </div>
@@ -185,8 +185,8 @@ export default function MyWorkspacePage() {
         <div className="flex justify-center py-16"><Spinner /></div>
       ) : failed ? (
         <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center">
-          <p className="text-[14px] font-semibold text-stone-700">Could not load your workspace</p>
-          <p className="text-[12px] text-stone-500 mt-1">Please refresh and try again.</p>
+          <p className="text-[15px] font-semibold text-stone-700">Could not load your workspace</p>
+          <p className="text-[13px] text-stone-500 mt-1">Please refresh and try again.</p>
         </div>
       ) : visible.length === 0 ? (
         <EmptyState
@@ -218,29 +218,29 @@ export default function MyWorkspacePage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 text-[10px] font-mono font-semibold">
+                      <span className="px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 text-[11px] font-mono font-semibold">
                         {formatCaseId(record)}
                       </span>
                       {badges.map((b) => (
                         <span
                           key={b.label}
-                          className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", BADGE_TONE_CLASS[b.tone])}
+                          className={cn("px-1.5 py-0.5 rounded text-[11px] font-semibold", BADGE_TONE_CLASS[b.tone])}
                         >
                           {b.label}
                         </span>
                       ))}
                       {flagged && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">
+                        <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700">
                           <i className="fas fa-circle-exclamation mr-1" aria-hidden />Action Required
                         </span>
                       )}
                     </div>
 
-                    <Link to={`/records/${record.id}`} className="block text-[14px] font-bold text-stone-900 hover:text-brand leading-snug">
+                    <Link to={`/records/${record.id}`} className="block text-[15px] font-bold text-stone-900 hover:text-brand leading-snug">
                       {record.title}
                     </Link>
 
-                    <p className="text-[12px] text-stone-500 mt-2">
+                    <p className="text-[13px] text-stone-500 mt-2">
                       Office: <span className="font-medium text-stone-700">{currentOfficeLabel(record)}</span>
                       <span className="mx-1.5 text-stone-300">·</span>
                       Submitted: {formatDate(record.created_at)}
@@ -254,7 +254,7 @@ export default function MyWorkspacePage() {
                   </div>
 
                   <div className="w-full sm:w-56 shrink-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1.5 text-right">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-1.5 text-right">
                       {atIndex >= 0 ? `Stage ${atIndex + 1} of ${sequence.length}` : "Workflow stage"}
                     </p>
                     <div className="flex gap-1 mb-1.5">
@@ -268,13 +268,13 @@ export default function MyWorkspacePage() {
                         />
                       ))}
                     </div>
-                    <p className="text-[12px] font-semibold text-stone-700 text-right">
+                    <p className="text-[13px] font-semibold text-stone-700 text-right">
                       {flagged ? "Awaiting your revision" : `Current: ${stageLabel(at)}`}
                     </p>
                     <div className="text-right mt-2">
                       <Link
                         to={`/records/${record.id}`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 text-[12px] font-semibold text-stone-600 hover:border-brand/40 hover:text-brand transition-colors"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 text-[13px] font-semibold text-stone-600 hover:border-brand/40 hover:text-brand transition-colors"
                       >
                         Inspect Dossier <i className="fas fa-chevron-right text-[9px]" aria-hidden />
                       </Link>

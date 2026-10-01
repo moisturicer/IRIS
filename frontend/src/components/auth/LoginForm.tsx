@@ -98,7 +98,7 @@ export function LoginForm({
                     // px/min-w give the 44px target 2.5.5 asks for; the text
                     // alone would be about 34x18.
                     className="flex items-center justify-center min-h-11 min-w-11 px-1
-                      text-[13px] font-semibold text-brand hover:underline"
+                      text-[14px] font-semibold text-brand hover:underline"
                   >
                     {showPassword ? "Hide" : "Show"}
                   </button>
@@ -110,7 +110,7 @@ export function LoginForm({
           <div className="flex justify-end -mt-1">
             <button
               type="button"
-              className="text-[13px] font-semibold text-brand hover:underline"
+              className="text-[14px] font-semibold text-brand hover:underline"
               onClick={() =>
                 addToast({
                   type: "info",

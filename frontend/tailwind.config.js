@@ -43,13 +43,15 @@ export default {
       },
 
       fontSize: {
-        // Keep consistent with the 13px base used across components
-        "2xs": ["11px", { lineHeight: "16px" }],
-        xs:   ["12px", { lineHeight: "16px" }],
-        sm:   ["13px", { lineHeight: "20px" }],
-        base: ["14px", { lineHeight: "20px" }],
-        md:   ["15px", { lineHeight: "22px" }],
-        lg:   ["16px", { lineHeight: "24px" }],
+        // Raised one step in IR-452; components carry the same sizes inline,
+        // so the two move together or the app renders at two scales.
+        "3xs": ["11px", { lineHeight: "15px" }],
+        "2xs": ["12px", { lineHeight: "17px" }],
+        xs:   ["13px", { lineHeight: "18px" }],
+        sm:   ["14px", { lineHeight: "21px" }],
+        base: ["15px", { lineHeight: "22px" }],
+        md:   ["16px", { lineHeight: "24px" }],
+        lg:   ["17px", { lineHeight: "26px" }],
       },
 
       borderRadius: {

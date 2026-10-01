@@ -112,16 +112,16 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
               />
             </div>
             <div className="min-w-0 border-l border-brand/15 pl-4 sm:pl-5">
-              <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.14em] text-brand uppercase leading-snug">
+              <p className="text-[11px] sm:text-[12px] font-bold tracking-[0.14em] text-brand uppercase leading-snug">
                 Cebu Institute of Technology
               </p>
-              <p className="text-[10px] sm:text-[11px] font-bold tracking-[0.12em] text-brand/90 uppercase">
+              <p className="text-[11px] sm:text-[12px] font-bold tracking-[0.12em] text-brand/90 uppercase">
                 University
               </p>
               <p className="mt-2 text-[32px] sm:text-[36px] font-extrabold text-brand leading-none tracking-[0.2em]">
                 IRIS
               </p>
-              <p className="mt-1 text-[11px] font-semibold text-gray-600 tracking-wide">
+              <p className="mt-1 text-[12px] font-semibold text-gray-600 tracking-wide">
                 CIT-U Research Hub
               </p>
             </div>
@@ -130,10 +130,10 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
 
         {variant === "login" ? (
           <>
-            <p className="mt-8 text-[15px] font-medium text-gray-700 max-w-md">
+            <p className="mt-8 text-[16px] font-medium text-gray-700 max-w-md">
               Intelligent Research &amp; IP System
             </p>
-            <p className="mt-2 text-[13px] text-gray-500 leading-relaxed max-w-sm">
+            <p className="mt-2 text-[14px] text-gray-500 leading-relaxed max-w-sm">
               Securely managing the university&apos;s innovation and research assets.
             </p>
           </>
@@ -145,17 +145,17 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
                 Academic Curator.
               </span>
             </h1>
-            <p className="mt-5 text-[14px] sm:text-[15px] text-brand/90 leading-relaxed max-w-md">
+            <p className="mt-5 text-[15px] sm:text-[16px] text-brand/90 leading-relaxed max-w-md">
               Welcome to the Digital Vault of CIT-U Intellectual Property. A prestigious archive
               for students and researchers to safeguard and manage their academic assets.
             </p>
             <blockquote className="mt-8 pl-5 border-l-[3px] border-gold max-w-md">
-              <p className="font-serif italic text-[15px] text-brand leading-relaxed">
+              <p className="font-serif italic text-[16px] text-brand leading-relaxed">
                 &ldquo;Transforming complex IP data into a high-end editorial experience that feels
                 as permanent as a physical archive.&rdquo;
               </p>
             </blockquote>
-            <p className="mt-4 text-[10px] font-bold tracking-[0.12em] text-brand uppercase">
+            <p className="mt-4 text-[11px] font-bold tracking-[0.12em] text-brand uppercase">
               Cebu Institute of Technology – University
             </p>
           </>
@@ -170,7 +170,7 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
 
       <p
         className={cn(
-          "relative z-10 text-[11px] text-gray-500 mt-8 lg:mt-6",
+          "relative z-10 text-[12px] text-gray-500 mt-8 lg:mt-6",
           isSignup && "text-center"
         )}
       >
@@ -189,7 +189,7 @@ export function AuthFormBrandMark() {
       </div>
       <div>
         <p className="text-[20px] font-extrabold text-brand tracking-[0.15em] leading-none">IRIS</p>
-        <p className="text-[10px] font-semibold text-brand uppercase tracking-wider mt-0.5">
+        <p className="text-[11px] font-semibold text-brand uppercase tracking-wider mt-0.5">
           CIT-U Research Hub
         </p>
       </div>

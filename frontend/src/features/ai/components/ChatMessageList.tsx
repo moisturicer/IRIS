@@ -43,7 +43,7 @@ export function ChatMessageList({
         <div className="max-w-xl w-full animate-fade-in-up motion-reduce:animate-none">
           <AskIrisEmblem className="w-16 h-16 mx-auto mb-5" />
           <h2 className="text-[26px] font-bold text-stone-900 mb-2">What do you want to ask?</h2>
-          <p className="text-[14px] text-stone-500 leading-relaxed">
+          <p className="text-[15px] text-stone-500 leading-relaxed">
             Every answer is grounded in published CIT-U records
             {indexedRecords != null && (
               <> — <strong className="text-stone-700">{indexedRecords}</strong> currently searchable</>
@@ -59,7 +59,7 @@ export function ChatMessageList({
                   type="button"
                   onClick={() => onSuggestion?.(prompt)}
                   style={{ animationDelay: `${i * 60}ms` }}
-                  className="px-4 py-3.5 rounded-xl border border-stone-200 bg-white text-[13px] text-stone-700
+                  className="px-4 py-3.5 rounded-xl border border-stone-200 bg-white text-[14px] text-stone-700
                     hover:border-brand/40 hover:text-brand hover:shadow-sm transition-all duration-200
                     animate-fade-in-up motion-reduce:animate-none [animation-fill-mode:backwards]"
                 >

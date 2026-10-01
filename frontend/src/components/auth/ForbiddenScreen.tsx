@@ -20,11 +20,11 @@ export function ForbiddenScreen({ authenticatedRole, requiredRoles }: ForbiddenS
           <i className="fas fa-shield-alt text-2xl" aria-hidden />
         </div>
         <h1 className="text-[22px] font-bold text-stone-900">403 — Access Denied</h1>
-        <p className="mt-2 text-[14px] text-stone-600">
+        <p className="mt-2 text-[15px] text-stone-600">
           You do not have permission to view this page.
         </p>
 
-        <dl className="mt-6 space-y-3 rounded-lg bg-stone-50 px-5 py-4 text-left text-[13px]">
+        <dl className="mt-6 space-y-3 rounded-lg bg-stone-50 px-5 py-4 text-left text-[14px]">
           <div className="flex justify-between gap-4">
             <dt className="font-semibold text-stone-500">Your role</dt>
             <dd className="font-medium text-stone-900">{authenticatedRole ?? "Unknown"}</dd>
@@ -35,15 +35,15 @@ export function ForbiddenScreen({ authenticatedRole, requiredRoles }: ForbiddenS
           </div>
         </dl>
 
-        <p className="mt-5 text-[12px] font-medium text-brand">
+        <p className="mt-5 text-[13px] font-medium text-brand">
           Access violation attempt logged to AuditLog.
         </p>
 
         <Link
           to="/"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-brand-light transition-colors"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-brand-light transition-colors"
         >
-          <i className="fas fa-home text-[12px]" aria-hidden />
+          <i className="fas fa-home text-[13px]" aria-hidden />
           Return to Dashboard
         </Link>
       </div>

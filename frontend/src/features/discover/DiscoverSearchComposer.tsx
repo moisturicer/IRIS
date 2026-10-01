@@ -65,7 +65,7 @@ export function DiscoverSearchComposer({
           }}
           aria-label="Search records"
           placeholder="Who's working on edge AI at CIT-U? Search research, authors, topics…"
-          className="flex-1 min-w-0 resize-none bg-transparent text-[13px] text-stone-800 placeholder-stone-400 outline-none leading-6 max-h-32"
+          className="flex-1 min-w-0 resize-none bg-transparent text-[14px] text-stone-800 placeholder-stone-400 outline-none leading-6 max-h-32"
         />
         {value && (
           <button
@@ -74,7 +74,7 @@ export function DiscoverSearchComposer({
             aria-label="Clear search"
             className="p-1 text-stone-300 hover:text-stone-500"
           >
-            <i className="fas fa-times-circle text-[13px]" aria-hidden />
+            <i className="fas fa-times-circle text-[14px]" aria-hidden />
           </button>
         )}
       </div>
@@ -87,7 +87,7 @@ export function DiscoverSearchComposer({
           title="Add a filter"
           className="w-7 h-7 shrink-0 rounded-full border border-stone-200 text-stone-500 flex items-center justify-center hover:border-brand-200 hover:text-brand transition-colors"
         >
-          <i className="fas fa-plus text-[11px]" aria-hidden />
+          <i className="fas fa-plus text-[12px]" aria-hidden />
         </button>
 
         <div className="relative" ref={menuRef}>
@@ -96,7 +96,7 @@ export function DiscoverSearchComposer({
             onClick={() => setMenuOpen((v) => !v)}
             aria-expanded={menuOpen}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-semibold transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[13px] font-semibold transition-colors",
               mode === "smart"
                 ? "bg-brand-50 border-brand-200 text-brand"
                 : "bg-white border-stone-200 text-stone-600 hover:border-stone-300",
@@ -125,7 +125,7 @@ export function DiscoverSearchComposer({
         </div>
 
         <div className="ml-auto flex items-center gap-2.5">
-          <span className="hidden sm:inline text-[11px] font-mono text-stone-400">
+          <span className="hidden sm:inline text-[12px] font-mono text-stone-400">
             {mode === "smart" ? "Enter to ask" : "Filtering as you type"}
           </span>
           <button
@@ -136,7 +136,7 @@ export function DiscoverSearchComposer({
             title={mode === "smart" ? "Ask IRIS" : "Switch to Smart AI Search to ask"}
             className="w-8 h-8 shrink-0 rounded-full bg-brand text-white flex items-center justify-center transition-colors hover:bg-brand-light disabled:opacity-30"
           >
-            <i className="fas fa-arrow-up text-[12px]" aria-hidden />
+            <i className="fas fa-arrow-up text-[13px]" aria-hidden />
           </button>
         </div>
       </div>
@@ -162,10 +162,10 @@ function ModeOption({
       className="w-full text-left px-3 py-2 hover:bg-stone-50 transition-colors"
     >
       <span className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-semibold text-stone-800">{title}</span>
-        {active && <i className="fas fa-check text-brand text-[11px]" aria-hidden />}
+        <span className="text-[13px] font-semibold text-stone-800">{title}</span>
+        {active && <i className="fas fa-check text-brand text-[12px]" aria-hidden />}
       </span>
-      <span className="block text-[11px] text-stone-500 mt-0.5">{detail}</span>
+      <span className="block text-[12px] text-stone-500 mt-0.5">{detail}</span>
     </button>
   );
 }

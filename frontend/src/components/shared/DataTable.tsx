@@ -47,7 +47,7 @@ export function DataTable<T>({
   return (
     <div className="flex flex-col">
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
+        <table className="w-full text-[14px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
@@ -75,7 +75,7 @@ export function DataTable<T>({
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="py-12 text-center text-gray-500 text-[13px]">
+                <td colSpan={columns.length} className="py-12 text-center text-gray-500 text-[14px]">
                   No records found.
                 </td>
               </tr>
@@ -96,7 +96,7 @@ export function DataTable<T>({
 
       {/* Pagination bar */}
       {totalCount > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 text-[12px] text-gray-500">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 text-[13px] text-gray-500">
           <span>{start}-{end} of {totalCount}</span>
           <div className="flex gap-1">
             <Button
@@ -105,7 +105,7 @@ export function DataTable<T>({
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
-              <i className="fa fa-chevron-left text-[11px]" aria-hidden />
+              <i className="fa fa-chevron-left text-[12px]" aria-hidden />
             </Button>
             <span className="px-2 py-1 font-medium text-gray-700">{page} / {totalPages}</span>
             <Button
@@ -114,7 +114,7 @@ export function DataTable<T>({
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >
-              <i className="fa fa-chevron-right text-[11px]" aria-hidden />
+              <i className="fa fa-chevron-right text-[12px]" aria-hidden />
             </Button>
           </div>
         </div>

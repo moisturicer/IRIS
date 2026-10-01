@@ -39,7 +39,7 @@ function NavSection({
           drawer is always full width, so it keeps its titles either way. */}
       <div
         className={cn(
-          "px-4 py-2 text-[10px] font-bold tracking-widest text-stone-500 uppercase",
+          "px-4 py-2 text-[11px] font-bold tracking-widest text-stone-500 uppercase",
           collapsed ? "block md:hidden" : "block",
         )}
       >
@@ -54,7 +54,7 @@ function NavSection({
           title={collapsed ? item.label : undefined}
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 mx-2 py-2.5 rounded-md text-[13px] font-medium transition-colors relative",
+              "flex items-center gap-3 mx-2 py-2.5 rounded-md text-[14px] font-medium transition-colors relative",
               collapsed ? "px-4 md:px-2 justify-start md:justify-center" : "px-4 justify-start",
               isActive
                 ? "bg-brand-50 text-brand font-semibold before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-brand"
@@ -62,7 +62,7 @@ function NavSection({
             )
           }
         >
-          <i className={cn("fas", item.icon, "w-5 text-center text-[16px] flex-shrink-0")} aria-hidden />
+          <i className={cn("fas", item.icon, "w-5 text-center text-[17px] flex-shrink-0")} aria-hidden />
           {/* The visible label below is `md:hidden` while the rail is collapsed,
               which leaves the link with no accessible name on tablet and up --
               `title` is a tooltip, not a reliable name. This carries the name at
@@ -84,7 +84,7 @@ function NavSection({
           {item.badge != null && item.badge > 0 && (
             <span
               className={cn(
-                "min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[10px] font-bold items-center justify-center",
+                "min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[11px] font-bold items-center justify-center",
                 collapsed ? "flex md:hidden" : "flex",
               )}
             >
@@ -210,7 +210,7 @@ export function Sidebar({ className }: SidebarProps) {
               title="Expand sidebar"
               className="absolute inset-0 w-10 h-10 rounded-lg border border-stone-200 bg-white text-stone-500 flex items-center justify-center opacity-0 transition-opacity hover:text-brand hover:border-brand-200 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
             >
-              <i className="fas fa-chevron-right text-[13px]" aria-hidden />
+              <i className="fas fa-chevron-right text-[14px]" aria-hidden />
             </button>
           )}
         </div>
@@ -243,7 +243,7 @@ export function Sidebar({ className }: SidebarProps) {
             title="Collapse sidebar"
             className="hidden md:flex w-8 h-8 flex-shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 transition-colors hover:text-brand hover:border-brand-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
           >
-            <i className="fas fa-chevron-left text-[13px]" aria-hidden />
+            <i className="fas fa-chevron-left text-[14px]" aria-hidden />
           </button>
         )}
 
@@ -254,7 +254,7 @@ export function Sidebar({ className }: SidebarProps) {
           className="md:hidden p-1.5 text-stone-500 hover:text-brand rounded-md"
           aria-label="Close menu"
         >
-          <i className="fas fa-times text-[14px]" aria-hidden />
+          <i className="fas fa-times text-[15px]" aria-hidden />
         </button>
       </div>
 
@@ -284,15 +284,15 @@ export function Sidebar({ className }: SidebarProps) {
             collapsed ? "justify-start md:justify-center" : "justify-start",
           )}
         >
-          <div className="w-[34px] h-[34px] rounded-full bg-brand text-white flex items-center justify-center text-[13px] font-bold flex-shrink-0">
+          <div className="w-[34px] h-[34px] rounded-full bg-brand text-white flex items-center justify-center text-[14px] font-bold flex-shrink-0">
             {initials || "?"}
           </div>
 
           <div className={cn("min-w-0 flex-1", collapsed ? "block md:hidden" : "block")}>
-            <div className="text-[12px] font-semibold text-stone-900 truncate">
+            <div className="text-[13px] font-semibold text-stone-900 truncate">
               {user?.first_name} {user?.last_name}
             </div>
-            <div className="text-[11px] text-stone-500 truncate">
+            <div className="text-[12px] text-stone-500 truncate">
               {roleName ?? user?.email}
             </div>
           </div>
@@ -308,7 +308,7 @@ export function Sidebar({ className }: SidebarProps) {
               collapsed ? "block md:hidden" : "block",
             )}
           >
-            <i className="fas fa-arrow-right-from-bracket text-[13px]" aria-hidden />
+            <i className="fas fa-arrow-right-from-bracket text-[14px]" aria-hidden />
           </button>
         </div>
 
@@ -321,7 +321,7 @@ export function Sidebar({ className }: SidebarProps) {
             title="Sign out"
             className="hidden md:flex w-full mt-2 py-1.5 rounded-md text-stone-500 hover:text-brand hover:bg-brand-50 transition-colors items-center justify-center"
           >
-            <i className="fas fa-arrow-right-from-bracket text-[13px]" aria-hidden />
+            <i className="fas fa-arrow-right-from-bracket text-[14px]" aria-hidden />
           </button>
         )}
       </div>

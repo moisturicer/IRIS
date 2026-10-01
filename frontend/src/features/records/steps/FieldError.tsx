@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
  */
 export function FieldError({ id, children }: { id?: string; children: ReactNode }) {
   return (
-    <p id={id} className="flex items-start gap-1.5 text-[12px] text-brand mt-1">
+    <p id={id} className="flex items-start gap-1.5 text-[13px] text-brand mt-1">
       <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
       {children}
     </p>

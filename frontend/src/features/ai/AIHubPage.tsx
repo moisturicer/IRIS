@@ -18,7 +18,7 @@ export default function AIHubPage() {
         <button
           type="button"
           onClick={() => setMode("search")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[14px] font-medium transition-colors
             ${mode === "search"
               ? "bg-[#6B0F12] text-white"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -33,7 +33,7 @@ export default function AIHubPage() {
         <button
           type="button"
           onClick={() => setMode("ask")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[14px] font-medium transition-colors
             ${mode === "ask"
               ? "bg-[#6B0F12] text-white"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -53,10 +53,10 @@ export default function AIHubPage() {
           <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
             <i className="fas fa-robot text-2xl text-slate-300" aria-hidden />
           </div>
-          <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[11px] font-bold rounded-full border border-amber-200 uppercase tracking-wider mb-4">
+          <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[12px] font-bold rounded-full border border-amber-200 uppercase tracking-wider mb-4">
             Coming Soon
           </span>
-          <p className="text-[13px] text-gray-500 leading-relaxed max-w-sm">
+          <p className="text-[14px] text-gray-500 leading-relaxed max-w-sm">
             RAG-powered Q&amp;A — ask a question and get an AI-generated answer with citations
             from the research corpus — is currently being developed.
           </p>
@@ -69,10 +69,10 @@ export default function AIHubPage() {
           <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center mb-5">
             <i className="fas fa-search text-2xl text-slate-300" aria-hidden />
           </div>
-          <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[11px] font-bold rounded-full border border-amber-200 uppercase tracking-wider mb-4">
+          <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[12px] font-bold rounded-full border border-amber-200 uppercase tracking-wider mb-4">
             Coming Soon
           </span>
-          <p className="text-[13px] text-gray-500 leading-relaxed max-w-sm">
+          <p className="text-[14px] text-gray-500 leading-relaxed max-w-sm">
             Semantic search — find research records by meaning using vector embeddings and
             pgvector similarity queries — is currently being developed.
           </p>

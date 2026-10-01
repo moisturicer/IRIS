@@ -32,10 +32,10 @@ export function TitleAbstractStep() {
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-[13px] font-medium text-stone-700">
+          <label className="text-[14px] font-medium text-stone-700">
             Abstract <span className="text-brand">*</span>
           </label>
-          <span className="text-[11px] text-stone-500">{abstract.length} / 5000</span>
+          <span className="text-[12px] text-stone-500">{abstract.length} / 5000</span>
         </div>
         <textarea
           {...register("abstract")}

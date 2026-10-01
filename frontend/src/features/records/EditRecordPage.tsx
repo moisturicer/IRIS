@@ -99,19 +99,19 @@ export default function EditRecordPage() {
                 type="button"
                 onClick={() => i < step && setStep(i)}
                 aria-current={i === step ? "step" : undefined}
-                className={`flex items-center gap-2 text-[13px]
+                className={`flex items-center gap-2 text-[14px]
                   ${i === step ? "text-brand font-semibold" : i < step ? "text-stone-900 font-medium cursor-pointer" : "text-stone-500 font-medium"}`}
               >
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold
                   ${i === step ? "bg-brand text-white" : i < step ? "bg-stone-900 text-white" : "border border-stone-300 text-stone-600"}`}
                 >
-                  {i < step ? <i className="fa fa-check text-[10px]" aria-hidden /> : i + 1}
+                  {i < step ? <i className="fa fa-check text-[11px]" aria-hidden /> : i + 1}
                 </span>
                 {label}
                 {i < step && <span className="sr-only">, completed</span>}
               </button>
               {i < STEPS.length - 1 && (
-                <span className="mx-3 text-stone-300 text-[11px]"><i className="fa fa-chevron-right" aria-hidden /></span>
+                <span className="mx-3 text-stone-300 text-[12px]"><i className="fa fa-chevron-right" aria-hidden /></span>
               )}
             </div>
           ))}

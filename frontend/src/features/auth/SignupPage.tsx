@@ -34,7 +34,7 @@ const EMPTY: FormState = {
 };
 
 const INPUT_BASE =
-  "w-full rounded-lg px-4 py-3 text-[14px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-500 text-gray-900 border font-[inherit]";
+  "w-full rounded-lg px-4 py-3 text-[15px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-500 text-gray-900 border font-[inherit]";
 
 // ── Validation ─────────────────────────────────────────────────────────────
 function validateAll(f: FormState, role: Role): FieldErrors {
@@ -209,15 +209,15 @@ export default function SignupPage() {
 
   const errMsg = (name: keyof FormState) =>
     touched[name] && errors[name]
-      ? <p className="text-[12px] text-red-600 mt-1.5">{errors[name]}</p>
+      ? <p className="text-[13px] text-red-600 mt-1.5">{errors[name]}</p>
       : null;
 
-  const labelCls = "block text-[13px] font-semibold text-gray-900 mb-2";
+  const labelCls = "block text-[14px] font-semibold text-gray-900 mb-2";
 
   return (
     <AuthLayout variant="signup" wide>
       <h2 className="text-[28px] font-bold text-gray-900">Create an Account</h2>
-      <p className="mt-2 text-[14px] text-gray-500 mb-6">
+      <p className="mt-2 text-[15px] text-gray-500 mb-6">
         Enter your details to register for IRIS.
       </p>
 
@@ -228,7 +228,7 @@ export default function SignupPage() {
             key={r}
             type="button"
             onClick={() => switchRole(r)}
-            className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-all border ${
+            className={`flex-1 py-2.5 rounded-lg text-[14px] font-semibold transition-all border ${
               role === r
                 ? "border-brand text-brand bg-cream"
                 : "border-gray-200 text-gray-500 bg-[#F3F3F3] hover:border-brand/40 hover:text-brand"
@@ -381,13 +381,13 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-brand hover:underline"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-brand hover:underline"
             >
               {showPassword ? "Hide" : "Show"}
             </button>
           </div>
           {form.password && !errors.password && (
-            <p className="text-[11px] text-green-600 mt-1.5">Password looks good.</p>
+            <p className="text-[12px] text-green-600 mt-1.5">Password looks good.</p>
           )}
           {errMsg("password")}
         </div>
@@ -408,13 +408,13 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={() => setShowPassword2((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-brand hover:underline"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-brand hover:underline"
             >
               {showPassword2 ? "Hide" : "Show"}
             </button>
           </div>
           {form.password2 && !errors.password2 && (
-            <p className="text-[11px] text-green-600 mt-1.5">Passwords match.</p>
+            <p className="text-[12px] text-green-600 mt-1.5">Passwords match.</p>
           )}
           {errMsg("password2")}
         </div>
@@ -427,7 +427,7 @@ export default function SignupPage() {
             onChange={(e) => setTerms(e.target.checked)}
             className="mt-0.5 w-4 h-4 shrink-0 accent-brand cursor-pointer"
           />
-          <label htmlFor="terms" className="text-[12px] text-gray-500 leading-relaxed cursor-pointer">
+          <label htmlFor="terms" className="text-[13px] text-gray-500 leading-relaxed cursor-pointer">
             I agree to the IRIS{" "}
             <a href="#" className="text-brand font-semibold hover:underline">Terms of Service</a>
             {" "}and{" "}
@@ -438,14 +438,14 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={submitting || !terms}
-          className="w-full py-3.5 rounded-lg text-[15px] font-semibold text-white transition-colors bg-gold hover:bg-gold-dark disabled:bg-gray-300 disabled:cursor-not-allowed mt-1"
+          className="w-full py-3.5 rounded-lg text-[16px] font-semibold text-white transition-colors bg-gold hover:bg-gold-dark disabled:bg-gray-300 disabled:cursor-not-allowed mt-1"
         >
           {submitting ? "Creating account…" : "Register"}
         </button>
       </form>
 
       <div className="mt-8 pt-6 border-t border-gray-100">
-        <p className="text-[13px] text-gray-500 text-center">
+        <p className="text-[14px] text-gray-500 text-center">
           Already have an account?{" "}
           <Link to="/login" className="text-brand font-semibold hover:underline">
             Sign in

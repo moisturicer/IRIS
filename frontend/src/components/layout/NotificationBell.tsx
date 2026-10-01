@@ -87,9 +87,9 @@ export function NotificationBell() {
         title="Notifications"
         className="relative w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors"
       >
-        <i className="fas fa-bell text-[14px]" aria-hidden />
+        <i className="fas fa-bell text-[15px]" aria-hidden />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -102,14 +102,14 @@ export function NotificationBell() {
           className="absolute right-0 top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-stone-200 shadow-card-md z-50 overflow-hidden"
         >
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-stone-100">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-stone-400">
+            <p className="text-[13px] font-bold uppercase tracking-wider text-stone-400">
               Notifications
             </p>
             {items.length > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAllRead}
-                className="text-[11px] font-semibold text-brand hover:underline"
+                className="text-[12px] font-semibold text-brand hover:underline"
               >
                 Mark all read
               </button>
@@ -118,7 +118,7 @@ export function NotificationBell() {
 
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[12px] text-stone-400">
+              <p className="px-4 py-6 text-center text-[13px] text-stone-400">
                 Nothing new. You&apos;re all caught up.
               </p>
             ) : (
@@ -126,8 +126,8 @@ export function NotificationBell() {
                 {items.slice(0, PREVIEW_LIMIT).map((n) => {
                   const body = (
                     <>
-                      <p className="text-[12px] text-stone-700 leading-snug">{n.message}</p>
-                      <p className="text-[11px] text-stone-400 mt-0.5">
+                      <p className="text-[13px] text-stone-700 leading-snug">{n.message}</p>
+                      <p className="text-[12px] text-stone-400 mt-0.5">
                         {n.record_title ? `${n.record_title} · ` : ""}
                         {formatDate(n.created_at)}
                       </p>
@@ -165,7 +165,7 @@ export function NotificationBell() {
             to="/notifications"
             onClick={() => setOpen(false)}
             className={cn(
-              "block px-4 py-2.5 border-t border-stone-100 text-center text-[12px] font-semibold",
+              "block px-4 py-2.5 border-t border-stone-100 text-center text-[13px] font-semibold",
               "text-brand hover:bg-stone-50 transition-colors",
             )}
           >

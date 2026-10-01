@@ -79,13 +79,13 @@ export default function NotificationsPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] text-gray-800">{n.message}</p>
+                  <p className="text-[14px] text-gray-800">{n.message}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[12px] text-gray-500">{formatDate(n.created_at)}</span>
+                    <span className="text-[13px] text-gray-500">{formatDate(n.created_at)}</span>
                     {n.record != null && (
                       <Link
                         to={`/records/${n.record}`}
-                        className="text-[12px] text-[#6B0F12] hover:underline"
+                        className="text-[13px] text-[#6B0F12] hover:underline"
                       >
                         View record
                       </Link>
@@ -96,7 +96,7 @@ export default function NotificationsPage() {
                 {!n.is_read && (
                   <button
                     onClick={() => handleMarkRead(n.id)}
-                    className="shrink-0 text-[12px] text-gray-500 hover:text-gray-600"
+                    className="shrink-0 text-[13px] text-gray-500 hover:text-gray-600"
                   >
                     Dismiss
                   </button>

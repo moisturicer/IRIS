@@ -50,17 +50,17 @@ export default function SessionsPage() {
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-gray-600
+          className="flex items-center gap-2 px-4 py-2 text-[14px] font-medium text-gray-600
             bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
         >
-          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-[13px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </button>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[13px] text-red-700">
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[14px] text-red-700">
           {error}
         </div>
       )}
@@ -76,8 +76,8 @@ export default function SessionsPage() {
       {!loading && !error && sessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-gray-500">
           <i className="fas fa-shield-alt text-4xl mb-3" aria-hidden />
-          <p className="text-[13px] font-medium">No active sessions</p>
-          <p className="text-[12px] mt-1">All users are currently logged out.</p>
+          <p className="text-[14px] font-medium">No active sessions</p>
+          <p className="text-[13px] mt-1">All users are currently logged out.</p>
         </div>
       )}
 
@@ -86,13 +86,13 @@ export default function SessionsPage() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Count badge */}
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <span className="text-[12px] text-gray-500 font-medium">
+            <span className="text-[13px] text-gray-500 font-medium">
               {sessions.length} active session{sessions.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-left">
                   <th className="px-4 py-3 font-semibold text-gray-600">User</th>
@@ -119,7 +119,7 @@ export default function SessionsPage() {
                       <button
                         onClick={() => handleRevoke(s.jti)}
                         disabled={revoking === s.jti}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium
                           text-red-600 border border-red-200 rounded-lg hover:bg-red-50
                           disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >

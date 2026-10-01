@@ -68,7 +68,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
         </pre>
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[12px] text-slate-400">
             Generated from the record&apos;s authors, title and year.
           </p>
           <button
@@ -76,7 +76,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
             onClick={handleCopy}
             className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-light text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0"
           >
-            <i className={cn("fas text-[10px]", copied ? "fa-check" : "fa-copy")} aria-hidden />
+            <i className={cn("fas text-[11px]", copied ? "fa-check" : "fa-copy")} aria-hidden />
             <span>{copied ? "Copied" : "Copy citation"}</span>
           </button>
         </div>
