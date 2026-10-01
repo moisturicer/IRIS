@@ -111,7 +111,15 @@ export function CitationText({ text, citations, streaming = false, className }: 
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
-        components={{ a: CitationLink }}
+        components={{
+          a: CitationLink,
+          // A wide table scrolls inside the bubble instead of widening it.
+          table: ({ children }) => (
+            <div className="overflow-x-auto">
+              <table>{children}</table>
+            </div>
+          ),
+        }}
         urlTransform={urlTransform}
       >
         {toMarkdownLinks(text, streaming)}
