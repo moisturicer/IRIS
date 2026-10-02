@@ -9,6 +9,14 @@ import logging
 import pytest
 from django.test import override_settings
 
+from apps.ai.answers.citations import (
+    GENERATED,
+    NO_SOURCES,
+    PARTIAL,
+    UNAVAILABLE,
+    GroundedAnswer,
+)
+from apps.ai.conversations import record_turn
 from apps.ai.memory import (
     DEFAULT_MAX_RECALL_DISTANCE,
     MAX_RECALLED_TURNS,
@@ -332,6 +340,151 @@ class RecallingByTheAnswerTests:
         )
 
         assert recalled == []
+
+
+class AnswerVectorStateTests:
+    """Which Turns get an answer vector, driven through `record_turn` itself.
+
+    `GroundedAnswer.text` is populated in every state, so "has text" is not
+    the question -- "is that text an answer" is. A `no_sources` or
+    `unavailable` Turn holds an explanation and a `partial` one holds a
+    fragment from a stream that died mid-sentence, and embedding any of them
+    would make refusals and failures findable, which is the thing IR-448
+    exists to prevent.
+    """
+
+    @pytest.mark.parametrize(
+        "state", [NO_SOURCES, UNAVAILABLE, PARTIAL]
+    )
+    def test_a_turn_that_is_not_an_answer_stores_no_answer_vector(
+        self, embedder, space, state
+    ):
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            _answer("an explanation, or half a sentence", state, embedder, space),
+            embedder=embedder,
+        )
+
+        kinds = set(turn.embeddings.values_list("kind", flat=True))
+        assert kinds == {TURN_QUESTION_VECTOR}
+
+    def test_a_generated_turn_stores_both(self, embedder, space):
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            _answer(_SPECIFIC_ANSWER, GENERATED, embedder, space),
+            embedder=embedder,
+        )
+
+        kinds = set(turn.embeddings.values_list("kind", flat=True))
+        assert kinds == {TURN_QUESTION_VECTOR, TURN_ANSWER_VECTOR}
+
+    def test_a_generated_turn_with_an_empty_answer_stores_no_answer_vector(
+        self, embedder, space
+    ):
+        """Nothing to embed is not the same as something to embed badly."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            _answer("   ", GENERATED, embedder, space),
+            embedder=embedder,
+        )
+
+        kinds = set(turn.embeddings.values_list("kind", flat=True))
+        assert kinds == {TURN_QUESTION_VECTOR}
+
+    def test_a_degraded_answer_with_no_space_stores_neither(self, embedder, space):
+        """The degraded, full-text path carries no vector of any kind, and
+        IR-447 does not give it one -- there is no space to store it under."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            GroundedAnswer(
+                text=_SPECIFIC_ANSWER, citations=(), state=GENERATED, degraded=True
+            ),
+            embedder=embedder,
+        )
+
+        assert list(turn.embeddings.all()) == []
+
+
+class OneRankedListTests:
+    """ADR-026 §7: both vectors go in under the same input type, so
+    `recall`'s single `ORDER BY distance` compares like with like.
+
+    The fake embedder reproduces Voyage's asymmetry -- `embed_documents(x)`
+    and `embed_query(x)` differ for identical text -- which is what makes
+    this assertable without a vendor account: a vector can be attributed to
+    the method that produced it.
+    """
+
+    def test_every_vector_in_the_ranked_list_is_a_query_vector(
+        self, embedder, space
+    ):
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        turn = record_turn(
+            conversation,
+            _GENERIC_QUESTION,
+            _answer(_SPECIFIC_ANSWER, GENERATED, embedder, space),
+            embedder=embedder,
+        )
+
+        texts = {
+            TURN_QUESTION_VECTOR: _GENERIC_QUESTION,
+            TURN_ANSWER_VECTOR: _SPECIFIC_ANSWER,
+        }
+        rows = list(turn.embeddings.all())
+        assert len(rows) == 2
+
+        for row in rows:
+            text = texts[row.kind]
+            # Each stored vector matches the query method and not the
+            # document method, so the two kinds sit in one comparable space.
+            assert list(row.embedding) == pytest.approx(embedder.embed_query(text))
+            assert list(row.embedding) != pytest.approx(
+                embedder.embed_documents([text])[0]
+            )
+
+    def test_recall_does_not_filter_by_kind(self, embedder, space):
+        """One list, not one query per kind. If recall ever narrowed to a
+        single kind, the answer vector would be stored and never read -- a
+        silent no-op that every other test here would still pass."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        answer_only = _turn(
+            conversation,
+            _GENERIC_QUESTION,
+            answer=_SPECIFIC_ANSWER,
+            space=space,
+            embedder=embedder,
+        )
+        answer_only.embeddings.filter(kind=TURN_QUESTION_VECTOR).delete()
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(_ASKING_ABOUT_THE_ANSWER), space.pk
+        )
+
+        assert [turn.pk for turn in recalled] == [answer_only.pk]
+
+
+def _answer(text, state, embedder, space):
+    """A `GroundedAnswer` carrying the question vector retrieval would have
+    produced, so `record_turn` behaves as it does in the real path."""
+    return GroundedAnswer(
+        text=text,
+        citations=(),
+        state=state,
+        query_vector=embedder.embed_query(_GENERIC_QUESTION),
+        embedding_space_id=space.pk,
+    )
 
 
 class RelevanceCutOffTests:

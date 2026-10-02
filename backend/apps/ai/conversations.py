@@ -45,17 +45,22 @@ logger = logging.getLogger(__name__)
 #: An unnamed conversation takes its name from the question that started it.
 TITLE_LENGTH = 200
 
-#: The states whose `text` is an answer somebody could later ask about, and
-#: so the only ones worth embedding (IR-447).
+#: The one state whose `text` is an answer somebody could later ask about,
+#: and so the only one worth embedding (IR-447).
 #:
-#: `GroundedAnswer.text` is populated in every state, but in `no_sources` and
-#: `unavailable` it holds an *explanation* -- "nothing was found", "no model
-#: was reachable" -- not an answer. Embedding those would spend a vendor call
-#: per failure to make failures findable, and would put text nobody wrote
-#: into a list the prompt presents as relevant earlier answers. `partial` is
-#: included: a cut-off stream is a real answer as far as its reader is
-#: concerned (IR-328), just a shorter one.
-_EMBEDDABLE_STATES = frozenset({GENERATED, PARTIAL})
+#: `GroundedAnswer.text` is populated in every state, and in the other three
+#: it is not content. `no_sources` and `unavailable` hold an *explanation* --
+#: "nothing was found", "no model was reachable". `partial` holds a
+#: fragment: the stream died before its `Done` (IR-328), so the text stops
+#: mid-thought and a vector over it describes a sentence that was never
+#: finished.
+#:
+#: Embedding any of them would spend a vendor call per failure to make
+#: failures findable, which is the exact opposite of what IR-448 is for --
+#: it exists to keep refused and failed Turns *out* of the model's history,
+#: and indexing them here would be building the retrieval path that puts
+#: them back.
+_EMBEDDABLE_STATES = frozenset({GENERATED})
 
 
 def record_turn(
