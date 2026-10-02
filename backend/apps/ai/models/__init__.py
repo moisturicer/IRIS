@@ -1,4 +1,12 @@
-from .conversation import Conversation, Turn, TurnCitation, TurnEmbedding
+from .conversation import (
+    TURN_ANSWER_VECTOR,
+    TURN_QUESTION_VECTOR,
+    VECTORS_PER_TURN,
+    Conversation,
+    Turn,
+    TurnCitation,
+    TurnEmbedding,
+)
 from .summary import RecordOverview
 from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, EmbeddingJob
@@ -17,6 +25,9 @@ __all__ = [
     "Turn",
     "TurnCitation",
     "TurnEmbedding",
+    "TURN_ANSWER_VECTOR",
+    "TURN_QUESTION_VECTOR",
+    "VECTORS_PER_TURN",
     "RecordOverview",
     "DocumentMetadata",
     "RecordEmbedding",

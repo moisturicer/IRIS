@@ -12,9 +12,10 @@ Text frozen into a transcript outlives the permission that allowed it.
 No retention field and no expiry - a Conversation lives until its owner
 deletes it (IR-294 Privacy).
 
-`TurnEmbedding` (IR-297) stores the vector already computed to search the
-corpus for a Turn's question. Keyed by turn and space together, like
-`ChunkEmbedding`.
+`TurnEmbedding` (IR-297) stores a Turn's vectors. Keyed by turn, space and
+`kind` together -- two rows per Turn per space since IR-447: the question's
+vector, which is the one retrieval already computed, and the answer's, which
+is a real vendor call. ADR-026 §7 as amended.
 """
 from django.conf import settings
 from django.db import models
@@ -32,6 +33,25 @@ _STATE_CHOICES = [
     (UNAVAILABLE, "Unavailable"),
     (PARTIAL, "Partial"),
 ]
+
+
+#: What a `TurnEmbedding` is a vector *of* (IR-447, ADR-026 §7 as amended).
+#:
+#: Strings rather than an enum for the reason `_STATE_CHOICES` takes the same
+#: shape: these are stored values, and a name is what is wanted when reading a
+#: row back.
+TURN_QUESTION_VECTOR = "question"
+TURN_ANSWER_VECTOR = "answer"
+
+_VECTOR_KIND_CHOICES = [
+    (TURN_QUESTION_VECTOR, "Question"),
+    (TURN_ANSWER_VECTOR, "Answer"),
+]
+
+#: How many vectors one Turn can hold in one space. `apps.ai.memory` reads
+#: this to bound the rows it must scan to find N *distinct* Turns, so a third
+#: kind added above widens that scan instead of silently truncating recall.
+VECTORS_PER_TURN = len(_VECTOR_KIND_CHOICES)
 
 
 class ConversationManager(models.Manager):
@@ -168,15 +188,38 @@ class TurnCitation(models.Model):
 
 
 class TurnEmbedding(models.Model):
-    """A Turn's question, embedded under one embedding space.
+    """One vector of one Turn, under one embedding space.
 
-    The vector `TwoStageRetriever` already computed to search the corpus,
-    stored rather than discarded. Read by `apps.ai.memory`.
+    Two rows per Turn per space since IR-447 (ADR-026 §7 as amended), and
+    `kind` is which is which:
+
+    * ``question`` -- the vector `TwoStageRetriever` already computed to
+      search the corpus, stored rather than discarded. Free.
+    * ``answer`` -- the Turn's answer text, embedded on its own. A real
+      vendor call on every Turn that has an answer.
+
+    The second exists because indexing the question alone cannot find a Turn
+    whose *answer* states a fact its question never named. The Turn is still
+    returned whole; `apps.ai.memory` ranks both kinds in one list and either
+    one can reach it.
+
+    **Both kinds are embedded with `embed_query`**, answers included. That
+    looks like an ADR-015 rule 3 violation and is not: recall is a single
+    ``ORDER BY distance``, and storing answers as documents would put two
+    non-comparable distance scales in it. The note under rule 3 records the
+    choice, and ADR-026 names the two-ranked-list fallback should it measure
+    badly.
     """
 
     turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name="embeddings")
     space = models.ForeignKey(
         "ai.EmbeddingSpace", on_delete=models.CASCADE, related_name="turn_embeddings"
+    )
+    #: Defaults to ``question`` so every row written before IR-447 -- all of
+    #: which were question vectors -- keeps its meaning without a data
+    #: migration.
+    kind = models.CharField(
+        max_length=20, choices=_VECTOR_KIND_CHOICES, default=TURN_QUESTION_VECTOR
     )
     embedding = VectorField(dimensions=VECTOR_COLUMN_DIMENSIONS)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -184,7 +227,8 @@ class TurnEmbedding(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["turn", "space"], name="unique_turn_embedding_per_space"
+                fields=["turn", "space", "kind"],
+                name="unique_turn_vector_per_space_and_kind",
             ),
         ]
         indexes = [
@@ -198,4 +242,7 @@ class TurnEmbedding(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"TurnEmbedding(turn={self.turn_id}, space={self.space_id})"
+        return (
+            f"TurnEmbedding(turn={self.turn_id}, space={self.space_id}, "
+            f"kind={self.kind})"
+        )
