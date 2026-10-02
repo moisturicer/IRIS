@@ -2,6 +2,12 @@
 
 A module, not a port: one implementation, fully exercisable through HTTP.
 
+Writing a Turn is two steps since IR-447, deliberately not one. The Turn and
+its citations go down in one transaction; the answer's memory vector is a
+vendor call and happens *after* that transaction commits. A Turn that is
+written and then fails to embed is a Turn with weaker recall. A Turn rolled
+back because a vendor was down is a lost answer the reader already read.
+
 Reading is where the security lives. A stored citation is a pointer, so
 reopening a transcript re-resolves each one now, against two things that may
 have changed since it was written: whether the reader may still see the
@@ -14,27 +20,51 @@ text it once pointed at may no longer represent it.
 """
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
+from django.conf import settings
 from django.db import transaction
 
-from apps.ai.answers.citations import PARTIAL, GroundedAnswer
-from apps.ai.models import Conversation, DocumentChunk, Turn, TurnCitation, TurnEmbedding
+from apps.ai.answers.citations import GENERATED, PARTIAL, GroundedAnswer
+from apps.ai.models import (
+    TURN_ANSWER_VECTOR,
+    TURN_QUESTION_VECTOR,
+    Conversation,
+    DocumentChunk,
+    Turn,
+    TurnCitation,
+    TurnEmbedding,
+)
 from apps.ai.presentation import answer_body, answer_mode
 from apps.ai.regions import normalized_regions, regions_wire
 from apps.records.models import Record
 
+logger = logging.getLogger(__name__)
+
 #: An unnamed conversation takes its name from the question that started it.
 TITLE_LENGTH = 200
 
+#: The states whose `text` is an answer somebody could later ask about, and
+#: so the only ones worth embedding (IR-447).
+#:
+#: `GroundedAnswer.text` is populated in every state, but in `no_sources` and
+#: `unavailable` it holds an *explanation* -- "nothing was found", "no model
+#: was reachable" -- not an answer. Embedding those would spend a vendor call
+#: per failure to make failures findable, and would put text nobody wrote
+#: into a list the prompt presents as relevant earlier answers. `partial` is
+#: included: a cut-off stream is a real answer as far as its reader is
+#: concerned (IR-328), just a shorter one.
+_EMBEDDABLE_STATES = frozenset({GENERATED, PARTIAL})
 
-@transaction.atomic
+
 def record_turn(
     conversation: Conversation,
     question: str,
     answer: GroundedAnswer,
     resolved_question: Optional[str] = None,
     widened: bool = False,
+    embedder=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -60,6 +90,31 @@ def record_turn(
     into ``answer``: the two arrived on separate channels and a reopened
     transcript must keep them apart. ``answer.had_reasoning`` (IR-327) is
     stored beside it, redundant and kept -- see `Turn`.
+
+    ``embedder`` embeds the answer for memory recall (IR-447). It defaults to
+    the composition root's, and is a parameter so a test can drive this path
+    with a fake and count the calls. The call is made **after** the Turn is
+    committed and its failure is logged rather than raised -- see the module
+    docstring for why that order is not an accident.
+    """
+    turn = _write_turn(
+        conversation, question, answer, resolved_question, widened
+    )
+    _store_answer_vector(turn, answer, embedder)
+    return turn
+
+
+@transaction.atomic
+def _write_turn(
+    conversation: Conversation,
+    question: str,
+    answer: GroundedAnswer,
+    resolved_question: Optional[str],
+    widened: bool,
+) -> Turn:
+    """The Turn, its citations and its free question vector, all or nothing.
+
+    Everything here is local: no vendor call belongs inside this transaction.
     """
     turn = Turn.objects.create(
         conversation=conversation,
@@ -90,6 +145,7 @@ def record_turn(
             turn=turn,
             space_id=answer.embedding_space_id,
             embedding=answer.query_vector,
+            kind=TURN_QUESTION_VECTOR,
         )
 
     fields = ["updated_at"]
@@ -98,6 +154,84 @@ def record_turn(
         fields.append("title")
     conversation.save(update_fields=fields)
     return turn
+
+
+def _answer_vector_enabled() -> bool:
+    """Whether a Turn's answer is embedded at all.
+
+    Read per call, not bound at import: a harness run flips it with
+    `override_settings` between two otherwise identical configurations, which
+    is the comparison ADR-023 requires before this stops being provisional.
+    """
+    return bool(getattr(settings, "AI_MEMORY_ANSWER_VECTOR_ENABLED", True))
+
+
+def _store_answer_vector(turn: Turn, answer: GroundedAnswer, embedder) -> None:
+    """Embed ``turn``'s answer and store it as a second memory vector.
+
+    The vector that makes a Turn findable by what it *said* rather than only
+    by what was asked (IR-447, ADR-026 §7 as amended). Indexing the question
+    alone cannot recall a Turn whose answer states a fact the question never
+    named.
+
+    Four reasons to store nothing, all of them normal:
+
+    * the switch is off;
+    * there is no embedding space -- a degraded, full-text answer has no
+      vector of any kind, exactly as the question vector above;
+    * the state is not one whose text is an answer (see
+      `_EMBEDDABLE_STATES`), or the text is blank;
+    * the embedding call failed.
+
+    Only the last is a problem, and it is still not this function's to
+    raise. The Turn is committed by now and the reader has already read the
+    answer; the cost of a failure here is that one Turn is recalled by its
+    question alone, which is what every Turn written before IR-447 does. So
+    it is logged at warning and swallowed. Letting it propagate would turn a
+    vendor blip into a 500 on a request that had already succeeded.
+    """
+    if not _answer_vector_enabled():
+        return
+    if answer.embedding_space_id is None:
+        return
+    if answer.state not in _EMBEDDABLE_STATES:
+        return
+
+    text = (answer.text or "").strip()
+    if not text:
+        return
+
+    if embedder is None:
+        from apps.ai.composition import composition_root
+
+        embedder = composition_root().embedder()
+
+    try:
+        # `embed_query`, not `embed_documents`, for stored answer text. This
+        # is ADR-015 rule 3's documented exception, not an oversight -- see
+        # `TurnEmbedding`.
+        vector = embedder.embed_query(text)
+    except Exception:
+        logger.warning(
+            "could not embed the answer of turn=%s for conversation=%s; it "
+            "will be recalled by its question alone",
+            turn.pk,
+            turn.conversation_id,
+            exc_info=True,
+        )
+        return
+
+    # `update_or_create`, not `create`: a collision on
+    # `unique_turn_vector_per_space_and_kind` here would raise *after* the
+    # reader has already been served their answer, turning a duplicate write
+    # into a 500 on a request that succeeded. Idempotent is the safer shape
+    # for a step that runs outside the transaction above.
+    TurnEmbedding.objects.update_or_create(
+        turn=turn,
+        space_id=answer.embedding_space_id,
+        kind=TURN_ANSWER_VECTOR,
+        defaults={"embedding": vector},
+    )
 
 
 def turns_for_reader(conversation: Conversation, user) -> list[dict]:
