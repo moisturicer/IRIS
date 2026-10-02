@@ -104,6 +104,8 @@ Aggregation runs over `visible_to(user)`, always.
 
 This is the decision the capability's credibility rests on.
 
+> **Amended 2026-10-02 (IR-453): this section is an absolute bound on ADR-034.** [ADR-034](034-ungrounded-answers-as-a-distinct-state.md) permits an answer from the model's general knowledge when retrieval returns nothing relevant — and **no research question may reach it.** A question routed as corpus-level or landscape is answered by the Lens or refused, exactly as this section requires; a zero-source research question stays a refusal, because "the repository holds nothing on this" is a true and useful answer about the corpus and the model's own knowledge of the field is not a substitute for it. Paper Chat never goes ungrounded either. The sentence below about fabrication wearing institutional authority is the reason ADR-034 is written as narrowly as it is, and it is tested in that direction.
+
 Asked for research gaps, a language model will produce a confident list drawn from its general knowledge of the field rather than from this corpus. Presented as *"gaps in CIT-U research"*, that is fabrication wearing institutional authority — and the easiest thing for an examiner to take apart.
 
 So the Lens returns **rows of computed facts**, and the model is handed those rows and constrained to describe them:

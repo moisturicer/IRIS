@@ -12,6 +12,8 @@
 
 **Applies [ADR-026](026-conversational-retrieval-and-memory.md) §3's evidence discipline** — a technique is adopted on a measurement, not on reputation.
 
+**Note added — 2026-10-02 (IR-453): §5's gating rule cannot be satisfied for §3's cut-off, and §5 is deliberately unchanged.** See §Divergence — IR-453 below. §3 also acquires a dependant: [ADR-034](034-ungrounded-answers-as-a-distinct-state.md) makes an ungrounded answer reachable only when the cut-off returns nothing, so §3 is what makes that state detectable at all.
+
 > **ADR references in this file are by filename.** `docs/adr/` currently holds two files claiming 021 and two claiming 023, so a bare number is ambiguous. The collision is tracked as IR-403 and is not resolved here.
 
 ## Context
@@ -61,6 +63,57 @@ Between reranking and the prompt sits an explicit selection step:
 Fusion, the keyword index's participation in retrieval, the relevance cut-off, the per-paper cap, neighbour joining and the token budget each land behind a setting, **defaulting to the current behaviour**. A default is changed only when a run of the `023-retrieval-quality-evaluation.md` harness, one change at a time against a fixed baseline, shows the change helps.
 
 This is [ADR-026](026-conversational-retrieval-and-memory.md) §3's discipline applied to a second batch of techniques: adopting them on the strength of their general reputation would be taste presented as evidence, and these are cheap to leave off.
+
+## Divergence — 2026-10-02 (IR-453): the harness cannot measure the cut-off's benefit
+
+**Recorded, not reconciled.** `CLAUDE.md`'s source-of-truth rule requires a
+contradiction between an ADR and the code to be written down rather than quietly
+resolved. This is one, found while scoping IR-396.
+
+§5 says a default moves only when a harness run *"shows the change helps."* For
+§1's fusion that worked exactly as intended: IR-395 measured +0.192 recall@10
+with reranking and still shipped off, and IR-402 has a number to act on. **For
+§3's relevance cut-off the same rule is unsatisfiable**, for a structural reason:
+
+* Both harness measures are **recall** measures — recall@10 over what retrieval
+  returned, and recall over the final set the model received
+  (`023-retrieval-quality-evaluation.md` §Amendment).
+* A relevance cut-off can only ever **remove** passages.
+* Every question in both committed question sets —
+  `apps/ai/evaluation/fixtures/synthetic_set.json` (2) and
+  `docs/evaluation/proxy_starter.json` (52) — **is answerable**; not one has an
+  empty expected-passage list. Verified 2026-10-02.
+
+So any cut-off above zero scores at or below baseline on both numbers, by
+construction. A run can report what the floor **costs** and can never report what
+it **buys**, because "correctly refused a question the corpus cannot answer" is
+not a question in the set and not a figure in the report. A floor's entire
+purpose is invisible to the instrument meant to justify it.
+
+**What is done about it.**
+
+1. **§5 is unchanged, and the cut-off still ships off.** The rule's value is that
+   it is absolute; carving out the one technique whose benefit cannot be measured
+   would be the weakest possible exemption to grant. The default still moves only
+   at IR-402.
+2. **The provisional default comes from observation, not from a run** — the
+   method `026-conversational-retrieval-and-memory.md` §3 permits when a number
+   cannot be had honestly, and the one IR-446 already chose for the parallel
+   cut-off on conversational memory: print reranker scores for questions a human
+   agrees are relevant against ones that are not, pick a value separating them,
+   and record the observed numbers in the PR. If they do not separate cleanly,
+   say so and ship a deliberately loose default rather than a confident one.
+3. **The instrument is extended as its own ticket — IR-454**, not folded into IR-396:
+   unanswerable questions with empty expected sets, and a correct-refusal measure
+   alongside the two recall measures, so §5's rule becomes satisfiable for §3 and
+   for §4's selection. Until then the gap above is the honest state of the
+   evidence.
+
+**Why not simply tune the floor by taste in the meantime.** Because that is the
+failure `026` §3 named, and a cut-off set too high is this ADR's own recorded
+risk — *"a silent, reader-invisible regression, since the score is never
+displayed."* Observation with the numbers written down is weaker than a run and
+stronger than taste, and it is labelled as the middle thing it is.
 
 ## Alternatives Considered
 
@@ -122,4 +175,4 @@ FR-M3-02 (semantic indexing) · FR-M4-01 (RAG chatbot) · NFR-R2 (graceful degra
 
 ## Related Tasks
 
-IR-390 (parent spec) · IR-391 (this ADR) · IR-393 (chunk keyword index) · IR-394 (harness measures what the model received) · IR-396 (nothing-relevant answer) · IR-397 (passage selection).
+IR-390 (parent spec) · IR-391 (this ADR) · IR-393 (chunk keyword index) · IR-394 (harness measures what the model received) · IR-396 (nothing-relevant answer) · IR-397 (passage selection) · IR-402 (moves the defaults) · IR-454 (makes §5's rule satisfiable for §3 and §4 — see the divergence note) · IR-453 / [ADR-034](034-ungrounded-answers-as-a-distinct-state.md) (the ungrounded state §3 makes detectable, and the divergence note above).
