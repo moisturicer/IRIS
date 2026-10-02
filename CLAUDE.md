@@ -271,6 +271,8 @@ This is the team's standing preference, not a per-session request. Apply it unle
 
 Jira (`citiris.atlassian.net`, project `IR`) via the Atlassian MCP server registered in `.mcp.json`. Holds the state mapping and label taxonomy. See `docs/agents/issue-tracker.md`.
 
+**`.mcp.json` is gitignored and has never been committed, so a fresh clone has no Jira at all** — that includes every cloud session, every CI job and every newly cloned machine. It works only where someone created the file by hand. Its full contents are in `docs/agents/issue-tracker.md` §Access (no credentials; each person authenticates separately over OAuth), so recreating it is a copy-paste. **An agent that cannot reach Jira must not pretend otherwise:** build to the ADR, which is the requirements authority anyway, and then say plainly that the card was neither read nor transitioned — per that file's own rule, never claim an issue was created or moved when it was not.
+
 ### Triage labels
 
 The five canonical triage roles map onto the existing IRIS taxonomy, adding only `ready-for-agent` (`needs-info` maps onto `not-ready`). See `docs/agents/triage-labels.md`.
