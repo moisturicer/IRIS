@@ -83,7 +83,8 @@ class ConversationMemory:
         from apps.ai.models import VECTORS_PER_TURN, TurnEmbedding
 
         rows = (
-            TurnEmbedding.objects.filter(turn__conversation=conversation, space_id=space_id)
+            TurnEmbedding.objects.in_model_history()
+            .filter(turn__conversation=conversation, space_id=space_id)
             .exclude(turn_id__in=list(exclude_ids))
             .select_related("turn")
             .annotate(distance=CosineDistance("embedding", query_vector))
