@@ -174,7 +174,7 @@ How a flagged question is then answered:
 1. `has_back_reference` (`apps/ai/resolution.py`) found no pronoun in "give me a longer explanation", so resolution was skipped with no model call. That is §8's word check doing exactly what it was written to do.
 2. Retrieval therefore searched the literal string `give me a longer explanation`, which sits nowhere near a cosmology paper in embedding space, and returned arbitrary passages.
 3. The answering model had the previous Turn in its `Conversation so far:` block but is grounded to the numbered `Sources:`, so it correctly refused.
-4. That refusal became Turn 2 and entered every later prompt verbatim — the bias §13 exists to prevent. §13 was decided under IR-392 and implemented nowhere; IR-448 implements it and is not part of this amendment.
+4. That refusal became Turn 2 and entered every later prompt verbatim — the bias §13 exists to prevent. §13 was decided under IR-392 and implemented nowhere at the time this amendment was written; **IR-448 implements it as of 2026-10-02** — one predicate over `Turn.state`, applied to the verbatim window, the rewriter's history and memory recall alike, with the reader's transcript deliberately unfiltered. It was not part of this amendment and did not need to be: the rule above was already decided.
 
 Steps 1 and 2 are what this amendment decides. The Turn 3 / Turn 20 example under §7 below is a **constructed illustration**, not an observation, and is labelled as one.
 

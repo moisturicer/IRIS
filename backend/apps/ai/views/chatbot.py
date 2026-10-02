@@ -118,9 +118,18 @@ def _recent_turns(conversation: Conversation) -> list:
     """The Conversation's most recent Turns, oldest first, bounded at the
     source. Serves both resolution (IR-296) and the answering prompt
     (IR-297); older Turns are memory's job, not this function's.
+
+    **Failed and refused Turns are not here** (IR-448, ADR-026 §13):
+    `in_model_history()` keeps `no_sources`, `unavailable` and `partial` out,
+    so neither prompt is shown a refusal as a prior answer. The reader still
+    sees them -- `conversations.turns_for_reader` is deliberately unfiltered.
+    The bound applies *after* the exclusion, so a run of failures does not eat
+    the window and leave the model with less real history than it has.
     """
     return list(
-        conversation.turns.order_by("-id")[: resolution.MAX_HISTORY_TURNS]
+        conversation.turns.in_model_history().order_by("-id")[
+            : resolution.MAX_HISTORY_TURNS
+        ]
     )[::-1]
 
 
