@@ -212,6 +212,28 @@ class RelevanceCutOffTests:
         _system, prompt = llm.calls[-1]
         assert "Relevant earlier in this conversation:" in prompt
 
+    def test_the_verbatim_recent_window_is_not_subject_to_the_cut_off(
+        self, embedder, space, client_for
+    ):
+        """IR-446 acceptance criterion 4. The recent window is recency, not
+        relevance, so a cut-off that drops every recalled Turn must leave it
+        standing. Asserting only that `Relevant earlier` is absent cannot see
+        the difference: a floor wrongly applied to the recent window would
+        empty both blocks and still pass.
+        """
+        llm = ScriptedLLM()
+
+        self._conversation_about_flooding_then_a_question_about_ponds(
+            embedder, space, client_for, llm
+        )
+
+        _system, prompt = llm.calls[-1]
+        assert "Relevant earlier" not in prompt
+        assert "Conversation so far:" in prompt
+        # The fillers are the window's content here, and the last one is the
+        # Turn immediately before the question being answered.
+        assert f"Q: filler question number {MAX_HISTORY_TURNS - 1}" in prompt
+
     def test_no_distance_reaches_the_reader(self, embedder, space, client_for):
         """`apps/ai/presentation.py`'s rule: a score is never shown."""
         reader = make_user("reader@cit.edu")
