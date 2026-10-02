@@ -210,7 +210,7 @@ What this changes:
 
 ### The verbatim window — no number here to change
 
-§6 says only that "recent turns go into the prompt verbatim" and names no count. **This ADR contains no fixed Turn count for the window, so nothing in it changes.** The fixed count lives in code, and IR-449 replaces it with a token budget without needing an ADR amendment to do so.
+§6 says only that "recent turns go into the prompt verbatim" and names no count. **This ADR contains no fixed Turn count for the window, so nothing in it changes.** The fixed count lives in code, and IR-449 replaces it with a token budget without needing an ADR amendment to do so. **IR-449 shipped on 2026-10-02** and that is what it did: `AI_HISTORY_TOKEN_BUDGET`, filled newest-first, the newest Turn always present and truncated rather than dropped, counted locally with the repository's own pinned tokenizer and no vendor call. Still nothing here changed.
 
 ### ADR-015 rule 3 — a note, not a change
 
@@ -253,7 +253,7 @@ What this changes:
 
 **Widening or replacing the back-reference word list (added 2026-10-02, IR-444).** Rejected. The observed failure contained no referring word at all, so no list reaches it, and every list is incomplete in the cases a reader actually reaches for. A cheaper check that fails *silently and into a refusal* is not cheaper than a cached small-model call that cannot miss.
 
-**Overflow-triggered summarisation of older Turns (added 2026-10-02, IR-444).** Rejected, with the call count against the token size as the reasoning. A summary reduces tokens *per call* and adds a model call of its own, while the cost concern on this path is the *number* of calls. The history handed to the model is already hard-bounded at the source (`MAX_HISTORY_TURNS`), so an overflow trigger would never fire. It also fails §6's objection unchanged: the detail a summary drops is the detail a reader later asks about. The bounded-prompt benefit worth having comes from IR-449's token budget, which costs zero model calls.
+**Overflow-triggered summarisation of older Turns (added 2026-10-02, IR-444).** Rejected, with the call count against the token size as the reasoning. A summary reduces tokens *per call* and adds a model call of its own, while the cost concern on this path is the *number* of calls. The history handed to the model is already hard-bounded at the source (a token budget in `apps/ai/history.py` since IR-449; `MAX_HISTORY_TURNS` when this was written), so an overflow trigger would never fire. It also fails §6's objection unchanged: the detail a summary drops is the detail a reader later asks about. The bounded-prompt benefit worth having comes from IR-449's token budget, which costs zero model calls.
 
 ## Decision Rationale
 

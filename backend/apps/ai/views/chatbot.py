@@ -31,7 +31,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
-from apps.ai import resolution
+from apps.ai.history import HISTORY_CANDIDATE_LIMIT, history_window
 from apps.ai.answers.events import (
     CitationsResolved,
     Done,
@@ -115,22 +115,36 @@ def _conversation_for(request):
 
 
 def _recent_turns(conversation: Conversation) -> list:
-    """The Conversation's most recent Turns, oldest first, bounded at the
-    source. Serves both resolution (IR-296) and the answering prompt
+    """The Conversation's most recent Turns, oldest first, bounded by a
+    token budget. Serves both resolution (IR-296) and the answering prompt
     (IR-297); older Turns are memory's job, not this function's.
+
+    **This is the only place the verbatim window is decided** (IR-449). The
+    list returned here goes to `QuestionResolver.resolve` and on to
+    `answers.citations.build_prompt` unchanged, and neither narrows it
+    further, so the two prompts cannot disagree about how much history there
+    was. It used to be a fixed six Turns, which spent a fraction of the room
+    available on short exchanges and several times the room intended on long
+    ones; `apps.ai.history` explains why the budget is counted locally and
+    what the margin on it is for.
+
+    The query is bounded separately, at `HISTORY_CANDIDATE_LIMIT` rows
+    (`apps.ai.history`), so
+    filling a 3000-token budget never reads a five-hundred-Turn
+    Conversation. That is a bound on the fetch and not the window -- the
+    budget is what decides how many of those rows are used.
 
     **Failed and refused Turns are not here** (IR-448, ADR-026 §13):
     `in_model_history()` keeps `no_sources`, `unavailable` and `partial` out,
     so neither prompt is shown a refusal as a prior answer. The reader still
     sees them -- `conversations.turns_for_reader` is deliberately unfiltered.
-    The bound applies *after* the exclusion, so a run of failures does not eat
+    Both bounds apply *after* the exclusion, so a run of failures does not eat
     the window and leave the model with less real history than it has.
     """
-    return list(
-        conversation.turns.in_model_history().order_by("-id")[
-            : resolution.MAX_HISTORY_TURNS
-        ]
+    candidates = list(
+        conversation.turns.in_model_history().order_by("-id")[:HISTORY_CANDIDATE_LIMIT]
     )[::-1]
+    return history_window(candidates)
 
 
 @dataclass(frozen=True)
@@ -219,9 +233,10 @@ class ChatQueryView(APIView):
     its limitations?" becomes a question that names the paper. Retrieval and
     synthesis both see the resolved question; the raw one is what gets
     stored as ``question`` and shown back unchanged. Resolution is skipped
-    outright — no model call — on the first Turn and on a question with no
-    back-reference, and a failed resolution falls back to the raw question
-    rather than erroring.
+    outright — no model call — on the first Turn only; the word check that
+    also skipped a question with no pronoun in it was deleted by IR-445,
+    which is why this paragraph no longer claims one. A failed resolution
+    falls back to the raw question rather than erroring.
 
     **A Conversation scoped to a Record retrieves only that Record's
     passages by default** (IR-298, ADR-026 §9). ``widen`` opts one question
@@ -233,8 +248,11 @@ class ChatQueryView(APIView):
     which scope produced each answer rather than guessing from its citations.
 
     **Recent Turns go into the answering prompt verbatim; older ones are
-    found by memory recall, never summarised** (IR-297). The search vector
-    is stored on the new Turn as its own memory vector, at no extra cost.
+    found by memory recall, never summarised** (IR-297). How many count as
+    recent is a token budget rather than a Turn count (IR-449,
+    ``AI_HISTORY_TOKEN_BUDGET``), so a run of one-line exchanges carries
+    further back than a run of long answers does. The search vector is
+    stored on the new Turn as its own memory vector, at no extra cost.
     """
 
     permission_classes = [IsAuthenticated]
