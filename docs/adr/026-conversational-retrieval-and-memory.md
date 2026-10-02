@@ -136,6 +136,8 @@ A reader who is unhappy with an answer can ask the same question again — a **R
 
 ### 13. Failed and refused Turns stay visible to the reader and are kept out of the model's history
 
+> **Amended 2026-10-02 (IR-453).** An **ungrounded** Turn joins the three states excluded here, so `MODEL_HISTORY_STATES` stays `{generated}`. Unlike the other three it holds genuine content, so the exclusion has a real cost — a follow-up to an ungrounded aside does not resolve against it — and that cost is accepted rather than hidden: an ungrounded answer left in the prompt is a demonstration of answering without sources, and the bias runs toward the one path that must not drift. See [ADR-034](034-ungrounded-answers-as-a-distinct-state.md) §5.
+
 A Turn whose answer failed (no model reachable, per [ADR-008](008-ai-degradation-to-fts.md)) or whose answer was a refusal (no readable sources; [ADR-027](027-corpus-level-questions.md) §1b/§1d's refusals) **is excluded from the history handed to the answering model and to the rewriter of §1**. It stays in the transcript the reader sees, and it stays stored.
 
 A refusal left in the prompt is a demonstration of refusing. The next attempt — very often a Retry of the same question under §12 — is then biased toward repeating it, and the rewriter is asked to resolve a follow-up against text that says nothing about the subject. Excluding these Turns costs nothing: they carry no answer content a later question could need.

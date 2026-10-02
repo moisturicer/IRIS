@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-01 · **amended 2026-09-28 (IR-376, IR-391)**
+Accepted — 2026-09-01 · **amended 2026-09-28 (IR-376, IR-391)** · **amended 2026-10-02 (IR-453)**
 
 **Amended — 2026-09-28 (IR-376): model fallback inside one vendor account is
 permitted; cross-vendor failover remains rejected.** See §Amendment — IR-376
@@ -15,6 +15,13 @@ remains the outage fallback this ADR chose, and it additionally runs on the
 normal path as a retrieval signal. See §Amendment — IR-391 below and
 [ADR-033](033-hybrid-retrieval-and-passage-selection.md). Nothing in the
 degraded-mode table changes.
+
+**Amended — 2026-10-02 (IR-453): *"Never a fabricated answer"* is kept, and given
+an explicit boundary.** An answer carrying its own `ungrounded` state, its own
+presentation and no citations is not a fabricated answer; a grounded answer that
+is not grounded still is. See §Amendment — IR-453 below and
+[ADR-034](034-ungrounded-answers-as-a-distinct-state.md). The degraded-mode table
+is untouched, and the ungrounded path is **absent in degraded mode**.
 
 ## Context
 
@@ -150,6 +157,55 @@ a common query shape was available only when something was broken.
 position, the database-maintained chunk keyword index, the relevance cut-off,
 passage selection, and the rule that every technique ships off until a harness
 run shows it helps). Not restated here.
+
+## Amendment — 2026-10-02 (IR-453): what *"never a fabricated answer"* forbids
+
+**What this clarifies.** The rule in the Decision table — *"the answer is replaced
+by an explicit 'AI unavailable' state. **Never a fabricated answer**"* — is
+unchanged for every path it was written about. What IR-453 found is that the
+phrase was being read as forbidding a whole category it was never aimed at.
+
+The rule's target is **an answer a reader cannot tell apart from a grounded one.**
+Restated so the boundary is usable:
+
+> **Fabrication is a grounded answer that is not grounded. An answer that says
+> plainly it is not grounded is a different kind of answer, not a permitted
+> fabrication.**
+
+**Why the distinction holds.** Everything this ADR rejected a fabricated answer
+*for* is about a reader drawing a false conclusion about provenance: a sentence
+nobody wrote, presented with the authority of the repository, which in a
+research-integrity system is a correctness *and* reputational risk (§Security
+Impact). An answer stored under a distinct `Turn.state`, rendered with a visible
+"not from the repository" label, carrying no citations and no Record cards, and
+excluded from the model's own history, produces none of that. The reader is told
+the provenance; that is the opposite of the failure.
+
+**Bounds — none of these is relaxed by the above.**
+
+* The degraded-mode table is **unaltered**. An LLM outage is still the explicit
+  unavailable state, never an ungrounded answer standing in for one.
+* The ungrounded path is **absent in degraded mode**, for the same reason
+  [ADR-033](033-hybrid-retrieval-and-passage-selection.md) §3's cut-off is: no
+  reranker means no score to threshold, so the zero-source condition it branches
+  on is not trustworthy.
+* `GROUNDING_RULES` is **not weakened, reworded or made conditional.** The
+  ungrounded path uses a separate prompt with no `Sources:` block, so there is no
+  numbered source list for a model to be told it may ignore.
+* **No research question may reach it** — see
+  [ADR-027](027-corpus-level-questions.md) §4 as amended. A zero-source research
+  question is a true and useful answer about the corpus and stays a refusal.
+* It ships **on by default** (ADR-034 §3, with
+  [ADR-033](033-hybrid-retrieval-and-passage-selection.md) §5 amended to let the
+  cut-off ship on), so **this amendment does change reader-visible behaviour on
+  upgrade.** The mitigation is an ordering constraint rather than a flag: the
+  not-from-the-repository label ships in the same change as the behaviour, never
+  after it. A deployment wanting strictly grounded answers turns the setting off.
+
+**Design, reasoning and rejected alternatives:**
+[ADR-034](034-ungrounded-answers-as-a-distinct-state.md). Not restated here —
+including the rejected option of loosening `GROUNDING_RULES`, which is what this
+amendment exists to avoid.
 
 ## MVP Impact
 
