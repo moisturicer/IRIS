@@ -14,6 +14,8 @@ Jira is reachable through the **official Atlassian Remote MCP Server**, register
 { "mcpServers": { "atlassian": { "type": "http", "url": "https://mcp.atlassian.com/v2/mcp" } } }
 ```
 
+> **That file is gitignored (`.gitignore:89`) and has never been committed, so "registered in `.mcp.json`" is true only of a clone where somebody created it by hand.** A fresh clone — a cloud session, a CI job, a new machine — has no Jira tooling whatsoever, and the fallback at the end of this section is the normal path there, not an edge case. Since the file holds no credentials, the block above is the whole of it and recreating it is a copy-paste; whether it should be ignored at all is worth a deliberate decision rather than the status quo.
+
 The file carries **no credentials**. Each team member authenticates separately through OAuth (`/mcp` → `atlassian` → Authenticate), and the server acts **as that user** — an agent can only see and change what the authenticated person can. Grant least privilege.
 
 **Site cloudId:** `0e2327e8-dd75-4928-8968-84ef4c2fd413` — pass as a top-level `cloudId` argument on every call. Verified read-write on Jira.
