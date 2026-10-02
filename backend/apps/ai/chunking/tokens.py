@@ -93,3 +93,30 @@ def count_tokens(text: str) -> int:
     if not text.strip():
         return 0
     return len(get_tokenizer().encode(text, add_special_tokens=False).ids)
+
+
+def truncate_to_tokens(text: str, max_tokens: int) -> str:
+    """``text`` cut to at most ``max_tokens`` tokens, on a token boundary.
+
+    Cut, not summarised and not re-encoded: the returned string is a literal
+    prefix of ``text``, obtained from the encoding's character offsets, so a
+    caller can be certain nothing was reworded on the way through. A
+    decode-the-first-n-ids roundtrip would also be a prefix, but a lossy one
+    at the byte level -- byte-level BPE can split a multi-byte character
+    across two tokens, and decoding half of one yields a replacement
+    character rather than a clean stop.
+
+    ``max_tokens <= 0`` gives ``""``. A ``text`` already inside the ceiling is
+    returned unchanged, including its trailing whitespace.
+
+    Not memoized, unlike :func:`count_tokens`: the one caller (the verbatim
+    history window, IR-449) truncates at most one Turn per request, and
+    keying a cache on a long answer plus a budget would hold whole answers
+    in memory to save a cut that happens once.
+    """
+    if max_tokens <= 0:
+        return ""
+    encoding = get_tokenizer().encode(text, add_special_tokens=False)
+    if len(encoding.ids) <= max_tokens:
+        return text
+    return text[: encoding.offsets[max_tokens - 1][1]]
