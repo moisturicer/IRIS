@@ -18,7 +18,6 @@ from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
 from apps.ai.resolution import (
-    MAX_HISTORY_TURNS,
     QuestionResolver,
     build_resolution_prompt,
     resolution_cache_key,
@@ -59,13 +58,19 @@ class PromptTests:
         assert "It finds X." in prompt
         assert "what about its limitations?" in prompt
 
-    def test_only_the_most_recent_turns_are_included(self):
-        """Bounded, not the whole history — reaching further back is
-        memory's job (IR-297), not resolution's."""
-        turns = [_Turn(pk=i, question=f"q{i}") for i in range(MAX_HISTORY_TURNS + 3)]
+    def test_the_window_it_is_given_is_rendered_whole(self):
+        """**This prompt no longer bounds anything** (IR-449). It used to
+        keep `MAX_HISTORY_TURNS = 6` and slice its argument, so the caller
+        could not see the bound and the bound had nothing to do with the
+        size of what it bounded. The window is now a token budget, filled
+        once in `apps.ai.history` and shared with the answering prompt;
+        `test_history_window.py` covers what it admits, and what this
+        asserts is that the prompt does not quietly narrow it again.
+        """
+        turns = [_Turn(pk=i, question=f"q{i:03d}") for i in range(9)]
         prompt = build_resolution_prompt("its limitations?", turns)
-        assert "q0" not in prompt
-        assert f"q{MAX_HISTORY_TURNS + 2}" in prompt
+        for turn in turns:
+            assert turn.question in prompt
 
 
 class CacheKeyTests:

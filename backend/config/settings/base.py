@@ -544,6 +544,76 @@ AI_MEMORY_ANSWER_VECTOR_ENABLED = config(
     "AI_MEMORY_ANSWER_VECTOR_ENABLED", default=True, cast=bool
 )
 
+# ---- The verbatim history window (IR-449, ADR-026 §6) -------------------
+#
+# How much of a Conversation goes into the prompt verbatim. This was
+# `MAX_HISTORY_TURNS = 6` -- a count of Turns, which is a proxy for the
+# thing that matters. Six one-line exchanges spent a fraction of the room
+# they could have used, and six long answers (the separate-universe answer
+# in IR-443 is ~350 words by itself) produced a prompt several times larger
+# than intended, in the resolver call and the answering call both, with no
+# ceiling anywhere. The window now fills newest-first until this budget is
+# reached and then stops; the newest Turn is always included, truncated
+# rather than dropped, because a follow-up with nothing before it in view is
+# the IR-445 failure again.
+#
+# Read per request by apps.ai.history.history_token_budget(), and mirrored
+# by apps.ai.history.DEFAULT_HISTORY_TOKEN_BUDGET, which a test holds to
+# this value.
+#
+# WHY 3000. It is set to hold roughly what the old six Turns held for a
+# conversation of ordinary length -- a question plus a few-hundred-token
+# answer, six times over -- so this change moves the *shape* of the bound
+# and not, by implication, the amount of history a typical conversation
+# gets. Short exchanges now reach further back and long ones reach less far,
+# which is the point; the middle case is deliberately left where it was.
+#
+# THE COMBINED CEILING, stated here so IR-397 reconciles against a number.
+# This budget covers the verbatim window only. The answering prompt also
+# holds memory's recalled Turns (AI_MEMORY_RECALL_MAX_DISTANCE bounds their
+# relevance, `MAX_RECALLED_TURNS = 4` their count, and nothing bounds their
+# tokens) and the `Sources:` block, whose budget is IR-397's to add. The
+# ceiling the two halves are meant to add up to is **12000 estimated
+# tokens**: 3000 here, ~2000 for four recalled Turns at the same scale, and
+# ~7000 for the sources half, leaving room for the question and the system
+# prompt. IR-449 shipped first and capped its half; IR-397 ships second and
+# owns reconciling the sources half against that total, and bounding the
+# recall half if it chooses to.
+AI_HISTORY_TOKEN_BUDGET = config("AI_HISTORY_TOKEN_BUDGET", default=3000, cast=int)
+
+# Safety margin on every count made against the budget above. Mirrored by
+# apps.ai.history.DEFAULT_TOKEN_MARGIN.
+#
+# WHY A MARGIN EXISTS. Counting is local and uses the tokenizer this
+# repository already pins -- the SHA-256-pinned Qwen2 BPE vocabulary at
+# apps/ai/chunking/tokenizer/voyage-context-4.json, through the pinned
+# `tokenizers` runtime. No new dependency, nothing downloaded at build or
+# run time, and real BPE tokens rather than words. But that vocabulary is
+# `voyage-context-4`'s, while the model being budgeted for is a Llama- or
+# Qwen-class model on Groq or one of OpenRouter's many, so the count is an
+# estimate of the answering model's tokens and not a measurement of them.
+# A budget needs a number that is stable, conservative and monotonic, not
+# one that is exact, so every count is multiplied by this and rounded up.
+#
+# WHY NOT A VOCABULARY PER MODEL. ADR-021 sanctions two vendors and
+# OpenRouter alone fronts hundreds of models; shipping a tokenizer per
+# answering model is unbounded maintenance for a number that only has to be
+# roughly right. And there is no vendor endpoint that would do it instead:
+# OpenRouter reports prompt_tokens in the response `usage` field and serves
+# historical figures at GET /api/v1/generation?id=, Groq is the same shape,
+# and both require the request to have already been made.
+#
+# WHY 1.15. English prose tokenizes within roughly a tenth either way across
+# the modern 100k-150k-vocabulary BPEs, Qwen2's and Llama-3's among them, so
+# 15% covers that spread in the conservative direction and leaves a little
+# over. It is a defensible guess and not a measurement, which is the honest
+# description: IR-330 "Capture LLM token usage per Turn" (Deferred Until
+# Validation) would record the real `usage` figures this estimate could be
+# calibrated against, and that is the ticket that turns this number into
+# one. Values below 1.0 are clamped to 1.0 -- a margin that made the
+# estimate smaller than the count would defeat its own purpose.
+AI_HISTORY_TOKEN_MARGIN = config("AI_HISTORY_TOKEN_MARGIN", default=1.15, cast=float)
+
 # ---- Hybrid retrieval (IR-395, ADR-033 §1-2) ----------------------------
 #
 # Two halves of one technique, in two settings because ADR-033 §1 (merge the

@@ -21,7 +21,9 @@ from apps.ai.models import (
 from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedLLM
 from apps.ai.resilience.circuit import CircuitOpen
-from apps.ai.resolution import MAX_HISTORY_TURNS, QuestionResolver
+from apps.ai.models.conversation import Conversation
+from apps.ai.resolution import QuestionResolver
+from apps.ai.views.chatbot import _recent_turns
 
 from .corpus import (
     DIMENSIONS,
@@ -37,6 +39,22 @@ from .corpus import (
 )
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
+
+#: The verbatim window these tests run under, in estimated tokens (IR-449).
+#:
+#: Deliberately far below the production default. The subject of this file is
+#: recall of Turns that have fallen *outside* the verbatim window, so the
+#: window has to be small enough that a handful of HTTP asks pushes a Turn
+#: past it. Under the real 3000-token default, filler questions this short
+#: would take fifty round trips per test to push anything out, and the thing
+#: being asserted would be no different for it. What the budget *admits* is
+#: `test_history_window.py`'s subject, not this file's.
+HISTORY_BUDGET_FOR_TESTS = 120
+
+
+@pytest.fixture(autouse=True)
+def _tight_verbatim_window(settings):
+    settings.AI_HISTORY_TOKEN_BUDGET = HISTORY_BUDGET_FOR_TESTS
 
 
 def conversation_url(pk):
@@ -60,9 +78,31 @@ def _resolving_to_the_flood_question():
 
 
 def _fill_past_the_recent_window(client, conversation_id):
-    """Pushes the first Turn outside the verbatim window."""
-    for i in range(MAX_HISTORY_TURNS):
+    """Pushes the first Turn outside the verbatim window.
+
+    Asks filler questions **until the first Turn is actually outside the
+    window**, rather than asking a fixed number and assuming. The window is
+    a token budget since IR-449, not a Turn count, so a fixed number of
+    asks is no longer a statement about what the prompt holds -- and a test
+    that believes it pushed a Turn out of the window when it did not is a
+    test asserting recall found something the verbatim window was handing
+    over anyway.
+
+    Checked with `_recent_turns`, which is the predicate the view itself
+    uses, so this helper cannot drift from the thing it is setting up.
+    """
+    conversation = Conversation.objects.get(pk=conversation_id)
+    first = conversation.turns.order_by("id").first()
+    if first is None:
+        return
+    for i in range(50):
+        if all(turn.pk != first.pk for turn in _recent_turns(conversation)):
+            return
         ask(client, f"filler question number {i}", conversation_id=conversation_id)
+    raise AssertionError(
+        "50 filler Turns did not push the first Turn out of the verbatim "
+        f"window at a {HISTORY_BUDGET_FOR_TESTS}-token budget"
+    )
 
 
 class _CountingEmbedder(DeterministicEmbeddingProvider):
@@ -248,11 +288,24 @@ class BoundedPromptSizeTests:
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
 
         _system, prompt = llm.calls[-1]
+        from apps.ai import history
         from apps.ai.memory import MAX_RECALLED_TURNS
 
+        # Bounded by the budget and the recall limit, not by a Turn count
+        # (IR-449): what the window admits depends on how large those Turns
+        # were, so the ceiling is computed from the same predicate the view
+        # used rather than restated as a number here.
+        conversation = Conversation.objects.get(pk=conversation_id)
+        admitted = _recent_turns(conversation)
         assert prompt.count("\nQ: ") + (1 if prompt.startswith("Q: ") else 0) <= (
-            MAX_HISTORY_TURNS + MAX_RECALLED_TURNS
+            len(admitted) + MAX_RECALLED_TURNS
         )
+        # And the verbatim half of it is inside the budget it was given.
+        assert sum(history.turn_tokens(turn) for turn in admitted) <= (
+            HISTORY_BUDGET_FOR_TESTS
+        )
+        # 21 Turns of history went in; the window is a small fraction of it.
+        assert len(admitted) < 21
 
 
 #: A fact that exists only in an answer. Shares no word with any question

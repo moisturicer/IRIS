@@ -21,6 +21,11 @@ failed into a refusal: "give me a longer explanation" has no topic in it, so
 retrieval searched it as typed. What is left of cost control is the first-Turn
 skip, the cache, and the separately configured small model; a failed call
 falls back to the raw question rather than erroring.
+
+**How much history the prompt holds is not decided here** (IR-449). It was,
+as `MAX_HISTORY_TURNS = 6`; it is now a token budget in
+`apps.ai.history`, applied once by the caller and shared with the answering
+prompt. This module renders the window it is given.
 """
 
 from __future__ import annotations
@@ -37,13 +42,6 @@ if TYPE_CHECKING:
     from apps.ai.providers.ports import LLMProvider
 
 logger = logging.getLogger(__name__)
-
-#: How many of the conversation's most recent Turns go into the resolution
-#: prompt. Bounded rather than the whole history, for the same reason the
-#: answering prompt only takes recent Turns verbatim (ADR-026 Decision 6):
-#: reaching further back than this is memory's job (IR-297), not
-#: resolution's.
-MAX_HISTORY_TURNS = 6
 
 RESOLUTION_SYSTEM_PROMPT = (
     "Rewrite the follow-up question as a standalone question, using the "
@@ -67,11 +65,16 @@ def turn_qa_lines(turns: Sequence["Turn"]) -> list[str]:
 def build_resolution_prompt(question: str, turns: Sequence["Turn"]) -> str:
     """The user turn: the recent conversation, then the question to resolve.
 
-    Only the most recent ``MAX_HISTORY_TURNS`` -- see the module docstring.
+    ``turns`` is the window as given, rendered whole. **It is not sliced
+    here** (IR-449): the verbatim window is a token budget, filled once by
+    `apps.ai.history.history_window` and handed to this prompt and the
+    answering prompt alike, so neither can disagree with the other about
+    how much history there was. This function used to keep its own
+    `MAX_HISTORY_TURNS = 6`, which made the bound invisible to the caller
+    and unrelated to the size of what it bounded.
     """
-    recent = list(turns)[-MAX_HISTORY_TURNS:]
     lines = ["Conversation so far:"]
-    lines.extend(turn_qa_lines(recent))
+    lines.extend(turn_qa_lines(turns))
     lines.append("")
     lines.append(f"Follow-up question: {question}")
     return "\n".join(lines)
@@ -82,14 +85,27 @@ def resolution_cache_key(question: str, turns: Sequence["Turn"]) -> str:
 
     Keyed like a query embedding (``apps.ai.resilience.query_cache``): the
     same follow-up after the same history should cost one model call, not
-    one per asker. History is folded in by Turn id rather than by text --
-    cheaper to hash and just as exact, since a Turn's question and answer
-    never change once written.
+    one per asker.
+
+    **Computed from the Turns actually used** (IR-449). A token budget makes
+    the window variable, so which Turn ids are folded in is now a property
+    of this request rather than a fixed six, and this function must be given
+    the same window the prompt was built from -- which is why it takes the
+    window rather than the Conversation's history and slices it itself.
+
+    A Turn contributes its id *and* the length of its question and answer.
+    The id alone was exact while the window was whole Turns; the newest Turn
+    can now arrive truncated, and two different truncations of one Turn are
+    two different prompts that must not share an answer. Lengths are enough
+    to tell them apart and stay cheap -- a Turn's text never changes once
+    written, so the same (id, lengths) triple is the same text.
     """
-    recent = list(turns)[-MAX_HISTORY_TURNS:]
-    history_ids = ",".join(str(turn.pk) for turn in recent)
+    history = ",".join(
+        f"{turn.pk}:{len(turn.question or '')}:{len(turn.answer or '')}"
+        for turn in turns
+    )
     digest = hashlib.sha256(
-        f"{history_ids}\u0000{normalize_question(question)}".encode("utf-8")
+        f"{history}\u0000{normalize_question(question)}".encode("utf-8")
     ).hexdigest()
     return f"iris:qres:{digest}"
 
