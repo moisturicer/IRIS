@@ -9,8 +9,26 @@ import logging
 import pytest
 from django.test import override_settings
 
-from apps.ai.memory import DEFAULT_MAX_RECALL_DISTANCE, ConversationMemory
-from apps.ai.models import Conversation, Turn, TurnEmbedding
+from apps.ai.answers.citations import (
+    GENERATED,
+    NO_SOURCES,
+    PARTIAL,
+    UNAVAILABLE,
+    GroundedAnswer,
+)
+from apps.ai.conversations import record_turn
+from apps.ai.memory import (
+    DEFAULT_MAX_RECALL_DISTANCE,
+    MAX_RECALLED_TURNS,
+    ConversationMemory,
+)
+from apps.ai.models import (
+    TURN_ANSWER_VECTOR,
+    TURN_QUESTION_VECTOR,
+    Conversation,
+    Turn,
+    TurnEmbedding,
+)
 from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 
 from .corpus import FLOOD_QUESTION, POND_QUESTION, make_user
@@ -33,15 +51,59 @@ def memory_logs(caplog):
         logger.removeHandler(caplog.handler)
 
 
-def _turn(conversation, question, answer="", space=None, embedder=None):
+def _turn(
+    conversation,
+    question,
+    answer="",
+    space=None,
+    embedder=None,
+    answer_vector=True,
+):
+    """A stored Turn with the vectors `record_turn` would have given it.
+
+    Two of them when there is an answer (IR-447), both through `embed_query`,
+    which is what `conversations._store_answer_vector` does and why
+    `ConversationMemory` can rank them in one list.
+
+    ``answer_vector=False`` stores the question vector alone -- a Turn as it
+    would have been written before IR-447. It is what makes the answer-recall
+    tests below honest: the same question, the same answer and the same query,
+    recalled with the second vector and missed without it.
+    """
     turn = Turn.objects.create(
         conversation=conversation, question=question, answer=answer, state="generated"
     )
     if space is not None:
         TurnEmbedding.objects.create(
-            turn=turn, space=space, embedding=embedder.embed_query(question)
+            turn=turn,
+            space=space,
+            kind=TURN_QUESTION_VECTOR,
+            embedding=embedder.embed_query(question),
         )
+        if answer and answer_vector:
+            TurnEmbedding.objects.create(
+                turn=turn,
+                space=space,
+                kind=TURN_ANSWER_VECTOR,
+                embedding=embedder.embed_query(answer),
+            )
     return turn
+
+
+#: ADR-026 §7's own illustration, as a fixture pair. A generic question whose
+#: answer carries the only distinctive words in it -- which is precisely the
+#: Turn question-only indexing cannot reach.
+_GENERIC_QUESTION = "what does the paper conclude?"
+_SPECIFIC_ANSWER = (
+    "The Jordan frame bound is 0.37 under the separate-universe approach."
+)
+#: Deliberately shares no word with `_GENERIC_QUESTION` -- not even "what"
+#: or "the". The fake embedder is a hashed bag of words, so a stopword in
+#: common is real similarity to it, and the first draft of this fixture
+#: measured 0.9996 against the question either way: the control test passed
+#: for the wrong reason. Overlapping the *answer* and nothing else is what
+#: makes these tests about the answer vector.
+_ASKING_ABOUT_THE_ANSWER = "which figure gave Jordan frame bound 0.37"
 
 
 class RecallingRelevantTurnsTests:
@@ -105,6 +167,324 @@ class RecallingRelevantTurnsTests:
         )
 
         assert recalled == []
+
+
+class RecallingByTheAnswerTests:
+    """IR-447, ADR-026 §7 as amended -- a Turn is findable by what it said.
+
+    The pair of tests at the top is the whole acceptance criterion: identical
+    Turns, identical query, recalled with the answer vector and missed
+    without it. Written as a pair deliberately, because the positive test
+    alone would still pass if the fake embedder happened to put the query
+    near the *question* too, and would then be proving nothing.
+    """
+
+    def test_a_turn_is_recalled_by_its_answer_when_its_question_never_said_the_words(
+        self, embedder, space
+    ):
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        conclusion = _turn(
+            conversation,
+            _GENERIC_QUESTION,
+            answer=_SPECIFIC_ANSWER,
+            space=space,
+            embedder=embedder,
+        )
+        _turn(
+            conversation,
+            POND_QUESTION,
+            answer="Four fingerlings per square metre.",
+            space=space,
+            embedder=embedder,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(_ASKING_ABOUT_THE_ANSWER), space.pk
+        )
+
+        assert [turn.pk for turn in recalled] == [conclusion.pk]
+
+    def test_the_same_turn_is_missed_when_only_its_question_is_indexed(
+        self, embedder, space
+    ):
+        """The control. This is what the bug looked like before IR-447."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        _turn(
+            conversation,
+            _GENERIC_QUESTION,
+            answer=_SPECIFIC_ANSWER,
+            space=space,
+            embedder=embedder,
+            answer_vector=False,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(_ASKING_ABOUT_THE_ANSWER), space.pk
+        )
+
+        assert recalled == []
+
+    def test_a_turn_reached_by_its_answer_is_returned_whole(self, embedder, space):
+        """ADR-026 §7: "The Turn is still returned whole; either vector can
+        now reach it." So the question comes back too, not just the half that
+        matched."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        _turn(
+            conversation,
+            _GENERIC_QUESTION,
+            answer=_SPECIFIC_ANSWER,
+            space=space,
+            embedder=embedder,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(_ASKING_ABOUT_THE_ANSWER), space.pk
+        )
+
+        assert recalled[0].question == _GENERIC_QUESTION
+        assert recalled[0].answer == _SPECIFIC_ANSWER
+
+    def test_a_turn_matching_on_both_vectors_is_recalled_once(self, embedder, space):
+        """The de-duplication. Ranking is over vectors, the result is over
+        Turns, and a Turn that matches twice is still one Turn."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        both = _turn(
+            conversation,
+            FLOOD_QUESTION,
+            answer=FLOOD_QUESTION,
+            space=space,
+            embedder=embedder,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(FLOOD_QUESTION), space.pk
+        )
+
+        assert [turn.pk for turn in recalled] == [both.pk]
+
+    def test_a_turn_matching_twice_does_not_crowd_out_other_turns(
+        self, embedder, space
+    ):
+        """The reason de-duplication had to happen before the slice, not
+        after it: two rows of one Turn must not consume two of the four slots
+        and shrink the recall to three Turns."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        # Question and answer identical, so both of its vectors sit at the
+        # very top of the ranking.
+        _turn(
+            conversation, FLOOD_QUESTION, answer=FLOOD_QUESTION,
+            space=space, embedder=embedder,
+        )
+        for i in range(4):
+            _turn(
+                conversation,
+                f"{FLOOD_QUESTION} variation {i}",
+                answer=f"{FLOOD_QUESTION} answer {i}",
+                space=space, embedder=embedder,
+            )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(FLOOD_QUESTION), space.pk,
+        )
+
+        assert len(recalled) == MAX_RECALLED_TURNS
+        assert len({turn.pk for turn in recalled}) == MAX_RECALLED_TURNS
+
+    def test_an_excluded_turn_stays_excluded_through_its_answer_vector(
+        self, embedder, space
+    ):
+        """`exclude_ids` is how the caller keeps the verbatim window from
+        being recalled a second time. A second vector per Turn must not be a
+        second way around it."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        turn = _turn(
+            conversation,
+            _GENERIC_QUESTION,
+            answer=_SPECIFIC_ANSWER,
+            space=space,
+            embedder=embedder,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation,
+            embedder.embed_query(_ASKING_ABOUT_THE_ANSWER),
+            space.pk,
+            exclude_ids=[turn.pk],
+        )
+
+        assert recalled == []
+
+    def test_an_answer_vector_from_a_retired_space_is_never_compared_against_a_current_one(
+        self, embedder, space
+    ):
+        """The space rule holds per vector, not per Turn (ADR-026
+        §Consequences). A Turn can hold one vector in each."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        retired = EmbeddingSpace.objects.create(
+            model_id="retired-model",
+            dimensions=embedder.dimensions,
+            metric="cosine",
+            state=EmbeddingSpaceState.RETIRED,
+        )
+        turn = _turn(
+            conversation,
+            _GENERIC_QUESTION,
+            answer=_SPECIFIC_ANSWER,
+            space=space,
+            embedder=embedder,
+        )
+        turn.embeddings.filter(kind=TURN_ANSWER_VECTOR).update(space=retired)
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(_ASKING_ABOUT_THE_ANSWER), space.pk
+        )
+
+        assert recalled == []
+
+
+class AnswerVectorStateTests:
+    """Which Turns get an answer vector, driven through `record_turn` itself.
+
+    `GroundedAnswer.text` is populated in every state, so "has text" is not
+    the question -- "is that text an answer" is. A `no_sources` or
+    `unavailable` Turn holds an explanation and a `partial` one holds a
+    fragment from a stream that died mid-sentence, and embedding any of them
+    would make refusals and failures findable, which is the thing IR-448
+    exists to prevent.
+    """
+
+    @pytest.mark.parametrize(
+        "state", [NO_SOURCES, UNAVAILABLE, PARTIAL]
+    )
+    def test_a_turn_that_is_not_an_answer_stores_no_answer_vector(
+        self, embedder, space, state
+    ):
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            _answer("an explanation, or half a sentence", state, embedder, space),
+            embedder=embedder,
+        )
+
+        kinds = set(turn.embeddings.values_list("kind", flat=True))
+        assert kinds == {TURN_QUESTION_VECTOR}
+
+    def test_a_generated_turn_stores_both(self, embedder, space):
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            _answer(_SPECIFIC_ANSWER, GENERATED, embedder, space),
+            embedder=embedder,
+        )
+
+        kinds = set(turn.embeddings.values_list("kind", flat=True))
+        assert kinds == {TURN_QUESTION_VECTOR, TURN_ANSWER_VECTOR}
+
+    def test_a_generated_turn_with_an_empty_answer_stores_no_answer_vector(
+        self, embedder, space
+    ):
+        """Nothing to embed is not the same as something to embed badly."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            _answer("   ", GENERATED, embedder, space),
+            embedder=embedder,
+        )
+
+        kinds = set(turn.embeddings.values_list("kind", flat=True))
+        assert kinds == {TURN_QUESTION_VECTOR}
+
+    def test_a_degraded_answer_with_no_space_stores_neither(self, embedder, space):
+        """The degraded, full-text path carries no vector of any kind, and
+        IR-447 does not give it one -- there is no space to store it under."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+
+        turn = record_turn(
+            conversation,
+            "what does this paper conclude?",
+            GroundedAnswer(
+                text=_SPECIFIC_ANSWER, citations=(), state=GENERATED, degraded=True
+            ),
+            embedder=embedder,
+        )
+
+        assert list(turn.embeddings.all()) == []
+
+
+class OneRankedListTests:
+    """ADR-026 §7: both vectors go in under the same input type, so
+    `recall`'s single `ORDER BY distance` compares like with like.
+
+    The fake embedder reproduces Voyage's asymmetry -- `embed_documents(x)`
+    and `embed_query(x)` differ for identical text -- which is what makes
+    this assertable without a vendor account: a vector can be attributed to
+    the method that produced it.
+    """
+
+    def test_every_vector_in_the_ranked_list_is_a_query_vector(
+        self, embedder, space
+    ):
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        turn = record_turn(
+            conversation,
+            _GENERIC_QUESTION,
+            _answer(_SPECIFIC_ANSWER, GENERATED, embedder, space),
+            embedder=embedder,
+        )
+
+        texts = {
+            TURN_QUESTION_VECTOR: _GENERIC_QUESTION,
+            TURN_ANSWER_VECTOR: _SPECIFIC_ANSWER,
+        }
+        rows = list(turn.embeddings.all())
+        assert len(rows) == 2
+
+        for row in rows:
+            text = texts[row.kind]
+            # Each stored vector matches the query method and not the
+            # document method, so the two kinds sit in one comparable space.
+            assert list(row.embedding) == pytest.approx(embedder.embed_query(text))
+            assert list(row.embedding) != pytest.approx(
+                embedder.embed_documents([text])[0]
+            )
+
+    def test_recall_does_not_filter_by_kind(self, embedder, space):
+        """One list, not one query per kind. If recall ever narrowed to a
+        single kind, the answer vector would be stored and never read -- a
+        silent no-op that every other test here would still pass."""
+        conversation = Conversation.objects.create(user=make_user("reader@cit.edu"))
+        answer_only = _turn(
+            conversation,
+            _GENERIC_QUESTION,
+            answer=_SPECIFIC_ANSWER,
+            space=space,
+            embedder=embedder,
+        )
+        answer_only.embeddings.filter(kind=TURN_QUESTION_VECTOR).delete()
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(_ASKING_ABOUT_THE_ANSWER), space.pk
+        )
+
+        assert [turn.pk for turn in recalled] == [answer_only.pk]
+
+
+def _answer(text, state, embedder, space):
+    """A `GroundedAnswer` carrying the question vector retrieval would have
+    produced, so `record_turn` behaves as it does in the real path."""
+    return GroundedAnswer(
+        text=text,
+        citations=(),
+        state=state,
+        query_vector=embedder.embed_query(_GENERIC_QUESTION),
+        embedding_space_id=space.pk,
+    )
 
 
 class RelevanceCutOffTests:

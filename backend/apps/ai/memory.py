@@ -4,6 +4,13 @@ Recent Turns go into the answering prompt verbatim. Older ones are searched
 rather than summarised or dropped, so a fact from Turn 2 is still usable at
 Turn 50. A module, not a port, like `apps.ai.resolution` -- one
 implementation, no vendor call, fully exercisable through HTTP.
+
+**A Turn has two vectors since IR-447** -- its question and its answer, both
+stored under the query input type precisely so this module stays one
+``ORDER BY distance`` over one list (ADR-026 §7 as amended). What that costs
+here is a de-duplication step: the ranking is over *vectors*, the result is
+over *Turns*, and the two closest vectors in a Conversation can belong to the
+same Turn.
 """
 
 from __future__ import annotations
@@ -42,6 +49,10 @@ class ConversationMemory:
     Relevant, not merely closest: a Turn beyond the configured cosine
     distance is dropped, so the prompt never asserts relevance over the best
     of a bad set (IR-446).
+
+    Found by question or by answer, whichever is closer (IR-447). A Turn is
+    returned whole either way -- which vector reached it is a retrieval
+    detail and never travels any further than this method.
     """
 
     def __init__(self, limit: int = MAX_RECALLED_TURNS) -> None:
@@ -69,7 +80,7 @@ class ConversationMemory:
             )
             return []
 
-        from apps.ai.models import TurnEmbedding
+        from apps.ai.models import VECTORS_PER_TURN, TurnEmbedding
 
         rows = (
             TurnEmbedding.objects.filter(turn__conversation=conversation, space_id=space_id)
@@ -80,4 +91,22 @@ class ConversationMemory:
         cut_off = _max_distance()
         if cut_off > 0:
             rows = rows.filter(distance__lt=cut_off)
-        return [row.turn for row in rows.order_by("distance")[: self._limit]]
+
+        # Slicing at `self._limit` would be the bug IR-447 introduces if it
+        # were left alone: a Turn whose question *and* answer both rank well
+        # would occupy two of the slots and silently shrink the recall to
+        # three Turns. Taking `VECTORS_PER_TURN` times as many rows is enough
+        # to guarantee `self._limit` distinct Turns whenever that many exist,
+        # because that is the most rows any one Turn can contribute.
+        ranked = rows.order_by("distance")[: self._limit * VECTORS_PER_TURN]
+
+        # First occurrence wins, and the rows arrive nearest-first, so each
+        # Turn is held at its *best* vector and the Turns come out ranked by
+        # it. A dict because it preserves insertion order -- the ranking is
+        # the return value, not an incidental property of it.
+        best: dict[int, "Turn"] = {}
+        for row in ranked:
+            best.setdefault(row.turn_id, row.turn)
+            if len(best) == self._limit:
+                break
+        return list(best.values())

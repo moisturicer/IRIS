@@ -507,6 +507,43 @@ AI_MEMORY_RECALL_MAX_DISTANCE = config(
     "AI_MEMORY_RECALL_MAX_DISTANCE", default=0.80, cast=float
 )
 
+# ---- A Turn's answer vector (IR-447, ADR-026 §7 as amended) -------------
+#
+# A Turn is stored with two vectors, not one: its question -- the vector
+# retrieval already computed, free -- and its answer, which is a real Voyage
+# call on every Turn that gets answered.
+#
+# Why the second one exists. Indexing the question alone cannot find a Turn
+# whose *answer* states a fact its question never named: ask "what does the
+# paper conclude?" at Turn 3 and "what was that figure for the Jordan frame
+# bound?" at Turn 20, and recall cannot reach Turn 3, because the words to
+# match on are only in the answer. ADR-026 §7 originally claimed a question
+# and its answer are a pair and so answer recall came for free; that was an
+# assumption, was never measured, and IR-444 reversed it.
+#
+# ON by default, unlike ADR-033 §5's techniques. That rule governs its own
+# six switches; here the amended ADR decides the answer *is* embedded, and
+# this setting exists so the with-and-without comparison ADR-023 requires can
+# be run at all -- not because the feature ships off. Turning it off restores
+# pre-IR-447 behaviour exactly: question vectors only, no second call.
+#
+# It is a real cost and is stated here rather than discovered on an invoice:
+# roughly one extra embedding call per answered question. Failures and no_sources
+# Turns are not embedded -- their text is an explanation, not an answer -- so
+# the ceiling is one call per Turn a reader actually got an answer to.
+#
+# PROVISIONAL in design, not just in default. Both vectors are stored under
+# the *query* input type so that recall stays a single ORDER BY distance;
+# questions as queries and answers as documents would rank two
+# non-comparable distance scales in one list and would make
+# AI_MEMORY_RECALL_MAX_DISTANCE unsettable. ADR-015 rule 3 carries a note
+# recording that this use of embed_query is deliberate. If it measures badly,
+# the named fallback is two ranked lists merged by rank position, in the
+# shape of apps/ai/retrieval/fusion.py's fuse_by_rank -- not a flag here.
+AI_MEMORY_ANSWER_VECTOR_ENABLED = config(
+    "AI_MEMORY_ANSWER_VECTOR_ENABLED", default=True, cast=bool
+)
+
 # ---- Hybrid retrieval (IR-395, ADR-033 §1-2) ----------------------------
 #
 # Two halves of one technique, in two settings because ADR-033 §1 (merge the

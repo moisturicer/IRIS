@@ -134,6 +134,23 @@ python manage.py backfill_embeddings --dry-run           # what indexing the cor
                                    # --space N fills a pending space (chunk vectors only).
                                    # Verified on the dev database 2026-09-20: 26 records, 1,236 chunks,
                                    # 381,073 estimated tokens
+python manage.py backfill_turn_vectors --dry-run          # give existing Turns the answer
+                                   # vector IR-447 added (ADR-026 §7 as amended). A Turn written
+                                   # before IR-447 carries only its question vector, so a fact
+                                   # stated solely in an older answer stays unreachable until this
+                                   # runs. Prints Turns, estimated tokens and an approximate cost,
+                                   # then stops. Drop --dry-run to run it inline; --conversation N
+                                   # and --limit narrow it, --space N fills a pending space.
+                                   # Resumable and idempotent: it embeds only answered Turns with
+                                   # no answer vector in the space, recomputed every run, so a
+                                   # finished set re-runs for one query and no vendor call. Refuses
+                                   # past AI_EMBEDDING_TOKEN_CEILING (--token-ceiling overrides;
+                                   # 0 disables). Only `generated` Turns get one -- a no_sources,
+                                   # unavailable or partial Turn's text is an explanation or a
+                                   # fragment, and indexing it would make refusals findable.
+                                   # Inline only, no --queue: an answer is a few hundred tokens.
+                                   # Verified on the dev database 2026-10-02: 0 Turns, 0 tokens,
+                                   # which is the whole history that database holds
 python manage.py index_with_disclosure_bypass --dry-run  # index with ADR-015's disclosure
                                    # gate bypassed — DEVELOPMENT ONLY (IR-317). The gate refuses
                                    # every record until IR-250 gives Record an embargo field, so
@@ -270,6 +287,8 @@ This is the team's standing preference, not a per-session request. Apply it unle
 ### Issue tracker
 
 Jira (`citiris.atlassian.net`, project `IR`) via the Atlassian MCP server registered in `.mcp.json`. Holds the state mapping and label taxonomy. See `docs/agents/issue-tracker.md`.
+
+**`.mcp.json` is gitignored and has never been committed, so a fresh clone has no Jira at all** — that includes every cloud session, every CI job and every newly cloned machine. It works only where someone created the file by hand. Its full contents are in `docs/agents/issue-tracker.md` §Access (no credentials; each person authenticates separately over OAuth), so recreating it is a copy-paste. **An agent that cannot reach Jira must not pretend otherwise:** build to the ADR, which is the requirements authority anyway, and then say plainly that the card was neither read nor transitioned — per that file's own rule, never claim an issue was created or moved when it was not.
 
 ### Triage labels
 
