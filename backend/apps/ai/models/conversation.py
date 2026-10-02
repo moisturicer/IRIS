@@ -35,6 +35,63 @@ _STATE_CHOICES = [
 ]
 
 
+#: The only `Turn.state` whose text a model may be shown (IR-448, ADR-026 §13).
+#:
+#: A Turn that failed (`unavailable` -- no model was reachable, ADR-008) or
+#: that refused (`no_sources` -- nothing readable was found) holds an
+#: *explanation* in `answer`, not an answer. `partial` holds a fragment: the
+#: stream died before its `Done` (IR-328), so the text stops mid-sentence.
+#:
+#: None of the three carries content a later question could need, and leaving
+#: one in the prompt is actively harmful: a refusal shown as a prior answer is
+#: a demonstration of refusing, and the rewriter of ADR-026 §1 is asked to
+#: resolve a follow-up against text that says nothing about the subject.
+#: ADR-026 §13 rejected mitigating that, because excluding it is cheaper.
+#:
+#: **This filters the model's view only.** `conversations.turns_for_reader` is
+#: deliberately not filtered -- a reader who could not see their own failed
+#: question would be more confused, not less. The asymmetry is the decision.
+MODEL_HISTORY_STATES = frozenset({GENERATED})
+
+
+def model_history_q(prefix: str = "") -> models.Q:
+    """The IR-448 predicate itself, once, for any path reaching a `Turn`.
+
+    ``prefix`` is the relation to traverse first -- ``""`` on a `Turn`
+    queryset, ``"turn__"`` on a `TurnEmbedding` one. A `Q` rather than a
+    second `filter(state__in=...)` per call site because the two paths this
+    gates (`views.chatbot._recent_turns` and
+    `memory.ConversationMemory.recall`) must not be able to drift: adding a
+    state here changes both or neither.
+
+    A `Q` rather than a subquery on purpose, too. ``turn__in=Turn.objects
+    .in_model_history()`` would read as the stronger reuse and would make
+    Postgres semi-join the whole `Turn` table to answer a question about one
+    Conversation's rows.
+    """
+    return models.Q(**{f"{prefix}state__in": MODEL_HISTORY_STATES})
+
+
+class TurnQuerySet(models.QuerySet):
+    """Turns, with the IR-448 predicate reachable.
+
+    A queryset method rather than a free function because both callers reach
+    Turns through the ORM, so the predicate rides on the query.
+    """
+
+    def in_model_history(self):
+        """Turns whose text may go into a prompt. See `MODEL_HISTORY_STATES`."""
+        return self.filter(model_history_q())
+
+
+class TurnEmbeddingQuerySet(models.QuerySet):
+    """Vectors of Turns, with the same one predicate reachable (IR-448)."""
+
+    def in_model_history(self):
+        """Rows whose Turn may be recalled into a prompt."""
+        return self.filter(model_history_q("turn__"))
+
+
 #: What a `TurnEmbedding` is a vector *of* (IR-447, ADR-026 §7 as amended).
 #:
 #: Strings rather than an enum for the reason `_STATE_CHOICES` takes the same
@@ -150,6 +207,8 @@ class Turn(models.Model):
     reasoning = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = TurnQuerySet.as_manager()
+
     class Meta:
         ordering = ["id"]
         indexes = [models.Index(fields=["conversation", "id"])]
@@ -223,6 +282,8 @@ class TurnEmbedding(models.Model):
     )
     embedding = VectorField(dimensions=VECTOR_COLUMN_DIMENSIONS)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = TurnEmbeddingQuerySet.as_manager()
 
     class Meta:
         constraints = [

@@ -1,4 +1,5 @@
 from .conversation import (
+    MODEL_HISTORY_STATES,
     TURN_ANSWER_VECTOR,
     TURN_QUESTION_VECTOR,
     VECTORS_PER_TURN,
@@ -6,6 +7,7 @@ from .conversation import (
     Turn,
     TurnCitation,
     TurnEmbedding,
+    model_history_q,
 )
 from .summary import RecordOverview
 from .metadata import DocumentMetadata
@@ -25,6 +27,8 @@ __all__ = [
     "Turn",
     "TurnCitation",
     "TurnEmbedding",
+    "MODEL_HISTORY_STATES",
+    "model_history_q",
     "TURN_ANSWER_VECTOR",
     "TURN_QUESTION_VECTOR",
     "VECTORS_PER_TURN",

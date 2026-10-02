@@ -26,8 +26,9 @@ from typing import Optional
 from django.conf import settings
 from django.db import transaction
 
-from apps.ai.answers.citations import GENERATED, PARTIAL, GroundedAnswer
+from apps.ai.answers.citations import PARTIAL, GroundedAnswer
 from apps.ai.models import (
+    MODEL_HISTORY_STATES,
     TURN_ANSWER_VECTOR,
     TURN_QUESTION_VECTOR,
     Conversation,
@@ -60,7 +61,14 @@ TITLE_LENGTH = 200
 #: it exists to keep refused and failed Turns *out* of the model's history,
 #: and indexing them here would be building the retrieval path that puts
 #: them back.
-_EMBEDDABLE_STATES = frozenset({GENERATED})
+#:
+#: **It is that same predicate** as of IR-448, not a second set that happens
+#: to agree: `MODEL_HISTORY_STATES` is the states a model may be shown, and
+#: embedding a Turn exists only to let a model be shown it later. Two
+#: independent frozensets would be free to drift into a state that is
+#: embedded and then filtered out of every prompt -- a vendor call per
+#: failure, buying nothing.
+_EMBEDDABLE_STATES = MODEL_HISTORY_STATES
 
 
 def record_turn(

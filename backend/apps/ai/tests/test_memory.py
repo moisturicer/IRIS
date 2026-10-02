@@ -58,6 +58,7 @@ def _turn(
     space=None,
     embedder=None,
     answer_vector=True,
+    state=GENERATED,
 ):
     """A stored Turn with the vectors `record_turn` would have given it.
 
@@ -71,7 +72,7 @@ def _turn(
     recalled with the second vector and missed without it.
     """
     turn = Turn.objects.create(
-        conversation=conversation, question=question, answer=answer, state="generated"
+        conversation=conversation, question=question, answer=answer, state=state
     )
     if space is not None:
         TurnEmbedding.objects.create(
@@ -598,3 +599,118 @@ class DegradingWhenVectorsAreUnavailableTests:
         memory.recall(conversation, None, space.pk)
 
         assert "conversation memory unavailable" in memory_logs.text
+
+
+class FailedTurnsLeaveRecallTests:
+    """A failed or refused Turn is unreachable by vector (IR-448, ADR-026 §13).
+
+    Keeping one out of the verbatim window and leaving it recallable would be
+    the same bug with a longer fuse: memory exists precisely to reach a Turn
+    the window has dropped, so recall is the second door into the prompt and
+    has to be shut too.
+
+    These are written as *pairs* against `GENERATED`: the same Conversation,
+    the same text and the same query, recalled in one state and missed in the
+    other. Without the control a filter that excluded everything would pass.
+    """
+
+    @pytest.mark.parametrize("state", [NO_SOURCES, UNAVAILABLE, PARTIAL])
+    def test_a_failed_turn_is_not_recalled_even_when_it_is_the_closest(
+        self, embedder, space, state
+    ):
+        reader = make_user("reader@cit.edu")
+        conversation = Conversation.objects.create(user=reader)
+        # The only Turn there is, and an exact match on both its vectors.
+        _turn(
+            conversation,
+            FLOOD_QUESTION,
+            answer=FLOOD_QUESTION,
+            space=space,
+            embedder=embedder,
+            state=state,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(FLOOD_QUESTION), space.pk
+        )
+
+        assert recalled == []
+
+    @pytest.mark.parametrize("state", [NO_SOURCES, UNAVAILABLE, PARTIAL])
+    def test_the_same_turn_generated_is_recalled(self, embedder, space, state):
+        """The control for the test above -- the pair, not a second case.
+
+        `state` is parametrised identically and deliberately unused in the
+        body: it makes the two tests one table, so a state added to one list
+        cannot be left out of the other.
+        """
+        reader = make_user("reader@cit.edu")
+        conversation = Conversation.objects.create(user=reader)
+        turn = _turn(
+            conversation,
+            FLOOD_QUESTION,
+            answer=FLOOD_QUESTION,
+            space=space,
+            embedder=embedder,
+            state=GENERATED,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(FLOOD_QUESTION), space.pk
+        )
+
+        assert [t.pk for t in recalled] == [turn.pk]
+
+    def test_a_failed_turn_does_not_consume_a_recall_slot(self, embedder, space):
+        """Excluded before the ranking is cut to `MAX_RECALLED_TURNS`, not
+        after -- otherwise a run of refusals would crowd out the real Turns
+        it was meant to make room for."""
+        reader = make_user("reader@cit.edu")
+        conversation = Conversation.objects.create(user=reader)
+        for _ in range(MAX_RECALLED_TURNS):
+            _turn(
+                conversation,
+                FLOOD_QUESTION,
+                answer=FLOOD_QUESTION,
+                space=space,
+                embedder=embedder,
+                state=NO_SOURCES,
+            )
+        wanted = [
+            _turn(
+                conversation,
+                FLOOD_QUESTION,
+                answer=FLOOD_QUESTION,
+                space=space,
+                embedder=embedder,
+            ).pk
+            for _ in range(MAX_RECALLED_TURNS)
+        ]
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(FLOOD_QUESTION), space.pk
+        )
+
+        assert sorted(t.pk for t in recalled) == sorted(wanted)
+
+    def test_the_exclusion_is_by_state_not_by_answer_text(self, embedder, space):
+        """A reader may legitimately ask about refusals, and an answer that
+        happens to read like one is still an answer. `state` is the fact;
+        matching on the text would be a phrase list, which is what ADR-026
+        §13 chose a stored state over."""
+        reader = make_user("reader@cit.edu")
+        conversation = Conversation.objects.create(user=reader)
+        turn = _turn(
+            conversation,
+            FLOOD_QUESTION,
+            answer="The supplied sources do not contain any information about this.",
+            space=space,
+            embedder=embedder,
+            state=GENERATED,
+        )
+
+        recalled = ConversationMemory().recall(
+            conversation, embedder.embed_query(FLOOD_QUESTION), space.pk
+        )
+
+        assert [t.pk for t in recalled] == [turn.pk]
