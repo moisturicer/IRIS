@@ -68,12 +68,15 @@ Always distinguish **CURRENT / PROPOSED / DEFERRED / LEGACY**. Do not describe a
 
 ## Source-of-truth hierarchy
 
-1. **`docs/adr/`** — **requirements, design and decision authority**
+0. **[`docs/SOURCE_OF_TRUTH.md`](docs/SOURCE_OF_TRUTH.md)** — **requirements ground truth**, reconciling CIT-U's answered questionnaire ([`docs/requirements/CIT-U-ANSWERS-2026-10-02.md`](docs/requirements/CIT-U-ANSWERS-2026-10-02.md), answer ids `EB1`–`EB27`) against the ADRs. **New as of 2026-10-02: a confirmed stakeholder answer now outranks an accepted ADR.** Read its §3 conflict register before following an ADR it names.
+1. **`docs/adr/`** — **design and decision authority**, within what rank 0 permits
 2. **`docs/engineering/`** — how the team builds, tests, reviews, releases
 3. **Code and tests** — actual behaviour
 4. **Jira** — planning and tracking, **never a requirements authority**
 
 When these conflict, the higher one wins **and the lower one is corrected**. Do not silently reconcile — record the contradiction.
+
+**Rank 0 has limits, and they are part of the authority.** The questionnaire was answered by one engineering professor who wrote *"please ask other colleges for their system"* (EB5) and deferred to **RDCO** three times. It is authority for what the engineering college does, for where authority lies, and for what CIT-U has not decided. It is **not** a university-wide policy statement. **Six questions came back blank (Q9, Q19, Q26–Q31) — a blank is not permission to pick a default**, and four of them are what [ADR-015](docs/adr/015-voyage-embedding-and-reranking.md) needs to unblock IR-250. See §4 of the source-of-truth document.
 
 > **`docs/SRS.md` and `docs/SDD.md` are FROZEN (2026-09-03).** They are retained as **thesis deliverables** and are **not consulted, cited, or treated as authority** for any engineering work — not in code, tickets, ADRs, reviews or agent output. They are out of date and the team has decided not to maintain them. **Never cite an SRS or SDD section as justification.** Where a decision needs a written basis, that basis is an ADR — write one.
 >

@@ -1,5 +1,14 @@
 # ADR-018: Conditional parallel-office routing
 
+> **Stakeholder input, 2026-10-02.** This ADR's instinct is confirmed — CIT-U wants assessments as
+> *"simple tags and buttons"* rather than documents (**EB1**) and marks the Thesis Revision Form,
+> IP Application Status and Commercialization Assessment all **optional** (**EB2–EB4**), which is
+> what reducing the wizard to the manuscript alone achieves. Conflicts in
+> [`SOURCE_OF_TRUTH.md`](../SOURCE_OF_TRUTH.md): **C-05 (blocking)** — ITSO and KTTO's scopes in the
+> table below are unconfirmed by CIT-U, which instead names CES, WIL and TBI; **C-04** — EB4 makes
+> the commercialization tag an *adviser* assessment, not a submitter claim; **C-03** — the seeded
+> `UploadSlot` data still contradicts the reduced checklist this ADR decided.
+
 ## Status
 
 > **Further superseded by [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md)** (Accepted

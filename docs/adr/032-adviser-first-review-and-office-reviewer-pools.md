@@ -1,5 +1,20 @@
 # ADR-032: Adviser-first review, office reviewer pools, record versions and lineage, and one capability-driven Paper View
 
+> **Stakeholder input, 2026-10-02 — one confirmation and four conflicts.**
+> **§1 and §3 are independently confirmed:** CIT-U says the Commercialization Assessment applies
+> only to work *"tagged 'for commercialization' as assessed by adviser"* (**EB4**) — the adviser is
+> the institution's assessor, which is what adviser-first entry asserts from an internal design
+> session. Against that, [`SOURCE_OF_TRUTH.md`](../SOURCE_OF_TRUTH.md) records:
+> **C-05 (blocking)** — the party set `adviser|itso|ierc|ktto|rdco` does not match the offices
+> CIT-U names (RDCO, TBI, **CES**, **WIL**, a **departmental research committee**); ITSO and KTTO
+> are never confirmed by the respondent.
+> **C-08** — §3's *"RDCO is never involved"* collides with **EB11/EB16/EB18**, which make RDCO the
+> document, ethics and patent-status authority. Resolve by separating RDCO-as-policy-authority from
+> RDCO-as-reviewing-party; this ADR governs only the second.
+> **C-07** — ethics *"should be required"* (**EB16**), and a mandatory party is inexpressible here.
+> **C-04** — §3 treats the office booleans as the author's hint; EB4 makes the assessment the
+> adviser's.
+
 ## Status
 
 **Accepted** — 2026-09-26, by **Lee Jasmin Adolfo** (project lead), after [PR #133](https://github.com/moisturicer/IRIS/pull/133) merged. Tracked on [IR-373](https://citiris.atlassian.net/browse/IR-373).

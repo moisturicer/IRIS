@@ -1,5 +1,14 @@
 # ADR-022: Explicit document requests, distinct from resubmission
 
+> **Stakeholder input, 2026-10-02.** The questionnaire asked CIT-U this ADR's exact premise —
+> *"Is it acceptable for an office to request a document during review instead of requiring it at
+> submission?"* (Q9) — and **it came back blank**. Nothing opposes it, and **EB1** (documents are
+> friction validators dislike) and **EB11** (*"hold this thought and stick to the traditional
+> documents"*) both lean in its favour, so continue building. But its premise is **inferred, not
+> confirmed** — do not later cite Q9 as validation. Separately, the 13 seeded `UploadSlot` rows this
+> ADR repurposes as a reviewer picklist are **provably wrong on ten of thirteen rows**:
+> [`SOURCE_OF_TRUTH.md`](../SOURCE_OF_TRUTH.md) **C-03**, **C-11**, **C-14**.
+
 ## Status
 
 > **Note, 2026-09-26:** [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) (Accepted)

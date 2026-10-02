@@ -1,5 +1,16 @@
 # ADR-002: Workflow as a declarative transition table
 
+> **Stakeholder input, 2026-10-02.** Two findings bear on the §Context type-routing rule and on
+> §Research Impact's claim that *"this is where the contribution lives"*.
+> **C-01** — CIT-U cannot define the Thesis vs Project distinction and asks IRIS to supply one
+> (*"You have to define the difference"*, **EB5**), and floats merging them (**EB6**). After
+> ADR-032 the only type distinction with behavioural weight is Proposal vs everything else — which
+> **EB5.2 does confirm**. Stop claiming three-way type-differentiated routing.
+> **C-15** — there is **no official inter-office workflow documentation** (**EB20/EB21**, Q19
+> blank); the process is still being designed by CIT-U's Innovation group. The table is therefore
+> partly a *design*, not a transcription — which makes this ADR's configurability argument stronger,
+> not weaker, but the claim must be restated. See [`SOURCE_OF_TRUTH.md`](../SOURCE_OF_TRUTH.md).
+
 ## Status
 
 Accepted — 2026-09-01 · **amended 2026-09-09, §Amendment (shape and mechanism — PROPOSED, not yet built)**

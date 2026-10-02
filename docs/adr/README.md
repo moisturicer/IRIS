@@ -4,6 +4,14 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 
 **Status values:** `Proposed` · `Accepted` · `Superseded by ADR-XXX` · `Deprecated`
 
+> **An ADR is no longer the top of the hierarchy.** As of 2026-10-02,
+> [`docs/SOURCE_OF_TRUTH.md`](../SOURCE_OF_TRUTH.md) outranks `docs/adr/` on **requirements**:
+> it reconciles CIT-U's answered questionnaire against these decisions, and where a confirmed
+> stakeholder answer contradicts an accepted ADR, **the answer wins and the ADR is wrong until
+> amended**. Its §3 register currently records **15 conflicts**, three of them blocking, against
+> ADR-002, 013, 015, 018, 021, 022, 023-retrieval and 032. Check it before building on an ADR it
+> names. ADRs remain the authority for *design*.
+
 ---
 
 ## Index

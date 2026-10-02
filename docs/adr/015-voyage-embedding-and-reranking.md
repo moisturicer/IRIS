@@ -1,5 +1,16 @@
 # ADR-015: Voyage for embedding and reranking
 
+> **Stakeholder conflict, 2026-10-02 — read before acting on §Security Impact or planning IR-250.**
+> CIT-U's answered questionnaire ([transcript](../requirements/CIT-U-ANSWERS-2026-10-02.md))
+> **left blank every question this ADR's `DisclosurePolicy` depends on** — author opt-out of AI
+> processing (Q26), consent granularity (Q27), T&C terms (Q28), retrospective consent for
+> pre-IRIS work (Q29/Q30) and corpus availability (Q31). §A development bypass says the gate
+> *"turns on four questions CIT-U has to answer"*; those questions were asked and **IR-250 is not
+> unblocked**. Separately, **EB27** answers §One consequence of requirement 2 — asked whether
+> sending a full thesis to an AI vendor could affect patentability, CIT-U replied *"This is a very
+> new problem and I'm not so sure."* The 2026-09-20 send is therefore still unassessed.
+> See [`SOURCE_OF_TRUTH.md`](../SOURCE_OF_TRUTH.md) **C-12** and **C-13**.
+
 ## Status
 
 Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off precondition (see §Security Impact); adopted `voyage-context-4` as the embedding model; removed the local Ollama fallback this ADR had introduced, which contradicted [ADR-008](008-ai-degradation-to-fts.md)'s already-accepted rejection of a local model. There is no local lane. A `DisclosurePolicy` refusal means that content is not sent to Voyage and is not AI-processed at all — it degrades to the same FTS path ADR-008 already specifies for a vendor outage. **Revised again 2026-09-04:** "vendor no-training terms confirmed in writing" is replaced with the verified, actual mechanism — an opt-out toggle, not a default, not a written confirmation (see §Security Impact).
