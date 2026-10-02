@@ -195,8 +195,12 @@ the provenance; that is the opposite of the failure.
 * **No research question may reach it** — see
   [ADR-027](027-corpus-level-questions.md) §4 as amended. A zero-source research
   question is a true and useful answer about the corpus and stays a refusal.
-* It ships **off by default** and is unreachable until the cut-off's default
-  moves (IR-402), so this amendment changes no reader's experience on upgrade.
+* It ships **on by default** (ADR-034 §3, with
+  [ADR-033](033-hybrid-retrieval-and-passage-selection.md) §5 amended to let the
+  cut-off ship on), so **this amendment does change reader-visible behaviour on
+  upgrade.** The mitigation is an ordering constraint rather than a flag: the
+  not-from-the-repository label ships in the same change as the behaviour, never
+  after it. A deployment wanting strictly grounded answers turns the setting off.
 
 **Design, reasoning and rejected alternatives:**
 [ADR-034](034-ungrounded-answers-as-a-distinct-state.md). Not restated here —

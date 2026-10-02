@@ -12,7 +12,9 @@
 
 **Applies [ADR-026](026-conversational-retrieval-and-memory.md) §3's evidence discipline** — a technique is adopted on a measurement, not on reputation.
 
-**Note added — 2026-10-02 (IR-453): §5's gating rule cannot be satisfied for §3's cut-off, and §5 is deliberately unchanged.** See §Divergence — IR-453 below. §3 also acquires a dependant: [ADR-034](034-ungrounded-answers-as-a-distinct-state.md) makes an ungrounded answer reachable only when the cut-off returns nothing, so §3 is what makes that state detectable at all.
+**Amended — 2026-10-02 (IR-453): §3's relevance cut-off is exempted from §5's off-by-default rule and ships ON.** See §Amendment — IR-453 below. §5 continues to govern the other five techniques unchanged.
+
+**Note added — 2026-10-02 (IR-453): §5's gating rule cannot be satisfied for §3's cut-off.** See §Divergence — IR-453 below. §3 also acquires a dependant: [ADR-034](034-ungrounded-answers-as-a-distinct-state.md) makes an ungrounded answer reachable only when the cut-off returns nothing, so §3 is what makes that state detectable at all.
 
 > **ADR references in this file are by filename.** `docs/adr/` currently holds two files claiming 021 and two claiming 023, so a bare number is ambiguous. The collision is tracked as IR-403 and is not resolved here.
 
@@ -64,6 +66,8 @@ Fusion, the keyword index's participation in retrieval, the relevance cut-off, t
 
 This is [ADR-026](026-conversational-retrieval-and-memory.md) §3's discipline applied to a second batch of techniques: adopting them on the strength of their general reputation would be taste presented as evidence, and these are cheap to leave off.
 
+> **Amended 2026-10-02 (IR-453): the relevance cut-off is exempted from this rule and ships ON.** The other five techniques are unchanged. The exemption, its reasoning and the three safeguards attached to it are in §Amendment — IR-453 below. It is granted because §3 is not a recall optimisation like the rest of this list: it is the precondition for a reader-facing behaviour ([ADR-034](034-ungrounded-answers-as-a-distinct-state.md)), and leaving it off leaves that behaviour unreachable rather than merely unmeasured.
+
 ## Divergence — 2026-10-02 (IR-453): the harness cannot measure the cut-off's benefit
 
 **Recorded, not reconciled.** `CLAUDE.md`'s source-of-truth rule requires a
@@ -92,10 +96,13 @@ purpose is invisible to the instrument meant to justify it.
 
 **What is done about it.**
 
-1. **§5 is unchanged, and the cut-off still ships off.** The rule's value is that
-   it is absolute; carving out the one technique whose benefit cannot be measured
-   would be the weakest possible exemption to grant. The default still moves only
-   at IR-402.
+1. **Superseded 2026-10-02 by §Amendment — IR-453.** This note first concluded
+   that §5 should stay absolute and the cut-off should still ship off. That was
+   reversed the same day, deliberately and with the trade named: see the
+   amendment below. The reasoning recorded here still stands as the *cost* of
+   that reversal — the cut-off is switched on without a run able to show it
+   helps — which is why the amendment attaches three safeguards instead of
+   simply moving a default.
 2. **The provisional default comes from observation, not from a run** — the
    method `026-conversational-retrieval-and-memory.md` §3 permits when a number
    cannot be had honestly, and the one IR-446 already chose for the parallel
@@ -114,6 +121,56 @@ failure `026` §3 named, and a cut-off set too high is this ADR's own recorded
 risk — *"a silent, reader-invisible regression, since the score is never
 displayed."* Observation with the numbers written down is weaker than a run and
 stronger than taste, and it is labelled as the middle thing it is.
+
+## Amendment — 2026-10-02 (IR-453): §3's cut-off is exempted from §5 and ships on
+
+**What changes.** §5's rule — every technique here lands behind a setting
+defaulting to the current behaviour — **no longer covers §3's relevance
+cut-off.** The cut-off ships **on**, with a deliberately loose default. §1's
+fusion and keyword retrieval, and §4's per-paper cap, neighbour joining and
+token budget, are **unchanged**: they still ship off and still wait for IR-402.
+
+**Why §3 is different from the other five.** Everything else on §5's list is a
+*recall optimisation* — it changes how good the retrieved set is, and leaving it
+off costs nothing but the improvement. §3 is not that. It is the **precondition
+for a reader-facing behaviour**: [ADR-034](034-ungrounded-answers-as-a-distinct-state.md)
+makes an ungrounded answer reachable only when the cut-off leaves zero passages,
+so with the cut-off off, retrieval always returns its top *k*, the zero-source
+condition never arises, and ADR-034 is unreachable by construction rather than
+merely unmeasured. Leaving §3 off does not defer an improvement; it deletes a
+behaviour.
+
+It is also the technique §5's own rule cannot gate — see the divergence note
+above. A rule that can never be satisfied cannot be what holds a default shut.
+
+**This is a real reversal and the cost is named, not softened.** The cut-off is
+switched on without a harness run able to show it helps, which is exactly what
+§5 exists to prevent, and ADR-026 §3's evidence discipline is being traded
+against a product requirement. Three safeguards, all mandatory:
+
+1. **The default is deliberately loose, and labelled provisional.** It is set to
+   exclude only passages that are plainly irrelevant, not to maximise precision.
+   A floor tuned aggressively is this ADR's own recorded risk — *"a silent,
+   reader-invisible regression, since the score is never displayed"* — and that
+   risk is now live on every deployment rather than opt-in. When the observed
+   scores do not separate relevant from irrelevant cleanly, the default goes
+   **looser**, never tighter.
+2. **IR-454 is no longer optional.** The correct-refusal measure and the
+   false-refusal guard (answerable questions that returned nothing, named by id)
+   are what make this default auditable after the fact. Without them the one
+   failure mode nobody can see has nothing watching it.
+3. **ADR-034's reader-visible label ships in the same change as the floor.**
+   See that ADR's §6 and §Consequences as amended. With both defaults on, the
+   first off-corpus question on a live deployment is answered from model
+   knowledge, so a missing label is not a follow-up item — it is the window in
+   which an ungrounded answer is indistinguishable from a cited finding.
+
+**What this does not change.** §5 still governs the other five techniques, and
+IR-402 still owns their defaults. No default here is moved by taste: §3's is set
+from observed reranker scores recorded in the PR (IR-396), which is weaker than a
+run and stronger than a guess, and is labelled as the middle thing it is. The
+cut-off remains **absent in degraded mode** (§3), and the score remains **never
+shown to a reader**.
 
 ## Alternatives Considered
 

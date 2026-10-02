@@ -10,6 +10,8 @@
 
 **Amends [ADR-027](027-corpus-level-questions.md) §4** — *"the Lens computes; the model only reports"* becomes an absolute bound on this decision: no research question may reach the ungrounded path. See §4 and that file's IR-453 amendment.
 
+**Amends [ADR-033](033-hybrid-retrieval-and-passage-selection.md) §5** — §3's relevance cut-off is exempted from the off-by-default rule and ships on, because leaving it off does not defer this behaviour, it deletes it. The other five techniques are unchanged. See that file's IR-453 amendment.
+
 **Depends on [ADR-033](033-hybrid-retrieval-and-passage-selection.md) §3** — the relevance cut-off is what makes a zero-source question *detectable*. Without it retrieval always returns its top *k*, so the condition this ADR branches on never occurs. See §2.
 
 > **ADR references in this file are by filename.** `docs/adr/` holds two files claiming 021 and two claiming 023, so a bare number is ambiguous. The collision is tracked as IR-403 and is not resolved here.
@@ -47,14 +49,39 @@ A new `Turn.state`, **`ungrounded`**, joins `generated`, `no_sources`, `unavaila
 The ungrounded path is entered on exactly one condition: **retrieval, after `033-hybrid-retrieval-and-passage-selection.md` §3's relevance cut-off, yielded no passages at all.**
 
 - **If any passage clears the cut-off, the answer is grounded.** There is no partial mode, no "mostly grounded with a general aside", and no per-claim mixing. One Turn is grounded or it is ungrounded, and a reader never has to work out which sentence is which.
-- **It therefore depends on the cut-off existing and being on.** Without §3 retrieval always returns its top *k*, the zero-source condition never arises, and this decision is inert by construction rather than by a flag. IR-396 builds the cut-off; `033`'s §5 keeps it off until IR-402 moves the default.
+- **It therefore depends on the cut-off existing and being on.** Without §3 retrieval always returns its top *k*, the zero-source condition never arises, and this decision is inert by construction rather than by a flag. **This is why `033` §5 was amended rather than waited out**: leaving the cut-off off would not defer this behaviour to IR-402, it would delete it, since nothing downstream can branch on a condition that never occurs. IR-396 builds the cut-off and ships it **on**, with a loose provisional default.
 - **The disclosure gate's zero is not this zero.** A question whose passages were all withheld by `015-voyage-embedding-and-reranking.md`'s disclosure gate is `no_sources`, not `ungrounded`. Relevant research exists and the reader may not read it; answering from general knowledge would paper over a visibility boundary with prose.
 
-### 3. It ships off, and reader-visible behaviour is unchanged on upgrade
+### 3. It ships on, and the label is therefore not optional
 
-A setting, defaulting to today's behaviour, as `033`'s §5 requires of everything on this path. With it off, a zero-source question gets the existing *"nothing relevant"* answer. This ADR changes no reader's experience until a deployment turns it on deliberately.
+**The setting defaults on.** An ungrounded answer is what IRIS is *meant* to do
+with an off-corpus question, so the setting expresses that and the switch exists
+to turn the behaviour **off** for a deployment that wants strictly grounded
+answers — the per-instance posture `005-instance-per-tenant.md` already assumes.
 
-**It is also absent in degraded mode**, for the same reason §3's cut-off is: with the vendor unreachable there is no reranker score, so there is no cut-off, so the zero-source condition this branches on is not trustworthy. Degraded mode already tells the reader the system is running on fallback search, and stacking an ungrounded answer on top of that caveat asks a reader to hold two qualifications at once.
+This is a deliberate departure from `033` §5's off-by-default convention, taken
+together with that ADR's §5 amendment, and it has one consequence that must not
+be treated as a detail:
+
+> **Reader-visible behaviour changes on upgrade.** With both defaults on, the
+> first off-corpus question on a live deployment is answered from the model's
+> general knowledge. There is no opt-in step in which someone reviews the
+> presentation first.
+
+So **§6's label ships in the same change as the behaviour, not after it.** An
+ungrounded answer carries no citations and no Record cards, which means that
+without the label it renders as a confident, uncited answer in the same place a
+grounded answer appears — indistinguishable from a finding to anyone who does
+not notice the missing citations. That window is the whole risk of this ADR, and
+it is closed by ordering, not by vigilance: no deployment gets the behaviour
+before it gets the label.
+
+**It is absent in degraded mode**, for the same reason §3 of `033` is: with the
+vendor unreachable there is no reranker score, so there is no cut-off, so the
+zero-source condition this branches on is not trustworthy. Degraded mode already
+tells the reader the system is running on fallback search, and stacking an
+ungrounded answer on top of that caveat asks a reader to hold two qualifications
+at once.
 
 ### 4. No research question may reach it — ADR-027 §4 is the bound
 
@@ -113,13 +140,19 @@ Shipping it off is what makes being wrong affordable, and it is also an honest o
 
 - **Positive.** A reader's simple factual aside is answered instead of producing a non-sequitur. A whole class of model-written refusal stops entering the model's history, which is the IR-453 gap. The grounded path is untouched, and `GROUNDING_RULES` keeps its single unconditional meaning.
 - **Negative.** A fifth `Turn.state` and a migration; a second prompt assembly path; new frontend presentation that has to be unmissable rather than merely present. A follow-up to an ungrounded aside does not resolve against it (§5).
-- **Risk — the label is missed.** A reader skims past the "not from the repository" marker and quotes an ungrounded answer as an IRIS finding. This is `008`'s silent-degradation risk in a new place, and it is mitigated the same way: the visible state is an acceptance criterion, and the presentation is reviewed as such rather than assumed from the state existing.
+- **Risk — the label is missed, and this risk is now live rather than opt-in.** A reader skims past the "not from the repository" marker and quotes an ungrounded answer as an IRIS finding. This is `008`'s silent-degradation risk in a new place, and `008`'s own recorded mitigation applies: the visible state is an acceptance criterion, not a nicety. **Because the setting now defaults on (§3), the mitigation is also an ordering constraint** — the label ships with the behaviour, in one change, and a deployment can never receive the second without the first.
 - **Risk — a research question is misclassified as general.** §4 bounds it by question kind, and the bound is only as good as `027` §5's routing. The mitigation is the direction of the default: a question wrongly treated as *research* merely refuses, which is today's behaviour, while a question wrongly treated as *general* is the harmful case — so the gate is written to refuse when unsure, and tested in that direction.
 - **Known limitation, recorded rather than fixed here.** In **degraded mode the IR-453 history gap persists**. With no reranker there is no cut-off (§3), so an off-corpus question still retrieves *k* FTS chunks, still meets `GROUNDING_RULES`, and still produces a model-written refusal stored as `generated`. IR-453's claim that the floor closes that gap "at no extra cost" holds on the reranked path only. Closing it in degraded mode needs a signal that does not exist there and is deliberately not invented — see `008`'s IR-391 amendment on why a threshold over FTS ranks would mean something different depending on whether Voyage was up.
 
 ## MVP Impact
 
-**No scope change, and MVP-optional.** It refines a path that already exists, ships off, and degrades to today's behaviour. Under `CLAUDE.md`'s scope rule the cut-off it depends on (IR-396) is thesis-critical RAG work; this state is the supporting half and is the part to cut if capacity is short.
+**No scope change, but no longer optional either.** This started as the
+supporting half of IR-396's thesis-critical cut-off and the part to cut if
+capacity ran short. **That is superseded by §3's default.** Once the cut-off
+ships on, the ungrounded branch is live, so its presentation is on the critical
+path with it: the cuttable thing is now the *behaviour* (turn the setting off),
+never the *label*. Shipping the floor without the label is the one combination
+this ADR forbids.
 
 ## SaaS Impact
 
@@ -149,4 +182,4 @@ FR-M4-01 (RAG chatbot) · NFR-R2 (graceful degradation) — stable labels only, 
 
 ## Related Tasks
 
-IR-453 (this ADR and the state) · IR-396 (the relevance cut-off this depends on) · IR-402 (moves the cut-off's default; until then this is unreachable) · IR-448 (the history exclusion this extends) · IR-454 (the harness measure that makes §3's default justifiable by a run) · IR-443 (the transcript the defect was found in) · IR-278 (a real corpus, after which the cut-off is recalibrated).
+IR-453 (this ADR and the state) · IR-396 (the relevance cut-off this depends on) · IR-402 (owns `033` §5's other five defaults; **no longer gates this** — the cut-off's default was moved by the §5 amendment) · IR-448 (the history exclusion this extends) · IR-454 (the harness measure that makes §3's default justifiable by a run) · IR-443 (the transcript the defect was found in) · IR-278 (a real corpus, after which the cut-off is recalibrated).
