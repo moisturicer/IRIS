@@ -105,6 +105,15 @@ class RecordViewSet(viewsets.ModelViewSet):
             # may *own* a Proposal someone else advises.
             qs = qs.filter(adviser=self.request.user)
 
+        if self.action == "metadata_suggestions":
+            # The Publish dialog's prefill is the manuscript's own text, offered
+            # to the person publishing it (IR-406; IR-374 spec Appendix D:
+            # "the owner through visible_to(), with a 404 otherwise").
+            # visible_to() also admits office staff, the assigned adviser and,
+            # on a published record, every signed-in user; narrowing here makes
+            # their refusal the same 404 as a missing record.
+            qs = qs.filter(owners__user=self.request.user)
+
         if self.action == "list":
             # Discover is a public catalogue, not an authorization boundary, so
             # it narrows further. visible_to() is wider than the catalogue --
@@ -388,6 +397,19 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         return Response(tracker_payload(self.get_object(), request.user))
+
+    @action(detail=True, methods=["get"], url_path="metadata-suggestions")
+    def metadata_suggestions(self, request, pk=None):
+        """
+        GET /records/<id>/metadata-suggestions/ -- the manuscript's own title
+        and abstract, offered to the Publish dialog (IR-406; IR-374 spec §4.5).
+
+        **Owner-only**, through `get_queryset()`: anyone else gets the same
+        404 as a missing record (IR-153).
+        """
+        from .metadata_suggestions import suggestions_payload
+
+        return Response(suggestions_payload(self.get_object()))
 
     @action(detail=True, methods=["get", "post"], url_path="document-requests")
     def document_requests(self, request, pk=None):
