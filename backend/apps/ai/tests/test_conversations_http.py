@@ -617,10 +617,10 @@ class ReplayingATurnTests:
         self, embedder, space, client_for
     ):
         """A stream cut off mid-answer (IR-328) stores `state="partial"`.
-        `answer_mode` still maps that to `"generative"` -- a partial answer
-        is still an answer a model wrote -- so replay must carry a separate
-        `partial` flag or a reopened transcript could not tell a cut-off
-        reply from a complete one (IR-329)."""
+        Since IR-458 `answer_mode` maps that to `"partial"` -- the fragment
+        rides in `message`, `answer` is null, so it is never presented as a
+        finished answer -- and the `partial` flag stays for clients that
+        render the fragment with a notice (IR-329)."""
         reader = make_user("reader@cit.edu")
         make_record(title="Flood Prediction", text=FLOOD_TEXT,
                     embedder=embedder, space=space)
@@ -633,8 +633,11 @@ class ReplayingATurnTests:
                 b"".join(response.streaming_content)
 
         turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        assert turn["state"] == "generative"
+        stored = Turn.objects.get(conversation_id=conversation_id)
+        assert turn["state"] == "partial"
         assert turn["partial"] is True
+        assert turn["answer"] is None
+        assert turn["message"] == stored.answer
 
     def test_a_complete_turn_replays_with_no_partial_flag(
         self, embedder, space, client_for

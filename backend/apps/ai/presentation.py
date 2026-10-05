@@ -29,7 +29,13 @@ from __future__ import annotations
 
 from typing import Iterable, Sequence
 
-from apps.ai.answers.citations import NO_SOURCES, UNAVAILABLE, Citation
+from apps.ai.answers.citations import (
+    GENERATED,
+    NO_SOURCES,
+    PARTIAL,
+    UNAVAILABLE,
+    Citation,
+)
 from apps.ai.regions import regions_wire
 from apps.ai.retrieval.ports import RetrievedChunk
 from apps.records.models import Record
@@ -183,10 +189,16 @@ def citations(resolved: Iterable[Citation]) -> list[dict]:
 GENERATIVE_MODE = "generative"
 NO_RESULTS_MODE = "no_results"
 UNAVAILABLE_MODE = "unavailable"
+PARTIAL_MODE = "partial"
 
+#: One entry per `Turn.state`, no fallback to lean on. A state added without a
+#: line here is caught by `test_answer_states.py` and, failing that, renders as
+#: unavailable -- never as a finding.
 _WIRE_MODE = {
+    GENERATED: GENERATIVE_MODE,
     NO_SOURCES: NO_RESULTS_MODE,
     UNAVAILABLE: UNAVAILABLE_MODE,
+    PARTIAL: PARTIAL_MODE,
 }
 
 NO_RESULTS_MESSAGE = (
@@ -196,15 +208,21 @@ NO_RESULTS_MESSAGE = (
 
 
 def answer_mode(state: str) -> str:
-    return _WIRE_MODE.get(state, GENERATIVE_MODE)
+    """The wire name for ``state``; an unrecognised one is ``unavailable``.
+
+    Failing toward unavailable nulls ``answer``, so a state nobody mapped can
+    never be shown as an ordinary finding.
+    """
+    return _WIRE_MODE.get(state, UNAVAILABLE_MODE)
 
 
 def answer_body(mode: str, text: str) -> dict:
     """The ``answer``/``message`` pair for one answer state.
 
-    ``answer`` is a written answer or it is null. The two non-answers --
-    nothing found, and no model reachable -- say so in ``message``, so a
-    client rendering ``answer`` can never present an apology as a finding.
+    ``answer`` is a written answer or it is null. The non-answers -- nothing
+    found, no model reachable, and a stream cut off mid-sentence -- say so in
+    ``message``, so a client rendering ``answer`` can never present an apology
+    or a fragment as a finding.
 
     ``text`` is whatever the service produced: the answer in the generative
     case, and the explanation in the unavailable one. The no-results wording
