@@ -43,6 +43,8 @@ Clearance stages (itso_review, parallel_review) use submit_clearance;
 individual office statuses are tracked in RecordClearance rows.
 """
 import logging
+from copy import copy
+from functools import partial
 
 from django.db import transaction
 from django.utils import timezone
@@ -84,6 +86,25 @@ ROLE_TO_OFFICE: dict[str, str] = {
     RoleName.IERC: Office.IERC,
     RoleName.KTTO: Office.KTTO,
 }
+
+
+def _lock_record(record: Record) -> Record:
+    """Serialize review decisions before checking their stage or clearance.
+
+    Refuse a request whose stage changed while waiting, rather than approving
+    a later gate.
+    Peers deciding different offices at the same stage may both proceed.
+    """
+    locked = Record.objects.select_for_update().get(pk=record.pk)
+    if locked.pipeline_status != record.pipeline_status:
+        raise InvalidPipelineTransition(
+            "This record changed while your decision was being submitted. "
+            "Refresh the record and try again."
+        )
+    # Preserve the service contract: callers may reuse the same instance for
+    # successive decisions (including seed_demo). Refresh under the held lock.
+    record.refresh_from_db()
+    return record
 
 
 def _can_review(user, record: Record) -> bool:
@@ -178,6 +199,7 @@ def _require_edge(record: Record, event) -> None:
 # Sequential review actions: adviser_review, rdco_intake, rdco_review
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
     """
     Approve the record at its current sequential stage and advance the pipeline.
@@ -185,6 +207,7 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
     At rdco_intake this also creates RecordClearance rows for whichever
     offices were requested (ADR-018) — see _enter_clearance_stage().
     """
+    record = _lock_record(record)
     if not _can_review(reviewed_by, record):
         raise InvalidPipelineTransition(
             f"You are not authorised to review this record at '{record.pipeline_status}'."
@@ -211,15 +234,18 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
         lifecycle.apply(
             record, lifecycle.WorkflowEvent.APPROVE, reviewed_by, review=review
         )
-    notify_record_reviewed(record, review)
+    # Snapshot the destination: a caller may reuse this instance before commit.
+    transaction.on_commit(partial(notify_record_reviewed, copy(record), review))
     return review
 
 
+@transaction.atomic
 def decline_record(record: Record, reviewed_by, comment: str = "") -> Review:
     """
     Request revision at a sequential stage.
     The record enters 'declined'; the owner may call resubmit_record() to re-enter.
     """
+    record = _lock_record(record)
     if not _can_review(reviewed_by, record):
         raise InvalidPipelineTransition(
             f"You are not authorised to review this record at '{record.pipeline_status}'."
@@ -241,10 +267,11 @@ def decline_record(record: Record, reviewed_by, comment: str = "") -> Review:
         lifecycle.apply(
             record, lifecycle.WorkflowEvent.DECLINE, reviewed_by, review=review
         )
-    notify_record_reviewed(record, review)
+    transaction.on_commit(partial(notify_record_reviewed, copy(record), review))
     return review
 
 
+@transaction.atomic
 def reject_record(record: Record, reviewed_by, comment: str = "") -> Review:
     """
     Terminal rejection at a sequential stage.
@@ -253,6 +280,7 @@ def reject_record(record: Record, reviewed_by, comment: str = "") -> Review:
     Only adviser_review and rdco_review declare this edge; intake cannot
     reject (IR-265, ADR-021).
     """
+    record = _lock_record(record)
     if not _can_review(reviewed_by, record):
         raise InvalidPipelineTransition(
             f"You are not authorised to review this record at '{record.pipeline_status}'."
@@ -274,7 +302,7 @@ def reject_record(record: Record, reviewed_by, comment: str = "") -> Review:
         lifecycle.apply(
             record, lifecycle.WorkflowEvent.REJECT, reviewed_by, review=review
         )
-    notify_record_reviewed(record, review)
+    transaction.on_commit(partial(notify_record_reviewed, copy(record), review))
     return review
 
 
@@ -282,6 +310,7 @@ def reject_record(record: Record, reviewed_by, comment: str = "") -> Review:
 # Clearance action: itso_review, parallel_review
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def submit_clearance(
     record: Record,
     reviewed_by,
@@ -305,6 +334,7 @@ def submit_clearance(
           – If all remaining clearances are now cleared → advances to rdco_review.
           – Otherwise → records partial progress, no status change.
     """
+    record = _lock_record(record)
     can, resolved_office = _can_submit_clearance(reviewed_by, record)
     if not can:
         raise InvalidPipelineTransition(
@@ -361,17 +391,22 @@ def submit_clearance(
         )
 
     if decision in (ReviewDecision.DECLINED, ReviewDecision.REJECTED):
-        notify_clearance_result(record, review, office=office, advanced=False)
+        transaction.on_commit(partial(
+            notify_clearance_result, copy(record), review, office=office, advanced=False,
+        ))
         return review
 
     advanced = destination != was
     all_done = destination == PipelineStatus.RDCO_REVIEW
     if advanced:
-        notify_clearance_result(
-            record, review, office=office, advanced=True, all_done=all_done
-        )
+        transaction.on_commit(partial(
+            notify_clearance_result, copy(record), review,
+            office=office, advanced=True, all_done=all_done,
+        ))
     else:
-        notify_clearance_result(record, review, office=office, advanced=False)
+        transaction.on_commit(partial(
+            notify_clearance_result, copy(record), review, office=office, advanced=False,
+        ))
 
     return review
 
@@ -380,6 +415,7 @@ def submit_clearance(
 # Resubmission
 # ---------------------------------------------------------------------------
 
+@transaction.atomic
 def resubmit_record(record: Record, submitted_by) -> Record:
     """
     Resubmit a declined record back into the pipeline.
@@ -392,6 +428,7 @@ def resubmit_record(record: Record, submitted_by) -> Record:
 
     Requires at least one document to have been uploaded after the last decline.
     """
+    record = _lock_record(record)
     if record.pipeline_status != PipelineStatus.DECLINED:
         raise InvalidPipelineTransition(
             "Only records in 'declined' status can be resubmitted."
@@ -478,5 +515,7 @@ def resubmit_record(record: Record, submitted_by) -> Record:
         new_status,
     )
 
-    notify_resubmit(record, submitted_by, new_status=new_status)
+    transaction.on_commit(partial(
+        notify_resubmit, copy(record), submitted_by, new_status=new_status,
+    ))
     return record

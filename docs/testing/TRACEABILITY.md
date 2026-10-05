@@ -8,6 +8,41 @@
 
 ---
 
+## IR-138 transaction integrity (2026-10-06)
+
+**IMPLEMENTED, awaiting PostgreSQL execution evidence.** In
+`apps/reviews/services.py`, all five decision services now own an atomic
+transaction from validation through writes and notification registration. A
+record row lock serializes decisions before inspecting stage/clearance state.
+A stage changed since the caller's read is refused; a same-stage office decision
+rechecks its pending clearance under the lock. Notifications run on commit and
+retain a snapshot of the decision's destination. Existing callers still observe
+the updated Record instance.
+
+`apps/reviews/test_transition_transactions.py` exercises the HTTP review and
+resubmit endpoints: deferred delivery, outer rollback for all five actions,
+failure after workflow writes, failure between clearance inserts, two office
+approvals, duplicate office decisions, and a PostgreSQL lock-wait/stale-stage
+case. Existing workflow characterisation and seed-demo tests remain unchanged.
+Workflow `AuditEvent` creation remains IR-144; the boundary includes future
+audit writes, and rollback assertions check that existing audit rows are unchanged.
+
+Local evidence: Django configuration check passed with the existing axes
+deprecation warning; Python compilation passed. Both the focused database test
+and the full-suite attempt (`pytest -q --reuse-db --maxfail=1`) stopped at database
+setup: the configured role cannot create `test_iris_db`. These attempts are **not
+passing behavioral evidence**. PR CI supplies an isolated PostgreSQL/pgvector
+service; its result must be recorded before claiming verification.
+
+Contradictions recorded: IR-138's preserved original text excludes row-level
+concurrency control, while its current acceptance criteria require concurrent
+decisions to be safe. The minimal per-record lock implements the latter without
+adding optimistic versioning or distributed transactions. W-03's proposed-state
+sentence says audit events run on commit, but its scope and IR-138 correctly
+require audit writes **inside** the transaction. The current source hierarchy in
+AGENTS.md names SRS/SDD above ADRs while CLAUDE.md calls those documents frozen;
+this change does not resolve that documentation conflict or change routing policy.
+
 ## Status vocabulary
 
 | Status | Means |
