@@ -300,8 +300,8 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
             # the transcript reopens with. `None` rather than `""` so a client
             # need not distinguish "no reasoning" from an empty string.
             "reasoning": turn.reasoning or None,
-            # Orthogonal to `state` (stays "generative") -- a cut-off
-            # stream is still an answer, not `unavailable` (IR-328/329).
+            # Kept alongside `state == "partial"` for clients that render the
+            # fragment with a notice (IR-328/329, IR-458).
             "partial": turn.state == PARTIAL,
             "created_at": turn.created_at,
             "citations": [
