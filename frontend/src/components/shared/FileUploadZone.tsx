@@ -10,6 +10,8 @@ interface FileUploadZoneProps {
   multiple?:  boolean;
   disabled?:  boolean;
   hint?:      string;          // e.g. "PDF, DOCX up to 50 MB"
+  /** The zone's accessible name, when a screen shows more than one zone. */
+  label?:     string;
 }
 
 export function FileUploadZone({
@@ -18,6 +20,7 @@ export function FileUploadZone({
   multiple = false,
   disabled,
   hint,
+  label,
 }: FileUploadZoneProps) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +46,7 @@ export function FileUploadZone({
   return (
     <div
       role="button"
+      aria-label={label}
       tabIndex={disabled ? -1 : 0}
       onClick={() => !disabled && inputRef.current?.click()}
       onKeyDown={(e) => e.key === "Enter" && !disabled && inputRef.current?.click()}
@@ -65,7 +69,9 @@ export function FileUploadZone({
         type="file"
         accept={accept}
         multiple={multiple}
-        className="hidden"
+        // The attribute, not Tailwind's class: the zone is the control, and the
+        // input must stay out of the accessibility tree wherever styles are absent.
+        hidden
         onChange={handleChange}
         disabled={disabled}
       />

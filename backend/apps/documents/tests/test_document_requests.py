@@ -12,6 +12,9 @@ the real submit and review endpoints, so the assignments a request is checked
 against are the ones IR-257 dual-writes. Uploads go through the existing
 `/documents/submit/` endpoint, because ADR-022 adds no second upload path.
 
+IR-346 (§Amendment 1): an owner's ordinary upload into a requested slot, with
+no `request_item`, answers the request too -- through either slot endpoint.
+
 Accepting, rejecting and withdrawing (ADR-022 §3.4, §4), and the rule that
 only the owner fulfils, are IR-263's: `test_document_request_decisions.py`.
 A decision closing open requests (§3) is IR-270's.
@@ -267,6 +270,202 @@ class UploadsFulfilTheRequestTests(DocumentRequestTestBase):
         response = self.upload_against(record, item["id"])
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+UPLOAD_CREATE = "/api/v1/documents/uploads/create/"
+SLOT_ENDPOINTS = (SUBMIT_DOCUMENT, UPLOAD_CREATE)
+
+
+class SlotUploadsFulfilTheRequestTests(DocumentRequestTestBase):
+    """
+    IR-346, ADR-022 §Amendment 1: an owner who uploads a requested document
+    through the ordinary Documents flow -- a `slot`, no `request_item` -- has
+    answered the request. Otherwise the item stays missing for good.
+    """
+
+    def upload_to_slot(self, record, slot, uploader=None, endpoint=SUBMIT_DOCUMENT):
+        self.client.force_authenticate(uploader or self.owner)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                endpoint, {"record": record.pk, "slot": slot.pk, "file": pdf()},
+                format="multipart",
+            )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        return RecordUpload.objects.filter(record=record, slot=slot).latest("pk")
+
+    def item(self, record, item_id, viewer=None):
+        return next(
+            i for r in self.listed(record, viewer) for i in r["items"] if i["id"] == item_id
+        )
+
+    def test_an_owner_slot_upload_fulfils_the_request_and_notifies_ierc_once(self):
+        for endpoint in SLOT_ENDPOINTS:
+            with self.subTest(endpoint=endpoint):
+                record = self.at_parallel_review()
+                ethics = self.slot(record, "Ethics Clearance")
+                self.requested(record, self.ierc, [{"slot": ethics.pk}])
+                notices = Notification.objects.filter(
+                    broadcast_to_role=self.ierc.role, record=record
+                )
+                before = notices.count()
+
+                upload = self.upload_to_slot(record, ethics, endpoint=endpoint)
+
+                [request] = self.listed(record)
+                self.assertEqual(request["state"], "fulfilled")
+                [item] = request["items"]
+                self.assertEqual(item["state"], "uploaded")
+                self.assertEqual(item["upload"], upload.pk)
+                self.assertEqual(notices.count(), before + 1)
+
+    def test_a_slot_upload_answers_its_item_and_leaves_the_rest_missing(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        first, second = self.requested(
+            record, self.ierc,
+            [{"slot": ethics.pk}, {"slot": self.slot(record, "Patent Draft").pk}],
+        )["items"]
+
+        self.upload_to_slot(record, ethics)
+
+        [request] = self.listed(record)
+        self.assertEqual(request["state"], "open")
+        self.assertEqual(self.item(record, first["id"])["state"], "uploaded")
+        self.assertEqual(self.item(record, second["id"])["state"], "missing")
+
+    def test_an_other_item_is_never_answered_by_a_slot_upload(self):
+        record = self.at_parallel_review()
+        [item] = self.requested(record, self.ierc, [{"label": "Ethics Clearance"}])["items"]
+
+        # Even the type's slot of the same name: an "Other" item names no slot.
+        self.upload_to_slot(record, self.slot(record, "Ethics Clearance"))
+
+        self.assertEqual(self.item(record, item["id"])["state"], "missing")
+        self.uploaded(record, item["id"])
+        self.assertEqual(self.item(record, item["id"])["state"], "uploaded")
+
+    def test_a_staff_or_reviewer_slot_upload_stores_the_file_and_fulfils_nothing(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        self.requested(record, self.ierc, [{"slot": ethics.pk}])
+        notices_before = Notification.objects.count()
+
+        for uploader in (self.ierc, self.ktto):
+            for endpoint in SLOT_ENDPOINTS:
+                with self.subTest(uploader=uploader.email, endpoint=endpoint):
+                    self.upload_to_slot(record, ethics, uploader=uploader, endpoint=endpoint)
+
+        [request] = self.listed(record)
+        self.assertEqual(request["state"], "open")
+        self.assertEqual(request["items"][0]["state"], "missing")
+        self.assertEqual(Notification.objects.count(), notices_before)
+        self.assertEqual(RecordUpload.objects.filter(record=record, slot=ethics).count(), 4)
+
+    def test_an_upload_to_an_unrequested_slot_answers_nothing(self):
+        record = self.at_parallel_review()
+        [item] = self.requested(
+            record, self.ierc, [{"slot": self.slot(record, "Ethics Clearance").pk}]
+        )["items"]
+
+        self.upload_to_slot(record, self.slot(record, "Patent Draft"))
+
+        [request] = self.listed(record)
+        self.assertEqual(request["state"], "open")
+        self.assertEqual(self.item(record, item["id"])["state"], "missing")
+
+    def test_a_request_on_another_record_is_not_answered(self):
+        record = self.at_parallel_review()
+        other = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        [item] = self.requested(other, self.ierc, [{"slot": ethics.pk}])["items"]
+
+        self.upload_to_slot(record, ethics)
+
+        self.assertEqual(self.item(other, item["id"])["state"], "missing")
+
+    def test_one_upload_answers_every_open_request_asking_for_that_slot(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        from_ierc = self.requested(record, self.ierc, [{"slot": ethics.pk}])
+        from_ktto = self.requested(record, self.ktto, [{"slot": ethics.pk}])
+        notices = Notification.objects.filter(record=record)
+        before = {
+            office: notices.filter(broadcast_to_role=office.role).count()
+            for office in (self.ierc, self.ktto)
+        }
+
+        upload = self.upload_to_slot(record, ethics)
+
+        states = {r["id"]: r for r in self.listed(record)}
+        for data in (from_ierc, from_ktto):
+            self.assertEqual(states[data["id"]]["state"], "fulfilled")
+            self.assertEqual(states[data["id"]]["items"][0]["upload"], upload.pk)
+        for office, count in before.items():
+            self.assertEqual(notices.filter(broadcast_to_role=office.role).count(), count + 1)
+
+    def test_a_fulfilled_request_is_not_answered_again(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        self.requested(record, self.ierc, [{"slot": ethics.pk}])
+        first = self.upload_to_slot(record, ethics)
+        notices_before = Notification.objects.count()
+
+        self.upload_to_slot(record, ethics)
+
+        [request] = self.listed(record)
+        self.assertEqual(request["items"][0]["upload"], first.pk)
+        self.assertEqual(Notification.objects.count(), notices_before)
+
+    def test_an_upload_into_an_ad_hoc_slot_answers_nothing(self):
+        # An ad-hoc slot is only ever answered through `request_item`, even
+        # when another open item's label happens to name it.
+        record = self.at_parallel_review()
+        [first] = self.requested(record, self.ierc, [{"label": "Consent form"}])["items"]
+        self.uploaded(record, first["id"])
+        adhoc = UploadSlot.objects.get(record=record)
+        [second] = self.requested(record, self.ktto, [{"label": "Consent form"}])["items"]
+
+        self.upload_to_slot(record, adhoc)
+
+        self.assertEqual(self.item(record, second["id"])["state"], "missing")
+
+    def test_a_withdrawn_request_is_not_answered(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        data = self.requested(record, self.ierc, [{"slot": ethics.pk}])
+        self.client.force_authenticate(self.ierc)
+        withdrawn = self.client.patch(
+            f"/api/v1/document-requests/{data['id']}/", {"action": "withdraw"}, format="json"
+        )
+        self.assertEqual(withdrawn.status_code, status.HTTP_200_OK, withdrawn.data)
+        notices_before = Notification.objects.count()
+
+        self.upload_to_slot(record, ethics)
+
+        [request] = self.listed(record)
+        self.assertEqual(request["state"], "withdrawn")
+        self.assertEqual(request["items"][0]["state"], "missing")
+        self.assertEqual(Notification.objects.count(), notices_before)
+
+    def test_the_record_leaves_awaiting_document_once_no_request_is_open(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        self.requested(record, self.ierc, [{"slot": ethics.pk}])
+        self.assertEqual(self.detail(record)["workflow_state"], "awaiting_document")
+
+        self.upload_to_slot(record, ethics)
+
+        self.assertEqual(self.detail(record)["workflow_state"], "in_review")
+
+    def test_a_slot_upload_moves_no_status_clearance_or_assignment(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        self.requested(record, self.ierc, [{"slot": ethics.pk}])
+        before = self.snapshot(record)
+
+        self.upload_to_slot(record, ethics)
+
+        self.assertEqual(self.snapshot(record), before)
 
 
 class NothingElseChangesTests(DocumentRequestTestBase):

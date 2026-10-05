@@ -8,8 +8,9 @@ reset, no assignment closed. The record's `awaiting_document` state is derived
 from open requests by `apps.reviews.tracker` and never stored.
 
 Who does what (§Amendment 2): the requesting party creates, decides and
-withdraws; only the Record's owners fulfil. A decision closing open requests
-(§3) is IR-270's.
+withdraws; only the Record's owners fulfil -- against a `request_item`, or by
+an ordinary upload into a requested slot (§Amendment 1, IR-346). A decision
+closing open requests (§3) is IR-270's.
 
 The wire shape is `request_serializers`; this module builds no payload.
 """
@@ -145,7 +146,8 @@ def fulfil_item(item: DocumentRequestItem, upload, *, uploaded_by) -> DocumentRe
     """
     Mark `item` uploaded. When it was the last one missing, the request is
     fulfilled, and the requesting party is told once the transaction commits
-    (ADR-022 §3.3). Call inside the transaction `resolve_item_for_upload` ran in.
+    (ADR-022 §3.3). Call inside the transaction that locked the item and its
+    request: `resolve_item_for_upload`'s, or `fulfil_by_slot_upload`'s.
     """
     request = item.request
     item.upload = upload
@@ -162,6 +164,43 @@ def fulfil_item(item: DocumentRequestItem, upload, *, uploaded_by) -> DocumentRe
             lambda: notify_document_request_fulfilled(request, uploaded_by=uploaded_by)
         )
     return request
+
+
+def fulfil_by_slot_upload(record, slot: UploadSlot, upload, *, uploaded_by) -> list[DocumentRequest]:
+    """
+    An owner's ordinary upload into a picklist slot answers every open item
+    asking for that slot on this record (IR-346, ADR-022 §Amendment 1). One
+    upload answers all of them, across requests.
+
+    An ad-hoc slot is only ever answered through `request_item`: an "Other"
+    item names no canonical slot, so there is nothing to match it by. The
+    caller has checked `may_fulfil`, so a staff upload never gets here.
+
+    **Call inside the transaction that created `upload`.** Items are locked,
+    then their requests, in the order `resolve_item_for_upload` locks them, and
+    both are re-read under the lock: an item answered or a request closed in
+    between is skipped rather than fulfilled twice.
+    """
+    if slot.record_id is not None:
+        return []
+    candidates = list(
+        DocumentRequestItem.objects.select_for_update(of=("self",))
+        .filter(
+            slot=slot,
+            state=DocumentRequestItemState.MISSING,
+            request__record=record,
+            request__state=DocumentRequestState.OPEN,
+        )
+        .order_by("request_id", "pk")
+    )
+    answered = []
+    for item in candidates:
+        request = DocumentRequest.objects.select_for_update().get(pk=item.request_id)
+        if request.state != DocumentRequestState.OPEN:
+            continue
+        item.request = request
+        answered.append(fulfil_item(item, upload, uploaded_by=uploaded_by))
+    return answered
 
 
 def may_read_requests(record, user) -> bool:

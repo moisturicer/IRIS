@@ -12,7 +12,7 @@ import { useAuth }      from "@/hooks/useAuth";
 import { useUIStore }   from "@/store/ui.store";
 import { formatDate }   from "@/lib/utils";
 import type { RecordUpload, UploadSlot, RecordFile } from "@/types/documents";
-import type { RecordDetail } from "@/types/records";
+import type { DocumentRequest, RecordDetail } from "@/types/records";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 // ---------------------------------------------------------------------------
@@ -253,6 +253,7 @@ export default function DocumentsPage() {
   const [slots,           setSlots]          = useState<SlotWithUploads[]>([]);
   const [record,          setRecord]         = useState<RecordDetail | null>(null);
   const [miscFiles,       setMiscFiles]      = useState<RecordFile[]>([]);
+  const [docRequests,     setDocRequests]    = useState<DocumentRequest[]>([]);
   const [loading,         setLoading]        = useState(true);
   const [uploading,       setUploading]      = useState<Record<number, boolean>>({});
   const [deletingUpload,  setDeletingUpload] = useState<number | null>(null);
@@ -285,6 +286,12 @@ export default function DocumentsPage() {
         setMiscFiles(fileList);
       })
       .finally(() => setLoading(false));
+    // Only owners and the parties involved may read requests (IR-349); for
+    // anyone else this refuses, and the page simply offers nothing extra.
+    recordsApi
+      .documentRequests(Number(recordId))
+      .then(({ data }) => setDocRequests(data))
+      .catch(() => setDocRequests([]));
   }, [recordId]);
 
   useEffect(load, [load]);
@@ -295,6 +302,22 @@ export default function DocumentsPage() {
     isOwner &&
     record != null &&
     UPLOAD_ALLOWED_STATUSES.includes(record.pipeline_status);
+
+  // Who asked for each slot an open request is still waiting on. An owner's
+  // upload here answers that request (ADR-022 §Amendment 1, IR-346), so the
+  // slot takes one even while the record is in review. "Other" items have no
+  // slot and are answered from the Action required panel only.
+  const requestedBy = new Map<number, string[]>();
+  for (const r of docRequests) {
+    if (r.state !== "open") continue;
+    for (const item of r.items) {
+      if (item.state !== "missing" || item.slot == null) continue;
+      requestedBy.set(item.slot, [...(requestedBy.get(item.slot) ?? []), r.label]);
+    }
+  }
+  // Removing a version keeps `canUpload`: during review an owner may add the
+  // requested file, not take files away from what reviewers are reading.
+  const canUploadTo = (slotId: number) => canUpload || (isOwner && requestedBy.has(slotId));
 
   // Non-owners who aren't staff can request a PIN
   const canPin = !isOwner && !isStaff && record != null;
@@ -529,9 +552,16 @@ export default function DocumentsPage() {
               </div>
 
               <div className="p-5">
-                {/* Upload zone — owners only while record is editable, PDF only */}
-                {canUpload && (
+                {isOwner && requestedBy.has(slot.id) && (
+                  <p className="mb-3 text-[13px] font-semibold text-brand">
+                    Requested by {requestedBy.get(slot.id)?.join(", ")}. Uploading here answers
+                    the request.
+                  </p>
+                )}
+                {/* Upload zone — owners only while record is editable or the slot is requested, PDF only */}
+                {canUploadTo(slot.id) && (
                   <FileUploadZone
+                    label={`Upload ${slot.name}`}
                     onFiles={(files) => handleUpload(slot.id, files)}
                     accept=".pdf"
                     hint="PDF only, up to 50 MB"
@@ -541,7 +571,7 @@ export default function DocumentsPage() {
 
                 {/* Version history */}
                 {slot.uploads.length > 0 ? (
-                  <div className={canUpload ? "mt-4" : ""}>
+                  <div className={canUploadTo(slot.id) ? "mt-4" : ""}>
                     <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
                       Version History
                     </p>
@@ -610,7 +640,7 @@ export default function DocumentsPage() {
                     </table>
                   </div>
                 ) : (
-                  !canUpload && (
+                  !canUploadTo(slot.id) && (
                     <p className="text-[14px] text-gray-500 text-center py-4">
                       No files uploaded yet.
                     </p>
