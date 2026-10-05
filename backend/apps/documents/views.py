@@ -79,6 +79,23 @@ def _slot_for_record(record, slot_id):
     return slot, None
 
 
+def _store_slot_upload(record, slot, file, user):
+    """
+    Store a file uploaded into a slot. An owner's upload also answers every
+    open request item asking for that slot (ADR-022 §Amendment 1, IR-346),
+    in the same transaction, so a request is never fulfilled for a file that
+    was not stored. Anyone else's upload is stored and answers nothing.
+    """
+    from django.db import transaction
+    from .requests import fulfil_by_slot_upload, may_fulfil
+
+    with transaction.atomic():
+        upload = create_upload(record, slot, file, uploaded_by=user)
+        if may_fulfil(record, user):
+            fulfil_by_slot_upload(record, slot, upload, uploaded_by=user)
+    return upload
+
+
 class SubmitDocumentView(APIView):
     """
     POST /api/v1/documents/submit/
@@ -90,7 +107,9 @@ class SubmitDocumentView(APIView):
 
     Request (multipart/form-data):
         record        — Record PK
-        slot          — UploadSlot PK (optional with request_item)
+        slot          — UploadSlot PK (optional with request_item). An owner's
+                        upload here also answers every open request item
+                        asking for this slot (ADR-022 §Amendment 1, IR-346).
         request_item  — DocumentRequestItem PK, when the file answers a
                         reviewer's document request (ADR-022 §3.2, IR-262).
                         The slot is then taken from the item. Owners only:
@@ -173,7 +192,7 @@ class SubmitDocumentView(APIView):
             slot, missing = _slot_for_record(record, slot_id)
             if missing:
                 return missing
-            upload = create_upload(record, slot, file, uploaded_by=request.user)
+            upload = _store_slot_upload(record, slot, file, request.user)
 
         # --- Create extraction tracker and queue the background task ---
         # Every seeded UploadSlot is supplementary -- an Ethics Clearance
@@ -331,7 +350,7 @@ class RecordUploadCreateView(APIView):
         if missing:
             return missing
 
-        upload = create_upload(record, slot, file, uploaded_by=request.user)
+        upload = _store_slot_upload(record, slot, file, request.user)
         create_audit_event(
             "UPLOAD", request.user, record=record,
             metadata={"slot": slot.name, "filename": file.name, "version": upload.version},

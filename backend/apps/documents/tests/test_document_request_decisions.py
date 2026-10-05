@@ -384,6 +384,34 @@ class DecisionDataIsInternalTests(DecisionTestBase):
                 self.assertNotIn(secret, tracker)
 
 
+class RejectedThenSlotUploadTests(DecisionTestBase):
+    """IR-346 on IR-263: a rejected item is missing again, so a slot upload answers it."""
+
+    def test_an_owner_slot_upload_answers_a_rejected_item_again(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        data = self.requested(record, self.ierc, [{"slot": ethics.pk}])
+        [item] = data["items"]
+        self.uploaded(record, item["id"])
+        self.decided(item["id"], self.ierc, "reject", REASON)
+        self.assertEqual(self.request_state(data["id"]), "open")
+
+        self.client.force_authenticate(self.owner)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                SUBMIT_DOCUMENT, {"record": record.pk, "slot": ethics.pk, "file": pdf()},
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(self.item_state(item["id"]), "uploaded")
+        self.assertEqual(self.request_state(data["id"]), "fulfilled")
+        self.assertEqual(
+            DocumentRequestItem.objects.get(pk=item["id"]).upload_id,
+            response.data["upload"]["id"],
+        )
+
+
 class OnlyTheOwnerFulfilsTests(DecisionTestBase):
     """ADR-022 §Amendment 2: an upload against an item is the owner's to make."""
 
