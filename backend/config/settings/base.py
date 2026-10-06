@@ -666,6 +666,37 @@ VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4"
 VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-3")
 VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 
+# ---- The evidence decision (IR-464, ADR-035) -----------------------------
+#
+# Whether Ask IRIS establishes, before retrieval, that a question needs corpus
+# evidence at all. **`off` or `shadow` only.** `on` is rejected as an invalid
+# value rather than left unimplemented (ADR-035 §1): a mode a parser accepts is
+# one somebody enters by accident, and production routing is a separate
+# approval on a measurement. Nothing consumes a verdict yet -- the detector
+# lands here, the model decision in IR-465, the shadow pilot in IR-466.
+AI_EVIDENCE_DECISION = config("AI_EVIDENCE_DECISION", default="off")
+
+# The institution and Area terms the `institution_term` rule raises on.
+# Deployment-specific under ADR-005's instance-per-tenant posture, while the
+# other four rules' generic English terms are in code. Read **at startup**, not
+# per request (ADR-035 §5): a per-request read would let a `.env` edit silently
+# remove an evidence requirement between two questions. `apps.ai.evidence`
+# refuses to start when this is empty and the decision is enabled, so the rule
+# is disabled by turning the feature off, never by blanking the string.
+AI_EVIDENCE_INSTITUTION_TERMS = config(
+    "AI_EVIDENCE_INSTITUTION_TERMS",
+    default=(
+        "CIT-U,CIT University,Cebu Institute of Technology,IRIS,"
+        "this repository,the repository"
+    ),
+    cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
+)
+AI_EVIDENCE_AREA_TERMS = config(
+    "AI_EVIDENCE_AREA_TERMS",
+    default="",
+    cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
+)
+
 # ---- The development disclosure bypass (IR-317, ADR-015) -----------------
 #
 # Stands beside ADR-015's disclosure gate — it does not replace it and it

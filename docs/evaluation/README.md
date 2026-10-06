@@ -106,8 +106,29 @@ reads it so a report can be grouped by it:
 | `follow-up-after-direct` | A follow-up to an answer that used no retrieval |
 | `follow-up-after-grounded` | A follow-up to a cited answer; reuses its parent's passage |
 
-The two follow-up kinds are only meaningful with the preceding turn, which the
-schema does not carry yet; IR-464's command is where that history is supplied.
+### `resolved_question` (IR-464)
+
+The two follow-up kinds mean nothing on their own: "and how does that paper
+define it?" has no subject until the preceding turn fills it in. `resolved_question`
+carries **what a resolver would have rewritten the question into** — optional, a
+non-empty string, and validated at load.
+
+It exists because the evidence detector runs on the raw text **and** on the
+Resolved text and combines the two by OR (ADR-035 §5): a rewrite must never be
+able to weaken an evidence requirement. Both directions show up in the proxy
+set, which is the point of labelling them:
+
+| Question | Raw lane | Resolved lane |
+|---|---|---|
+| `q61` "what exactly did they say about that?" | misses — no repository vocabulary at all | catches it, on "authors" |
+| `q62` "and how does that paper define it?" | catches it, on "paper" | misses — the rewrite names the title instead |
+
+Neither lane alone is right, and the OR of them is. **The two `ambiguous`
+questions deliberately carry no Resolved form**: a question too vague to answer
+is too vague to resolve, which is why its `expected_outcome` is `clarify`.
+
+A set that supplies no `resolved_question` at all still measures the raw lane;
+the Resolved lane simply reports that no question carries one.
 
 ## How to label — the procedure
 
@@ -274,6 +295,58 @@ fifty-question set exists:
 3. Results from it are **tier 2 — thesis evidence** (ADR-023). Keep them in
    `runs/` alongside the proxy runs; the `tier` field in each results file is
    what distinguishes them, so never copy a proxy number into a tier-2 table.
+
+## Measuring the evidence detector (IR-464)
+
+A **separate instrument and a separate command**, and the distinction is load
+bearing (ADR-035 §10): this one supplies every accuracy number about the
+evidence decision, and IR-466's production shadowing supplies operational
+figures only and carries no ground truth, because nobody labelled real reader
+questions. Reading an accuracy number off the shadow pilot is a category error.
+
+```bash
+cd backend
+python manage.py eval_evidence --questions ../docs/evaluation/proxy_starter.json
+```
+
+It **costs nothing**: no model call, no vendor call, no database read, and no
+`--user`, because nothing here is filtered by visibility. It creates no
+`Conversation`, no `Turn` and no shadow row, and in IR-464 it calls no model at
+all — the results file carries a `model` key that is explicitly `null` so it can
+be compared with IR-465's, which will have one.
+
+What it reports, per lane (`raw`, `resolved`, `combined`):
+
+- **Over-fires and misses per reason code.** An over-fire is a rule firing on a
+  question annotated `evidence_required: none`; it costs one retrieval.
+- **`silent on required` per rule, which is not a detector miss.**
+  `sourcing_demand` not firing on a question about a paper is the rule working.
+  Only the combined lane can miss, and that column says which rule would have
+  caught it.
+- **Coverage** — how many questions in the set carry an annotation at all, and
+  how many carry a Resolved form.
+- **Institutional questions separately**, because a miss there is the dangerous
+  direction (ADR-027 §4, dormant rather than satisfied per ADR-035 §9).
+- **Categories with fewer than `--min-examples` labelled questions as
+  INCONCLUSIVE.** With two questions in a category, one question is fifty
+  points, and the figure is not a measurement.
+
+Provenance in every results file: the git commit, the question-set path and
+SHA-256, `AI_EVIDENCE_DECISION`, and a **digest of the complete active rule
+set** — all five rules including the generic English terms, so changing one word
+changes the digest. Written to `runs/<stamp>-evidence-<set>.json`.
+
+**Nothing consumes a verdict.** The detector is not wired into the answer path:
+production routing is out of ADR-035's scope (§11), and ADR-035 is Proposed, not
+accepted.
+
+### What the current proxy set can and cannot say
+
+Run 2026-10-06 over `proxy_starter.json`: **10 of 62 questions carry an evidence
+annotation.** Raw 9/10, Resolved 3/4, combined 10/10 — and **every category is
+inconclusive**, because each holds two questions. The combined figure is a
+demonstration that the OR rule works on ten questions, not a measurement of the
+detector. Labelling more questions in each category is what turns it into one.
 
 ## What blocks a real number today
 

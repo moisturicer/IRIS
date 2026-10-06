@@ -714,6 +714,7 @@
       "evidence_required": "none",
       "expected_outcome": "answer",
       "institutional": false,
+      "resolved_question": "can you give a simpler example of a convex optimization problem?",
       "expected": []
     },
     {
@@ -723,6 +724,7 @@
       "evidence_required": "none",
       "expected_outcome": "answer",
       "institutional": false,
+      "resolved_question": "and why does convexity matter in practice?",
       "expected": []
     },
     {
@@ -732,6 +734,7 @@
       "evidence_required": "corpus",
       "expected_outcome": "answer",
       "institutional": false,
+      "resolved_question": "what exactly did the authors say about quantifying uncertainties around Pareto fronts?",
       "expected": [
         {
           "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
@@ -747,6 +750,7 @@
       "evidence_required": "corpus",
       "expected_outcome": "answer",
       "institutional": false,
+      "resolved_question": "and how does Learning to Solve Hard Problems in RL for LLMs by Never Giving Up define continuing to sample a prompt?",
       "expected": [
         {
           "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
