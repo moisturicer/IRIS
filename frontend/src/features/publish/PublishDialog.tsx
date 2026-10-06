@@ -16,9 +16,8 @@
  * the parameter and keeps the draft.
  *
  * It decides no workflow. The type list is the server's, the author picks no
- * office (the hints carry `requested_*` only because the legacy pipeline routes
- * on them until IR-260; see `metadataPayload`), and the confirmation names
- * whoever the server says holds the record now.
+ * office (the hints are hints; see `metadataPayload`), and the confirmation
+ * names whoever the server says holds the record now.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FormProvider, useForm, type FieldErrors } from "react-hook-form";
@@ -444,7 +443,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       // Submitted all the same; the confirmation just names nobody.
     }
     setSubmitting(false);
-    setAnnouncement(`Submitted. ${successHeadline(holders, holderAdviser)}.`);
+    const headline = successHeadline(holders, holderAdviser);
+    setAnnouncement(headline.startsWith("Sent") ? `Submitted. ${headline}.` : `${headline}.`);
     setPhase({ kind: "success", recordId: id, holders, adviserName: holderAdviser });
   }
 

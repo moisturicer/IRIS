@@ -2,10 +2,14 @@
  * Publish's confirmation (spec §4.4 "Success").
  *
  * **Who it names comes from the server.** The dialog re-reads the record after
- * submitting and names its `current_holders`. Until IR-260 cuts over, a Thesis
- * or Project may still be held by Intake, so this never says "sent to your
+ * submitting and names its `current_holders`, so it never says "sent to your
  * adviser" unless the server says the Adviser holds it (§0). It invents no
  * timeline either: nothing promises how long a review takes.
+ *
+ * **Intake is never named.** ADR-032 retires it and invariant 1 forbids naming
+ * it as a current step, but until IR-260 cuts over the server still reports it
+ * for a Thesis or Project. Such a holder reads as a plain "Submitted for
+ * review", which names nobody rather than the wrong party (lead, 2026-10-06).
  */
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -29,9 +33,14 @@ function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** The holders as people where the client knows the person, otherwise as the server words them. */
+/** The holders worth naming: every party but the retired Intake. */
+function namedHolders(holders: TrackerHolder[] | null): TrackerHolder[] {
+  return (holders ?? []).filter((h) => h.party !== "intake");
+}
+
+/** The holders as people where the record names the person, otherwise as the server words them. */
 export function holderNames(holders: TrackerHolder[], adviserName: string | null): string[] {
-  return holders.map((h) => (h.party === "adviser" && adviserName ? adviserName : h.label));
+  return namedHolders(holders).map((h) => (h.party === "adviser" && adviserName ? adviserName : h.label));
 }
 
 export function successHeadline(holders: TrackerHolder[] | null, adviserName: string | null): string {
@@ -44,15 +53,16 @@ export function PublishSuccess({ recordId, holders, adviserName, isProposal, onP
   // Submit, which held focus, is gone; the next thing to do is open the paper.
   const openRef = useRef<HTMLAnchorElement>(null);
   useEffect(() => openRef.current?.focus(), []);
-  const withAdviser = holders?.some((h) => h.party === "adviser") ?? false;
+  const named = namedHolders(holders);
+  const withAdviser = named.some((h) => h.party === "adviser");
 
   let next: string | null = null;
   if (withAdviser) {
     next = isProposal
       ? "Your adviser reads it and decides: accept it, ask for revisions, or archive it."
       : "Your adviser reads it first. They can accept it, ask for revisions, or bring in a specialist office.";
-  } else if (holders && holders.length > 0) {
-    next = `${joinNames(holders.map((h) => h.label))} reviews it next.`;
+  } else if (named.length > 0) {
+    next = `${joinNames(named.map((h) => h.label))} reviews it next.`;
   }
 
   return (

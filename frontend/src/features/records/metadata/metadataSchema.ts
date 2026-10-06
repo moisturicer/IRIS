@@ -101,13 +101,11 @@ export const HINTS: ReadonlyArray<{
 /**
  * The PATCH body for these values.
  *
- * Each hint also sets its office's `requested_*` flag. Until IR-260 cuts over,
- * the live backend still routes on those flags after intake
- * (`lifecycle._resolve_enter_clearance_stage`), and the old wizard pre-checked
- * them from the same three answers. Sending the hint without the flag would
- * quietly drop every Publish submission's office review. Under ADR-032 the
- * Adviser decides routing and the flags become hints only. The form's copy
- * says both: a hint may bring in an office, and reviewers confirm which.
+ * The hints are sent as hints and nothing more: `requested_itso/ierc/ktto`
+ * are never written here. Under ADR-032 the author picks no office; the
+ * Adviser routes. Decided with the project lead on 2026-10-06 (IR-408),
+ * knowing the legacy pipeline still routes on those flags after intake, so
+ * until IR-260 cuts over a Publish submission reaches no specialist office.
  */
 export function metadataPayload(
   values: MetadataValues,
@@ -127,9 +125,6 @@ export function metadataPayload(
     is_ip:                  values.is_ip,
     requires_ethics_review: values.requires_ethics_review,
     for_commercialization:  values.for_commercialization,
-    requested_itso:         values.is_ip,
-    requested_ierc:         values.requires_ethics_review,
-    requested_ktto:         values.for_commercialization,
   };
   if (unloaded.classification) delete payload.classification;
   if (unloaded.psced) delete payload.psced;

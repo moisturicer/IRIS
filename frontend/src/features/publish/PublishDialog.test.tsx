@@ -401,11 +401,13 @@ describe("Details", () => {
         authors: ["Ada Reyes"],
         year_accomplished: new Date().getFullYear(),
         requires_ethics_review: true,
-        requested_ierc: true,
         is_ip: false,
-        requested_itso: false,
       }),
     );
+    // Rule change, 2026-10-06 (lead): hints are hints. The author picks no
+    // office (ADR-032), so Publish writes no requested_* flag.
+    const [, payload] = vi.mocked(recordsApi.update).mock.calls[0];
+    expect(Object.keys(payload).filter((key) => key.startsWith("requested_"))).toEqual([]);
   });
 
   it("links each error to its field and focuses the first", async () => {
@@ -565,12 +567,14 @@ describe("success", () => {
     await completeDetails(user);
     await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
-    await screen.findByRole("heading", { name: "Sent to Intake for review" });
+    await screen.findByRole("heading", { name: "Submitted for review" });
 
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("names who holds the record now, from the re-read record", async () => {
+  // Rule change, 2026-10-06 (lead): Intake is retired (ADR-032 invariant 1)
+  // and is never named, though the server reports it until IR-260.
+  it("never names Intake, though the server reports it", async () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
@@ -584,13 +588,15 @@ describe("success", () => {
     await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
 
-    expect(await screen.findByRole("heading", { name: "Sent to Intake for review" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Submitted for review" })).toBeInTheDocument();
+    expect(screen.queryByText(/Intake/)).not.toBeInTheDocument();
     expect(screen.queryByText(/your adviser reads it/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open paper" })).toHaveAttribute("href", "/records/42");
     expect(screen.getByRole("button", { name: "Publish another" })).toBeInTheDocument();
     // Announced politely, so a screen reader hears the outcome without moving focus.
     const announced = screen.getAllByRole("status").map((region) => region.textContent).join(" ");
-    expect(announced).toMatch(/Submitted\. Sent to Intake for review\./);
+    expect(announced).toMatch(/Submitted for review\./);
+    expect(announced).not.toMatch(/Intake/);
   });
 
   it("names the adviser when the server says the adviser holds it", async () => {

@@ -279,12 +279,8 @@ export function MetadataForm({
 
           <fieldset aria-describedby="metadata-hints-note">
             <legend className="text-body font-medium text-stone-800">Flag for your adviser</legend>
-            {/* Worded for both pipelines: today a hint also requests its office
-                (until IR-260); under ADR-032 the Adviser decides. Either way
-                the author raises it and reviewers confirm it. */}
             <p id="metadata-hints-note" className="mt-1 text-small text-stone-600">
-              What your reviewers should look at. A hint can bring in the matching office (IP, ethics or
-              commercialisation review); your reviewers confirm which offices are needed.
+              Your adviser sees these. They decide which offices, if any, review your work.
             </p>
             <div className="mt-3 flex flex-col gap-2.5">
               {HINTS.map(({ field, label }) => (
