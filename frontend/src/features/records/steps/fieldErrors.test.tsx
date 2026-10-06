@@ -16,6 +16,8 @@ import { useEffect, type ReactNode } from "react";
 import { renderScreen, screen } from "@/test/render";
 import type { RecordFormValues } from "../recordFormSchema";
 
+import { MetadataForm } from "../metadata/MetadataForm";
+
 import { RecordDetailsStep } from "./RecordDetailsStep";
 import { TitleAbstractStep } from "./TitleAbstractStep";
 
@@ -87,10 +89,21 @@ describe("wizard field errors carry a glyph as well as a tone", () => {
     for (const message of [TITLE, ABSTRACT, RECORD_TYPE, ADVISER, AUTHORS]) await expectGlyphBeside(message);
   });
 
+  // The submission form's guarantee. It lived in Submit Disclosure's Details
+  // step and moved with it into `MetadataForm` (IR-408). Edit Record's
+  // TitleAbstractStep never had it, since its labels are not tied to their
+  // fields; F5 replaces that page with MetadataForm too.
   it("keeps the error as the field's description, announced as the sentence alone", async () => {
     renderScreen(
       <WithErrors errors={{ title: TITLE, abstract: ABSTRACT }}>
-        <TitleAbstractStep />
+        <MetadataForm
+          advisers={[]}
+          classifications={[]}
+          psceds={[]}
+          selfId={null}
+          moreOpen={false}
+          onMoreOpenChange={() => {}}
+        />
       </WithErrors>,
     );
 
