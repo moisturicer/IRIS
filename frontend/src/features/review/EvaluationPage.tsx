@@ -250,7 +250,7 @@ export default function EvaluationPage() {
                 strictly more than the new tab ever did: an accidental back, a
                 reload and an expired session all used to lose the comment too. */}
             <Link
-              to={`/records/${id}/documents`}
+              to={`/records/${id}?section=files`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#6B0F12] text-white text-[13px] font-semibold hover:bg-[#7d1215] transition-colors"
             >
               <i className="fas fa-folder-open text-[12px]" aria-hidden />
@@ -268,7 +268,8 @@ export default function EvaluationPage() {
           {/* ADR-022: a missing form is a document request, not a revision --
               the record stays in review and no clearance resets (IR-262).
               The same block manages what this reviewer asked for (IR-263). */}
-          <ReviewerDocumentRequests record={record} className="pt-3 border-t border-gray-100" />
+          {/* Reaching this screen means reviewing; the route is the reviewer gate. */}
+          <ReviewerDocumentRequests record={record} reviewing className="pt-3 border-t border-gray-100" />
         </div>
 
         {/* Review form */}

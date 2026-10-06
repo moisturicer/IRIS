@@ -4,21 +4,14 @@ import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { cn, formatDate } from "@/lib/utils";
 import { errorDetail } from "./errorDetail";
-import type { DocumentRequest, DocumentRequestItem, DocumentRequestItemState } from "@/types/records";
+import { ItemStatusChip } from "./itemStatus";
+import type { DocumentRequest, DocumentRequestItem } from "@/types/records";
 
 interface ActionRequiredPanelProps {
   recordId: number;
   /** Told after an upload, so the page can refresh what it derived from the old state. */
   onChanged?: () => void;
 }
-
-/** Presentation only; every word comes from the server. */
-const ITEM_TONE: Record<DocumentRequestItemState, string> = {
-  missing:  "text-brand bg-brand-100",
-  uploaded: "text-stone-900 bg-stone-100",
-  accepted: "text-stone-900 bg-stone-100",
-  rejected: "text-brand bg-brand-100",
-};
 
 /**
  * The owner's list of what reviewers have asked them to provide (IR-262,
@@ -35,6 +28,9 @@ const ITEM_TONE: Record<DocumentRequestItemState, string> = {
  * entry vanishing. On the next visit it is gone from here and lives on in the
  * tracker's document-request history. A withdrawn request is never shown: the
  * reviewer no longer needs it (IR-263).
+ *
+ * Each item reads in spec §4.10's one vocabulary (`itemStatus`): Requested,
+ * Uploaded · awaiting review, Accepted, Replacement needed.
  *
  * An upload the requesting party rejected is back to missing, with the
  * reviewer's reason beside it and the upload control offered again (ADR-022
@@ -187,11 +183,7 @@ function ItemRow({
           {item.label}
         </span>
         <span className="flex items-center gap-2">
-          <span
-            className={cn("px-1.5 py-0.5 rounded text-2xs font-bold", ITEM_TONE[item.state])}
-          >
-            {item.state_label}
-          </span>
+          <ItemStatusChip item={item} />
           {item.state === "missing" && (
             <label
               htmlFor={inputId}

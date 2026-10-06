@@ -1,0 +1,141 @@
+/**
+ * The capabilities adapter (IR-411; spec §4.8, ADR-032 §10).
+ *
+ * **The one place the frontend decides what a viewer may do with a record.**
+ * Paper View, My Library, My Reviews and Publish ask this module; none of them
+ * reads a role name or `can_act` itself. `test/roleGuard.test.ts` fails the
+ * build if one does.
+ *
+ * **Phase 1 (now).** The Record detail payload carries no `capabilities` list
+ * yet, so this derives one from the server fields that exist:
+ *
+ * - `can_act` non-empty → the review actions (`open_review`, and `decide`
+ *   through the current decision form until ADR-032's actions land);
+ * - `can_request_document` non-empty → `request_document`;
+ * - ownership plus the server's `workflow_state` → the author actions.
+ *
+ * `tag_ip` is the one capability still read from the viewer's role, here and
+ * nowhere else, until the server says it (phase 2).
+ *
+ * **Phase 2 (IR-418, "Capabilities payload").** The serializer adds
+ * `capabilities: string[]` from `core.permissions`; this module becomes a
+ * pass-through and every caller is untouched.
+ *
+ * Nothing here is a permission. The server re-checks every action, so a
+ * capability is only a decision about what to *offer*.
+ */
+import { STAFF_ROLES, type RoleName } from "@/lib/constants";
+import type { RecordDetail } from "@/types/records";
+
+/**
+ * ADR-032 §10's action keys, as spec §4.8 lists them, plus `continue_draft`:
+ * reopening one's own draft in Publish, which ADR-032 leaves unnamed.
+ */
+export type Capability =
+  | "open_review"
+  | "request_document"
+  | "request_revision"
+  | "route"
+  | "decide"
+  | "create_version"
+  | "edit_details"
+  | "continue_draft"
+  | "continue_as"
+  | "set_visibility"
+  | "tag_ip"
+  | "comment_review"
+  | "comment_public"
+  | "cite";
+
+/** Paper View's sections, in tab order (spec §4.6). */
+export const PAPER_SECTIONS = ["overview", "paper", "review", "files"] as const;
+export type PaperSection = (typeof PAPER_SECTIONS)[number];
+
+/** Who is looking: the signed-in user, or nobody. */
+export type Viewer = { id: number; role_name: RoleName | null };
+
+type Record_ = Pick<
+  RecordDetail,
+  "owners" | "can_act" | "can_request_document" | "workflow_state" | "pipeline_status" | "abstract_file" | "files"
+>;
+
+/** Whether the viewer owns the record: the adapter's one client-side input. */
+export function isOwner(record: Pick<RecordDetail, "owners">, viewer: Viewer | null): boolean {
+  return viewer != null && record.owners.some((o) => o.user === viewer.id);
+}
+
+/**
+ * An owner, or someone the server lets act or ask on the record. ADR-032's
+ * `is_record_participant` also counts anyone who *has* held a seat; until
+ * seats exist (IR-415) a reviewer whose part is finished is not counted here.
+ */
+function isParticipant(record: Record_, viewer: Viewer | null): boolean {
+  if (viewer == null) return false;
+  return isOwner(record, viewer) || record.can_act.length > 0 || record.can_request_document.length > 0;
+}
+
+/** Whether there is a paper to read: the manuscript, else any attached file. */
+function hasPaper(record: Record_): boolean {
+  return Boolean(record.abstract_file) || record.files.length > 0;
+}
+
+export function capabilitiesFor(record: Record_, viewer: Viewer | null): ReadonlySet<Capability> {
+  const granted = new Set<Capability>(["cite"]);
+  if (viewer == null) return granted;
+
+  // Reading `can_act` belongs here alone; see the module comment.
+  if (record.can_act.length > 0) {
+    granted.add("open_review");
+    // Through the current decision form, until IR-260 retires it.
+    granted.add("decide");
+  }
+  if (record.can_request_document.length > 0) granted.add("request_document");
+
+  if (isOwner(record, viewer)) {
+    // Every author action keys off the server's derived state, never the
+    // stored stage, so a rejected record (terminal) offers none of them.
+    if (record.workflow_state === "draft") {
+      granted.add("continue_draft");
+      granted.add("edit_details");
+    }
+    if (record.workflow_state === "awaiting_resubmission") {
+      // Today's act is "Resubmit for review"; versions (IR-416) replace it.
+      granted.add("create_version");
+      // The edit becomes part of the next version (IR-273, invariant 4).
+      granted.add("edit_details");
+    }
+  }
+
+  // Phase 1 only: the one role-derived capability. Phase 2 reads it from the
+  // server's list.
+  if (
+    viewer.role_name != null &&
+    STAFF_ROLES.includes(viewer.role_name) &&
+    record.pipeline_status === "published"
+  ) {
+    granted.add("tag_ip");
+  }
+
+  return granted;
+}
+
+/** The sections this viewer may open, in tab order. */
+/** A `?section=` value Paper View knows, else null. */
+export function asSection(value: string | null): PaperSection | null {
+  return (PAPER_SECTIONS as readonly string[]).includes(value ?? "") ? (value as PaperSection) : null;
+}
+
+export function sectionsFor(record: Record_, viewer: Viewer | null): PaperSection[] {
+  const participant = isParticipant(record, viewer);
+  return PAPER_SECTIONS.filter((section) => {
+    switch (section) {
+      case "overview":
+        return true;
+      case "paper":
+        return hasPaper(record);
+      case "review":
+      case "files":
+        return participant;
+    }
+  });
+}

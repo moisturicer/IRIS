@@ -1,0 +1,225 @@
+/**
+ * The capabilities adapter, as a table (IR-411; spec §4.8, §5 Seam 1).
+ *
+ * Each row is a Record detail payload and a viewer, and the exact set of
+ * capabilities and sections the adapter must answer. The expected sets are
+ * written out by hand from the spec and ADR-032, not recomputed the way the
+ * adapter computes them, so a wrong rule shows up as a wrong row.
+ */
+import { describe, expect, it } from "vitest";
+
+import type { RecordDetail } from "@/types/records";
+
+import { capabilitiesFor, sectionsFor, type Capability, type PaperSection, type Viewer } from "./capabilities";
+
+const OWNER = 40;
+const ADVISER = 30;
+const STRANGER = 99;
+
+/** A published Thesis no viewer below takes part in, unless a row says so. */
+function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
+  return {
+    id: 7,
+    title: "Flood Prediction in the Mananga Catchment",
+    abstract: "A study.",
+    year_accomplished: 2026,
+    year_completed: null,
+    abstract_file: "https://iris.test/media/manuscripts/thesis.pdf",
+    classification_name: null,
+    classification: null,
+    psced: null,
+    record_type_name: "Thesis/Research",
+    record_type: "Thesis/Research",
+    pipeline_status: "published",
+    is_ip: false,
+    ip_type: "",
+    for_commercialization: false,
+    community_extension: false,
+    access_count: 0,
+    file_count: 1,
+    created_at: "2026-09-01T08:00:00Z",
+    authors: [],
+    adviser: ADVISER,
+    added_by: null,
+    requires_ethics_review: false,
+    requested_itso: false,
+    requested_ierc: false,
+    requested_ktto: false,
+    owners: [{ id: 1, user: OWNER, email: "o@cit.edu", full_name: "O. Wner", is_primary: true }],
+    is_deleted: false,
+    reviews: [],
+    clearances: [],
+    resubmission: { count: 0, last_resubmitted_at: null, declining_office: null, offices_preserved: [] },
+    stage_label: "Published",
+    your_office: null,
+    your_office_label: null,
+    files: [],
+    workflow_state: "published",
+    workflow_state_label: "Published",
+    current_holders: [],
+    can_act: [],
+    can_request_document: [],
+    ...overrides,
+  };
+}
+
+const owner: Viewer = { id: OWNER, role_name: "Student" };
+const adviser: Viewer = { id: ADVISER, role_name: "Adviser" };
+const stranger: Viewer = { id: STRANGER, role_name: "Student" };
+const itsoStaff: Viewer = { id: 51, role_name: "ITSO" };
+
+interface Row {
+  name: string;
+  record: RecordDetail;
+  viewer: Viewer | null;
+  capabilities: Capability[];
+  sections: PaperSection[];
+}
+
+const ROWS: Row[] = [
+  {
+    name: "a reader of a published paper may cite it, and nothing else",
+    record: record(),
+    viewer: stranger,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "a record with no manuscript has no Paper section",
+    record: record({ abstract_file: null, files: [] }),
+    viewer: stranger,
+    capabilities: ["cite"],
+    sections: ["overview"],
+  },
+  {
+    name: "a supplementary file alone is still a paper to read",
+    record: record({
+      abstract_file: null,
+      files: [{ id: 3, filename: "paper.pdf", url: null, size_bytes: 10, created_at: "2026-09-01T08:00:00Z" }],
+    }),
+    viewer: stranger,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "nobody signed in is nobody's participant",
+    record: record({ can_act: ["adviser"] }),
+    viewer: null,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "the owner of a draft may continue it and edit its details",
+    record: record({ pipeline_status: "draft", workflow_state: "draft", workflow_state_label: "Draft" }),
+    viewer: owner,
+    capabilities: ["cite", "continue_draft", "edit_details"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "someone who can read another person's draft may not edit it",
+    record: record({ pipeline_status: "draft", workflow_state: "draft", workflow_state_label: "Draft" }),
+    viewer: stranger,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "the owner asked for a revision may resubmit and edit details",
+    record: record({ pipeline_status: "declined", workflow_state: "awaiting_resubmission" }),
+    viewer: owner,
+    capabilities: ["cite", "create_version", "edit_details"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a stored 'declined' that the server says is still in review gives the owner nothing to do",
+    record: record({ pipeline_status: "declined", workflow_state: "in_review" }),
+    viewer: owner,
+    capabilities: ["cite"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a rejected record offers its owner no author action (invariant 5)",
+    record: record({ pipeline_status: "rejected", workflow_state: "rejected" }),
+    viewer: owner,
+    capabilities: ["cite"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a published record's details are not editable by its owner",
+    record: record(),
+    viewer: owner,
+    capabilities: ["cite"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "the party the server names in can_act may open the review and decide",
+    record: record({ pipeline_status: "in_review", workflow_state: "in_review", can_act: ["adviser"] }),
+    viewer: adviser,
+    capabilities: ["cite", "open_review", "decide"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a party that may only ask for documents is a participant, without a decision",
+    record: record({ pipeline_status: "in_review", workflow_state: "in_review", can_request_document: ["ierc"] }),
+    viewer: { id: 52, role_name: "IERC" },
+    capabilities: ["cite", "request_document"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a reviewer's role alone opens nothing the server did not grant",
+    record: record({ pipeline_status: "in_review", workflow_state: "in_review" }),
+    viewer: adviser,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "office staff may tag the IP type of a published record (phase 1, role-derived)",
+    record: record(),
+    viewer: itsoStaff,
+    capabilities: ["cite", "tag_ip"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "office staff may not tag a record that is not published",
+    record: record({ pipeline_status: "in_review", workflow_state: "in_review" }),
+    viewer: itsoStaff,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "an Adviser is not office staff, and tags nothing",
+    record: record(),
+    viewer: adviser,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
+    name: "an accepted Proposal offers no Proposal completion and no continuation yet",
+    record: record({
+      record_type_name: "Proposal",
+      record_type: "Proposal",
+      pipeline_status: "approved",
+      workflow_state: "approved",
+      abstract_file: null,
+    }),
+    viewer: adviser,
+    capabilities: ["cite"],
+    sections: ["overview"],
+  },
+];
+
+describe("the capabilities adapter", () => {
+  it.each(ROWS)("$name", ({ record: r, viewer, capabilities, sections }) => {
+    expect([...capabilitiesFor(r, viewer)].sort()).toEqual([...capabilities].sort());
+    expect(sectionsFor(r, viewer)).toEqual(sections);
+  });
+
+  it("never grants an action whose backend does not exist yet", () => {
+    const unbuilt: Capability[] = [
+      "request_revision", "route", "continue_as", "set_visibility", "comment_review", "comment_public",
+    ];
+    for (const { record: r, viewer } of ROWS) {
+      const granted = capabilitiesFor(r, viewer);
+      for (const capability of unbuilt) expect(granted.has(capability)).toBe(false);
+    }
+  });
+});

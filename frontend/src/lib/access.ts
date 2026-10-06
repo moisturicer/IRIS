@@ -83,9 +83,11 @@ export const SCREEN_ACCESS = {
                    nav: { label: "Settings & Profile", icon: "fa-cog", section: "Tools" } },
   help:          { path: "/help",          roles: EVERYONE },
   // Reached from Discover and the queues, never from the nav. Which *records*
-  // are visible is the server's decision (IR-153), not this map's.
+  // are visible is the server's decision (IR-153), not this map's, and what a
+  // viewer may do there is the capabilities adapter's (IR-411). The documents
+  // and edit pages became its Files section and Edit details dialog; their
+  // URLs are redirects (`router/redirects.tsx`).
   paper:         { path: "/records/:id",           roles: EVERYONE },
-  documents:     { path: "/records/:id/documents", roles: EVERYONE },
 
   // --- authoring ---------------------------------------------------------
   // `/records/add` now redirects to the Publish dialog (IR-408); F1 replaces
@@ -94,7 +96,6 @@ export const SCREEN_ACCESS = {
                 nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "IP Management" } },
   workspace:  { path: "/workspace",         roles: AUTHORS,
                 nav: { label: "My Workspace", icon: "fa-briefcase", section: "IP Management" } },
-  editRecord: { path: "/records/:id/edit",  roles: AUTHORS },
 
   // --- review ------------------------------------------------------------
   // One queue, three filters (IR-143). Approved and Declined were separate nav

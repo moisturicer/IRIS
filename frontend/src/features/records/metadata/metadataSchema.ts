@@ -1,9 +1,9 @@
 /**
  * A record's metadata, as `MetadataForm` edits it (IR-408; spec §4.4 step 2).
  *
- * One schema for every place metadata is edited: Publish's Details step now,
- * Paper View's *Edit details* dialog when F5 lands. `recordFormSchema` stays
- * only for `EditRecordPage`, which F5 deletes.
+ * One schema for every place metadata is edited: Publish's Details step and
+ * Paper View's *Edit details* dialog (IR-411). The older `recordFormSchema`
+ * went with `EditRecordPage`.
  *
  * Two rules differ from that older schema, both from ADR-032 §1:
  *

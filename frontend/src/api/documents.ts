@@ -1,6 +1,19 @@
 import { apiClient } from "./client";
 import type { RecordUpload, RecordFile, UploadSlot, SlotWithUploads } from "@/types/documents";
 
+/** Upload progress as a percentage, for `UploadDropzone`'s bar. */
+type ProgressOptions = { onProgress?: (percent: number) => void };
+
+function progressConfig(file: File, { onProgress }: ProgressOptions) {
+  return {
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress: (event: { loaded: number; total?: number }) => {
+      const total = event.total ?? file.size;
+      if (onProgress && total > 0) onProgress((event.loaded / total) * 100);
+    },
+  };
+}
+
 export const documentsApi = {
   // Fetch all UploadSlots for a record type.
   // The global paginator wraps this in { count, next, previous, results }.
@@ -9,7 +22,7 @@ export const documentsApi = {
       params: recordTypeId ? { record_type: recordTypeId } : {},
     }),
 
-  // Fetch slots with their upload history for a specific record (used in DocumentsPage)
+  // Fetch slots with their upload history for a specific record (Paper View's Files section)
   slotsForRecord: (recordId: number) =>
     apiClient.get<SlotWithUploads[]>(`/documents/records/${recordId}/slots/`),
 
@@ -20,26 +33,24 @@ export const documentsApi = {
    * Upload a PDF answering one item of a document request (ADR-022 §3.2,
    * IR-262). Same endpoint as `upload`; the server takes the slot from the item.
    */
-  uploadForRequestItem: (recordId: number, itemId: number, file: File) => {
+  uploadForRequestItem: (recordId: number, itemId: number, file: File, options: ProgressOptions = {}) => {
     const fd = new FormData();
     fd.append("record",       String(recordId));
     fd.append("request_item", String(itemId));
     fd.append("file",         file);
     return apiClient.post<{ upload: RecordUpload; extraction: { id: number; status: string } }>(
-      "/documents/submit/", fd,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      "/documents/submit/", fd, progressConfig(file, options),
     );
   },
 
   // Upload a PDF to a slot — triggers Celery extraction task
-  upload:         (recordId: number, slotId: number, file: File) => {
+  upload:         (recordId: number, slotId: number, file: File, options: ProgressOptions = {}) => {
     const fd = new FormData();
     fd.append("record", String(recordId));
     fd.append("slot",   String(slotId));
     fd.append("file",   file);
     return apiClient.post<{ upload: RecordUpload; extraction: { id: number; status: string } }>(
-      "/documents/submit/", fd,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      "/documents/submit/", fd, progressConfig(file, options),
     );
   },
 

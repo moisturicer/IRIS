@@ -1,5 +1,8 @@
 /**
  * Every retired URL lands where the table says (spec §4.1).
+ *
+ * A path with a parameter is followed with a sample value, which must reach
+ * the destination unchanged: `/records/7/documents` lands on record 7.
  */
 import { describe, expect, it } from "vitest";
 import { useLocation, useRoutes } from "react-router-dom";
@@ -17,10 +20,23 @@ function App() {
   return useRoutes([...redirectRoutes, { path: "*", element: <Landing /> }]);
 }
 
+/** Each `:param` filled with a sample value. */
+const sample = (pattern: string) => pattern.replace(/:\w+/g, "7");
+
 describe("retired URLs", () => {
   it.each(REDIRECTS)("/$path redirects to $to", async ({ path, to }) => {
-    renderScreen(<App />, { route: `/${path}` });
+    renderScreen(<App />, { route: `/${sample(path)}` });
 
-    expect(await screen.findByText(`Landed on ${to}`)).toBeInTheDocument();
+    expect(await screen.findByText(`Landed on ${sample(to)}`)).toBeInTheDocument();
+  });
+
+  it("sends the documents page and the edit page to the record they named", async () => {
+    renderScreen(<App />, { route: "/records/41/documents" });
+    expect(await screen.findByText("Landed on /records/41?section=files")).toBeInTheDocument();
+  });
+
+  it("opens Edit details on the record the edit page named", async () => {
+    renderScreen(<App />, { route: "/records/41/edit" });
+    expect(await screen.findByText("Landed on /records/41?edit=details")).toBeInTheDocument();
   });
 });
