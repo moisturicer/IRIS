@@ -11,7 +11,6 @@ from pathlib import Path
 import pytest
 from hypothesis import HealthCheck, settings as hypothesis_settings
 
-from testing.source_files import python_sources
 from testing.hypothesis_profiles import (
     CI_ENV_VAR,
     CI_PROFILE,
@@ -20,6 +19,7 @@ from testing.hypothesis_profiles import (
     profile_for,
     register_profiles,
 )
+from testing.source_files import python_sources
 
 
 class ProfileSelectionTests:

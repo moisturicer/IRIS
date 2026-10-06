@@ -12,7 +12,7 @@ No database and no Django settings -- it reads files.
 
 from pathlib import Path
 
-from testing.source_files import python_sources
+from testing.source_files import SKIPPED_DIRS, python_sources
 
 BACKEND = Path(__file__).resolve().parents[2]
 
@@ -90,4 +90,19 @@ def test_the_real_project_scan_finds_real_source():
 
     assert "apps/records/models.py" in found
     assert "config/settings/base.py" in found
-    assert not any(part in {"venv", ".venv", "__pycache__"} for p in found for part in p.split("/"))
+    assert not any(part in SKIPPED_DIRS for p in found for part in p.split("/"))
+
+
+def test_no_project_folder_carries_a_skipped_name():
+    """A skipped name matches at any depth, so a project package called `env`
+    would silently drop out of every guard. Fail instead, so the name gets
+    changed or the rule does -- deliberately."""
+    project = [BACKEND / name for name in ("apps", "config", "core", "testing")]
+    clashes = [
+        folder.relative_to(BACKEND).as_posix()
+        for root in project
+        for folder in root.rglob("*")
+        if folder.is_dir() and folder.name in SKIPPED_DIRS - {"__pycache__"}
+    ]
+
+    assert clashes == [], f"project folders named like a skipped folder: {clashes}"

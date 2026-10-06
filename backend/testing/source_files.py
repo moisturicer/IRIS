@@ -9,7 +9,11 @@ environment inside `backend/` hit a UnicodeDecodeError on a third-party file
 that CI, which has no such folder, never saw.
 
 Skipped folders are pruned during the walk rather than filtered afterwards, so
-an environment is never descended into at all. `migrations` and `tests` are
+an environment is never descended into at all. A name matches at any depth,
+which would also hide a project folder that happened to be called `env`;
+`apps/tests/test_source_files.py` fails if one ever appears. `root` itself is
+never tested for `pyvenv.cfg` -- a guard is pointed at project code, not into
+an environment. `migrations` and `tests` are
 **not** skipped here: whether a guard reads them is that guard's decision, and
 several deliberately do.
 """
@@ -29,7 +33,7 @@ def _is_skipped(directory: Path) -> bool:
     return directory.name in SKIPPED_DIRS or (directory / "pyvenv.cfg").exists()
 
 
-def python_sources(root, pattern: str = "*.py") -> list[Path]:
+def python_sources(root: str | os.PathLike[str], pattern: str = "*.py") -> list[Path]:
     """Every file under `root` whose name matches `pattern`, sorted, outside skipped folders."""
     found = []
     for dirpath, dirnames, filenames in os.walk(root):
