@@ -63,6 +63,12 @@ class CircuitBreaker:
         with self._lock:
             return self._state_unlocked()
 
+    @property
+    def failures(self) -> int:
+        """Consecutive failures since the last success; 0 when healthy."""
+        with self._lock:
+            return self._failures
+
     def _state_unlocked(self) -> CircuitState:
         if self._opened_at is None:
             return CircuitState.CLOSED

@@ -30,6 +30,8 @@ class Lane(enum.Enum):
 
     QUERY = "query"
     INGESTION = "ingestion"
+    #: IR-466: its own strict budget, not a share of the account.
+    SHADOW = "shadow"
 
 
 #: How the account's budget is divided. The query lane is prioritised because a
@@ -55,7 +57,7 @@ class _Store(Protocol):
 
 
 def lane_budget(lane: Lane, total: int) -> int:
-    """This lane's share of the account budget."""
+    """This lane's share of the account budget. The shadow lane has none."""
     return int(math.floor(total * _LANE_SHARE[lane]))
 
 
@@ -83,7 +85,7 @@ class TokenBucket:
         window = int(self._clock() // self._window)
         return f"iris:ratelimit:{self._lane.value}:{window}"
 
-    def spend(self, tokens: int) -> None:
+    def spend(self, tokens: int) -> str:
         """Consume ``tokens`` from this lane, or raise.
 
         The increment is atomic, which is what makes this correct across
@@ -103,6 +105,15 @@ class TokenBucket:
                 f"{self._lane.value} lane has spent its budget of {self._budget} "
                 f"for this {self._window}s window"
             )
+        return key
+
+    def adjust(self, tokens: int, key: str) -> None:
+        """Correct the window ``key`` (as `spend` returned it) by ``tokens``,
+        never refusing: the tokens were already paid for."""
+        if not tokens:
+            return
+        self._store.incrby(key, tokens)
+        self._store.expire(key, self._window * 2)
 
 
 def bucket_for(lane: Lane, store: Optional[_Store] = None) -> TokenBucket:
@@ -124,5 +135,9 @@ def bucket_for(lane: Lane, store: Optional[_Store] = None) -> TokenBucket:
             decode_responses=True,
         )
 
-    total = getattr(settings, "AI_RATE_LIMIT_TOKENS_PER_MINUTE", 1_000_000)
-    return TokenBucket(store, lane, budget=lane_budget(lane, total), window_seconds=60)
+    if lane is Lane.SHADOW:
+        budget = settings.AI_EVIDENCE_SHADOW_TOKENS_PER_MINUTE
+    else:
+        total = getattr(settings, "AI_RATE_LIMIT_TOKENS_PER_MINUTE", 1_000_000)
+        budget = lane_budget(lane, total)
+    return TokenBucket(store, lane, budget=budget, window_seconds=60)

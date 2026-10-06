@@ -20,8 +20,6 @@ retriever or an answer service, and shape the reply — which is what makes the
 whole path drivable from a test with deterministic fakes.
 """
 import json
-from dataclasses import dataclass
-from typing import Optional
 
 from django.http import Http404, StreamingHttpResponse
 
@@ -31,7 +29,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
-from apps.ai.history import HISTORY_CANDIDATE_LIMIT, history_window
+from apps.ai.history import recent_window
 from apps.ai.answers.events import (
     CitationsResolved,
     Done,
@@ -40,8 +38,8 @@ from apps.ai.answers.events import (
     TextDelta,
 )
 from apps.ai.composition import composition_root
-from apps.ai.conversations import record_turn
 from apps.ai.models import Conversation
+from apps.ai.orchestrator import ChatOrchestrator, ChatQuestion
 from apps.ai.presentation import (
     answer_body,
     answer_mode,
@@ -141,28 +139,7 @@ def _recent_turns(conversation: Conversation) -> list:
     Both bounds apply *after* the exclusion, so a run of failures does not eat
     the window and leave the model with less real history than it has.
     """
-    candidates = list(
-        conversation.turns.in_model_history().order_by("-id")[:HISTORY_CANDIDATE_LIMIT]
-    )[::-1]
-    return history_window(candidates)
-
-
-@dataclass(frozen=True)
-class _AskRequest:
-    """One parsed, validated `/ask/`-shaped request -- everything both
-    `ChatQueryView` and `ChatStreamView` need before calling the answer
-    service, gathered in one place (IR-326 code review) rather than kept as
-    two copies of the same ~30 lines that would drift the next time
-    resolution or scoping changes.
-    """
-
-    conversation: Optional[Conversation]
-    question: str
-    effective_question: str
-    resolved_question: Optional[str]
-    history: list
-    widened: bool
-    scope_record: object
+    return recent_window(conversation.turns.all())
 
 
 def _prepare_ask_request(request):
@@ -203,7 +180,7 @@ def _prepare_ask_request(request):
     scope_record = None if widened else scoped_to
 
     return (
-        _AskRequest(
+        ChatQuestion(
             conversation=conversation,
             question=question,
             effective_question=effective_question,
@@ -263,26 +240,11 @@ class ChatQueryView(APIView):
         if error is not None:
             return error
 
-        service = composition_root().answer_service(
-            max_sources=_parse_top_k(request.data.get("top_k")),
-            record=prepared.scope_record,
+        orchestrator = ChatOrchestrator(
+            prepared, max_sources=_parse_top_k(request.data.get("top_k"))
         )
-        answer = service.answer(
-            prepared.effective_question,
-            request.user,
-            conversation=prepared.conversation,
-            history=prepared.history,
-        )
+        answer = orchestrator.answer(request.user)
         mode = answer_mode(answer.state)
-
-        if prepared.conversation is not None:
-            record_turn(
-                prepared.conversation,
-                prepared.question,
-                answer,
-                prepared.resolved_question,
-                prepared.widened,
-            )
 
         return Response(
             {
@@ -380,30 +342,14 @@ class ChatStreamView(APIView):
         if error is not None:
             return error
 
-        service = composition_root().answer_service(
-            max_sources=_parse_top_k(request.data.get("top_k")),
-            record=prepared.scope_record,
+        orchestrator = ChatOrchestrator(
+            prepared, max_sources=_parse_top_k(request.data.get("top_k"))
         )
 
-        def persist_partial(answer):
-            """`answer_stream`'s `on_interrupted` (IR-328)."""
-            if prepared.conversation is not None:
-                record_turn(
-                    prepared.conversation,
-                    prepared.question,
-                    answer,
-                    prepared.resolved_question,
-                    prepared.widened,
-                )
-
         def event_source():
-            for event in service.answer_stream(
-                prepared.effective_question,
-                request.user,
-                conversation=prepared.conversation,
-                history=prepared.history,
-                on_interrupted=persist_partial,
-            ):
+            # The orchestrator records the Turn before `Done` reaches here,
+            # and as `partial` on interruption (IR-328).
+            for event in orchestrator.answer_stream(request.user):
                 if isinstance(event, RetrievalFinished):
                     yield _sse(
                         event.name,
@@ -420,14 +366,6 @@ class ChatStreamView(APIView):
                 elif isinstance(event, Done):
                     answer = event.answer
                     mode = answer_mode(answer.state)
-                    if prepared.conversation is not None:
-                        record_turn(
-                            prepared.conversation,
-                            prepared.question,
-                            answer,
-                            prepared.resolved_question,
-                            prepared.widened,
-                        )
                     yield _sse(
                         event.name,
                         {

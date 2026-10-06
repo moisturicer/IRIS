@@ -21,6 +21,7 @@ from .embedding_space import (
 )
 from .chunk import ChunkSet, DocumentChunk, ChunkEmbedding
 from .ingestion_job import IngestionJob
+from .shadow import ShadowEvidenceDecision, ShadowEvidenceTally
 
 __all__ = [
     "Conversation",
@@ -45,4 +46,6 @@ __all__ = [
     "DocumentChunk",
     "ChunkEmbedding",
     "IngestionJob",
+    "ShadowEvidenceDecision",
+    "ShadowEvidenceTally",
 ]

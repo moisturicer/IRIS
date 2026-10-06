@@ -1,10 +1,10 @@
 """The deterministic half of the evidence decision (IR-464, ADR-035 §5).
 
 Five rules over question text emitting five reason codes, run on the raw and
-Resolved questions and combined by OR. **Nothing consumes a verdict yet**: the
-model decision is IR-465 and the shadow pilot is IR-466, and production
-routing is out of scope for ADR-035 (§11). The curated instrument that
-measures this lives in `apps.ai.evaluation.evidence`.
+Resolved questions and combined by OR. The shadow pilot (`shadow.py`, IR-466)
+records a verdict per sampled chat Turn and routes nothing; production routing
+is out of scope for ADR-035 (§11). The curated instrument that measures this
+lives in `apps.ai.evaluation.evidence`.
 """
 
 from .config import (

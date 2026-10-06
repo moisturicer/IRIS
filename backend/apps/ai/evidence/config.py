@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 SETTING_MODE = "AI_EVIDENCE_DECISION"
 SETTING_INSTITUTION_TERMS = "AI_EVIDENCE_INSTITUTION_TERMS"
 SETTING_AREA_TERMS = "AI_EVIDENCE_AREA_TERMS"
+SETTING_SAMPLE_RATE = "AI_EVIDENCE_SHADOW_SAMPLE_RATE"
 
 MODE_OFF = "off"
 MODE_SHADOW = "shadow"
@@ -47,6 +48,10 @@ _cached: Optional[RuleSet] = None
 
 def configured_mode() -> str:
     return str(getattr(settings, SETTING_MODE, MODE_OFF) or MODE_OFF).strip().lower()
+
+
+def sample_rate() -> float:
+    return float(getattr(settings, SETTING_SAMPLE_RATE, 0.0) or 0.0)
 
 
 def decision_enabled() -> bool:
@@ -83,6 +88,13 @@ def evidence_configuration_problems() -> list[str]:
         problems.append(
             f"{SETTING_MODE}={mode!r} is not one of {', '.join(MODES)}"
         )
+
+    try:
+        rate_ok = 0.0 <= sample_rate() <= 1.0
+    except (TypeError, ValueError):
+        rate_ok = False
+    if not rate_ok:
+        problems.append(f"{SETTING_SAMPLE_RATE} is not a number between 0 and 1")
 
     if decision_enabled() and not institution_terms():
         problems.append(

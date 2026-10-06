@@ -183,6 +183,16 @@ def _cut(text: str, estimated_budget: int) -> str:
     return cut.rstrip() + TRUNCATION_MARKER
 
 
+def recent_window(turns) -> list["Turn"]:
+    """The verbatim window over a Turn queryset: the newest model-history
+    candidates, oldest first, then the budget. One shape for the chat views
+    and the evidence shadow's parity check (IR-466)."""
+    candidates = list(
+        turns.in_model_history().order_by("-id")[:HISTORY_CANDIDATE_LIMIT]
+    )[::-1]
+    return history_window(candidates)
+
+
 def history_window(
     turns: Sequence["Turn"], budget: Optional[int] = None
 ) -> list["Turn"]:

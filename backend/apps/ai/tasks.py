@@ -207,6 +207,35 @@ def chunk_extraction(self, extraction_id: int, *, force: bool = False):
     return _run_ingestion(self, extraction, force)
 
 
+#: For unexpected errors only; a vendor failure is a recorded fallback route.
+SHADOW_MAX_RETRIES = 3
+
+
+@shared_task(
+    bind=True,
+    max_retries=SHADOW_MAX_RETRIES,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    ignore_result=True,
+    soft_time_limit=120,
+    time_limit=150,
+)
+def decide_evidence_shadow(self, shadow_id: int):
+    """One shadow evidence decision (IR-466). A lost worker requeues the
+    message, so its stale row can be reclaimed once."""
+    from apps.ai.evidence.shadow import run_shadow_decision
+
+    final = self.request.retries >= self.max_retries
+    try:
+        return run_shadow_decision(shadow_id, final_attempt=final)
+    except Exception as exc:
+        # Only the type travels into Celery's retry log, never a message.
+        raise self.retry(
+            exc=RuntimeError(type(exc).__name__),
+            countdown=30 * (self.request.retries + 1),
+        )
+
+
 @shared_task
 def metadata_extraction_task(document_id):
     pass
