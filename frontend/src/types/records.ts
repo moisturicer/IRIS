@@ -261,8 +261,8 @@ export interface RecordFormData {
   year_accomplished?:    number;
   year_completed?:       number;
   abstract?:             string;
-  classification?:       number;
-  psced?:                number;
+  classification?:       number | null;
+  psced?:                number | null;
   record_type?:          number;
   adviser?:              number;
   is_ip?:                boolean;

@@ -8,9 +8,27 @@ interface ModalProps {
   children: ReactNode;
   /** px width class, e.g. "max-w-lg". Defaults to "max-w-lg". */
   size?:    string;
+  /**
+   * Full screen below `md`, a centred dialog above it (spec §4.13). For a
+   * dialog that is a task rather than a question, such as Publish.
+   */
+  sheet?:   boolean;
+  /** Pinned under the scrolling body, so the step's actions never scroll away. */
+  footer?:  ReactNode;
+  /** The title in the display face, as a content title (01-design-system §0). */
+  displayTitle?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, size = "max-w-lg" }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  size = "max-w-lg",
+  sheet = false,
+  footer,
+  displayTitle = false,
+}: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // The element that had focus when the dialog opened, so it can be given focus
   // back on close. Without this, closing drops focus to <body> and a keyboard
@@ -84,7 +102,7 @@ export function Modal({ open, onClose, title, children, size = "max-w-lg" }: Mod
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center ${sheet ? "md:p-4" : "p-4"}`}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40"
@@ -95,17 +113,26 @@ export function Modal({ open, onClose, title, children, size = "max-w-lg" }: Mod
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`relative bg-white rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`}
+        className={
+          sheet
+            ? `relative bg-white shadow-xl w-full h-full md:h-auto md:rounded-xl ${size} md:max-h-[90vh] flex flex-col outline-none`
+            : `relative bg-white rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`
+        }
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
       >
         {title && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-            <h2 id={titleId} className="text-[16px] font-semibold text-gray-900">{title}</h2>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
+            <h2
+              id={titleId}
+              className={displayTitle ? "font-display text-title text-stone-900" : "text-[16px] font-semibold text-stone-900"}
+            >
+              {title}
+            </h2>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              className="p-1 rounded-md text-stone-500 hover:text-stone-700 hover:bg-stone-100"
               aria-label="Close"
             >
               <i className="fa fa-times text-[15px]" aria-hidden />
@@ -115,6 +142,7 @@ export function Modal({ open, onClose, title, children, size = "max-w-lg" }: Mod
         <div className="overflow-y-auto flex-1 p-5">
           {children}
         </div>
+        {footer && <div className="border-t border-stone-200 px-5 py-3">{footer}</div>}
       </div>
     </div>
   );

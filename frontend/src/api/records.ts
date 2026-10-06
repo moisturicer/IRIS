@@ -63,15 +63,25 @@ export const recordsApi = {
    * The manuscript itself. `abstract_file` is a plain FileField on Record,
    * separate from the per-type UploadSlot/RecordUpload system — no seeded
    * slot is named "manuscript" for any record type, so this is the only way
-   * to attach it. AddRecordPage never called this before, which is why
-   * records could reach the paper view with zero files (see
-   * iris-paper-view-design memory).
+   * to attach it.
+   *
+   * `onProgress` gets 0–100 as the bytes go up, and `signal` cancels the
+   * upload (IR-408: Publish shows progress and lets the author stop it).
    */
-  uploadManuscript: (id: number, file: File) => {
+  uploadManuscript: (
+    id: number,
+    file: File,
+    options: { onProgress?: (percent: number) => void; signal?: AbortSignal } = {},
+  ) => {
     const fd = new FormData();
     fd.append("abstract_file", file);
     return apiClient.patch<RecordDetail>(`/records/${id}/`, fd, {
       headers: { "Content-Type": "multipart/form-data" },
+      signal: options.signal,
+      onUploadProgress: (event) => {
+        const total = event.total ?? file.size;
+        if (options.onProgress && total > 0) options.onProgress((event.loaded / total) * 100);
+      },
     });
   },
   /**

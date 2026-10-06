@@ -339,9 +339,9 @@ Administration (RDCO) — unchanged
 
 **Pattern: one dialog, three steps, with a slim progress indicator.**
 
-It is not a long form, and not a full-page wizard. Three steps is the fewest that keep upload, confirmation and consent separate. Each step fits one screen at 1280×720 without scrolling the dialog body, except for a long abstract.
+It is not a long form, and not a full-page wizard. Three steps is the fewest that keep upload, confirmation and consent separate. Each step fits one screen at 1280×720 without scrolling the dialog body, except Details, whose body may scroll while its actions stay pinned in the dialog footer. *(Amended 2026-10-06, IR-408: Details measured about 100 px over at 1280×720 with every essential field shown, and the lead accepted a scrolling body over hiding an essential field.)*
 
-At `sm` and above it is a centred dialog up to 720 px wide. Below `sm` it is a full-screen sheet. It is built on the existing `Modal` (focus trap, Escape, return focus).
+At `md` and above it is a centred dialog up to 720 px wide. Below `md` it is a full-screen sheet. *(Amended 2026-10-06, IR-408: this said `sm` while §4.13 said `md`; §4.13 is kept.)* It is built on the existing `Modal` (focus trap, Escape, return focus).
 
 **Opening.** The Publish button, or the URLs `/?publish=new` and `/?publish=<draftId>` (so redirects and *Continue draft* land here). The URL state is cleared on close.
 
@@ -362,7 +362,7 @@ At `sm` and above it is a centred dialog up to 720 px wide. Below `sm` it is a f
 **Step 2 — "Details".**
 
 - **Essential fields:** title, abstract, adviser (searchable, from the existing advisers endpoint), co-authors, year.
-- **More details** (a disclosure, closed by default): classification, PSCED, and "Flag for your adviser" hints (possible IP · human subjects · commercialisation). These are the existing `is_ip`, `requires_ethics_review`, `for_commercialization` and `requested_*` fields. Under ADR-032 they are hints the Adviser sees, not routes, and the copy says so.
+- **More details** (a disclosure, closed by default): classification, PSCED, and "Flag for your adviser" hints (possible IP · human subjects · commercialisation). These are the existing `is_ip`, `requires_ethics_review` and `for_commercialization` fields. Under ADR-032 they are hints the Adviser sees, not routes, and the copy says so. **Publish never writes `requested_*`:** the author picks no office. *(Amended 2026-10-06, IR-408, lead decision: the legacy pipeline still routes on `requested_*` after intake, so until IR-260 cuts over a Publish-submitted Thesis or Project reaches no specialist office. Accepted rather than letting authors choose offices.)*
 - **Prefill** (§4.5): a field the server found text for shows a "Found in your PDF" chip with **Use** and **Dismiss**. A suggestion **never overwrites** a field the user has typed in.
 - **While extraction runs:** the title and abstract fields show a quiet inline "Reading your PDF…" line. They are **never** disabled, so the user may type over them at any time.
 - **Adviser ≠ owner.** The client disables choosing oneself, with an explanation. The server refuses it as well (IR-260 owns the server rule).
@@ -385,14 +385,14 @@ At `sm` and above it is a centred dialog up to 720 px wide. Below `sm` it is a f
 - "Sent to Prof. Santos for review", with the name taken from `current_holders`;
 - a short "what happens next", written from the record type and the settled workflow, and never inventing a timeline.
 
-  **Who it names comes from the server.** After submit, the dialog re-reads the record and names `current_holders`. During the transition that may still be RDCO intake for a Thesis or Project (§0). The adviser-first sentence appears only once the server's holder is the Adviser.
+  **Who it names comes from the server.** After submit, the dialog re-reads the record and names `current_holders`. During the transition that may still be RDCO intake for a Thesis or Project (§0). **Intake is never named** (invariant 1): such a holder reads as a plain "Submitted for review". The adviser-first sentence appears only once the server's holder is the Adviser. The Adviser's name comes from the re-read record's `adviser`, because a holder is a party, not a person. *(Amended 2026-10-06, IR-408, lead decision.)*
 - **Open paper** and **Publish another**.
 
 A polite live region announces the result.
 
 **Failure recovery.**
 
-- A server refusal on submit keeps the dialog on step 3. It shows the server's message and field errors, jumping back to step 2 when a field is at fault.
+- A server refusal on submit keeps the dialog on step 3. It shows the server's message and field errors, with **Fix in Details** when a field is at fault; the errors are already set on those fields. *(Amended 2026-10-06, IR-408: this said "jumping back to step 2", which the ticket's AC contradicted; an automatic jump would hide the server's message.)*
 - A network failure offers Retry.
 - Closing at any point keeps the draft. My Library → Drafts → **Continue** reopens it at the first incomplete step.
 

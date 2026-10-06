@@ -1,5 +1,7 @@
 # 05 — Submission
 
+> **Superseded by the Publish dialog (IR-408, 2026-10-06).** `AddRecordPage` and the wizard described below are deleted, and `/records/add` redirects to `/?publish=new`. The design is [`frontend_redesign_spec.md`](../frontend_redesign_spec.md) §4.4, and the components are listed in [14](14-component-inventory.md) under "IR-408 additions". This page is kept as the record of the wizard it replaced.
+
 **Verdict: KEEP, with corrections.** The wizard exists and works. NFR-U2 sets a hard target it must meet.
 
 ---

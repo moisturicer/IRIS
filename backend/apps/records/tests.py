@@ -354,6 +354,83 @@ class ManuscriptExtractionTriggerTests(APITestCase):
         mock_delay.assert_not_called()
 
 
+class ManuscriptValidationTests(APITestCase):
+    """The manuscript is checked on the server as well as in the browser (IR-408).
+
+    Publish's dropzone refuses a non-PDF or an oversized file before uploading,
+    but that is a courtesy. `/documents/submit/` already enforced PDF-only and
+    50 MB for supplementary files; `abstract_file` accepted anything, so a
+    direct API call could store a .exe as a record's manuscript and queue it for
+    Docling. Both now ask `documents/validators.py`, so there is one rule.
+    """
+
+    def setUp(self):
+        self.record_type = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        self.owner = make_user("owner@cit.edu", "Student")
+        self.record = Record.objects.create(
+            title="A" * 10, abstract="B" * 40, record_type=self.record_type,
+            added_by=self.owner, pipeline_status="draft",
+        )
+        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+        self.client.force_authenticate(self.owner)
+
+    def _file(self, name="thesis.pdf", content_type="application/pdf", body=b"%PDF-1.7 fake bytes"):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, body, content_type=content_type)
+
+    def _patch(self, file):
+        from unittest.mock import patch
+
+        with patch("apps.documents.tasks.extract_manuscript_text.delay"):
+            return self.client.patch(
+                reverse("record-detail", args=[self.record.id]),
+                {"abstract_file": file},
+                format="multipart",
+            )
+
+    def test_a_pdf_within_the_limit_is_accepted(self):
+        response = self._patch(self._file())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_a_file_that_is_not_a_pdf_is_refused_and_not_stored(self):
+        response = self._patch(self._file("notes.docx", "application/msword"))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("abstract_file", response.data)
+        self.record.refresh_from_db()
+        self.assertFalse(self.record.abstract_file)
+
+    def test_a_pdf_name_with_a_non_pdf_type_is_refused(self):
+        response = self._patch(self._file("thesis.pdf", "text/plain"))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("abstract_file", response.data)
+
+    def test_a_file_over_the_limit_is_refused_naming_the_limit(self):
+        from unittest.mock import patch
+
+        # The real limit is 50 MB; lowering it keeps the test from allocating that.
+        with patch("apps.documents.validators.MAX_PDF_SIZE_BYTES", 10):
+            response = self._patch(self._file())
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("limit", str(response.data["abstract_file"][0]))
+
+    def test_creating_a_record_with_a_non_pdf_is_refused_and_creates_nothing(self):
+        before = Record.objects.count()
+
+        response = self.client.post(
+            reverse("record-list"),
+            {"title": "A new disclosure", "abstract_file": self._file("x.png", "image/png")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Record.objects.count(), before)
+
+
 class LongManuscriptFilenameTests(APITestCase):
     """A title well past the old 100-char max_length round-trips via the real API (IR-422)."""
 

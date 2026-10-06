@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { rolesFor } from "@/lib/access";
+import { redirectRoutes } from "./redirects";
 
 // Auth pages
 import LoginPage         from "@/features/auth/LoginPage";
@@ -14,7 +15,6 @@ import { AppShell } from "@/components/layout/AppShell";
 // Feature pages
 import HomePage             from "@/features/dashboard/HomePage";
 import PaperViewPage        from "@/features/records/paper-view/PaperViewPage";
-import AddRecordPage        from "@/features/records/AddRecordPage";
 import MyWorkspacePage      from "@/features/records/MyWorkspacePage";
 import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
@@ -49,6 +49,9 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage />, handle: { crumb: "Discover" } },
+          // Retired URLs (spec §4.1). Outside the role gates: a redirect only
+          // moves the address, and the page it lands on applies its own.
+          ...redirectRoutes,
           { path: "records/:id",           element: <PaperViewPage />,   handle: { crumb: "Paper" } },
           { path: "records/:id/documents", element: <DocumentsPage />,   handle: { crumb: "Documents" } },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
@@ -64,7 +67,6 @@ export const router = createBrowserRouter([
             // they later clear.
             element: <ProtectedRoute allowedRoles={rolesFor("submit")} />,
             children: [
-              { path: "records/add",      element: <AddRecordPage />,   handle: { crumb: "Submit Disclosure" } },
               { path: "workspace",        element: <MyWorkspacePage />, handle: { crumb: "My Workspace" } },
               { path: "records/:id/edit", element: <EditRecordPage />,  handle: { crumb: "Edit Record" } },
             ],

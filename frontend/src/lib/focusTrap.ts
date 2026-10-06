@@ -40,7 +40,7 @@ const TABBABLE = [
 
 /** The tabbable elements inside `root`, in document order. */
 export function tabbableWithin(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(TABBABLE)).filter((el) => {
+  return oneStopPerRadioGroup(Array.from(root.querySelectorAll<HTMLElement>(TABBABLE)).filter((el) => {
     // `offsetParent` is null for anything `display: none`, which keeps hidden
     // panels (a collapsed section, a closed dropdown) out of the tab ring.
     // `position: fixed` elements report null too, so they are let through on
@@ -50,6 +50,28 @@ export function tabbableWithin(root: HTMLElement): HTMLElement[] {
     // it survives the check above -- but browsers do not Tab to it, and neither
     // should we. `getComputedStyle` is the only honest way to see this.
     return getComputedStyle(el).visibility !== "hidden";
+  }));
+}
+
+/**
+ * A radio group is one Tab stop, as browsers make it (IR-408).
+ *
+ * Tab lands on the group's checked radio, or on its first when none is
+ * checked, and the arrow keys move within it. Because the trap above handles
+ * Tab itself, listing every radio made Tab walk the group one option at a time
+ * in any dialog: found in Publish's type choice, where Tab from Thesis /
+ * Research went to Project instead of to the file picker.
+ */
+export function oneStopPerRadioGroup(elements: HTMLElement[]): HTMLElement[] {
+  const isRadio = (el: HTMLElement): el is HTMLInputElement =>
+    el instanceof HTMLInputElement && el.type === "radio" && el.name !== "";
+  return elements.filter((el) => {
+    if (!isRadio(el)) return true;
+    const group = elements.filter((other): other is HTMLInputElement =>
+      isRadio(other) && other.name === el.name && other.form === el.form,
+    );
+    const checked = group.find((radio) => radio.checked);
+    return el === (checked ?? group[0]);
   });
 }
 

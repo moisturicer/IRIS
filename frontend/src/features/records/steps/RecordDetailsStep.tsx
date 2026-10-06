@@ -16,8 +16,8 @@ import { recordsApi } from "@/api/records";
 import type { User } from "@/types/auth";
 import type { RecordType } from "@/types/records";
 import type { RecordFormValues } from "../recordFormSchema";
-import { FieldError } from "./FieldError";
-import { LABEL, LOAD_ERROR, fieldClasses } from "./fieldClasses";
+import { FieldError } from "@/components/ui/FieldError";
+import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 
 export function RecordDetailsStep() {
   const {

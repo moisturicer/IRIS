@@ -88,6 +88,8 @@ export const SCREEN_ACCESS = {
   documents:     { path: "/records/:id/documents", roles: EVERYONE },
 
   // --- authoring ---------------------------------------------------------
+  // `/records/add` now redirects to the Publish dialog (IR-408); F1 replaces
+  // this entry with a `publish` capability and drops it from the sidebar.
   submit:     { path: "/records/add",       roles: AUTHORS,
                 nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "IP Management" } },
   workspace:  { path: "/workspace",         roles: AUTHORS,

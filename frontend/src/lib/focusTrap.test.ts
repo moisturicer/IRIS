@@ -24,8 +24,8 @@
  * jsdom and no DOM types.
  */
 
-import { nextTrapFocus } from "./focusTrap";
-import { test } from "vitest";
+import { nextTrapFocus, oneStopPerRadioGroup } from "./focusTrap";
+import { expect, test } from "vitest";
 
 
 // --- the smallest assert that does the job ---------------------------------
@@ -97,4 +97,38 @@ test("a panel with nothing focusable traps nothing", () => {
   // swallowing Tab and stranding the user in a dialog with no exit.
   assertEqual(nextTrapFocus([], "close", FWD), null, "forward on an empty panel");
   assertEqual(nextTrapFocus([], null, BACK), null, "backward on an empty panel");
+});
+
+// --- radio groups are one stop (IR-408) ------------------------------------
+
+function radio(name: string, value: string, checked = false): HTMLInputElement {
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = name;
+  input.value = value;
+  input.checked = checked;
+  return input;
+}
+
+test("a radio group with a checked option is one stop: the checked one", () => {
+  const close = document.createElement("button");
+  const [a, b, c] = [radio("type", "a"), radio("type", "b", true), radio("type", "c")];
+  const next = document.createElement("button");
+
+  expect(oneStopPerRadioGroup([close, a, b, c, next])).toEqual([close, b, next]);
+});
+
+test("a radio group with nothing checked is one stop: the first", () => {
+  const [a, b] = [radio("type", "a"), radio("type", "b")];
+
+  expect(oneStopPerRadioGroup([a, b])).toEqual([a]);
+});
+
+test("two groups are two stops, and other controls are untouched", () => {
+  const [a, b] = [radio("one", "a", true), radio("one", "b")];
+  const [x, y] = [radio("two", "x"), radio("two", "y", true)];
+  const box = document.createElement("input");
+  box.type = "checkbox";
+
+  expect(oneStopPerRadioGroup([a, b, box, x, y])).toEqual([a, box, y]);
 });

@@ -8,8 +8,7 @@ from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, Record
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
-
-MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+from .validators import pdf_upload_problem
 
 
 def authorize_record_documents(request, record_id):
@@ -138,22 +137,10 @@ class SubmitDocumentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Format validation ---
-        file_name = file.name.lower()
-        content_type = getattr(file, "content_type", "")
-        if not file_name.endswith(".pdf") or "pdf" not in content_type:
-            return Response(
-                {"detail": "Only PDF files are accepted."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # --- Size validation (50 MB) ---
-        if file.size > MAX_PDF_SIZE_BYTES:
-            mb = file.size / (1024 * 1024)
-            return Response(
-                {"detail": f"File size {mb:.1f} MB exceeds the 50 MB limit."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # --- Format and size (one rule with the manuscript's, IR-408) ---
+        problem = pdf_upload_problem(file)
+        if problem:
+            return Response({"detail": problem}, status=status.HTTP_400_BAD_REQUEST)
 
         # --- Authorization (IR-153) ---
         # Before this, any authenticated account could upload a PDF into any

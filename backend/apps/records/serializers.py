@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from core.enums import ReviewDecision
 
+from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, resubmission_payload
 
 from .models import (
@@ -260,6 +261,20 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             "authors",
         ]
         read_only_fields = ["id", "pipeline_status", "added_by"]
+
+    def validate_abstract_file(self, file):
+        """The manuscript is a PDF within the upload limit (IR-408).
+
+        The same rule `SubmitDocumentView` applies to supplementary files, from
+        the one module both use. Publish checks it in the browser first; this
+        is the boundary.
+        """
+        if not file:
+            return file
+        problem = pdf_upload_problem(file)
+        if problem:
+            raise serializers.ValidationError(problem)
+        return file
 
     def _sync_authors(self, record, authors_data: list[str]):
         """Replace all Author rows for a record with the provided name list."""

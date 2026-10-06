@@ -4,8 +4,8 @@
  */
 import { useFormContext } from "react-hook-form";
 import type { RecordFormValues } from "../recordFormSchema";
-import { FieldError } from "./FieldError";
-import { LABEL, fieldClasses } from "./fieldClasses";
+import { FieldError } from "@/components/ui/FieldError";
+import { LABEL, fieldClasses } from "@/components/ui/fieldClasses";
 
 export function TitleAbstractStep() {
   const {
