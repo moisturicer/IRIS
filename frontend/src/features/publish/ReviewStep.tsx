@@ -9,9 +9,16 @@ import type { ReactNode } from "react";
 
 import { DpaConsentInline } from "@/components/compliance";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
 
 import type { ApiFailure } from "./draft";
+
+/** The server's names for the fields the Details step edits. */
+const DETAIL_FIELDS: Record<string, true> = {
+  title: true, abstract: true, adviser: true, authors: true,
+  year_accomplished: true, classification: true, psced: true,
+};
 
 export interface ReviewSummary {
   typeName:       string;
@@ -31,6 +38,10 @@ interface ReviewStepProps {
   dpaAccepted:      boolean;
   onDpaChange:      (accepted: boolean) => void;
   failure:          ApiFailure | null;
+  /** Submit again, offered when the server never answered. */
+  onRetry:          () => void;
+  /** Back to Details, offered when the server faults a Details field. */
+  onFixDetails:     () => void;
   /** Labels for the server's field names, so an error reads as the form does. */
   fieldLabels:      Record<string, string>;
   onEditManuscript: () => void;
@@ -43,6 +54,8 @@ export function ReviewStep({
   dpaAccepted,
   onDpaChange,
   failure,
+  onRetry,
+  onFixDetails,
   fieldLabels,
   onEditManuscript,
   onEditDetails,
@@ -52,7 +65,8 @@ export function ReviewStep({
     <div className="flex flex-col gap-section">
       <Group title="Manuscript" editLabel="Edit manuscript" onEdit={onEditManuscript}>
         <Row term="Type">{summary.typeName}</Row>
-        <Row term="File">{summary.fileName ?? "Uploaded"}</Row>
+        {/* A resumed draft's file name is not kept: the server stores a random one. */}
+        <Row term="File">{summary.fileName ?? "Uploaded earlier"}</Row>
       </Group>
 
       <Group title="Details" editLabel="Edit details" onEdit={onEditDetails}>
@@ -76,7 +90,7 @@ export function ReviewStep({
       <DpaConsentInline accepted={dpaAccepted} onAcceptedChange={onDpaChange} />
 
       {failure && (
-        <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand">
+        <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-body text-brand">
           <p className="flex items-start gap-2">
             <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
             <span>{failure.message}</span>
@@ -89,6 +103,23 @@ export function ReviewStep({
                 </li>
               ))}
             </ul>
+          )}
+          {/* Spec §4.4 jumps back to Details when a field is at fault; the
+              ticket keeps step 3. Both hold: the errors are listed here and
+              already set on the Details fields, one press away. */}
+          {(failure.network || Object.keys(failure.fields).some((f) => f in DETAIL_FIELDS)) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {failure.network && (
+                <button type="button" onClick={onRetry} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}>
+                  Try again
+                </button>
+              )}
+              {Object.keys(failure.fields).some((f) => f in DETAIL_FIELDS) && (
+                <button type="button" onClick={onFixDetails} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}>
+                  Fix in Details
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -116,7 +147,7 @@ function Group({
           type="button"
           onClick={onEdit}
           aria-label={editLabel}
-          className={cn("rounded px-1 text-sm font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}
+          className={cn("rounded px-1 text-body font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}
         >
           Edit
         </button>
@@ -130,7 +161,7 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
   return (
     <>
       <dt className="text-small text-stone-600">{term}</dt>
-      <dd className="break-words text-sm text-stone-900">{children}</dd>
+      <dd className="break-words text-body text-stone-900">{children}</dd>
     </>
   );
 }

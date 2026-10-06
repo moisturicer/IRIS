@@ -9,6 +9,17 @@ import { emptyMetadata, metadataSchema, type MetadataValues } from "@/features/r
 export type PublishStep = 1 | 2 | 3;
 
 /**
+ * A record type's name reduced to a stable key ("Thesis / Research" →
+ * "thesis/research"), so copy keyed by type survives spacing and case. The
+ * one place the client compares type names.
+ */
+export function typeKey(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, "");
+}
+
+export const isProposal = (typeName: string): boolean => typeKey(typeName) === "proposal";
+
+/**
  * A draft's provisional title, from the manuscript's file name.
  *
  * Title is the only field a Record requires, so the draft is created with

@@ -24,7 +24,7 @@ import type { User } from "@/types/auth";
 import type { Classification, PSCEDClassification } from "@/types/records";
 
 import { AdviserCombobox } from "./AdviserCombobox";
-import type { MetadataValues } from "./metadataSchema";
+import { HINTS, type MetadataValues } from "./metadataSchema";
 
 /** Each field's element id, so a caller can move focus to the first invalid one. */
 export const METADATA_FIELD_IDS: Record<keyof MetadataValues, string> = {
@@ -56,7 +56,6 @@ interface MetadataFormProps {
   psceds:          PSCEDClassification[];
   /** Who is signed in, so they can be shown but not chosen as adviser. */
   selfId:          number | null;
-  loading?:        boolean;
   loadError?:      boolean;
   /** More details is controlled, so a summary's "Edit hints" can open it. */
   moreOpen:        boolean;
@@ -70,7 +69,6 @@ export function MetadataForm({
   classifications,
   psceds,
   selfId,
-  loading = false,
   loadError = false,
   moreOpen,
   onMoreOpenChange,
@@ -160,7 +158,6 @@ export function MetadataForm({
                 onChange={(id) => field.onChange(id)}
                 onBlur={field.onBlur}
                 selfId={selfId}
-                loading={loading}
                 invalid={Boolean(errors.adviser)}
                 describedBy={describedBy("adviser", `${ids.adviser}-hint`)}
               />
@@ -228,7 +225,7 @@ export function MetadataForm({
                   aria-label={`Remove ${name}`}
                   className={cn("rounded-full p-1 text-stone-600 hover:text-stone-900", FOCUS_RING)}
                 >
-                  <i className="fas fa-xmark text-[11px]" aria-hidden />
+                  <i className="fas fa-xmark text-label" aria-hidden />
                 </button>
               </li>
             ))}
@@ -246,7 +243,7 @@ export function MetadataForm({
         onToggle={(e) => onMoreOpenChange((e.currentTarget as HTMLDetailsElement).open)}
         className="rounded-xl border border-stone-200"
       >
-        <summary className={cn("cursor-pointer select-none rounded-xl px-4 py-3 text-sm font-medium text-stone-800", FOCUS_RING)}>
+        <summary className={cn("cursor-pointer select-none rounded-xl px-4 py-3 text-body font-medium text-stone-800", FOCUS_RING)}>
           More details
           <span className="ml-2 font-normal text-stone-600">Field, PSCED and hints for your adviser</span>
         </summary>
@@ -257,10 +254,9 @@ export function MetadataForm({
               <select
                 id={ids.classification}
                 {...register("classification", { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) })}
-                disabled={loading}
                 className={fieldClasses(false)}
               >
-                <option value="">{loading ? "Loading…" : "Not set"}</option>
+                <option value="">Not set</option>
                 {classifications.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -271,10 +267,9 @@ export function MetadataForm({
               <select
                 id={ids.psced}
                 {...register("psced", { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) })}
-                disabled={loading}
                 className={fieldClasses(false)}
               >
-                <option value="">{loading ? "Loading…" : "Not set"}</option>
+                <option value="">Not set</option>
                 {psceds.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -283,20 +278,21 @@ export function MetadataForm({
           </div>
 
           <fieldset aria-describedby="metadata-hints-note">
-            <legend className="text-sm font-medium text-stone-800">Flag for your adviser</legend>
+            <legend className="text-body font-medium text-stone-800">Flag for your adviser</legend>
+            {/* Worded for both pipelines: today a hint also requests its office
+                (until IR-260); under ADR-032 the Adviser decides. Either way
+                the author raises it and reviewers confirm it. */}
             <p id="metadata-hints-note" className="mt-1 text-small text-stone-600">
-              Hints, not requests. You don't choose offices: your reviewers decide who else needs to see this work.
+              What your reviewers should look at. A hint can bring in the matching office (IP, ethics or
+              commercialisation review); your reviewers confirm which offices are needed.
             </p>
             <div className="mt-3 flex flex-col gap-2.5">
-              <Hint id={ids.is_ip} label="This may involve intellectual property worth protecting">
-                <input id={ids.is_ip} type="checkbox" {...register("is_ip")} className={CHECKBOX} />
-              </Hint>
-              <Hint id={ids.requires_ethics_review} label="This involves human participants, animal subjects or sensitive personal data">
-                <input id={ids.requires_ethics_review} type="checkbox" {...register("requires_ethics_review")} className={CHECKBOX} />
-              </Hint>
-              <Hint id={ids.for_commercialization} label="This may have commercial potential">
-                <input id={ids.for_commercialization} type="checkbox" {...register("for_commercialization")} className={CHECKBOX} />
-              </Hint>
+              {HINTS.map(({ field, label }) => (
+                <div key={field} className="flex items-start gap-2.5">
+                  <input id={ids[field]} type="checkbox" {...register(field)} className={cn(CHECKBOX, "mt-1")} />
+                  <label htmlFor={ids[field]} className="text-body text-stone-700">{label}</label>
+                </div>
+              ))}
             </div>
           </fieldset>
         </div>
@@ -336,15 +332,6 @@ function Field({
       </label>
       {children}
       {error && <FieldError id={errorId}>{error}</FieldError>}
-    </div>
-  );
-}
-
-function Hint({ id, label, children }: { id: string; label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-start gap-2.5">
-      <span className="mt-0.5">{children}</span>
-      <label htmlFor={id} className="text-sm text-stone-700">{label}</label>
     </div>
   );
 }

@@ -361,7 +361,7 @@ class ManuscriptValidationTests(APITestCase):
     but that is a courtesy. `/documents/submit/` already enforced PDF-only and
     50 MB for supplementary files; `abstract_file` accepted anything, so a
     direct API call could store a .exe as a record's manuscript and queue it for
-    Docling. The limit is the supplementary upload's, so there is one number.
+    Docling. Both now ask `documents/validators.py`, so there is one rule.
     """
 
     def setUp(self):
@@ -412,7 +412,7 @@ class ManuscriptValidationTests(APITestCase):
         from unittest.mock import patch
 
         # The real limit is 50 MB; lowering it keeps the test from allocating that.
-        with patch("apps.documents.views.MAX_PDF_SIZE_BYTES", 10):
+        with patch("apps.documents.validators.MAX_PDF_SIZE_BYTES", 10):
             response = self._patch(self._file())
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

@@ -528,7 +528,48 @@ describe("submitting", () => {
   });
 });
 
+describe("a network failure", () => {
+  it("on submit offers Try again, and trying again submits", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.submit)
+      .mockRejectedValueOnce(new Error("Network Error"))
+      .mockResolvedValueOnce({ data: { detail: "Submitted." } } as never);
+    vi.mocked(recordsApi.detail).mockResolvedValue({
+      data: draftDetail({ pipeline_status: "rdco_intake", current_holders: [] }),
+    } as never);
+    openNew();
+    await completeManuscript(user);
+    await completeDetails(user);
+    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
+    await user.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't reach IRIS/);
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("heading", { name: "Submitted for review" })).toBeInTheDocument();
+    expect(recordsApi.submit).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("success", () => {
+  it("passes axe", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.detail).mockResolvedValue({
+      data: draftDetail({
+        pipeline_status: "rdco_intake",
+        current_holders: [{ party: "intake", label: "Intake", opened_at: null, opened_by: null }],
+      }),
+    } as never);
+    const { container } = openNew();
+    await completeManuscript(user);
+    await completeDetails(user);
+    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
+    await user.click(screen.getByRole("button", { name: "Submit for review" }));
+    await screen.findByRole("heading", { name: "Sent to Intake for review" });
+
+    await expectNoBlockingA11yViolations(container);
+  });
+
   it("names who holds the record now, from the re-read record", async () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
@@ -557,6 +598,7 @@ describe("success", () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
         pipeline_status: "adviser_review",
+        adviser: 21,
         current_holders: [{ party: "adviser", label: "Adviser", opened_at: null, opened_by: null }],
       }),
     } as never);
@@ -611,6 +653,24 @@ describe("resuming a draft from /?publish=<id>", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
+  it("does not erase a saved field of research when that list failed to load", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.classifications).mockRejectedValue(new Error("Network Error"));
+    vi.mocked(recordsApi.detail).mockResolvedValue({
+      data: draftDetail({ ...COMPLETE, abstract: "", classification: "Computing" }),
+    } as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+
+    await user.type(await screen.findByRole("textbox", { name: /^Abstract/ }), COMPLETE.abstract);
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "Manuscript" });
+
+    const calls = vi.mocked(recordsApi.update).mock.calls;
+    const payload = calls[calls.length - 1][1];
+    expect(payload).not.toHaveProperty("classification");
+    expect(payload).toHaveProperty("psced", null);
+  });
+
   it("says so when the record has already been submitted", async () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({ pipeline_status: "adviser_review" }),
@@ -642,7 +702,8 @@ describe("closing", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText(/Stop the upload and close/)).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: "Stop the upload and close?" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Keep uploading" })).toHaveFocus());
     await user.click(screen.getByRole("button", { name: "Keep uploading" }));
     expect(screen.queryByText(/Stop the upload and close/)).not.toBeInTheDocument();
   });

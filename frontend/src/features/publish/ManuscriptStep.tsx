@@ -13,6 +13,8 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatBytes } from "@/lib/utils";
 import type { RecordType } from "@/types/records";
 
+import { typeKey } from "./draft";
+
 /** The same limit `SubmitDocumentView` and the serializer enforce (50 MB). */
 export const MANUSCRIPT_MAX_BYTES = 50 * 1024 * 1024;
 
@@ -22,10 +24,7 @@ export type ManuscriptUpload =
   | { status: "failed"; fileName: string; error: string }
   | { status: "done"; fileName: string | null; size: number | null };
 
-/**
- * One sentence per type. The types come from the server; only the sentence is
- * copy, matched on the name with spacing and case ignored.
- */
+/** One sentence per type. The types come from the server; only the sentence is copy. */
 const TYPE_SENTENCES: Record<string, string> = {
   proposal: "An idea you want your adviser to approve before the full study.",
   "thesis/research": "Finished research, written up as a thesis or paper.",
@@ -33,7 +32,7 @@ const TYPE_SENTENCES: Record<string, string> = {
 };
 
 function sentenceFor(name: string): string | undefined {
-  return TYPE_SENTENCES[name.toLowerCase().replace(/\s+/g, "")];
+  return TYPE_SENTENCES[typeKey(name)];
 }
 
 interface ManuscriptStepProps {
@@ -98,7 +97,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
                   className="mt-1 h-4 w-4 shrink-0 accent-brand focus:outline-none"
                 />
                 <span>
-                  <span className="block text-sm font-semibold text-stone-900">{type.name}</span>
+                  <span className="block text-body font-semibold text-stone-900">{type.name}</span>
                   {sentence && (
                     <span id={`publish-type-${type.id}-note`} className="mt-0.5 block text-small text-stone-600">
                       {sentence}
@@ -129,9 +128,10 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
         {upload.status === "done" && (
           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
             <i className="fas fa-file-pdf text-xl text-stone-600" aria-hidden />
-            <p className="min-w-0 flex-1 text-sm text-stone-800">
+            <p className="min-w-0 flex-1 text-body text-stone-800">
               <i className="fas fa-circle-check mr-1.5 text-stone-900" aria-hidden />
-              <span className="font-medium break-all">{upload.fileName ?? "Your manuscript"}</span> uploaded
+              <span className="font-medium break-all">{upload.fileName ?? "Your manuscript"}</span>{" "}
+              {upload.fileName ? "uploaded" : "was uploaded earlier"}
               {upload.size != null && <span className="text-stone-600"> · {formatBytes(upload.size)}</span>}
             </p>
             {!replacing && (

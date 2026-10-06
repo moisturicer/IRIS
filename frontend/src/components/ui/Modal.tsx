@@ -9,7 +9,7 @@ interface ModalProps {
   /** px width class, e.g. "max-w-lg". Defaults to "max-w-lg". */
   size?:    string;
   /**
-   * Full screen below `sm`, a centred dialog above it (spec §4.13). For a
+   * Full screen below `md`, a centred dialog above it (spec §4.13). For a
    * dialog that is a task rather than a question, such as Publish.
    */
   sheet?:   boolean;
@@ -102,7 +102,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center ${sheet ? "sm:p-4" : "p-4"}`}>
+    <div className={`fixed inset-0 z-50 flex items-center justify-center ${sheet ? "md:p-4" : "p-4"}`}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40"
@@ -115,7 +115,7 @@ export function Modal({
         tabIndex={-1}
         className={
           sheet
-            ? `relative bg-white shadow-xl w-full h-full sm:h-auto sm:rounded-xl ${size} sm:max-h-[90vh] flex flex-col outline-none`
+            ? `relative bg-white shadow-xl w-full h-full md:h-auto md:rounded-xl ${size} md:max-h-[90vh] flex flex-col outline-none`
             : `relative bg-white rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`
         }
         role="dialog"
@@ -123,16 +123,16 @@ export function Modal({
         aria-labelledby={title ? titleId : undefined}
       >
         {title && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
             <h2
               id={titleId}
-              className={displayTitle ? "font-display text-title text-stone-900" : "text-[16px] font-semibold text-gray-900"}
+              className={displayTitle ? "font-display text-title text-stone-900" : "text-[16px] font-semibold text-stone-900"}
             >
               {title}
             </h2>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              className="p-1 rounded-md text-stone-500 hover:text-stone-700 hover:bg-stone-100"
               aria-label="Close"
             >
               <i className="fa fa-times text-[15px]" aria-hidden />
@@ -142,7 +142,7 @@ export function Modal({
         <div className="overflow-y-auto flex-1 p-5">
           {children}
         </div>
-        {footer && <div className="border-t border-gray-200 px-5 py-3">{footer}</div>}
+        {footer && <div className="border-t border-stone-200 px-5 py-3">{footer}</div>}
       </div>
     </div>
   );

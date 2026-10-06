@@ -15,9 +15,10 @@
  * URL to its id, so a reload resumes rather than starting over. Closing clears
  * the parameter and keeps the draft.
  *
- * It decides no workflow. The type list is the server's, nothing here picks
- * an office, and the confirmation names whoever the server says holds the
- * record now.
+ * It decides no workflow. The type list is the server's, the author picks no
+ * office (the hints carry `requested_*` only because the legacy pipeline routes
+ * on them until IR-260; see `metadataPayload`), and the confirmation names
+ * whoever the server says holds the record now.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FormProvider, useForm, type FieldErrors } from "react-hook-form";
@@ -27,6 +28,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
 import { Modal } from "@/components/ui/Modal";
+import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { rolesFor } from "@/lib/access";
@@ -53,6 +55,7 @@ import { personName } from "@/features/records/metadata/personName";
 import {
   describeFailure,
   firstIncompleteStep,
+  isProposal,
   provisionalTitle,
   stateFromDraft,
   type ApiFailure,
@@ -146,7 +149,7 @@ type Phase =
   | { kind: "notFound" }
   | { kind: "notDraft"; recordId: number }
   | { kind: "form" }
-  | { kind: "success"; recordId: number; holders: TrackerHolder[] | null };
+  | { kind: "success"; recordId: number; holders: TrackerHolder[] | null; adviserName: string | null };
 
 interface Lists {
   recordTypes:     RecordType[];
@@ -182,7 +185,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [lists, setLists] = useState<Lists>(NO_LISTS);
-  const [listsError, setListsError] = useState(false);
+  // Which reference lists failed. Details still opens; a failed list's field is
+  // left out of the save so a resumed draft's value is not erased.
+  const [listsFailed, setListsFailed] = useState({ advisers: false, classification: false, psced: false });
   const [attempt, setAttempt] = useState(0);
 
   const [step, setStep] = useState<PublishStep>(1);
@@ -205,6 +210,11 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [submitting, setSubmitting] = useState(false);
   const [submitFailure, setSubmitFailure] = useState<ApiFailure | null>(null);
   const [confirmingClose, setConfirmingClose] = useState(false);
+  // Escape or Close put the question on screen; focus goes with it, once.
+  const keepUploadingRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (confirmingClose) keepUploadingRef.current?.focus();
+  }, [confirmingClose]);
   const [announcement, setAnnouncement] = useState("");
 
   /* ── Load the lists, then the draft if one was named ─────────────────── */
@@ -232,7 +242,11 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         psceds: psceds.status === "fulfilled" ? psceds.value.data.results ?? [] : [],
       };
       setLists(loaded);
-      setListsError([advisers, classifications, psceds].some((r) => r.status === "rejected"));
+      setListsFailed({
+        advisers: advisers.status === "rejected",
+        classification: classifications.status === "rejected",
+        psced: psceds.status === "rejected",
+      });
 
       if (startTarget === "new") {
         setPhase({ kind: "form" });
@@ -313,6 +327,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       if (id == null) {
         const title = provisionalTitle(file.name);
         const { data } = await recordsApi.create({ title, record_type: typeId });
+        // Closed while the draft was being created: keep the draft, but do not
+        // write its id into the URL, which would reopen the dialog.
+        if (controller.signal.aborted) return;
         id = data.id;
         draftIdRef.current = id;
         setDraftId(id);
@@ -377,7 +394,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     setSaving(true);
     setStepFailure(null);
     try {
-      await recordsApi.update(id, metadataPayload(values));
+      await recordsApi.update(id, metadataPayload(values, listsFailed));
       goTo(3);
     } catch (err) {
       const failure = describeFailure(err, "We couldn't save these details. Try again.");
@@ -415,15 +432,20 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     }
 
     let holders: TrackerHolder[] | null = null;
+    let holderAdviser: string | null = null;
     try {
       const { data } = await recordsApi.detail(id);
       holders = data.current_holders ?? [];
+      // A holder is a party, not a person. When the party is the Adviser, the
+      // person is the re-read record's own `adviser`, not the form's.
+      const person = lists.advisers.find((a) => a.id === data.adviser);
+      holderAdviser = person ? personName(person) : null;
     } catch {
       // Submitted all the same; the confirmation just names nobody.
     }
     setSubmitting(false);
-    setAnnouncement(`Submitted. ${successHeadline(holders, adviserName)}.`);
-    setPhase({ kind: "success", recordId: id, holders });
+    setAnnouncement(`Submitted. ${successHeadline(holders, holderAdviser)}.`);
+    setPhase({ kind: "success", recordId: id, holders, adviserName: holderAdviser });
   }
 
   /* ── Closing ─────────────────────────────────────────────────────────── */
@@ -529,13 +551,23 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       </span>
 
       {confirmingClose && (
-        <div className="mb-section rounded-xl border border-stone-300 bg-stone-50 p-card-compact">
-          <p className="text-sm font-medium text-stone-900">Stop the upload and close?</p>
-          <p className="mt-1 text-small text-stone-600">
+        <div
+          role="alertdialog"
+          aria-labelledby="publish-close-title"
+          aria-describedby="publish-close-body"
+          className="mb-section rounded-xl border border-stone-300 bg-stone-50 p-card-compact"
+        >
+          <p id="publish-close-title" className="text-body font-medium text-stone-900">Stop the upload and close?</p>
+          <p id="publish-close-body" className="mt-1 text-small text-stone-600">
             Your draft is kept, but the file has not finished uploading. You can add it when you come back.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => setConfirmingClose(false)} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+            <button
+              type="button"
+              ref={keepUploadingRef}
+              onClick={() => setConfirmingClose(false)}
+              className={cn(PILL_PRIMARY, FOCUS_RING)}
+            >
               Keep uploading
             </button>
             <button type="button" onClick={stopAndClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>
@@ -546,7 +578,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       )}
 
       {phase.kind === "loading" && (
-        <p className="flex items-center gap-2 py-section text-sm text-stone-600" role="status">
+        <p className="flex items-center gap-2 py-section text-body text-stone-600" role="status">
           <i className="fas fa-spinner fa-spin" aria-hidden /> Getting things ready…
         </p>
       )}
@@ -588,8 +620,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <PublishSuccess
           recordId={phase.recordId}
           holders={phase.holders}
-          adviserName={adviserName}
-          isProposal={typeName.toLowerCase() === "proposal"}
+          adviserName={phase.adviserName}
+          isProposal={isProposal(typeName)}
           onPublishAnother={onRestart}
         />
       )}
@@ -599,10 +631,19 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           <StepIndicator current={step} />
 
           {stepFailure && step !== 3 && (
-            <p role="alert" className="mb-section flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand">
+            <div role="alert" className={cn(LOAD_ERROR, "mb-section flex-wrap")}>
               <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-              {stepFailure.message}
-            </p>
+              <span className="flex-1">{stepFailure.message}</span>
+              {stepFailure.network && (
+                <button
+                  type="button"
+                  onClick={() => void (step === 1 ? continueFromManuscript() : continueFromDetails())}
+                  className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}
+                >
+                  Try again
+                </button>
+              )}
+            </div>
           )}
 
           <div ref={stepRef} tabIndex={-1} className="outline-none">
@@ -631,7 +672,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
                   classifications={lists.classifications}
                   psceds={lists.psceds}
                   selfId={selfId}
-                  loadError={listsError}
+                  loadError={listsFailed.advisers || listsFailed.classification || listsFailed.psced}
                   moreOpen={moreOpen}
                   onMoreOpenChange={setMoreOpen}
                 />
@@ -645,6 +686,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               dpaAccepted={dpaAccepted}
               onDpaChange={setDpaAccepted}
               failure={submitFailure}
+              onRetry={() => void submit()}
+              onFixDetails={() => goTo(2)}
               fieldLabels={FIELD_LABELS}
               onEditManuscript={() => goTo(1)}
               onEditDetails={() => goTo(2)}
@@ -688,7 +731,7 @@ function StepIndicator({ current }: { current: PublishStep }) {
                   isCurrent ? "font-semibold text-stone-900" : done ? "text-stone-800" : "text-stone-600",
                 )}
               >
-                {done && <i className="fas fa-check text-[11px]" aria-hidden />}
+                {done && <i className="fas fa-check text-label" aria-hidden />}
                 {title}
               </span>
               <span className="sr-only">

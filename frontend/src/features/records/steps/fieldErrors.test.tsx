@@ -89,6 +89,23 @@ describe("wizard field errors carry a glyph as well as a tone", () => {
     for (const message of [TITLE, ABSTRACT, RECORD_TYPE, ADVISER, AUTHORS]) await expectGlyphBeside(message);
   });
 
+  it("in the submission form's MetadataForm (IR-408)", async () => {
+    renderScreen(
+      <WithErrors errors={{ title: TITLE, abstract: ABSTRACT, adviser: ADVISER, authors: AUTHORS }}>
+        <MetadataForm
+          advisers={[]}
+          classifications={[]}
+          psceds={[]}
+          selfId={null}
+          moreOpen={false}
+          onMoreOpenChange={() => {}}
+        />
+      </WithErrors>,
+    );
+
+    for (const message of [TITLE, ABSTRACT, ADVISER, AUTHORS]) await expectGlyphBeside(message);
+  });
+
   // The submission form's guarantee. It lived in Submit Disclosure's Details
   // step and moved with it into `MetadataForm` (IR-408). Edit Record's
   // TitleAbstractStep never had it, since its labels are not tied to their

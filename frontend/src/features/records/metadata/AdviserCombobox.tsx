@@ -26,7 +26,6 @@ interface AdviserComboboxProps {
   onChange:    (id: number | undefined) => void;
   onBlur?:     () => void;
   selfId:      number | null;
-  loading?:    boolean;
   invalid?:    boolean;
   describedBy?: string;
 }
@@ -38,7 +37,6 @@ export function AdviserCombobox({
   onChange,
   onBlur,
   selfId,
-  loading = false,
   invalid = false,
   describedBy,
 }: AdviserComboboxProps) {
@@ -63,6 +61,8 @@ export function AdviserCombobox({
   }, [advisers, query]);
 
   const choosable = options.filter((a) => a.id !== selfId);
+  // The list is hidden when nothing matches, so it is not "expanded" then.
+  const listShown = open && options.length > 0;
 
   function choose(adviser: User) {
     if (adviser.id === selfId) return;
@@ -111,13 +111,12 @@ export function AdviserCombobox({
         role="combobox"
         autoComplete="off"
         aria-autocomplete="list"
-        aria-expanded={open}
+        aria-expanded={listShown}
         aria-controls={listId}
-        aria-activedescendant={open && active != null ? optionId(active) : undefined}
+        aria-activedescendant={listShown && active != null ? optionId(active) : undefined}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
-        disabled={loading}
-        placeholder={loading ? "Loading advisers…" : "Type a name to search"}
+        placeholder="Type a name to search"
         value={shown}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -144,7 +143,7 @@ export function AdviserCombobox({
         id={listId}
         role="listbox"
         aria-label="Advisers"
-        hidden={!open || options.length === 0}
+        hidden={!listShown}
         className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
       >
         {options.map((adviser) => {
@@ -162,7 +161,7 @@ export function AdviserCombobox({
                 choose(adviser);
               }}
               className={cn(
-                "px-3 py-2 text-sm",
+                "px-3 py-2 text-body",
                 isSelf ? "cursor-not-allowed text-stone-500" : "cursor-pointer text-stone-800",
                 adviser.id === active && "bg-stone-100",
                 adviser.id === value && "font-semibold",
@@ -180,7 +179,7 @@ export function AdviserCombobox({
           );
         })}
       </ul>
-      {open && !loading && options.length === 0 && (
+      {open && options.length === 0 && (
         <p className="absolute z-10 mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-small text-stone-600 shadow-lg">
           {advisers.length === 0 ? "No advisers are registered yet. Contact RDCO." : "No adviser matches that name."}
         </p>
