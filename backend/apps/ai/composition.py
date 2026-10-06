@@ -72,8 +72,10 @@ from apps.ai.retrieval.two_stage import TwoStageRetriever
 from apps.records.models import Record
 
 if TYPE_CHECKING:
+    from apps.ai.evidence.model_decision import ModelEvidenceDecision
     from apps.ai.inference import InferenceTask
     from apps.ai.memory import ConversationMemory
+    from apps.ai.providers.tool_calling import ToolCallingLLM
     from apps.ai.resolution import QuestionResolver
 
 
@@ -129,6 +131,7 @@ class CompositionRoot:
         memory: Optional["ConversationMemory"] = None,
         permits: Callable[[Record], bool] = disclosure_permits,
         policy_enabled: bool = True,
+        shadow_llm: Optional["ToolCallingLLM"] = None,
     ) -> None:
         self._embedder = embedder
         self._reranker = reranker
@@ -138,6 +141,7 @@ class CompositionRoot:
         self._memory = memory
         self._permits = permits
         self._policy_enabled = policy_enabled
+        self._shadow_llm = shadow_llm
 
     # -- the vendor seams ---------------------------------------------------
 
@@ -238,6 +242,31 @@ class CompositionRoot:
 
             self._resolver = QuestionResolver(llm=llm, cache=cache)
         return self._resolver
+
+    def shadow_decider(self) -> Optional["ModelEvidenceDecision"]:
+        """The shadow pilot's decision (IR-466): the `answer` Profile under
+        its own breaker key. ``None`` with no model, or an injected answer
+        ``llm`` and no ``shadow_llm``."""
+        from apps.ai.evidence.model_decision import ModelEvidenceDecision
+
+        if self._shadow_llm is None:
+            if self._llm is not None:
+                return None
+
+            from apps.ai.evidence.shadow import SHADOW_BREAKER_KEY
+            from apps.ai.inference import InferenceTask, build_profile_llm, profile_for
+            from apps.ai.providers.openai_compatible import LLMUnavailable
+
+            profile = profile_for(InferenceTask.ANSWER)
+            if not profile.is_configured:
+                return None
+            try:
+                self._shadow_llm = build_profile_llm(
+                    profile, breaker_key=SHADOW_BREAKER_KEY
+                )
+            except LLMUnavailable:
+                return None
+        return ModelEvidenceDecision(self._shadow_llm)
 
     def memory(self) -> Optional["ConversationMemory"]:
         """The conversation-memory recaller, or ``None`` when off.

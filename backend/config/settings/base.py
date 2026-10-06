@@ -261,6 +261,8 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
+    # IR-466: its own concurrency-1 worker, apart from reader work.
+    "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
 }
 
 # ---- Static / Media -----------------------------------------------------
@@ -672,9 +674,24 @@ VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 # evidence at all. **`off` or `shadow` only.** `on` is rejected as an invalid
 # value rather than left unimplemented (ADR-035 §1): a mode a parser accepts is
 # one somebody enters by accident, and production routing is a separate
-# approval on a measurement. Nothing consumes a verdict yet -- the detector
-# lands here, the model decision in IR-465, the shadow pilot in IR-466.
+# approval on a measurement. `shadow` records a decision per sampled Turn and
+# changes no answer (IR-466). Not on real reader questions until the vendor's
+# data retention is verified (ADR-035 §11).
 AI_EVIDENCE_DECISION = config("AI_EVIDENCE_DECISION", default="off")
+
+# Fraction of chat Turns shadowed, 0.0-1.0; zero records nothing.
+AI_EVIDENCE_SHADOW_SAMPLE_RATE = config(
+    "AI_EVIDENCE_SHADOW_SAMPLE_RATE", default=0.0, cast=float
+)
+# Shadow's own token budget per minute; past it a decision is skipped.
+# The reader path stays unenforced (IR-468).
+AI_EVIDENCE_SHADOW_TOKENS_PER_MINUTE = config(
+    "AI_EVIDENCE_SHADOW_TOKENS_PER_MINUTE", default=20_000, cast=int
+)
+# Seconds before a running decision may be reclaimed, once.
+AI_EVIDENCE_SHADOW_STALE_SECONDS = config(
+    "AI_EVIDENCE_SHADOW_STALE_SECONDS", default=600, cast=int
+)
 
 # The institution and Area terms the `institution_term` rule raises on.
 # Deployment-specific under ADR-005's instance-per-tenant posture, while the

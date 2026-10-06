@@ -40,12 +40,15 @@ ADR_033_TECHNIQUES = {
     "token_budget",
 }
 
+# ADR-035 §1 registers the evidence decision under the same convention (IR-466).
+REGISTERED = ADR_033_TECHNIQUES | {"evidence_decision"}
+
 
 # -- the registry -------------------------------------------------------------
 
 
 def test_every_adr_033_technique_is_in_the_registry():
-    assert {t.name for t in TECHNIQUES} == ADR_033_TECHNIQUES
+    assert {t.name for t in TECHNIQUES} == REGISTERED
 
 
 def test_names_and_settings_are_each_unique():
@@ -112,8 +115,8 @@ def test_a_technique_whose_setting_exists_is_recorded_at_its_value():
     assert fusion["overridden"] is False
 
 
-def test_resolve_records_all_six_techniques_whatever_the_run_asked_for():
-    assert set(resolve()) == ADR_033_TECHNIQUES
+def test_resolve_records_every_technique_whatever_the_run_asked_for():
+    assert set(resolve()) == REGISTERED
 
 
 @override_settings(AI_RETRIEVAL_FUSION_ENABLED=False)

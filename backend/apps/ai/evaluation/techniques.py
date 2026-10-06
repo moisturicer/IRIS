@@ -46,6 +46,8 @@ class Technique:
     adr: str
     ticket: str
     note: str = ""
+    #: For `kind="choice"`, the only values accepted.
+    choices: tuple[str, ...] = ()
 
     @property
     def implemented(self) -> bool:
@@ -64,6 +66,12 @@ class Technique:
                 return False
             raise TechniqueError(
                 f"{self.name} is a switch: give it on or off, not {raw!r}"
+            )
+        if self.kind == "choice":
+            if text.lower() in self.choices:
+                return text.lower()
+            raise TechniqueError(
+                f"{self.name} takes one of {', '.join(self.choices)}, not {raw!r}"
             )
         try:
             return int(text) if self.kind == "int" else float(text)
@@ -119,6 +127,15 @@ TECHNIQUES: tuple[Technique, ...] = (
         adr="ADR-033 §4",
         ticket="IR-397",
         note="token ceiling on the assembled passage set; 0 is unbudgeted",
+    ),
+    Technique(
+        name="evidence_decision",
+        setting="AI_EVIDENCE_DECISION",
+        kind="choice",
+        adr="ADR-035 §1",
+        ticket="IR-466",
+        note="record a shadow evidence decision per Turn; `on` is rejected, not unbuilt",
+        choices=("off", "shadow"),
     ),
 )
 

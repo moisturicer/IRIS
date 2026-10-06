@@ -123,6 +123,9 @@ ALLOWED = {
     # the status would silently change what the detector recognises. Same shape
     # as the embedding_space.py entry: two concepts, one string.
     "ai/evidence/rules.py",
+    # (IR-466) A Celery job's own lifecycle (pending/.../completed), not a
+    # person's request or a Record's stage. Same shape as embedding_space.py.
+    "ai/models/shadow.py",
 }
 
 

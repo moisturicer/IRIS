@@ -33,6 +33,8 @@ one.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from apps.ai.providers.dialects import dialect_for
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
@@ -41,8 +43,14 @@ from apps.ai.resilience.llm import LLMProviderConfig, build_task_llm
 from .profiles import Profile
 
 
-def build_profile_llm(profile: Profile) -> LLMProvider:
-    """The provider `profile`'s task reaches its model through."""
+def build_profile_llm(
+    profile: Profile, breaker_key: Optional[str] = None
+) -> LLMProvider:
+    """The provider `profile`'s task reaches its model through.
+
+    `breaker_key` defaults to the task's own. The evidence shadow passes its
+    own key (IR-466), so its failures never open the reader's breaker.
+    """
     if not profile.is_configured:
         raise LLMUnavailable(
             f"the {profile.task.value!r} Inference task has no model. Set "
@@ -71,4 +79,4 @@ def build_profile_llm(profile: Profile) -> LLMProvider:
     else:
         configs = [config(model) for model in profile.models]
 
-    return build_task_llm(configs, breaker_key=profile.task.breaker_key)
+    return build_task_llm(configs, breaker_key=breaker_key or profile.task.breaker_key)
