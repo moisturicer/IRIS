@@ -202,3 +202,19 @@ The Paper tab overrides the stored dock choice but never overwrites it, so the A
 | `components/ui/statusTones.ts` | `TONES`: the four status tones (quiet · active · attention · settled, [01](01-design-system.md) §0) defined once, for any screen that shows a state. `StatusBadge` takes its colours from here |
 | `src/test/palette.test.ts` | The palette guard: fails naming the file and class on any off-palette colour ([01](01-design-system.md) §0) outside `NOT_YET_CONVERTED`, and on any file in that list that no longer has one. The list only shrinks as IR-357's subtasks land; IR-366 removes it |
 
+## IR-408 additions (2026-10-06)
+
+The Publish dialog replaces Submit Disclosure ([`frontend_redesign_spec.md`](../frontend_redesign_spec.md) §4.4).
+
+| Component | Change |
+|---|---|
+| `features/publish/PublishDialog` | **New.** Opened by `/?publish=new` or `/?publish=<draftId>`, and hosted on the home route. It has three steps: Your manuscript · Details · Review & submit. Choosing the file creates the draft, titled from the file name, and the URL is rewritten to the draft's id. A reopened draft resumes at its first incomplete step. The confirmation names the server's `current_holders` |
+| `features/publish/ManuscriptStep`, `ReviewStep`, `PublishSuccess`, `draft.ts` | **New.** The steps, and the pure rules: the provisional title, where a draft resumes, and reading an API failure |
+| `features/records/metadata/MetadataForm` | **New, shared.** The metadata fields: title, abstract, adviser, authors and year, with More details holding field, PSCED and three hints. It renders inside the caller's form provider, so the caller decides what saving means. F5's *Edit details* reuses it |
+| `features/records/metadata/metadataSchema` | **New.** The adviser is required for every type and is never the signed-in user (ADR-032 §1). `metadataPayload` also sets each hint's `requested_*` flag, which the legacy pipeline routes on until IR-260 |
+| `features/records/metadata/AdviserCombobox` | **New.** A searchable adviser picker, following the ARIA 1.2 combobox pattern. The signed-in user is listed but cannot be chosen, and the option says why |
+| `components/ui/FieldError`, `components/ui/fieldClasses` | **Moved** from `features/records/steps/`, unchanged, because `MetadataForm` uses them and F5 deletes the steps folder |
+| `Modal` | `sheet`, `footer` and `displayTitle` props, all optional ([01](01-design-system.md) §0) |
+| `router/redirects.tsx` | **New.** The retired-URL table, one entry per URL, each followed by `redirects.test.tsx`. `/records/add` → `/?publish=new`. F1 adds the others |
+| ~~`AddRecordPage`~~, ~~`TypeRouteStep`~~, ~~`PaperDetailsStep`~~, ~~`lib/submissionRoutes`~~ | **Deleted.** `TitleAbstractStep`, `RecordDetailsStep` and `UploadsStep` stay until F5 deletes `EditRecordPage`, which still imports them |
+

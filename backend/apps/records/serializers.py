@@ -261,6 +261,29 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "pipeline_status", "added_by"]
 
+    def validate_abstract_file(self, file):
+        """The manuscript is a PDF within the supplementary upload's limit (IR-408).
+
+        The same two checks `SubmitDocumentView` makes, and the same limit, read
+        from there at call time so there is one number. Publish checks both in
+        the browser first; this is the boundary.
+        """
+        if not file:
+            return file
+        from apps.documents import views as document_views
+
+        name = (file.name or "").lower()
+        content_type = getattr(file, "content_type", "") or ""
+        if not name.endswith(".pdf") or "pdf" not in content_type:
+            raise serializers.ValidationError("Only PDF files are accepted.")
+        limit = document_views.MAX_PDF_SIZE_BYTES
+        if file.size > limit:
+            raise serializers.ValidationError(
+                f"File size {file.size / (1024 * 1024):.1f} MB exceeds the "
+                f"{limit / (1024 * 1024):.0f} MB limit."
+            )
+        return file
+
     def _sync_authors(self, record, authors_data: list[str]):
         """Replace all Author rows for a record with the provided name list."""
         from .models import Author

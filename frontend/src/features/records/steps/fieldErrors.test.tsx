@@ -16,10 +16,8 @@ import { useEffect, type ReactNode } from "react";
 import { renderScreen, screen } from "@/test/render";
 import type { RecordFormValues } from "../recordFormSchema";
 
-import { PaperDetailsStep } from "./PaperDetailsStep";
 import { RecordDetailsStep } from "./RecordDetailsStep";
 import { TitleAbstractStep } from "./TitleAbstractStep";
-import { TypeRouteStep } from "./TypeRouteStep";
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
@@ -76,26 +74,6 @@ const ADVISER = "An adviser must be assigned before a Proposal can be submitted.
 const AUTHORS = "At least one author is required.";
 
 describe("wizard field errors carry a glyph as well as a tone", () => {
-  it("in Submit Disclosure's Details step", async () => {
-    renderScreen(
-      <WithErrors errors={{ title: TITLE, abstract: ABSTRACT, adviser: ADVISER, authors: AUTHORS }}>
-        <PaperDetailsStep />
-      </WithErrors>,
-    );
-
-    for (const message of [TITLE, ABSTRACT, ADVISER, AUTHORS]) await expectGlyphBeside(message);
-  });
-
-  it("in Submit Disclosure's type step", async () => {
-    renderScreen(
-      <WithErrors errors={{ record_type: RECORD_TYPE }}>
-        <TypeRouteStep />
-      </WithErrors>,
-    );
-
-    await expectGlyphBeside(RECORD_TYPE);
-  });
-
   it("in Edit Record's title and details steps", async () => {
     renderScreen(
       <WithErrors
@@ -112,7 +90,7 @@ describe("wizard field errors carry a glyph as well as a tone", () => {
   it("keeps the error as the field's description, announced as the sentence alone", async () => {
     renderScreen(
       <WithErrors errors={{ title: TITLE, abstract: ABSTRACT }}>
-        <PaperDetailsStep />
+        <TitleAbstractStep />
       </WithErrors>,
     );
 

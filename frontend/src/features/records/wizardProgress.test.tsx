@@ -1,5 +1,6 @@
 /**
- * Step progress without colour (IR-360), in both wizards.
+ * Step progress without colour (IR-360), in Edit Record. Submit Disclosure's
+ * wizard was replaced by the Publish dialog (IR-408), which tests its own.
  *
  * A step is done, current or upcoming. Done was the only green thing on the
  * screen; in the palette it is near-black, the same as plain text. So each
@@ -10,9 +11,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 
-import { renderScreen, screen, userEvent, within } from "@/test/render";
+import { renderScreen, screen, userEvent } from "@/test/render";
 
-import AddRecordPage from "./AddRecordPage";
 import EditRecordPage from "./EditRecordPage";
 
 vi.mock("@/api/records", () => ({
@@ -70,24 +70,6 @@ function expectUpcoming(step: HTMLElement) {
   expect(step).not.toHaveAttribute("aria-current");
   expect(step.querySelector('[aria-current="step"]')).toBeNull();
 }
-
-describe("Submit Disclosure — step progress", () => {
-  it("tells done, current and upcoming apart without colour", async () => {
-    const user = userEvent.setup();
-    renderScreen(<AddRecordPage />);
-
-    await user.click(await screen.findByRole("radio", { name: /Thesis \/ Research/ }));
-    await user.click(screen.getByRole("button", { name: /Continue to Details/ }));
-
-    const [first, second, third] = within(
-      screen.getByRole("list", { name: "Submission steps" }),
-    ).getAllByRole("listitem");
-
-    expectDone(first);
-    expect(second.querySelector('[aria-current="step"]')).toHaveTextContent("Details");
-    expectUpcoming(third);
-  });
-});
 
 describe("Edit Record — step progress", () => {
   it("tells done, current and upcoming apart without colour", async () => {

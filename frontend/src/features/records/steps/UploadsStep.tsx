@@ -14,7 +14,7 @@ import { UploadDropzone }  from "@/components/shared/UploadDropzone";
 import { Badge }           from "@/components/ui/Badge";
 import { Spinner }         from "@/components/ui/Spinner";
 import type { UploadSlot } from "@/types/documents";
-import { FieldError }      from "./FieldError";
+import { FieldError }      from "@/components/ui/FieldError";
 
 const MAX_PDF_BYTES = 50 * 1024 * 1024; // 50 MB — mirrors documents/views.py::MAX_PDF_SIZE_BYTES
 
@@ -109,7 +109,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
       .finally(() => setLoading(false));
   }, [recordTypeId, hideSlots]);    // re-fetch when record type changes
 
-  // Notify parent (AddRecordPage) whenever the staged map changes
+  // Notify parent (the old submission wizard; EditRecordPage now) whenever the staged map changes
   useEffect(() => {
     onStagedChange?.(staged);
   }, [staged, onStagedChange]);

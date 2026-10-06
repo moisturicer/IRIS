@@ -1,5 +1,5 @@
 /**
- * Edit record page -- same wizard as AddRecordPage but pre-populated with existing data.
+ * Edit record page -- the old submission wizard's steps, pre-populated with existing data.
  * Only the record owner (or staff) can access this page.
  * Record must be in "draft" or "declined" status to be editable.
  *

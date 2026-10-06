@@ -1,5 +1,5 @@
 /**
- * Class strings the wizard's hand-built controls share (IR-360), so a select
+ * Class strings hand-built form controls share (IR-360), so a select
  * or textarea reads the same as `Input` beside it.
  */
 

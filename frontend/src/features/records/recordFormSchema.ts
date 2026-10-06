@@ -1,6 +1,6 @@
 /**
- * Zod schema shared by AddRecordPage and EditRecordPage.
- * Keep validation rules here so both wizard forms stay in sync.
+ * Zod schema for EditRecordPage. Publish uses `metadata/metadataSchema` (IR-408),
+ * and F5 replaces EditRecordPage with an Edit details dialog built on that one.
  */
 import { z } from "zod";
 
@@ -60,7 +60,7 @@ export const recordFormSchema = z.object({
   // Ethics trigger + conditional office routing (ADR-018).
   // requires_ethics_review has no upstream flag to derive from -- it's its
   // own question. requested_itso/ierc/ktto are the submitter's actual
-  // request; PaperDetailsStep pre-checks them from the flags above but the
+  // request; the old wizard pre-checked them from the flags above and the
   // student can override before continuing.
   requires_ethics_review: z.boolean().default(false),
   requested_itso: z.boolean().default(false),
