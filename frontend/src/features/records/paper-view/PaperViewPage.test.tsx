@@ -32,7 +32,7 @@
  */
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, Route, Routes, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
@@ -909,6 +909,17 @@ describe("following a citation to another paper (IR-355)", () => {
    * reader reaches Y other than through a citation (Discover, a typed URL,
    * Related works), carrying no router state at all.
    */
+  /** The browser's Back and Forward, which `MemoryRouter` takes as `navigate(-1)` and `navigate(1)`. */
+  function HistoryButtons() {
+    const navigate = useNavigate();
+    return (
+      <>
+        <button type="button" onClick={() => navigate(-1)}>Browser back</button>
+        <button type="button" onClick={() => navigate(1)}>Browser forward</button>
+      </>
+    );
+  }
+
   function renderWithPlainLink() {
     return renderScreen(
       <>
@@ -916,6 +927,7 @@ describe("following a citation to another paper (IR-355)", () => {
           <Route path="/records/:id" element={<PaperViewPage />} />
         </Routes>
         <Link to={`/records/${OTHER_ID}`}>Go to the other paper</Link>
+        <HistoryButtons />
       </>,
       { route: `/records/${RECORD_ID}` },
     );
@@ -972,7 +984,8 @@ describe("following a citation to another paper (IR-355)", () => {
     await followToOtherPaper();
 
     await userEvent.type(
-      within(panel()).getByRole("textbox", { name: "Ask about this paper" }),
+      // Named for X while pinned, not "this paper" (decided 2026-10-06).
+      within(panel()).getByRole("textbox", { name: `Ask about ${record.title}` }),
       "How much longer was the lead time?",
     );
     await userEvent.click(within(panel()).getByRole("button", { name: "Send" }));
@@ -1050,6 +1063,47 @@ describe("following a citation to another paper (IR-355)", () => {
 
     expect(within(panel()).getByText(PINNED_HEADER)).toHaveTextContent(`Chatting about ${record.title}`);
     expect(within(panel()).getByText(/Gauge density matters/)).toBeVisible();
+    expect(await conversationsOpened()).toEqual([RECORD_ID]);
+  });
+
+  // While pinned, "this paper" would read as Y, the paper on screen. The
+  // scope control and the composer name X instead (decided 2026-10-06).
+  it("names the pinned paper on the scope control and the composer, not 'this paper'", async () => {
+    await followToOtherPaper();
+
+    await userEvent.click(within(panel()).getByRole("button", { name: "All papers" }));
+
+    expect(within(panel()).getByRole("button", { name: record.title })).toHaveAttribute("aria-pressed", "false");
+    expect(within(panel()).queryByRole("button", { name: "This paper" })).not.toBeInTheDocument();
+    expect(within(panel()).getByRole("textbox", { name: `Ask about ${record.title}` })).toBeInTheDocument();
+  });
+
+  // A history entry brings back the chat it was left with (decided
+  // 2026-10-06): X's entry carries no mark, Y's does.
+  it("re-aligns on Back to X, and keeps the pin on Forward to Y", async () => {
+    await followToOtherPaper();
+
+    await userEvent.click(screen.getByRole("button", { name: "Browser back" }));
+    await screen.findByRole("heading", { level: 1, name: record.title });
+    expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
+    expect(within(panel()).getByText(/Gauge density matters/)).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Browser forward" }));
+    await screen.findByRole("heading", { level: 1, name: other.title });
+    expect(within(panel()).getByText(PINNED_HEADER)).toHaveTextContent(`Chatting about ${record.title}`);
+    expect(await conversationsOpened()).toEqual([RECORD_ID]);
+  });
+
+  it("keeps the pin on Back while hopping between the conversation's citations", async () => {
+    await followToOtherPaper();
+    // A second citation from the same answer, back to X itself.
+    await userEvent.click(within(panel()).getByRole("link", TO_SAME));
+    await screen.findByRole("heading", { level: 1, name: record.title });
+
+    await userEvent.click(screen.getByRole("button", { name: "Browser back" }));
+
+    await screen.findByRole("heading", { level: 1, name: other.title });
+    expect(within(panel()).getByText(PINNED_HEADER)).toHaveTextContent(`Chatting about ${record.title}`);
     expect(await conversationsOpened()).toEqual([RECORD_ID]);
   });
 

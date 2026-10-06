@@ -375,16 +375,25 @@ export function PaperChatPanel({
             type="button"
             onClick={() => setWiden((v) => !v)}
             aria-pressed={widen}
-            title={widen ? "Searching every paper — click to search only this one" : "Searching only this paper — click to search every paper"}
+            title={
+              widen
+                ? `Searching every paper — click to search only ${pinned ? subject.title : "this one"}`
+                : `Searching only ${pinned ? subject.title : "this paper"} — click to search every paper`
+            }
             className={cn(
-              "inline-flex items-center gap-1.5 font-semibold px-3 min-h-11 lg:min-h-7 rounded-full ring-1 transition-colors duration-200",
+              "inline-flex items-center gap-1.5 min-w-0 max-w-[16rem] font-semibold px-3 min-h-11 lg:min-h-7 rounded-full ring-1 transition-colors duration-200",
               widen
                 ? "bg-brand text-white ring-brand"
                 : "bg-white text-stone-700 ring-stone-300 hover:ring-brand/40 hover:text-brand",
             )}
           >
             <i className="fas fa-layer-group text-2xs" aria-hidden />
-            {widen ? "All papers" : "This paper"}
+            {/* While pinned, "this paper" would read as the one on screen,
+                so the pill names the conversation's own paper (IR-355).
+                Truncated on screen; the accessible name keeps it whole. */}
+            <span className="truncate">
+              {widen ? "All papers" : pinned ? subject.title : "This paper"}
+            </span>
           </button>
         </div>
       </div>
@@ -446,7 +455,9 @@ export function PaperChatPanel({
                 send();
               }
             }}
-            aria-label="Ask about this paper"
+            // The composer's only label, so it names the pinned paper too:
+            // a screen reader on Y must not hear "this paper" and mean X.
+            aria-label={pinned ? `Ask about ${subject.title}` : "Ask about this paper"}
             placeholder="Ask about methodology, findings, datasets…"
             className="flex-1 resize-none bg-transparent py-1.5 text-sm text-stone-800 placeholder-stone-500 outline-none"
           />
