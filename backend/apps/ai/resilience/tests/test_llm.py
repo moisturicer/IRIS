@@ -157,7 +157,7 @@ class SwitchableFailureTests:
 
     def test_auth_context_overflow_and_unknown_are_not_switchable(self):
         """Auth gives up immediately rather than silently trying a second
-        key -- regressing this would reopen the ADR-021 "no silent
+        key -- regressing this would reopen the ADR-036 "no silent
         fall-through" failure mode. Context overflow and an unclassified
         failure both fail identically against a second provider, so
         switching would hide a real error behind another attempt."""
@@ -189,7 +189,7 @@ class FallbackLLMProviderTests:
     def test_an_auth_failure_gives_up_without_trying_the_next_provider(self):
         """Never silently retries a bad key against a second account --
         that would hide a real misconfiguration behind an apparently
-        working answer (ADR-021's "no silent fall-through" rule)."""
+        working answer (ADR-036's "no silent fall-through" rule)."""
         primary = _ScriptedLLM(model="primary", kind=ErrorKind.AUTH, fail_times=None)
         fallback = _ScriptedLLM(model="fallback")
         provider = FallbackLLMProvider([primary, fallback])

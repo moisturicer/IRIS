@@ -140,7 +140,7 @@ class ProfileResolutionTests:
         assert profile_for(InferenceTask.ANSWER).vendor is Vendor.OPENROUTER
 
     def test_a_self_hosted_base_url_is_not_refused(self, settings):
-        """ADR-021 covers vLLM and Ollama as configurations of the same
+        """ADR-036 covers vLLM and Ollama as configurations of the same
         adapter, so an unrecognised URL is not a mistake to raise on -- only
         a *named* vendor outside the pair is."""
         settings.LLM_ANSWER_VENDOR = ""

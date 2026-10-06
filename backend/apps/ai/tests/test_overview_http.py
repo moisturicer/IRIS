@@ -219,7 +219,7 @@ class SummaryRunsAsItsOwnInferenceTaskTests:
         self, embedder, space, client_for, settings, built_configs
     ):
         """No `LLM_SUMMARY_MODEL` switches the overview off, rather than
-        falling through to the answer model (ADR-021's no-silent-fall-through
+        falling through to the answer model (ADR-036's no-silent-fall-through
         rule). The same state an outage produces, and stored no more than it.
 
         `answer` is left configured and its provider would have answered

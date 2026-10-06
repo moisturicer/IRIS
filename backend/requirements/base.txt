@@ -19,12 +19,12 @@ pgvector>=0.3
 
 # openai: the client for every OpenAI-compatible vendor (Groq, OpenRouter, etc.),
 # not only OpenAI — apps/ai/providers/openai_compatible.py imports it directly
-# (ADR-021). A 2026-09-17 removal claimed nothing under backend/ imported it;
+# (ADR-036). A 2026-09-17 removal claimed nothing under backend/ imported it;
 # that was false and broke the configured-LLM test path. Restored.
 openai>=1.30
 
 # httpx: Docling-serve extraction (ADR-016), Voyage embedding and reranking
-# (ADR-015), and the OpenAI-compatible inference call (ADR-021). It no longer
+# (ADR-015), and the OpenAI-compatible inference call (ADR-036). It no longer
 # proxies to the ai-gateway — ADR-024 took the embedding path off it, and nothing
 # else in Django called it.
 httpx>=0.27.0

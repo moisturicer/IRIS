@@ -85,7 +85,7 @@ which for a reasoning model can exceed the answer. That is storage the team
 accepts in exchange for an inspectable answer; a retention rule, if one is ever
 wanted, is a later decision and not this one. Reasoning is still requested
 per-task — only `answer` has it on, and a task whose Profile switches it off
-sends no reasoning configuration at all and stores nothing (ADR-021
+sends no reasoning configuration at all and stores nothing (ADR-036
 §Amendment).
 
 ## Alternatives Considered

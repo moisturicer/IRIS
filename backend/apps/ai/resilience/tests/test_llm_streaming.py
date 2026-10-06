@@ -224,7 +224,7 @@ class FailoverStopsAtTheFirstDeltaTests:
         assert spare.calls == 0
 
     def test_a_non_switchable_failure_is_raised_rather_than_switched_on(self):
-        """ADR-021's no-silent-fall-through rule: a bad key is still a bad key
+        """ADR-036's no-silent-fall-through rule: a bad key is still a bad key
         on the next provider, and switching would hide the misconfiguration."""
         down = _StreamingLLM(model="primary", fail_before_first=None,
                              kind=ErrorKind.AUTH)

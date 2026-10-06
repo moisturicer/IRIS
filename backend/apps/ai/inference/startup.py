@@ -1,7 +1,7 @@
 """Refusing to start on a misconfigured Inference task (IR-379).
 
 Per-task configuration multiplies the number of things that can be mistyped,
-which is why ADR-021 §Amendment makes its no-silent-fall-through rule *more*
+which is why ADR-036 §Amendment makes its no-silent-fall-through rule *more*
 important rather than less. Two mistakes take the deployment down here:
 
 * an **unknown task name** -- `LLM_ANWSER_MODEL` configures nothing, and

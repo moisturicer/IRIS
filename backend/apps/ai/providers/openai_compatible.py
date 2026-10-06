@@ -1,11 +1,11 @@
-"""One adapter for every vendor that speaks the OpenAI chat format (ADR-021).
+"""One adapter for every vendor that speaks the OpenAI chat format (ADR-036).
 
 Groq, OpenRouter, OpenAI, Together, Fireworks, vLLM and Ollama differ in a base
 URL, an API key and a model string. **Adapters key on the protocol, not the
 vendor**: one adapter per vendor would be five near-identical files that drift,
 where this makes switching Groq for OpenRouter a `.env` change with no new code.
 
-Groq in development, OpenRouter in production, per ADR-021.
+Groq in development, OpenRouter in production, per ADR-036.
 
 **Where they differ, a dialect says so** (IR-382, `dialects.py`). Extra request
 fields, the attribute a reasoning token arrives on, and the citation markers
@@ -14,7 +14,7 @@ injected here. The transport below -- the HTTP call, the error classification,
 the streaming loop -- is written once and names no vendor.
 
 **No silent fall-through.** An absent key raises rather than degrading to a
-mock or a local model -- the failure mode ADR-021 records the previous
+mock or a local model -- the failure mode ADR-036 records the previous
 `if/else` provider factory for, and the same rule the chunker registry applies
 to an unknown strategy id.
 
@@ -72,7 +72,7 @@ def _classify(exc: Exception) -> ClassifiedError:
     """Classify a raw failure from ``client.chat.completions.create`` (IR-320).
 
     The ``openai`` SDK is the client for every vendor this adapter reaches
-    (ADR-021), so its exception hierarchy -- not a per-vendor one -- is the
+    (ADR-036), so its exception hierarchy -- not a per-vendor one -- is the
     first thing read: it already carries the HTTP status apart from a
     malformed response. Only a failure the SDK does not model (a raw
     ``RuntimeError`` a test double raises, or a connection error the SDK
@@ -159,7 +159,7 @@ class OpenAICompatibleAdapter:
         if not key:
             raise LLMUnavailable(
                 "LLM_API_KEY is not set. There is no unauthenticated lane and no "
-                "local model to fall back to (ADR-008, ADR-021), so this fails "
+                "local model to fall back to (ADR-008, ADR-036), so this fails "
                 "rather than defaulting silently.",
                 kind=ErrorKind.AUTH,
             )
@@ -171,7 +171,7 @@ class OpenAICompatibleAdapter:
         except ImportError as exc:  # pragma: no cover - dependency is declared
             raise LLMUnavailable(
                 "the openai package is not installed; it is the client for every "
-                "OpenAI-compatible vendor, not only OpenAI (ADR-021)"
+                "OpenAI-compatible vendor, not only OpenAI (ADR-036)"
             ) from exc
 
         return OpenAI(

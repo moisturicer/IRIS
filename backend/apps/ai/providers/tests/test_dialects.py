@@ -47,7 +47,7 @@ class TestGroqRequestShaping:
 
 class TestOpenRouterRequestShaping:
     def test_the_data_policy_is_sent_regardless_of_reasoning(self):
-        """Uniform across tasks (ADR-021 Amendment): a request with no
+        """Uniform across tasks (ADR-036 Amendment): a request with no
         reasoning configured still must not train the vendor on it."""
         assert OPENROUTER.request_extras("")["extra_body"]["provider"] == {
             "data_collection": "deny"

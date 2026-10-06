@@ -21,7 +21,7 @@ decisions, not two:
   over-long prompt is still over-long, and an unclassified failure is treated
   as a real error rather than assumed to be one of the kinds above (see
   `errors.py`'s own docstring). These give up immediately -- this is what
-  keeps a misconfigured key from being silently retried, which is the ADR-021
+  keeps a misconfigured key from being silently retried, which is the ADR-036
   "no silent fall-through" rule this must not regress.
 
 **Circuit breaker state must outlive one request.** `apps.ai.composition
@@ -37,14 +37,14 @@ so a plain dict guarded by a lock is enough.
 was that `FallbackLLMProvider` and the flat-settings multi-config path
 implemented a Groq-primary/OpenRouter-fallback list, which
 [ADR-008](../../../../docs/adr/008-ai-degradation-to-fts.md) rejected by name
-and [ADR-021](../../../../docs/adr/021-openai-compatible-inference-provider.md)
+and [ADR-036](../../../../docs/adr/036-openai-compatible-inference-provider.md)
 restated as *"one provider per environment"*. Both ADRs were amended on
 2026-09-28:
 
 * ADR-008 §Amendment permits a **fallback list of models inside one vendor
   account** -- same `base_url`, same `api_key`, a different `model` -- and
   confirms **cross-vendor failover stays rejected**.
-* ADR-021 §Amendment replaces "one provider per environment" with **one adapter
+* ADR-036 §Amendment replaces "one provider per environment" with **one adapter
   per protocol, vendor chosen per Inference task**. Two vendors configured for
   two different tasks is not failover.
 
@@ -417,7 +417,7 @@ def reset_llm_breakers() -> None:
 @dataclass(frozen=True)
 class LLMProviderConfig:
     """One candidate provider: enough to build an `OpenAICompatibleAdapter`
-    (ADR-021 -- one adapter, keyed on the wire protocol, covers every vendor
+    (ADR-036 -- one adapter, keyed on the wire protocol, covers every vendor
     in scope) and to identify it for `breaker_for`."""
 
     base_url: Optional[str] = None

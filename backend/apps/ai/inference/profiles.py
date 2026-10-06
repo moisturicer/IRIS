@@ -1,4 +1,4 @@
-"""A Profile per Inference task (IR-378, ADR-021 §Amendment).
+"""A Profile per Inference task (IR-378, ADR-036 §Amendment).
 
 What a task needs to reach a model: vendor, model, the ordered models to fall
 back to *inside that vendor account*, whether its Reasoning is shown, and what
@@ -6,7 +6,7 @@ the vendor may do with what it receives. Resolved from settings on demand,
 never at import: a machine with no vendor account must still be able to build
 a composition root, which is every machine the test suite runs on.
 
-**Only the sanctioned pair.** Groq and OpenRouter, per ADR-021 -- an
+**Only the sanctioned pair.** Groq and OpenRouter, per ADR-036 -- an
 unrecognised vendor raises rather than being passed through as a base URL.
 
 **Fallback stays inside one vendor.** ``fallback_models`` shares the profile's
@@ -47,7 +47,7 @@ _VENDOR_BASE_URLS = {
 
 
 class UnknownVendor(ValueError):
-    """A vendor outside ADR-021's sanctioned pair."""
+    """A vendor outside ADR-036's sanctioned pair."""
 
 
 def vendor(name: Union[Vendor, str]) -> Vendor:
@@ -58,7 +58,7 @@ def vendor(name: Union[Vendor, str]) -> Vendor:
     except ValueError as exc:
         known = ", ".join(v.value for v in Vendor)
         raise UnknownVendor(
-            f"{name!r} is not a sanctioned inference vendor (ADR-021): {known}."
+            f"{name!r} is not a sanctioned inference vendor (ADR-036): {known}."
         ) from exc
 
 
@@ -135,7 +135,7 @@ def _vendor_at(base_url: str) -> Optional[Vendor]:
     """Which sanctioned vendor answers at ``base_url``, if any.
 
     Non-raising, unlike ``vendor()``: a base URL is also how a self-hosted
-    vLLM or Ollama is reached (ADR-021 covers them as configurations of the
+    vLLM or Ollama is reached (ADR-036 covers them as configurations of the
     same adapter), and an unrecognised one is not a mistake to refuse here.
     """
     for candidate, url in _VENDOR_BASE_URLS.items():

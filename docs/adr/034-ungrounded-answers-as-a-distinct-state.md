@@ -14,8 +14,6 @@
 
 **Depends on [ADR-033](033-hybrid-retrieval-and-passage-selection.md) §3** — the relevance cut-off is what makes a zero-source question *detectable*. Without it retrieval always returns its top *k*, so the condition this ADR branches on never occurs. See §2.
 
-> **ADR references in this file are by filename.** `docs/adr/` holds two files claiming 021 and two claiming 023, so a bare number is ambiguous. The collision is tracked as IR-403 and is not resolved here.
-
 ## Context
 
 Ask a question the corpus has nothing to do with — *"what is the colour of the sky?"* — and IRIS today produces a non-sequitur refusal. Verified in code 2026-10-02 against a two-paper corpus (IR-453):
@@ -46,18 +44,18 @@ A new `Turn.state`, **`ungrounded`**, joins `generated`, `no_sources`, `unavaila
 
 ### 2. It is reachable only when zero passages survive the relevance cut-off
 
-The ungrounded path is entered on exactly one condition: **retrieval, after `033-hybrid-retrieval-and-passage-selection.md` §3's relevance cut-off, yielded no passages at all.**
+The ungrounded path is entered on exactly one condition: **retrieval, after ADR-033 §3's relevance cut-off, yielded no passages at all.**
 
 - **If any passage clears the cut-off, the answer is grounded.** There is no partial mode, no "mostly grounded with a general aside", and no per-claim mixing. One Turn is grounded or it is ungrounded, and a reader never has to work out which sentence is which.
 - **It therefore depends on the cut-off existing and being on.** Without §3 retrieval always returns its top *k*, the zero-source condition never arises, and this decision is inert by construction rather than by a flag. **This is why `033` §5 was amended rather than waited out**: leaving the cut-off off would not defer this behaviour to IR-402, it would delete it, since nothing downstream can branch on a condition that never occurs. IR-396 builds the cut-off and ships it **on**, with a loose provisional default.
-- **The disclosure gate's zero is not this zero.** A question whose passages were all withheld by `015-voyage-embedding-and-reranking.md`'s disclosure gate is `no_sources`, not `ungrounded`. Relevant research exists and the reader may not read it; answering from general knowledge would paper over a visibility boundary with prose.
+- **The disclosure gate's zero is not this zero.** A question whose passages were all withheld by ADR-015's disclosure gate is `no_sources`, not `ungrounded`. Relevant research exists and the reader may not read it; answering from general knowledge would paper over a visibility boundary with prose.
 
 ### 3. It ships on, and the label is therefore not optional
 
 **The setting defaults on.** An ungrounded answer is what IRIS is *meant* to do
 with an off-corpus question, so the setting expresses that and the switch exists
 to turn the behaviour **off** for a deployment that wants strictly grounded
-answers — the per-instance posture `005-instance-per-tenant.md` already assumes.
+answers — the per-instance posture ADR-005 already assumes.
 
 This is a deliberate departure from `033` §5's off-by-default convention, taken
 together with that ADR's §5 amendment, and it has one consequence that must not
@@ -87,7 +85,7 @@ at once.
 
 This is the thesis-critical property, and the one that must not slip.
 
-`027-corpus-level-questions.md` §4 states the risk precisely: *"Asked for research gaps, a language model will produce a confident list drawn from its general knowledge of the field rather than from this corpus. Presented as 'gaps in CIT-U research', that is fabrication wearing institutional authority — and the easiest thing for an examiner to take apart."*
+ADR-027 §4 states the risk precisely: *"Asked for research gaps, a language model will produce a confident list drawn from its general knowledge of the field rather than from this corpus. Presented as 'gaps in CIT-U research', that is fabrication wearing institutional authority — and the easiest thing for an examiner to take apart."*
 
 That sentence is the reason this ADR is narrow:
 
@@ -99,7 +97,7 @@ A test proving a research question still refuses rather than answering from mode
 
 ### 5. An ungrounded Turn is kept out of the model's history — and the cost is recorded
 
-`026-conversational-retrieval-and-memory.md` §13 excludes failed and refused Turns from the history handed to the answering model and the §1 rewriter. **`ungrounded` joins them**, so `MODEL_HISTORY_STATES` stays `{GENERATED}`.
+ADR-026 §13 excludes failed and refused Turns from the history handed to the answering model and the §1 rewriter. **`ungrounded` joins them**, so `MODEL_HISTORY_STATES` stays `{GENERATED}`.
 
 The reasoning is §13's own, applied to a case it did not anticipate: a refusal left in the prompt is a demonstration of refusing, and an **ungrounded answer left in the prompt is a demonstration of answering without sources** — precedent the next question is biased toward following. That bias runs in the direction this ADR is most concerned about, and the grounded path is the one that must not drift.
 
@@ -156,7 +154,7 @@ this ADR forbids.
 
 ## SaaS Impact
 
-Per-instance under `005-instance-per-tenant.md`. Whether an institution permits ungrounded answers at all is exactly the kind of policy that differs between institutions, and the setting is per-deployment. One institution turning it on has no effect on another's.
+Per-instance under ADR-005. Whether an institution permits ungrounded answers at all is exactly the kind of policy that differs between institutions, and the setting is per-deployment. One institution turning it on has no effect on another's.
 
 ## Security Impact
 
@@ -172,9 +170,9 @@ One migration (the `Turn.state` choice). No new service, no new vendor, no new c
 
 ## Research Impact
 
-Thesis-critical under `013-chunk-level-rag-pipeline.md` §Research Impact (amended 2026-09-04) — but as a **boundary**, not a capability. The defensible claim is not "IRIS can also answer general questions"; it is that **IRIS can always say which of its answers are grounded in CIT-U research and which are not**, enforced by a stored state rather than by prose. §4 is the part to present at defence: the system declines to answer a research question from general knowledge even when it could, and a test demonstrates it.
+Thesis-critical under ADR-013 §Research Impact (amended 2026-09-04) — but as a **boundary**, not a capability. The defensible claim is not "IRIS can also answer general questions"; it is that **IRIS can always say which of its answers are grounded in CIT-U research and which are not**, enforced by a stored state rather than by prose. §4 is the part to present at defence: the system declines to answer a research question from general knowledge even when it could, and a test demonstrates it.
 
-An ungrounded answer is **never** evidence about CIT-U research and never enters `023-retrieval-quality-evaluation.md`'s measurement. It has no retrieved passages, so it has no recall; a question that goes ungrounded is scored as retrieving nothing, which is what it did.
+An ungrounded answer is **never** evidence about CIT-U research and never enters ADR-023's measurement. It has no retrieved passages, so it has no recall; a question that goes ungrounded is scored as retrieving nothing, which is what it did.
 
 ## Related Requirements
 

@@ -363,7 +363,7 @@ AI_RATE_LIMIT_TOKENS_PER_MINUTE = config(
     "AI_RATE_LIMIT_TOKENS_PER_MINUTE", default=1_000_000, cast=int
 )
 
-# ---- Inference provider (ADR-021) ---------------------------------------
+# ---- Inference provider (ADR-036) ---------------------------------------
 #
 # Groq in development, OpenRouter in production, and the switch is these three
 # values -- no second adapter. Every vendor worth using here speaks the OpenAI
@@ -372,10 +372,10 @@ AI_RATE_LIMIT_TOKENS_PER_MINUTE = config(
 #
 # Anthropic is deliberately absent: it was chosen in an import statement rather
 # than a decision record, was never declared as a dependency, and silently
-# degraded every environment to extractive answers. ADR-021 supersedes it.
+# degraded every environment to extractive answers. ADR-036 supersedes it.
 #
 # No default key and no local fallback -- the adapter raises rather than
-# degrading to a mock, which is the failure ADR-021 records the previous
+# degrading to a mock, which is the failure ADR-036 records the previous
 # provider factory for.
 LLM_BASE_URL  = config("LLM_BASE_URL", default="https://api.groq.com/openai/v1")
 LLM_API_KEY   = config("LLM_API_KEY", default="")
@@ -391,13 +391,13 @@ LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
 LLM_REASONING_EFFORT = config("LLM_REASONING_EFFORT", default="")
 
 # The LLM_FALLBACK_* second vendor IR-321 added is deleted, not disabled
-# (IR-385). ADR-008 rejected a second vendor by name, and ADR-021 chooses the
+# (IR-385). ADR-008 rejected a second vendor by name, and ADR-036 chooses the
 # vendor per Inference task; what replaces it is LLM_<TASK>_FALLBACK_MODELS
 # below -- an ordered model list on the account a task already uses. Setting
 # any LLM_FALLBACK_* variable now refuses startup, which is deliberate: the
 # value it carries is a second vendor's key.
 
-# ---- Inference tasks and Profiles (IR-378, ADR-021 §Amendment) -----------
+# ---- Inference tasks and Profiles (IR-378, ADR-036 §Amendment) -----------
 #
 # One Profile per Inference task: vendor, model, ordered same-vendor fallback
 # models, and whether its Reasoning is shown. The vendor is chosen per task,
@@ -595,7 +595,7 @@ AI_HISTORY_TOKEN_BUDGET = config("AI_HISTORY_TOKEN_BUDGET", default=3000, cast=i
 # A budget needs a number that is stable, conservative and monotonic, not
 # one that is exact, so every count is multiplied by this and rounded up.
 #
-# WHY NOT A VOCABULARY PER MODEL. ADR-021 sanctions two vendors and
+# WHY NOT A VOCABULARY PER MODEL. ADR-036 sanctions two vendors and
 # OpenRouter alone fronts hundreds of models; shipping a tokenizer per
 # answering model is unbounded maintenance for a number that only has to be
 # roughly right. And there is no vendor endpoint that would do it instead:
@@ -724,7 +724,7 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # OPENAI_API_KEY was removed by IR-319: nothing under backend/ read it. The
 # `openai` package stays (see requirements/base.txt) as the SDK for every
 # OpenAI-compatible vendor, keyed by LLM_API_KEY below, not this setting.
-# ANTHROPIC_API_KEY and AI_LLM_MODEL were removed by ADR-021. Anthropic is not
+# ANTHROPIC_API_KEY and AI_LLM_MODEL were removed by ADR-036. Anthropic is not
 # used, and a setting nothing reads is the defect this codebase keeps finding
 # (REDIS_URL in IR-132, EXTRACTION_TIMEOUT in the compose comments). The
 # inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
