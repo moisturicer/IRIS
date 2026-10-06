@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Callable, Iterator, Optional, Sequence
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.providers.ports import LLMProvider
+from apps.ai.retrieval.diagnostics import RetrievalDiagnostics
 from apps.ai.retrieval.ports import RetrievalResult, RetrievedChunk, Retriever
 from apps.records.models import Record
 
@@ -112,7 +113,7 @@ class GroundedAnswerService:
 
     def _retrieve_and_gate(
         self, question: str, user
-    ) -> tuple[RetrievalResult, list[RetrievedChunk]]:
+    ) -> tuple[RetrievalResult, list[RetrievedChunk], RetrievalDiagnostics]:
         """Retrieval plus the disclosure gate -- the one step ``answer`` and
         ``answer_stream`` must never disagree about, since it is where
         IR-129's visibility guarantee lives. Shared rather than duplicated
@@ -120,9 +121,28 @@ class GroundedAnswerService:
 
         The gate-and-cap half is `SourceSelection`, so the eval harness can
         measure what the model received without calling a model (IR-394).
+
+        **A refusal is diagnosable from here** (IR-459). "Nothing was found",
+        "everything was withheld" and "retrieval raised" all produced one
+        empty list and one `no_sources` answer, so a log line could not tell
+        them apart. The classification is recorded; nothing branches on it
+        yet and no reader sees it, and a failure is logged and **re-raised**
+        exactly as before.
         """
-        retrieved = self._retriever.retrieve(question, user, limit=self._max_sources)
-        return retrieved, self._selection.apply(retrieved.passages)
+        try:
+            retrieved = self._retriever.retrieve(
+                question, user, limit=self._max_sources
+            )
+        except Exception:
+            logger.warning(
+                "retrieval outcome: %s", RetrievalDiagnostics.failed().summary,
+                exc_info=True,
+            )
+            raise
+
+        selection = self._selection.select(retrieved)
+        logger.info("retrieval outcome: %s", selection.diagnostics.summary)
+        return retrieved, list(selection.passages), selection.diagnostics
 
     def _recall(self, retrieved, conversation, history) -> Sequence["Turn"]:
         if self._memory is None or conversation is None:
@@ -197,7 +217,7 @@ class GroundedAnswerService:
         into the prompt verbatim; memory recall adds older, relevant ones
         when ``conversation`` is given (IR-297).
         """
-        retrieved, sources = self._retrieve_and_gate(question, user)
+        retrieved, sources, _diagnostics = self._retrieve_and_gate(question, user)
         if not sources:
             return self._no_sources_answer(retrieved)
 
@@ -270,7 +290,9 @@ class GroundedAnswerService:
         reasoning_parts: list[str] = []
         try:
             yield RetrievalStarted()
-            retrieved, sources = self._retrieve_and_gate(question, user)
+            retrieved, sources, _diagnostics = self._retrieve_and_gate(
+                question, user
+            )
             yield RetrievalFinished(
                 passage_count=len(sources),
                 record_count=len({s.record_id for s in sources}),
