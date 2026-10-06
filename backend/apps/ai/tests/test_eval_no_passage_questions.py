@@ -34,12 +34,12 @@ def _with_general_knowledge():
     return parse_question_set(data)
 
 
-def test_a_question_with_no_passages_does_not_move_recall(corpus, reader, embedder):
+def test_a_question_with_no_passages_does_not_move_recall(corpus, reader, embedder):  # noqa: F811
     report = run(_root(embedder), _with_general_knowledge(), RunConfig(), user=reader)
     assert report.retrieval_recall == 1.0
     assert "gk" not in [o.question_id for o in report.outcomes]
     assert report.question_set.as_dict()["without_passages"] == 1
 
 
-def test_dry_run_checks_a_set_holding_a_question_with_no_passages(corpus):
+def test_dry_run_checks_a_set_holding_a_question_with_no_passages(corpus):  # noqa: F811
     assert [c.problem for c in check_question_set(_with_general_knowledge()) if not c.ok] == []
