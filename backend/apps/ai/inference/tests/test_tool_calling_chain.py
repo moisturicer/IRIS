@@ -151,10 +151,13 @@ def test_the_completion_record_names_the_model_and_never_the_text(
     finally:
         logging.getLogger("apps").propagate = False
 
+    # pytest 9 also attaches caplog's handler to the non-propagating `apps`
+    # logger, so one emitted record can be captured twice; judge the distinct
+    # messages, not the capture count.
     records = [r for r in caplog.records if r.name == LOGGER_NAME]
-    assert len(records) == 1
-    assert records[0].model == "first"
-    assert records[0].reasoning_present is True
+    assert records
+    assert len({r.getMessage() for r in records}) == 1
+    assert all(r.model == "first" and r.reasoning_present is True for r in records)
 
     everything = caplog.text
     for secret in ("HYPOTHETICAL-ANSWER", "SECRET-REASONING", "a user question"):
