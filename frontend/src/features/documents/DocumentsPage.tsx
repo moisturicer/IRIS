@@ -5,7 +5,7 @@ import { recordsApi }   from "@/api/records";
 import { reviewsApi }   from "@/api/reviews";
 import { PageHeader }   from "@/components/layout/PageHeader";
 import { EmptyState }   from "@/components/shared/EmptyState";
-import { FileUploadZone } from "@/components/shared/FileUploadZone";
+import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Badge }        from "@/components/ui/Badge";
 import { Spinner }      from "@/components/ui/Spinner";
 import { useAuth }      from "@/hooks/useAuth";
@@ -560,7 +560,7 @@ export default function DocumentsPage() {
                 )}
                 {/* Upload zone — owners only while record is editable or the slot is requested, PDF only */}
                 {canUploadTo(slot.id) && (
-                  <FileUploadZone
+                  <UploadDropzone
                     label={`Upload ${slot.name}`}
                     onFiles={(files) => handleUpload(slot.id, files)}
                     accept=".pdf"

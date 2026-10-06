@@ -18,6 +18,20 @@ A system exists. It is systematically bypassed. **The recommendation is adoption
 | **`Button`** | `size="icon"` (44 px below `lg`, 32 px above; `aria-label` required by the type) and the `aria-pressed:` state on `ghost` — **added by IR-352**, listed here because this section is the one place to find the current system | "5 variants × 3 sizes" (§3) |
 | **Header search** | Not shown on Paper View (a reading surface). It is inert on every screen — it has no handler — which is a separate fix | — |
 
+### IR-405 amendments: the design language for the whole redesign
+
+The IR-374 redesign extends the IR-356 direction from Paper View to every screen it rebuilds (`docs/frontend_redesign_spec.md` §4.12). IR-405 (F0) put the tokens and shared components in place. Each later ticket adopts them as it rebuilds its screen.
+
+| Area | Rule now | Replaces |
+|---|---|---|
+| **Type roles** | Six named sizes in `tailwind.config.js`, picked for what the text *is*: `text-display` 28/34 (page and record titles), `text-title` 20/28 (dialog titles, card titles), `text-heading` 16/24 (section headings), `text-body` 15/24, `text-small` 13/20 (secondary lines, metadata), `text-label` 12/16 (labels). `display` and `title` are set in `font-display` (EB Garamond 600); everything else in Inter. **Labels are sentence case**: no uppercase-and-tracking labels below 12 px. The size ladder `3xs`–`lg` (11–17 px, IR-452) stays for existing code; new and rebuilt screens use the roles. `src/test/typeScale.test.ts` pins every role's size and leading | The scattered 10–11 px uppercase labels, and choosing a size by number |
+| **Spacing** | Tailwind's 4 px base, plus named steps: `section-sm` 16, `section` 24, `section-lg` 32 for the gaps between a page's sections; `card` 20 and `card-compact` 16 for card padding (`p-card-compact md:p-card`) | "Spacing is Tailwind default" (§1) |
+| **Surfaces** | A `stone-50` canvas. Cards are white with a 1 px `stone-200` border and **no resting shadow**. With no shadow to lift it, a card shows hover and keyboard focus by darkening its border to `stone-400`. That is an IR-405 addition; §4.12 does not specify a hover state. Shadow is kept for things that float: dialogs, menus, the mobile sheet | `shadow-card` on resting cards |
+| **Action hierarchy** | One maroon primary pill per region (`pillStyles`), outline pills for the rest, text buttons for tertiary actions. Danger is `brand-dark` with its glyph (IR-359) | — |
+| **Focus** | A visible 2 px maroon ring with an offset on every interactive element: `FOCUS_RING` in `components/ui/interaction.ts` | Browser default outlines |
+| **Motion** | 150–200 ms, opacity and transform only for anything that moves or appears, and none under `prefers-reduced-motion` (`motion-reduce:transition-none`). A progress bar grows by `scaleX`, not by animating its width. **One deliberate addition to spec §4.12**, whose rule reads "opacity/transform only": hover and focus **colour** changes keep a short transition (`COLOUR_TRANSITION` in `components/ui/interaction.ts`), as every existing pill and link already does. A colour fade moves nothing and causes no reflow, and dropping it would make the rebuilt screens snap where the rest of the app fades. Recorded here under the lead's licence to amend the design system (§0 note), not silently | Spec §4.12 "150–200 ms opacity/transform only" |
+| **Shared components** | `ResearchCard` (new: one card for a record, `list`/`grid`, with slots), `EmptyState` (action slot, `error` tone, `framed`; Discover's private copy deleted), `UploadDropzone` (replaces `FileUploadZone`: checks before upload when asked to, progress, retry, Enter/Space), `PageHeader` (restyled to the type roles). Details in [14](14-component-inventory.md) §4–5 | §4's "No change for MVP" for these |
+
 
 ## 1 · Tokens as defined
 
@@ -43,9 +57,11 @@ A system exists. It is systematically bypassed. **The recommendation is adoption
 
 **13px base is small** but internally consistent and appropriate for a dense institutional tool. Keep it. Do not go below 11px anywhere.
 
+> **Corrected (IR-405).** The ladder above is stale. IR-452 raised it one step: `3xs` 11 · `2xs` 12 · `xs` 13 · `sm` 14 · `base` 15 · `md` 16 · `lg` 17 px. IR-405 added the six type roles beside it (§0): `display` 28/34 · `title` 20/28 · `heading` 16/24 · `body` 15/24 · `small` 13/20 · `label` 12/16.
+
 ### Radius, shadow, spacing
 
-`rounded` 0.5rem · `lg` 0.75rem · `xl` 1rem · `2xl` 1.25rem. Two card shadows (`card`, `card-md`). Spacing is Tailwind default.
+`rounded` 0.5rem · `lg` 0.75rem · `xl` 1rem · `2xl` 1.25rem. Two card shadows (`card`, `card-md`). Spacing is Tailwind default. **IR-405: plus the named steps `section-sm`/`section`/`section-lg` (16/24/32) and `card`/`card-compact` (20/16), and resting cards take no shadow (§0).**
 
 ---
 
@@ -103,8 +119,10 @@ no-restricted-syntax on /\[#6B0F12\]/ → "use bg-brand / text-brand"
 |---|---|---|
 | `DataTable` | Wraps `@tanstack/react-table`, server pagination, empty and loading rows | **Add `scope="col"`, `aria-label` on the icon-only pager, `overflow-x-auto` container.** Sorting is a `TODO` at line 3 |
 | `StatusBadge` | Maps 13 statuses → colour + label | **Remove the stale `ktto_review` key** (not in `PIPELINE_STATUS`). Keep otherwise |
-| `EmptyState` | Icon + title + message | **`text-gray-400` fails contrast** → `gray-500`; add `aria-hidden` to the icon |
-| `RoleBadge`, `ConfirmDialog`, `FileUploadZone` | Fine | No change for MVP |
+| `EmptyState` | Icon + title + message | ~~**`text-gray-400` fails contrast** → `gray-500`; add `aria-hidden` to the icon~~ **Done (IR-405):** `stone-600` message, `aria-hidden` icon, heading title, `action` slot, `error` tone |
+| `RoleBadge`, `ConfirmDialog` | Fine | No change for MVP |
+| `UploadDropzone` | **IR-405**, replaces `FileUploadZone` | With `validate`, checks type and size before upload; shows progress; retries a failed upload; opens with Enter or Space |
+| `ResearchCard` | **IR-405**, new | One card for a record in a list or grid ([14](14-component-inventory.md) §4) |
 | `ComingSoonPage` | Placeholder | Used by `/storage`, which is removed (`SC-01`) |
 
 ### Two components to add

@@ -4,6 +4,8 @@ import { recordsApi } from "@/api/records";
 import { accountsApi } from "@/api/accounts";
 import { useUIStore } from "@/store/ui.store";
 import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { RecordListItem } from "@/types/records";
 import { DiscoverRecordCard } from "./DiscoverRecordCard";
@@ -323,20 +325,23 @@ export default function DiscoverPage() {
             <span className="text-xs text-stone-400 font-medium">Searching the repository…</span>
           </div>
         ) : error ? (
-          <EmptyState icon="fa-triangle-exclamation" tone="error" title="Something went wrong" body={error} />
+          <EmptyState framed icon="fa-triangle-exclamation" tone="error" title="Something went wrong" message={error} />
         ) : records.length === 0 ? (
           <EmptyState
+            framed
             icon="fa-book-open"
             title="No research papers found"
-            body={
+            message={
               activeFilterCount > 0 || activeQuery
                 ? "No records match your current search and filters."
                 : "Nothing has been published yet. Records appear here once they clear review."
             }
             action={
-              activeFilterCount > 0 || activeQuery
-                ? { label: "Reset all filters", onClick: resetAll }
-                : undefined
+              activeFilterCount > 0 || activeQuery ? (
+                <button type="button" onClick={resetAll} className={PILL_PRIMARY}>
+                  Reset all filters
+                </button>
+              ) : undefined
             }
           />
         ) : (
@@ -374,44 +379,6 @@ export default function DiscoverPage() {
         isOpen={Boolean(citeRecord)}
         onClose={() => setCiteRecord(null)}
       />
-    </div>
-  );
-}
-
-function EmptyState({
-  icon,
-  title,
-  body,
-  action,
-  tone = "neutral",
-}: {
-  icon: string;
-  title: string;
-  body: string;
-  action?: { label: string; onClick: () => void };
-  tone?: "neutral" | "error";
-}) {
-  return (
-    <div className="py-16 flex flex-col items-center justify-center text-center bg-white rounded-2xl border border-stone-200 px-6">
-      <div
-        className={cn(
-          "w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-[18px]",
-          tone === "error" ? "bg-red-50 text-red-400" : "bg-stone-100 text-stone-400",
-        )}
-      >
-        <i className={cn("fas", icon)} aria-hidden />
-      </div>
-      <h3 className="text-[16px] font-bold text-stone-900">{title}</h3>
-      <p className="text-[14px] text-stone-500 mt-1 max-w-sm">{body}</p>
-      {action && (
-        <button
-          type="button"
-          onClick={action.onClick}
-          className="mt-4 px-4 py-2 bg-brand hover:bg-brand-light text-white text-[13px] font-bold rounded-lg transition"
-        >
-          {action.label}
-        </button>
-      )}
     </div>
   );
 }

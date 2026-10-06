@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { recordsApi }      from "@/api/records";
 import { documentsApi }    from "@/api/documents";
-import { FileUploadZone }  from "@/components/shared/FileUploadZone";
+import { UploadDropzone }  from "@/components/shared/UploadDropzone";
 import { Badge }           from "@/components/ui/Badge";
 import { Spinner }         from "@/components/ui/Spinner";
 import type { UploadSlot } from "@/types/documents";
@@ -201,7 +201,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
             </button>
           </div>
         ) : (
-          <FileUploadZone onFiles={stageManuscript} accept=".pdf" hint="PDF only, up to 50 MB" />
+          <UploadDropzone onFiles={stageManuscript} accept=".pdf" hint="PDF only, up to 50 MB" />
         )}
         {manuscript?.error && <FieldError>{manuscript.error}</FieldError>}
       </div>
@@ -284,7 +284,7 @@ export function UploadsStep({ recordId, recordTypeId, onStagedChange, onManuscri
                     </button>
                   </div>
                 ) : (
-                  <FileUploadZone
+                  <UploadDropzone
                     onFiles={(files) => stageFile(slot.id, files)}
                     accept=".pdf"
                     hint="PDF only, up to 50 MB"
