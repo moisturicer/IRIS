@@ -97,7 +97,7 @@ def run(
         active = root if config.reranking else root.without_reranking()
         retriever = active.retriever()
         selection = active.source_selection(config.max_sources)
-        for question in question_set.questions:
+        for question in question_set.scored:
             result = retriever.retrieve(question.question, user, limit=limit)
             passages = list(result.passages)
             final = selection.apply(passages)

@@ -60,6 +60,55 @@ be destroyed by the very comparison the harness exists to make — "did raising
 holding it. There is a test for exactly this:
 `apps/ai/evaluation/tests/test_labels.py::test_a_label_survives_rechunking_at_any_ceiling`.
 
+## What a question needs, and what should happen (IR-463)
+
+Three optional fields say whether a question needs the corpus at all and what
+the right outcome is. They are **two fields, not one**, because an empty
+`expected` list cannot carry two meanings: a general-knowledge question also has
+no expected passage, and it must be *answered*, not refused.
+
+| Field | Values | Meaning |
+|---|---|---|
+| `evidence_required` | `none` / `corpus` / `corpus_multi` | Does answering need the corpus at all? |
+| `expected_outcome` | `answer` / `clarify` / `decline-no-evidence` / `decline-restricted` | What the reader should get |
+| `institutional` | `true` / `false` | A claim about CIT-U or the repository. Reported separately: a miss here is the dangerous direction (ADR-027 §4) |
+
+- `evidence_required` and `expected_outcome` are declared **together or not at
+  all**. A set that declares neither loads exactly as before.
+- **An empty `expected: []` is deliberate only when the question declares those
+  two fields.** Without them it is an *unlabelled* question: refused by default,
+  and skipped (and named) by `--drop-incomplete`. A deliberately empty question
+  is never skipped.
+- A contradiction is refused: `evidence_required: none` or
+  `decline-no-evidence` with expected passages, or `corpus` + `answer` with none.
+- A question with no expected passage has nothing to recall, so the retrieval
+  harness does not run it and it does not enter either recall average; the run
+  reports how many it left out (`without_passages`). Scoring a refusal is
+  IR-454's measure, and the model-facing command is IR-464's. **This harness
+  still calls no model.**
+- `--dry-run` validates every field (an invalid value is refused at load), calls
+  no vendor and costs nothing.
+
+### `kind`
+
+Every question in `proxy_starter.json` carries a `kind`, and the loader now
+reads it so a report can be grouped by it:
+
+| `kind` | What it probes |
+|---|---|
+| `mechanism` | A paraphrased question about how something works (the default) |
+| `exact-term` | A specific term or number |
+| `near-duplicate` | Telling two near-identical papers apart |
+| `cross-paper` | An answer spread over several papers |
+| `general-knowledge` | Answerable without the corpus (`none` / `answer`) |
+| `off-corpus-research` | Research the corpus does not hold (`corpus` / `decline-no-evidence`) |
+| `ambiguous` | Too vague to answer (`none` / `clarify`) |
+| `follow-up-after-direct` | A follow-up to an answer that used no retrieval |
+| `follow-up-after-grounded` | A follow-up to a cited answer; reuses its parent's passage |
+
+The two follow-up kinds are only meaningful with the preceding turn, which the
+schema does not carry yet; IR-464's command is where that history is supplied.
+
 ## How to label — the procedure
 
 Extend [`proxy_starter.json`](proxy_starter.json). It already holds labelled

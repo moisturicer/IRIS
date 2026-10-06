@@ -2,7 +2,7 @@
   "name": "proxy-starter",
   "tier": "proxy",
   "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
-  "notes": "ADR-023 tier 1: an engineering gate. A number from this set decides whether a retrieval switch earns its place and is NEVER cited as a finding about CIT-U research. Question kinds follow docs/evaluation/README.md: paraphrased mechanism (the default), exact term or number, near-duplicate discrimination, and cross-paper. Every quote is copied from the chunk text `manage.py inspect_chunks` prints, not from the PDF, because Docling respaces parentheses and maths.",
+  "notes": "ADR-023 tier 1: an engineering gate. A number from this set decides whether a retrieval switch earns its place and is NEVER cited as a finding about CIT-U research. Question kinds follow docs/evaluation/README.md: paraphrased mechanism (the default), exact term or number, near-duplicate discrimination, and cross-paper; IR-463 adds general-knowledge, off-corpus-research, ambiguous, follow-up-after-direct and follow-up-after-grounded, which carry evidence_required and expected_outcome. Every quote is copied from the chunk text `manage.py inspect_chunks` prints, not from the PDF, because Docling respaces parentheses and maths.",
   "questions": [
     {
       "id": "q01",
@@ -650,6 +650,108 @@
           "record": "The abundance and emission of PAHs from the local to early Universe",
           "page": 3,
           "quote": "the first large-volume cosmological simulation of galaxy evolution, based on a semi-analytic model"
+        }
+      ]
+    },
+    {
+      "id": "q53",
+      "kind": "general-knowledge",
+      "question": "what is the difference between a mean and a median?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q54",
+      "kind": "general-knowledge",
+      "question": "what does it mean for an optimization problem to be convex?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q55",
+      "kind": "off-corpus-research",
+      "question": "what did the 2019 survey of reinforcement learning for protein folding conclude?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q56",
+      "kind": "off-corpus-research",
+      "question": "which paper in the repository introduced a diffusion model for weather forecasting?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": true,
+      "expected": []
+    },
+    {
+      "id": "q57",
+      "kind": "ambiguous",
+      "question": "how does it compare?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q58",
+      "kind": "ambiguous",
+      "question": "is the second approach better?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q59",
+      "kind": "follow-up-after-direct",
+      "question": "can you give a simpler example of that?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q60",
+      "kind": "follow-up-after-direct",
+      "question": "and why does that matter in practice?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q61",
+      "kind": "follow-up-after-grounded",
+      "question": "what exactly did they say about that?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+          "page": 2,
+          "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
+        }
+      ]
+    },
+    {
+      "id": "q62",
+      "kind": "follow-up-after-grounded",
+      "question": "and how does that paper define it?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+          "page": 2,
+          "quote": "puts the prompt back in the queue to continue sampling"
         }
       ]
     }
