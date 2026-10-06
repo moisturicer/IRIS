@@ -2,9 +2,11 @@
 
 ## Status
 
-**Proposed** — drafted 2026-10-06 (IR-461). **Not accepted.** No human review has taken place and none is claimed.
+**Accepted** — 2026-10-06 (IR-461). Drafted by an AI agent; reviewed and approved by **Jive Tyler Revalde**, approver of record.
 
-**This is a governance gate.** IR-464 (the deterministic detector) and IR-466 (the reader-invisible shadow pilot) are blocked on this ADR being *approved*, not merely drafted, because both contradict [ADR-028](028-no-tool-calling-in-the-answer-path.md) as it stands. An agent may draft this document. An agent may not approve it.
+**Still open after acceptance, and not resolved by it:** §9's landscape exception needs an accountable owner named by a person before any production `on`, and §11's vendor-retention verification gates shadowing real reader questions.
+
+**This was a governance gate, now cleared.** IR-464 (the deterministic detector) and IR-466 (the reader-invisible shadow pilot) were blocked on this ADR being *approved*, not merely drafted, because both contradict [ADR-028](028-no-tool-calling-in-the-answer-path.md) as it stood. An agent drafted this document; a person approved it.
 
 **Supersedes [ADR-028](028-no-tool-calling-in-the-answer-path.md)'s decision, and preserves its reasoning in full.** ADR-028 exists so that "expose retrieval as tools" is not re-proposed without new evidence. That service is still being done: its four reasons, its evidence table and its three revisit conditions are **kept, not overwritten**, and §Context below assesses each revisit condition as holding, partly holding or not holding. This ADR proceeds on the first condition plus a design argument — **not** on the third, which has not been met.
 

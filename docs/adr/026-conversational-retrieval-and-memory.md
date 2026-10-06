@@ -4,7 +4,7 @@
 
 **Accepted** — 2026-09-17.
 
-> **Proposed amendment to §13 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Proposed 2026-10-06, IR-461), not accepted.** The evidence decision is a consumer §13's single predicate does not describe: it receives prior **reader questions only** — no prior assistant answer text, no recalled Turns, no Passage text — because a grounded answer is retrieval-derived and may echo text injected into a Passage. A `generated` Turn is admissible to the answering model and **not** to a routing decision, so state is the wrong axis there. Implemented by IR-465; the broader per-consumer refactor is IR-453's. See ADR-035 §8.
+> **Amendment to §13 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** The evidence decision is a consumer §13's single predicate does not describe: it receives prior **reader questions only** — no prior assistant answer text, no recalled Turns, no Passage text — because a grounded answer is retrieval-derived and may echo text injected into a Passage. A `generated` Turn is admissible to the answering model and **not** to a routing decision, so state is the wrong axis there. Implemented by IR-465; the broader per-consumer refactor is IR-453's. See ADR-035 §8.
 
 **Implements and amends [ADR-019](019-persisted-unified-conversation-history.md).** ADR-019 decided *that* conversation history is persisted and unified across Ask IRIS and Paper Chat, and that decision stands unchanged. It deliberately left *how* history reaches retrieval unspecified, and its citation-storage mechanics have been overtaken by work completed since. This ADR settles the first and amends the second.
 
