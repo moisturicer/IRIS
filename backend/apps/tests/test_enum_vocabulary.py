@@ -115,6 +115,14 @@ ALLOWED = {
     # not a person's request awaiting a decision. Same shape as the
     # embedding_space.py entry.
     "records/metadata_suggestions.py",
+    # (IR-464) "published" here is a word a reader might type in a question --
+    # one entry in the `document_reference` rule's English term list, beside
+    # "paper", "thesis" and "preprint". It is not a stored value and it is not
+    # `PipelineStatus.PUBLISHED`: pointing it at core.enums would tie the
+    # vocabulary a human types to the workflow's internal spelling, so renaming
+    # the status would silently change what the detector recognises. Same shape
+    # as the embedding_space.py entry: two concepts, one string.
+    "ai/evidence/rules.py",
 }
 
 
