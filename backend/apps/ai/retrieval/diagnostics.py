@@ -188,6 +188,14 @@ class StageDiagnostics:
     def summary(self) -> dict[str, object]:
         return {"counts": self.buckets.counts, "config": self.configuration.summary}
 
+    @property
+    def log_summary(self) -> dict[str, object]:
+        """`summary` without the withheld count, which no log line may carry
+        (IR-460): it is the one number that says relevant work exists and was
+        refused."""
+        counts = {k: v for k, v in self.buckets.counts.items() if k != "withheld"}
+        return {"counts": counts, "config": self.configuration.summary}
+
 
 def classify(
     presented: Optional[Iterable[int]],
@@ -251,10 +259,21 @@ class RetrievalDiagnostics:
 
     @property
     def summary(self) -> dict[str, object]:
-        """The shape a log line carries: the outcome, then each stage."""
+        """The outcome, then each stage -- every count. For a test or a
+        debugger; a log line takes `log_summary`."""
         return {
             "outcome": self.outcome,
             "degraded": self.degraded,
             "selection": self.selection.summary,
             "recall": self.recall.summary,
+        }
+
+    @property
+    def log_summary(self) -> dict[str, object]:
+        """What an ordinary log line carries: no withheld count (IR-460)."""
+        return {
+            "outcome": self.outcome,
+            "degraded": self.degraded,
+            "selection": self.selection.log_summary,
+            "recall": self.recall.log_summary,
         }

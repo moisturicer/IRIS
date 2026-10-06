@@ -63,6 +63,11 @@ class SourceSelection:
     max_sources: int = 8
 
     def disclosable(self, chunks: Sequence[RetrievedChunk]) -> list[RetrievedChunk]:
+        # Accepted unknown, not a solved problem (IR-460): the response is the
+        # same whether this gate removed nothing or everything, but the time
+        # taken is not -- gate work scales with what was withheld. Timing is
+        # not mitigated here, and nor is repeated probing at a non-zero
+        # temperature. See ADR-034 §Security Impact.
         if not self.policy_enabled:
             return list(chunks)
         records = Record.objects.filter(pk__in={c.record_id for c in chunks}).in_bulk()
