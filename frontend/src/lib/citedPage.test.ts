@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { citationNavigationState, citedPage } from "./citedPage";
+import { citationNavigationState, citedPage, followedFromPaperChat } from "./citedPage";
 import type { Citation, ReplayedCitation } from "@/types/ai";
 
 describe("the page a citation asked for", () => {
@@ -58,5 +58,30 @@ describe("carrying a citation to the paper view", () => {
 
   it("wraps a replayed citation the same way, with no regions to carry", () => {
     expect(citationNavigationState(replayedCitation)).toEqual({ citation: replayedCitation });
+  });
+});
+
+/**
+ * A citation followed from inside Paper Chat says so (IR-355), and only
+ * that: the panel keeps its own conversation open across the navigation.
+ * Any other way of arriving -- Discover, a typed URL, an in-page link, Ask
+ * IRIS's own transcript -- carries no such mark.
+ */
+describe("marking a citation followed from Paper Chat", () => {
+  it("marks the state when the citation came from Paper Chat", () => {
+    const state = citationNavigationState(liveCitation, "paper-chat");
+    expect(state).toEqual({ citation: liveCitation, origin: "paper-chat" });
+    expect(followedFromPaperChat(state)).toBe(true);
+  });
+
+  it("does not mark a citation followed from anywhere else", () => {
+    expect(followedFromPaperChat(citationNavigationState(liveCitation))).toBe(false);
+    expect(followedFromPaperChat(citationNavigationState(liveCitation, null))).toBe(false);
+  });
+
+  it("reads no mark off a navigation that carried no state, or someone else's", () => {
+    expect(followedFromPaperChat(null)).toBe(false);
+    expect(followedFromPaperChat(undefined)).toBe(false);
+    expect(followedFromPaperChat({ from: "/discover" })).toBe(false);
   });
 });

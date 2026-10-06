@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { ROLES, STAFF_ROLES } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
-import { citedPage, type CitationNavigationState } from "@/lib/citedPage";
+import { citedPage, followedFromPaperChat, type CitationNavigationState } from "@/lib/citedPage";
 import type { RecordDetail, IpType, RecordReview } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region, SemanticSearchResult } from "@/types/ai";
@@ -291,15 +291,26 @@ function SimilarPapers({ recordId }: { recordId: number }) {
 // Page
 // ---------------------------------------------------------------------------
 
+/**
+ * The main column while a record loads. On its own when the page already
+ * shows a record and is moving to another, so Paper Chat beside it stays
+ * mounted, conversation and all (IR-355).
+ */
+function MainColumnSkeleton() {
+  return (
+    <div className="min-w-0 space-y-4 animate-pulse motion-reduce:animate-none" aria-hidden>
+      <div className="h-5 w-56 rounded bg-stone-200" />
+      <div className="h-9 w-full rounded bg-stone-200" />
+      <div className="h-9 w-2/3 rounded bg-stone-200" />
+      <div className="h-32 w-full rounded-2xl bg-stone-100" />
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start animate-pulse">
-      <div className="space-y-4">
-        <div className="h-5 w-56 rounded bg-stone-200" />
-        <div className="h-9 w-full rounded bg-stone-200" />
-        <div className="h-9 w-2/3 rounded bg-stone-200" />
-        <div className="h-32 w-full rounded-2xl bg-stone-100" />
-      </div>
+      <MainColumnSkeleton />
       <div className="space-y-4">
         <div className="h-44 rounded-2xl bg-stone-100" />
         <div className="h-36 rounded-2xl bg-stone-100" />
@@ -452,7 +463,11 @@ export default function PaperViewPage() {
     }
   };
 
-  if (loading) return <LoadingSkeleton />;
+  // The whole page is a skeleton only before the first record arrives.
+  // Moving from one record to another keeps the page, and Paper Chat with
+  // it, and swaps only the main column (IR-355): a citation followed from
+  // the chat must not unmount the conversation it was followed from.
+  if (loading && !record) return <LoadingSkeleton />;
 
   if (!record) {
     return (
@@ -471,6 +486,10 @@ export default function PaperViewPage() {
       </div>
     );
   }
+
+  // Still on the record being left while the next one loads. Its own
+  // content is not shown meanwhile, only the chat beside it.
+  const arriving = loading || record.id !== Number(id);
 
   const userIsOwner      = isOwner(record, user?.id);
   // Both gates read the API (IR-259), which knows who holds the record and
@@ -522,7 +541,7 @@ export default function PaperViewPage() {
       : chatDocked
         ? DOCKED_PANEL_CLASS
         : FLOATING_PANEL_CLASS;
-  const showRail = !onPaperTab && !chatDocked;
+  const showRail = !onPaperTab && !chatDocked && !arriving;
   const highlightRegions: Region[] =
     navCitation && navCitation.record_id === record.id && "regions" in navCitation
       ? navCitation.regions
@@ -591,6 +610,9 @@ export default function PaperViewPage() {
           {/* ------------------------------------------------------------- */}
           {/* Main column                                                    */}
           {/* ------------------------------------------------------------- */}
+          {arriving ? (
+            <MainColumnSkeleton />
+          ) : (
           <div className="min-w-0 space-y-6">
             {/* Editorial header (IR-356): where it sits, what it is, who
                 wrote it, then what to do with it. */}
@@ -848,6 +870,7 @@ export default function PaperViewPage() {
               </>
             )}
           </div>
+          )}
 
           {/* ------------------------------------------------------------- */}
           {/* Right rail                                                     */}
@@ -874,6 +897,14 @@ export default function PaperViewPage() {
       {chat.open ? (
         <PaperChatPanel
           record={record}
+          // Whether a citation inside the chat brought the reader here, which
+          // keeps its conversation open (IR-355); withheld until the record
+          // this navigation is going to has arrived.
+          arrival={
+            arriving
+              ? null
+              : { key: location.key, fromPaperChat: followedFromPaperChat(location.state) }
+          }
           dock={dock}
           onDockChange={chat.setDockMode}
           onClose={() => chat.setOpen(false)}

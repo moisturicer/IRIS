@@ -32,10 +32,10 @@
  */
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { Link, Route, Routes } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { useAuthStore } from "@/store/auth.store";
 import type { User } from "@/types/auth";
 import type { RecordDetail } from "@/types/records";
@@ -180,6 +180,8 @@ vi.mock("@/api/ai", () => ({
     // Paper Chat opens its Conversation on mount; its behaviour is
     // `PaperChatDock.test.tsx`'s. Here only where the panel sits is.
     conversations: { findOrCreateForRecord: vi.fn(() => new Promise(() => {})) },
+    // A follow-up asked from Paper Chat (IR-355); nothing else here asks.
+    askStream:     vi.fn(),
   },
 }));
 
@@ -780,5 +782,280 @@ describe("following a citation from Paper Chat (IR-354)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
     await screen.findByRole("complementary", { name: "Paper Chat" });
     expect(screen.getByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Following a citation to a different paper keeps the conversation it came
+ * from (IR-355, decided with the project lead 2026-09-24). With "All papers"
+ * on, an answer about X can cite Y. Following it shows Y's paper, but the
+ * panel stays on X's conversation, the answer the reader clicked included,
+ * until the reader says otherwise or reaches Y some other way.
+ */
+describe("following a citation to another paper (IR-355)", () => {
+  const OTHER_ID = 8;
+  const other: RecordDetail = {
+    ...record,
+    id: OTHER_ID,
+    title: "Rainfall Gauge Density and Flood Warning Lead Time",
+  };
+  const crossCitation = {
+    marker: 1,
+    chunk_id: 21,
+    record_id: OTHER_ID,
+    record_title: other.title,
+    page: 3,
+    text: "denser gauge networks lengthened warning lead time",
+    context_path: [other.title, "Results"],
+    regions: [{ page: 3, left: 0.1, top: 0.4, right: 0.6, bottom: 0.45 }],
+  };
+  const samePaperCitation = {
+    ...crossCitation,
+    marker: 2,
+    chunk_id: 11,
+    record_id: RECORD_ID,
+    record_title: record.title,
+    page: 12,
+  };
+  const ANSWER_ON_X = "Gauge density matters [1], as this paper also finds [2].";
+  const QUESTION_ON_Y = "What lead time did the denser network give?";
+  const TO_OTHER = { name: `Open ${other.title} at page 3` };
+  const TO_SAME = { name: `Open ${record.title} at page 12` };
+  const INSTEAD = { name: "Chat about this paper instead" };
+  const PINNED_HEADER = /^Chatting about/;
+
+  function turn(id: number, question: string, answer: string, citations: unknown[] = []) {
+    return {
+      id, question, resolved_question: null, answer, message: null, state: "generative",
+      degraded: false, widened: false, created_at: "2026-09-20T00:00:00.000Z", citations,
+    };
+  }
+
+  const conversations: Record<number, unknown> = {
+    [RECORD_ID]: {
+      id: 42, title: "", record: RECORD_ID, record_title: record.title, turn_count: 1,
+      created_at: "2026-09-20T00:00:00.000Z", updated_at: "2026-09-20T00:00:00.000Z",
+      turns: [turn(1, "Does gauge density matter?", ANSWER_ON_X, [crossCitation, samePaperCitation])],
+    },
+    [OTHER_ID]: {
+      id: 43, title: "", record: OTHER_ID, record_title: other.title, turn_count: 1,
+      created_at: "2026-09-20T00:00:00.000Z", updated_at: "2026-09-20T00:00:00.000Z",
+      turns: [turn(2, QUESTION_ON_Y, "About forty minutes.")],
+    },
+  };
+
+  /** A record whose detail is held back, to watch the page while it loads. */
+  let heldBack: { id: number; release: () => void } | null = null;
+
+  beforeEach(async () => {
+    signInAs(99, "Student");
+    localStorage.setItem(DOCK_KEY, "right");
+    // At `lg` the docked chat is a column and never minimizes (IR-354), so
+    // the transcript stays readable after a citation is followed.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === CONTAINED_LAYOUT_QUERY,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+
+    const { recordsApi } = await import("@/api/records");
+    vi.mocked(recordsApi.detail).mockImplementation(((id: number) => {
+      const data = id === OTHER_ID ? other : record;
+      const held = heldBack;
+      if (held?.id === id) {
+        return new Promise((resolve) => {
+          held.release = () => resolve({ data });
+        });
+      }
+      return Promise.resolve({ data });
+    }) as never);
+
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockReset();
+    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(
+      ((id: number) => Promise.resolve({ data: conversations[id] })) as never,
+    );
+    vi.mocked(aiApi.askStream).mockReset();
+    vi.mocked(aiApi.askStream).mockImplementation((async function* () {
+      yield {
+        event: "done",
+        data: {
+          answer: "Roughly forty minutes longer.", citations: [], sources: [], message: null,
+          mode: "generative", degraded: false, conversation_id: 42, resolved_question: null,
+          widened: true,
+        },
+      };
+    }) as never);
+  });
+
+  afterEach(async () => {
+    heldBack = null;
+    localStorage.removeItem(DOCK_KEY);
+    vi.unstubAllGlobals();
+    const { recordsApi } = await import("@/api/records");
+    vi.mocked(recordsApi.detail).mockImplementation((() => Promise.resolve({ data: shownRecord })) as never);
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(() => new Promise(() => {}));
+  });
+
+  async function conversationsOpened(): Promise<number[]> {
+    const { aiApi } = await import("@/api/ai");
+    return vi.mocked(aiApi.conversations.findOrCreateForRecord).mock.calls.map(([id]) => id as number);
+  }
+
+  /**
+   * Mounted on its real path, with a plain link to Y beside it: the way a
+   * reader reaches Y other than through a citation (Discover, a typed URL,
+   * Related works), carrying no router state at all.
+   */
+  function renderWithPlainLink() {
+    return renderScreen(
+      <>
+        <Routes>
+          <Route path="/records/:id" element={<PaperViewPage />} />
+        </Routes>
+        <Link to={`/records/${OTHER_ID}`}>Go to the other paper</Link>
+      </>,
+      { route: `/records/${RECORD_ID}` },
+    );
+  }
+
+  function panel() {
+    return screen.getByRole("complementary", { name: "Paper Chat" });
+  }
+
+  /** On X, chat open, "All papers" on, the answer citing Y on screen. */
+  async function openChatOnX() {
+    const view = renderWithPlainLink();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
+    await screen.findByText(/Gauge density matters/);
+    await userEvent.click(within(panel()).getByRole("button", { name: "This paper" }));
+    return view;
+  }
+
+  async function followToOtherPaper() {
+    const view = await openChatOnX();
+    await userEvent.click(within(panel()).getByRole("link", TO_OTHER));
+    await screen.findByText(/open at page 3, 1 region\(s\)/i);
+    await screen.findByRole("heading", { level: 1, name: other.title });
+    return view;
+  }
+
+  it("shows Y's paper at the cited passage while the panel keeps X's conversation", async () => {
+    await followToOtherPaper();
+
+    expect(within(panel()).getByText(/Gauge density matters/)).toBeVisible();
+    expect(within(panel()).getByText(PINNED_HEADER)).toHaveTextContent(`Chatting about ${record.title}`);
+    expect(within(panel()).getByRole("button", { name: "All papers" })).toHaveAttribute("aria-pressed", "true");
+    expect(await conversationsOpened()).toEqual([RECORD_ID]);
+  });
+
+  it("keeps the panel mounted while Y loads, rather than a skeleton over it", async () => {
+    const held = { id: OTHER_ID, release: () => {} };
+    heldBack = held;
+    await openChatOnX();
+
+    await userEvent.click(within(panel()).getByRole("link", TO_OTHER));
+
+    // Y is still loading: the panel and its answer are there all the same.
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(within(panel()).getByText(/Gauge density matters/)).toBeVisible();
+    held.release();
+    await screen.findByRole("heading", { level: 1, name: other.title });
+    expect(within(panel()).getByText(/Gauge density matters/)).toBeVisible();
+    expect(await conversationsOpened()).toEqual([RECORD_ID]);
+  });
+
+  it("sends a follow-up into X's conversation, with the widen it had", async () => {
+    await followToOtherPaper();
+
+    await userEvent.type(
+      within(panel()).getByRole("textbox", { name: "Ask about this paper" }),
+      "How much longer was the lead time?",
+    );
+    await userEvent.click(within(panel()).getByRole("button", { name: "Send" }));
+
+    const { aiApi } = await import("@/api/ai");
+    await waitFor(() => expect(aiApi.askStream).toHaveBeenCalled());
+    const [question, options] = vi.mocked(aiApi.askStream).mock.calls[0];
+    expect(question).toBe("How much longer was the lead time?");
+    expect(options).toMatchObject({ conversationId: 42, widen: true });
+  });
+
+  it("switches to Y's own conversation, named Y, on Chat about this paper instead", async () => {
+    await followToOtherPaper();
+
+    await userEvent.click(within(panel()).getByRole("button", INSTEAD));
+
+    expect(await within(panel()).findByText(QUESTION_ON_Y)).toBeInTheDocument();
+    expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
+    expect(within(panel()).queryByRole("button", INSTEAD)).not.toBeInTheDocument();
+    expect(within(panel()).getByText(other.title)).toBeInTheDocument();
+    // The conversation changed, so its scope starts again at this paper.
+    expect(within(panel()).getByRole("button", { name: "This paper" })).toHaveAttribute("aria-pressed", "false");
+    expect(await conversationsOpened()).toEqual([RECORD_ID, OTHER_ID]);
+  });
+
+  it("releases the pin when the panel is closed and opened again", async () => {
+    await followToOtherPaper();
+
+    await userEvent.click(within(panel()).getByRole("button", { name: "Close Paper Chat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    expect(await within(panel()).findByText(QUESTION_ON_Y)).toBeInTheDocument();
+    expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
+  });
+
+  it("releases the pin when the reader reaches Y some other way", async () => {
+    await followToOtherPaper();
+
+    await userEvent.click(screen.getByRole("link", { name: "Go to the other paper" }));
+
+    expect(await within(panel()).findByText(QUESTION_ON_Y)).toBeInTheDocument();
+    expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
+  });
+
+  it("pins nothing on a page that only remembers a citation, as after a reload", async () => {
+    // A reload keeps the history entry's state, the mark included, but the
+    // panel that followed it is gone: there is no conversation to keep.
+    renderPaper(`/records/${OTHER_ID}?page=3`, { citation: crossCitation, origin: "paper-chat" });
+    await screen.findByRole("heading", { level: 1, name: other.title });
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    expect(await within(panel()).findByText(QUESTION_ON_Y)).toBeInTheDocument();
+    expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
+  });
+
+  it("follows a same-paper citation exactly as before: no pin, no header change", async () => {
+    await openChatOnX();
+
+    await userEvent.click(within(panel()).getByRole("link", TO_SAME));
+    await screen.findByText(/open at page 12, 1 region\(s\)/i);
+
+    expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
+    expect(within(panel()).getByText(record.title)).toBeInTheDocument();
+    expect(await conversationsOpened()).toEqual([RECORD_ID]);
+  });
+
+  it("keeps the pin when the panel changes position", async () => {
+    await followToOtherPaper();
+
+    // The Paper tab fixes the dock (IR-372); the Abstract tab offers it.
+    await userEvent.click(screen.getByRole("tab", { name: "Abstract" }));
+    await userEvent.click(within(panel()).getByRole("button", { name: "Panel position" }));
+    await userEvent.click(within(panel()).getByRole("button", { name: /Floating/ }));
+
+    expect(within(panel()).getByText(PINNED_HEADER)).toHaveTextContent(`Chatting about ${record.title}`);
+    expect(within(panel()).getByText(/Gauge density matters/)).toBeVisible();
+    expect(await conversationsOpened()).toEqual([RECORD_ID]);
+  });
+
+  it("has no serious or critical accessibility violations while pinned", async () => {
+    const { container } = await followToOtherPaper();
+
+    await expectNoBlockingA11yViolations(container);
   });
 });

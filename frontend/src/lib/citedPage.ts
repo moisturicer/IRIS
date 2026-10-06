@@ -17,6 +17,7 @@
  * citation's job is to say which page and which chunk, not to shape a URL to
  * the file at all.
  */
+import { createContext } from "react";
 import type { ChatCitation, Citation } from "@/types/ai";
 
 /**
@@ -89,8 +90,40 @@ export function openCitationLabel(
  */
 export interface CitationNavigationState {
   citation: ChatCitation;
+  /**
+   * Where the citation was followed from, when that matters to the screen
+   * it lands on (IR-355). Absent everywhere but Paper Chat.
+   */
+  origin?: CitationOrigin;
 }
 
-export function citationNavigationState(citation: ChatCitation): CitationNavigationState {
-  return { citation };
+/**
+ * A transcript whose citations the paper view treats differently (IR-355).
+ * Only Paper Chat today: a citation followed from it keeps its conversation
+ * open on the paper it lands on.
+ */
+export type CitationOrigin = "paper-chat";
+
+export function citationNavigationState(
+  citation: ChatCitation,
+  origin?: CitationOrigin | null,
+): CitationNavigationState {
+  return origin ? { citation, origin } : { citation };
+}
+
+/**
+ * Which transcript the citations below were rendered in. The citation links
+ * read it, so a transcript marks its own citations without every component
+ * between it and the link passing the mark down; outside any provider it is
+ * `null`, and a citation carries no origin.
+ */
+export const CitationOriginContext = createContext<CitationOrigin | null>(null);
+
+/**
+ * Whether this navigation followed a citation inside Paper Chat (IR-355).
+ * `state` is `useLocation().state`: whatever the navigation that got here
+ * left behind, which on a typed URL or a link elsewhere is nothing at all.
+ */
+export function followedFromPaperChat(state: unknown): boolean {
+  return (state as CitationNavigationState | null)?.origin === "paper-chat";
 }

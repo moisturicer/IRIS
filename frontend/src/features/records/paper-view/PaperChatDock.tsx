@@ -3,6 +3,7 @@ import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
+import { CitationOriginContext } from "@/lib/citedPage";
 import { AskIrisEmblem, AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
 import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessageBubble";
@@ -83,8 +84,24 @@ const STARTER_QUESTIONS = [
   "What are the key findings?",
 ] as const;
 
+/**
+ * How the page's current record was reached (IR-355). `key` is unique per
+ * navigation; `fromPaperChat` says it followed a citation inside this panel.
+ */
+export interface PaperChatArrival {
+  key: string;
+  fromPaperChat: boolean;
+}
+
 interface PaperChatPanelProps {
+  /** The record the page is showing. */
   record: RecordDetail;
+  /**
+   * How the page got to `record`, or `null` while it is still loading the
+   * record it is going to, when `record` is still the one it is leaving.
+   * Absent, the panel stays on the paper it opened on.
+   */
+  arrival?: PaperChatArrival | null;
   dock: DockMode;
   onDockChange: (mode: DockMode) => void;
   onClose: () => void;
@@ -106,6 +123,9 @@ interface PaperChatPanelProps {
   className?: string;
 }
 
+/** The paper a Paper Chat conversation is about. */
+type ChatSubject = Pick<RecordDetail, "id" | "title">;
+
 /**
  * Paper Chat — a Conversation scoped to the record being viewed (IR-298).
  *
@@ -115,9 +135,17 @@ interface PaperChatPanelProps {
  * Record's own passages by default — the backend consults the Conversation's
  * `record`, not a title glued onto the question — until the reader turns on
  * "All papers" for a question that needs one.
+ *
+ * The conversation is about the paper it opened on, usually the page's
+ * record. Following one of its citations to a different paper keeps it open,
+ * pinned, so the reader does not lose the answer they followed (IR-355,
+ * ADR-026 section 9 as amended). The pin holds only across that navigation:
+ * "Chat about this paper instead", closing the panel, and reaching a paper
+ * any other way all bring back the page's own record.
  */
 export function PaperChatPanel({
   record,
+  arrival,
   dock,
   onDockChange,
   onClose,
@@ -137,17 +165,36 @@ export function PaperChatPanel({
   const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const { streaming, ask } = useAskStream();
+  const [subject, setSubject] = useState<ChatSubject>(() => ({ id: record.id, title: record.title }));
+  const pinned = subject.id !== record.id;
 
-  // Find or start the Conversation for this Record. Re-runs if the reader
-  // navigates to a different paper while the panel stays open.
+  // A citation followed from this panel keeps its conversation; any other
+  // arrival brings the page's record. Decided once the page has the record
+  // it was going to (`arrival` set), never against the one it is leaving.
+  useEffect(() => {
+    if (!arrival || arrival.fromPaperChat) return;
+    setSubject((current) =>
+      current.id === record.id ? current : { id: record.id, title: record.title },
+    );
+    // `arrival.key` changes on every navigation, including a second visit
+    // to the record already shown, which is still "another way" to it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record.id, arrival?.key]);
+
+  // Find or start the Conversation for the subject. Re-runs when the subject
+  // changes, and resets the scope with it: the conversation owns its scope,
+  // so the page moving to another paper leaves it alone (IR-355).
   useEffect(() => {
     let cancelled = false;
     setReady(false);
     setWiden(false);
+    // Until the new conversation arrives there is nowhere to send to: a
+    // question typed during the switch must not land in the old one.
+    setConversationId(null);
 
     (async () => {
       try {
-        const { data: conversation } = await aiApi.conversations.findOrCreateForRecord(record.id);
+        const { data: conversation } = await aiApi.conversations.findOrCreateForRecord(subject.id);
         if (cancelled) return;
         setConversationId(conversation.id);
         setMessages(conversation.turns.flatMap(turnToMessages));
@@ -157,7 +204,7 @@ export function PaperChatPanel({
     })();
 
     return () => { cancelled = true; };
-  }, [record.id]);
+  }, [subject.id]);
 
   // Scroll the transcript itself, never with `scrollIntoView` (IR-351): that
   // scrolls every scrollable ancestor too, the window included, and threw a
@@ -241,7 +288,11 @@ export function PaperChatPanel({
                 IRIS AI
               </span>
             </p>
-            <p className="text-2xs text-stone-500 truncate">{record.title}</p>
+            {pinned ? (
+              <p className="text-2xs text-stone-500 truncate">Chatting about {subject.title}</p>
+            ) : (
+              <p className="text-2xs text-stone-500 truncate">{record.title}</p>
+            )}
           </div>
 
           {canChangePosition && (
@@ -291,9 +342,24 @@ export function PaperChatPanel({
           </Button>
         </div>
 
+        {/* Pinned to another paper (IR-355): one step to this one's own. */}
+        {pinned && (
+          <div className="px-4 pb-1">
+            <button
+              type="button"
+              onClick={() => setSubject({ id: record.id, title: record.title })}
+              className="inline-flex items-center gap-1.5 min-h-11 lg:min-h-7 text-2xs font-semibold text-brand hover:underline"
+            >
+              <i className="fas fa-arrow-right-arrow-left text-2xs" aria-hidden />
+              Chat about this paper instead
+            </button>
+          </div>
+        )}
+
         {/* The scope control (IR-298, ADR-026 section 9): visible, and the
             only thing that ever widens retrieval past this paper. Resets to
-            "this paper" whenever the panel switches to a different one. */}
+            "this paper" whenever the panel switches to a different
+            conversation, and not when only the page's paper changes. */}
         <div className="flex items-center gap-2 px-4 pb-2.5 text-2xs text-stone-500">
           <span>Answers from</span>
           <button
@@ -346,9 +412,13 @@ export function PaperChatPanel({
           </div>
         )}
 
-        {messages.map((m) => (
-          <ChatMessageBubble key={m.id} message={m} compact />
-        ))}
+        {/* Its citations say they came from here, which is what keeps this
+            conversation open on the paper they lead to (IR-355). */}
+        <CitationOriginContext.Provider value="paper-chat">
+          {messages.map((m) => (
+            <ChatMessageBubble key={m.id} message={m} compact />
+          ))}
+        </CitationOriginContext.Provider>
 
         {busy && streaming && <StreamingMessageBubble state={streaming} compact />}
       </div>
