@@ -60,6 +60,21 @@ describe("what counts as deciding by role", () => {
     ]);
   });
 
+  it("catches a role-name list, a switch on the role, and Django's staff flags", () => {
+    expect(
+      roleDecisions(`
+        const offices = ["RDCO", "ITSO"].includes(user.role_name);
+        switch (user?.role_name) {}
+        const staff = user.is_staff || user.is_superuser;
+      `),
+    ).toEqual([
+      'a role-name list: ["RDCO"',
+      "a switch on role_name: switch (user?.role_name",
+      "a Django staff flag: is_staff",
+      "a Django staff flag: is_superuser",
+    ]);
+  });
+
   it("lets the access map's screen gate and plain prose through", () => {
     expect(
       roleDecisions(`

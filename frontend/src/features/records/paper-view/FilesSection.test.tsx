@@ -174,6 +174,15 @@ describe("the Files section, for the owner of a record in review", () => {
     expect(within(ethics).getByRole("button", { name: "Upload Ethics Clearance" })).toBeInTheDocument();
   });
 
+  it("shows the reason on an item stored as rejected, too", async () => {
+    requests = [openRequest([item({ state: "rejected", state_label: "Rejected", rejection_reason: "Wrong form." })])];
+    renderFiles();
+
+    const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
+    expect(await within(ethics).findByText("Replacement needed")).toBeInTheDocument();
+    expect(within(ethics).getByText(/Wrong form\./)).toBeInTheDocument();
+  });
+
   it("says when an upload fails, and retries without choosing the file again", async () => {
     upload.mockReset().mockRejectedValueOnce({ response: { status: 400, data: { detail: "Only PDF files are accepted." } } });
     renderFiles();

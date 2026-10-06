@@ -54,7 +54,8 @@ export type PaperSection = (typeof PAPER_SECTIONS)[number];
 /** Who is looking: the signed-in user, or nobody. */
 export type Viewer = { id: number; role_name: RoleName | null };
 
-type Record_ = Pick<
+/** The Record detail fields the adapter reads. */
+type CapabilityInputs = Pick<
   RecordDetail,
   "owners" | "can_act" | "can_request_document" | "workflow_state" | "pipeline_status" | "abstract_file" | "files"
 >;
@@ -65,21 +66,28 @@ export function isOwner(record: Pick<RecordDetail, "owners">, viewer: Viewer | n
 }
 
 /**
- * An owner, or someone the server lets act or ask on the record. ADR-032's
+ * Whether the viewer takes part in the review: the server lets them act on the
+ * record, or ask its owner for documents.
+ */
+export function isReviewing(record: CapabilityInputs, viewer: Viewer | null): boolean {
+  return viewer != null && (record.can_act.length > 0 || record.can_request_document.length > 0);
+}
+
+/**
+ * An owner, or someone taking part in the review. ADR-032's
  * `is_record_participant` also counts anyone who *has* held a seat; until
  * seats exist (IR-415) a reviewer whose part is finished is not counted here.
  */
-function isParticipant(record: Record_, viewer: Viewer | null): boolean {
-  if (viewer == null) return false;
-  return isOwner(record, viewer) || record.can_act.length > 0 || record.can_request_document.length > 0;
+export function isParticipant(record: CapabilityInputs, viewer: Viewer | null): boolean {
+  return isOwner(record, viewer) || isReviewing(record, viewer);
 }
 
 /** Whether there is a paper to read: the manuscript, else any attached file. */
-function hasPaper(record: Record_): boolean {
+function hasPaper(record: CapabilityInputs): boolean {
   return Boolean(record.abstract_file) || record.files.length > 0;
 }
 
-export function capabilitiesFor(record: Record_, viewer: Viewer | null): ReadonlySet<Capability> {
+export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null): ReadonlySet<Capability> {
   const granted = new Set<Capability>(["cite"]);
   if (viewer == null) return granted;
 
@@ -119,13 +127,13 @@ export function capabilitiesFor(record: Record_, viewer: Viewer | null): Readonl
   return granted;
 }
 
-/** The sections this viewer may open, in tab order. */
 /** A `?section=` value Paper View knows, else null. */
 export function asSection(value: string | null): PaperSection | null {
   return (PAPER_SECTIONS as readonly string[]).includes(value ?? "") ? (value as PaperSection) : null;
 }
 
-export function sectionsFor(record: Record_, viewer: Viewer | null): PaperSection[] {
+/** The sections this viewer may open, in tab order. */
+export function sectionsFor(record: CapabilityInputs, viewer: Viewer | null): PaperSection[] {
   const participant = isParticipant(record, viewer);
   return PAPER_SECTIONS.filter((section) => {
     switch (section) {

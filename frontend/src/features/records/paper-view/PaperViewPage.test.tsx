@@ -1331,6 +1331,20 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 });
 
+describe("the Review section's actions (IR-411)", () => {
+  // Spec §4.7: until F6's action bar, Request documents sits beside the link
+  // to the current decision form.
+  it("offers Request documents to a party the API names", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Request documents" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
+  });
+});
+
 describe("a record the viewer cannot read (IR-411)", () => {
   it("shows the same not-found state as a missing record", async () => {
     vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
@@ -1339,5 +1353,18 @@ describe("a record the viewer cannot read (IR-411)", () => {
 
     expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+  });
+
+  it("says a failed load failed, rather than calling the record missing, and tries again", async () => {
+    shownRecord = record;
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce(new Error("Network Error"));
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "We couldn't load this record" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Record not available" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitForRecord(record.title);
   });
 });

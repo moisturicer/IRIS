@@ -18,6 +18,9 @@ const PATTERNS: ReadonlyArray<{ name: string; pattern: RegExp }> = [
     name: "a role-name literal comparison",
     pattern: /[!=]==?\s*["'](?:Student|Adviser|RDCO|ITSO|IERC|KTTO)["']|["'](?:Student|Adviser|RDCO|ITSO|IERC|KTTO)["']\s*[!=]==?/g,
   },
+  { name: "a role-name list", pattern: /\[\s*["'](?:Student|Adviser|RDCO|ITSO|IERC|KTTO)["']/g },
+  { name: "a switch on role_name", pattern: /\bswitch\s*\(\s*[\w.?]*\brole_name\b/g },
+  { name: "a Django staff flag", pattern: /\bis_(?:staff|superuser)\b/g },
   { name: "can_act", pattern: /\bcan_act\b/g },
 ];
 

@@ -238,7 +238,6 @@ describe("ReviewerDocumentRequests", () => {
   // Whether the viewer reviews comes from the capabilities adapter now, not
   // from their role (IR-411), so the caller says so.
   it("does not load requests for a viewer who reviews nothing", async () => {
-    signInAs("Student");
     renderBlock([], vi.fn(), false);
 
     expect(documentRequests).not.toHaveBeenCalled();

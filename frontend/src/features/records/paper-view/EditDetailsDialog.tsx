@@ -11,7 +11,7 @@
  * to the reviewers with the resubmission (invariant 4). The server re-checks.
  */
 import { useEffect, useMemo, useState } from "react";
-import { FormProvider, useForm, type FieldErrors } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { accountsApi } from "@/api/accounts";
@@ -26,24 +26,8 @@ import type { User } from "@/types/auth";
 import type { Classification, PSCEDClassification, RecordDetail } from "@/types/records";
 
 import { describeFailure, stateFromDraft, type ApiFailure } from "@/features/publish/draft";
-import {
-  METADATA_FIELD_IDS,
-  METADATA_FIELD_ORDER,
-  MORE_DETAILS_FIELDS,
-  MetadataForm,
-} from "@/features/records/metadata/MetadataForm";
+import { FORM_FIELD, MetadataForm, focusFirstInvalid } from "@/features/records/metadata/MetadataForm";
 import { metadataPayload, metadataSchema, type MetadataValues } from "@/features/records/metadata/metadataSchema";
-
-/** The server's field names, as the form names them, where they differ. */
-const FORM_FIELD: Record<string, keyof MetadataValues> = {
-  title: "title",
-  abstract: "abstract",
-  adviser: "adviser",
-  authors: "authors",
-  year_accomplished: "year",
-  classification: "classification",
-  psced: "psced",
-};
 
 interface Lists {
   advisers:        User[];
@@ -108,13 +92,6 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function focusFirstError(errors: FieldErrors<MetadataValues>) {
-    const field = METADATA_FIELD_ORDER.find((name) => errors[name]);
-    if (!field) return;
-    if (MORE_DETAILS_FIELDS.includes(field)) setMoreOpen(true);
-    requestAnimationFrame(() => document.getElementById(METADATA_FIELD_IDS[field])?.focus());
-  }
-
   async function save(values: MetadataValues) {
     setSaving(true);
     setFailure(null);
@@ -134,7 +111,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
     }
   }
 
-  const onSubmit = form.handleSubmit(save, focusFirstError);
+  const onSubmit = form.handleSubmit(save, (errors) => focusFirstInvalid(errors, () => setMoreOpen(true)));
   const revising = record.workflow_state === "awaiting_resubmission";
 
   return (
@@ -168,7 +145,8 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-section-sm">
         {revising && (
           <p className="text-small text-stone-700">
-            A revision was requested. What you change here goes back to the reviewers with your resubmission.
+            A revision was requested. Changes here are saved straight away, and the reviewers see them when you
+            resubmit.
           </p>
         )}
         {failure && failure.message && Object.keys(failure.fields).length === 0 && (

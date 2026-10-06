@@ -20,7 +20,7 @@
  * names whoever the server says holds the record now.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { FormProvider, useForm, type FieldErrors } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -37,12 +37,7 @@ import { useAuthStore } from "@/store/auth.store";
 import type { User } from "@/types/auth";
 import type { Classification, PSCEDClassification, RecordType, TrackerHolder } from "@/types/records";
 
-import {
-  METADATA_FIELD_IDS,
-  METADATA_FIELD_ORDER,
-  MORE_DETAILS_FIELDS,
-  MetadataForm,
-} from "@/features/records/metadata/MetadataForm";
+import { FORM_FIELD, MetadataForm, focusFirstInvalid } from "@/features/records/metadata/MetadataForm";
 import {
   emptyMetadata,
   metadataPayload,
@@ -83,17 +78,6 @@ const FIELD_LABELS: Record<string, string> = {
   psced: "PSCED classification",
   record_type: "Type",
   abstract_file: "Manuscript",
-};
-
-/** Server field → form field, where they differ in name. */
-const FORM_FIELD: Record<string, keyof MetadataValues> = {
-  title: "title",
-  abstract: "abstract",
-  adviser: "adviser",
-  authors: "authors",
-  year_accomplished: "year",
-  classification: "classification",
-  psced: "psced",
 };
 
 /**
@@ -379,14 +363,6 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   /* ── Step 2: validate, then patch the draft ──────────────────────────── */
-  function focusFirstError(errors: FieldErrors<MetadataValues>) {
-    const field = METADATA_FIELD_ORDER.find((name) => errors[name]);
-    if (!field) return;
-    if (MORE_DETAILS_FIELDS.includes(field)) setMoreOpen(true);
-    // After the render that opens More details or shows the error.
-    requestAnimationFrame(() => document.getElementById(METADATA_FIELD_IDS[field])?.focus());
-  }
-
   async function saveDetails(values: MetadataValues) {
     const id = draftIdRef.current;
     if (id == null) return;
@@ -412,7 +388,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     }
   }
 
-  const continueFromDetails = form.handleSubmit(saveDetails, focusFirstError);
+  const continueFromDetails = form.handleSubmit(saveDetails, (errors) => focusFirstInvalid(errors, () => setMoreOpen(true)));
 
   /* ── Step 3: submit, then re-read who holds it ───────────────────────── */
   async function submit() {

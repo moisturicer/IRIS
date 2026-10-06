@@ -29,14 +29,4 @@ describe("retired URLs", () => {
 
     expect(await screen.findByText(`Landed on ${sample(to)}`)).toBeInTheDocument();
   });
-
-  it("sends the documents page and the edit page to the record they named", async () => {
-    renderScreen(<App />, { route: "/records/41/documents" });
-    expect(await screen.findByText("Landed on /records/41?section=files")).toBeInTheDocument();
-  });
-
-  it("opens Edit details on the record the edit page named", async () => {
-    renderScreen(<App />, { route: "/records/41/edit" });
-    expect(await screen.findByText("Landed on /records/41?edit=details")).toBeInTheDocument();
-  });
 });

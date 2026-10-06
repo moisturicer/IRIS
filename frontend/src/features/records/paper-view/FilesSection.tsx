@@ -27,7 +27,7 @@ import { UploadDropzone, type UploadState } from "@/components/shared/UploadDrop
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
@@ -86,12 +86,7 @@ function askedFor(requests: DocumentRequest[]): { bySlot: Map<number, Asked>; ot
 
 async function saveBlob(fetch: () => Promise<{ data: unknown }>, filename: string) {
   const { data } = await fetch();
-  const url = URL.createObjectURL(data as Blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(data as Blob, filename);
 }
 
 export function FilesSection({ record, owner, editable, reviewing, onChanged }: FilesSectionProps) {
@@ -187,15 +182,21 @@ export function FilesSection({ record, owner, editable, reviewing, onChanged }: 
       <section>
         <SectionHeading>Manuscript</SectionHeading>
         {record.abstract_file ? (
-          <p className="text-body text-stone-700">
-            The manuscript is the paper itself.{" "}
-            <Link
-              to={`/records/${record.id}?section=paper`}
-              className={cn("font-semibold text-brand hover:underline", FOCUS_RING)}
-            >
-              Read it in the Paper section
-            </Link>
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-body text-stone-700">
+              The manuscript is the paper itself.{" "}
+              <Link
+                to={`/records/${record.id}?section=paper`}
+                className={cn("font-semibold text-brand hover:underline", FOCUS_RING)}
+              >
+                Read it in the Paper section
+              </Link>
+            </p>
+            <DownloadButton
+              name="the manuscript"
+              onClick={() => download(() => recordsApi.manuscriptBlob(record.id), "manuscript.pdf")}
+            />
+          </div>
         ) : (
           <p className="text-body text-stone-600">No manuscript has been uploaded yet.</p>
         )}
@@ -300,10 +301,9 @@ export function FilesSection({ record, owner, editable, reviewing, onChanged }: 
         </section>
       )}
 
-      <p role="status" className="sr-only">
+      <p role="status" className="text-small text-brand empty:hidden">
         {notice ?? ""}
       </p>
-      {notice && <p className="text-small text-brand">{notice}</p>}
     </div>
   );
 }
@@ -322,7 +322,7 @@ function DocumentCard({ name, asked, children }: { name: string; asked?: Asked; 
       {asked && (
         <p className="text-small text-stone-600">
           Requested by {asked.asker}.
-          {asked.item.state === "missing" && asked.item.rejection_reason && (
+          {itemStatus(asked.item) === "replacement_needed" && asked.item.rejection_reason && (
             <>
               {" "}
               {asked.asker} did not accept the last upload: “{asked.item.rejection_reason}”

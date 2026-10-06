@@ -39,10 +39,15 @@ export const ITEM_STATUS_WORDS: Record<ItemStatus, string> = {
   replacement_needed: "Replacement needed",
 };
 
-/** By meaning (IR-358): waiting on the owner is attention, with a reviewer is active. */
+/**
+ * By meaning (IR-358; 01-design-system §0). Requested is recoverable and
+ * awaiting review is with a reviewer, so both are active and their words tell
+ * them apart; a refused upload is attention, because the owner must act; an
+ * accepted one is settled.
+ */
 export const ITEM_STATUS_TONES: Record<ItemStatus, string> = {
   requested:          TONES.active,
-  awaiting_review:    TONES.quiet,
+  awaiting_review:    TONES.active,
   accepted:           TONES.settled,
   replacement_needed: TONES.attention,
 };
@@ -51,7 +56,7 @@ export const ITEM_STATUS_TONES: Record<ItemStatus, string> = {
 export function ItemStatusChip({ item }: { item: Pick<DocumentRequestItem, "state" | "rejection_reason"> }) {
   const status = itemStatus(item);
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold ${ITEM_STATUS_TONES[status]}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-label font-semibold ${ITEM_STATUS_TONES[status]}`}>
       {ITEM_STATUS_WORDS[status]}
     </span>
   );

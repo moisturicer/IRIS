@@ -21,10 +21,13 @@ import {
   asSection,
   capabilitiesFor,
   isOwner,
+  isParticipant,
+  isReviewing,
   sectionsFor,
   type PaperSection,
   type Viewer,
 } from "@/features/records/capabilities";
+import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
 import {
   usePaperChat,
   PaperChatPanel,
@@ -69,9 +72,7 @@ const REVIEW_STATUS_STYLES: Record<string, string> = {
 function ReviewHistory({ reviews }: { reviews: RecordReview[] }) {
   return (
     <section className="bg-white border border-stone-200 rounded-2xl p-5">
-      <h2 className="text-2xs font-bold uppercase tracking-wider text-stone-500 mb-3">
-        Review History
-      </h2>
+      <h2 className="text-heading font-semibold text-stone-900 mb-3">Review history</h2>
       <ol className="space-y-3">
         {reviews.map((r) => (
           <li key={r.id} className="flex gap-3">
@@ -149,9 +150,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
 
   return (
     <section className="bg-white border border-stone-200 rounded-2xl p-5">
-      <h2 className="text-2xs font-bold uppercase tracking-wider text-stone-500 mb-1">
-        IP Classification
-      </h2>
+      <h2 className="text-heading font-semibold text-stone-900 mb-1">IP classification</h2>
       <p className="text-xs text-stone-500 mb-3">
         Office staff only. Sets the structured IP type recorded against this disclosure.
       </p>
@@ -357,6 +356,9 @@ export default function PaperViewPage() {
   const chat = usePaperChat();
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  /** The last load failed for a reason other than "no such record"; Try again bumps `attempt`. */
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const [resubmitting, setResubmitting] = useState(false);
@@ -373,29 +375,27 @@ export default function PaperViewPage() {
   // What counts as arriving. A change of section or of the Edit details
   // dialog rewrites the URL, which gives the location a new key, but nobody
   // arrived: the reader is still on this paper, in the conversation they had.
-  // Those changes mark themselves here first, and every other new key -- a
-  // citation, a link, Back or Forward -- is an arrival.
-  const viewChange = useRef(false);
+  // Such a change records the exact address it asked for, and a new key at
+  // that address is the change landing; every other new key -- a citation, a
+  // link, Back or Forward -- is an arrival. Read during render, and
+  // idempotent there: a second render of the same location changes nothing.
+  const viewChange = useRef<string | null>(null);
   const lastKey = useRef(location.key);
   const arrivalKey = useRef(location.key);
   if (location.key !== lastKey.current) {
     lastKey.current = location.key;
-    if (viewChange.current) viewChange.current = false;
+    if (viewChange.current === `${location.pathname}${location.search}`) viewChange.current = null;
     else arrivalKey.current = location.key;
   }
 
   /** Set or clear one view parameter in place, keeping the rest and the router state. */
   const setViewParam = (name: string, value: string | null) => {
-    viewChange.current = true;
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (value == null) next.delete(name);
-        else next.set(name, value);
-        return next;
-      },
-      { replace: true, state: location.state },
-    );
+    const next = new URLSearchParams(searchParams);
+    if (value == null) next.delete(name);
+    else next.set(name, value);
+    const search = next.toString();
+    viewChange.current = `${location.pathname}${search ? `?${search}` : ""}`;
+    setSearchParams(next, { replace: true, state: location.state });
   };
 
   // Below `lg` the docked chat is a bottom sheet over the paper; at `lg` it
@@ -422,17 +422,24 @@ export default function PaperViewPage() {
       .detail(Number(id))
       .then(({ data }) => {
         setRecord(data);
+        setLoadFailed(false);
         // access_count is a global counter, so it cannot answer "what have I
         // read?". My Library's reading history is written here instead, per
         // browser. See lib/recordLibrary.
         recordVisit(data.id, data.title);
       })
       // A 404 is a missing record and a refused one alike (IR-153): the API
-      // never says which, so neither does this page.
-      .catch(() => setRecord(null))
+      // never says which, so neither does this page. Any other failure is
+      // not "not found", and says so with a way to try again.
+      .catch((err: { response?: { status?: number } }) => {
+        setRecord(null);
+        setLoadFailed(err?.response?.status !== 404);
+      })
       .finally(() => setLoading(false));
-    recordsApi.incrementAccess(Number(id)).catch(() => {});
-  }, [id]);
+    if (attempt === 0) recordsApi.incrementAccess(Number(id)).catch(() => {});
+    // `attempt` is Try again; a retry is not a second visit to count.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, attempt]);
 
   const handleResubmit = async () => {
     if (!id) return;
@@ -485,11 +492,28 @@ export default function PaperViewPage() {
   // the chat must not unmount the conversation it was followed from.
   if (loading && !record) return <LoadingSkeleton />;
 
+  if (!record && loadFailed) {
+    return (
+      <div role="alert" className="max-w-md mx-auto text-center py-20">
+        <i className="fas fa-circle-exclamation text-3xl text-stone-300 mb-3" aria-hidden />
+        <h1 className="text-heading font-bold text-stone-800">We couldn't load this record</h1>
+        <p className="text-small text-stone-600 mt-1">Check your connection and try again.</p>
+        <button
+          type="button"
+          onClick={() => setAttempt((n) => n + 1)}
+          className={cn(PILL_PRIMARY, FOCUS_RING, "mt-4")}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   if (!record) {
     return (
       <div className="max-w-md mx-auto text-center py-20">
         <i className="fas fa-file-circle-question text-3xl text-stone-300 mb-3" aria-hidden />
-        <h1 className="text-md font-bold text-stone-800">Record not available</h1>
+        <h1 className="text-heading font-bold text-stone-800">Record not available</h1>
         <p className="text-sm text-stone-500 mt-1">
           It may have been withdrawn, or you may not have access to it.
         </p>
@@ -511,8 +535,8 @@ export default function PaperViewPage() {
   const can = capabilitiesFor(record, viewer);
   const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
-  const participant = sections.includes("review");
-  const reviewing = can.has("open_review") || can.has("request_document");
+  const participant = isParticipant(record, viewer);
+  const reviewing = isReviewing(record, viewer);
 
   // The section asked for, else the reader for a citation's page, else
   // Overview. One the viewer may not open is Overview too.
@@ -562,13 +586,19 @@ export default function PaperViewPage() {
       ? navCitation.regions
       : [];
 
-  // One filled action in the header (spec §4.6): the owner's pending action,
-  // else the reviewer's Open review, else Save.
+  // One filled action per region (spec §4.6, 01-design-system §0): the
+  // owner's pending action, else the reviewer's Open review, else Save. When
+  // the pending action has its own region -- the revision banner, the
+  // Review section's decision -- the header fills nothing.
   const primary = can.has("continue_draft")
     ? "continue"
-    : can.has("open_review") && section !== "review"
-      ? "open_review"
-      : "save";
+    : can.has("create_version")
+      ? "elsewhere"
+      : can.has("open_review") && section !== "review"
+        ? "open_review"
+        : section === "review" && can.has("decide")
+          ? "elsewhere"
+          : "save";
 
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -613,11 +643,11 @@ export default function PaperViewPage() {
                   type="button"
                   role="tab"
                   aria-selected={section === s}
-                  aria-controls={`${tabsId}-panel`}
+                  aria-controls={arriving ? undefined : `${tabsId}-panel`}
                   tabIndex={section === s ? 0 : -1}
                   onClick={() => setViewParam("section", s)}
                   className={cn(
-                    "min-h-11 px-3.5 sm:px-6 rounded-full text-sm sm:text-md font-semibold transition-colors duration-200",
+                    "min-h-11 px-3.5 sm:px-6 rounded-full text-small sm:text-body font-semibold transition-colors duration-200",
                     FOCUS_RING,
                     section === s ? "bg-brand text-white shadow-card" : "text-stone-600 hover:text-brand",
                   )}
@@ -640,12 +670,7 @@ export default function PaperViewPage() {
           {arriving ? (
             <MainColumnSkeleton />
           ) : (
-          <div
-            id={`${tabsId}-panel`}
-            role="tabpanel"
-            aria-labelledby={tabId(section)}
-            className="min-w-0 space-y-6"
-          >
+          <div className="min-w-0 space-y-6">
             {/* Editorial header (IR-356): where it sits, what it is, who
                 wrote it, then what to do with it. */}
             <header className="space-y-3">
@@ -781,6 +806,12 @@ export default function PaperViewPage() {
               )}
             </header>
 
+            <div
+              id={`${tabsId}-panel`}
+              role="tabpanel"
+              aria-labelledby={tabId(section)}
+              className="space-y-6"
+            >
             {section === "paper" && (
               <Suspense
                 fallback={<Skeleton rows={8} label="Loading the reader…" />}
@@ -890,15 +921,27 @@ export default function PaperViewPage() {
               // The review so far, until F6 (IR-412) turns it into the
               // timeline beside the paper with its action bar.
               <div className="space-y-6">
-                {can.has("decide") && (
+                {(can.has("decide") || can.has("request_document")) && (
                   <div className="rounded-2xl border border-stone-200 bg-white p-card space-y-3">
-                    <p className="text-body text-stone-700">
-                      Decisions are recorded on the current review form for now.
-                    </p>
-                    <Link to={`/review/${record.id}/evaluate`} className={PILL_PRIMARY}>
-                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                      Record a decision (current form)
-                    </Link>
+                    {can.has("decide") && (
+                      <>
+                        <p className="text-body text-stone-700">
+                          Decisions are recorded on the current review form for now.
+                        </p>
+                        <Link to={`/review/${record.id}/evaluate`} className={PILL_PRIMARY}>
+                          <i className="fas fa-clipboard-check text-xs" aria-hidden />
+                          Record a decision (current form)
+                        </Link>
+                      </>
+                    )}
+                    {can.has("request_document") && (
+                      <ReviewerDocumentRequests
+                        record={record}
+                        reviewing={reviewing}
+                        parts="request"
+                        onChanged={handleDocumentRequestChanged}
+                      />
+                    )}
                   </div>
                 )}
                 <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
@@ -915,6 +958,7 @@ export default function PaperViewPage() {
                 onChanged={handleDocumentRequestChanged}
               />
             )}
+            </div>
           </div>
           )}
 
