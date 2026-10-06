@@ -395,7 +395,8 @@ class RecordFileListView(generics.ListAPIView):
 
     def get_queryset(self):
         record_id = self.request.query_params.get("record")
-        return RecordFile.objects.filter(record_id=record_id)
+        # `record` for each file's `can_remove`, `uploaded_by` for its name.
+        return RecordFile.objects.filter(record_id=record_id).select_related("record", "uploaded_by")
 
 
 class RecordFileUploadView(APIView):
@@ -539,13 +540,12 @@ class RecordFileDeleteView(APIView):
     def delete(self, request, pk):
         from apps.records.models import Record
 
-        from .attachments import may_remove
+        from .attachments import delete_record_file, may_remove
 
-        try:
-            record_file = RecordFile.objects.select_related("record").get(pk=pk)
-        except RecordFile.DoesNotExist:
-            return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
-        if not Record.objects.visible_to(request.user).filter(pk=record_file.record_id).exists():
+        record_file = RecordFile.objects.select_related("record").filter(pk=pk).first()
+        if record_file is None or not (
+            Record.objects.visible_to(request.user).filter(pk=record_file.record_id).exists()
+        ):
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if not may_remove(record_file, request.user):
@@ -556,14 +556,7 @@ class RecordFileDeleteView(APIView):
 
         record = record_file.record
         filename = record_file.filename
-
-        try:
-            if record_file.file:
-                record_file.file.delete(save=False)
-        except Exception:
-            pass
-
-        record_file.delete()
+        delete_record_file(record_file)
 
         create_audit_event(
             "DELETE", request.user, record=record,

@@ -2,9 +2,9 @@
 IR-476: a supplementary file belongs to the office that filed it.
 
 Adds `RecordFile.party` and fills existing rows from the uploader's *current*
-role (decision 7). The mapping is written out here rather than imported from
-`apps.reviews.tracker`, so a later change to who staffs what cannot rewrite
-what this migration did. RDCO maps to `rdco`, never `intake`. A row whose
+role (ADR-032 §10, IR-476 amendment). The mapping is written out here rather
+than imported from `apps.reviews.tracker`, so a later change to who staffs what
+cannot rewrite what this migration did. RDCO maps to `rdco`, never `intake`. A row whose
 uploader is gone or is not an office stays null, and only the superuser can
 remove it, in Django admin.
 """

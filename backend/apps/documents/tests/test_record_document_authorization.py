@@ -599,6 +599,11 @@ class RecordFileAdminTests(APITestCase):
         self.assertFalse(RecordFile.objects.filter(pk=self.record_file.pk).exists())
         self.assertFalse(default_storage.exists(name), "admin delete left the stored file behind")
         self.assertTrue(LogEntry.objects.filter(action_flag=DELETION, user=self.superuser).exists())
+        from apps.audit.models import AuditEvent
+        self.assertTrue(
+            AuditEvent.objects.filter(event_type="DELETE", user=self.superuser).exists(),
+            "an admin removal left no trace in the IRIS audit trail",
+        )
 
     def test_the_admin_bulk_delete_removes_the_stored_files(self):
         from django.core.files.storage import default_storage
@@ -614,10 +619,23 @@ class RecordFileAdminTests(APITestCase):
         self.assertFalse(default_storage.exists(name), "bulk delete left the stored file behind")
 
     def test_an_office_admin_account_is_not_the_escape_hatch(self):
-        """Only the superuser: a Django `is_staff` office account is refused."""
+        """
+        Only the superuser. An `is_staff` RDCO account is refused even when it
+        holds Django's own view and delete permissions on the model, which the
+        default `ModelAdmin` would honour.
+        """
+        from django.contrib.auth.models import Permission
+        from django.core.files.storage import default_storage
+
         rdco = RecordDocumentAuthorizationTests.make_user("admin-rdco@cit.edu", "RDCO")
         User.objects.filter(pk=rdco.pk).update(is_staff=True)
         rdco.refresh_from_db()
+        rdco.user_permissions.add(*Permission.objects.filter(
+            content_type__app_label="documents",
+            codename__in=("view_recordfile", "delete_recordfile"),
+        ))
         self.client.force_login(rdco)
-        self.client.post(self._delete_url(), {"post": "yes"})
+        response = self.client.post(self._delete_url(), {"post": "yes"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertTrue(RecordFile.objects.filter(pk=self.record_file.pk).exists())
+        self.assertTrue(default_storage.exists(self.record_file.file.name))

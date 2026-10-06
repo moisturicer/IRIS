@@ -276,6 +276,17 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 - **`continue_draft`**: an owner reopens their own `draft` in Publish. Granted to an owner of a draft only.
 - **`attach_file`**: an office files a supplementary file of its own on a record it takes part in, and may remove one. It complements ADR-022's document requests: a request asks the owner for a document, an attachment is the office's own. Until IR-418 the frontend adapter derives it from the office role (the server's `IsStaff`), as it does `tag_ip`.
 
+**Amendment, 2026-10-06 (project lead, IR-474 and IR-476): what "of its own" and "takes part" mean for `attach_file`.** Settled in a design grilling and built in IR-474 (attach) and IR-476 (remove):
+
+- **Taking part** is an active assignment the user can staff (`tracker.requestable_parties`). A completed assignment grants nothing.
+- **A file belongs to an office, not a person.** `RecordFile.party` records the office that filed it, the same "party, not person" rule as a document request. RDCO always files as `rdco`, never `intake`.
+- **Removing a file** takes both: the file's party is one the user can staff, and the user's office is taking part right now. Another office's file, or a file on a record the office no longer takes part in, is refused.
+- **Owners do not remove office attachments.** An office's file is part of its review record.
+- **The escape hatch is Django admin, superuser only.** It removes the stored file and writes an audit event. There is no API override, for RDCO or anyone. A row with no party (one backfilled from an uploader who was gone or not an office) can be removed only there.
+- **The screen follows the server.** Each file carries a server-computed `can_remove`, and Paper View offers Remove only where it is true.
+- **Refusals follow ADR-022 §Amendment 4:** 404 for a file that does not exist or is on a record the caller cannot see, 403 for one they can see but may not remove.
+- **Out of scope:** KTTO filing on a published record (for example a patent receipt). If needed, it becomes its own capability.
+
 **The party status strip** follows ADR-021 §14, with two changes. The Intake row is gone. The RDCO row reads **"Not required"** on a record no office was routed to, instead of "awaiting".
 
 ### 11. Lifecycle

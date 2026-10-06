@@ -209,7 +209,8 @@ class RecordFile(models.Model):
     UploadSlot: owners file their documents through the slots instead.
 
     The file belongs to the office in `party`, not to the person who uploaded
-    it (IR-476), and only that office may remove it -- `attachments.py`.
+    it, and only that office may remove it (ADR-032 §10, IR-476 amendment;
+    `attachments.py`).
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="files")
     file        = models.FileField(upload_to="record_files/")
