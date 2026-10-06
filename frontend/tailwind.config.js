@@ -52,6 +52,26 @@ export default {
         base: ["15px", { lineHeight: "22px" }],
         md:   ["16px", { lineHeight: "24px" }],
         lg:   ["17px", { lineHeight: "26px" }],
+
+        // Type roles (IR-405; frontend_redesign_spec §4.12; 01-design-system §0).
+        // Named for what the text is, so a screen asks for `text-title` and the
+        // size follows. `display` and `title` are set in `font-display`.
+        display: ["28px", { lineHeight: "34px" }],
+        title:   ["20px", { lineHeight: "28px" }],
+        heading: ["16px", { lineHeight: "24px" }],
+        body:    ["15px", { lineHeight: "24px" }],
+        small:   ["13px", { lineHeight: "20px" }],
+        label:   ["12px", { lineHeight: "16px" }],
+      },
+
+      // On Tailwind's 4 px base (IR-405): the section rhythm and card padding,
+      // so `p-card` means the same 20 px on every card.
+      spacing: {
+        "section-sm":   "1rem",
+        section:        "1.5rem",
+        "section-lg":   "2rem",
+        card:           "1.25rem",
+        "card-compact": "1rem",
       },
 
       borderRadius: {

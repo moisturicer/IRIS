@@ -27,9 +27,32 @@ function inlineSizes(): Map<number, string[]> {
   return found;
 }
 
+type FontSize = [string, { lineHeight: string }];
+
+/**
+ * The type roles (IR-405; spec §4.12). Named for what the text is rather than
+ * how big it is, so a screen picks `text-title` for a dialog title and the
+ * size follows. They sit beside the size ladder, not on it: two of them are
+ * heading sizes, which the ladder deliberately stops short of.
+ */
+const ROLES: Record<string, [number, number]> = {
+  display: [28, 34],
+  title:   [20, 28],
+  heading: [16, 24],
+  body:    [15, 24],
+  small:   [13, 20],
+  label:   [12, 16],
+};
+
+function px(value: string): number {
+  return Number(value.replace("px", ""));
+}
+
 function scaleSizes(): number[] {
-  const scale = config.theme.extend.fontSize as Record<string, [string, unknown]>;
-  return Object.values(scale).map(([size]) => Number(size.replace("px", "")));
+  const scale = config.theme.extend.fontSize as Record<string, FontSize>;
+  return Object.entries(scale)
+    .filter(([name]) => !(name in ROLES))
+    .map(([, [size]]) => px(size));
 }
 
 describe("type scale", () => {
@@ -51,6 +74,18 @@ describe("type scale", () => {
     for (let i = 1; i < sorted.length; i += 1) {
       expect(sorted[i] - sorted[i - 1], `gap between ${sorted[i - 1]}px and ${sorted[i]}px`).toBe(1);
     }
+  });
+
+  it("defines each type role at the size and leading the spec gives it", () => {
+    const scale = config.theme.extend.fontSize as Record<string, FontSize>;
+    const defined = Object.fromEntries(
+      Object.keys(ROLES).map((role) => {
+        const entry = scale[role];
+        return [role, entry ? [px(entry[0]), px(entry[1].lineHeight)] : undefined];
+      }),
+    );
+
+    expect(defined).toEqual(ROLES);
   });
 
   it("sets Discover titles in the face the paper view gives a title", () => {

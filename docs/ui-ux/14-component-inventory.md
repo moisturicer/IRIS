@@ -57,10 +57,11 @@ A component library exists. Roughly a tenth of the product uses it.
 |---|---|---|---|
 | `DataTable` | 124 | **FIX** | `<caption>`, `<th scope>`, `overflow-x-auto`, cards below 768 px ([13](13-responsive.md)). Fix once — the two consumers and every future one inherit it |
 | `StatusBadge` | 26 | **FIX** | Remove the stale `ktto_review` key; take labels from the API, not a literal map ([11](11-saas-admin.md)). **IR-356:** now four palette tones (quiet · active · attention · settled, [01](01-design-system.md) §0) instead of eleven colour families |
-| `EmptyState` | 15 | **FIX** | `text-gray-400` → `text-gray-500`. Add an optional action slot — most empty states in these docs prescribe a next step |
+| `EmptyState` | 60 | **DONE (IR-405)** | An `action` slot, an `error` tone (announced as an alert, icon on maroon) and a `framed` card; the title is a heading. Discover's private copy is deleted and Discover uses this one |
 | `ConfirmDialog` | 49 | **KEEP** | Correct. **Use it on the reject action** ([07](07-review-clearance.md)) |
-| `FileUploadZone` | 74 | **FIX** | Must expose a real keyboard-operable `<input type="file">`, not drag-only ([05](05-submission.md)) |
+| ~~`FileUploadZone`~~ → `UploadDropzone` | 300 | **DONE (IR-405)** | Replaced by `UploadDropzone`, and `FileUploadZone` is deleted. Enter and Space open the chooser. With `validate` it refuses a file whose type is not in `accept` or whose size is over `maxBytes`, before upload, naming the limit; its accepted-types line is then built from the same two props. `upload={{ status: "uploading" }}` turns it into a progress bar; `upload={{ status: "failed", onRetry }}` retries without choosing the file again. One live region announces the start and the success, and keyboard focus follows the zone into the progress bar and back. Without `validate` it checks nothing, so its two existing callers (the Documents page and the wizard's uploads step, which validate for themselves) behave as before |
 | `RoleBadge` | 20 | **FIX** | Same hardcoded-vocabulary issue as `StatusBadge` |
+| `ResearchCard` | 138 | **NEW (IR-405)** | One card for a record, `list` or `grid`, with slots for the eyebrow, meta, byline, summary, status line, next step, footer and actions. The title link is stretched over the card, so the article needs no `onClick` and the actions stay separate controls. It replaces Discover's card, My Library's rows, My Workspace's case card and the queue rows as F2, F4 and IR-268 adopt it; F0 adopts it nowhere |
 | `ComingSoonPage` | 39 | **REMOVE** | No "coming soon" destinations in the pilot ([03](03-navigation.md)). Deleting the component is what enforces the rule |
 
 ---
@@ -74,7 +75,7 @@ A component library exists. Roughly a tenth of the product uses it.
 | `NotificationBell` | 104 | **FIX** | `w-[320px]` dropdown needs `max-w-[calc(100vw-2rem)]` ([13](13-responsive.md)) |
 | `Header` | 50 | **FIX** | `w-[34px]` toggle is below the 44 px touch target; **no global search box** ([03](03-navigation.md) §6) |
 | `Breadcrumbs` | 46 | **KEEP** | `handle.crumb` metadata is a good pattern |
-| `PageHeader` | 17 | **KEEP** | Sound |
+| `PageHeader` | 23 | **RESTYLED (IR-405)** | Same props. The title is `font-display`, at `title` on a phone and `display` from `sm`; the description is `body`; the actions wrap under the title on a phone instead of squeezing it |
 
 ---
 

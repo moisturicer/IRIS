@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, within } from "@/test/render";
+import { recordsApi } from "@/api/records";
 import type { RecordListItem } from "@/types/records";
 
 import DiscoverPage from "./DiscoverPage";
@@ -119,5 +120,41 @@ describe("Discover without Proposals", () => {
   it("still lists a published thesis", async () => {
     renderScreen(<DiscoverPage />, { route: "/discover" });
     expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
+  });
+});
+
+/**
+ * The feed's empty and failed states, now drawn by the shared `EmptyState`
+ * (IR-405) instead of a private copy. What each one says and offers is
+ * unchanged from before the swap.
+ */
+describe("Discover with nothing to show", () => {
+  it("says nothing is published yet, and offers no reset when nothing was filtered", async () => {
+    listed = [];
+    const { container } = renderScreen(<DiscoverPage />, { route: "/discover" });
+
+    expect(await screen.findByRole("heading", { name: "No research papers found" })).toBeInTheDocument();
+    expect(screen.getByText(/nothing has been published yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset all filters" })).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("offers to reset a search that matched nothing", async () => {
+    listed = [];
+    renderScreen(<DiscoverPage />, { route: "/discover?q=flood" });
+
+    expect(await screen.findByText(/no records match your current search/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reset all filters" }));
+
+    expect(await screen.findByText(/nothing has been published yet/i)).toBeInTheDocument();
+  });
+
+  it("announces a feed that failed to load", async () => {
+    vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new Error("down")));
+    renderScreen(<DiscoverPage />, { route: "/discover" });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Something went wrong");
+    expect(alert).toHaveTextContent("Could not load records.");
   });
 });
