@@ -33,6 +33,7 @@ from django.conf import settings
 from .dialects import DEFAULT_DIALECT, VendorDialect
 from .errors import ClassifiedError, ErrorKind, classify_message, classify_status_code
 from .ports import StreamDelta
+from .tool_calling import ToolCall, ToolCallingLLM, ToolCompletion, ToolDefinition
 
 
 class LLMUnavailable(RuntimeError):
@@ -96,8 +97,9 @@ def _classify(exc: Exception) -> ClassifiedError:
     return ClassifiedError(classify_message(str(exc)), exc)
 
 
-class OpenAICompatibleAdapter:
-    """`LLMProvider` over any OpenAI-compatible chat-completions endpoint."""
+class OpenAICompatibleAdapter(ToolCallingLLM):
+    """`LLMProvider` and `ToolCallingLLM` over any OpenAI-compatible
+    chat-completions endpoint."""
 
     def __init__(
         self,
@@ -288,3 +290,84 @@ class OpenAICompatibleAdapter:
 
         if not received_any:
             raise LLMUnavailable("the model returned no choices")
+
+    def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        """One buffered call with `tools` on offer (IR-465, ADR-035 §2).
+
+        Buffered, never streamed: the evidence decision is read whole. The
+        reasoning configuration is the same `generate` sends, so the decision
+        reuses the `answer` task unchanged. Nothing is normalised and nothing
+        is refused for being empty: an empty or malformed completion is the
+        caller's to classify, so it comes back as data. Only a transport
+        failure raises.
+        """
+        client = self._client or self._build_client()
+
+        temperature = (
+            self._temperature
+            if self._temperature is not None
+            else getattr(settings, "LLM_TEMPERATURE", 0.1)
+        )
+        extra = self.dialect.request_extras(
+            self._resolved_reasoning_effort(), self.models
+        )
+        if timeout_seconds is not None:
+            extra["timeout"] = timeout_seconds
+
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=temperature,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.parameters,
+                        },
+                    }
+                    for tool in tools
+                ],
+                tool_choice="auto",
+                **extra,
+            )
+        except LLMUnavailable:
+            raise
+        except Exception as exc:
+            classified = _classify(exc)
+            raise LLMUnavailable(
+                f"{type(exc).__name__}: {exc}", kind=classified.kind
+            ) from exc
+
+        choices = getattr(response, "choices", None) or []
+        if not choices:
+            raise LLMUnavailable("the model returned no choices")
+
+        message = choices[0].message
+        usage = getattr(response, "usage", None)
+        return ToolCompletion(
+            text=getattr(message, "content", None) or "",
+            reasoning=self.dialect.read_reasoning(message),
+            tool_calls=tuple(
+                ToolCall(
+                    name=getattr(getattr(call, "function", None), "name", "") or "",
+                    arguments=getattr(getattr(call, "function", None), "arguments", "")
+                    or "",
+                )
+                for call in (getattr(message, "tool_calls", None) or [])
+            ),
+            input_tokens=getattr(usage, "prompt_tokens", None),
+            output_tokens=getattr(usage, "completion_tokens", None),
+        )
