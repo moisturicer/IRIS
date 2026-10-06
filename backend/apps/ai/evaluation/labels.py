@@ -110,6 +110,11 @@ class Question:
     evidence_required: Optional[str] = None
     expected_outcome: Optional[str] = None
     institutional: Optional[bool] = None
+    #: The question as a resolver would have rewritten it, where the raw text
+    #: only means something after a preceding turn (IR-464). Optional: the
+    #: evidence detector runs on raw and Resolved text and ORs the two, so a
+    #: set that supplies neither still measures the raw lane.
+    resolved_question: Optional[str] = None
 
     @property
     def deliberately_empty(self) -> bool:
@@ -129,6 +134,7 @@ class Question:
             "evidence_required": self.evidence_required,
             "expected_outcome": self.expected_outcome,
             "institutional": self.institutional,
+            "resolved_question": self.resolved_question,
             "expected": [label.as_dict() for label in self.expected],
         }
 
@@ -153,6 +159,11 @@ class QuestionSet:
         return sum(len(q.expected) for q in self.questions)
 
     @property
+    def resolved(self) -> tuple[Question, ...]:
+        """The questions carrying a Resolved form (IR-464)."""
+        return tuple(q for q in self.questions if q.resolved_question)
+
+    @property
     def scored(self) -> tuple[Question, ...]:
         """The questions a recall measure can score. One with no expected
         passage has nothing to recall, and averaging it in as 0.0 would pull
@@ -167,6 +178,7 @@ class QuestionSet:
             "tier": self.tier,
             "questions": len(self.questions),
             "without_passages": len(self.questions) - len(self.scored),
+            "with_resolved_question": len(self.resolved),
             "labels": self.label_count,
             "skipped_questions": list(self.skipped),
         }
@@ -239,6 +251,7 @@ def parse_question_set(
             raise QuestionSetError(f"{where}: has no question text yet")
 
         kind, evidence, outcome, institutional = _read_evidence_fields(raw, where)
+        resolved = _read_resolved_question(raw, where)
 
         raw_expected = raw.get("expected")
         deliberate = (
@@ -291,6 +304,7 @@ def parse_question_set(
                 evidence_required=evidence,
                 expected_outcome=outcome,
                 institutional=institutional,
+                resolved_question=resolved,
             )
         )
 
@@ -343,6 +357,25 @@ def _read_evidence_fields(raw: dict, where: str):
     if institutional is not None and not isinstance(institutional, bool):
         raise QuestionSetError(f"{where}: institutional must be true or false")
     return kind, evidence, outcome, institutional
+
+
+def _read_resolved_question(raw: dict, where: str) -> Optional[str]:
+    """``resolved_question``: what a resolver would have rewritten this into.
+
+    Only meaningful for a question whose raw text depends on a preceding turn
+    -- the two follow-up kinds. Validated as a non-empty string so a blank
+    does not read as "resolution produced nothing".
+    """
+    value = raw.get("resolved_question")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise QuestionSetError(
+            f"{where}: resolved_question must be a non-empty string, or absent"
+        )
+    if value.strip() == PLACEHOLDER:
+        raise QuestionSetError(f"{where}: resolved_question is still a template slot")
+    return value.strip()
 
 
 def _check_declaration(where, evidence, outcome, *, has_passages: bool) -> None:

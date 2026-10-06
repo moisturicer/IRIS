@@ -5,11 +5,19 @@ tiers never conflated, labels that survive re-chunking, two measures per run,
 one change at a time, and a manual command rather than CI.
 
 `labels` is the question-set format, `harness` is a run, `report` is what a run
-produces, `techniques` is ADR-033 §5's switches a run can move, and
-`validation` is the pre-flight a labeller uses. Only `validation` touches the
+produces, `techniques` is ADR-033 §5's switches a run can move,
+`validation` is the pre-flight a labeller uses, and `evidence` is IR-464's
+curated instrument for the evidence detector. Only `validation` touches the
 database outside a run.
 """
 
+from .evidence import (
+    EvidenceReport,
+    Judgement,
+    annotated,
+    judge,
+    run_curated,
+)
 from .harness import run, run_both
 from .labels import (
     Label,
@@ -34,6 +42,8 @@ from .validation import check_question_set, render_checks
 
 __all__ = [
     "EvalReport",
+    "EvidenceReport",
+    "Judgement",
     "TECHNIQUES",
     "ResolvedTechniques",
     "Technique",
@@ -44,6 +54,7 @@ __all__ = [
     "QuestionSet",
     "QuestionSetError",
     "RunConfig",
+    "annotated",
     "check_question_set",
     "compare",
     "load_question_set",
@@ -53,6 +64,8 @@ __all__ = [
     "render_checks",
     "render_registry",
     "resolve_techniques",
+    "judge",
     "run",
     "run_both",
+    "run_curated",
 ]

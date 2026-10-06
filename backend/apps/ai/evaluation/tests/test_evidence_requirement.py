@@ -157,3 +157,45 @@ def test_the_retrieval_harness_imports_no_model_path():
         source = path.read_text(encoding="utf-8")
         for name in forbidden:
             assert name not in source, f"{path.name} reaches a model via {name!r}"
+
+
+# -- resolved_question (IR-464) -------------------------------------------
+
+
+def test_the_loader_reads_a_resolved_question():
+    question = parse_question_set(
+        _q(
+            kind="follow-up-after-grounded",
+            evidence_required="corpus",
+            expected_outcome="answer",
+            resolved_question="what did the authors say about Pareto fronts?",
+            **GROUNDED,
+        )
+    ).questions[0]
+    assert question.resolved_question == (
+        "what did the authors say about Pareto fronts?"
+    )
+
+
+def test_a_question_without_a_resolved_question_loads_unchanged():
+    assert parse_question_set(_q(**GROUNDED)).questions[0].resolved_question is None
+
+
+@pytest.mark.parametrize("value", ["", "   ", 3, "TODO"])
+def test_a_blank_or_unfilled_resolved_question_is_refused(value):
+    with pytest.raises(QuestionSetError, match="resolved_question"):
+        parse_question_set(_q(resolved_question=value, **GROUNDED))
+
+
+def test_the_set_reports_how_many_questions_carry_a_resolved_form():
+    given = parse_question_set(
+        {
+            "name": "t",
+            "questions": [
+                {"id": "a", "question": "x?", "resolved_question": "x in full?", **GROUNDED},
+                {"id": "b", "question": "y?", **GROUNDED},
+            ],
+        }
+    )
+    assert [q.id for q in given.resolved] == ["a"]
+    assert given.as_dict()["with_resolved_question"] == 1
