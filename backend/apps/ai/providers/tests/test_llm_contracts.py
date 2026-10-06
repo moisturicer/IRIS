@@ -271,7 +271,7 @@ class AdapterRequestTests:
 
     def test_it_refuses_to_run_without_a_key(self, settings):
         """No unauthenticated lane, and no local model to fall back to
-        (ADR-008, ADR-021)."""
+        (ADR-008, ADR-036)."""
         settings.LLM_API_KEY = ""
         with pytest.raises(LLMUnavailable, match="LLM_API_KEY"):
             OpenAICompatibleAdapter().generate(system="s", user="u")
@@ -370,7 +370,7 @@ class VendorFailureClassificationTests:
 
     def test_a_rate_limit_is_classified_the_same_way_behind_openrouters_dialect(self):
         """Classification reads the `openai` SDK's exception hierarchy, not
-        the dialect -- OpenRouter speaks the same wire protocol (ADR-021), so
+        the dialect -- OpenRouter speaks the same wire protocol (ADR-036), so
         its failures are classified exactly as Groq's are (IR-384)."""
         exc = _status_error(openai.RateLimitError, 429, message="slow down", body=None)
         client = _FakeClient(fail=exc)

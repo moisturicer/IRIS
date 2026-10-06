@@ -42,7 +42,7 @@ in retry and circuit-breaking, driven by the ``ErrorKind`` IR-320 attaches to
 the failure, and walks a same-vendor fallback list when a task's Profile
 names one. **Cross-vendor failover is refused, not merely unconfigured**
 (IR-385) -- there is no second vendor account anywhere in this module, under
-ADR-021 §Amendment's "vendor chosen per Inference task" rule. See
+ADR-036 §Amendment's "vendor chosen per Inference task" rule. See
 ``apps/ai/resilience/llm.py``'s and ``apps/ai/inference/providers.py``'s
 module docstrings.
 

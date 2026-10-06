@@ -1,6 +1,6 @@
 """Building the `LLMProvider` a Profile describes (IR-378, IR-385, IR-386).
 
-One adapter per protocol (ADR-021), so a Profile is a `base_url`, an
+One adapter per protocol (ADR-036), so a Profile is a `base_url`, an
 `api_key` and a model list -- and the list is walked by the same resilience
 stack every task shares, `apps.ai.resilience.llm.build_task_llm`.
 
@@ -47,7 +47,7 @@ def build_profile_llm(profile: Profile) -> LLMProvider:
         raise LLMUnavailable(
             f"the {profile.task.value!r} Inference task has no model. Set "
             f"{profile.task.settings_prefix}_MODEL, or leave the task off; "
-            "there is no shared default to fall through to (ADR-021)."
+            "there is no shared default to fall through to (ADR-036)."
         )
 
     # A task whose Reasoning is not shown sends no reasoning configuration at

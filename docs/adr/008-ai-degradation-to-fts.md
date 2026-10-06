@@ -74,7 +74,7 @@ capacity-starved while the account itself is fine.
 Cross-vendor failover stays rejected for exactly the original reasons, which
 this amendment does not weaken. Note that **two vendors configured for two
 different Inference tasks is not failover** — see
-[ADR-021](021-openai-compatible-inference-provider.md) §Amendment
+[ADR-036](036-openai-compatible-inference-provider.md) §Amendment
 (2026-09-28), which makes the vendor a per-task choice. Each task has one
 vendor and no vendor stands in for another.
 
@@ -85,7 +85,7 @@ vendor and no vendor stands in for another.
 * When every model on the list fails, the answer degrades per the table above —
   an explicit unavailable state, never a fabricated answer. The list changes
   how often degradation is reached; it does not change what degradation is.
-* This permits nothing about *which* vendors are sanctioned. ADR-021 decides
+* This permits nothing about *which* vendors are sanctioned. ADR-036 decides
   that.
 
 **What this closes.** IR-321 (*Wire the resilience decorators around

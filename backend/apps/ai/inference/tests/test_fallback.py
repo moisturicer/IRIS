@@ -123,7 +123,7 @@ class GroqWalksTheListItselfTests:
     ):
         """A bad key is still a bad key on the next model, so spending the
         rest of the list on it buys nothing and hides the real fault -- the
-        no-silent-fall-through rule ADR-021 states."""
+        no-silent-fall-through rule ADR-036 states."""
         vendor = _vendor(
             monkeypatch, failing={"first": RuntimeError("unauthorized")}
         )

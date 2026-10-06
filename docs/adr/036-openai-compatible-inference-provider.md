@@ -1,4 +1,4 @@
-# ADR-021: Groq and OpenRouter behind one OpenAI-compatible adapter
+# ADR-036: Groq and OpenRouter behind one OpenAI-compatible adapter
 
 ## Status
 

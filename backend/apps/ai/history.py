@@ -32,7 +32,7 @@ That vocabulary belongs to `voyage-context-4`, and the model being budgeted
 for is a Llama- or Qwen-class model on Groq or one of OpenRouter's many, so
 the count is an estimate and :func:`estimate_tokens` applies a safety margin
 to it. The reason the margin is the right answer and a per-model vocabulary
-is not: ADR-021 sanctions two vendors and OpenRouter alone fronts hundreds of
+is not: ADR-036 sanctions two vendors and OpenRouter alone fronts hundreds of
 models, so shipping a vocabulary per answering model is unbounded
 maintenance for a number that only has to be stable, conservative and
 monotonic. `AI_HISTORY_TOKEN_MARGIN` in `config/settings/base.py` carries the

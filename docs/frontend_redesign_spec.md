@@ -791,7 +791,7 @@ It never asserts internal state, hook calls or component structure. It is writte
 
 ### 7.2 Things this spec corrects in the repository's own record
 
-- `AddRecordPage`'s header says Docling is unimplemented and the LLM provider undecided. Both are stale: Docling is implemented (IR-107/ADR-016), and generation is OpenAI-compatible (ADR-021-openai). The page is deleted by F3, so it is not edited.
+- `AddRecordPage`'s header says Docling is unimplemented and the LLM provider undecided. Both are stale: Docling is implemented (IR-107/ADR-016), and generation is OpenAI-compatible (ADR-036). The page is deleted by F3, so it is not edited.
 - `lib/submissionRoutes.ts` shows "RDCO Intake" bookends. That is ADR-021 vocabulary that ADR-032 retired. It is deleted by F3.
 - This spec's own first draft claimed the wizard demands up to 13 required attachments. That was stale: `documents/0005` (IR-118) removed every requirement. Corrected in §1 and §7.1.
 - **IR-372's Jira description says Ask IRIS docks on the *left*.** Its summary, the code (`dock = onPaperTab ? "right"`) and `ui-ux/14` say *right*. The description is stale and should be corrected on the card; bookkeeping only.

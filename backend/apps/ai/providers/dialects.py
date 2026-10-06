@@ -1,5 +1,5 @@
 """One collaborator per vendor, behind the one OpenAI-compatible adapter
-(IR-382, ADR-021 §Amendment).
+(IR-382, ADR-036 §Amendment).
 
 Vendors that speak the same wire protocol still differ: what extra fields a
 request carries, which attribute a reasoning token arrives on, and what
@@ -155,7 +155,7 @@ GROQ = GroqDialect()
 
 class OpenRouterDialect(VendorDialect):
     """OpenRouter: many models behind one account, so its dialect owns a
-    request shape Groq's does not need (IR-384, ADR-021 §Amendment).
+    request shape Groq's does not need (IR-384, ADR-036 §Amendment).
 
     No citation-marker normalisation here, unlike Groq's: that habit belongs
     to the specific model behind a vendor account, and OpenRouter routes to

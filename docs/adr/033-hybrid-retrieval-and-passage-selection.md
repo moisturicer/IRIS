@@ -6,7 +6,7 @@
 
 **Amends [ADR-008](008-ai-degradation-to-fts.md)** — full-text search keeps its outage-fallback job and gains a second one, as a retrieval signal on the normal path. See that file's IR-391 amendment.
 
-**Amends [ADR-023](023-retrieval-quality-evaluation.md)** (`023-retrieval-quality-evaluation.md`, not `023-migrate-on-container-boot.md`) — the harness's label format, its two measures, and how a run is conducted. See that file's IR-391 amendment.
+**Amends [ADR-023](023-retrieval-quality-evaluation.md)** — the harness's label format, its two measures, and how a run is conducted. See that file's IR-391 amendment.
 
 **Extends [ADR-013](013-chunk-level-rag-pipeline.md)** (the chunk is the retrievable unit) and [ADR-015](015-voyage-embedding-and-reranking.md) (Voyage embedding and reranking, both stages). Neither is superseded.
 
@@ -15,8 +15,6 @@
 **Amended — 2026-10-02 (IR-453): §3's relevance cut-off is exempted from §5's off-by-default rule and ships ON.** See §Amendment — IR-453 below. §5 continues to govern the other five techniques unchanged.
 
 **Note added — 2026-10-02 (IR-453): §5's gating rule cannot be satisfied for §3's cut-off.** See §Divergence — IR-453 below. §3 also acquires a dependant: [ADR-034](034-ungrounded-answers-as-a-distinct-state.md) makes an ungrounded answer reachable only when the cut-off returns nothing, so §3 is what makes that state detectable at all.
-
-> **ADR references in this file are by filename.** `docs/adr/` currently holds two files claiming 021 and two claiming 023, so a bare number is ambiguous. The collision is tracked as IR-403 and is not resolved here.
 
 ## Context
 
@@ -57,12 +55,12 @@ A minimum relevance score is configurable. Passages scoring below it are dropped
 Between reranking and the prompt sits an explicit selection step:
 
 - **A per-paper cap** on how many passages one Record may contribute, so a single verbose paper cannot crowd out the rest of the corpus. The cap is **ignored in Paper Chat**, where every passage legitimately comes from one paper.
-- **Neighbour joining.** Adjacent chunks of the same document that both survive are joined into one passage. The joined passage **keeps every constituent chunk's regions** — they are what the PDF overlay highlights under `031-pdf-citation-overlay.md` — and **cites the first page** of the joined span.
+- **Neighbour joining.** Adjacent chunks of the same document that both survive are joined into one passage. The joined passage **keeps every constituent chunk's regions** — they are what the PDF overlay highlights under ADR-031 — and **cites the first page** of the joined span.
 - **A token budget** for the assembled passage set, measured with the same real tokenizer the chunker uses (`apps/ai/chunking/tokens.py`), so the budget is in the unit it claims to be in.
 
 ### 5. Every technique here ships off, and is switched on only once a harness run shows it helps
 
-Fusion, the keyword index's participation in retrieval, the relevance cut-off, the per-paper cap, neighbour joining and the token budget each land behind a setting, **defaulting to the current behaviour**. A default is changed only when a run of the `023-retrieval-quality-evaluation.md` harness, one change at a time against a fixed baseline, shows the change helps.
+Fusion, the keyword index's participation in retrieval, the relevance cut-off, the per-paper cap, neighbour joining and the token budget each land behind a setting, **defaulting to the current behaviour**. A default is changed only when a run of the ADR-023 harness, one change at a time against a fixed baseline, shows the change helps.
 
 This is [ADR-026](026-conversational-retrieval-and-memory.md) §3's discipline applied to a second batch of techniques: adopting them on the strength of their general reputation would be taste presented as evidence, and these are cheap to leave off.
 
@@ -81,7 +79,7 @@ with reranking and still shipped off, and IR-402 has a number to act on. **For
 
 * Both harness measures are **recall** measures — recall@10 over what retrieval
   returned, and recall over the final set the model received
-  (`023-retrieval-quality-evaluation.md` §Amendment).
+  (ADR-023 §Amendment).
 * A relevance cut-off can only ever **remove** passages.
 * Every question in both committed question sets —
   `apps/ai/evaluation/fixtures/synthetic_set.json` (2) and
@@ -104,7 +102,7 @@ purpose is invisible to the instrument meant to justify it.
    helps — which is why the amendment attaches three safeguards instead of
    simply moving a default.
 2. **The provisional default comes from observation, not from a run** — the
-   method `026-conversational-retrieval-and-memory.md` §3 permits when a number
+   method ADR-026 §3 permits when a number
    cannot be had honestly, and the one IR-446 already chose for the parallel
    cut-off on conversational memory: print reranker scores for questions a human
    agrees are relevant against ones that are not, pick a value separating them,
@@ -182,7 +180,7 @@ shown to a reader**.
 
 **A hardcoded cut-off.** Rejected. The right value depends on the reranker model and the corpus, neither of which is fixed, and the value has to be tuned by harness runs — which means it has to be changeable without a code change.
 
-**A query-time reference-list filter** — detect bibliography passages when answering and drop them. Rejected here, twice over: it pays the cost on every question for a problem that belongs to ingestion (front matter and reference sections are a chunking-policy question under `013-chunk-level-rag-pipeline.md`), and a heuristic that guesses "this looks like a reference list" will also discard a genuine related-work discussion, which is a legitimate answer to a legitimate question.
+**A query-time reference-list filter** — detect bibliography passages when answering and drop them. Rejected here, twice over: it pays the cost on every question for a problem that belongs to ingestion (front matter and reference sections are a chunking-policy question under ADR-013), and a heuristic that guesses "this looks like a reference list" will also discard a genuine related-work discussion, which is a legitimate answer to a legitimate question.
 
 **Leave retrieval vector-only and rely on reranking.** Rejected. Reranking reorders candidates; it cannot recover a passage retrieval never returned. An exact-token query that the dense embedding blurs never reaches the reranker at all.
 
@@ -199,8 +197,8 @@ FTS earning a second job is the cheapest of the changes: the retriever, the visi
 - **Positive.** Exact-term queries work. A question the corpus cannot answer is answerable with "nothing relevant" instead of a guess. One paper cannot monopolise the prompt. A passage split across a chunk boundary arrives whole, still highlightable, citing a page a reader can open.
 - **Negative.** More moving parts on the hot path, and six settings whose defaults are only justified once a harness run exists. Until then the system behaves as it does today — which is the point of the off-by-default rule, not a workaround for it.
 - A chunk migration and a database-maintained index are added; `apps/ai/retrieval/degraded.py`'s query-time `SearchVector` becomes redundant on both paths and its docstring's reasoning is superseded by §2.
-- **Risk.** A cut-off set too high turns answerable questions into "nothing relevant" — a silent, reader-invisible regression, since the score is never displayed. The harness's recall-over-the-final-set measure (`023-retrieval-quality-evaluation.md` §Amendment, IR-391) exists to catch exactly this, and is the reason that second measure is mandatory rather than nice to have.
-- **Risk.** Neighbour joining changes what a citation points at. It keeps every region and cites the first page precisely so the overlay contract in `031-pdf-citation-overlay.md` still holds.
+- **Risk.** A cut-off set too high turns answerable questions into "nothing relevant" — a silent, reader-invisible regression, since the score is never displayed. The harness's recall-over-the-final-set measure (ADR-023 §Amendment, IR-391) exists to catch exactly this, and is the reason that second measure is mandatory rather than nice to have.
+- **Risk.** Neighbour joining changes what a citation points at. It keeps every region and cites the first page precisely so the overlay contract in ADR-031 still holds.
 
 ## MVP Impact
 
@@ -208,13 +206,13 @@ No scope change. It refines a path that already exists and is already MVP. Every
 
 ## SaaS Impact
 
-Per-instance under `005-instance-per-tenant.md`. The settings are per-deployment, and a cut-off tuned on one institution's corpus does not transfer to another's — the same non-transferability `023-retrieval-quality-evaluation.md` §SaaS Impact already records for recall.
+Per-instance under ADR-005. The settings are per-deployment, and a cut-off tuned on one institution's corpus does not transfer to another's — the same non-transferability ADR-023 §SaaS Impact already records for recall.
 
 ## Security Impact
 
 **Neutral by construction, and the one thing that must not slip.** Both searches filter by `visible_to(user)` inside retrieval, before scoring or merging, so a fused candidate list cannot contain a passage the asker may not read. Hybrid retrieval adds a second candidate source and **no** second visibility predicate — the rule `CLAUDE.md` states and IR-285 enforced by deleting the alternative. A joined passage spans chunks of one document, so joining cannot merge across visibility boundaries.
 
-No new outbound data: the keyword search is local, and the reranker already receives the candidate passages under `015-voyage-embedding-and-reranking.md`'s disclosure gate.
+No new outbound data: the keyword search is local, and the reranker already receives the candidate passages under ADR-015's disclosure gate.
 
 ## Deployment Impact
 
@@ -222,9 +220,9 @@ One migration (the stored chunk keyword column and its index). No new service, n
 
 ## Research Impact
 
-Thesis-critical under `013-chunk-level-rag-pipeline.md` §Research Impact (amended 2026-09-04). §5 is the part that matters for the write-up: each technique is a measured switch with a before and an after on a fixed baseline, so the RAG chapter can report which techniques helped on this corpus and which did not. A technique that did not help is a finding and is reported as one, not quietly deleted.
+Thesis-critical under ADR-013 §Research Impact (amended 2026-09-04). §5 is the part that matters for the write-up: each technique is a measured switch with a before and an after on a fixed baseline, so the RAG chapter can report which techniques helped on this corpus and which did not. A technique that did not help is a finding and is reported as one, not quietly deleted.
 
-Results from the proxy corpus decide engineering switches and are **never** cited as findings about CIT-U research — `023-retrieval-quality-evaluation.md`'s two tiers, restated there by the IR-391 amendment.
+Results from the proxy corpus decide engineering switches and are **never** cited as findings about CIT-U research — ADR-023's two tiers, restated there by the IR-391 amendment.
 
 ## Related Requirements
 
