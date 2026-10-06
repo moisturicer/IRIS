@@ -9,14 +9,21 @@ It reads the questions carrying `evidence_required` / `expected_outcome` /
 text, and on the two combined by OR, and reports over-fires and misses **per
 reason code, per lane**.
 
-**It costs nothing and touches nothing.** No model call, no vendor call, no
-database read, and no `Conversation`, `Turn` or shadow row — so unlike
+**By default it costs nothing and touches nothing.** No model call, no vendor
+call, no database read, and no `Conversation`, `Turn` or shadow row — so unlike
 `eval_retrieval` it is safe to run on any checkout, and it needs no `--user`
 because nothing here is filtered by visibility.
 
-**Nothing consumes a verdict.** The detector is not wired into the answer path:
-production routing is out of scope for ADR-035 (§11), and ADR-035 is Proposed,
-not accepted.
+**`--model-decision` is the exception (IR-465).** It puts each question to the
+`answer` model as one tool-offering call and reports the model's route beside
+the detector's, in its own section: agreement, the union, and each fallback
+reason code. It spends vendor credits, so it is manual and never CI, like
+`eval_retrieval`. It still reads no record and creates no `Conversation`,
+`Turn` or shadow row, and the model's hypothetical direct answers are measured
+for length and discarded (ADR-035 §10).
+
+**Nothing consumes a verdict.** Neither half is wired into the answer path:
+production routing is out of scope for ADR-035 (§11).
 """
 
 import hashlib
@@ -37,6 +44,9 @@ from apps.ai.evidence import (
     institution_terms,
 )
 from apps.ai.evidence.detector import EvidenceDetector
+from apps.ai.evidence.model_decision import ModelEvidenceDecision
+from apps.ai.inference import InferenceTask
+from apps.ai.providers.tool_calling import ToolCallingLLM
 
 DEFAULT_OUT = Path("docs") / "evaluation" / "runs"
 
@@ -71,7 +81,8 @@ def _digest(path) -> str:
 class Command(BaseCommand):
     help = (
         "Report the evidence detector's over-fires and misses per reason code "
-        "against the annotated question set. Calls no model and no vendor."
+        "against the annotated question set. Calls no model and no vendor "
+        "unless --model-decision is given."
     )
 
     def add_arguments(self, parser):
@@ -94,6 +105,13 @@ class Command(BaseCommand):
             "set.",
         )
         parser.add_argument(
+            "--model-decision",
+            action="store_true",
+            help="Also ask the answer model for its route on each question and "
+            "report it beside the detector's. Calls the vendor and spends "
+            "credits (IR-465).",
+        )
+        parser.add_argument(
             "--out",
             default=str(DEFAULT_OUT),
             help=f"Directory for the results file (default: {DEFAULT_OUT}).",
@@ -113,11 +131,14 @@ class Command(BaseCommand):
         except QuestionSetError as exc:
             raise CommandError(str(exc))
 
+        decider = self._decider() if options["model_decision"] else None
+
         rule_set = active_rule_set()
         report = run_curated(
             EvidenceDetector(rule_set),
             question_set,
             min_examples=options["min_examples"],
+            decider=decider,
             provenance={
                 "git_commit": _git_commit(),
                 "question_set_path": question_set.source,
@@ -125,10 +146,10 @@ class Command(BaseCommand):
                 "rule_set_digest": rule_set.digest,
                 SETTING_MODE: configured_mode(),
                 "institution_terms": len(institution_terms()),
-                # Recorded as absent rather than omitted: a results file with
-                # no model key cannot be compared with IR-465's, which has one.
-                "model": None,
-                "model_note": "no model call in IR-464 (ADR-035 §10)",
+                # Recorded as absent rather than omitted, so a results file
+                # without a model run can still be compared with one that has.
+                "model_decision": bool(decider),
+                "model": "answer task" if decider else None,
             },
         )
 
@@ -150,6 +171,33 @@ class Command(BaseCommand):
         if path is not None:
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
+
+    def _decider(self) -> ModelEvidenceDecision:
+        """The decision over the `answer` task, refused when nothing is
+        configured rather than scored as a column of fallbacks.
+
+        A run with no model would report every question as a fallback to
+        evidence: a plausible-looking number measuring nothing.
+        """
+        # Imported here so that a run without the flag never reaches it, and a
+        # test that makes the root explode can prove that.
+        from apps.ai.composition import composition_root
+
+        root = composition_root()
+        if not root.generation_configured():
+            raise CommandError(
+                "--model-decision needs the answer model, and none is "
+                "configured (LLM_API_KEY, LLM_MODEL). Without one every "
+                "question would fall back to evidence and the section would "
+                "measure nothing."
+            )
+        llm = root.llm_for(InferenceTask.ANSWER)
+        if not isinstance(llm, ToolCallingLLM):
+            raise CommandError(
+                f"the answer provider ({type(llm).__name__}) cannot carry a "
+                "tool-calling decision."
+            )
+        return ModelEvidenceDecision(llm)
 
     def _widen_stream_encoding(self):
         """A Windows console defaults to cp1252 and the report holds a §."""
@@ -190,8 +238,8 @@ class Command(BaseCommand):
                     f"{len(combined.misses)} question(s) needing the corpus "
                     f"raised no reason code: {', '.join(combined.misses)}. The "
                     f"detector is defense in depth, not a classifier — the "
-                    f"model decision (IR-465) is what covers these, and "
-                    f"neither half is trusted alone (ADR-035 §5)."
+                    f"model decision is what covers these (--model-decision), "
+                    f"and neither half is trusted alone (ADR-035 §5)."
                 )
             )
 

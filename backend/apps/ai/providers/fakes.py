@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import hashlib
 import math
-from typing import Iterator, Optional, Sequence
+from dataclasses import dataclass
+from typing import Callable, Iterator, Optional, Sequence, Union
 
 from .ports import EmbeddingProvider, LLMProvider, RerankedCandidate, Reranker, StreamDelta
+from .tool_calling import ToolCall, ToolCallingLLM, ToolCompletion, ToolDefinition
 
 
 #: Reserved dimension carrying the document/query marker. Reproducing
@@ -159,3 +161,90 @@ class ScriptedLLM(LLMProvider):
             return
         self.calls.append((system, user))
         yield from self._stream_deltas
+
+
+@dataclass(frozen=True)
+class ToolRequest:
+    """One `complete_with_tools` call as it was actually sent, for a test to
+    assert on -- including what it did **not** carry."""
+
+    system: str
+    user: str
+    tools: tuple[ToolDefinition, ...]
+    timeout_seconds: Optional[float]
+
+
+#: What a scripted tool-calling provider hands back for one call: a completion,
+#: an exception to raise, or a function of the request producing either.
+ToolScriptStep = Union[ToolCompletion, BaseException]
+ToolScript = Union[
+    Sequence[ToolScriptStep], Callable[[ToolRequest], ToolScriptStep]
+]
+
+
+class ScriptedToolCallingLLM(ScriptedLLM, ToolCallingLLM):
+    """A scripted stand-in that can also carry a tool-calling decision.
+
+    A sequence is consumed one step per call and **raises when exhausted**,
+    rather than repeating its last step: a test that makes more calls than it
+    scripted has a bug, and a silent repeat would hide it. A callable is for a
+    run over many questions, where the reply depends on the question.
+
+    Every shape the evidence decision has to survive is one constructor away
+    (`calling`, `answering`, `empty`, `calling_twice`, ...), so a test names
+    the case instead of assembling the dataclass.
+    """
+
+    def __init__(self, script: ToolScript = (), **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._script = script
+        self._position = 0
+        self.tool_requests: list[ToolRequest] = []
+
+    def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        request = ToolRequest(system, user, tuple(tools), timeout_seconds)
+        self.tool_requests.append(request)
+        if callable(self._script):
+            step = self._script(request)
+        else:
+            if self._position >= len(self._script):
+                raise AssertionError(
+                    f"ScriptedToolCallingLLM was called {self._position + 1} "
+                    f"times but scripted {len(self._script)}"
+                )
+            step = self._script[self._position]
+            self._position += 1
+        if isinstance(step, BaseException):
+            raise step
+        return step
+
+    # -- named shapes -------------------------------------------------------
+
+    @staticmethod
+    def calling(
+        name: str = "search_corpus", arguments: str = "", **fields
+    ) -> ToolCompletion:
+        return ToolCompletion(tool_calls=(ToolCall(name, arguments),), **fields)
+
+    @staticmethod
+    def calling_twice(
+        name: str = "search_corpus", other: Optional[str] = None
+    ) -> ToolCompletion:
+        return ToolCompletion(
+            tool_calls=(ToolCall(name), ToolCall(other or name))
+        )
+
+    @staticmethod
+    def answering(text: str = "A direct answer.", **fields) -> ToolCompletion:
+        return ToolCompletion(text=text, **fields)
+
+    @staticmethod
+    def empty() -> ToolCompletion:
+        return ToolCompletion()

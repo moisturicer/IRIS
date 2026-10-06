@@ -309,11 +309,40 @@ cd backend
 python manage.py eval_evidence --questions ../docs/evaluation/proxy_starter.json
 ```
 
-It **costs nothing**: no model call, no vendor call, no database read, and no
-`--user`, because nothing here is filtered by visibility. It creates no
-`Conversation`, no `Turn` and no shadow row, and in IR-464 it calls no model at
-all — the results file carries a `model` key that is explicitly `null` so it can
-be compared with IR-465's, which will have one.
+By default it **costs nothing**: no model call, no vendor call, no database
+read, and no `--user`, because nothing here is filtered by visibility. It
+creates no `Conversation`, no `Turn` and no shadow row, and the results file
+carries a `model` key that is explicitly `null`.
+
+### `--model-decision` (IR-465)
+
+```bash
+python manage.py eval_evidence --questions ../docs/evaluation/proxy_starter.json --model-decision
+```
+
+Puts each annotated question to the `answer` model as **one tool-offering call**
+(the no-parameter `search_corpus` tool, ADR-035 §2) and fills the `model`
+section beside the detector's. **It calls the vendor and spends credits**, so it
+is manual and never CI; it refuses when no model is configured rather than
+scoring a column of fallbacks. It still creates no `Conversation`, `Turn` or
+shadow row, and the tool call is read as a route signal and never executed.
+
+The section reports, apart from the detector's numbers: the model alone (over-
+and missed searches), the model alone over the calls where it actually ruled
+(fallbacks excluded, like the spike's "parsed accuracy"), the **union**
+(ADR-035 §3 — a question is a union miss only when neither half asked for
+evidence), detector/model agreement in all four cells, every reason code with a
+count, anomalies, latency and token totals. Every fallback — empty completion,
+several calls, text beside a call, an unknown tool, a malformed argument
+payload, a timeout, a rate limit, any other vendor failure — routes to evidence
+with its own code. A model-supplied argument is never read; its presence is an
+`arguments_supplied` anomaly. A hypothetical direct answer is **measured for
+length and discarded**: the file and the console carry a count and a character
+total, never the text.
+
+Read it with the spike's caveats: 44-ish synthetic questions and one labeller
+make a single question worth several points, and decisions flip between runs, so
+one run is not a measurement.
 
 What it reports, per lane (`raw`, `resolved`, `combined`):
 

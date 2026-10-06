@@ -33,11 +33,17 @@ task's model through -- so `build_profile_llm`'s own contract is untouched.
 from __future__ import annotations
 
 import logging
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Sequence
 
 from apps.ai.providers.dialects import DEFAULT_DIALECT, VendorDialect
 from apps.ai.providers.ports import LLMProvider, StreamDelta
+from apps.ai.providers.tool_calling import (
+    ToolCallingLLM,
+    ToolCompletion,
+    ToolDefinition,
+)
 from apps.ai.resilience.circuit import CircuitOpen
+from apps.ai.resilience.llm import require_tool_calling
 
 from .profiles import Profile
 
@@ -51,7 +57,7 @@ logger = logging.getLogger(LOGGER_NAME)
 CIRCUIT_OPEN = "circuit_open"
 
 
-class CompletionLoggingLLMProvider(LLMProvider):
+class CompletionLoggingLLMProvider(LLMProvider, ToolCallingLLM):
     """Emits one structured completion record per call (IR-387).
 
     Wraps whichever provider `build_profile_llm` built for `profile` -- a
@@ -168,3 +174,33 @@ class CompletionLoggingLLMProvider(LLMProvider):
                 reasoning_present=reasoning_present,
                 error_kind=None,
             )
+
+    def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        """One record per tool-offering call, with the same fields as
+        `generate`'s -- which model answered, whether reasoning arrived, and
+        on failure the error kind. The completion's text, reasoning and tool
+        arguments are read for presence only and never written."""
+        try:
+            completion = require_tool_calling(self._provider).complete_with_tools(
+                system, user, tools, timeout_seconds=timeout_seconds
+            )
+        except Exception as exc:
+            self._record(
+                model=self._model_attempted(),
+                reasoning_present=False,
+                error_kind=self._error_kind(exc),
+            )
+            raise
+        self._record(
+            model=self._model_used(),
+            reasoning_present=bool(completion.reasoning),
+            error_kind=None,
+        )
+        return completion

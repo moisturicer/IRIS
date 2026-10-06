@@ -6,10 +6,13 @@ over the annotated question set, against `evidence_required` and
 operational figures only and carries no ground truth, because nobody labelled
 real reader questions.
 
-It creates no `Conversation`, no `Turn` and no shadow row, and in this ticket
-it calls no model: the report holds a `model` slot that stays empty until
-IR-465 puts the model decision beside the detector verdict. **Detector results
-and model decisions are separate sections, never one number.**
+It creates no `Conversation`, no `Turn` and no shadow row. Given a decider
+(IR-465, `--model-decision`) it also asks the model for its route on each
+question and reports it in a `model` section beside the detector's: **detector
+results and model decisions are separate sections, never one number**, and
+their agreement, the union (ADR-035 §3) and each fallback reason code are
+reported on their own. The model's hypothetical direct answer is measured for
+length inside the decider and is never held here (ADR-035 §10).
 
 Three reporting rules, because each one stops a misreading:
 
@@ -22,16 +25,23 @@ Three reporting rules, because each one stops a misreading:
 - **A category with too few examples is inconclusive, not accurate.** With two
   questions in a category, one question is fifty points.
 
-Pure: no Django, no database, no vendor. The command does the I/O.
+Pure: no database and no vendor of its own. The decider it is handed does the
+model call, and the command does the rest of the I/O.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence
 
 from apps.ai.evidence import REASON_CODES, SOURCE_RAW, SOURCE_RESOLVED, Verdict
 from apps.ai.evidence.detector import EvidenceDetector
+from apps.ai.evidence.model_decision import (
+    REASONS as MODEL_REASONS,
+    ModelDecision,
+    ModelEvidenceDecision,
+)
 
 from .labels import Question, QuestionSet
 
@@ -185,6 +195,212 @@ class CategoryResult:
         }
 
 
+def _percentile(values: Sequence[int], fraction: float) -> Optional[int]:
+    """Nearest-rank percentile, so a small set reports a value it contains."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = math.ceil(fraction * len(ordered))
+    return ordered[max(rank, 1) - 1]
+
+
+@dataclass(frozen=True)
+class ModelResult:
+    """The model's route on every judged question, beside the detector's.
+
+    Three things are scored, separately, because they answer different
+    questions: the model alone, the detector and model **agreeing**, and the
+    **union** (ADR-035 §3), where a direct answer needs both to permit it.
+
+    A fallback is a route to evidence with its own reason code, so it can only
+    show up as an over-search, never as a miss. `decided` therefore excludes
+    them, which is the spike's "parsed accuracy": a call lost to a vendor 429
+    is not the model being wrong about a question.
+    """
+
+    judgements: tuple[Judgement, ...]
+    decisions: tuple[ModelDecision, ...]
+
+    def _pairs(self) -> list[tuple[Judgement, ModelDecision]]:
+        return list(zip(self.judgements, self.decisions))
+
+    def _tally(self, requires) -> dict[str, Any]:
+        over: list[str] = []
+        missed: list[str] = []
+        for judgement, decision in self._pairs():
+            needed = requires(judgement, decision)
+            if needed and not judgement.expects_evidence:
+                over.append(judgement.question_id)
+            elif judgement.expects_evidence and not needed:
+                missed.append(judgement.question_id)
+        total = len(self.judgements)
+        correct = total - len(over) - len(missed)
+        return {
+            "judged": total,
+            "correct": correct,
+            "accuracy": round(correct / total, 4) if total else None,
+            "over_searches": over,
+            "missed_searches": missed,
+        }
+
+    @property
+    def alone(self) -> dict[str, Any]:
+        return self._tally(lambda j, d: d.evidence_required)
+
+    @property
+    def union(self) -> dict[str, Any]:
+        return self._tally(
+            lambda j, d: d.evidence_required or j.combined.evidence_required
+        )
+
+    @property
+    def decided(self) -> dict[str, Any]:
+        """The model alone, over the calls where it actually ruled."""
+        ruled = [(j, d) for j, d in self._pairs() if d.decided]
+        correct = sum(1 for j, d in ruled if d.evidence_required == j.expects_evidence)
+        return {
+            "judged": len(ruled),
+            "correct": correct,
+            "accuracy": round(correct / len(ruled), 4) if ruled else None,
+        }
+
+    @property
+    def agreement(self) -> dict[str, Any]:
+        both_evidence = both_direct = detector_only = model_only = 0
+        for judgement, decision in self._pairs():
+            detector = judgement.combined.evidence_required
+            model = decision.evidence_required
+            if detector and model:
+                both_evidence += 1
+            elif not detector and not model:
+                both_direct += 1
+            elif detector:
+                detector_only += 1
+            else:
+                model_only += 1
+        total = len(self.judgements)
+        return {
+            "both_evidence": both_evidence,
+            "both_direct": both_direct,
+            "detector_only_evidence": detector_only,
+            "model_only_evidence": model_only,
+            "agreement": (
+                round((both_evidence + both_direct) / total, 4) if total else None
+            ),
+        }
+
+    @property
+    def reasons(self) -> dict[str, int]:
+        counts = {code: 0 for code in MODEL_REASONS}
+        for decision in self.decisions:
+            counts[decision.reason] = counts.get(decision.reason, 0) + 1
+        return counts
+
+    @property
+    def fallbacks(self) -> int:
+        return sum(1 for d in self.decisions if not d.decided)
+
+    @property
+    def anomalies(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for decision in self.decisions:
+            for anomaly in decision.anomalies:
+                counts[anomaly] = counts.get(anomaly, 0) + 1
+        return counts
+
+    @property
+    def models(self) -> list[str]:
+        return sorted({d.model for d in self.decisions if d.model})
+
+    def as_dict(self) -> dict[str, Any]:
+        latencies = [d.latency_ms for d in self.decisions]
+        answers = [d for d in self.decisions if d.answer_present]
+        return {
+            "models": self.models,
+            "questions": len(self.decisions),
+            "fallbacks": self.fallbacks,
+            "model_alone": self.alone,
+            "model_alone_decided_only": self.decided,
+            "union": self.union,
+            "agreement_with_detector": self.agreement,
+            "reasons": self.reasons,
+            "anomalies": self.anomalies,
+            "latency_ms": {
+                "mean": round(sum(latencies) / len(latencies)) if latencies else None,
+                "p95": _percentile(latencies, 0.95),
+            },
+            "tokens": {
+                "input": sum(d.input_tokens or 0 for d in self.decisions),
+                "output": sum(d.output_tokens or 0 for d in self.decisions),
+            },
+            # Lengths only. The text was discarded inside the decider.
+            "hypothetical_answers": {
+                "count": len(answers),
+                "chars_total": sum(d.answer_chars for d in answers),
+            },
+            "per_question": [
+                {
+                    "id": j.question_id,
+                    "expects_evidence": j.expects_evidence,
+                    "detector": j.combined.evidence_required,
+                    **d.as_dict(),
+                }
+                for j, d in self._pairs()
+            ],
+        }
+
+    def render_lines(self) -> list[str]:
+        alone, union, decided = self.alone, self.union, self.decided
+        agreement = self.agreement
+
+        def fmt(tally: dict[str, Any]) -> str:
+            if tally["accuracy"] is None:
+                return "n/a"
+            return f"{tally['correct']}/{tally['judged']} ({tally['accuracy']:.3f})"
+
+        lines = [
+            "Model decision - the model's route beside the detector "
+            "(ADR-035 §3, §10)",
+            f"  model(s): {', '.join(self.models) or 'unknown'}; "
+            f"{len(self.decisions)} calls, {self.fallbacks} fell back to evidence",
+            f"  {'model alone':<28} {fmt(alone):>16}   "
+            f"over-searches {len(alone['over_searches'])}, "
+            f"missed searches {len(alone['missed_searches'])}",
+            f"  {'model alone, decided only':<28} {fmt(decided):>16}   "
+            f"(fallbacks excluded)",
+            f"  {'union (detector OR model)':<28} {fmt(union):>16}   "
+            f"over-searches {len(union['over_searches'])}, "
+            f"missed searches {len(union['missed_searches'])}",
+            f"  detector/model agreement {agreement['agreement']}: "
+            f"both evidence {agreement['both_evidence']}, "
+            f"both direct {agreement['both_direct']}, "
+            f"detector only {agreement['detector_only_evidence']}, "
+            f"model only {agreement['model_only_evidence']}",
+            "  reason codes: "
+            + ", ".join(f"{code} {n}" for code, n in self.reasons.items() if n),
+        ]
+        if alone["missed_searches"]:
+            lines.append(f"  model missed: {', '.join(alone['missed_searches'])}")
+        if union["missed_searches"]:
+            lines.append(
+                "  UNION missed (neither half caught): "
+                f"{', '.join(union['missed_searches'])}"
+            )
+        if self.anomalies:
+            lines.append(
+                "  anomalies: "
+                + ", ".join(f"{k} {v}" for k, v in self.anomalies.items())
+                + " (recorded; the arguments were never read)"
+            )
+        answers = [d for d in self.decisions if d.answer_present]
+        lines.append(
+            f"  hypothetical direct answers: {len(answers)} generated, "
+            f"{sum(d.answer_chars for d in answers)} characters in all; "
+            "none retained."
+        )
+        return lines
+
+
 @dataclass(frozen=True)
 class EvidenceReport:
     """What a curated run produced. A value that serializes; no I/O here."""
@@ -198,8 +414,8 @@ class EvidenceReport:
     provenance: dict[str, Any] = field(default_factory=dict)
     min_examples: int = MIN_EXAMPLES
     #: Model decisions, kept separate from detector results by construction.
-    #: Empty in IR-464: this command calls no model.
-    model: Optional[dict[str, Any]] = None
+    #: `None` unless the run was given a decider (IR-465, `--model-decision`).
+    model: Optional["ModelResult"] = None
 
     def lane(self, name: str) -> Optional[LaneResult]:
         for result in self.lanes:
@@ -245,7 +461,7 @@ class EvidenceReport:
                 "categories": [c.as_dict() for c in self.categories],
                 "institutional": self.institutional,
             },
-            "model": self.model,
+            "model": self.model.as_dict() if self.model else None,
             "provenance": self.provenance,
             "min_examples": self.min_examples,
             "questions": [j.as_dict() for j in self.judgements],
@@ -341,11 +557,17 @@ class EvidenceReport:
             "ADR-035 §9)."
         )
         lines.append("")
-        lines.append(
-            "Model decisions: none. This command calls no model in IR-464; "
-            "IR-465 adds one"
-        )
-        lines.append("  beside the detector verdict, in its own section.")
+        if self.model is None:
+            lines.append(
+                "Model decisions: none. Pass --model-decision to put the "
+                "model's route beside"
+            )
+            lines.append(
+                "  the detector verdict, in its own section. It calls the "
+                "vendor and spends credits."
+            )
+        else:
+            lines.extend(self.model.render_lines())
         return "\n".join(lines)
 
 
@@ -455,9 +677,28 @@ def run_curated(
     *,
     min_examples: int = MIN_EXAMPLES,
     provenance: Optional[dict[str, Any]] = None,
+    decider: Optional[ModelEvidenceDecision] = None,
 ) -> EvidenceReport:
-    """Submit the annotated questions to the detector and score the result."""
-    judgements = tuple(judge(detector, q) for q in annotated(question_set))
+    """Submit the annotated questions to the detector and score the result.
+
+    With a `decider`, each is also put to the model, once, on the raw question
+    and its Resolved form together. Curated questions carry no earlier turns,
+    so no prior reader question is sent; `decide` has no way to be handed a
+    Passage or an answer regardless.
+    """
+    questions = annotated(question_set)
+    judgements = tuple(judge(detector, q) for q in questions)
+    model = (
+        ModelResult(
+            judgements=judgements,
+            decisions=tuple(
+                decider.decide(q.question, resolved_question=q.resolved_question)
+                for q in questions
+            ),
+        )
+        if decider is not None and judgements
+        else None
+    )
     rule_set = detector.rule_set
     return EvidenceReport(
         question_set=question_set,
@@ -473,5 +714,5 @@ def run_curated(
         },
         provenance=dict(provenance or {}),
         min_examples=min_examples,
-        model=None,
+        model=model,
     )
