@@ -92,16 +92,43 @@ class Label:
         return {"record": self.record, "page": self.page, "quote": self.quote}
 
 
+#: Does answering this need the corpus at all? (IR-463)
+EVIDENCE_REQUIRED = ("none", "corpus", "corpus_multi")
+
+#: What the reader should get. Separate from `evidence_required` so that
+#: "decline" is never mistaken for a retrieval route.
+EXPECTED_OUTCOMES = ("answer", "clarify", "decline-no-evidence", "decline-restricted")
+_DECLINES = ("decline-no-evidence", "decline-restricted")
+
+
 @dataclass(frozen=True)
 class Question:
     id: str
     question: str
     expected: tuple[Label, ...]
+    kind: Optional[str] = None
+    evidence_required: Optional[str] = None
+    expected_outcome: Optional[str] = None
+    institutional: Optional[bool] = None
+
+    @property
+    def deliberately_empty(self) -> bool:
+        """No expected passages, *on purpose* -- the question declared what it
+        needs and what should happen, so an empty list is a label, not a gap."""
+        return not self.expected and self.evidence_required is not None
+
+    @property
+    def expects_decline(self) -> bool:
+        return self.expected_outcome in _DECLINES
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "question": self.question,
+            "kind": self.kind,
+            "evidence_required": self.evidence_required,
+            "expected_outcome": self.expected_outcome,
+            "institutional": self.institutional,
             "expected": [label.as_dict() for label in self.expected],
         }
 
@@ -125,6 +152,13 @@ class QuestionSet:
     def label_count(self) -> int:
         return sum(len(q.expected) for q in self.questions)
 
+    @property
+    def scored(self) -> tuple[Question, ...]:
+        """The questions a recall measure can score. One with no expected
+        passage has nothing to recall, and averaging it in as 0.0 would pull
+        every recall figure down for a reason that is not retrieval."""
+        return tuple(q for q in self.questions if q.expected)
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
@@ -132,6 +166,7 @@ class QuestionSet:
             "corpus": self.corpus,
             "tier": self.tier,
             "questions": len(self.questions),
+            "without_passages": len(self.questions) - len(self.scored),
             "labels": self.label_count,
             "skipped_questions": list(self.skipped),
         }
@@ -203,14 +238,23 @@ def parse_question_set(
                 continue
             raise QuestionSetError(f"{where}: has no question text yet")
 
+        kind, evidence, outcome, institutional = _read_evidence_fields(raw, where)
+
         raw_expected = raw.get("expected")
-        if not isinstance(raw_expected, list) or not raw_expected:
+        deliberate = (
+            evidence is not None
+            and isinstance(raw_expected, list)
+            and not raw_expected
+        )
+        if deliberate:
+            raw_expected = []
+        elif not isinstance(raw_expected, list) or not raw_expected:
             if drop_incomplete:
                 skipped.append(qid)
                 continue
             raise QuestionSetError(f"{where}: needs at least one expected passage")
 
-        if drop_incomplete and _is_unlabelled(raw_expected):
+        if drop_incomplete and raw_expected and _is_unlabelled(raw_expected):
             skipped.append(qid)
             continue
 
@@ -237,7 +281,18 @@ def parse_question_set(
                 )
             )
 
-        questions.append(Question(id=qid, question=text, expected=tuple(labels)))
+        _check_declaration(where, evidence, outcome, has_passages=bool(labels))
+        questions.append(
+            Question(
+                id=qid,
+                question=text,
+                expected=tuple(labels),
+                kind=kind,
+                evidence_required=evidence,
+                expected_outcome=outcome,
+                institutional=institutional,
+            )
+        )
 
     if not questions:
         raise QuestionSetError(
@@ -253,6 +308,61 @@ def parse_question_set(
         tier=str(data.get("tier") or "proxy"),
         skipped=tuple(skipped),
     )
+
+
+def _read_evidence_fields(raw: dict, where: str):
+    """`kind`, `evidence_required`, `expected_outcome`, `institutional`.
+
+    The first and last are free-standing; the middle two are declared together
+    or not at all, because one without the other leaves a question that says
+    what it needs but not what should happen (or the reverse).
+    """
+    kind = raw.get("kind")
+    if kind is not None and (not isinstance(kind, str) or not kind.strip()):
+        raise QuestionSetError(f"{where}: kind must be a non-empty string")
+
+    evidence = raw.get("evidence_required")
+    outcome = raw.get("expected_outcome")
+    if (evidence is None) != (outcome is None):
+        raise QuestionSetError(
+            f"{where}: evidence_required and expected_outcome are declared "
+            f"together or not at all"
+        )
+    if evidence is not None and evidence not in EVIDENCE_REQUIRED:
+        raise QuestionSetError(
+            f"{where}: evidence_required {evidence!r} is not one of "
+            f"{', '.join(EVIDENCE_REQUIRED)}"
+        )
+    if outcome is not None and outcome not in EXPECTED_OUTCOMES:
+        raise QuestionSetError(
+            f"{where}: expected_outcome {outcome!r} is not one of "
+            f"{', '.join(EXPECTED_OUTCOMES)}"
+        )
+
+    institutional = raw.get("institutional")
+    if institutional is not None and not isinstance(institutional, bool):
+        raise QuestionSetError(f"{where}: institutional must be true or false")
+    return kind, evidence, outcome, institutional
+
+
+def _check_declaration(where, evidence, outcome, *, has_passages: bool) -> None:
+    """Refuse a declaration that contradicts the passages it sits beside."""
+    if evidence is None:
+        return
+    if evidence == "none" and has_passages:
+        raise QuestionSetError(
+            f"{where}: needs no evidence (evidence_required: none) but lists "
+            f"expected passages"
+        )
+    if outcome == "decline-no-evidence" and has_passages:
+        raise QuestionSetError(
+            f"{where}: declines for want of evidence but lists expected passages"
+        )
+    if evidence != "none" and outcome == "answer" and not has_passages:
+        raise QuestionSetError(
+            f"{where}: needs corpus evidence and should be answered, so it "
+            f"needs at least one expected passage"
+        )
 
 
 def _is_unlabelled(raw_expected: list) -> bool:
