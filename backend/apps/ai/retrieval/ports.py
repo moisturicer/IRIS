@@ -14,6 +14,8 @@ from typing import Optional, Sequence
 
 from apps.ai.regions import Region
 
+from .diagnostics import StageDiagnostics
+
 #: The two ways a result can have been produced. Strings rather than an enum
 #: because this crosses into an API response and a log line, where a name is
 #: what is wanted; the set is small and closed enough that a constant each is
@@ -74,6 +76,14 @@ class RetrievalResult:
     ``query_vector`` is the embedding computed to search the corpus, carried
     out so it can be stored as a Turn's memory vector at no extra vendor
     cost (IR-297). ``None`` when no vector was computed for this question.
+
+    ``diagnostics`` is what the recall stage observed -- which candidates a
+    disclosure gate removed, which were trimmed, which survived (IR-459). It
+    rides here for the same reason ``degraded`` does: a count computed inside
+    a decorator and returned any other way is a count the next decorator
+    drops, which is the IR-334 lesson. The default is every bucket *absent*,
+    not zero, which is the honest report from a path with no recall stage at
+    all -- the degraded one.
     """
 
     passages: tuple[RetrievedChunk, ...] = ()
@@ -81,16 +91,28 @@ class RetrievalResult:
     mode: Optional[str] = None
     embedding_space_id: Optional[int] = None
     query_vector: Optional[Sequence[float]] = None
+    diagnostics: StageDiagnostics = StageDiagnostics()
 
-    def with_passages(self, passages: Sequence[RetrievedChunk]) -> "RetrievalResult":
+    def with_passages(
+        self,
+        passages: Sequence[RetrievedChunk],
+        *,
+        diagnostics: Optional[StageDiagnostics] = None,
+    ) -> "RetrievalResult":
         """The same result, re-ranked or trimmed.
 
         The method a decorator should reach for, and the reason the default
         is to carry everything forward: changing the passages is what a
         decorator does, and every other field surviving is what it must not
         have to remember.
+
+        ``diagnostics`` is the one field a decorator may deliberately replace,
+        because a decorator that gates or trims is the only thing that knows
+        what it removed. Omitting it carries the inner report forward.
         """
-        return replace(self, passages=tuple(passages))
+        if diagnostics is None:
+            return replace(self, passages=tuple(passages))
+        return replace(self, passages=tuple(passages), diagnostics=diagnostics)
 
 
 class Retriever(ABC):
