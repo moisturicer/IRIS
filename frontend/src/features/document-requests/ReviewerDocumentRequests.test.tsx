@@ -58,9 +58,10 @@ function signInAs(roleName: string) {
   } as never);
 }
 
-function renderBlock(canRequest: Party[] = [], onChanged = vi.fn()) {
+function renderBlock(canRequest: Party[] = [], onChanged = vi.fn(), reviewing = true) {
   return renderScreen(
     <ReviewerDocumentRequests
+      reviewing={reviewing}
       record={{
         id: RECORD_ID,
         can_request_document: canRequest,
@@ -234,9 +235,10 @@ describe("ReviewerDocumentRequests", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  // Whether the viewer reviews comes from the capabilities adapter now, not
+  // from their role (IR-411), so the caller says so.
   it("does not load requests for a viewer who reviews nothing", async () => {
-    signInAs("Student");
-    renderBlock();
+    renderBlock([], vi.fn(), false);
 
     expect(documentRequests).not.toHaveBeenCalled();
   });

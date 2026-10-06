@@ -68,7 +68,6 @@ test("only Student and Adviser may author a disclosure", () => {
   // RDCO performs both intake and final review.
   only("submit", [ROLES.STUDENT, ROLES.ADVISER]);
   only("workspace", [ROLES.STUDENT, ROLES.ADVISER]);
-  only("editRecord", [ROLES.STUDENT, ROLES.ADVISER]);
 });
 
 // --- review ----------------------------------------------------------------

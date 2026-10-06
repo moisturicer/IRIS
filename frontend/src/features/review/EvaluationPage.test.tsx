@@ -122,7 +122,7 @@ const DETAIL_LINK = "Record Detail";
 /** Renders wherever the router ends up, so a navigation is observable. */
 function LandedOn() {
   const location = useLocation();
-  return <h1>{`landed on ${location.pathname}`}</h1>;
+  return <h1>{`landed on ${location.pathname}${location.search}`}</h1>;
 }
 
 function renderEvaluationScreen() {
@@ -160,7 +160,8 @@ describe("the office evaluation screen", () => {
 
     const documents = await screen.findByRole("link", { name: DOCUMENTS_LINK });
 
-    expect(documents).toHaveAttribute("href", `/records/${RECORD_ID}/documents`);
+    // The documents page became Paper View's Files section (IR-411).
+    expect(documents).toHaveAttribute("href", `/records/${RECORD_ID}?section=files`);
     // The regression guard, and the point of IR-237. A new tab is a fresh
     // browsing context that never receives the `sessionStorage` the refresh
     // token lives in, so opening one signs the reviewer out at exactly the
@@ -186,7 +187,7 @@ describe("the office evaluation screen", () => {
     await user.click(await screen.findByRole("link", { name: DOCUMENTS_LINK }));
 
     expect(
-      await screen.findByRole("heading", { name: `landed on /records/${RECORD_ID}/documents` }),
+      await screen.findByRole("heading", { name: `landed on /records/${RECORD_ID}?section=files` }),
     ).toBeInTheDocument();
   });
 

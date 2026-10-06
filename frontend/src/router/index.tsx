@@ -18,11 +18,9 @@ import PaperViewPage        from "@/features/records/paper-view/PaperViewPage";
 import MyWorkspacePage      from "@/features/records/MyWorkspacePage";
 import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
-import EditRecordPage       from "@/features/records/EditRecordPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
 import ReviewQueuePage      from "@/features/review/ReviewQueuePage";
 import EvaluationPage       from "@/features/review/EvaluationPage";
-import DocumentsPage        from "@/features/documents/DocumentsPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
@@ -53,7 +51,6 @@ export const router = createBrowserRouter([
           // moves the address, and the page it lands on applies its own.
           ...redirectRoutes,
           { path: "records/:id",           element: <PaperViewPage />,   handle: { crumb: "Paper" } },
-          { path: "records/:id/documents", element: <DocumentsPage />,   handle: { crumb: "Documents" } },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
           { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
@@ -68,7 +65,6 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute allowedRoles={rolesFor("submit")} />,
             children: [
               { path: "workspace",        element: <MyWorkspacePage />, handle: { crumb: "My Workspace" } },
-              { path: "records/:id/edit", element: <EditRecordPage />,  handle: { crumb: "Edit Record" } },
             ],
           },
 

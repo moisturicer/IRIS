@@ -12,17 +12,17 @@
  * here — it fetches and renders real PDF bytes through pdf.js, which is its
  * own test file's job (`PaperPdfReader.test.tsx`) — so what this file checks
  * is that this screen hands it the right `scrollToPage` and
- * `highlightRegions`, and that the Abstract/Paper toggle follows along.
+ * `highlightRegions`, and that the section switch follows along.
  *
- * **Who sees "Mark as completed" (IR-267).** ADR-021 §3: a Proposal is
- * completed by its assigned Adviser or by RDCO. The button follows the same
- * rule the server enforces -- RDCO, or the Adviser whose id is the record's
- * `adviser` -- and nobody else sees it. The server still refuses everyone
- * else; this only keeps the page from offering an action that would be
- * refused.
+ * **Sections and actions by capability (IR-411).** Paper View has four
+ * sections -- Overview, Paper, Review, Files -- kept in the URL as
+ * `?section=`. Which ones a viewer sees, and which header actions, come from
+ * the capabilities adapter (its own table test is `capabilities.test.ts`);
+ * these tests check the page renders exactly what it grants. *Mark as
+ * completed* is gone: ADR-032 retires the Proposal completion act.
  *
  * **Who sees the review and resubmit controls (IR-259).** Both read the API,
- * never the stored stage: "Review this record" appears exactly when `can_act`
+ * never the stored stage: "Open review" appears exactly when `can_act`
  * names a party for this viewer, and "Resubmit for review" exactly when the
  * record is `awaiting_resubmission` and the viewer owns it. The records below
  * carry a `pipeline_status` that would have said the opposite, so a gate that
@@ -32,13 +32,15 @@
  */
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Link, Route, Routes, useNavigate } from "react-router-dom";
+import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { useAuthStore } from "@/store/auth.store";
 import type { User } from "@/types/auth";
 import type { RecordDetail } from "@/types/records";
+
+import { recordsApi } from "@/api/records";
 
 import { DOCK_KEY } from "./PaperChatDock";
 import { CONTAINED_LAYOUT_QUERY } from "./paneLayout";
@@ -152,6 +154,10 @@ let shownRecord: RecordDetail = record;
 
 const completeProposal = vi.fn((_id: number) => Promise.resolve({ data: { detail: "ok" } }));
 
+function page<T>(results: T[]) {
+  return { data: { count: results.length, next: null, previous: null, results } };
+}
+
 const documentRequests = vi.fn(() => Promise.resolve({ data: [] as unknown[] }));
 
 vi.mock("@/api/records", () => ({
@@ -166,7 +172,22 @@ vi.mock("@/api/records", () => ({
     documentRequests: () => documentRequests(),
     updateTags:       vi.fn(),
     completeProposal: (id: number) => completeProposal(id),
+    // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
+    update:           vi.fn(() => Promise.resolve({ data: {} })),
+    classifications:  vi.fn(() => Promise.resolve(page([]))),
+    pscedList:        vi.fn(() => Promise.resolve(page([]))),
   },
+}));
+
+// The Files section loads itself; its behaviour is `FilesSection.test.tsx`'s.
+vi.mock("@/api/documents", () => ({
+  documentsApi: {
+    slotsForRecord: vi.fn(() => Promise.resolve({ data: [] })),
+    files:          vi.fn(() => Promise.resolve({ data: [] })),
+  },
+}));
+vi.mock("@/api/accounts", () => ({
+  accountsApi: { listAdvisers: vi.fn(() => Promise.resolve(page([]))) },
 }));
 
 vi.mock("@/api/reviews", () => ({ reviewsApi: { resubmit: vi.fn() } }));
@@ -271,17 +292,17 @@ describe("arriving from a citation", () => {
     expect(await screen.findByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
   });
 
-  it("opens on the Abstract tab, with the Paper tab one click away, when no page was named", async () => {
+  it("opens on Overview, with the Paper tab one click away, when no page was named", async () => {
     renderPaper(`/records/${RECORD_ID}`);
 
-    expect(await screen.findByRole("tab", { name: "Abstract", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Paper", selected: false })).toBeEnabled();
   });
 
-  it("ignores a page that is not a page and stays on Abstract", async () => {
+  it("ignores a page that is not a page and stays on Overview", async () => {
     renderPaper(`/records/${RECORD_ID}?page=not-a-page`);
 
-    expect(await screen.findByRole("tab", { name: "Abstract", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
   });
 
   it("switches to the reader when the Paper tab is chosen", async () => {
@@ -298,37 +319,18 @@ describe("arriving from a citation", () => {
 
 const MARK_COMPLETED = { name: /mark as completed/i };
 
-describe("Mark as completed on an approved Proposal", () => {
+// ADR-032 retires the Proposal *complete* act and gives RDCO no Proposal
+// role, so nobody is offered it any more (spec §4.6, IR-411).
+describe("Mark as completed is retired", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     shownRecord = approvedProposal;
   });
 
-  it("is offered to the assigned Adviser, and completes the Proposal", async () => {
-    signInAs(ASSIGNED_ADVISER_ID, "Adviser");
-    const { container } = renderPaperView();
-
-    const button = await screen.findByRole("button", MARK_COMPLETED);
-    await expectNoBlockingA11yViolations(container);
-    await userEvent.click(button);
-
-    await waitFor(() => expect(completeProposal).toHaveBeenCalledWith(RECORD_ID));
-  });
-
-  it("is offered to RDCO", async () => {
-    signInAs(1, "RDCO");
-    renderPaperView();
-
-    expect(await screen.findByRole("button", MARK_COMPLETED)).toBeInTheDocument();
-  });
-
   it.each([
-    ["an Adviser who is not assigned", 99, "Adviser"],
-    ["ITSO", 2, "ITSO"],
-    ["IERC", 3, "IERC"],
-    ["KTTO", 4, "KTTO"],
-    ["a student", 5, "Student"],
-  ] as const)("is not offered to %s", async (_label, id, role) => {
+    ["the assigned Adviser", ASSIGNED_ADVISER_ID, "Adviser"],
+    ["RDCO", 1, "RDCO"],
+  ] as const)("is not offered to %s on an approved Proposal", async (_label, id, role) => {
     signInAs(id, role);
     renderPaperView();
 
@@ -336,20 +338,12 @@ describe("Mark as completed on an approved Proposal", () => {
     // assertion would pass against the loading skeleton.
     await screen.findByRole("heading", { name: approvedProposal.title });
     expect(screen.queryByRole("button", MARK_COMPLETED)).not.toBeInTheDocument();
-  });
-
-  it("is not offered once the Proposal is completed", async () => {
-    shownRecord = { ...approvedProposal, pipeline_status: "completed" };
-    signInAs(ASSIGNED_ADVISER_ID, "Adviser");
-    renderPaperView();
-
-    await screen.findByRole("heading", { name: approvedProposal.title });
-    expect(screen.queryByRole("button", MARK_COMPLETED)).not.toBeInTheDocument();
+    expect(completeProposal).not.toHaveBeenCalled();
   });
 });
 
 const OWNER_ID = 40;
-const REVIEW_THIS = { name: "Review this record" } as const;
+const OPEN_REVIEW = { name: "Open review" } as const;
 const RESUBMIT = { name: "Resubmit for review" } as const;
 
 /** A Thesis/Research in office review, for the IR-259 gate tests. */
@@ -382,8 +376,25 @@ describe("the review control follows can_act", () => {
     signInAs(2, "ITSO");
     const { container } = renderPaperView();
 
-    expect(await screen.findByRole("link", REVIEW_THIS)).toBeInTheDocument();
+    expect(await screen.findByRole("button", OPEN_REVIEW)).toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
+  });
+
+  // Until F6 (IR-412) builds the action bar, the Review section reaches the
+  // decision through the current form, which is left as it is (spec §4.7).
+  it("opens the Review section, which reaches the current decision form", async () => {
+    shownRecord = { ...inReview, can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    renderPaperView();
+
+    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
+
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Record a decision (current form)" })).toHaveAttribute(
+      "href",
+      `/review/${RECORD_ID}/evaluate`,
+    );
+    expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
   });
 
   it("is not offered to a same-role viewer the API does not name, whatever the stage", async () => {
@@ -394,7 +405,7 @@ describe("the review control follows can_act", () => {
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    expect(screen.queryByRole("link", REVIEW_THIS)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
   });
 
   it("is not offered to the owner", async () => {
@@ -403,7 +414,7 @@ describe("the review control follows can_act", () => {
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    expect(screen.queryByRole("link", REVIEW_THIS)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
   });
 });
 
@@ -492,10 +503,11 @@ describe("document requests (IR-262)", () => {
     expect(documentRequests).not.toHaveBeenCalled();
   });
 
+  // In the Files section now, which replaced the Documents page (IR-411).
   it("offers Request documents exactly when the API names a party", async () => {
     shownRecord = { ...inReview, can_request_document: ["ierc"] };
     signInAs(2, "IERC");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=files`);
 
     expect(await screen.findByRole("button", { name: "Request documents" })).toBeInTheDocument();
   });
@@ -503,7 +515,7 @@ describe("document requests (IR-262)", () => {
   it("does not offer Request documents otherwise", async () => {
     shownRecord = inReview;
     signInAs(2, "IERC");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=files`);
 
     await waitForRecord(inReview.title);
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
@@ -548,7 +560,7 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
 });
 
 // The Paper tab is the paper and Ask IRIS docked right, full width, nothing
-// else (IR-372, decided with the project lead 2026-09-25). The Abstract tab
+// else (IR-372, decided with the project lead 2026-09-25). Overview
 // keeps IR-351's rule above.
 describe("the Paper tab (IR-372)", () => {
   const RAIL = { name: "Institutional Governance" };
@@ -589,7 +601,7 @@ describe("the Paper tab (IR-372)", () => {
       expect(await screen.findByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Panel position" })).not.toBeInTheDocument();
-      // The reader's own choice is left alone for the Abstract tab.
+      // The reader's own choice is left alone for Overview.
       expect(localStorage.getItem(DOCK_KEY)).toBe(stored);
     },
   );
@@ -604,9 +616,9 @@ describe("the Paper tab (IR-372)", () => {
     expect(screen.getByRole("button", REOPEN)).toBeInTheDocument();
   });
 
-  it("gives the Abstract tab back its own layout, rail and floating chat included", async () => {
+  it("gives Overview back its own layout, rail and floating chat included", async () => {
     await openPaperTab("floating");
-    await userEvent.click(screen.getByRole("tab", { name: "Abstract" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
 
     expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
@@ -627,7 +639,7 @@ describe("the Paper tab (IR-372)", () => {
     await screen.findByRole("complementary", { name: "Paper Chat" });
 
     await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
-    await userEvent.click(screen.getByRole("tab", { name: "Abstract" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
 
     expect(screen.getByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
     expect(findOrCreate).toHaveBeenCalledTimes(1);
@@ -1056,8 +1068,8 @@ describe("following a citation to another paper (IR-355)", () => {
   it("keeps the pin when the panel changes position", async () => {
     await followToOtherPaper();
 
-    // The Paper tab fixes the dock (IR-372); the Abstract tab offers it.
-    await userEvent.click(screen.getByRole("tab", { name: "Abstract" }));
+    // The Paper tab fixes the dock (IR-372); Overview offers it.
+    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
     await userEvent.click(within(panel()).getByRole("button", { name: "Panel position" }));
     await userEvent.click(within(panel()).getByRole("button", { name: /Floating/ }));
 
@@ -1111,5 +1123,248 @@ describe("following a citation to another paper (IR-355)", () => {
     const { container } = await followToOtherPaper();
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// IR-411: sections, header actions and Edit details, by capability
+// ---------------------------------------------------------------------------
+
+/** Where the router is, so a test can read what the page put in the URL. */
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="Location">{`${location.pathname}${location.search}`}</output>;
+}
+
+function renderWithProbe(route: string) {
+  return renderScreen(
+    <>
+      <Routes>
+        <Route path="/records/:id" element={<PaperViewPage />} />
+      </Routes>
+      <LocationProbe />
+    </>,
+    { route },
+  );
+}
+
+const tabNames = () => screen.getAllByRole("tab").map((tab) => tab.textContent);
+
+describe("the sections follow the capabilities (IR-411)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("gives a reader Overview and Paper only", async () => {
+    shownRecord = record;
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(tabNames()).toEqual(["Overview", "Paper"]);
+  });
+
+  it("gives the owner Review and Files as well", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(tabNames()).toEqual(["Overview", "Paper", "Review", "Files"]);
+  });
+
+  it("gives a reviewer the API names Review and Files", async () => {
+    shownRecord = { ...inReview, can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(tabNames()).toEqual(["Overview", "Paper", "Review", "Files"]);
+  });
+
+  it("has no Paper section on a record with no paper to read", async () => {
+    shownRecord = { ...record, abstract_file: null, files: [] };
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(tabNames()).toEqual(["Overview"]);
+  });
+
+  it("opens the section the URL names", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=files`);
+
+    expect(await screen.findByRole("tab", { name: "Files", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Supporting documents" })).toBeInTheDocument();
+  });
+
+  it("shows Overview, not the section, to a viewer who may not open it", async () => {
+    shownRecord = inReview;
+    signInAs(99, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=files`);
+
+    expect(await screen.findByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Files" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Supporting documents" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the chosen section in the URL, with the rest of the address", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderWithProbe(`/records/${RECORD_ID}?page=4`);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Review" }));
+
+    expect(screen.getByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
+      `/records/${RECORD_ID}?page=4&section=review`,
+    );
+  });
+
+  it("moves between sections with the arrow keys", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const overview = await screen.findByRole("tab", { name: "Overview", selected: true });
+    overview.focus();
+    await userEvent.keyboard("{ArrowRight}");
+
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toHaveFocus();
+  });
+});
+
+describe("the header's actions follow the capabilities (IR-411)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const draft: RecordDetail = {
+    ...inReview,
+    pipeline_status: "draft",
+    workflow_state: "draft",
+    workflow_state_label: "Draft",
+    adviser: ASSIGNED_ADVISER_ID,
+  };
+
+  it("offers the owner of a draft Continue, into Publish, as the one primary action", async () => {
+    shownRecord = draft;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const resume = await screen.findByRole("link", { name: "Continue" });
+    expect(resume).toHaveAttribute("href", `/?publish=${RECORD_ID}`);
+    expect(screen.getByRole("button", { name: "Edit details" })).toBeInTheDocument();
+  });
+
+  it("offers no author action on a rejected record (invariant 5)", async () => {
+    shownRecord = { ...inReview, pipeline_status: "rejected", workflow_state: "rejected", workflow_state_label: "Rejected" };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.getByText("This record was rejected")).toBeInTheDocument();
+    for (const name of [/^Continue/, /Edit details/, /New version/, /Resubmit/]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it.each([
+    ["in review", { workflow_state: "in_review" as const }],
+    ["published", { pipeline_status: "published" as const, workflow_state: "published" as const }],
+    ["approved", { pipeline_status: "approved" as const, workflow_state: "approved" as const }],
+  ])("offers no Edit details on a record that is %s", async (_label, overrides) => {
+    shownRecord = { ...inReview, ...overrides };
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?edit=details`);
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Edit details" })).not.toBeInTheDocument();
+  });
+
+  it("offers Edit details to the owner while a revision is requested", async () => {
+    shownRecord = { ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested" };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("button", { name: "Edit details" })).toBeInTheDocument();
+  });
+
+  it("offers nobody but the owner Edit details on a draft", async () => {
+    shownRecord = draft;
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
+  });
+
+  it("edits the details in a dialog, and the page shows the change at once", async () => {
+    shownRecord = draft;
+    signInAs(OWNER_ID, "Student");
+    renderWithProbe(`/records/${RECORD_ID}`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edit details" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+    const title = await within(dialog).findByRole("textbox", { name: /Title/ });
+    await userEvent.clear(title);
+    await userEvent.type(title, "Groundwater Recharge Mapping, Revised");
+    shownRecord = { ...draft, title: "Groundwater Recharge Mapping, Revised" };
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save details" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Groundwater Recharge Mapping, Revised" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Edit details" })).not.toBeInTheDocument();
+    expect(recordsApi.update).toHaveBeenCalledWith(
+      RECORD_ID,
+      expect.objectContaining({ title: "Groundwater Recharge Mapping, Revised" }),
+    );
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(`/records/${RECORD_ID}`);
+    expect(screen.getByRole("status", { name: "Location" })).not.toHaveTextContent("edit=");
+  });
+
+  it("opens Edit details from the old edit page's address", async () => {
+    shownRecord = draft;
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?edit=details`);
+
+    expect(await screen.findByRole("dialog", { name: "Edit details" })).toBeInTheDocument();
+  });
+});
+
+describe("the Review section's actions (IR-411)", () => {
+  // Spec §4.7: until F6's action bar, Request documents sits beside the link
+  // to the current decision form.
+  it("offers Request documents to a party the API names", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Request documents" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
+  });
+});
+
+describe("a record the viewer cannot read (IR-411)", () => {
+  it("shows the same not-found state as a missing record", async () => {
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+  });
+
+  it("says a failed load failed, rather than calling the record missing, and tries again", async () => {
+    shownRecord = record;
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce(new Error("Network Error"));
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "We couldn't load this record" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Record not available" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitForRecord(record.title);
   });
 });

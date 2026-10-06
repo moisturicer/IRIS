@@ -4,8 +4,9 @@ import { formatBytes, formatDate } from "@/lib/utils";
 import { RailHeading } from "./headings";
 
 interface PaperDocumentsProps {
-  recordId: number;
   files: RecordFileItem[];
+  /** Where this viewer manages the files: the Files section, for a participant only. */
+  manageHref?: string | null;
 }
 
 /**
@@ -15,7 +16,7 @@ interface PaperDocumentsProps {
  * the URL when the viewer may not fetch it, and the rail must not imply a
  * download it cannot serve.
  */
-export function PaperDocuments({ recordId, files }: PaperDocumentsProps) {
+export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
   return (
     <section className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -77,13 +78,15 @@ export function PaperDocuments({ recordId, files }: PaperDocumentsProps) {
         </ul>
       )}
 
-      <Link
-        to={`/records/${recordId}/documents`}
-        className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
-      >
-        Manage documents
-        <i className="fas fa-arrow-right text-2xs" aria-hidden />
-      </Link>
+      {manageHref && (
+        <Link
+          to={manageHref}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+        >
+          Manage documents
+          <i className="fas fa-arrow-right text-2xs" aria-hidden />
+        </Link>
+      )}
     </section>
   );
 }

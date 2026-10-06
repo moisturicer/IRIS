@@ -2,32 +2,34 @@ import { useCallback, useEffect, useId, useState } from "react";
 
 import { recordsApi } from "@/api/records";
 import { cn, formatDate } from "@/lib/utils";
-import { useIsReviewer } from "@/store/auth.store";
 import type {
   DocumentRequest,
   DocumentRequestItem,
-  DocumentRequestItemState,
   RecordDetail,
 } from "@/types/records";
 
 import { errorDetail } from "./errorDetail";
+import { ItemStatusChip } from "./itemStatus";
 import { RequestDocumentDialog } from "./RequestDocumentDialog";
 
 interface ReviewerDocumentRequestsProps {
   record: Pick<RecordDetail, "id" | "can_request_document" | "current_holders">;
+  /**
+   * Whether the viewer takes part in the review, as the capabilities adapter
+   * says. Requests are loaded only then: for anyone else the list endpoint
+   * would refuse (IR-349).
+   */
+  reviewing: boolean;
+  /**
+   * `request` shows only *Request documents*, for Paper View's Review section;
+   * the requests to manage live in its Files section (spec §4.10).
+   */
+  parts?: "all" | "request";
   /** Told after a request is made, decided or withdrawn, so the page can re-read. */
   onChanged?: () => void;
   /** Placement on the host page; applied only when there is something to show. */
   className?: string;
 }
-
-/** Presentation only; every word comes from the server. */
-const ITEM_TONE: Record<DocumentRequestItemState, string> = {
-  missing:  "text-brand bg-brand-100",
-  uploaded: "text-brand bg-brand-50",
-  accepted: "text-stone-900 bg-stone-100",
-  rejected: "text-brand bg-brand-100",
-};
 
 /** A request still asks something of the party that made it. */
 function needsTheRequester(r: DocumentRequest): boolean {
@@ -45,28 +47,29 @@ function needsTheRequester(r: DocumentRequest): boolean {
  * needs a reason, which the owner reads -- and Withdraw on an open request.
  * Who may manage a request is the server's `can_manage`, never decided here.
  *
- * Requests are loaded only for a reviewing role. For anyone else the list
- * endpoint would refuse, and a 403 here -- a reviewer who took no part in the
- * record (IR-349) -- just means there is nothing to manage.
+ * Requests are loaded only for a viewer the caller says is reviewing, which
+ * comes from the capabilities adapter, never from a role name (IR-411). A 403
+ * here still just means there is nothing to manage.
  */
 export function ReviewerDocumentRequests({
   record,
+  reviewing,
+  parts = "all",
   onChanged,
   className,
 }: ReviewerDocumentRequestsProps) {
-  const isReviewer = useIsReviewer();
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState(false);
 
   const load = useCallback(() => {
-    if (!isReviewer) return Promise.resolve();
+    if (!reviewing || parts === "request") return Promise.resolve();
     return recordsApi
       .documentRequests(record.id)
       .then(({ data }) => setRequests(data))
       .catch(() => setRequests([]));
-  }, [isReviewer, record.id]);
+  }, [reviewing, parts, record.id]);
 
   useEffect(() => {
     void load();
@@ -204,9 +207,7 @@ function ManagedItem({
           {item.label}
         </span>
         <span className="flex items-center gap-1.5 flex-wrap">
-          <span className={cn("px-1.5 py-0.5 rounded text-2xs font-bold", ITEM_TONE[item.state])}>
-            {item.state_label}
-          </span>
+          <ItemStatusChip item={item} />
           {decidable && (
             <>
               <button

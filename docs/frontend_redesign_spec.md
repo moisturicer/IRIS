@@ -631,6 +631,9 @@ The frontend is visually weak, not functionally missing.
   - *Request document* is a dialog from the action bar, reusing `RequestDocumentDialog`;
   - accept, reject and withdraw sit on each item in the Files section, reusing `ReviewerDocumentRequests`' logic.
 - **The upload control is the shared `UploadDropzone`** (below), in both Files and the banner.
+
+  *Amended 2026-10-06 (project lead, IR-411):* **the banner keeps a compact *Upload* button per item.** A full dropzone per item pushed the abstract far down, worst on a phone. Files keeps `UploadDropzone`. Giving the compact button the dropzone's progress bar and *Retry* is a follow-up ticket.
+- *Amended 2026-10-06 (project lead, IR-411):* **an office may attach a supplementary file of its own in Files** (any type), and remove one, under the `attach_file` capability (ADR-032 §10 as amended). It complements document requests rather than replacing them: a request asks the owner; an attachment is the office filing its own document.
 - **IR-346** makes a normal upload to a requested slot fulfil the request. It is a dependency of the Files section's single upload path, and it stays its own ticket.
 
 ### 4.11 Versions, lineage, discussions, Discoverable Proposals

@@ -72,9 +72,10 @@ describe("ActionRequiredPanel", () => {
     const items = within(panel).getByRole("list", { name: /documents requested by IERC/i });
     const [missing, uploaded] = within(items).getAllByRole("listitem");
     expect(missing).toHaveTextContent("Ethics Clearance");
-    expect(missing).toHaveTextContent("Missing");
+    // Spec §4.10's vocabulary, not the stored state's name (IR-411).
+    expect(missing).toHaveTextContent("Requested");
     expect(uploaded).toHaveTextContent("Consent form");
-    expect(uploaded).toHaveTextContent("Uploaded");
+    expect(uploaded).toHaveTextContent("Uploaded · awaiting review");
   });
 
   it("offers an upload only for a missing item", async () => {
@@ -190,6 +191,7 @@ describe("ActionRequiredPanel", () => {
     expect(row).toHaveTextContent(
       "IERC did not accept your last upload: “The scan is unreadable; please rescan at 300 dpi.”",
     );
+    expect(row).toHaveTextContent("Replacement needed");
     expect(within(row).getByLabelText("Upload Ethics Clearance")).toBeInTheDocument();
   });
 

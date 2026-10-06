@@ -13,7 +13,7 @@
  * `aria-describedby` and carry a glyph, not only a colour.
  */
 import { useState, type ReactNode } from "react";
-import { Controller, useFormContext } from "react-hook-form";
+import { Controller, useFormContext, type FieldErrors } from "react-hook-form";
 
 import { FieldError } from "@/components/ui/FieldError";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
@@ -49,6 +49,28 @@ export const METADATA_FIELD_ORDER: Array<keyof MetadataValues> = [
 export const MORE_DETAILS_FIELDS: Array<keyof MetadataValues> = [
   "classification", "psced", "is_ip", "requires_ethics_review", "for_commercialization",
 ];
+
+/** Server field → form field, so a refusal's field errors land in place. */
+export const FORM_FIELD: Record<string, keyof MetadataValues> = {
+  title: "title",
+  abstract: "abstract",
+  adviser: "adviser",
+  authors: "authors",
+  year_accomplished: "year",
+  classification: "classification",
+  psced: "psced",
+};
+
+/**
+ * Move focus to the first invalid field. A field inside More details is
+ * focused after `openMore` has opened it, on the next frame.
+ */
+export function focusFirstInvalid(errors: FieldErrors<MetadataValues>, openMore: () => void) {
+  const field = METADATA_FIELD_ORDER.find((name) => errors[name]);
+  if (!field) return;
+  if (MORE_DETAILS_FIELDS.includes(field)) openMore();
+  requestAnimationFrame(() => document.getElementById(METADATA_FIELD_IDS[field])?.focus());
+}
 
 interface MetadataFormProps {
   advisers:        User[];
