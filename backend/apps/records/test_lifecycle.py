@@ -453,13 +453,14 @@ class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
     def test_only_the_permitted_modules_mention_the_policy(self):
         from pathlib import Path
 
+        from testing.source_files import python_sources
+
         backend = Path(lifecycle.__file__).resolve().parent.parent.parent
         offenders = sorted(
             path.relative_to(backend).as_posix()
-            for path in backend.rglob("*.py")
+            for path in python_sources(backend)
             if not path.name.startswith("test_")
             and "tests" not in path.parts
-            and ".venv" not in path.parts
             and "migrations" not in path.parts
             and any(
                 needle in path.read_text(encoding="utf-8").lower().replace("_", "")

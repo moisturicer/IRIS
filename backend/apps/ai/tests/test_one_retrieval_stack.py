@@ -19,6 +19,8 @@ No database and no Django settings — it reads files, like
 import ast
 import pathlib
 
+from testing.source_files import python_sources
+
 APPS_AI = pathlib.Path(__file__).resolve().parents[1]
 THIS_FILE = pathlib.Path(__file__).name
 
@@ -37,8 +39,8 @@ DELETED_MODULES = [
 def _python_files():
     return [
         path
-        for path in APPS_AI.rglob("*.py")
-        if path.name != THIS_FILE and "__pycache__" not in path.parts
+        for path in python_sources(APPS_AI)
+        if path.name != THIS_FILE
     ]
 
 

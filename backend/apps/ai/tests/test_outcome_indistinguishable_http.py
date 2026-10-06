@@ -19,6 +19,8 @@ import re
 
 import pytest
 
+from testing.source_files import python_sources
+
 from apps.ai.answers.citations import NO_SOURCES
 from apps.ai.answers.selection import Selection, SourceSelection
 from apps.ai.composition import use_composition_root
@@ -197,7 +199,7 @@ class TestNoBranchReadsTheOutcome:
 
     def test_only_the_classifying_modules_touch_it(self):
         offenders = []
-        for path in APPS_AI.rglob("*.py"):
+        for path in python_sources(APPS_AI):
             relative = path.relative_to(APPS_AI).as_posix()
             if "tests/" in relative or relative in self.ALLOWED:
                 continue

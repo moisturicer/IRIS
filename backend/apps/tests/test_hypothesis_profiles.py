@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from hypothesis import HealthCheck, settings as hypothesis_settings
 
+from testing.source_files import python_sources
 from testing.hypothesis_profiles import (
     CI_ENV_VAR,
     CI_PROFILE,
@@ -105,7 +106,7 @@ class ProfileIsActuallyReachedTests:
         """
         root = Path(__file__).resolve().parent.parent / "ai"
         offenders = []
-        for path in root.rglob("test_*.py"):
+        for path in python_sources(root, pattern="test_*.py"):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             for node in ast.walk(tree):
                 if not isinstance(node, ast.Call):
