@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef } from "react";
+import { useContext, type ComponentPropsWithoutRef } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -7,7 +7,13 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
-import { citationHref, citationNavigationState, hasCitationQuote, openCitationLabel } from "@/lib/citedPage";
+import {
+  CitationOriginContext,
+  citationHref,
+  citationNavigationState,
+  hasCitationQuote,
+  openCitationLabel,
+} from "@/lib/citedPage";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -56,6 +62,7 @@ function CitationPlaceholder() {
 
 /** A resolved citation, as a small clickable pill sitting inline in the text. */
 function CitationChip({ citation }: { citation: ChatCitation }) {
+  const origin = useContext(CitationOriginContext);
   const label = openCitationLabel(
     citation,
     hasCitationQuote(citation) ? undefined : "the source",
@@ -65,8 +72,9 @@ function CitationChip({ citation }: { citation: ChatCitation }) {
       to={citationHref(citation)}
       // The citation itself, regions included -- so the paper view can draw
       // the highlight without a second fetch (IR-335). See
-      // `citationNavigationState`'s own doc for the graceful fallback.
-      state={citationNavigationState(citation)}
+      // `citationNavigationState`'s own doc for the graceful fallback. Inside
+      // Paper Chat it also says so, which keeps the conversation (IR-355).
+      state={citationNavigationState(citation, origin)}
       title={label}
       aria-label={label}
       className="inline-flex items-center justify-center w-[15px] h-[15px] rounded-full

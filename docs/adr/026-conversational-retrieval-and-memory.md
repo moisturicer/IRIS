@@ -12,6 +12,8 @@
 
 **Amended — 2026-10-02 (IR-444), under [ADR-013](013-chunk-level-rag-pipeline.md)'s thesis-critical RAG scope.** Two reversals, both traced to one observed failure: §8's back-reference word check is struck, so resolution runs on every follow-up, and §7's question-only embedding becomes question *and* answer, which is no longer free. §6 is unchanged. See §Amendment — 2026-10-02 below, and the [ADR-015](015-voyage-embedding-and-reranking.md) note it requires.
 
+**Amended — 2026-10-06 (IR-355), §9 only, reader-facing, no backend change.** A Paper Chat conversation whose citation the reader followed to a *different* paper stays open, pinned, while that paper is shown. This stretches [ADR-019](019-persisted-unified-conversation-history.md)'s description of Paper Chat as "shown only while viewing one record's detail page, scoped to that record". Decided with the project lead 2026-09-24; **pending review by the AI-track owner** (ADR-019 and this ADR are AI-track decisions). See §Amendment — 2026-10-06 below.
+
 ## Context
 
 ADR-019 states that the backend "loads and extends the real message history for both retrieval and LLM synthesis". That sentence admits two readings which behave completely differently, and nothing records which was meant.
@@ -216,6 +218,29 @@ What this changes:
 
 [ADR-015](015-voyage-embedding-and-reranking.md) rule 3 (`embed_documents` and `embed_query` are separate methods, not a flag) is **unchanged**; this amendment adds no flag. A note under rule 3 now records that sending stored answer text through `embed_query` is deliberate, so a later reader does not "fix" it as a bug.
 
+
+## Amendment — 2026-10-06 (IR-355): a followed citation keeps its Paper Chat conversation
+
+### What was observed
+
+With "All papers" on, a Paper Chat answer about paper X can cite paper Y. Following that citation used to replace the conversation: the paper view unmounted the panel while Y loaded, and remounted it scoped to Y. The answer the reader had just clicked disappeared, and the scope control reset to "This paper". Nothing was lost, since Back to X restored X's conversation, but the reader lost the argument they were following. This was traced from the code, not exercised live: it needs an answer citing a second indexed record, and none is indexed yet ([IR-250](https://citiris.atlassian.net/browse/IR-250)).
+
+### §9 — the conversation owns its scope, and a citation it produced may pin it
+
+§9's rule is unchanged: a Conversation scoped to a Record retrieves only that Record's passages unless the reader widens it, and nothing widens it silently. What this amendment adds is *which* Record a Paper Chat panel shows the conversation for.
+
+1. **A citation followed from inside Paper Chat keeps that conversation open** while the cited paper is displayed. The panel says so ("Chatting about <X>") and offers one step back to the displayed paper's own conversation ("Chat about this paper instead"). While pinned, nothing calls X "this paper", because a reader looking at Y would take it to mean Y. The scope control names X (truncated on screen, whole in its accessible name), and so does the composer's accessible name ("Ask about <X>"). Decided with the project lead 2026-10-06.
+2. **The scope belongs to the conversation, not the page.** A follow-up asked while pinned goes to X's Conversation with the widen setting it had before the click. Widening resets when the *conversation* changes, never because the page's paper changed. No question is ever answered from a scope the reader did not set.
+3. **The pin holds only across navigation that originated from a citation inside the panel.** It is released, and the displayed paper's own conversation shown, on: "Chat about this paper instead"; closing and reopening the panel; reaching the paper any other way (Discover, a typed URL, an in-page link); and a reload, which leaves no panel to keep. Back to X re-aligns naturally.
+
+   **Back and Forward restore the chat a history entry was left with** (decided with the project lead 2026-10-06). An entry reached by a Paper Chat citation carries the mark, and every other entry carries none. So Back to X re-aligns, Forward to Y re-pins X's conversation, and Back while hopping between one conversation's citations keeps that conversation. The accepted cost: a reader who chose "Chat about this paper instead" on Y, went Back and then Forward, gets X's pin again rather than Y's conversation. Rewriting history entries to remember that choice was rejected as machinery for an edge case. Releasing the pin on every Back or Forward was rejected because it drops the conversation in the middle of the citation-hopping this amendment exists to protect.
+
+**Mechanism, for the record.** The citation link carries `origin: "paper-chat"` in router state, beside the citation it already carried for the highlight ([ADR-031](031-pdf-citation-overlay.md)). The panel holds its own subject record and moves it to the page's record on any arrival without that mark. No API, model or stored field changed: `aiApi.conversations.findOrCreateForRecord` and the existing `{ conversationId, widen }` ask path already supported asking into a conversation about another record.
+
+### What this does not change
+
+- **Visibility.** A pinned conversation's citations are the ones it already had, each re-resolved through `visible_to` on replay as before (§10). Pinning shows nothing the reader could not already open.
+- **[ADR-019](019-persisted-unified-conversation-history.md)'s one-Conversation-per-Record model.** No Conversation is created, moved or re-scoped by a pin. The panel only chooses which existing one to show.
 
 ## Alternatives Considered
 
