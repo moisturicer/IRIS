@@ -158,9 +158,16 @@ const ROWS: Row[] = [
     sections: ["overview", "paper", "review", "files"],
   },
   {
-    name: "a party that may only ask for documents is a participant, without a decision",
+    name: "an office that may only ask for documents is a participant, without a decision, and may attach files",
     record: record({ pipeline_status: "in_review", workflow_state: "in_review", can_request_document: ["ierc"] }),
     viewer: { id: 52, role_name: "IERC" },
+    capabilities: ["cite", "request_document", "attach_file"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "an Adviser taking part may not attach files, which is an office's act",
+    record: record({ pipeline_status: "in_review", workflow_state: "in_review", can_request_document: ["adviser"] }),
+    viewer: adviser,
     capabilities: ["cite", "request_document"],
     sections: ["overview", "paper", "review", "files"],
   },

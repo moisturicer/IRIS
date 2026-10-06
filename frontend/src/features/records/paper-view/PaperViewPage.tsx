@@ -955,6 +955,7 @@ export default function PaperViewPage() {
                 owner={userIsOwner}
                 editable={can.has("edit_details")}
                 reviewing={reviewing}
+                attach={can.has("attach_file")}
                 onChanged={handleDocumentRequestChanged}
               />
             )}

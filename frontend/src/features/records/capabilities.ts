@@ -14,8 +14,8 @@
  * - `can_request_document` non-empty → `request_document`;
  * - ownership plus the server's `workflow_state` → the author actions.
  *
- * `tag_ip` is the one capability still read from the viewer's role, here and
- * nowhere else, until the server says it (phase 2).
+ * `tag_ip` and `attach_file` are the two capabilities still read from the
+ * viewer's role, here and nowhere else, until the server says them (phase 2).
  *
  * **Phase 2 (IR-418, "Capabilities payload").** The serializer adds
  * `capabilities: string[]` from `core.permissions`; this module becomes a
@@ -28,8 +28,10 @@ import { STAFF_ROLES, type RoleName } from "@/lib/constants";
 import type { RecordDetail } from "@/types/records";
 
 /**
- * ADR-032 §10's action keys, as spec §4.8 lists them, plus `continue_draft`:
- * reopening one's own draft in Publish, which ADR-032 leaves unnamed.
+ * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
+ * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
+ * draft in Publish, and `attach_file`, an office filing a supplementary file
+ * on a record it takes part in.
  */
 export type Capability =
   | "open_review"
@@ -43,6 +45,7 @@ export type Capability =
   | "continue_as"
   | "set_visibility"
   | "tag_ip"
+  | "attach_file"
   | "comment_review"
   | "comment_public"
   | "cite";
@@ -114,15 +117,12 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
     }
   }
 
-  // Phase 1 only: the one role-derived capability. Phase 2 reads it from the
-  // server's list.
-  if (
-    viewer.role_name != null &&
-    STAFF_ROLES.includes(viewer.role_name) &&
-    record.pipeline_status === "published"
-  ) {
-    granted.add("tag_ip");
-  }
+  // Phase 1 only: the two role-derived capabilities, mirroring the server's
+  // `IsStaff` (KTTO, RDCO, ITSO, IERC). Phase 2 reads them from the server.
+  const officeStaff = viewer.role_name != null && STAFF_ROLES.includes(viewer.role_name);
+  if (officeStaff && record.pipeline_status === "published") granted.add("tag_ip");
+  // Only where the office takes part, which is where the Files section is.
+  if (officeStaff && isReviewing(record, viewer)) granted.add("attach_file");
 
   return granted;
 }

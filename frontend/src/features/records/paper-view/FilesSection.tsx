@@ -15,8 +15,10 @@
  *   reason (`document-requests/itemStatus`).
  *
  * The page decides who is looking: `owner`, `editable` (the `edit_details`
- * capability, so a draft or a record awaiting revision) and `reviewing`. This
- * component decides nothing by role. The server re-checks every upload.
+ * capability, so a draft or a record awaiting revision), `reviewing`, and
+ * `attach` (the `attach_file` capability: an office filing a supplementary
+ * file of its own, decided 2026-10-06). This component decides nothing by
+ * role. The server re-checks every upload.
  */
 import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -47,6 +49,8 @@ interface FilesSectionProps {
   editable:  boolean;
   /** The viewer takes part in the review: they ask for and decide documents. */
   reviewing: boolean;
+  /** The viewer may attach a supplementary file of any type, and remove one. */
+  attach:    boolean;
   /** Told after anything changes, so the page can re-read what derives from it. */
   onChanged?: () => void;
 }
@@ -89,7 +93,7 @@ async function saveBlob(fetch: () => Promise<{ data: unknown }>, filename: strin
   downloadBlob(data as Blob, filename);
 }
 
-export function FilesSection({ record, owner, editable, reviewing, onChanged }: FilesSectionProps) {
+export function FilesSection({ record, owner, editable, reviewing, attach, onChanged }: FilesSectionProps) {
   const [slots, setSlots] = useState<SlotWithUploads[] | null>(null);
   const [files, setFiles] = useState<RecordFile[]>([]);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
@@ -282,22 +286,51 @@ export function FilesSection({ record, owner, editable, reviewing, onChanged }: 
         </section>
       )}
 
-      {files.length > 0 && (
-        <section>
+      {(files.length > 0 || attach) && (
+        <section className="space-y-3">
           <SectionHeading>Supplementary attachments</SectionHeading>
-          <ul className="divide-y divide-stone-200 rounded-2xl border border-stone-200 bg-white">
-            {files.map((f) => (
-              <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 px-card-compact py-3">
-                <span className="min-w-0">
-                  <span className="block truncate text-body font-medium text-stone-800">{f.filename}</span>
-                  <span className="block text-small text-stone-600">
-                    {[f.uploaded_by_name, formatDate(f.created_at)].filter(Boolean).join(" · ")}
+          {attach && (
+            <UploadDropzone
+              label="Attach a supplementary file"
+              hint="Any file type. Filed by your office, alongside the author's documents."
+              upload={uploads.attachment}
+              onFiles={([file]) =>
+                void send("attachment", file, (onProgress) =>
+                  documentsApi.uploadRecordFile(record.id, file, { onProgress }),
+                )
+              }
+            />
+          )}
+          {files.length > 0 && (
+            <ul className="divide-y divide-stone-200 rounded-2xl border border-stone-200 bg-white">
+              {files.map((f) => (
+                <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 px-card-compact py-3">
+                  <span className="min-w-0">
+                    <span className="block truncate text-body font-medium text-stone-800">{f.filename}</span>
+                    <span className="block text-small text-stone-600">
+                      {[f.uploaded_by_name, formatDate(f.created_at)].filter(Boolean).join(" · ")}
+                    </span>
                   </span>
-                </span>
-                <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
-              </li>
-            ))}
-          </ul>
+                  <span className="flex items-center gap-2">
+                    <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
+                    {attach && (
+                      <RemoveButton
+                        name={f.filename}
+                        onClick={async () => {
+                          try {
+                            await documentsApi.deleteFile(f.id);
+                            await changed();
+                          } catch (err) {
+                            setNotice(errorDetail(err, `Could not remove ${f.filename}. Please try again.`));
+                          }
+                        }}
+                      />
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 
@@ -361,17 +394,7 @@ function Versions({
           </span>
           <span className="flex items-center gap-2">
             <DownloadButton name={`${name} version ${u.version}`} onClick={() => onDownload(u)} />
-            {removable && (
-              <button
-                type="button"
-                onClick={() => onRemove(u)}
-                aria-label={`Remove ${name} version ${u.version}`}
-                className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}
-              >
-                <i className="fas fa-trash-can text-2xs" aria-hidden />
-                Remove
-              </button>
-            )}
+            {removable && <RemoveButton name={`${name} version ${u.version}`} onClick={() => onRemove(u)} />}
           </span>
         </li>
       ))}
@@ -389,6 +412,20 @@ function DownloadButton({ name, onClick }: { name: string; onClick: () => void }
     >
       <i className="fas fa-download text-2xs" aria-hidden />
       Download
+    </button>
+  );
+}
+
+function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Remove ${name}`}
+      className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}
+    >
+      <i className="fas fa-trash-can text-2xs" aria-hidden />
+      Remove
     </button>
   );
 }

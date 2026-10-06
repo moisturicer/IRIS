@@ -20,6 +20,8 @@
 
 Details are in the *Amendment* notes under §8 and §10. The original text is kept for the record.
 
+**Amended 2026-10-06 (project lead, IR-411): §10 gains two capabilities**, `continue_draft` and `attach_file`. See the *Amendment* note under §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -268,6 +270,11 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 | **Author** | Owners | Reading, plus the version picker, **New version** (when a revision is requested), the Action Required panel (ADR-022), **Continue as…** (on an accepted Proposal), visibility, and the review timeline read/reply |
 | **Review** | Seat holders, after **Open review** | The paper beside the review timeline (*amended 2026-09-26: no Ask IRIS here; it stays on the Paper tab, IR-372*), the party status strip (Adviser ✓ · ITSO ● · IERC ● · KTTO — · RDCO ○), and an action bar built from `capabilities` |
 | **Summary** | Strangers on a Discoverable Proposal | The §8 summary and public discussion. No PDF. |
+
+**Amendment, 2026-10-06 (project lead, IR-411): two more capabilities.** The list above is examples, not a closed set; these two are named so the capabilities payload (IR-418) sends them and the frontend never derives them itself once it does:
+
+- **`continue_draft`**: an owner reopens their own `draft` in Publish. Granted to an owner of a draft only.
+- **`attach_file`**: an office files a supplementary file of its own on a record it takes part in, and may remove one. It complements ADR-022's document requests: a request asks the owner for a document, an attachment is the office's own. Until IR-418 the frontend adapter derives it from the office role (the server's `IsStaff`), as it does `tag_ip`.
 
 **The party status strip** follows ADR-021 §14, with two changes. The Intake row is gone. The RDCO row reads **"Not required"** on a record no office was routed to, instead of "awaiting".
 

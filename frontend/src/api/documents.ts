@@ -73,13 +73,11 @@ export const documentsApi = {
   files:          (recordId: number) =>
     apiClient.get<RecordFile[]>("/documents/files/", { params: { record: recordId } }),
 
-  uploadRecordFile: (recordId: number, file: File) => {
+  uploadRecordFile: (recordId: number, file: File, options: ProgressOptions = {}) => {
     const fd = new FormData();
     fd.append("record", String(recordId));
     fd.append("file",   file);
-    return apiClient.post<RecordFile>("/documents/files/upload/", fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return apiClient.post<RecordFile>("/documents/files/upload/", fd, progressConfig(file, options));
   },
 
   downloadAll:    (recordId: number) =>
