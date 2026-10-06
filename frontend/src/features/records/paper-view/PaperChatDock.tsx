@@ -126,6 +126,10 @@ interface PaperChatPanelProps {
 /** The paper a Paper Chat conversation is about. */
 type ChatSubject = Pick<RecordDetail, "id" | "title">;
 
+function subjectOf(record: RecordDetail): ChatSubject {
+  return { id: record.id, title: record.title };
+}
+
 /**
  * Paper Chat — a Conversation scoped to the record being viewed (IR-298).
  *
@@ -165,17 +169,19 @@ export function PaperChatPanel({
   const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const { streaming, ask } = useAskStream();
-  const [subject, setSubject] = useState<ChatSubject>(() => ({ id: record.id, title: record.title }));
+  const [subject, setSubject] = useState<ChatSubject>(() => subjectOf(record));
   const pinned = subject.id !== record.id;
+  // Read after an answer arrives: the reader may have switched conversations
+  // while it streamed, and it belongs to the one it was asked in.
+  const subjectId = useRef(subject.id);
+  subjectId.current = subject.id;
 
   // A citation followed from this panel keeps its conversation; any other
   // arrival brings the page's record. Decided once the page has the record
   // it was going to (`arrival` set), never against the one it is leaving.
   useEffect(() => {
     if (!arrival || arrival.fromPaperChat) return;
-    setSubject((current) =>
-      current.id === record.id ? current : { id: record.id, title: record.title },
-    );
+    setSubject((current) => (current.id === record.id ? current : subjectOf(record)));
     // `arrival.key` changes on every navigation, including a second visit
     // to the record already shown, which is still "another way" to it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,9 +194,11 @@ export function PaperChatPanel({
     let cancelled = false;
     setReady(false);
     setWiden(false);
-    // Until the new conversation arrives there is nowhere to send to: a
-    // question typed during the switch must not land in the old one.
+    // Until the new conversation arrives there is nowhere to send to, and
+    // nothing of the old one to show: a question typed during the switch
+    // must not land in it, nor its transcript sit under the new header.
     setConversationId(null);
+    setMessages([]);
 
     (async () => {
       try {
@@ -228,14 +236,17 @@ export function PaperChatPanel({
     setInput("");
     setMessages((prev) => [...prev, newChatMessage("user", question)]);
     setBusy(true);
+    const askedAbout = subject.id;
+    // The answer is stored in the conversation it was asked in either way;
+    // it is shown only if that is still the one on screen (IR-355).
+    const show = (reply: ChatMessage) => {
+      if (subjectId.current === askedAbout) setMessages((prev) => [...prev, reply]);
+    };
     try {
       const { message } = await ask(question, { conversationId, widen });
-      setMessages((prev) => [...prev, message]);
+      show(message);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        newChatMessage("assistant", "IRIS could not answer right now."),
-      ]);
+      show(newChatMessage("assistant", "IRIS could not answer right now."));
     } finally {
       setBusy(false);
     }
@@ -288,11 +299,9 @@ export function PaperChatPanel({
                 IRIS AI
               </span>
             </p>
-            {pinned ? (
-              <p className="text-2xs text-stone-500 truncate">Chatting about {subject.title}</p>
-            ) : (
-              <p className="text-2xs text-stone-500 truncate">{record.title}</p>
-            )}
+            <p className="text-2xs text-stone-500 truncate">
+              {pinned ? `Chatting about ${subject.title}` : record.title}
+            </p>
           </div>
 
           {canChangePosition && (
@@ -347,7 +356,7 @@ export function PaperChatPanel({
           <div className="px-4 pb-1">
             <button
               type="button"
-              onClick={() => setSubject({ id: record.id, title: record.title })}
+              onClick={() => setSubject(subjectOf(record))}
               className="inline-flex items-center gap-1.5 min-h-11 lg:min-h-7 text-2xs font-semibold text-brand hover:underline"
             >
               <i className="fas fa-arrow-right-arrow-left text-2xs" aria-hidden />
@@ -418,9 +427,9 @@ export function PaperChatPanel({
           {messages.map((m) => (
             <ChatMessageBubble key={m.id} message={m} compact />
           ))}
-        </CitationOriginContext.Provider>
 
-        {busy && streaming && <StreamingMessageBubble state={streaming} compact />}
+          {busy && streaming && <StreamingMessageBubble state={streaming} compact />}
+        </CitationOriginContext.Provider>
       </div>
 
       {/* Composer */}
