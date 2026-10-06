@@ -125,9 +125,9 @@ class GroundedAnswerService:
         **A refusal is diagnosable from here** (IR-459). "Nothing was found",
         "everything was withheld" and "retrieval raised" all produced one
         empty list and one `no_sources` answer, so a log line could not tell
-        them apart. The classification is recorded; nothing branches on it
-        yet and no reader sees it, and a failure is logged and **re-raised**
-        exactly as before.
+        them apart. The classification is logged, without the withheld count;
+        nothing branches on it and no reader sees it (IR-460), and a failure
+        is logged and **re-raised** exactly as before.
         """
         try:
             retrieved = self._retriever.retrieve(
@@ -135,13 +135,13 @@ class GroundedAnswerService:
             )
         except Exception:
             logger.warning(
-                "retrieval outcome: %s", RetrievalDiagnostics.failed().summary,
+                "retrieval outcome: %s", RetrievalDiagnostics.failed().log_summary,
                 exc_info=True,
             )
             raise
 
         selection = self._selection.select(retrieved)
-        logger.info("retrieval outcome: %s", selection.diagnostics.summary)
+        logger.info("retrieval outcome: %s", selection.diagnostics.log_summary)
         return retrieved, list(selection.passages), selection.diagnostics
 
     def _recall(self, retrieved, conversation, history) -> Sequence["Turn"]:
