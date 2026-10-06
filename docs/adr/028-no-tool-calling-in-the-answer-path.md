@@ -2,11 +2,11 @@
 
 ## Status
 
-**Accepted** — 2026-09-19.
+**Superseded by [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md)** — 2026-10-06. Originally Accepted 2026-09-19.
 
-**Does not supersede anything.** It records a decision *not* to adopt an architecture, so that it is not re-proposed without new evidence.
+The reasoning, the evidence table and the three revisit conditions below are **kept, not overwritten**, as ADR-035 requires.
 
-> **Proposed supersession — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Proposed 2026-10-06, IR-461), not accepted.** It proposes one no-argument `search_corpus` tool call used **only as a route signal** — never executed, no loop, no model-written query — to decide whether a question needs evidence at all. It **keeps every reason, the evidence table and the three revisit conditions below**, assesses each (1 holds · 2 partly · 3 does not), and records that it proceeds on condition 1 plus a design argument rather than on the measurement this ADR asked for. It also records that the page-precision objection in reason (1) **has no instrument** and can be neither confirmed nor refuted today. **Until ADR-035 is accepted by a human reviewer, this ADR's decision stands as written.**
+> **Supersession — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** It adopts one no-argument `search_corpus` tool call used **only as a route signal** — never executed, no loop, no model-written query — to decide whether a question needs evidence at all. It **keeps every reason, the evidence table and the three revisit conditions below**, assesses each (1 holds · 2 partly · 3 does not), and records that it proceeds on condition 1 plus a design argument rather than on the measurement this ADR asked for. It also records that the page-precision objection in reason (1) **has no instrument** and can be neither confirmed nor refuted today. **ADR-035 has been accepted by a human reviewer, so this ADR's decision no longer stands; its reasoning does.**
 
 **Constrains [ADR-026](026-conversational-retrieval-and-memory.md) and [ADR-027](027-corpus-level-questions.md)**, both of which specify explicit mechanisms — question resolution, routing, conditional decomposition — that a tool-calling agent would have replaced.
 

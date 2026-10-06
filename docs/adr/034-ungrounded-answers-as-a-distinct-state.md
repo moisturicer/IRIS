@@ -4,7 +4,7 @@
 
 **Accepted** — 2026-10-02 (IR-453).
 
-> **Proposed amendment to §2 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Proposed 2026-10-06, IR-461), not accepted.** It makes *withheld evidence does not affect the route* a routing rule: the route, the response and the answer state are a function of whether any Passage was kept and whether the question carried an evidence requirement, **never of why nothing was kept**. This completes the §Security Impact correction IR-460 already applied below. §2's own rule that a withheld question is `no_sources` rather than `ungrounded` is unchanged.
+> **Amendment to §2 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** It makes *withheld evidence does not affect the route* a routing rule: the route, the response and the answer state are a function of whether any Passage was kept and whether the question carried an evidence requirement, **never of why nothing was kept**. This completes the §Security Impact correction IR-460 already applied below. §2's own rule that a withheld question is `no_sources` rather than `ungrounded` is unchanged.
 
 **Amends [ADR-008](008-ai-degradation-to-fts.md)** — *"Never a fabricated answer"* is kept for the grounded path and given an explicit boundary rather than an exception. See §1 and that file's IR-453 amendment.
 

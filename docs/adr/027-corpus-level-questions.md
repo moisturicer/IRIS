@@ -4,7 +4,7 @@
 
 **Accepted** — 2026-09-18.
 
-> **Proposed amendment to §4 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Proposed 2026-10-06, IR-461), not accepted.** §4's obligation binds a question *routed as corpus-level or landscape*, and §5's router does not exist (verified 2026-10-06: no routing module, no Lens, IR-302–305 unbuilt), so **§4 is dormant, not satisfied**. ADR-035 §9 records a bounded landscape exception: ordinary retrieval **does not** satisfy Lens-or-refuse, no answer may claim a comprehensive landscape or research-gap analysis from it, an accountable owner must be **named by a person** before any production `on`, and the exception **expires at that go/no-go**. It is not a blanket postponement.
+> **Amendment to §4 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** §4's obligation binds a question *routed as corpus-level or landscape*, and §5's router does not exist (verified 2026-10-06: no routing module, no Lens, IR-302–305 unbuilt), so **§4 is dormant, not satisfied**. ADR-035 §9 records a bounded landscape exception: ordinary retrieval **does not** satisfy Lens-or-refuse, no answer may claim a comprehensive landscape or research-gap analysis from it, an accountable owner must be **named by a person** before any production `on`, and the exception **expires at that go/no-go**. It is not a blanket postponement.
 
 **Extends [ADR-013](013-chunk-level-rag-pipeline.md)** rather than amending it. ADR-013 made the chunk the retrievable unit, which is right for questions about a Record's contents. This ADR covers questions about the corpus itself, which retrieval cannot answer at all.
 
