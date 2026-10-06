@@ -83,6 +83,8 @@ export interface RecordFileItem {
   url:        string | null;
   size_bytes: number;
   created_at: string;
+  /** The viewer may remove it: their office filed it and takes part (IR-476). */
+  can_remove: boolean;
 }
 
 export interface RecordDetail extends RecordListItem {

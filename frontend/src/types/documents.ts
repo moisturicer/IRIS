@@ -43,4 +43,6 @@ export interface RecordFile {
   uploaded_by:      number | null;
   uploaded_by_name: string | null;
   created_at:       string;
+  /** The viewer may remove it: their office filed it and takes part (IR-476). */
+  can_remove:       boolean;
 }

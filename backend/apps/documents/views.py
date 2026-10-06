@@ -395,7 +395,8 @@ class RecordFileListView(generics.ListAPIView):
 
     def get_queryset(self):
         record_id = self.request.query_params.get("record")
-        return RecordFile.objects.filter(record_id=record_id)
+        # `record` for each file's `can_remove`, `uploaded_by` for its name.
+        return RecordFile.objects.filter(record_id=record_id).select_related("record", "uploaded_by")
 
 
 class RecordFileUploadView(APIView):
@@ -415,7 +416,7 @@ class RecordFileUploadView(APIView):
     permission_classes = [IsAuthenticated, IsStaff]
 
     def post(self, request):
-        from apps.reviews.tracker import requestable_parties
+        from .attachments import filing_party
 
         file      = request.FILES.get("file")
         record_id = request.data.get("record")
@@ -424,7 +425,8 @@ class RecordFileUploadView(APIView):
         record, denied = authorize_record_documents(request, record_id)
         if denied:
             return denied
-        if not requestable_parties(record, request.user):
+        party = filing_party(record, request.user)
+        if party is None:
             return Response(
                 {"detail": "Only an office taking part in this record's review may attach a file."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -434,12 +436,16 @@ class RecordFileUploadView(APIView):
             file=file,
             filename=file.name,
             uploaded_by=request.user,
+            party=party,
         )
         create_audit_event(
             "UPLOAD", request.user, record=record_file.record,
             metadata={"filename": file.name},
         )
-        return Response(RecordFileSerializer(record_file).data, status=status.HTTP_201_CREATED)
+        return Response(
+            RecordFileSerializer(record_file, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class RecordUploadDeleteView(APIView):
@@ -519,31 +525,38 @@ class RecordFileDownloadView(APIView):
 class RecordFileDeleteView(APIView):
     """
     DELETE /documents/files/<id>/
-    Owners and staff may delete a RecordFile attachment.
-    Physical file is removed from storage.
+    The office that filed a supplementary file removes it, while it takes part
+    in the record (IR-476, `attachments.may_remove`). The stored file is
+    removed from storage too.
+
+    `owns_or_staffs_record` was the gate, and it admits every office, so any
+    office could delete any office's file on any record. Owners may not remove
+    an office's file either; the superuser can, in Django admin. Refusals follow
+    ADR-022 §Amendment 4: a missing file, or one on a record the caller cannot
+    see, is a 404; one they can see but may not remove is a 403.
     """
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
-        from .models import RecordFile
-        try:
-            record_file = RecordFile.objects.select_related("record").get(pk=pk)
-        except RecordFile.DoesNotExist:
+        from apps.records.models import Record
+
+        from .attachments import delete_record_file, may_remove
+
+        record_file = RecordFile.objects.select_related("record").filter(pk=pk).first()
+        if record_file is None or not (
+            Record.objects.visible_to(request.user).filter(pk=record_file.record_id).exists()
+        ):
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not owns_or_staffs_record(request.user, record_file.record):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if not may_remove(record_file, request.user):
+            return Response(
+                {"detail": "Only the office that filed this file may remove it, while it takes part in the review."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         record = record_file.record
         filename = record_file.filename
-
-        try:
-            if record_file.file:
-                record_file.file.delete(save=False)
-        except Exception:
-            pass
-
-        record_file.delete()
+        delete_record_file(record_file)
 
         create_audit_event(
             "DELETE", request.user, record=record,
