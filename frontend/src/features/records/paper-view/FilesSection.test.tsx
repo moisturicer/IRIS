@@ -103,7 +103,8 @@ function slot(id: number, name: string): SlotWithUploads {
 beforeEach(() => {
   attachments = [];
   uploadRecordFile.mockReset().mockImplementation((_record: number, file: File) => {
-    attachments = [...attachments, attachment(70, file.name)];
+    // The server says the office that just filed it may remove it.
+    attachments = [...attachments, attachment(70, file.name, true)];
     return Promise.resolve({ data: attachments[attachments.length - 1] });
   });
   deleteFile.mockReset().mockImplementation((fileId: number) => {
@@ -122,10 +123,10 @@ beforeEach(() => {
   });
 });
 
-function attachment(id: number, filename: string): RecordFile {
+function attachment(id: number, filename: string, canRemove = false): RecordFile {
   return {
     id, record: RECORD_ID, file: "", filename, uploaded_by: 51, uploaded_by_name: "Ivy Ethics",
-    created_at: "2026-09-22T02:00:00Z",
+    created_at: "2026-09-22T02:00:00Z", can_remove: canRemove,
   };
 }
 
@@ -256,6 +257,18 @@ describe("supplementary attachments", () => {
     fireEvent.click(remove);
     await waitFor(() => expect(deleteFile).toHaveBeenCalledWith(70));
     await waitFor(() => expect(screen.queryByText("ierc-minutes.docx")).not.toBeInTheDocument());
+  });
+
+  // IR-476: a file belongs to the office that filed it. The server decides per
+  // file, and the screen offers Remove only where the server will allow it.
+  it("offers Remove only on a file the server says this viewer may remove", async () => {
+    attachments = [attachment(71, "itso-memo.pdf", true), attachment(72, "ierc-minutes.pdf", false)];
+    renderFiles({ owner: false, reviewing: true, attach: true });
+
+    expect(await screen.findByRole("button", { name: "Remove itso-memo.pdf" })).toBeInTheDocument();
+    expect(screen.getByText("ierc-minutes.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download ierc-minutes.pdf" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove ierc-minutes.pdf" })).not.toBeInTheDocument();
   });
 
   it("lists attachments for download only, to a viewer who may not attach", async () => {

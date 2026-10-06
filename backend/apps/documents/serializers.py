@@ -67,11 +67,27 @@ class SlotWithUploadsSerializer(serializers.ModelSerializer):
 
 class RecordFileSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.SerializerMethodField()
+    #: Whether the viewer may remove this file -- the delete view's own rule
+    #: (IR-476), so Paper View offers Remove only where it would succeed.
+    can_remove       = serializers.SerializerMethodField()
 
     class Meta:
         model  = RecordFile
-        fields = ["id", "record", "file", "filename", "uploaded_by", "uploaded_by_name", "created_at"]
+        fields = [
+            "id", "record", "file", "filename", "uploaded_by", "uploaded_by_name",
+            "created_at", "can_remove",
+        ]
         read_only_fields = ["uploaded_by", "uploaded_by_name"]
+
+    def get_can_remove(self, obj):
+        from .attachments import may_remove, removable_parties
+
+        user = getattr(self.context.get("request"), "user", None)
+        # One set per record, shared by every file in a list.
+        cache = self.context.setdefault("_removable_parties", {})
+        if obj.record_id not in cache:
+            cache[obj.record_id] = removable_parties(obj.record, user)
+        return may_remove(obj, user, removable=cache[obj.record_id])
 
     def get_uploaded_by_name(self, obj):
         if obj.uploaded_by:

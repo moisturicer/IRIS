@@ -326,3 +326,298 @@ class RecordFileUploadAuthorizationTests(APITestCase):
             (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
         )
         self.assertEqual(self._files_on_record(), 0)
+
+
+class RecordFileRemovalAuthorizationTests(APITestCase):
+    """
+    IR-476: `DELETE /documents/files/<id>/` -- the removal half of `attach_file`
+    (ADR-032 §10 as amended 2026-10-06: an office files a supplementary file of
+    its own on a record it takes part in, "and may remove one").
+
+    The route authorized with `owns_or_staffs_record`, which admits every
+    office, so any KTTO, RDCO, ITSO or IERC account could delete any office's
+    file on any record -- from disk, so it could not be undone. A file now
+    belongs to the office that filed it (`RecordFile.party`), and removing it
+    takes the same office while it holds an active assignment on the record:
+    the attach rule (IR-474), plus ownership of the file.
+
+    Owners lose the delete `owns_or_staffs_record` gave them; the screen never
+    offered it. Refusals follow ADR-022 §Amendment 4: a missing file, or one on
+    a record the caller cannot see, is a 404; a file the caller can see but may
+    not remove is a 403.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp(prefix="iris-test-media-")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._media_override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    make_user = staticmethod(RecordDocumentAuthorizationTests.make_user)
+
+    def setUp(self):
+        from apps.reviews.models import RecordAssignment
+        from core.enums import Party
+
+        self.owner    = self.make_user("remove-owner@cit.edu", "Student")
+        self.stranger = self.make_user("remove-stranger@cit.edu", "Student")
+        self.itso     = self.make_user("remove-itso@cit.edu", "ITSO")
+        self.ierc     = self.make_user("remove-ierc@cit.edu", "IERC")
+        self.ktto     = self.make_user("remove-ktto@cit.edu", "KTTO")
+        self.rdco     = self.make_user("remove-rdco@cit.edu", "RDCO")
+
+        self.record_type = RecordType.objects.first()
+        self.assertIsNotNone(self.record_type, "no seeded RecordType -- migrations incomplete")
+        self.record = self._record("parallel_review")
+        # ITSO and IERC both hold the record; KTTO has no part in it.
+        RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
+        RecordAssignment.objects.create(record=self.record, party=Party.IERC)
+
+        self.itso_file = self._file(self.record, "itso", self.itso)
+        self.ierc_file = self._file(self.record, "ierc", self.ierc)
+
+    def _record(self, pipeline_status):
+        record = Record.objects.create(
+            title=f"Disclosure at {pipeline_status}", abstract="D" * 40,
+            record_type=self.record_type, added_by=self.owner,
+            pipeline_status=pipeline_status,
+        )
+        RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
+        return record
+
+    @staticmethod
+    def _file(record, party, uploaded_by):
+        from django.core.files.base import ContentFile
+
+        return RecordFile.objects.create(
+            record=record, file=ContentFile(b"office memo", name=f"{party}-memo.txt"),
+            filename=f"{party}-memo.txt", uploaded_by=uploaded_by, party=party,
+        )
+
+    def _remove(self, record_file):
+        pk = record_file if isinstance(record_file, int) else record_file.pk
+        return self.client.delete(f"/api/v1/documents/files/{pk}/")
+
+    def assertRemoved(self, record_file, response):
+        from django.core.files.storage import default_storage
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT, getattr(response, "data", None))
+        self.assertFalse(RecordFile.objects.filter(pk=record_file.pk).exists())
+        self.assertFalse(default_storage.exists(record_file.file.name), "the stored file was left behind")
+
+    def assertSurvives(self, record_file, response, code=status.HTTP_403_FORBIDDEN):
+        from django.core.files.storage import default_storage
+
+        self.assertEqual(response.status_code, code, getattr(response, "data", None))
+        self.assertTrue(RecordFile.objects.filter(pk=record_file.pk).exists(), "a refused remove deleted the row")
+        self.assertTrue(default_storage.exists(record_file.file.name), "a refused remove deleted the stored file")
+
+    # --- who may remove -------------------------------------------------------
+
+    def test_an_office_taking_part_can_remove_its_own_file(self):
+        self.client.force_authenticate(self.itso)
+        self.assertRemoved(self.itso_file, self._remove(self.itso_file))
+
+    def test_an_office_cannot_remove_another_offices_file(self):
+        self.client.force_authenticate(self.itso)
+        self.assertSurvives(self.ierc_file, self._remove(self.ierc_file))
+
+    def test_an_office_with_no_part_cannot_remove_anything(self):
+        self.client.force_authenticate(self.ktto)
+        for record_file in (self.itso_file, self.ierc_file):
+            with self.subTest(file=record_file.filename):
+                self.assertSurvives(record_file, self._remove(record_file))
+
+    def test_an_office_whose_assignment_is_not_active_cannot_remove_its_own_file(self):
+        """Taking part is present tense: a completed assignment grants nothing."""
+        from core.enums import AssignmentState, Party
+
+        self.record.assignments.filter(party=Party.ITSO).update(state=AssignmentState.COMPLETED)
+        self.client.force_authenticate(self.itso)
+        self.assertSurvives(self.itso_file, self._remove(self.itso_file))
+
+    def test_an_owner_cannot_remove_an_office_attachment_on_their_own_record(self):
+        self.client.force_authenticate(self.owner)
+        self.assertSurvives(self.itso_file, self._remove(self.itso_file))
+
+    def test_a_file_no_office_owns_is_removable_by_no_one(self):
+        """A backfilled row with no party is left to the admin escape hatch."""
+        orphan = self._file(self.record, "orphan", None)
+        RecordFile.objects.filter(pk=orphan.pk).update(party=None)
+        for user in (self.itso, self.ierc, self.rdco, self.owner):
+            with self.subTest(user=user.email):
+                self.client.force_authenticate(user)
+                self.assertSurvives(orphan, self._remove(orphan))
+
+    def test_rdco_can_remove_its_own_file_at_either_rdco_stage(self):
+        from apps.reviews.models import RecordAssignment
+        from core.enums import Party
+
+        for pipeline_status, party in (("rdco_intake", Party.INTAKE), ("rdco_review", Party.RDCO)):
+            with self.subTest(stage=pipeline_status):
+                record = self._record(pipeline_status)
+                RecordAssignment.objects.create(record=record, party=party)
+                record_file = self._file(record, "rdco", self.rdco)
+                self.client.force_authenticate(self.rdco)
+                self.assertRemoved(record_file, self._remove(record_file))
+
+    # --- refusals ------------------------------------------------------------
+
+    def test_a_file_that_does_not_exist_is_a_404(self):
+        self.client.force_authenticate(self.itso)
+        missing = RecordFile.objects.order_by("-pk").first().pk + 1000
+        self.assertEqual(self._remove(missing).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_file_on_a_record_the_caller_cannot_see_is_a_404(self):
+        """ADR-022 §Amendment 4: an unseen Record reads as a missing id."""
+        self.client.force_authenticate(self.stranger)
+        self.assertSurvives(self.itso_file, self._remove(self.itso_file), status.HTTP_404_NOT_FOUND)
+
+    def test_anonymous_is_refused(self):
+        response = self._remove(self.itso_file)
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+        self.assertTrue(RecordFile.objects.filter(pk=self.itso_file.pk).exists())
+
+    # --- what attaching stores ----------------------------------------------
+
+    def _attach(self, record):
+        return self.client.post(
+            "/api/v1/documents/files/upload/",
+            {"record": record.pk, "file": SimpleUploadedFile("memo.txt", b"office memo")},
+            format="multipart",
+        )
+
+    def test_attaching_stores_the_uploaders_party(self):
+        self.client.force_authenticate(self.ierc)
+        response = self._attach(self.record)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(RecordFile.objects.get(pk=response.data["id"]).party, "ierc")
+        self.assertTrue(response.data["can_remove"])
+
+    def test_rdco_attaching_at_intake_stores_rdco_never_intake(self):
+        from apps.reviews.models import RecordAssignment
+        from core.enums import Party
+
+        record = self._record("rdco_intake")
+        RecordAssignment.objects.create(record=record, party=Party.INTAKE)
+        self.client.force_authenticate(self.rdco)
+        response = self._attach(record)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(RecordFile.objects.get(pk=response.data["id"]).party, "rdco")
+        self.assertTrue(response.data["can_remove"], "RDCO could not remove what it just filed at intake")
+
+    # --- the screen follows the server ---------------------------------------
+
+    @staticmethod
+    def _can_remove_by_id(files):
+        return {f["id"]: f["can_remove"] for f in files}
+
+    def test_the_file_list_carries_can_remove_per_file(self):
+        expected = {
+            self.itso:  {self.itso_file.pk: True,  self.ierc_file.pk: False},
+            self.ierc:  {self.itso_file.pk: False, self.ierc_file.pk: True},
+            self.ktto:  {self.itso_file.pk: False, self.ierc_file.pk: False},
+            self.owner: {self.itso_file.pk: False, self.ierc_file.pk: False},
+        }
+        for user, can_remove in expected.items():
+            with self.subTest(user=user.email):
+                self.client.force_authenticate(user)
+                response = self.client.get("/api/v1/documents/files/", {"record": self.record.pk})
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                data = response.data
+                results = data["results"] if isinstance(data, dict) else data
+                self.assertEqual(self._can_remove_by_id(results), can_remove)
+
+    def test_the_record_detail_payload_carries_can_remove_per_file(self):
+        expected = {
+            self.itso:  {self.itso_file.pk: True,  self.ierc_file.pk: False},
+            self.owner: {self.itso_file.pk: False, self.ierc_file.pk: False},
+        }
+        for user, can_remove in expected.items():
+            with self.subTest(user=user.email):
+                self.client.force_authenticate(user)
+                response = self.client.get(f"/api/v1/records/{self.record.pk}/")
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(self._can_remove_by_id(response.data["files"]), can_remove)
+
+
+class RecordFileAdminTests(APITestCase):
+    """
+    IR-476 decision 5: the escape hatch. A file no office may remove -- one
+    with no party, or one whose office no longer takes part -- is removed by
+    the superuser in Django admin, which logs it, and the stored file goes too.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp(prefix="iris-test-media-")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._media_override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        from django.core.files.base import ContentFile
+
+        owner = RecordDocumentAuthorizationTests.make_user("admin-owner@cit.edu", "Student")
+        record = Record.objects.create(
+            title="Disclosure With An Orphan File", abstract="D" * 40,
+            record_type=RecordType.objects.first(), added_by=owner,
+        )
+        self.record_file = RecordFile.objects.create(
+            record=record, file=ContentFile(b"office memo", name="orphan.txt"),
+            filename="orphan.txt", uploaded_by=None, party=None,
+        )
+        self.superuser = User.objects.create_superuser(
+            email="admin-root@cit.edu", password="TestPass123!",
+            first_name="Root", last_name="User", is_verified=True,
+        )
+
+    def _delete_url(self):
+        return f"/admin/documents/recordfile/{self.record_file.pk}/delete/"
+
+    def test_the_superuser_deleting_a_file_in_admin_removes_the_stored_file(self):
+        from django.contrib.admin.models import DELETION, LogEntry
+        from django.core.files.storage import default_storage
+
+        name = self.record_file.file.name
+        self.client.force_login(self.superuser)
+        response = self.client.post(self._delete_url(), {"post": "yes"})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(RecordFile.objects.filter(pk=self.record_file.pk).exists())
+        self.assertFalse(default_storage.exists(name), "admin delete left the stored file behind")
+        self.assertTrue(LogEntry.objects.filter(action_flag=DELETION, user=self.superuser).exists())
+
+    def test_the_admin_bulk_delete_removes_the_stored_files(self):
+        from django.core.files.storage import default_storage
+
+        name = self.record_file.file.name
+        self.client.force_login(self.superuser)
+        response = self.client.post(
+            "/admin/documents/recordfile/",
+            {"action": "delete_selected", "_selected_action": [self.record_file.pk], "post": "yes"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(RecordFile.objects.filter(pk=self.record_file.pk).exists())
+        self.assertFalse(default_storage.exists(name), "bulk delete left the stored file behind")
+
+    def test_an_office_admin_account_is_not_the_escape_hatch(self):
+        """Only the superuser: a Django `is_staff` office account is refused."""
+        rdco = RecordDocumentAuthorizationTests.make_user("admin-rdco@cit.edu", "RDCO")
+        User.objects.filter(pk=rdco.pk).update(is_staff=True)
+        rdco.refresh_from_db()
+        self.client.force_login(rdco)
+        self.client.post(self._delete_url(), {"post": "yes"})
+        self.assertTrue(RecordFile.objects.filter(pk=self.record_file.pk).exists())

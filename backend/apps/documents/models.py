@@ -204,14 +204,25 @@ class PdfExtraction(models.Model):
 
 class RecordFile(models.Model):
     """
-    Direct file attachment to a record (not tied to an UploadSlot).
-    Used for miscellaneous files the owner wants to attach.
+    A supplementary file an office files on a record it takes part in
+    (`attach_file`, ADR-032 §10 as amended 2026-10-06). Not tied to an
+    UploadSlot: owners file their documents through the slots instead.
+
+    The file belongs to the office in `party`, not to the person who uploaded
+    it (IR-476), and only that office may remove it -- `attachments.py`.
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="files")
     file        = models.FileField(upload_to="record_files/")
     filename    = models.CharField(max_length=300)
     uploaded_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="record_files"
+    )
+    #: The office that filed it. RDCO is always `rdco`, never `intake`. Null
+    #: only on a row backfilled from an uploader who was gone or not an office;
+    #: no office may remove such a row, only the superuser in Django admin.
+    party       = models.CharField(
+        max_length=20, choices=[(p.value, p.label) for p in ASSIGNABLE_PARTIES],
+        null=True, blank=True,
     )
     created_at  = models.DateTimeField(auto_now_add=True)
 

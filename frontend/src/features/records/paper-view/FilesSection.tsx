@@ -17,8 +17,9 @@
  * The page decides who is looking: `owner`, `editable` (the `edit_details`
  * capability, so a draft or a record awaiting revision), `reviewing`, and
  * `attach` (the `attach_file` capability: an office filing a supplementary
- * file of its own, decided 2026-10-06). This component decides nothing by
- * role. The server re-checks every upload.
+ * file of its own, decided 2026-10-06). Remove follows each file's
+ * server-computed `can_remove` (IR-476). This component decides nothing by
+ * role. The server re-checks every upload and removal.
  */
 import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -49,7 +50,11 @@ interface FilesSectionProps {
   editable:  boolean;
   /** The viewer takes part in the review: they ask for and decide documents. */
   reviewing: boolean;
-  /** The viewer may attach a supplementary file of any type, and remove one. */
+  /**
+   * The viewer may attach a supplementary file of any type. Removing one is
+   * per file, by the server's `can_remove` (IR-476): only the office that
+   * filed it, while it takes part.
+   */
   attach:    boolean;
   /** Told after anything changes, so the page can re-read what derives from it. */
   onChanged?: () => void;
@@ -313,7 +318,7 @@ export function FilesSection({ record, owner, editable, reviewing, attach, onCha
                   </span>
                   <span className="flex items-center gap-2">
                     <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
-                    {attach && (
+                    {f.can_remove && (
                       <RemoveButton
                         name={f.filename}
                         onClick={async () => {

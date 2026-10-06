@@ -95,7 +95,7 @@ const ROWS: Row[] = [
     name: "a supplementary file alone is still a paper to read",
     record: record({
       abstract_file: null,
-      files: [{ id: 3, filename: "paper.pdf", url: null, size_bytes: 10, created_at: "2026-09-01T08:00:00Z" }],
+      files: [{ id: 3, filename: "paper.pdf", url: null, size_bytes: 10, created_at: "2026-09-01T08:00:00Z", can_remove: false }],
     }),
     viewer: stranger,
     capabilities: ["cite"],

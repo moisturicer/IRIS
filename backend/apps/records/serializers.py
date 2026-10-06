@@ -183,6 +183,14 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         # `/media/` path, which nothing has served since IR-152 removed both
         # the nginx block and Django's DEBUG route -- every one of these links
         # was a 404 (IR-334).
+        from apps.documents.attachments import may_remove, removable_parties
+
+        files = list(obj.files.all().order_by("-created_at"))
+        if not files:
+            return []
+        user = getattr(self.context.get("request"), "user", None)
+        # The delete view's own rule (IR-476), asked once for the record.
+        removable = removable_parties(obj, user)
         return [
             {
                 "id":          f.id,
@@ -190,8 +198,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
                 "url":         f"/api/v1/documents/files/{f.id}/download/" if f.file else None,
                 "size_bytes":  f.file.size if f.file else 0,
                 "created_at":  f.created_at.isoformat(),
+                "can_remove":  may_remove(f, user, removable=removable),
             }
-            for f in obj.files.all().order_by("-created_at")
+            for f in files
         ]
 
     def get_abstract_file(self, obj):
