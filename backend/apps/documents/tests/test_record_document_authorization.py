@@ -210,3 +210,119 @@ class RecordDocumentAuthorizationTests(APITestCase):
                     call().status_code, 400,
                     f"{label} refused office staff",
                 )
+
+
+class RecordFileUploadAuthorizationTests(APITestCase):
+    """
+    IR-474: `POST /documents/files/upload/` -- an office filing a supplementary
+    file of its own (`attach_file`, ADR-032 §10 as amended 2026-10-06).
+
+    The route checked only `IsStaff`, then wrote a `RecordFile` onto whatever
+    record id the body named. `authorize_record_documents` alone would not close
+    that: `owns_or_staffs_record` admits every office, so any KTTO, RDCO, ITSO or
+    IERC account would still pass. ADR-032 grants `attach_file` on a record the
+    office *takes part in*, so the gate is participation -- an active assignment
+    the user can staff, the same test that offers the action in Paper View.
+
+    The refusals follow ADR-022 §Amendment 4. Office staff can see every
+    record, so an office that does not take part is refused with a **403**, not
+    a 404 that would pretend a visible record is missing. A record id that
+    names nothing is a 404.
+
+    This route is not in `RecordDocumentAuthorizationTests._all_endpoints()`:
+    that matrix admits the owner and any office, and this route admits neither
+    by that rule alone. Its own matrix is here.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_root = tempfile.mkdtemp(prefix="iris-test-media-")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_root)
+        cls._media_override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_root, ignore_errors=True)
+        super().tearDownClass()
+
+    make_user = staticmethod(RecordDocumentAuthorizationTests.make_user)
+
+    def setUp(self):
+        from apps.reviews.models import RecordAssignment
+        from core.enums import Party
+
+        self.owner    = self.make_user("attach-owner@cit.edu", "Student")
+        self.stranger = self.make_user("attach-stranger@cit.edu", "Student")
+        self.itso     = self.make_user("attach-itso@cit.edu", "ITSO")
+        self.ktto     = self.make_user("attach-ktto@cit.edu", "KTTO")
+
+        record_type = RecordType.objects.first()
+        self.assertIsNotNone(record_type, "no seeded RecordType -- migrations incomplete")
+        self.record = Record.objects.create(
+            title="Disclosure Under Review", abstract="D" * 40,
+            record_type=record_type, added_by=self.owner,
+            pipeline_status="itso_review",
+        )
+        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+        # ITSO holds the record; KTTO has no part in it.
+        RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
+
+    def _attach(self, record_id=None):
+        return self.client.post(
+            "/api/v1/documents/files/upload/",
+            {
+                "record": self.record.pk if record_id is None else record_id,
+                "file": SimpleUploadedFile("memo.txt", b"office memo"),
+            },
+            format="multipart",
+        )
+
+    def _files_on_record(self):
+        return RecordFile.objects.filter(record=self.record).count()
+
+    def test_an_office_taking_part_can_attach(self):
+        self.client.force_authenticate(self.itso)
+        response = self._attach()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(self._files_on_record(), 1)
+
+    def test_an_office_with_no_part_is_refused_and_nothing_is_written(self):
+        self.client.force_authenticate(self.ktto)
+        self.assertEqual(self._attach().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._files_on_record(), 0, "a refused attach still created a RecordFile")
+
+    def test_an_office_whose_assignment_completed_is_refused(self):
+        """Taking part is present tense: a completed assignment grants nothing."""
+        from core.enums import AssignmentState
+
+        self.record.assignments.update(state=AssignmentState.COMPLETED)
+        self.client.force_authenticate(self.itso)
+        self.assertEqual(self._attach().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._files_on_record(), 0)
+
+    def test_a_record_that_does_not_exist_is_a_404(self):
+        self.client.force_authenticate(self.itso)
+        missing = Record.objects.order_by("-pk").first().pk + 1000
+        for record_id in (missing, "not-an-id"):
+            with self.subTest(record=record_id):
+                self.assertEqual(
+                    self._attach(record_id).status_code, status.HTTP_404_NOT_FOUND,
+                )
+        self.assertFalse(RecordFile.objects.exists())
+
+    def test_a_student_is_refused_by_role_even_on_their_own_record(self):
+        """Owners file through the slot upload, not here (no change)."""
+        for user in (self.owner, self.stranger):
+            with self.subTest(user=user.email):
+                self.client.force_authenticate(user)
+                self.assertEqual(self._attach().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._files_on_record(), 0)
+
+    def test_anonymous_is_refused(self):
+        self.assertIn(
+            self._attach().status_code,
+            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+        )
+        self.assertEqual(self._files_on_record(), 0)

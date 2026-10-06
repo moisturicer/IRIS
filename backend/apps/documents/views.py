@@ -401,18 +401,36 @@ class RecordFileListView(generics.ListAPIView):
 class RecordFileUploadView(APIView):
     """
     POST /documents/files/upload/
-    Staff only — attach any supplementary file to a record.
+    An office files a supplementary file of its own on a record it takes part
+    in (`attach_file`, ADR-032 §10 as amended 2026-10-06).
     Owners submit PDFs through the slot-based SubmitDocumentView instead.
+
+    IR-474. `IsStaff` is the role gate and `authorize_record_documents` resolves
+    the record, but neither refuses an office: `owns_or_staffs_record` admits
+    every one. Taking part is an active assignment the user can staff
+    (`tracker.requestable_parties`), the same test that offers the action in
+    Paper View. Office staff can see every record, so an office with no part is
+    a 403 rather than a 404 (ADR-022 §Amendment 4).
     """
     permission_classes = [IsAuthenticated, IsStaff]
 
     def post(self, request):
+        from apps.reviews.tracker import requestable_parties
+
         file      = request.FILES.get("file")
         record_id = request.data.get("record")
         if not all([file, record_id]):
             return Response({"detail": "record and file are required."}, status=400)
+        record, denied = authorize_record_documents(request, record_id)
+        if denied:
+            return denied
+        if not requestable_parties(record, request.user):
+            return Response(
+                {"detail": "Only an office taking part in this record's review may attach a file."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         record_file = RecordFile.objects.create(
-            record_id=record_id,
+            record=record,
             file=file,
             filename=file.name,
             uploaded_by=request.user,
