@@ -8,9 +8,16 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { RecordDetail } from "@/types/records";
+import type { RecordDetail, ReviewerSeat, SeatState } from "@/types/records";
 
-import { capabilitiesFor, sectionsFor, type Capability, type PaperSection, type Viewer } from "./capabilities";
+import {
+  capabilitiesFor,
+  seatToOpen,
+  sectionsFor,
+  type Capability,
+  type PaperSection,
+  type Viewer,
+} from "./capabilities";
 
 const OWNER = 40;
 const ADVISER = 30;
@@ -59,7 +66,29 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     current_holders: [],
     can_act: [],
     can_request_document: [],
+    my_seats: [],
+    is_participant: false,
     ...overrides,
+  };
+}
+
+/** One of the viewer's own seats, as `my_seats` carries it (IR-415). */
+function seat(state: SeatState, id = 1): ReviewerSeat {
+  return {
+    id,
+    assignment: 11,
+    record: 7,
+    party: "itso",
+    party_label: "ITSO",
+    reviewer: 51,
+    reviewer_name: "ITSO Reviewer",
+    state,
+    state_label: state,
+    source: "claimed",
+    assigned_by: 51,
+    assigned_at: "2026-10-01T08:00:00Z",
+    opened_at: state === "assigned" ? null : "2026-10-02T08:00:00Z",
+    done_at: state === "done" ? "2026-10-03T08:00:00Z" : null,
   };
 }
 
@@ -200,6 +229,37 @@ const ROWS: Row[] = [
     sections: ["overview", "paper"],
   },
   {
+    name: "a seat to work is a review to open, even where the legacy pipeline lets its holder do nothing yet",
+    record: record({
+      pipeline_status: "itso_review",
+      workflow_state: "in_review",
+      my_seats: [seat("assigned")],
+      is_participant: true,
+    }),
+    viewer: itsoStaff,
+    capabilities: ["cite", "open_review"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a past seat holder keeps Review and Files, with nothing left to do (IR-411's gap, IR-415)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "in_review",
+      my_seats: [seat("done")],
+      is_participant: true,
+    }),
+    viewer: itsoStaff,
+    capabilities: ["cite"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "an office member who never held a seat here is not a participant",
+    record: record({ pipeline_status: "in_review", workflow_state: "in_review", is_participant: false }),
+    viewer: itsoStaff,
+    capabilities: ["cite"],
+    sections: ["overview", "paper"],
+  },
+  {
     name: "an accepted Proposal offers no Proposal completion and no continuation yet",
     record: record({
       record_type_name: "Proposal",
@@ -218,6 +278,12 @@ describe("the capabilities adapter", () => {
   it.each(ROWS)("$name", ({ record: r, viewer, capabilities, sections }) => {
     expect([...capabilitiesFor(r, viewer)].sort()).toEqual([...capabilities].sort());
     expect(sectionsFor(r, viewer)).toEqual(sections);
+  });
+
+  it("Open review records the seat not yet opened, and only that one", () => {
+    expect(seatToOpen(record({ my_seats: [seat("done", 1), seat("assigned", 2)] }))?.id).toBe(2);
+    expect(seatToOpen(record({ my_seats: [seat("in_review")] }))).toBeNull();
+    expect(seatToOpen(record())).toBeNull();
   });
 
   it("never grants an action whose backend does not exist yet", () => {

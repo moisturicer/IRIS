@@ -214,6 +214,50 @@ class AssignmentState(models.TextChoices):
     WITHDRAWN = "withdrawn", "Withdrawn"
 
 
+class SeatState(models.TextChoices):
+    """
+    Where one reviewer's part in an office's assignment stands. `ReviewerSeat.state`.
+
+    ADR-032 §4. `ASSIGNED` is a seat nobody has opened yet; *Open review* moves
+    it to `IN_REVIEW` and stamps `opened_at`. `DONE` is the reviewer's part
+    finished, and `WITHDRAWN` is a coordinator, or a decision, taking it away.
+    Like `AssignmentState`, **not an outcome**: the verdict is the seat
+    holder's own `Review` row.
+
+    `IN_REVIEW` and `WITHDRAWN` share their values with `PipelineStatus` and
+    `AssignmentState`, which is why this enum is not listed in the vocabulary
+    guard: those two already govern the shared spellings, and `"done"` is also
+    an unrelated `PdfExtraction` status.
+    """
+
+    ASSIGNED = "assigned", "Assigned"
+    IN_REVIEW = "in_review", "In review"
+    DONE = "done", "Done"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+
+
+#: The seat states that still count as holding one: not finished, not taken away.
+OPEN_SEAT_STATES = (SeatState.ASSIGNED, SeatState.IN_REVIEW)
+
+
+class SeatSource(models.TextChoices):
+    """
+    How a reviewer came to hold a seat. `ReviewerSeat.source`. ADR-032 §4.
+
+    - `ENTRY`: the record's Adviser, seated automatically when it is submitted.
+    - `CLAIMED`: an office member took an unclaimed record from the pool.
+    - `ASSIGNED`: an office coordinator seated a member.
+    - `NOMINATED`: whoever routed the record to the office named the member.
+    - `ADDED`: a seat holder brought in a colleague from their own office.
+    """
+
+    ENTRY = "entry", "Entry"
+    CLAIMED = "claimed", "Claimed"
+    ASSIGNED = "assigned", "Assigned"
+    NOMINATED = "nominated", "Nominated"
+    ADDED = "added", "Added"
+
+
 class ResubmissionRequestState(models.TextChoices):
     """
     Where one party's request for changes stands. `ResubmissionRequest.state`.

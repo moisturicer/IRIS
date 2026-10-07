@@ -93,6 +93,8 @@ const record: RecordDetail = {
   current_holders: [],
   can_act: [],
   can_request_document: [],
+  my_seats: [],
+  is_participant: false,
 };
 
 /** What the mocked detail endpoint returns; a test may park it at another stage. */

@@ -74,6 +74,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active      = models.BooleanField(default=True)
     date_joined    = models.DateTimeField(auto_now_add=True)
     consent_given  = models.BooleanField(default=False)   # FR-M6-06: Data Privacy Act (RA 10173) consent recorded at signup
+    #: ADR-032 §4: may assign, reassign and withdraw reviewer seats in the
+    #: office their role staffs, and nowhere else. Granted by an administrator
+    #: (`PATCH /users/<id>/coordinator/`), never by the user. Meaningless
+    #: without an office role: `core.permissions.is_office_coordinator` asks both.
+    is_office_coordinator = models.BooleanField(default=False)
 
     objects = UserManager()
 
@@ -86,6 +91,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_full_name(self):
         parts = [self.first_name, self.middle_initial, self.last_name]
         return " ".join(p for p in parts if p)
+
+    def assign_role(self, role):
+        """
+        Give the user `role`, and drop any office-coordinator grant (IR-415).
+
+        The grant was for the office the *old* role staffed. Kept across a
+        move, an ITSO coordinator moved to IERC would coordinate IERC without
+        anyone granting it, so every role change goes through here.
+        """
+        self.role = role
+        self.is_office_coordinator = False
+        self.save(update_fields=["role", "is_office_coordinator"])
 
 
 class StudentProfile(models.Model):

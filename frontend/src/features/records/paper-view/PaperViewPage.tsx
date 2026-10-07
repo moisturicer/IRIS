@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
-import { reviewsApi } from "@/api/reviews";
+import { reviewsApi, seatsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button, Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -23,6 +23,7 @@ import {
   isOwner,
   isParticipant,
   isReviewing,
+  seatToOpen,
   sectionsFor,
   type PaperSection,
   type Viewer,
@@ -564,6 +565,25 @@ export default function PaperViewPage() {
           ? "elsewhere"
           : "save";
 
+  // *Open review* (ADR-032 §4) records when this reviewer started -- the
+  // seat moves to `in_review` and the server stamps `opened_at` -- then moves
+  // into the Review section. With no unopened seat it only navigates. A
+  // failed recording still opens the review: the seat stays `assigned`, and
+  // the next *Open review* records it.
+  const openReview = async () => {
+    const seat = seatToOpen(record);
+    if (seat) {
+      try {
+        await seatsApi.open(seat.id);
+        const { data } = await recordsApi.detail(record.id);
+        setRecord(data);
+      } catch {
+        // See above: the review opens regardless.
+      }
+    }
+    setViewParam("section", "review");
+  };
+
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -725,7 +745,7 @@ export default function PaperViewPage() {
                   )}
 
                   {primary === "open_review" && (
-                    <button type="button" onClick={() => setViewParam("section", "review")} className={PILL_PRIMARY}>
+                    <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
                       <i className="fas fa-clipboard-check text-xs" aria-hidden />
                       Open review
                     </button>

@@ -9,6 +9,8 @@ from core.enums import (
     ResubmissionRequestState,
     ReviewDecision,
     ReviewStage,
+    SeatSource,
+    SeatState,
 )
 
 PARTY_CHOICES = [(p.value, p.label) for p in ASSIGNABLE_PARTIES]
@@ -154,6 +156,64 @@ class RecordAssignment(models.Model):
 
     def __str__(self):
         return f"Record {self.record_id} | {self.party} | {self.state}"
+
+
+class ReviewerSeat(models.Model):
+    """
+    One person reviewing a record for a party. ADR-032 §4, IR-415.
+
+    The assignment says "this office has the record"; the seat says "this
+    person is reviewing it for that office". An active assignment with no
+    seat is the office's **pool**: routed there, and claimed by nobody yet.
+    An assignment can hold several seats, so two ITSO members can both review.
+
+    The IR-256 rules hold here too: no workflow action deletes a seat (a
+    withdrawal changes its `state`), and a seat stores no verdict -- that is
+    the holder's `Review`.
+    """
+
+    assignment  = models.ForeignKey(
+        RecordAssignment, on_delete=models.CASCADE, related_name="seats"
+    )
+    #: `SET_NULL`, like every user foreign key on these tables: deleting an
+    #: account must not delete the history of who reviewed what.
+    reviewer    = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="reviewer_seats",
+    )
+    state       = models.CharField(
+        max_length=20, choices=SeatState.choices, default=SeatState.ASSIGNED,
+    )
+    source      = models.CharField(max_length=20, choices=SeatSource.choices)
+    #: Who seated the reviewer: the coordinator, the router, the colleague who
+    #: added them, or the claimer themselves. Null for an entry seat and a
+    #: backfilled one, which nobody chose.
+    assigned_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="reviewer_seats_assigned",
+    )
+    assigned_at = models.DateTimeField(default=timezone.now)
+    #: Stamped by *Open review* (§4): the time-on-task start IR-144 measures from.
+    opened_at   = models.DateTimeField(null=True, blank=True)
+    done_at     = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["assignment", "assigned_at", "pk"]
+        constraints = [
+            # ADR-032 §4: at most one non-withdrawn seat per (assignment,
+            # reviewer). Partial, so a withdrawn seat stays as history and the
+            # same person can be seated again.
+            models.UniqueConstraint(
+                fields=["assignment", "reviewer"],
+                condition=~models.Q(state=SeatState.WITHDRAWN),
+                name="one_live_seat_per_assignment_reviewer",
+            ),
+        ]
+        # My Reviews (IR-268) lists a user's seats by state.
+        indexes = [models.Index(fields=["reviewer", "state"])]
+
+    def __str__(self):
+        return f"Assignment {self.assignment_id} | {self.reviewer_id} | {self.state}"
 
 
 class RoutingEvent(models.Model):

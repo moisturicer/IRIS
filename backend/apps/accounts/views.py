@@ -9,7 +9,7 @@ from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer,
 )
@@ -60,7 +60,9 @@ class LoginView(APIView):
         return Response({
             "access":  str(refresh.access_token),
             "refresh": str(refresh),
-            "user":    UserSerializer(user).data,
+            # The signed-in user's own payload, `review_access` included, so
+            # the landing after sign-in needs no second request (IR-415).
+            "user":    MeSerializer(user).data,
         })
 
 
@@ -99,7 +101,7 @@ class ChangePasswordView(APIView):
 
 
 class MeView(generics.RetrieveUpdateAPIView):
-    serializer_class   = UserSerializer
+    serializer_class   = MeSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
@@ -162,8 +164,7 @@ class ChangeUserRoleView(APIView):
         else:
             return Response({"detail": "role_name or role is required."}, status=400)
 
-        user.role = role
-        user.save(update_fields=["role"])
+        user.assign_role(role)
 
         create_audit_event(
             "ROLE_CHANGE", request.user,
@@ -184,6 +185,45 @@ class ChangeUserRoleView(APIView):
             recipient_list=[user.email],
         )
 
+        return Response(UserSerializer(user).data)
+
+
+class OfficeCoordinatorView(APIView):
+    """
+    PATCH /users/<id>/coordinator/  {"is_office_coordinator": bool}
+
+    ADR-032 §4: an administrator grants or revokes the coordinator flag. A
+    coordinator may assign, reassign and withdraw reviewer seats in the office
+    their role staffs, so granting it to a user with no office role is
+    refused rather than stored as a flag that means nothing.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def patch(self, request, pk):
+        from core.permissions import office_parties_of
+
+        user = User.objects.filter(pk=pk).select_related("role").first()
+        if user is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        value = request.data.get("is_office_coordinator")
+        if not isinstance(value, bool):
+            return Response(
+                {"detail": "`is_office_coordinator` must be true or false."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if value and not office_parties_of(user):
+            return Response(
+                {"detail": "Only a member of ITSO, IERC, KTTO or RDCO can coordinate an office."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.is_office_coordinator = value
+        user.save(update_fields=["is_office_coordinator"])
+        create_audit_event(
+            "ROLE_CHANGE", request.user,
+            metadata={"target_user": user.email, "is_office_coordinator": value},
+        )
         return Response(UserSerializer(user).data)
 
 

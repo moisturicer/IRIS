@@ -38,9 +38,10 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { useAuthStore } from "@/store/auth.store";
 import type { User } from "@/types/auth";
-import type { RecordDetail } from "@/types/records";
+import type { RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
+import { seatsApi } from "@/api/reviews";
 
 import { DOCK_KEY } from "./PaperChatDock";
 import { CONTAINED_LAYOUT_QUERY } from "./paneLayout";
@@ -97,6 +98,8 @@ const record: RecordDetail = {
   current_holders: [],
   can_act: [],
   can_request_document: [],
+  my_seats: [],
+  is_participant: false,
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -146,6 +149,8 @@ const approvedProposal: RecordDetail = {
   current_holders: [],
   can_act: [],
   can_request_document: [],
+  my_seats: [],
+  is_participant: false,
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -193,7 +198,10 @@ vi.mock("@/api/accounts", () => ({
   accountsApi: { listAdvisers: vi.fn(() => Promise.resolve(page([]))) },
 }));
 
-vi.mock("@/api/reviews", () => ({ reviewsApi: { resubmit: vi.fn() } }));
+vi.mock("@/api/reviews", () => ({
+  reviewsApi: { resubmit: vi.fn() },
+  seatsApi: { open: vi.fn(() => Promise.resolve({ data: {} })) },
+}));
 
 // The AI overview reads its own cache; this screen is not what that
 // behaviour is tested through (`PaperAiOverview.test.tsx` is).
@@ -362,6 +370,8 @@ const inReview: RecordDetail = {
   ],
   can_act: [],
   can_request_document: [],
+  my_seats: [],
+  is_participant: false,
 };
 
 async function waitForRecord(title: string) {
@@ -399,6 +409,35 @@ describe("the review control follows can_act", () => {
       `/review/${RECORD_ID}/evaluate`,
     );
     expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
+  });
+
+  // ADR-032 §4, IR-415: opening the review records when this reviewer started.
+  it("records the viewer's unopened seat, then opens the Review section", async () => {
+    const assigned: ReviewerSeat = {
+      id: 77, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
+      reviewer: 2, reviewer_name: "ITSO Reviewer", state: "assigned", state_label: "Assigned",
+      source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
+      opened_at: null, done_at: null,
+    };
+    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true };
+    signInAs(2, "ITSO");
+    renderPaperView();
+
+    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
+
+    expect(vi.mocked(seatsApi.open)).toHaveBeenCalledWith(77);
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+  });
+
+  it("only navigates when every seat is already open", async () => {
+    shownRecord = { ...inReview, can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    renderPaperView();
+
+    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
+
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(vi.mocked(seatsApi.open)).not.toHaveBeenCalled();
   });
 
   it("is not offered to a same-role viewer the API does not name, whatever the stage", async () => {

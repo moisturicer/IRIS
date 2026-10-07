@@ -22,6 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
             "role", "role_name",
             "is_staff", "is_superuser",
             "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_office_coordinator",
             "college_name", "department_name", "course_name",
         ]
         # `email` is read-only, and that is a security boundary rather than a
@@ -32,9 +33,13 @@ class UserSerializer(serializers.ModelSerializer):
         # was writable a student could PATCH their own address to any external
         # mailbox and keep `is_verified: True`, moving the account off CIT-U
         # identity entirely. Verified reproducible before the fix.
+        # `is_office_coordinator` is read-only for the same reason as `role`:
+        # coordinators assign other people's reviews (ADR-032 §4), so the grant
+        # is an administrator's, through `PATCH /users/<id>/coordinator/`.
         read_only_fields = [
             "email", "role", "is_staff", "is_superuser",
             "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_office_coordinator",
         ]
 
     def _profile_college(self, obj):
@@ -62,6 +67,28 @@ class UserSerializer(serializers.ModelSerializer):
     def get_course_name(self, obj):
         student = getattr(obj, "student_profile", None)
         return student.course.name if student and student.course else ""
+
+
+class MeSerializer(UserSerializer):
+    """
+    `GET /users/me/`: the signed-in user, plus what only they may read about
+    themselves.
+
+    `review_access` (spec Appendix D · B3, IR-415) says whether the user has
+    review work: My Reviews' sidebar entry, its route guard and the landing
+    after sign-in all read it. It is never on another user's payload -- the
+    adviser picker and the admin list use `UserSerializer` -- so nobody learns
+    who else reviews what.
+    """
+    review_access = serializers.SerializerMethodField()
+
+    class Meta(UserSerializer.Meta):
+        fields = [*UserSerializer.Meta.fields, "review_access"]
+
+    def get_review_access(self, obj):
+        from apps.reviews.seats import review_access
+
+        return review_access(obj)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
