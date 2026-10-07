@@ -167,10 +167,17 @@ class AcceptAndRouteTests(RoutingTestBase):
             )
             self.assertFalse(assignment.seats.exists(), f"{party} should be a pool")
         # One movement, Adviser -> ITSO + IERC, on the tracker it answers with.
-        self.assertEqual(len(response.data["routing_history"]), 1)
-        movement = response.data["routing_history"][0]
-        self.assertEqual(movement["from"], Party.ADVISER)
-        self.assertEqual(set(movement["to"]), {Party.ITSO, Party.IERC})
+        # (The history also starts with the submitter's movement in, to the
+        # Adviser, which `enter_at_adviser` records.)
+        from_adviser = [
+            m for m in response.data["routing_history"] if m["from"] == Party.ADVISER
+        ]
+        self.assertEqual(len(from_adviser), 1)
+        self.assertEqual(set(from_adviser[0]["to"]), {Party.ITSO, Party.IERC})
+        self.assertEqual(
+            [(m["from"], m["to"]) for m in response.data["routing_history"]],
+            [(None, [Party.ADVISER]), (Party.ADVISER, from_adviser[0]["to"])],
+        )
         # The Adviser's turn is over, and the record is still in review.
         adviser = RecordAssignment.objects.get(record=record, party=Party.ADVISER)
         self.assertEqual(adviser.state, AssignmentState.COMPLETED)
