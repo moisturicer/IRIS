@@ -370,7 +370,9 @@ def _notify(record, actor, plan, opened, *, accepted):
         actor=actor,
         from_label=_label(plan.from_party),
         target_labels=[_label(p) for p in targets],
-        opened_parties=[t.party for t in opened],
+        # An office whose router named a nominee is not told its pool has work:
+        # the record went straight to that person (decided 2026-10-08).
+        opened_parties=[t.party for t in opened if t.nominee is None],
         nominees=[(t.nominee, _label(t.party)) for t in plan.targets if t.nominee is not None],
         reason=plan.reason,
         accepted=accepted,

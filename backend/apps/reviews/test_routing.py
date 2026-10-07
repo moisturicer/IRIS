@@ -218,6 +218,10 @@ class AcceptAndRouteTests(RoutingTestBase):
             (self.itso, SeatSource.NOMINATED, self.adviser),
         )
         self.assertTrue(Notification.objects.filter(record=record, recipient=self.itso).exists())
+        # It went to the nominee, not the pool: ITSO is not told its pool has work.
+        self.assertFalse(
+            Notification.objects.filter(record=record, broadcast_to_role__name=RoleName.ITSO).exists()
+        )
 
     def test_a_nominee_who_does_not_staff_the_office_is_refused_and_nothing_is_written(self):
         record = self.new_model()

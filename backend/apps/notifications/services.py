@@ -552,9 +552,12 @@ def notify_routed(
     """
     A record was routed to one or more offices (ADR-032 §4, IR-261).
 
-    - Every member of each office the record **newly** reached: its pool is
-      shared work, so the whole office hears, in-app and by email. An office
-      that already held the record is not told again.
+    - Every member of each office the record **newly** reached **into its
+      pool**: the pool is shared work, so the whole office hears, in-app and by
+      email. An office that already held the record is not told again, and
+      neither is one whose router named a nominee -- the record went straight
+      to that person, so "in your office's pool" would be false (2026-10-08).
+      The caller passes only pool offices in `opened_parties`.
     - Each nominee, personally: the work is theirs.
     - The owners, only when the Adviser **accepted** it. Onward routing between
       offices is review traffic, visible on the tracker.
