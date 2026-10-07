@@ -37,10 +37,13 @@ import uuid
 from dataclasses import dataclass, field
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.records.lifecycle import type_name_of
+
 from core.enums import (
+    OPEN_SEAT_STATES,
     AssignmentState,
     ClearanceStatus,
     Office,
@@ -97,12 +100,7 @@ class RoutingRefused(Exception):
     """The caller may not route this record. A 403."""
 
 
-def _label(party) -> str:
-    return str(Party(party).label)
-
-
-def _type_name(record) -> str:
-    return record.record_type.name if record.record_type else ""
+_label = seats._label
 
 
 def is_new_model(record) -> bool:
@@ -119,16 +117,21 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
 
     `in_review`, an active Adviser assignment with an `entry` seat for
     `record.adviser`, and the submitter's movement in as a routing event. No
-    intake assignment is ever opened. Refuses a record with no Adviser, since
-    nobody could review it, and one already in the workflow.
+    intake assignment is ever opened. Only a draft enters, and only one whose
+    Adviser is not also an owner (ADR-032 §1); a record with no Adviser is
+    refused, since nobody could review it.
     """
     if record.adviser_id is None:
         raise RoutingError("A record enters at its Adviser, and this one names none.")
-    if record.pipeline_status not in (PipelineStatus.DRAFT, PipelineStatus.IN_REVIEW):
+    if record.owners.filter(user_id=record.adviser_id).exists():
+        # ADR-032 §1: nobody reviews their own submission.
+        raise RoutingError("A record's Adviser cannot also be one of its owners.")
+    if record.pipeline_status != PipelineStatus.DRAFT:
         raise RoutingError("Only a draft can enter the review workflow.")
-    if RecordAssignment.objects.filter(record=record, state=AssignmentState.ACTIVE).exists():
-        raise RoutingError("This record is already in the review workflow.")
 
+    # The one write of `pipeline_status` outside `lifecycle.apply()`: the
+    # legacy table has no edge into `in_review`, and IR-260 moves submission
+    # onto this function (module note).
     record.pipeline_status = PipelineStatus.IN_REVIEW
     record.save(update_fields=["pipeline_status", "updated_at"])
     now = timezone.now()
@@ -145,21 +148,34 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
 
 # --- who may route, as what -----------------------------------------------------
 
-def _may_accept_and_route(record, user) -> bool:
+def _seated_adviser(record, user) -> bool:
+    """`user` is this record's Adviser, holds the open Adviser seat, and does
+    not own the record (ADR-032 §1: nobody reviews their own submission)."""
     return (
-        is_new_model(record)
-        and _type_name(record) in ROUTABLE_TYPES
-        and user is not None
+        user is not None
         and record.adviser_id == getattr(user, "pk", None)
         and holds_seat(user, record, Party.ADVISER)
+        and not record.owners.filter(user=user).exists()
     )
 
 
-def _route_as(record, user):
+def _seated_office(record, user):
     """The office party `user` holds an open seat for, or None."""
-    if not is_new_model(record) or user is None:
+    if user is None:
         return None
     return next((p for p in ONWARD_PARTIES if holds_seat(user, record, p)), None)
+
+
+def _routable(record) -> bool:
+    return is_new_model(record) and type_name_of(record) in ROUTABLE_TYPES
+
+
+def _may_accept_and_route(record, user) -> bool:
+    return _routable(record) and _seated_adviser(record, user)
+
+
+def _route_as(record, user):
+    return _seated_office(record, user) if _routable(record) else None
 
 
 def routing_flags(record, user) -> dict:
@@ -172,12 +188,12 @@ def routing_flags(record, user) -> dict:
         return {"accept_and_route": False, "route_as": None}
     return {
         "accept_and_route": _may_accept_and_route(record, user),
-        "route_as": None if _type_name(record) not in ROUTABLE_TYPES else _route_as(record, user),
+        "route_as": _route_as(record, user),
     }
 
 
 def _require_routable(record):
-    if _type_name(record) == RecordTypeName.PROPOSAL:
+    if type_name_of(record) == RecordTypeName.PROPOSAL:
         raise RoutingError(
             "A Proposal is decided by its Adviser alone and is never routed to an office."
         )
@@ -189,16 +205,24 @@ def _require_routable(record):
 
 
 def _from_party_for(record, user, *, accepting: bool) -> str:
-    _require_routable(record)
+    """
+    The party `user` routes as. Who comes first, then what (ADR-022
+    §Amendment 4, ordered as `seats` orders it): a caller who could never
+    route this record is a 403 whatever state it is in; a seated reviewer is
+    told why the record cannot be routed (a Proposal, the legacy pipeline)
+    with a 400.
+    """
     if accepting:
-        if not _may_accept_and_route(record, user):
+        if not _seated_adviser(record, user):
             raise RoutingRefused(
                 "Only this record's Adviser, holding its review, may accept and route it."
             )
-        return str(Party.ADVISER)
-    party = _route_as(record, user)
-    if party is None:
-        raise RoutingRefused("Only a reviewer seated on this record may route it onward.")
+        party = str(Party.ADVISER)
+    else:
+        party = _seated_office(record, user)
+        if party is None:
+            raise RoutingRefused("Only a reviewer seated on this record may route it onward.")
+    _require_routable(record)
     return party
 
 
@@ -210,7 +234,7 @@ def route_options(record, user) -> dict:
     to, and who they may nominate in each office. Raises as the routing acts
     do, so the picklist is offered to exactly the people who could use it.
     """
-    accepting = _may_accept_and_route(record, user)
+    accepting = _seated_adviser(record, user)
     from_party = _from_party_for(record, user, accepting=accepting)
     active = set(
         RecordAssignment.objects.filter(record=record, state=AssignmentState.ACTIVE)
@@ -220,7 +244,7 @@ def route_options(record, user) -> dict:
     targets = []
     for party in ROUTE_TARGETS[from_party]:
         members = [
-            {"id": u.pk, "name": u.get_full_name() or u.email}
+            {"id": u.pk, "name": u.get_full_name() or f"Member #{u.pk}"}
             for u in User.objects.filter(
                 is_active=True, role__name=_ROLE_FOR_PARTY[party],
             ).order_by("last_name", "first_name", "pk")
@@ -353,6 +377,27 @@ def _notify(record, actor, plan, opened, *, accepted):
     ))
 
 
+def _locked(record):
+    """
+    Re-read `record` under a row lock, so routing requests on it run one after
+    the other: a double-clicked *Accept & route*, or two offices routing to the
+    same third one at once, then refuse cleanly instead of racing.
+    """
+    from apps.records.models import Record
+
+    return Record.objects.select_for_update().select_related("record_type").get(pk=record.pk)
+
+
+def _seat_errors_as_routing_errors(act):
+    """A seat that cannot change, or a constraint a race reached, is a 400."""
+    try:
+        return act()
+    except seats.SeatError as exc:
+        raise RoutingError(str(exc))
+    except IntegrityError:
+        raise RoutingError("This record changed while you were routing it. Reload and try again.")
+
+
 @transaction.atomic
 def accept_and_route(record, actor, *, to, reason):
     """
@@ -361,6 +406,7 @@ def accept_and_route(record, actor, *, to, reason):
     reason; their seat is done, so their assignment completes. The record stays
     `in_review`.
     """
+    record = _locked(record)
     from_party = _from_party_for(record, actor, accepting=True)
     plan = _plan(record, from_party, to, reason)
 
@@ -370,7 +416,7 @@ def accept_and_route(record, actor, *, to, reason):
             assignment__record=record, assignment__party=Party.ADVISER,
             assignment__state=AssignmentState.ACTIVE, reviewer=actor,
         )
-        .exclude(state__in=(SeatState.DONE, SeatState.WITHDRAWN))
+        .filter(state__in=OPEN_SEAT_STATES)
         .first()
     )
     Review.objects.create(
@@ -378,8 +424,11 @@ def accept_and_route(record, actor, *, to, reason):
         status=ReviewDecision.APPROVED, comment=plan.reason,
         assignment=adviser_seat.assignment,
     )
-    seats.complete_seat(adviser_seat, actor)
-    opened = _apply(record, actor, plan)
+    def accept_then_route():
+        seats.complete_seat(adviser_seat, actor)
+        return _apply(record, actor, plan)
+
+    opened = _seat_errors_as_routing_errors(accept_then_route)
     _notify(record, actor, plan, opened, accepted=True)
     return plan
 
@@ -387,8 +436,9 @@ def accept_and_route(record, actor, *, to, reason):
 @transaction.atomic
 def route(record, actor, *, to, reason):
     """An office or RDCO seat holder routes onward; their own turn stays active."""
+    record = _locked(record)
     from_party = _from_party_for(record, actor, accepting=False)
     plan = _plan(record, from_party, to, reason)
-    opened = _apply(record, actor, plan)
+    opened = _seat_errors_as_routing_errors(lambda: _apply(record, actor, plan))
     _notify(record, actor, plan, opened, accepted=False)
     return plan

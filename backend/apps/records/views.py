@@ -495,23 +495,35 @@ class RecordViewSet(viewsets.ModelViewSet):
             {"id": slot.pk, "name": slot.name} for slot in picklist(self.get_object())
         ])
 
+    @staticmethod
+    def _routing_refusal(run):
+        """
+        `(result, None)`, or `(None, a refusal)` when a routing act refuses:
+        a 403 for who the caller is, a 400 for what they asked (IR-261).
+        """
+        from apps.reviews import routing
+
+        try:
+            return run(), None
+        except routing.RoutingRefused as exc:
+            return None, Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except routing.RoutingError as exc:
+            return None, Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
     def _routing_response(self, request, act):
         """
         Run a routing act on the record and answer with its tracker. ADR-032 §4,
         IR-261. `get_object()` resolves through `visible_to()`, so a record the
-        caller cannot see is the same 404 as a missing one (IR-153); the act's
-        own refusals are a 403 (who) or a 400 (what).
+        caller cannot see is the same 404 as a missing one (IR-153).
         """
-        from apps.reviews import routing
         from apps.reviews.tracker import tracker_payload
 
         record = self.get_object()
-        try:
-            act(record, request.user, to=request.data.get("to"), reason=request.data.get("reason"))
-        except routing.RoutingRefused as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except routing.RoutingError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        _, refused = self._routing_refusal(lambda: act(
+            record, request.user, to=request.data.get("to"), reason=request.data.get("reason"),
+        ))
+        if refused is not None:
+            return refused
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
@@ -550,12 +562,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews import routing
 
         record = self.get_object()
-        try:
-            return Response(routing.route_options(record, request.user))
-        except routing.RoutingRefused as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except routing.RoutingError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        options, refused = self._routing_refusal(
+            lambda: routing.route_options(record, request.user)
+        )
+        return refused if refused is not None else Response(options)
 
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):

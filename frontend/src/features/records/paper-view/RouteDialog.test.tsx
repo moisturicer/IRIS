@@ -134,6 +134,10 @@ describe("RouteDialog", () => {
     await userEvent.click(await screen.findByRole("checkbox", { name: "ITSO already reviewing" }));
     await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Second opinion.");
     expect(submitButton()).toBeDisabled();
+    // Disabled, and the dialog says why.
+    expect(screen.getByRole("combobox", { name: "Reviewer at ITSO" })).toHaveAccessibleDescription(
+      "ITSO already has this record. Choose someone to add.",
+    );
 
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Reviewer at ITSO" }), "51");
     expect(submitButton()).toBeEnabled();

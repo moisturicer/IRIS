@@ -126,6 +126,21 @@ class EntryTests(RoutingTestBase):
         tracker = self.client.get(reverse("record-tracker", args=[record.pk])).data
         self.assertEqual(tracker["workflow_state"], "submitted")
 
+    def test_an_adviser_who_owns_the_record_cannot_be_its_adviser(self):
+        """ADR-032 §1: nobody reviews their own submission."""
+        record = self.make_record()
+        RecordOwner.objects.create(record=record, user=self.adviser)
+        with self.assertRaises(routing.RoutingError):
+            routing.enter_at_adviser(record, self.owner)
+        record.refresh_from_db()
+        self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
+
+    def test_only_a_draft_enters(self):
+        record = self.new_model()
+        with self.assertRaises(routing.RoutingError):
+            routing.enter_at_adviser(record, self.owner)
+        self.assertEqual(RecordAssignment.objects.filter(record=record).count(), 1)
+
     def test_a_record_with_no_adviser_cannot_enter(self):
         record = self.make_record()
         record.adviser = None
@@ -328,6 +343,14 @@ class RefusalTests(RoutingTestBase):
         response = self.accept(proposal, [{"party": Party.ITSO}])
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertEqual(self.active(proposal), {Party.ADVISER})
+
+    def test_who_is_asked_before_what(self):
+        """Someone who could never route it is a 403, whatever the record's state."""
+        proposal = self.new_model(RecordTypeName.PROPOSAL)
+        self.assertEqual(
+            self.route(proposal, self.itso, [{"party": Party.KTTO}]).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
 
     def test_a_record_on_the_old_pipeline_is_refused(self):
         legacy = self.make_record(requested_itso=True)

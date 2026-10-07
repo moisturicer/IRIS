@@ -133,6 +133,9 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
                 const checkId = `${ids}-${target.party}`;
                 const pickId = `${checkId}-nominee`;
                 const hintId = `${checkId}-hint`;
+                // Already reviewing: routing there only adds someone, so a
+                // reviewer must be chosen -- and the dialog says so.
+                const needsNominee = choice.ticked && target.already_holds && !choice.nominee;
                 return (
                   <li key={target.party} className="rounded-lg border border-stone-200 px-3 py-2.5">
                     <div className="flex items-start gap-2.5">
@@ -171,7 +174,8 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
                           id={pickId}
                           value={choice.nominee}
                           onChange={(e) => setChoice(target.party, { nominee: e.target.value })}
-                          className={fieldClasses(false)}
+                          aria-describedby={needsNominee ? `${pickId}-why` : undefined}
+                          className={fieldClasses(needsNominee)}
                         >
                           <option value="">
                             {target.already_holds
@@ -184,6 +188,11 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
                             </option>
                           ))}
                         </select>
+                        {needsNominee && (
+                          <p id={`${pickId}-why`} className="mt-1 text-[13px] text-brand">
+                            {target.label} already has this record. Choose someone to add.
+                          </p>
+                        )}
                       </div>
                     )}
                   </li>
