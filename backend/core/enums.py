@@ -343,6 +343,10 @@ class TrackerPartyState(models.TextChoices):
     WITHDRAWN = "withdrawn", "Withdrawn"
     NOT_REQUESTED = "not_requested", "Not requested"
     AWAITING = "awaiting", "Awaiting"
+    #: ADR-032 §10 and its 2026-10-08 Amendment: RDCO on a record on the
+    #: adviser-first model that no specialist office has ever held. RDCO
+    #: enters only by the hand-back, so nothing waits on it there (IR-269).
+    NOT_REQUIRED = "not_required", "Not required"
 
 
 class RequestStatus(models.TextChoices):

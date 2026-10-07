@@ -4,6 +4,7 @@ The seat endpoints (ADR-032 §4, IR-415). Mounted at `/api/v1/`.
     POST assignments/<id>/claim/         an office member takes it from the pool
     POST assignments/<id>/assign/        {"reviewer": id}  a coordinator seats a member
     POST assignments/<id>/add-reviewer/  {"reviewer": id}  a seat holder adds a colleague
+    GET  assignments/<id>/add-reviewer/  who they may add (IR-269)
     POST seats/<id>/open/                the holder opens their review
     POST seats/<id>/reassign/            {"reviewer": id}  a coordinator moves a seat
     POST seats/<id>/withdraw/            a coordinator takes a seat away
@@ -125,6 +126,23 @@ class AssignView(APIView):
 
 class AddReviewerView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        """
+        The *Add reviewer* picklist (IR-269): the members of this office, each
+        marked when already seated. Offered only to a seat holder, refused as
+        the act is, so the list reaches exactly the people who could use it.
+        """
+        assignment = _visible_assignment(pk, request.user)
+        if assignment is None:
+            return _not_found()
+        try:
+            options = seats.add_reviewer_options(assignment, request.user)
+        except seats.SeatRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except seats.SeatError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(options)
 
     def post(self, request, pk):
         assignment = _visible_assignment(pk, request.user)
