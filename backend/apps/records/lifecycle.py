@@ -756,7 +756,16 @@ def type_name_of(record) -> str:
 
 
 def entry_party_for(record) -> str:
-    """The party a record of this type is submitted to."""
+    """
+    The party a record of this type is submitted to.
+
+    On the adviser-first model (stored `in_review`, IR-261) every type enters
+    at its Adviser (ADR-032 §1). A record still on this pipeline keeps the
+    legacy entry, so the tracker's "submitted" stays right for a Thesis sitting
+    at intake. IR-260 deletes the legacy branch with the pipeline.
+    """
+    if record.pipeline_status == PipelineStatus.IN_REVIEW:
+        return Party.ADVISER
     return ENTRY_PARTY.get(type_name_of(record), DEFAULT_ENTRY_PARTY)
 
 

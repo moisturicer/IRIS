@@ -38,6 +38,7 @@ export type Capability =
   | "request_document"
   | "request_revision"
   | "route"
+  | "accept_route"
   | "decide"
   | "create_version"
   | "edit_details"
@@ -65,6 +66,7 @@ type CapabilityInputs = Pick<
   | "can_request_document"
   | "my_seats"
   | "is_participant"
+  | "routing"
   | "workflow_state"
   | "pipeline_status"
   | "abstract_file"
@@ -127,6 +129,9 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
   // A seat to work is a review to open, even where the legacy pipeline does
   // not let its holder act yet (IERC waiting on ITSO, say).
   if (holdsOpenSeat(record)) granted.add("open_review");
+  // Routing (ADR-032 §4, IR-261): the server's own flags, never derived here.
+  if (record.routing.accept_and_route) granted.add("accept_route");
+  if (record.routing.route_as != null) granted.add("route");
   if (record.can_request_document.length > 0) granted.add("request_document");
 
   if (isOwner(record, viewer)) {

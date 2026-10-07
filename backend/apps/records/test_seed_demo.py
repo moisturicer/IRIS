@@ -30,6 +30,7 @@ from core.enums import ClearanceStatus, Office, PipelineStatus
 from .management.commands.seed_demo import (
     ADMIN_EMAIL,
     FLAGSHIP_TITLE,
+    NEW_MODEL_TITLE,
     PASSWORD,
     RESUBMITTED_TITLE,
     ROLE_ACCOUNTS,
@@ -197,6 +198,19 @@ class SeedDemoRecordTests(TestCase):
             dict(Record.objects.values_list("title", "pipeline_status")),
             "a second run duplicated records or advanced ones already seeded",
         )
+
+    def test_one_new_model_thesis_waits_at_its_adviser(self):
+        """IR-261: in_review, an active Adviser assignment with an entry seat, no intake."""
+        from apps.reviews.models import RecordAssignment, ReviewerSeat
+
+        record = Record.objects.get(title=NEW_MODEL_TITLE)
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        self.assertEqual(
+            set(RecordAssignment.objects.filter(record=record).values_list("party", "state")),
+            {("adviser", "active")},
+        )
+        seat = ReviewerSeat.objects.get(assignment__record=record)
+        self.assertEqual((seat.reviewer_id, seat.source), (record.adviser_id, "entry"))
 
     def test_the_flagship_starts_declined_with_two_offices_cleared(self):
         record = Record.objects.get(title=FLAGSHIP_TITLE)

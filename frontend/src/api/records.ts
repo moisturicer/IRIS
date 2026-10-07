@@ -4,7 +4,7 @@ import type {
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest, RecordTracker,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
-  DocumentRequestSlot, Party,
+  DocumentRequestSlot, Party, RouteOptions, RouteRequest,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -52,6 +52,14 @@ export const recordsApi = {
   /** The requesting party withdraws an open request (IR-263). No reason is recorded. */
   withdrawDocumentRequest: (requestId: number) =>
     apiClient.patch<DocumentRequest>(`/document-requests/${requestId}/`, { action: "withdraw" }),
+  /** The routing dialog's picklist: offices, their members, the author's hints (IR-261). */
+  routeOptions: (id: number) => apiClient.get<RouteOptions>(`/records/${id}/route-options/`),
+  /** The Adviser accepts and routes to offices (ADR-032 §3). Answers with the tracker. */
+  acceptAndRoute: (id: number, body: RouteRequest) =>
+    apiClient.post<RecordTracker>(`/records/${id}/accept-and-route/`, body),
+  /** A seat holder routes onward; their own review continues (ADR-032 §4). */
+  route: (id: number, body: RouteRequest) =>
+    apiClient.post<RecordTracker>(`/records/${id}/route/`, body),
   /** The picklist: the record type's upload slots. */
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),

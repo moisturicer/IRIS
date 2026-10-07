@@ -100,6 +100,7 @@ const record: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
+  routing: { accept_and_route: false, route_as: null },
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -151,6 +152,7 @@ const approvedProposal: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
+  routing: { accept_and_route: false, route_as: null },
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -372,6 +374,7 @@ const inReview: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
+  routing: { accept_and_route: false, route_as: null },
 };
 
 async function waitForRecord(title: string) {

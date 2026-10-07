@@ -26,6 +26,9 @@ vi.mock("@/api/records", () => ({
   recordsApi: {
     documentRequestSlots: vi.fn(() => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] })),
     createDocumentRequest: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
+    routeOptions: vi.fn(() => new Promise(() => {})),
+    acceptAndRoute: vi.fn(),
+    route: vi.fn(),
   },
 }));
 
@@ -236,6 +239,28 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
       "Documents requested. The owner has been notified.",
     );
     expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  // IR-261: the Adviser's filled action is Accept & route; an office keeps
+  // Request documents filled, with Route to office beside it.
+  it("orders the routing actions so each viewer's primary is the right one", async () => {
+    const { unmount } = renderBar(["accept_route", "request_document"]);
+    let bar = screen.getByRole("toolbar", { name: "Review actions" });
+    expect(within(bar).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
+      "Accept & route…",
+      "Request documents",
+    ]);
+    unmount();
+
+    renderBar(["request_document", "route"]);
+    bar = screen.getByRole("toolbar", { name: "Review actions" });
+    expect(within(bar).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
+      "Request documents",
+      "Route to office…",
+    ]);
+
+    await userEvent.click(within(bar).getByRole("button", { name: "Route to office…" }));
+    expect(screen.getByRole("dialog", { name: "Route to office" })).toBeInTheDocument();
   });
 
   it("offers nothing a viewer with no review capability was not granted", () => {

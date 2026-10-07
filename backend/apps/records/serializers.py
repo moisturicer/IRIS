@@ -77,6 +77,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # (ADR-032 §4, §10; IR-415).
     my_seats             = serializers.SerializerMethodField()
     is_participant       = serializers.SerializerMethodField()
+    # What Paper View's action bar may offer for routing (ADR-032 §4, IR-261):
+    # `{accept_and_route: bool, route_as: party | null}`. A rendering hint;
+    # the routing endpoints re-check both.
+    routing              = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -118,6 +122,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         from core.permissions import is_record_participant
 
         return is_record_participant(self._viewer(), obj)
+
+    def get_routing(self, obj):
+        from apps.reviews.routing import routing_flags
+
+        return routing_flags(obj, self._viewer())
 
     def get_reviews(self, obj):
         from apps.reviews.models import Review
@@ -248,7 +257,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "your_office", "your_office_label",
             "workflow_state", "workflow_state_label", "current_holders", "can_act",
-            "can_request_document", "my_seats", "is_participant",
+            "can_request_document", "my_seats", "is_participant", "routing",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

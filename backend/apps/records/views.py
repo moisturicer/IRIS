@@ -495,6 +495,68 @@ class RecordViewSet(viewsets.ModelViewSet):
             {"id": slot.pk, "name": slot.name} for slot in picklist(self.get_object())
         ])
 
+    def _routing_response(self, request, act):
+        """
+        Run a routing act on the record and answer with its tracker. ADR-032 §4,
+        IR-261. `get_object()` resolves through `visible_to()`, so a record the
+        caller cannot see is the same 404 as a missing one (IR-153); the act's
+        own refusals are a 403 (who) or a 400 (what).
+        """
+        from apps.reviews import routing
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            act(record, request.user, to=request.data.get("to"), reason=request.data.get("reason"))
+        except routing.RoutingRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except routing.RoutingError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
+
+    @action(detail=True, methods=["post"], url_path="accept-and-route")
+    def accept_and_route(self, request, pk=None):
+        """
+        POST /records/<id>/accept-and-route/
+        `{"to": [{"party": "itso", "nominee"?: user_id}, ...], "reason": str}`
+
+        The record's Adviser accepts a Thesis/Research or Project and routes it
+        to ITSO, IERC and/or KTTO (ADR-032 §3). Answers with the tracker.
+        """
+        from apps.reviews import routing
+
+        return self._routing_response(request, routing.accept_and_route)
+
+    @action(detail=True, methods=["post"])
+    def route(self, request, pk=None):
+        """
+        POST /records/<id>/route/  (same body as accept-and-route)
+
+        An office or RDCO seat holder routes the record onward; their own
+        assignment stays active (ADR-032 §4). Answers with the tracker.
+        """
+        from apps.reviews import routing
+
+        return self._routing_response(request, routing.route)
+
+    @action(detail=True, methods=["get"], url_path="route-options")
+    def route_options(self, request, pk=None):
+        """
+        GET /records/<id>/route-options/ -- the routing dialog's picklist: the
+        offices the caller may route to, the author's hint for each, and who
+        may be nominated there. Refused exactly as the routing acts are.
+        """
+        from apps.reviews import routing
+
+        record = self.get_object()
+        try:
+            return Response(routing.route_options(record, request.user))
+        except routing.RoutingRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except routing.RoutingError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):
         """POST /records/<id>/increment_access/"""

@@ -148,6 +148,43 @@ export interface RecordDetail extends RecordListItem {
    * a seat here -- so a reviewer whose part is done keeps Review and Files.
    */
   is_participant:       boolean;
+  /**
+   * What the action bar may offer for routing (ADR-032 §4, IR-261): *Accept &
+   * route…* for the record's Adviser, and the office party *Route to office…*
+   * acts as for a seat holder. A rendering hint; the endpoints re-check it.
+   */
+  routing:              RoutingFlags;
+}
+
+export interface RoutingFlags {
+  accept_and_route: boolean;
+  route_as:         Party | null;
+}
+
+/** One office the routing dialog offers (`GET /records/<id>/route-options/`). */
+export interface RouteTarget {
+  party:         Party;
+  label:         string;
+  /** Who may be nominated there: the office's members. */
+  members:       { id: number; name: string }[];
+  /** The office already reviews this record: routing there only adds a nominee. */
+  already_holds: boolean;
+  /** The author's ADR-018 flag for this office, worded; routes nothing by itself. */
+  author_hint:   string | null;
+}
+
+export interface RouteOptions {
+  from_party: Party;
+  from_label: string;
+  /** True for the Adviser's *Accept & route*, false for onward routing. */
+  accept:     boolean;
+  targets:    RouteTarget[];
+}
+
+/** A routing request: one reason for the decision, at most one nominee per office. */
+export interface RouteRequest {
+  to:     { party: Party; nominee?: number }[];
+  reason: string;
 }
 
 // ---------------------------------------------------------------------------

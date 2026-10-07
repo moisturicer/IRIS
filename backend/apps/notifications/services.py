@@ -546,6 +546,72 @@ def _role_for_party(party: str):
     return None
 
 
+def notify_routed(
+    record, *, actor, from_label, target_labels, opened_parties, nominees, reason, accepted,
+):
+    """
+    A record was routed to one or more offices (ADR-032 §4, IR-261).
+
+    - Every member of each office the record **newly** reached: its pool is
+      shared work, so the whole office hears, in-app and by email. An office
+      that already held the record is not told again.
+    - Each nominee, personally: the work is theirs.
+    - The owners, only when the Adviser **accepted** it. Onward routing between
+      offices is review traffic, visible on the tracker.
+    """
+    try:
+        notif_type = NotificationType.objects.get_or_create(name="Record Routed")[0]
+        url = _record_url(record)
+        title = record.title
+
+        from apps.accounts.models import User as UserModel
+
+        for party in opened_parties:
+            role = _role_for_party(party)
+            if role is None:
+                continue
+            message = (
+                f'{from_label} sent "{title}" to your office for review: {reason} '
+                f"It is in your office's pool until someone claims it."
+            )
+            Notification.objects.create(
+                sender=actor, broadcast_to_role=role, record=record,
+                notif_type=notif_type, message=message,
+            )
+            emails = list(
+                UserModel.objects.filter(role=role, is_active=True).values_list("email", flat=True)
+            )
+            if emails:
+                send_email_async(
+                    subject=f"[IRIS] For review: {title[:60]}",
+                    message=f"Hello,\n\n{message}\n\n{url}\n\n-- The IRIS Team",
+                    recipient_list=emails,
+                )
+
+        for nominee, office_label in nominees:
+            message = f'{from_label} nominated you to review "{title}" for {office_label}.'
+            Notification.objects.create(
+                sender=actor, recipient=nominee, record=record,
+                notif_type=notif_type, message=message,
+            )
+            send_email_async(
+                subject=f"[IRIS] You were nominated to review: {title[:60]}",
+                message=f"Hello {nominee.first_name},\n\n{message}\n\n{url}\n\n-- The IRIS Team",
+                recipient_list=[nominee.email],
+            )
+
+        if accepted:
+            offices = " and ".join(target_labels)
+            message = f'Your Adviser accepted "{title}" and sent it to {offices} for review.'
+            for ownership in record.owners.select_related("user").all():
+                Notification.objects.create(
+                    sender=actor, recipient=ownership.user, record=record,
+                    notif_type=notif_type, message=message,
+                )
+    except Exception:
+        pass
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).
