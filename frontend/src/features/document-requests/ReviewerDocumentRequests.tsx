@@ -20,11 +20,6 @@ interface ReviewerDocumentRequestsProps {
    * would refuse (IR-349).
    */
   reviewing: boolean;
-  /**
-   * `request` shows only *Request documents*, for Paper View's Review section;
-   * the requests to manage live in its Files section (spec §4.10).
-   */
-  parts?: "all" | "request";
   /** Told after a request is made, decided or withdrawn, so the page can re-read. */
   onChanged?: () => void;
   /** Placement on the host page; applied only when there is something to show. */
@@ -54,7 +49,6 @@ function needsTheRequester(r: DocumentRequest): boolean {
 export function ReviewerDocumentRequests({
   record,
   reviewing,
-  parts = "all",
   onChanged,
   className,
 }: ReviewerDocumentRequestsProps) {
@@ -64,12 +58,12 @@ export function ReviewerDocumentRequests({
   const [requested, setRequested] = useState(false);
 
   const load = useCallback(() => {
-    if (!reviewing || parts === "request") return Promise.resolve();
+    if (!reviewing) return Promise.resolve();
     return recordsApi
       .documentRequests(record.id)
       .then(({ data }) => setRequests(data))
       .catch(() => setRequests([]));
-  }, [reviewing, parts, record.id]);
+  }, [reviewing, record.id]);
 
   useEffect(() => {
     void load();

@@ -129,8 +129,9 @@ const afterResubmission = payload({
   resubmissions: [
     {
       id: 1, party: "ierc", label: "IERC", state: "resubmitted", state_label: "Resubmitted",
-      reason: "Consent form is missing.", requested_by: "Test IERC",
+      reason: "Consent form is missing.", review: 1, requested_by: "Test IERC",
       created_at: "2026-09-18T04:00:00Z", resolved_at: "2026-09-18T05:00:00Z",
+      resolved_by: "Andrea Lim",
     },
   ],
 });

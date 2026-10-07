@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn, formatDate } from "@/lib/utils";
 import { citedPage, followedFromPaperChat, type CitationNavigationState } from "@/lib/citedPage";
-import type { RecordDetail, IpType, RecordReview } from "@/types/records";
+import type { RecordDetail, IpType } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region, SemanticSearchResult } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
@@ -27,7 +27,6 @@ import {
   type PaperSection,
   type Viewer,
 } from "@/features/records/capabilities";
-import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
 import {
   usePaperChat,
   PaperChatPanel,
@@ -44,6 +43,7 @@ import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
+import { ReviewSection } from "./ReviewSection";
 import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -55,57 +55,6 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 const PaperPdfReader = lazy(() =>
   import("./PaperPdfReader").then((m) => ({ default: m.PaperPdfReader })),
 );
-
-// ---------------------------------------------------------------------------
-// Review history
-// ---------------------------------------------------------------------------
-
-// Declined (recoverable: revision requested) and rejected (terminal) must
-// never look alike -- resubmission is the thesis contribution. Soft versus
-// solid maroon, and their labels (IR-356).
-const REVIEW_STATUS_STYLES: Record<string, string> = {
-  approved: "bg-stone-100 text-stone-900 border-stone-300",
-  declined: "bg-brand-50 text-brand border-brand-200",
-  rejected: "bg-brand text-white border-brand",
-};
-
-function ReviewHistory({ reviews }: { reviews: RecordReview[] }) {
-  return (
-    <section className="bg-white border border-stone-200 rounded-2xl p-5">
-      <h2 className="text-heading font-semibold text-stone-900 mb-3">Review history</h2>
-      <ol className="space-y-3">
-        {reviews.map((r) => (
-          <li key={r.id} className="flex gap-3">
-            <span
-              className={cn(
-                "shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-2xs font-bold border capitalize",
-                REVIEW_STATUS_STYLES[r.status] ?? "bg-stone-50 text-stone-600 border-stone-200",
-              )}
-            >
-              {r.status}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-2xs text-stone-500">
-                <span className="font-semibold text-stone-600">
-                  {r.reviewed_by_name ?? "Reviewer"}
-                </span>
-                {" · "}
-                <span className="capitalize">{r.stage.replace(/_/g, " ")}</span>
-                {" · "}
-                {formatDate(r.created_at)}
-              </p>
-              {r.comment ? (
-                <p className="text-sm text-stone-700 leading-relaxed mt-0.5">{r.comment}</p>
-              ) : (
-                <p className="text-xs text-stone-500 italic mt-0.5">No comment provided.</p>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // IP classification tagger -- offered under the `tag_ip` capability
@@ -562,16 +511,18 @@ export default function PaperViewPage() {
   // own dock choice is only overridden, never overwritten, so Overview gets
   // it back unchanged.
   const onPaperTab = section === "paper";
-  // Ask IRIS is not part of the Review section (spec §4.6, decided
-  // 2026-09-26). The panel stays mounted there, only hidden, so the
-  // conversation is waiting on the Paper tab.
-  const chatHidden = section === "review";
+  // The Review section puts the paper beside the review pane (IR-412), so it
+  // takes the full width the Paper tab does rather than the reading column.
+  // Ask IRIS is not part of it (spec §4.6, decided 2026-09-26): the panel
+  // stays mounted there, only hidden, so the conversation is waiting on the
+  // Paper tab.
+  const onReviewTab = section === "review";
   const dock: DockMode = onPaperTab ? "right" : chat.dock;
-  const chatDocked = chat.open && dock !== "floating" && !chatHidden;
+  const chatDocked = chat.open && dock !== "floating" && !onReviewTab;
   // Never at `lg`, where there is no sheet to tuck away: widening the window
   // brings the column back whole.
   const chatMinimized = chat.minimized && chatDocked && !contained;
-  const chatPanelClass = chatHidden
+  const chatPanelClass = onReviewTab
     ? "hidden"
     : chatMinimized
       ? MINIMIZED_SHEET_CLASS
@@ -585,6 +536,19 @@ export default function PaperViewPage() {
     navCitation && navCitation.record_id === record.id && "regions" in navCitation
       ? navCitation.regions
       : [];
+  // The one reader (IR-352), for the Paper tab and the Review section alike:
+  // a citation lands the same way in either (IR-354).
+  const reader = (toolbarStart?: ReactNode) => (
+    <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
+      <PaperPdfReader
+        recordId={record.id}
+        scrollToPage={openAtPage}
+        highlightRegions={highlightRegions}
+        navKey={arrivalKey.current}
+        toolbarStart={toolbarStart}
+      />
+    </Suspense>
+  );
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else Save. When
@@ -619,11 +583,11 @@ export default function PaperViewPage() {
     // The Paper section is the exception (IR-372): the reader and Ask IRIS
     // use the whole width, so a wide screen gives the paper more room
     // instead of margins.
-    <div className={cn(!onPaperTab && "max-w-6xl mx-auto")}>
+    <div className={cn(!onPaperTab && !onReviewTab && "max-w-6xl mx-auto")}>
       <div
         className={cn(
           "lg:flex lg:gap-6 lg:items-start",
-          dock === "left" && !chatHidden && "lg:flex-row-reverse",
+          dock === "left" && !onReviewTab && "lg:flex-row-reverse",
         )}
       >
         <div className="min-w-0 lg:flex-1">
@@ -812,31 +776,20 @@ export default function PaperViewPage() {
               aria-labelledby={tabId(section)}
               className="space-y-6"
             >
-            {section === "paper" && (
-              <Suspense
-                fallback={<Skeleton rows={8} label="Loading the reader…" />}
-              >
-                <PaperPdfReader
-                  recordId={record.id}
-                  scrollToPage={openAtPage}
-                  highlightRegions={highlightRegions}
-                  navKey={arrivalKey.current}
-                  toolbarStart={
-                    !chat.open && (
-                      <Button
-                        variant="outline"
-                        onClick={() => chat.setOpen(true)}
-                        title="Ask IRIS about this paper"
-                        className="min-h-11 lg:min-h-8 mr-1 font-semibold"
-                      >
-                        <AskIrisMark className="w-4 h-4 text-brand" />
-                        Ask IRIS
-                      </Button>
-                    )
-                  }
-                />
-              </Suspense>
-            )}
+            {section === "paper" &&
+              reader(
+                !chat.open && (
+                  <Button
+                    variant="outline"
+                    onClick={() => chat.setOpen(true)}
+                    title="Ask IRIS about this paper"
+                    className="min-h-11 lg:min-h-8 mr-1 font-semibold"
+                  >
+                    <AskIrisMark className="w-4 h-4 text-brand" />
+                    Ask IRIS
+                  </Button>
+                ),
+              )}
 
             {section === "overview" && (
               <>
@@ -918,35 +871,21 @@ export default function PaperViewPage() {
             )}
 
             {section === "review" && (
-              // The review so far, until F6 (IR-412) turns it into the
-              // timeline beside the paper with its action bar.
-              <div className="space-y-6">
-                {(can.has("decide") || can.has("request_document")) && (
-                  <div className="rounded-2xl border border-stone-200 bg-white p-card space-y-3">
-                    {can.has("decide") && (
-                      <>
-                        <p className="text-body text-stone-700">
-                          Decisions are recorded on the current review form for now.
-                        </p>
-                        <Link to={`/review/${record.id}/evaluate`} className={PILL_PRIMARY}>
-                          <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                          Record a decision (current form)
-                        </Link>
-                      </>
-                    )}
-                    {can.has("request_document") && (
-                      <ReviewerDocumentRequests
-                        record={record}
-                        reviewing={reviewing}
-                        parts="request"
-                        onChanged={handleDocumentRequestChanged}
-                      />
-                    )}
-                  </div>
-                )}
-                <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
-                {record.reviews.length > 0 && <ReviewHistory reviews={record.reviews} />}
-              </div>
+              <ReviewSection
+                record={record}
+                can={can}
+                reader={sections.includes("paper") ? reader() : null}
+                timelineVersion={trackerVersion}
+                onChanged={handleDocumentRequestChanged}
+                onAskAboutPaper={
+                  sections.includes("paper")
+                    ? () => {
+                        chat.setOpen(true);
+                        setViewParam("section", "paper");
+                      }
+                    : undefined
+                }
+              />
             )}
 
             {section === "files" && (
@@ -1023,7 +962,7 @@ export default function PaperViewPage() {
         // On the Paper tab the way back sits in the reader's toolbar instead,
         // so nothing floats over the paper (IR-372); the Review section has
         // no Ask IRIS at all (spec §4.6).
-        !onPaperTab && !chatHidden && <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
+        !onPaperTab && !onReviewTab && <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
       )}
       </div>
     </div>

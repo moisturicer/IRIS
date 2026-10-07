@@ -460,12 +460,17 @@ def _resubmissions(record, *, staff: bool) -> list[dict]:
             "state": r.state,
             "state_label": r.get_state_display(),
             "reason": r.reason,
+            # The `declined` review carrying this request, one of `reviews`:
+            # the same act, which a timeline shows once (IR-412).
+            "review": r.review_id,
             "requested_by": _name(r.requested_by),
             "created_at": _iso(r.created_at),
             "resolved_at": _iso(r.resolved_at),
+            # Who resubmitted, or withdrew, and so closed it.
+            "resolved_by": _name(r.resolved_by),
         }
         for r in ResubmissionRequest.objects.filter(record=record)
-        .select_related("requested_by").order_by("created_at", "pk")
+        .select_related("requested_by", "resolved_by").order_by("created_at", "pk")
     ]
 
 

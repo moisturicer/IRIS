@@ -234,9 +234,13 @@ export interface TrackerResubmission {
   state:        "open" | "resubmitted" | "withdrawn";
   state_label:  string;
   reason:       string;
+  /** The `declined` review that made this request, one of `reviews` (IR-412). */
+  review:       number;
   requested_by: string | null;
   created_at:   string | null;
   resolved_at:  string | null;
+  /** Who resubmitted, or withdrew, and so closed it (IR-412). */
+  resolved_by:  string | null;
 }
 
 export interface RecordTracker {
