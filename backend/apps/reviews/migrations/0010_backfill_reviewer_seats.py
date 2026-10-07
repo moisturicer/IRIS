@@ -41,10 +41,12 @@ CLEARANCE_OFFICES = {"itso", "ierc", "ktto"}
 def _latest_reviewer(Review, RecordClearance, assignment):
     """(reviewer id, when) of the party's most recent review, or None."""
     party = assignment.party
+    # A review whose author's account is gone names nobody to seat.
     candidates = [
         (created_at, reviewer_id)
         for reviewer_id, created_at in Review.objects.filter(
             record_id=assignment.record_id, stage=STAGE_FOR_PARTY[party],
+            reviewed_by__isnull=False,
         ).values_list("reviewed_by_id", "created_at")
     ]
     if party in CLEARANCE_OFFICES:

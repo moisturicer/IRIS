@@ -191,8 +191,10 @@ def sync(record, event, actor, *, acting_party=None, review=None):
             review.save(update_fields=["assignment"])
 
     # After the review is saved, so the reviewer who closed it counts as done.
-    for assignment in closed.values():
-        seats.settle_closed(assignment, actor, closing_state)
+    for party, assignment in closed.items():
+        seats.settle_closed(
+            assignment, actor, closing_state, acted=party == acting_party,
+        )
 
     if event is WorkflowEvent.DECLINE and review is not None:
         ResubmissionRequest.objects.create(

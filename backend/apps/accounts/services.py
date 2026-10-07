@@ -43,8 +43,7 @@ def activate_user(uidb64: str, token: str) -> User | None:
 def approve_role_request(role_request: RoleRequest, reviewed_by: User):
     """Approve a role request, update the user's role, and notify them by email."""
     user = role_request.user
-    user.role = role_request.requested_role
-    user.save(update_fields=["role"])
+    user.assign_role(role_request.requested_role)
 
     role_request.status      = RequestStatus.APPROVED
     role_request.reviewed_by = reviewed_by

@@ -103,8 +103,10 @@ def _seat(assignment, reviewer, *, source, by) -> ReviewerSeat:
     """
     _require_active(assignment)
     if not is_office_member(reviewer, assignment.party):
+        # Unnamed: any user id can be sent here, and a refusal must not turn
+        # into a way of looking up who someone is.
         raise SeatError(
-            f"{_name(reviewer)} is not a member of {_label(assignment.party)}. "
+            f"That person is not a member of {_label(assignment.party)}. "
             f"To involve another office, route the record to it instead."
         )
     if _live_seats(assignment).filter(reviewer=reviewer).exists():
@@ -330,16 +332,22 @@ def seat_entry(assignment) -> ReviewerSeat | None:
     )
 
 
-def settle_closed(assignment, actor, closing_state):
+def settle_closed(assignment, actor, closing_state, *, acted=False):
     """
-    The legacy pipeline closed `assignment`; settle its unfinished seats.
+    The legacy pipeline closed `assignment`; settle its seats.
 
-    Completed: whoever reviewed the record as this party -- the acting
-    reviewer, or anyone with a `Review` at its stage -- finished their part,
-    so their seat is `done`. Everyone else seated was never needed: withdrawn.
-    The legacy pipeline lets one person decide for an office, so this is the
-    nearest true reading of a closure it made. A withdrawn assignment (a
-    deletion) withdraws every seat.
+    Completed: whoever reviewed the record as this party *during this
+    assignment* -- the acting reviewer, or anyone with a `Review` at its stage
+    since it opened -- finished their part, so their seat is `done`. Everyone
+    else seated was never needed: withdrawn. The legacy pipeline lets one
+    person decide for an office, so this is the nearest true reading of a
+    closure it made. A withdrawn assignment (a deletion) withdraws every seat.
+
+    `acted` says `actor` closed it by acting *as this party*. The legacy
+    pipeline lets an office member decide straight from the pool, without
+    claiming; that reviewer is given the `done` seat they never took, so they
+    stay a participant (ADR-032 §10: "anyone who has ever held a seat") and
+    keep the Review and Files sections once their part is over.
     """
     from .shadow import party_for_stage
 
@@ -348,12 +356,18 @@ def settle_closed(assignment, actor, closing_state):
     if closing_state == AssignmentState.COMPLETED:
         reviewed = {
             reviewer_id
-            for stage, reviewer_id in Review.objects.filter(record_id=assignment.record_id)
-            .values_list("stage", "reviewed_by_id")
+            for stage, reviewer_id in Review.objects.filter(
+                record_id=assignment.record_id, created_at__gte=assignment.opened_at,
+            ).values_list("stage", "reviewed_by_id")
             if str(party_for_stage(stage) or "") == str(assignment.party)
         }
-        if actor is not None:
+        if acted and actor is not None:
             reviewed.add(actor.pk)
+            if not _live_seats(assignment).filter(reviewer=actor).exists():
+                ReviewerSeat.objects.create(
+                    assignment=assignment, reviewer=actor, source=SeatSource.CLAIMED,
+                    state=SeatState.DONE, assigned_by=actor, assigned_at=now, done_at=now,
+                )
         open_seats.filter(reviewer_id__in=reviewed).update(state=SeatState.DONE, done_at=now)
     open_seats.filter(state__in=OPEN_SEAT_STATES).update(state=SeatState.WITHDRAWN)
 
@@ -412,5 +426,5 @@ def review_access(user) -> dict:
     return {
         "my_reviews": bool(offices) or ReviewerSeat.objects.filter(reviewer=user).exists(),
         "offices": offices,
-        "is_coordinator": bool(offices) and bool(getattr(user, "is_office_coordinator", False)),
+        "is_coordinator": any(is_office_coordinator(user, office) for office in offices),
     }

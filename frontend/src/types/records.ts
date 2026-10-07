@@ -157,6 +157,9 @@ export interface RecordDetail extends RecordListItem {
 export type SeatState = "assigned" | "in_review" | "done" | "withdrawn";
 export type SeatSource = "entry" | "claimed" | "assigned" | "nominated" | "added";
 
+/** The states in which a seat is still held: not finished, not taken away. The server's `OPEN_SEAT_STATES`. */
+export const OPEN_SEAT_STATES: readonly SeatState[] = ["assigned", "in_review"];
+
 /** One person reviewing a record for a party. Every seat endpoint answers with this. */
 export interface ReviewerSeat {
   id:            number;

@@ -23,12 +23,14 @@ from apps.records.models import Record, RecordOwner, RecordType
 from apps.reviews import seats
 from apps.reviews.models import (
     RecordAssignment,
+    RecordClearance,
     ResubmissionRequest,
     Review,
     ReviewerSeat,
 )
 from core.enums import (
     AssignmentState,
+    Office,
     Party,
     PipelineStatus,
     RecordTypeName,
@@ -180,6 +182,30 @@ class EntrySeatAndPoolTests(SeatTestBase):
         seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.adviser)
         self.assertEqual(seat.state, SeatState.DONE)
         self.assertIsNotNone(seat.done_at)
+
+    def test_an_office_member_who_decides_straight_from_the_pool_is_left_a_done_seat(self):
+        """
+        The legacy pipeline lets ITSO clear without claiming. That reviewer
+        still took part, so they keep Review and Files afterwards (AC9).
+        """
+        record = self.make_record(pipeline_status=PipelineStatus.ITSO_REVIEW, requested_itso=True)
+        RecordClearance.objects.create(record=record, office=Office.ITSO)
+        self.assignment(record, Party.ITSO)
+        self.client.force_authenticate(self.itso)
+        response = self.client.post(
+            SUBMIT_REVIEW,
+            {"record_id": record.pk, "status": ReviewDecision.APPROVED, "comment": "Clear."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.itso)
+        self.assertEqual((seat.state, seat.source), (SeatState.DONE, SeatSource.CLAIMED))
+        detail = self.client.get(reverse("record-detail", args=[record.pk])).data
+        self.assertTrue(detail["is_participant"])
+        # Nobody else at ITSO is made a participant by it.
+        self.client.force_authenticate(self.itso2)
+        self.assertFalse(self.client.get(reverse("record-detail", args=[record.pk])).data["is_participant"])
 
 
 # --- claim -----------------------------------------------------------------------
@@ -578,6 +604,18 @@ class CoordinatorGrantTests(SeatTestBase):
 
     def test_a_user_with_no_office_cannot_be_made_a_coordinator(self):
         self.assertEqual(self.grant(self.rdco, self.adviser).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_role_change_drops_the_grant(self):
+        """An ITSO coordinator moved to IERC is not thereby an IERC coordinator."""
+        self.grant(self.rdco, self.itso2)
+        self.client.force_authenticate(self.rdco)
+        response = self.client.patch(
+            reverse("user-change-role", args=[self.itso2.pk]),
+            {"role_name": RoleName.IERC}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.itso2.refresh_from_db()
+        self.assertFalse(self.itso2.is_office_coordinator)
 
     def test_users_cannot_grant_it_to_themselves_through_me(self):
         self.client.force_authenticate(self.itso2)

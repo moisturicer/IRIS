@@ -25,7 +25,7 @@
  * capability is only a decision about what to *offer*.
  */
 import { STAFF_ROLES, type RoleName } from "@/lib/constants";
-import type { RecordDetail, ReviewerSeat } from "@/types/records";
+import { OPEN_SEAT_STATES, type RecordDetail, type ReviewerSeat } from "@/types/records";
 
 /**
  * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
@@ -106,7 +106,7 @@ export function seatToOpen(record: Pick<RecordDetail, "my_seats">): ReviewerSeat
 
 /** Whether the viewer holds a seat still to work: assigned, or in review. */
 function holdsOpenSeat(record: Pick<RecordDetail, "my_seats">): boolean {
-  return record.my_seats.some((seat) => seat.state === "assigned" || seat.state === "in_review");
+  return record.my_seats.some((seat) => OPEN_SEAT_STATES.includes(seat.state));
 }
 
 /** Whether there is a paper to read: the manuscript, else any attached file. */

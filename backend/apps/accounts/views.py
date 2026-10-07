@@ -164,8 +164,7 @@ class ChangeUserRoleView(APIView):
         else:
             return Response({"detail": "role_name or role is required."}, status=400)
 
-        user.role = role
-        user.save(update_fields=["role"])
+        user.assign_role(role)
 
         create_audit_event(
             "ROLE_CHANGE", request.user,

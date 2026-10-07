@@ -92,6 +92,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         parts = [self.first_name, self.middle_initial, self.last_name]
         return " ".join(p for p in parts if p)
 
+    def assign_role(self, role):
+        """
+        Give the user `role`, and drop any office-coordinator grant (IR-415).
+
+        The grant was for the office the *old* role staffed. Kept across a
+        move, an ITSO coordinator moved to IERC would coordinate IERC without
+        anyone granting it, so every role change goes through here.
+        """
+        self.role = role
+        self.is_office_coordinator = False
+        self.save(update_fields=["role", "is_office_coordinator"])
+
 
 class StudentProfile(models.Model):
     """Extended info for Student role users."""
