@@ -95,6 +95,7 @@ const record: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
+  routing: { accept_and_route: false, route_as: null },
 };
 
 /** What the mocked detail endpoint returns; a test may park it at another stage. */

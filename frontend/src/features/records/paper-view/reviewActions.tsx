@@ -31,6 +31,8 @@ import { RequestDocumentDialog } from "@/features/document-requests/RequestDocum
 import type { Capability } from "@/features/records/capabilities";
 import type { RecordDetail } from "@/types/records";
 
+import { RouteDialog } from "./RouteDialog";
+
 export interface ReviewActionDialogProps {
   record: RecordDetail;
   /** Closed with nothing done. */
@@ -84,12 +86,60 @@ function RequestDocumentAction({ record, onClose, onDone }: ReviewActionDialogPr
   );
 }
 
+/** "ITSO and IERC", "ITSO, IERC and KTTO". */
+function joinLabels(labels: string[]): string {
+  return labels.length <= 1 ? labels.join("") : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
+
+/** The Adviser accepts the work and routes it to offices (ADR-032 §3, IR-261). */
+function AcceptAndRouteAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return (
+    <RouteDialog
+      recordId={record.id}
+      mode="accept"
+      onClose={onClose}
+      onRouted={(offices) => onDone(`Accepted and sent to ${joinLabels(offices)}.`)}
+    />
+  );
+}
+
+/** An office seat holder routes onward; their own review continues (ADR-032 §4). */
+function RouteAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return (
+    <RouteDialog
+      recordId={record.id}
+      mode="route"
+      onClose={onClose}
+      onRouted={(offices) => onDone(`Sent to ${joinLabels(offices)}.`)}
+    />
+  );
+}
+
+/**
+ * Order matters: the bar fills its first granted action. The Adviser's primary
+ * is *Accept & route*; an office's stays *Request documents*, with *Route to
+ * office* beside it.
+ */
 export const REVIEW_ACTIONS: readonly ReviewAction[] = [
+  {
+    kind: "dialog",
+    capability: "accept_route",
+    label: "Accept & route…",
+    icon: "fa-share-from-square",
+    Dialog: AcceptAndRouteAction,
+  },
   {
     kind: "dialog",
     capability: "request_document",
     label: "Request documents",
     icon: "fa-file-circle-plus",
     Dialog: RequestDocumentAction,
+  },
+  {
+    kind: "dialog",
+    capability: "route",
+    label: "Route to office…",
+    icon: "fa-route",
+    Dialog: RouteAction,
   },
 ];

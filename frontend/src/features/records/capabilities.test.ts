@@ -68,6 +68,7 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     can_request_document: [],
     my_seats: [],
     is_participant: false,
+    routing: { accept_and_route: false, route_as: null },
     ...overrides,
   };
 }
@@ -260,6 +261,32 @@ const ROWS: Row[] = [
     sections: ["overview", "paper"],
   },
   {
+    name: "the record's Adviser, holding its review on the new model, may accept and route (IR-261)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "submitted",
+      my_seats: [{ ...seat("assigned"), party: "adviser", party_label: "Adviser", source: "entry" }],
+      is_participant: true,
+      routing: { accept_and_route: true, route_as: null },
+    }),
+    viewer: adviser,
+    capabilities: ["cite", "open_review", "accept_route"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "an office seat holder may route onward (IR-261)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "in_review",
+      my_seats: [seat("in_review")],
+      is_participant: true,
+      routing: { accept_and_route: false, route_as: "itso" },
+    }),
+    viewer: itsoStaff,
+    capabilities: ["cite", "open_review", "route"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
     name: "an accepted Proposal offers no Proposal completion and no continuation yet",
     record: record({
       record_type_name: "Proposal",
@@ -288,7 +315,7 @@ describe("the capabilities adapter", () => {
 
   it("never grants an action whose backend does not exist yet", () => {
     const unbuilt: Capability[] = [
-      "request_revision", "route", "continue_as", "set_visibility", "comment_review", "comment_public",
+      "request_revision", "continue_as", "set_visibility", "comment_review", "comment_public",
     ];
     for (const { record: r, viewer } of ROWS) {
       const granted = capabilitiesFor(r, viewer);

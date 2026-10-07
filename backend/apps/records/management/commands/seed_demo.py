@@ -148,6 +148,7 @@ _PREFIX = "[DEMO]"
 
 FLAGSHIP_TITLE = f"{_PREFIX} Declined by IERC, ITSO and KTTO preserved"
 RESUBMITTED_TITLE = f"{_PREFIX} Resubmitted, ITSO and KTTO preserved"
+NEW_MODEL_TITLE = f"{_PREFIX} New model: Thesis at its Adviser, ready to accept and route"
 
 
 class Command(BaseCommand):
@@ -313,6 +314,7 @@ class Command(BaseCommand):
             self._scenario_rejected,
             self._scenario_declined_preserving_peers,
             self._scenario_resubmitted_with_preserved_clearances,
+            self._scenario_new_model_at_adviser,
         ):
             scenario(users)
 
@@ -537,6 +539,28 @@ class Command(BaseCommand):
         )
         resubmit_record(record, owner)
         self._done(record)
+
+    @transaction.atomic
+    def _scenario_new_model_at_adviser(self, users):
+        """
+        A Thesis/Research on the adviser-first model, at its Adviser (IR-261).
+
+        Entered through `routing.enter_at_adviser`, not the legacy submit: until
+        IR-260 the seed is how a record reaches the new model, and this one is
+        where *Accept & route…* is demoed (as adviser@cit.edu).
+        """
+        from apps.reviews.routing import enter_at_adviser
+
+        record = self._make(
+            NEW_MODEL_TITLE, RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT],
+            adviser=users[RoleName.ADVISER], requested_itso=True,
+        )
+        if record:
+            record.dpa_accepted_at = timezone.now()
+            record.dpa_accepted_by = users[RoleName.STUDENT]
+            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+            enter_at_adviser(record, users[RoleName.STUDENT])
+            self._done(record)
 
     # -- output ------------------------------------------------------------
 

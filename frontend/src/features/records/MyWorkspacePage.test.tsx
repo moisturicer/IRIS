@@ -71,6 +71,7 @@ const base: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
+  routing: { accept_and_route: false, route_as: null },
 };
 
 /** The student-facing holder labels the API serves (ADR-021 §2). */
