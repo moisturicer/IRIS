@@ -385,7 +385,9 @@ def _locked(record):
     """
     from apps.records.models import Record
 
-    return Record.objects.select_for_update().select_related("record_type").get(pk=record.pk)
+    # Only the record row: `FOR UPDATE` cannot lock the nullable side of the
+    # outer join `select_related("record_type")` would add.
+    return Record.objects.select_for_update(of=("self",)).get(pk=record.pk)
 
 
 def _seat_errors_as_routing_errors(act):

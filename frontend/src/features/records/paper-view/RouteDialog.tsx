@@ -150,8 +150,11 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
                       <div className="min-w-0">
                         <label htmlFor={checkId} className="text-[14px] font-medium text-stone-900">
                           {target.label}
+                          {/* A real space, not only a margin: the checkbox's accessible
+                              name must read "ITSO already reviewing", not run together. */}
+                          {target.already_holds && " "}
                           {target.already_holds && (
-                            <span className="ml-2 text-[13px] font-normal text-stone-600">
+                            <span className="ml-1 text-[13px] font-normal text-stone-600">
                               already reviewing
                             </span>
                           )}
