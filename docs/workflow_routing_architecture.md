@@ -347,7 +347,7 @@ GET /api/v1/records/<id>/tracker/
   "routing_history":      [{"group_id": "…", "from": "intake", "to": ["itso","ierc"], "actor": "…", "reason": "…", "at": "…"}],
   "routing_recorded_from": "2026-09-…",
   "reviews":              [ … Review rows, newest last … ],
-  "resubmissions":        [ … ResubmissionRequest rows; `review` names the declined review that made each (IR-412) … ],
+  "resubmissions":        [ … ResubmissionRequest rows; `review` names the declined review that made each, `resolved_by` who closed it (IR-412) … ],
   "document_requests":    [ … ADR-022 … ],
   "clearances":           [ … IR-139 payload, unchanged … ]
 }

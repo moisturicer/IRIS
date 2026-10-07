@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { reviewsApi } from "@/api/reviews";
@@ -513,17 +513,16 @@ export default function PaperViewPage() {
   const onPaperTab = section === "paper";
   // The Review section puts the paper beside the review pane (IR-412), so it
   // takes the full width the Paper tab does rather than the reading column.
+  // Ask IRIS is not part of it (spec §4.6, decided 2026-09-26): the panel
+  // stays mounted there, only hidden, so the conversation is waiting on the
+  // Paper tab.
   const onReviewTab = section === "review";
-  // Ask IRIS is not part of the Review section (spec §4.6, decided
-  // 2026-09-26). The panel stays mounted there, only hidden, so the
-  // conversation is waiting on the Paper tab.
-  const chatHidden = onReviewTab;
   const dock: DockMode = onPaperTab ? "right" : chat.dock;
-  const chatDocked = chat.open && dock !== "floating" && !chatHidden;
+  const chatDocked = chat.open && dock !== "floating" && !onReviewTab;
   // Never at `lg`, where there is no sheet to tuck away: widening the window
   // brings the column back whole.
   const chatMinimized = chat.minimized && chatDocked && !contained;
-  const chatPanelClass = chatHidden
+  const chatPanelClass = onReviewTab
     ? "hidden"
     : chatMinimized
       ? MINIMIZED_SHEET_CLASS
@@ -537,6 +536,19 @@ export default function PaperViewPage() {
     navCitation && navCitation.record_id === record.id && "regions" in navCitation
       ? navCitation.regions
       : [];
+  // The one reader (IR-352), for the Paper tab and the Review section alike:
+  // a citation lands the same way in either (IR-354).
+  const reader = (toolbarStart?: ReactNode) => (
+    <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
+      <PaperPdfReader
+        recordId={record.id}
+        scrollToPage={openAtPage}
+        highlightRegions={highlightRegions}
+        navKey={arrivalKey.current}
+        toolbarStart={toolbarStart}
+      />
+    </Suspense>
+  );
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else Save. When
@@ -575,7 +587,7 @@ export default function PaperViewPage() {
       <div
         className={cn(
           "lg:flex lg:gap-6 lg:items-start",
-          dock === "left" && !chatHidden && "lg:flex-row-reverse",
+          dock === "left" && !onReviewTab && "lg:flex-row-reverse",
         )}
       >
         <div className="min-w-0 lg:flex-1">
@@ -764,31 +776,20 @@ export default function PaperViewPage() {
               aria-labelledby={tabId(section)}
               className="space-y-6"
             >
-            {section === "paper" && (
-              <Suspense
-                fallback={<Skeleton rows={8} label="Loading the reader…" />}
-              >
-                <PaperPdfReader
-                  recordId={record.id}
-                  scrollToPage={openAtPage}
-                  highlightRegions={highlightRegions}
-                  navKey={arrivalKey.current}
-                  toolbarStart={
-                    !chat.open && (
-                      <Button
-                        variant="outline"
-                        onClick={() => chat.setOpen(true)}
-                        title="Ask IRIS about this paper"
-                        className="min-h-11 lg:min-h-8 mr-1 font-semibold"
-                      >
-                        <AskIrisMark className="w-4 h-4 text-brand" />
-                        Ask IRIS
-                      </Button>
-                    )
-                  }
-                />
-              </Suspense>
-            )}
+            {section === "paper" &&
+              reader(
+                !chat.open && (
+                  <Button
+                    variant="outline"
+                    onClick={() => chat.setOpen(true)}
+                    title="Ask IRIS about this paper"
+                    className="min-h-11 lg:min-h-8 mr-1 font-semibold"
+                  >
+                    <AskIrisMark className="w-4 h-4 text-brand" />
+                    Ask IRIS
+                  </Button>
+                ),
+              )}
 
             {section === "overview" && (
               <>
@@ -873,18 +874,7 @@ export default function PaperViewPage() {
               <ReviewSection
                 record={record}
                 can={can}
-                reader={
-                  sections.includes("paper") ? (
-                    <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
-                      <PaperPdfReader
-                        recordId={record.id}
-                        scrollToPage={openAtPage}
-                        highlightRegions={highlightRegions}
-                        navKey={arrivalKey.current}
-                      />
-                    </Suspense>
-                  ) : null
-                }
+                reader={sections.includes("paper") ? reader() : null}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
                 onAskAboutPaper={
@@ -972,7 +962,7 @@ export default function PaperViewPage() {
         // On the Paper tab the way back sits in the reader's toolbar instead,
         // so nothing floats over the paper (IR-372); the Review section has
         // no Ask IRIS at all (spec §4.6).
-        !onPaperTab && !chatHidden && <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
+        !onPaperTab && !onReviewTab && <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
       )}
       </div>
     </div>

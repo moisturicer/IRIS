@@ -14,6 +14,9 @@ interface ConfirmDialogProps {
   error?:     string | null;
 }
 
+/** Closing is refused while confirming; one function, so `Modal` keeps its listener. */
+const STAY_OPEN = () => {};
+
 // The buttons are `Button`'s own variants (IR-359), so a destructive confirm
 // carries the same maroon, glyph and named verb here as anywhere else.
 //
@@ -34,7 +37,7 @@ export function ConfirmDialog({
   return (
     <Modal
       open={open}
-      onClose={confirming ? () => {} : onCancel}
+      onClose={confirming ? STAY_OPEN : onCancel}
       title={title}
       size="max-w-sm"
       footer={

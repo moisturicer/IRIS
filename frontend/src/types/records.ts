@@ -239,6 +239,8 @@ export interface TrackerResubmission {
   requested_by: string | null;
   created_at:   string | null;
   resolved_at:  string | null;
+  /** Who resubmitted, or withdrew, and so closed it (IR-412). */
+  resolved_by:  string | null;
 }
 
 export interface RecordTracker {

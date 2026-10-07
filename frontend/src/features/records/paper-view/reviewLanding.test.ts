@@ -8,6 +8,15 @@
  * the screen. These check, with IR-354's helper rather than a new one, that
  * the landed passage clears the header and that pane or bar alike.
  *
+ * **What this does not prove.** The reader is unchanged (Appendix K), so it is
+ * told nothing about the bar: its view runs to the bottom of the window. A
+ * passage lands 48px under the reader's toolbar, so it clears the bar only
+ * while it is shorter than the room left above the bar -- about 350px at
+ * 360×740. A taller one ends under the bar. These cases pin that room; they
+ * are arithmetic on the section's measured geometry, not a rendered layout,
+ * which jsdom cannot measure (spec §5). The layout itself was checked in a
+ * browser at the four viewports.
+ *
  * The bar's height is measured in a browser (IR-412's PR): one row of 44px
  * controls is 60px tall at 768px wide; at 360px the controls wrap to two
  * rows, 112px (headless Chrome, 2026-10-07).

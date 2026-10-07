@@ -219,6 +219,8 @@ class TrackerPartiesTests(TrackerTestBase):
         declined = [r for r in payload["reviews"] if r["status"] == "declined"]
         self.assertEqual(len(declined), 1)
         self.assertEqual(request["review"], declined[0]["id"])
+        # Who answered it: the owner who resubmitted (IR-412's timeline).
+        self.assertEqual(request["resolved_by"], self.owner.get_full_name())
 
     def test_a_new_proposal(self):
         record = self.submitted(RecordTypeName.PROPOSAL, adviser=self.adviser)

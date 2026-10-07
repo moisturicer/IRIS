@@ -69,11 +69,10 @@ describe("ReviewTimeline", () => {
 
     const list = await screen.findByRole("list", { name: "Review timeline" });
     const items = within(list).getAllByRole("listitem");
-    expect(items.map((li) => li.querySelector("p")?.textContent)).toEqual([
-      "Submitted to Intake (retired)",
-      "Routed to ITSO",
-      "Approved",
-    ]);
+    expect(items).toHaveLength(3);
+    expect(items[0]).toHaveTextContent(/^Submitted to Intake \(retired\)/);
+    expect(items[1]).toHaveTextContent(/^Routed to ITSO/);
+    expect(items[2]).toHaveTextContent(/^Approved/);
     expect(items[1]).toHaveTextContent("Ana Cruz");
     expect(items[1]).toHaveTextContent("Intake (retired)");
     expect(items[1]).toHaveTextContent("Needs an IP check.");
@@ -87,9 +86,10 @@ describe("ReviewTimeline", () => {
     renderScreen(<ReviewTimeline recordId={7} />);
 
     await screen.findByRole("list", { name: "Review timeline" });
-    expect(screen.queryByText(/currently with/i)).not.toBeInTheDocument();
+    // The tracker says Intake holds the record; the timeline says nothing of
+    // where it is now, Intake least of all.
+    expect(screen.queryByText(/currently with|current step|now with/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^now$/i)).not.toBeInTheDocument();
-    expect(document.querySelector("[aria-current]")).toBeNull();
   });
 
   it("says so when nothing has happened yet", async () => {

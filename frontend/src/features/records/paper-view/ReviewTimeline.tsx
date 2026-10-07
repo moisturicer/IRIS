@@ -57,8 +57,10 @@ export function ReviewTimeline({ recordId }: { recordId: number }) {
       <RailHeading id={headingId}>Timeline</RailHeading>
 
       {failed ? (
-        <div role="alert" className="space-y-2">
-          <p className="text-small text-stone-700">Could not load the review timeline.</p>
+        <div className="space-y-2">
+          <p role="alert" className="text-small text-stone-700">
+            Could not load the review timeline.
+          </p>
           <button
             type="button"
             onClick={() => setAttempt((n) => n + 1)}
@@ -127,8 +129,9 @@ function TimelineItem({ entry }: { entry: TimelineEntry }) {
       {entry.note && (
         <p className="text-small text-stone-700 leading-relaxed mt-1 break-words">“{entry.note}”</p>
       )}
-      {entry.details.map((line) => (
-        <p key={line} className="text-2xs text-stone-600 mt-0.5 break-words">
+      {/* By position: two items can read the same (one label, one state). */}
+      {entry.details.map((line, i) => (
+        <p key={i} className="text-2xs text-stone-600 mt-0.5 break-words">
           {line}
         </p>
       ))}

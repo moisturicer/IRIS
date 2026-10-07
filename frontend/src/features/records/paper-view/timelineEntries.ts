@@ -103,28 +103,33 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
   }
 
   // One resubmission answers every open request at once, so the requests it
-  // closed share a time and a state: one entry, naming every party answered.
+  // closed share a time, a state and who closed them: one entry, naming every
+  // party answered. A withdrawal (the record was withdrawn) closes them too,
+  // unanswered, and says so.
   const resolutions = new Map<string, TrackerResubmission[]>();
   for (const r of tracker.resubmissions) {
     if (r.state === "open" || !r.resolved_at) continue;
-    const key = `${r.resolved_at}|${r.state}`;
+    const key = `${r.resolved_at}|${r.state}|${r.resolved_by ?? ""}`;
     resolutions.set(key, [...(resolutions.get(key) ?? []), r]);
   }
   for (const [key, closed] of resolutions) {
-    const labels = closed.map((r) => r.label);
+    const [first] = closed;
+    const requests = closed.length === 1 ? "the request" : "the requests";
+    const from = joinLabels(closed.map((r) => r.label));
     entries.push({
       key: `resolved-${key}`,
       kind: "revision_resolved",
-      at: closed[0].resolved_at,
-      actor: null,
+      at: first.resolved_at,
+      // The owner, who is not a party: no party is named.
+      actor: first.resolved_by,
       party: null,
-      act: closed[0].state_label,
+      act: first.state_label,
       status: null,
       note: null,
       details: [
-        labels.length === 1
-          ? `Answers the request for changes from ${labels[0]}`
-          : `Answers the requests for changes from ${joinLabels(labels)}`,
+        first.state === "resubmitted"
+          ? `Answers ${requests} for changes from ${from}`
+          : `Closes ${requests} for changes from ${from}, unanswered`,
       ],
     });
   }

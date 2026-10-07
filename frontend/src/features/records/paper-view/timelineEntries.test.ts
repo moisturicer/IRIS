@@ -52,6 +52,7 @@ const resubmission = (overrides: Partial<TrackerResubmission>): TrackerResubmiss
   requested_by: "Leo Tan",
   created_at: "2026-09-06T08:00:00Z",
   resolved_at: null,
+  resolved_by: null,
   ...overrides,
 });
 
@@ -158,19 +159,41 @@ describe("timelineEntries", () => {
           review({ id: 3, party: "ktto", label: "KTTO", status: "declined", status_label: "Resubmission requested" }),
         ],
         resubmissions: [
-          resubmission({ id: 1, review: 2, state: "resubmitted", state_label: "Resubmitted", resolved_at: resolvedAt }),
+          resubmission({
+            id: 1, review: 2, state: "resubmitted", state_label: "Resubmitted",
+            resolved_at: resolvedAt, resolved_by: "Rhea Owner",
+          }),
           resubmission({
             id: 2, review: 3, party: "ktto", label: "KTTO", state: "resubmitted",
-            state_label: "Resubmitted", resolved_at: resolvedAt,
+            state_label: "Resubmitted", resolved_at: resolvedAt, resolved_by: "Rhea Owner",
           }),
         ],
       }),
     );
 
     const last = entries[entries.length - 1];
-    expect(last).toMatchObject({ act: "Resubmitted", at: resolvedAt, actor: null, party: null });
+    // The owner is not a party, so the entry names no party.
+    expect(last).toMatchObject({ act: "Resubmitted", at: resolvedAt, actor: "Rhea Owner", party: null });
     expect(last.details).toEqual(["Answers the requests for changes from IERC and KTTO"]);
     expect(entries.filter((e) => e.act === "Resubmitted")).toHaveLength(1);
+  });
+
+  it("says a withdrawn request was closed unanswered, not answered", () => {
+    const entries = timelineEntries(
+      tracker({
+        reviews: [review({ id: 2, party: "ierc", label: "IERC", status: "declined", status_label: "Resubmission requested" })],
+        resubmissions: [
+          resubmission({
+            review: 2, state: "withdrawn", state_label: "Withdrawn",
+            resolved_at: "2026-09-10T08:00:00Z", resolved_by: "Rhea Owner",
+          }),
+        ],
+      }),
+    );
+
+    const last = entries[entries.length - 1];
+    expect(last).toMatchObject({ act: "Withdrawn", actor: "Rhea Owner" });
+    expect(last.details).toEqual(["Closes the request for changes from IERC, unanswered"]);
   });
 
   it("keeps a request for changes whose review it cannot find, rather than lose it", () => {

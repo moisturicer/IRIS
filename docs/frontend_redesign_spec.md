@@ -691,7 +691,8 @@ This extends the IR-356 direction (in `ui-ux/01-design-system.md` §0) from Pape
   | 1745×777 | the IR-350 measurement width |
 
   For the method, see the fixed-size same-origin iframe in the `iris-ir350-paper-reading-workspace` memory. There is no horizontal page scroll at 360.
-- **Below `md`:** the sidebar is a drawer (as today); Discover filters are a sheet; the library rail is a select; Paper View's Review section stacks the paper above the pane with a sticky action bar; the Publish dialog is a full-screen sheet.
+- **Below `md`:** the sidebar is a drawer (as today); Discover filters are a sheet; the library rail is a select; the Publish dialog is a full-screen sheet.
+- **Below `lg`:** Paper View's Review section stacks the paper above the pane with a sticky action bar. *(Amended 2026-10-07, IR-412: this said `md` while F6 said `lg`. `lg` is kept, because it is where IR-352's reader becomes a contained pane (`CONTAINED_LAYOUT_QUERY`); between `md` and `lg` there is no room for the reader and the pane side by side.)*
 - **Dialogs:** `Modal`'s focus trap, labelled by the title, Escape closes (the Publish dialog asks to confirm only if an upload is mid-flight), and focus returns to the opener.
 - **Live regions:** upload progress/result, "Moved to In review", action outcomes.
 - **Colour:** status is never colour-only (icon + word). Text contrast is ≥ 4.5:1: no `stone-400` text on white (IR-360 finding), and checkboxes use `accent-brand`.
