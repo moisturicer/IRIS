@@ -214,6 +214,11 @@ class TrackerPartiesTests(TrackerTestBase):
         self.assertEqual(request["state"], "resubmitted")
         self.assertEqual(request["reason"], "Consent form is missing.")
         self.assertIsNotNone(request["resolved_at"])
+        # The declined review that made the request, so the Review section's
+        # timeline shows the one act once, not as a review and a request (IR-412).
+        declined = [r for r in payload["reviews"] if r["status"] == "declined"]
+        self.assertEqual(len(declined), 1)
+        self.assertEqual(request["review"], declined[0]["id"])
 
     def test_a_new_proposal(self):
         record = self.submitted(RecordTypeName.PROPOSAL, adviser=self.adviser)

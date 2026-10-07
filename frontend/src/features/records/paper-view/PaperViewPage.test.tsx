@@ -170,6 +170,9 @@ vi.mock("@/api/records", () => ({
     // The Action required panel loads itself; its behaviour is tested in
     // features/document-requests (IR-262). Here only its placement is.
     documentRequests: () => documentRequests(),
+    // Request documents, from the Review section's action bar (IR-412).
+    documentRequestSlots:  vi.fn(() => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] })),
+    createDocumentRequest: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
     updateTags:       vi.fn(),
     completeProposal: (id: number) => completeProposal(id),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
@@ -380,9 +383,9 @@ describe("the review control follows can_act", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  // Until F6 (IR-412) builds the action bar, the Review section reaches the
+  // Until IR-260 retires it, the Review section's action bar reaches the
   // decision through the current form, which is left as it is (spec §4.7).
-  it("opens the Review section, which reaches the current decision form", async () => {
+  it("opens the Review section, whose action bar reaches the current decision form", async () => {
     shownRecord = { ...inReview, can_act: ["itso"] };
     signInAs(2, "ITSO");
     renderPaperView();
@@ -390,7 +393,8 @@ describe("the review control follows can_act", () => {
     await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
 
     expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Record a decision (current form)" })).toHaveAttribute(
+    const bar = screen.getByRole("toolbar", { name: "Review actions" });
+    expect(within(bar).getByRole("link", { name: "Record a decision (current form)" })).toHaveAttribute(
       "href",
       `/review/${RECORD_ID}/evaluate`,
     );
@@ -1331,17 +1335,143 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 });
 
-describe("the Review section's actions (IR-411)", () => {
-  // Spec §4.7: until F6's action bar, Request documents sits beside the link
-  // to the current decision form.
-  it("offers Request documents to a party the API names", async () => {
+// The Review section (IR-412; spec §4.7): the paper, the timeline beside it,
+// and an action bar whose buttons are the capabilities adapter's, nothing
+// else. Ask IRIS is not part of it (spec §4.6, decided 2026-09-26).
+describe("the Review section (IR-412)", () => {
+  const trackerPayload = {
+    record_id: RECORD_ID,
+    record_type: "Thesis / Research",
+    workflow_state: "in_review",
+    workflow_state_label: "In review",
+    current_holders: [],
+    can_act: [],
+    parties: [],
+    routing_history: [
+      {
+        group_id: "g1", from: null, from_label: null, to: ["itso"], to_labels: ["ITSO"],
+        actor: "Rhea Owner", reason: "", at: "2026-09-01T08:00:00Z",
+      },
+    ],
+    routing_recorded_from: null,
+    reviews: [],
+    resubmissions: [],
+    document_requests: [],
+    clearances: [],
+    resubmission: { count: 0, last_resubmitted_at: null, declining_office: null, offices_preserved: [] },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: trackerPayload } as never);
+  });
+
+  afterEach(() => {
+    vi.mocked(recordsApi.tracker).mockImplementation(() => Promise.reject(new Error("not under test")));
+    localStorage.removeItem(DOCK_KEY);
+  });
+
+  const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
+
+  it("puts the paper beside the timeline, from the tracker", async () => {
+    shownRecord = { ...inReview, can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    expect(await screen.findByText(/paper reader open at page none/i)).toBeInTheDocument();
+    const timeline = await screen.findByRole("list", { name: "Review timeline" });
+    expect(within(timeline).getByText("Submitted to ITSO")).toBeInTheDocument();
+    expect(recordsApi.tracker).toHaveBeenCalledWith(RECORD_ID);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("offers a reviewer who may request documents exactly that, and the current form", async () => {
+    shownRecord = { ...inReview, can_act: ["ierc"], can_request_document: ["ierc"] };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await screen.findByRole("tab", { name: "Review", selected: true });
+    expect(within(bar()).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
+      "Request documents",
+    ]);
+    expect(within(bar()).getByRole("link", { name: "Record a decision (current form)" })).toBeInTheDocument();
+  });
+
+  it("offers Request documents alone to a party that may ask but not decide", async () => {
     shownRecord = { ...inReview, can_request_document: ["ierc"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
-    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Request documents" })).toBeInTheDocument();
+    await screen.findByRole("tab", { name: "Review", selected: true });
+    expect(within(bar()).getByRole("button", { name: "Request documents" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
+  });
+
+  it("gives an owner the timeline and no action bar: nothing was granted", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByRole("toolbar", { name: "Review actions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+
+  it("requests documents from the bar and re-reads the timeline after", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Request documents" }));
+    const dialog = screen.getByRole("dialog", { name: "Request documents" });
+    await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /Message to the owner/ }), "Please.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+
+    expect(await screen.findByText("Documents requested. The owner has been notified.")).toBeInTheDocument();
+    await waitFor(() => expect(recordsApi.tracker).toHaveBeenCalledTimes(2));
+  });
+
+  it("has no Ask IRIS, and Ask about this paper takes the reader to the Paper tab with the chat open", async () => {
+    shownRecord = { ...inReview, can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    renderWithProbe(`/records/${RECORD_ID}?section=review`);
+
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByRole("complementary", { name: "Paper Chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
+
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
+      `/records/${RECORD_ID}?section=paper`,
+    );
+  });
+
+  it("offers no Ask about this paper when there is no paper to ask about", async () => {
+    shownRecord = { ...inReview, abstract_file: null, files: [], can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByText(/paper reader open/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();
+  });
+
+  it("lands a citation on its passage in the Review section's reader too", async () => {
+    shownRecord = { ...inReview, can_act: ["itso"] };
+    signInAs(2, "ITSO");
+    const citation = {
+      marker: 1, chunk_id: 11, record_id: RECORD_ID, record_title: inReview.title, page: 3,
+      text: "recharge rates fell", context_path: [inReview.title],
+      regions: [{ page: 3, left: 0.1, top: 0.4, right: 0.6, bottom: 0.45 }],
+    };
+    renderPaper(`/records/${RECORD_ID}?section=review&page=3`, { citation });
+
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 3, 1 region\(s\)/i)).toBeInTheDocument();
   });
 });
 
