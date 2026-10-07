@@ -69,6 +69,8 @@ const base: RecordDetail = {
   current_holders: [],
   can_act: [],
   can_request_document: [],
+  my_seats: [],
+  is_participant: false,
 };
 
 /** The student-facing holder labels the API serves (ADR-021 §2). */

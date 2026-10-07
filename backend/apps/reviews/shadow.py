@@ -38,6 +38,7 @@ from core.enums import (
     ReviewStage,
 )
 
+from . import seats
 from .models import (
     RecordAssignment,
     RecordClearance,
@@ -176,6 +177,8 @@ def sync(record, event, actor, *, acting_party=None, review=None):
             opened_by=actor if triaged else None,
             opened_at=now,
         )
+        # The Adviser enters seated; an office enters as a pool (IR-415).
+        seats.seat_entry(opened[party])
     held.update(opened)
 
     if event is WorkflowEvent.DECLINE and review is None:
@@ -186,6 +189,10 @@ def sync(record, event, actor, *, acting_party=None, review=None):
         if assignment is not None:
             review.assignment = assignment
             review.save(update_fields=["assignment"])
+
+    # After the review is saved, so the reviewer who closed it counts as done.
+    for assignment in closed.values():
+        seats.settle_closed(assignment, actor, closing_state)
 
     if event is WorkflowEvent.DECLINE and review is not None:
         ResubmissionRequest.objects.create(

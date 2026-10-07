@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
-from core.enums import RoleName
+from core.enums import OPEN_SEAT_STATES, AssignmentState, Party, RoleName
 
 # Role name constants -- match the Role.name values in the DB exactly.
 # Aliases onto `RoleName` since IR-135: the names are kept because the sets
@@ -171,6 +171,85 @@ def owns_or_staffs_record(user, record) -> bool:
     if get_role_name(user) in STAFF_ROLES:
         return True
     return record.owners.filter(user=user).exists()
+
+
+# --- reviewer seats (ADR-032 §4, §10; IR-415) --------------------------------
+#
+# Each new authority ADR-032 grants -- an office member may claim, a coordinator
+# may assign, a seat holder may add a colleague -- is one of these predicates,
+# checked at the endpoint. None is ever inferred from a role name alone at the
+# call site, and none from the `capabilities` hint the frontend renders.
+
+#: The office party each office role staffs. **The Adviser is not an office**:
+#: an Adviser reviews a record only through the entry seat on one they advise.
+#: RDCO staffs `rdco` only; `intake` is retired (ADR-032 §1) and nobody is
+#: seated on it.
+OFFICE_PARTY_BY_ROLE = {
+    ROLE_ITSO: Party.ITSO,
+    ROLE_IERC: Party.IERC,
+    ROLE_KTTO: Party.KTTO,
+    ROLE_RDCO: Party.RDCO,
+}
+
+
+def office_parties_of(user) -> frozenset:
+    """The office parties `user` is a member of: one, or none."""
+    if not user or not user.is_authenticated:
+        return frozenset()
+    party = OFFICE_PARTY_BY_ROLE.get(get_role_name(user))
+    return frozenset({str(party)}) if party else frozenset()
+
+
+def is_office_member(user, party) -> bool:
+    """Does `user`'s role staff the office `party`? (ADR-032 §4)"""
+    return str(party) in office_parties_of(user)
+
+
+def is_office_coordinator(user, party) -> bool:
+    """
+    May `user` assign, reassign and withdraw seats for `party`?
+
+    A member of that office whom an administrator made a coordinator. The flag
+    alone grants nothing: a coordinator's authority stops at their own office.
+    """
+    return bool(getattr(user, "is_office_coordinator", False)) and is_office_member(user, party)
+
+
+def holds_seat(user, record, party) -> bool:
+    """
+    Does `user` hold an open seat on `record`'s active `party` assignment?
+
+    Open means assigned or in review: a reviewer whose part is `done`, or whose
+    seat was withdrawn, no longer holds it.
+    """
+    from apps.reviews.models import ReviewerSeat
+
+    if not user or not user.is_authenticated:
+        return False
+    return ReviewerSeat.objects.filter(
+        assignment__record=record,
+        assignment__party=str(party),
+        assignment__state=AssignmentState.ACTIVE,
+        reviewer=user,
+        state__in=OPEN_SEAT_STATES,
+    ).exists()
+
+
+def is_record_participant(user, record) -> bool:
+    """
+    An owner of `record`, or anyone who has ever held a seat on it (ADR-032 §10).
+
+    "Ever": a reviewer keeps the Review and Files sections once their part is
+    done, so they can revisit what they worked on (IR-411, settled 2026-10-06).
+    It gates the review discussion and the timeline.
+    """
+    from apps.reviews.models import ReviewerSeat
+
+    if not user or not user.is_authenticated:
+        return False
+    if record.owners.filter(user=user).exists():
+        return True
+    return ReviewerSeat.objects.filter(assignment__record=record, reviewer=user).exists()
 
 
 class IsOwnerOrStaff(BasePermission):

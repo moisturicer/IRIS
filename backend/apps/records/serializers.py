@@ -72,6 +72,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     can_act              = serializers.SerializerMethodField()
     # The parties this viewer may ask the owner for documents as (IR-262).
     can_request_document = serializers.SerializerMethodField()
+    # The viewer's own reviewer seats here, and whether they take part in the
+    # review at all -- an owner, or anyone who has ever held a seat
+    # (ADR-032 §4, §10; IR-415).
+    my_seats             = serializers.SerializerMethodField()
+    is_participant       = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -100,6 +105,19 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
     def get_can_request_document(self, obj):
         return self._workflow(obj)["can_request_document"]
+
+    def _viewer(self):
+        return getattr(self.context.get("request"), "user", None)
+
+    def get_my_seats(self, obj):
+        from apps.reviews.seats import my_seats
+
+        return my_seats(obj, self._viewer())
+
+    def get_is_participant(self, obj):
+        from core.permissions import is_record_participant
+
+        return is_record_participant(self._viewer(), obj)
 
     def get_reviews(self, obj):
         from apps.reviews.models import Review
@@ -230,7 +248,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "your_office", "your_office_label",
             "workflow_state", "workflow_state_label", "current_holders", "can_act",
-            "can_request_document",
+            "can_request_document", "my_seats", "is_participant",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

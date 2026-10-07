@@ -25,7 +25,7 @@
  * capability is only a decision about what to *offer*.
  */
 import { STAFF_ROLES, type RoleName } from "@/lib/constants";
-import type { RecordDetail } from "@/types/records";
+import type { RecordDetail, ReviewerSeat } from "@/types/records";
 
 /**
  * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
@@ -60,7 +60,15 @@ export type Viewer = { id: number; role_name: RoleName | null };
 /** The Record detail fields the adapter reads. */
 type CapabilityInputs = Pick<
   RecordDetail,
-  "owners" | "can_act" | "can_request_document" | "workflow_state" | "pipeline_status" | "abstract_file" | "files"
+  | "owners"
+  | "can_act"
+  | "can_request_document"
+  | "my_seats"
+  | "is_participant"
+  | "workflow_state"
+  | "pipeline_status"
+  | "abstract_file"
+  | "files"
 >;
 
 /** Whether the viewer owns the record: the adapter's one client-side input. */
@@ -77,12 +85,28 @@ export function isReviewing(record: CapabilityInputs, viewer: Viewer | null): bo
 }
 
 /**
- * An owner, or someone taking part in the review. ADR-032's
- * `is_record_participant` also counts anyone who *has* held a seat; until
- * seats exist (IR-415) a reviewer whose part is finished is not counted here.
+ * An owner, or someone taking part in the review. The server's
+ * `is_participant` is ADR-032's `is_record_participant`, which also counts
+ * anyone who *has* held a seat (IR-415): a reviewer whose part is done keeps
+ * the Review and Files sections. The two client-side grounds stay for a
+ * reviewer on the legacy pipeline who acts without holding a seat.
  */
 export function isParticipant(record: CapabilityInputs, viewer: Viewer | null): boolean {
-  return isOwner(record, viewer) || isReviewing(record, viewer);
+  return viewer != null && (record.is_participant || isOwner(record, viewer) || isReviewing(record, viewer));
+}
+
+/**
+ * The viewer's seat that *Open review* records (ADR-032 §4): one not yet
+ * opened. Null when every seat is already open, finished, or there is none,
+ * so the button then only navigates.
+ */
+export function seatToOpen(record: Pick<RecordDetail, "my_seats">): ReviewerSeat | null {
+  return record.my_seats.find((seat) => seat.state === "assigned") ?? null;
+}
+
+/** Whether the viewer holds a seat still to work: assigned, or in review. */
+function holdsOpenSeat(record: Pick<RecordDetail, "my_seats">): boolean {
+  return record.my_seats.some((seat) => seat.state === "assigned" || seat.state === "in_review");
 }
 
 /** Whether there is a paper to read: the manuscript, else any attached file. */
@@ -100,6 +124,9 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
     // Through the current decision form, until IR-260 retires it.
     granted.add("decide");
   }
+  // A seat to work is a review to open, even where the legacy pipeline does
+  // not let its holder act yet (IERC waiting on ITSO, say).
+  if (holdsOpenSeat(record)) granted.add("open_review");
   if (record.can_request_document.length > 0) granted.add("request_document");
 
   if (isOwner(record, viewer)) {

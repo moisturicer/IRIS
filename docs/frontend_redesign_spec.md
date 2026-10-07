@@ -291,7 +291,7 @@ Administration (RDCO) — unchanged
   ```
 
   - `my_reviews` is true when the user holds or has held a seat or assignment on any record, **or** is a member of an office party. Office members need the page even with no seats, because the office pool (claim) lives there.
-  - **Before seats exist** (phase 1), the server computes it from what exists: the user is `record.adviser` on any submitted record, or staffs an office party (`staffable_parties`), or has written a `Review`. When the ADR-032 seats ticket lands, it replaces that computation with seats, without changing the field.
+  - **Built once, from seats** (decided by the project lead 2026-10-07, superseding this section's earlier two-phase wording): IR-415 ships the field in its final form, read from reviewer seats, office membership and `User.is_office_coordinator`. There is no phase-1 computation, and F1 (IR-413) only consumes it.
   - Both the sidebar entry and the `/review` route guard read this flag. The access map keeps `reviewQueue` only as the outer role gate, and the server's queue endpoint still scopes every row.
   - Landing after sign-in follows the same flag: My Reviews when `my_reviews` is true, otherwise Discover.
 - **The sidebar's workspace badge becomes a dot on My Library.** It is shown only when something needs the user's action. It is justified because it is actionable, not a count for its own sake. **Correction found while verifying:** today's badge reads `/dashboard/stats/`'s `pending_mine`, which counts the user's records that are *in review*, not records *waiting on the user*. The dot therefore needs `needs_action_mine` added to that endpoint (B2, Appendix D).
@@ -524,7 +524,7 @@ Versions and comments join the timeline when their backend lands (ADR-032 §5, �
 
   **Those tickets' held frontend criteria are satisfied here, not in a separate screen.**
 
-**Opening a review.** *Open review* (seats, ADR-032 §4) moves the user into the Review section. Until seats exist, the button simply navigates to the section; it records nothing.
+**Opening a review.** *Open review* (seats, ADR-032 §4) moves the user into the Review section. Since IR-415 it also records the start: the viewer's unopened seat moves to `in_review` and the server stamps `opened_at`. A viewer with no unopened seat is only navigated.
 
 ### 4.8 Capabilities contract
 
@@ -990,13 +990,12 @@ It never asserts internal state, hook calls or component structure. It is writte
 **B3 · `review_access` on `GET /users/me/` (reconciliation pass).**
 
 - **Why:** My Reviews must appear only when the server says the user has review work or capability (§4.2), not for every reviewer role.
-- **Reuse:** `MeView` / `UserSerializer` (exists), plus the tracker's `staffable_parties` and the existing `Review`/`RecordAssignment` rows. No new model.
+- **Reuse:** `MeView` with a `MeSerializer` over `UserSerializer`, reading IR-415's `ReviewerSeat` rows and `User.is_office_coordinator` (both added by IR-415's migrations, not by B3).
 - **Contract:** `review_access: { my_reviews, offices, is_coordinator }`.
-  - **Phase 1:** `my_reviews` means adviser of a submitted record, **or** staffs an office party, **or** has authored a review. `is_coordinator` is `false` until seats exist.
-  - **Phase 2:** the ADR-032 seats ticket re-points it at seats and `User.is_office_coordinator`, without changing the field.
-- **Scope:** serializer only; no migration; the user sees only their own flag.
-- **Tests:** an Adviser with no advisees gets `false`; an Adviser of a submitted record gets `true`; an ITSO member with no records gets `true` (pool); a Student gets `false`.
-- It ships inside F1. **Agent-ready.**
+  - **Built once, in IR-415** (decided by the project lead 2026-10-07; this replaces the earlier "phase 1 / phase 2" split, which was never built): `my_reviews` is true when the user holds or has held a reviewer seat, **or** is a member of an office (ITSO, IERC, KTTO, RDCO). `offices` lists the office parties the user is a member of. `is_coordinator` is `User.is_office_coordinator`, for a member of an office.
+- **Scope:** serializer only; the user sees only their own flag (on `/users/me/` and the sign-in response, never on another user's payload).
+- **Tests (IR-415's):** an Adviser holding no seat gets `false`; an Adviser holding an entry seat on a submitted record gets `true`; an ITSO member holding no seat gets `true` (pool); a Student gets `false`; `is_coordinator` follows `User.is_office_coordinator`.
+- **It ships in IR-415, not F1** (2026-10-07). F1 (IR-413) consumes it.
 
 **Verification items, not changes (checked inside F3):**
 
@@ -1091,7 +1090,7 @@ It never asserts internal state, hook calls or component structure. It is writte
   - access-map changes;
   - the redirect table;
   - "Review Queue" renamed to "My Reviews", gated by B3's `review_access.my_reviews` (in both the sidebar and the route guard), with the post-login landing following the same flag;
-  - B2 and B3 (backend).
+  - B2 (backend). B3 ships in IR-415, and F1 consumes it (2026-10-07).
 - **AC:**
   - `access.test.ts` asserts the new nav per role;
   - My Reviews is absent for a user whose `my_reviews` is false, even with the Adviser role, and present for an office member with no seats; `/review` redirects such a user to Discover;
@@ -1241,7 +1240,7 @@ It never asserts internal state, hook calls or component structure. It is writte
 
 | ADR-032 ticket | Its UI lands in |
 |---|---|
-| Seats, pool and coordinator | My Reviews (with IR-268); *Claim* / *Assign* on rows; *Open review* recording; B3's phase-2 definition |
+| Seats, pool and coordinator | My Reviews (with IR-268); *Claim* / *Assign* on rows; *Open review* recording; B3's `review_access`, built once (2026-10-07) |
 | Record versions | The header version picker; the timeline version tags; *Submit new version* |
 | Proposal continuation and lineage | The lineage slot; *Continue as…* on cards and Overview, opening the Publish dialog on the child draft (§4.4) |
 | **Capabilities payload** (renamed from ADR-032 §14's "capabilities payload and Paper View modes"; the modes are F5's) | Adapter phase 2 (pass-through) |
@@ -1353,7 +1352,7 @@ The ADR-032 vertical tickets are created later, per the hold recorded on IR-255.
 | Capability / work | ADR-032 ticket | Existing Jira | Frontend redesign ticket | Backend ticket | Paper Chat / reader ticket | Action |
 |---|---|---|---|---|---|---|
 | Sidebar / IA, redirects, header, account menu | — | IR-149 (parent), IR-160 (done) | F1 | B2, B3 (inside F1) | IR-351 (AppShell scroll rule must be kept) | **New** F1; IR-149 closed once IR-161/162 are resolved |
-| My Reviews gate (capability, not role) | T1 (phase 2) | IR-268 | F1 (nav + guard) | B3 | — | **New** B3 in F1; T1 re-points it |
+| My Reviews gate (capability, not role) | T1 | IR-268 | F1 (nav + guard) | B3 | — | B3 built once in T1 (IR-415); F1 consumes it (2026-10-07) |
 | My Reviews page (tabs, rows, claim/assign) | T1 | **IR-268** | uses F0 `ResearchCard` | T1 + IR-268 | — | **Reuse** IR-268; no F ticket |
 | Every record enters at Adviser | — | IR-261, IR-260 | — | IR-261 / IR-260 | — | **Reuse** |
 | Adviser ≠ owner | — | IR-260 | F3 (client guard) | IR-260 | — | **Reuse**; F3 depends softly |
@@ -1409,7 +1408,7 @@ The ADR-032 vertical tickets are created later, per the hold recorded on IR-255.
 | F / B | Overlaps with | Finding | Resolution |
 |---|---|---|---|
 | F0 primitives | none | — | Keep |
-| F1 navigation + B2 + B3 | T1 (seats) defines who has review work | B3's phase-1 definition would be replaced by T1 | Keep. T1's criteria include "re-point `review_access` at seats"; one field, two phases, **not** two implementations |
+| F1 navigation + B2 + B3 | T1 (seats) defines who has review work | B3's phase-1 definition would have been replaced by T1 | **Superseded 2026-10-07 (project lead):** B3 is built once, seat-based, in T1 (IR-415); F1 builds no phase-1 version and only consumes the field |
 | F2 Discover | T7 (Discoverable) | F2 builds the tab container but not the Proposals tab | Keep. T7 adds the tab and must use F2's container and `ResearchCard` |
 | F3 Publish | T3 (continuation), T7 (visibility) | "Continue as" could have become a second form; visibility is a Publish field | Keep. T3 reuses F3's dialog; T7 adds the visibility control to F3's step 3 |
 | B1 / F3b prefill | none | — | Keep |

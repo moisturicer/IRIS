@@ -138,6 +138,42 @@ export interface RecordDetail extends RecordListItem {
    * pipeline still narrows.
    */
   can_request_document: Party[];
+  /**
+   * The viewer's own reviewer seats on this record, withdrawn ones left out
+   * (ADR-032 §4, IR-415). Never anyone else's.
+   */
+  my_seats:             ReviewerSeat[];
+  /**
+   * ADR-032's `is_record_participant`: an owner, or anyone who has ever held
+   * a seat here -- so a reviewer whose part is done keeps Review and Files.
+   */
+  is_participant:       boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Reviewer seats (ADR-032 §4, IR-415)
+// ---------------------------------------------------------------------------
+
+export type SeatState = "assigned" | "in_review" | "done" | "withdrawn";
+export type SeatSource = "entry" | "claimed" | "assigned" | "nominated" | "added";
+
+/** One person reviewing a record for a party. Every seat endpoint answers with this. */
+export interface ReviewerSeat {
+  id:            number;
+  assignment:    number;
+  record:        number;
+  party:         Party;
+  party_label:   string;
+  reviewer:      number | null;
+  reviewer_name: string | null;
+  state:         SeatState;
+  state_label:   string;
+  source:        SeatSource;
+  assigned_by:   number | null;
+  assigned_at:   string | null;
+  /** Stamped by *Open review*: when this reviewer started. */
+  opened_at:     string | null;
+  done_at:       string | null;
 }
 
 // ---------------------------------------------------------------------------
