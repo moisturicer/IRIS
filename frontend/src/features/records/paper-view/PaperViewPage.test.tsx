@@ -1704,6 +1704,23 @@ describe("record versions (IR-416)", () => {
     expect(await screen.findByText(/reading v1/i)).toBeInTheDocument();
   });
 
+  it("lets an owner with an unsubmitted revision still read the submitted latest version (IR-273)", async () => {
+    shownRecord = { ...record, versions: twoVersions, manuscript_unsubmitted: true };
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    expect(await screen.findByText("Your revised manuscript, not yet submitted")).toBeInTheDocument();
+
+    const picker = screen.getByRole("combobox", PICKER);
+    expect(picker).toHaveValue("");
+    expect(within(picker).getByRole("option", { name: "Your revision · not yet submitted (current)" }))
+      .toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: /^v2 .*\(current\)$/ })).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(picker, "2");
+
+    expect(await screen.findByText(/reading v2/i)).toBeInTheDocument();
+  });
+
   it("tells Paper Chat's reader that answers are about the current version", async () => {
     shownRecord = { ...record, versions: twoVersions };
     renderPaper(`/records/${RECORD_ID}?section=paper&version=1`);

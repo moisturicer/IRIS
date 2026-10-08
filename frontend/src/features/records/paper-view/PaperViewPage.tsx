@@ -548,8 +548,13 @@ export default function PaperViewPage() {
   const versions = record.versions ?? [];
   const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
   const askedVersion = Number(searchParams.get("version"));
+  // While the owner's revised manuscript is unsubmitted (IR-273), the current
+  // paper is that upload, so the newest version opens like an earlier one.
   const viewedVersion =
-    versions.find((v) => v.number === askedVersion && v !== latestVersion && v.manuscript_url) ?? null;
+    versions.find(
+      (v) =>
+        v.number === askedVersion && (v !== latestVersion || record.manuscript_unsubmitted) && v.manuscript_url,
+    ) ?? null;
   /** Open version `n`, or the current paper for null, in a section that shows the paper. */
   const chooseVersion = (n: number | null) =>
     setViewParams({
@@ -750,9 +755,11 @@ export default function PaperViewPage() {
               {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
                   renders here once the payload carries it -- never an empty
                   or made-up state (spec §4.11). The version picker (IR-416)
-                  only with two or more versions to choose between. */}
-              {versions.length >= 2 && (
+                  only with two or more versions to choose between, or one
+                  beside the owner's unsubmitted revision (IR-273). */}
+              {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (
                 <VersionPicker
+                  unsubmitted={record.manuscript_unsubmitted}
                   versions={versions}
                   viewing={viewedVersion?.number ?? null}
                   onChoose={chooseVersion}
@@ -976,7 +983,8 @@ export default function PaperViewPage() {
                       setNewVersionOpen(false);
                       setNewVersionDone(outcome);
                       setTrackerVersion((n) => n + 1);
-                      void recordsApi.detail(record.id).then(({ data }) => setRecord(data));
+                      // A failed reload leaves the page as it was; the next visit catches up.
+                      recordsApi.detail(record.id).then(({ data }) => setRecord(data)).catch(() => {});
                     }}
                   />
                 )}
@@ -1057,6 +1065,7 @@ export default function PaperViewPage() {
                 editable={can.has("edit_details")}
                 reviewing={reviewing}
                 attach={can.has("attach_file")}
+                replaceManuscript={can.has("replace_manuscript")}
                 onChanged={handleDocumentRequestChanged}
               />
             )}

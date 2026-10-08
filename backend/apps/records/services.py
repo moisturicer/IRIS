@@ -151,3 +151,27 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
         })
 
     return records, errors
+
+
+def queue_manuscript_extraction(record: Record) -> None:
+    """
+    Send `record`'s manuscript to extraction, after commit, so the chunker
+    reads the file the record now names (IR-195 / ADR-013's 2026-09-08
+    amendment). Called by every write that changes `abstract_file`: an
+    update through the API, and a revision's manuscript put back (IR-273).
+    """
+    from django.db import transaction
+
+    from apps.documents.models import DocumentKind, PdfExtraction
+    from apps.documents.tasks import extract_manuscript_text
+
+    if not record.abstract_file:
+        return
+    # kind, explicitly: abstract_file *is* the manuscript, and IR-239 moved
+    # that judgement onto the row so the chunker reads it there rather than
+    # inferring it from which task was queued.
+    PdfExtraction.objects.update_or_create(
+        record=record,
+        defaults={"status": "queued", "error": "", "kind": DocumentKind.MANUSCRIPT},
+    )
+    transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))

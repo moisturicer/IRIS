@@ -224,6 +224,34 @@ class UploadVersionTests(NewVersionTestBase):
         self.assertEqual(self.read_manuscript(record, self.ierc), b"%PDF-1.7 v2")
         self.assertFalse(self.detail(record, self.owner)["manuscript_unsubmitted"])
 
+    def test_withdrawing_the_last_request_puts_the_submitted_manuscript_back(self):
+        """Found in review: an upload no version can carry must not stay the record's."""
+        record = self.itso_cleared_and_ierc_asked()
+        request = self.open_requests(record).get()
+        self.upload_manuscript(record)
+
+        with patch("apps.documents.tasks.extract_manuscript_text.delay"):
+            response = self.withdraw(record, self.ierc, request.pk)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        record.refresh_from_db()
+        [v1] = self.versions(record)
+        self.assertEqual(record.abstract_file.name, v1.manuscript.name)
+        self.assertEqual(self.read_manuscript(record, self.owner), b"%PDF-1.7 v1")
+        self.assertFalse(self.detail(record, self.owner)["manuscript_unsubmitted"])
+
+    def test_withdrawing_one_of_two_requests_keeps_the_owner_s_upload(self):
+        record = self.thesis(Party.IERC, Party.KTTO)
+        self.opened_seat(record, Party.IERC, self.ierc)
+        self.opened_seat(record, Party.KTTO, self.ktto)
+        ierc_request = self.asked(record, self.ierc)
+        self.asked(record, self.ktto)
+        self.upload_manuscript(record)
+
+        self.withdraw(record, self.ierc, ierc_request.pk)
+
+        self.assertEqual(self.read_manuscript(record, self.owner), b"%PDF-1.7 v2")
+
 
 # --- AC: nothing changed -----------------------------------------------------------------
 
@@ -253,6 +281,13 @@ class NothingChangedTests(NewVersionTestBase):
     def test_saving_the_same_details_again_is_not_a_change(self):
         record = self.itso_cleared_and_ierc_asked()
         self.edit_title(record, title=record.title)
+
+        self.assert_refused_as_unchanged(record)
+
+    def test_a_reviewer_editing_the_details_does_not_answer_the_request(self):
+        """Found in review: the revision is the owner's to make."""
+        record = self.itso_cleared_and_ierc_asked()
+        self.edit_title(record, as_user=self.ierc)
 
         self.assert_refused_as_unchanged(record)
 

@@ -144,7 +144,7 @@ function attachment(id: number, filename: string, canRemove = false): RecordFile
 }
 
 function renderFiles(
-  props: Partial<{ owner: boolean; editable: boolean; reviewing: boolean; attach: boolean }> = {},
+  props: Partial<{ owner: boolean; editable: boolean; reviewing: boolean; attach: boolean; replaceManuscript: boolean }> = {},
   shown: RecordDetail = record,
 ) {
   return renderScreen(
@@ -306,7 +306,15 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
   it("lets the owner upload a revised manuscript for the new version", async () => {
     const onChanged = vi.fn();
     renderScreen(
-      <FilesSection record={revising} owner editable reviewing={false} attach={false} onChanged={onChanged} />,
+      <FilesSection
+        record={revising}
+        owner
+        editable
+        reviewing={false}
+        attach={false}
+        replaceManuscript
+        onChanged={onChanged}
+      />,
     );
     const zone = await screen.findByRole("button", { name: "Upload revised manuscript" });
     const file = pdf("revised.pdf");
@@ -319,21 +327,19 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
   });
 
   it("labels an uploaded manuscript that is not yet submitted", async () => {
-    const { container } = renderFiles({ editable: true }, { ...revising, manuscript_unsubmitted: true } as RecordDetail);
+    const { container } = renderFiles(
+      { editable: true, replaceManuscript: true },
+      { ...revising, manuscript_unsubmitted: true } as RecordDetail,
+    );
 
     expect(await screen.findByText("Revised, not yet submitted")).toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("offers no manuscript upload without a revision request, nor to a reviewer", async () => {
+  it("offers no manuscript upload without the replace_manuscript capability", async () => {
     renderFiles({ editable: true });
     await screen.findByRole("button", { name: "Upload Ethics Clearance" });
     expect(screen.queryByRole("button", { name: "Upload revised manuscript" })).not.toBeInTheDocument();
   });
 
-  it("offers a reviewer no manuscript upload even while a revision is asked for", async () => {
-    renderFiles({ owner: false, reviewing: true }, revising);
-    await screen.findByRole("region", { name: "Ethics Clearance" });
-    expect(screen.queryByRole("button", { name: "Upload revised manuscript" })).not.toBeInTheDocument();
-  });
 });

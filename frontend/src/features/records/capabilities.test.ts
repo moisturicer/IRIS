@@ -348,7 +348,7 @@ const ROWS: Row[] = [
       },
     }),
     viewer: owner,
-    capabilities: ["cite", "create_version", "edit_details"],
+    capabilities: ["cite", "create_version", "replace_manuscript", "edit_details"],
     sections: ["overview", "paper", "review", "files"],
   },
   {

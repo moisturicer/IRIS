@@ -417,10 +417,13 @@ class RecordWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         authors_data = validated_data.pop("authors", None)
-        if self._details_changed(instance, validated_data, authors_data):
+        from core.permissions import is_record_owner
+
+        editor = getattr(self.context.get("request"), "user", None)
+        if is_record_owner(editor, instance) and self._details_changed(instance, validated_data, authors_data):
             # What a new version answers a revision request with, when no file
-            # changed (IR-273). Only a real change: saving the same details
-            # again answers nothing.
+            # changed (IR-273). Only an owner's real change: the revision is
+            # theirs, and saving the same details again answers nothing.
             validated_data["details_edited_at"] = timezone.now()
         record = super().update(instance, validated_data)
         if authors_data is not None:           # only replace when field was explicitly sent

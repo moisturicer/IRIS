@@ -4,6 +4,7 @@ import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/features/document-requests/errorDetail";
+import { joinLabels } from "@/lib/utils";
 import type { NewVersionHint } from "@/types/records";
 
 interface NewVersionDialogProps {
@@ -16,12 +17,6 @@ interface NewVersionDialogProps {
   onDone: (outcome: string) => void;
 }
 
-/** "IERC", "IERC and KTTO", "ITSO, IERC and KTTO". */
-export function joinParties(names: string[]): string {
-  if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
-
 /**
  * What submitting does, in the words the confirmation uses (IR-273):
  * "IERC will review v3. ITSO's clearance is kept." Both halves come from
@@ -29,12 +24,12 @@ export function joinParties(names: string[]): string {
  * so nothing here decides who reviews again.
  */
 export function newVersionSummary(hint: NewVersionHint): string {
-  const review = `${joinParties(hint.rereview)} will review v${hint.number}.`;
+  const review = `${joinLabels(hint.rereview)} will review v${hint.number}.`;
   if (hint.kept.length === 0) return review;
   const kept =
     hint.kept.length === 1
       ? `${hint.kept[0]}'s clearance is kept.`
-      : `${joinParties(hint.kept)} keep their clearances.`;
+      : `${joinLabels(hint.kept)} keep their clearances.`;
   return `${review} ${kept}`;
 }
 

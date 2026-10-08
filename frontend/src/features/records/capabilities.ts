@@ -31,7 +31,8 @@ import { OPEN_SEAT_STATES, type RecordDetail, type ReviewerSeat } from "@/types/
  * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
  * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
  * draft in Publish, and `attach_file`, an office filing a supplementary file
- * on a record it takes part in.
+ * on a record it takes part in. IR-273 adds `replace_manuscript`: the owner
+ * uploading a revised manuscript for the next version (ADR-032 §5 Amendment).
  */
 export type Capability =
   | "open_review"
@@ -44,6 +45,7 @@ export type Capability =
   | "add_reviewer"
   | "decide"
   | "create_version"
+  | "replace_manuscript"
   | "edit_details"
   | "continue_draft"
   | "continue_as"
@@ -167,6 +169,10 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
       if (record.pipeline_status !== "in_review" || record.revision.new_version != null) {
         granted.add("create_version");
       }
+      // A new version may carry a revised manuscript (IR-273). The server
+      // opens the manuscript lock to an owner only while a revision is asked
+      // for on the new model, which is what its offer says.
+      if (record.revision.new_version != null) granted.add("replace_manuscript");
       // The edit becomes part of the next version (IR-273, invariant 4).
       granted.add("edit_details");
     }

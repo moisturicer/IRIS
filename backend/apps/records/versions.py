@@ -19,7 +19,9 @@ that last case only an owner may: the revision is theirs to make.
 the owner's upload and their new version, the stored manuscript is a file no
 reviewer was ever handed. `served_manuscript()` gives everyone but an owner
 the latest version's file meanwhile; an owner reads their own upload, and
-`manuscript_unsubmitted()` says so.
+`manuscript_unsubmitted()` says so. If the last request is withdrawn first,
+`restore_submitted_manuscript()` puts the latest version's file back, so an
+upload no version can carry is never left as the record's manuscript.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from typing import Optional
 from django.db import transaction
 
 from core.enums import PipelineStatus, VersionCause
+from core.permissions import is_record_owner
 
 from .models import Record, RecordVersion
 
@@ -37,13 +40,6 @@ MANUSCRIPT_REPLACEABLE_STATUSES = frozenset({
     PipelineStatus.DRAFT,
     PipelineStatus.DECLINED,
 })
-
-
-def _is_owner(record, user) -> bool:
-    return (
-        user is not None and getattr(user, "is_authenticated", False)
-        and record.owners.filter(user=user).exists()
-    )
 
 
 def _awaiting_resubmission(record) -> bool:
@@ -60,7 +56,16 @@ def may_replace_manuscript(record, user=None) -> bool:
     """May `user` replace `record`'s manuscript right now? (module note)"""
     if record.pipeline_status in MANUSCRIPT_REPLACEABLE_STATUSES:
         return True
-    return _awaiting_resubmission(record) and _is_owner(record, user)
+    return _awaiting_resubmission(record) and is_record_owner(user, record)
+
+
+def stored_manuscript_unsubmitted(record) -> bool:
+    """
+    Does the record store a manuscript other than its latest version's -- an
+    owner's upload for a version not yet submitted? (module note)
+    """
+    latest = latest_version(record)
+    return latest is not None and (latest.manuscript.name or None) != (record.abstract_file.name or None)
 
 
 def manuscript_unsubmitted(record, user) -> bool:
@@ -68,10 +73,10 @@ def manuscript_unsubmitted(record, user) -> bool:
     Is the stored manuscript one `user`, an owner, uploaded for a version
     they have not submitted yet? False for anyone else: they never read it.
     """
-    if not record.abstract_file or not _is_owner(record, user):
-        return False
-    latest = latest_version(record)
-    return latest is not None and (latest.manuscript.name or None) != record.abstract_file.name
+    return (
+        bool(record.abstract_file) and stored_manuscript_unsubmitted(record)
+        and is_record_owner(user, record)
+    )
 
 
 def served_manuscript(record, user):
@@ -81,14 +86,27 @@ def served_manuscript(record, user):
     version's while the stored one is still unsubmitted. Falsy when there is
     no manuscript.
     """
-    latest = latest_version(record)
-    if (
-        latest is not None and record.abstract_file
-        and (latest.manuscript.name or None) != record.abstract_file.name
-        and not _is_owner(record, user)
-    ):
-        return latest.manuscript
+    if stored_manuscript_unsubmitted(record) and not is_record_owner(user, record):
+        return latest_version(record).manuscript
     return record.abstract_file
+
+
+def restore_submitted_manuscript(record) -> bool:
+    """
+    Put the latest version's manuscript back as the record's own, when the
+    owner's upload was never submitted. The last revision request was
+    withdrawn, so no version can carry it any more, and the lock that let it
+    in has closed again (IR-273). The upload's file stays in storage, as every
+    manuscript file does. Returns whether anything changed.
+    """
+    if not stored_manuscript_unsubmitted(record):
+        return False
+    from .services import queue_manuscript_extraction
+
+    record.abstract_file = latest_version(record).manuscript.name or None
+    record.save(update_fields=["abstract_file", "updated_at"])
+    queue_manuscript_extraction(record)
+    return True
 
 
 def latest_version(record) -> Optional[RecordVersion]:

@@ -63,3 +63,9 @@ export function formatBytes(bytes: number): string {
   }
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
+
+/** A list of names as prose: "IERC", "ITSO and IERC", "ITSO, IERC and KTTO". */
+export function joinLabels(labels: string[]): string {
+  if (labels.length <= 1) return labels.join("");
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}

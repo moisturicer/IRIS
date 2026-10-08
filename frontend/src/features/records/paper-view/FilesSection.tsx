@@ -45,7 +45,7 @@ const PDF_LIMIT = 50 * 1024 * 1024;
 interface FilesSectionProps {
   record:    Pick<
     RecordDetail,
-    "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted" | "revision"
+    "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
   >;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
@@ -59,6 +59,11 @@ interface FilesSectionProps {
    * filed it, while it takes part.
    */
   attach:    boolean;
+  /**
+   * The owner may upload a revised manuscript for the next version (the
+   * `replace_manuscript` capability, IR-273).
+   */
+  replaceManuscript?: boolean;
   /** Told after anything changes, so the page can re-read what derives from it. */
   onChanged?: () => void;
 }
@@ -101,7 +106,15 @@ async function saveBlob(fetch: () => Promise<{ data: unknown }>, filename: strin
   downloadBlob(data as Blob, filename);
 }
 
-export function FilesSection({ record, owner, editable, reviewing, attach, onChanged }: FilesSectionProps) {
+export function FilesSection({
+  record,
+  owner,
+  editable,
+  reviewing,
+  attach,
+  replaceManuscript = false,
+  onChanged,
+}: FilesSectionProps) {
   const [slots, setSlots] = useState<SlotWithUploads[] | null>(null);
   const [files, setFiles] = useState<RecordFile[]>([]);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
@@ -222,7 +235,7 @@ export function FilesSection({ record, owner, editable, reviewing, attach, onCha
             a revised manuscript (IR-273). Reviewers keep reading the submitted
             one until the owner submits; the server allows the replacement
             only to an owner, only while a revision is asked for. */}
-        {owner && record.revision.new_version != null && (
+        {replaceManuscript && (
           <div className="mt-3">
             <UploadDropzone
               label="Upload revised manuscript"

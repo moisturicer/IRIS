@@ -54,6 +54,20 @@ def resolve_record_download_file(record):
     return None, None
 
 
+def resolve_served_manuscript(record, user):
+    """
+    `resolve_record_download_file`, for the reader `user` (IR-273): while an
+    owner's revised manuscript is not yet submitted, everyone else is handed
+    the latest version's (`versions.served_manuscript`).
+    """
+    from .versions import served_manuscript
+
+    served = served_manuscript(record, user)
+    if served and served.name != (record.abstract_file.name or None):
+        return served.open("rb"), manuscript_download_name(record, served.name)
+    return resolve_record_download_file(record)
+
+
 def file_response_for_record(record) -> FileResponse | None:
     handle, filename = resolve_record_download_file(record)
     if not handle:

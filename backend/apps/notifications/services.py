@@ -744,17 +744,16 @@ def notify_revision_withdrawn(revision_request, *, party_label: str, withdrawn_b
         pass
 
 
-def notify_new_version(record, version, *, submitted_by, reviewers, rereview):
+def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: str):
     """
     Tell the reviewers of the parties that asked for a revision that the owner
     answered with a new version, which they now review (ADR-032 §5, IR-273).
     Nobody else: every other party's work stands. In-app only.
     """
     try:
-        who = rereview[0] if len(rereview) == 1 else f"{', '.join(rereview[:-1])} and {rereview[-1]}"
         message = (
             f'The owner submitted v{version.number} of "{record.title}" in answer to '
-            f"{who}'s revision request. Review the new version."
+            f"{asked_by}'s revision request. Review the new version."
         )
         notif_type = NotificationType.objects.get_or_create(name="New Version Submitted")[0]
         for reviewer in reviewers:

@@ -41,7 +41,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.records import lifecycle
-from apps.records.versions import latest_version, write_version
+from apps.records.versions import latest_version, stored_manuscript_unsubmitted, write_version
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
@@ -50,6 +50,7 @@ from core.enums import (
     SeatState,
     VersionCause,
 )
+from core.permissions import is_record_owner
 
 from . import revisions, routing
 from .models import RecordClearance, ResubmissionRequest, ReviewerSeat
@@ -67,13 +68,6 @@ class NewVersionRefused(Exception):
     """The caller may not submit a new version of this record. A 403."""
 
 
-def _is_owner(record, user) -> bool:
-    return (
-        user is not None and getattr(user, "is_authenticated", False)
-        and record.owners.filter(user=user).exists()
-    )
-
-
 def _parties(requests) -> list[str]:
     """The parties that asked, in the tracker's order."""
     asked = {r.party for r in requests}
@@ -87,9 +81,7 @@ def unchanged_reason(record, requests) -> Optional[str]:
     from apps.documents.models import RecordUpload
 
     since = max(r.created_at for r in requests)
-    latest = latest_version(record)
-    stored = record.abstract_file.name or None
-    if latest is None or (latest.manuscript.name or None) != stored:
+    if latest_version(record) is None or stored_manuscript_unsubmitted(record):
         return None
     if record.details_edited_at is not None and record.details_edited_at > since:
         return None
@@ -97,7 +89,7 @@ def unchanged_reason(record, requests) -> Optional[str]:
         record=record, created_at__gt=since, uploaded_by__owned_records__record=record,
     ).exists():
         return None
-    who = revisions._join([_label(p) for p in _parties(requests)])
+    who = revisions.join_labels([_label(p) for p in _parties(requests)])
     return (
         f"Nothing has changed since {who} asked for a revision. Upload a revised "
         f"manuscript or a supporting document, or edit the record's details, "
@@ -125,7 +117,7 @@ def new_version_hint(record, user) -> Optional[dict]:
     - `kept`: the offices whose `cleared` clearance it keeps;
     - `blocked`: why it cannot be submitted yet.
     """
-    if not routing.is_new_model(record) or not _is_owner(record, user):
+    if not routing.is_new_model(record) or not is_record_owner(user, record):
         return None
     requests = list(revisions.open_requests(record))
     if not requests:
@@ -155,7 +147,7 @@ def submit_new_version(record, actor):
     a 403 whatever state the record is in.
     """
     record = routing._locked(record)
-    if not _is_owner(record, actor):
+    if not is_record_owner(actor, record):
         raise NewVersionRefused("Only an owner of this record may submit a new version of it.")
     if not routing.is_new_model(record):
         raise NewVersionError(
@@ -189,12 +181,14 @@ def submit_new_version(record, actor):
     record.last_resubmitted_at = now
     record.save(update_fields=["resubmission_count", "last_resubmitted_at", "updated_at"])
     RecordClearance.objects.filter(record=record, office__in=reset).update(
-        **lifecycle._clearance_reset_fields()
+        **lifecycle.clearance_reset_fields()
     )
-    ReviewerSeat.objects.filter(
+    # The requesting parties' seats on the assignments still reviewing.
+    requesting_seats = ReviewerSeat.objects.filter(
         assignment__record=record, assignment__party__in=parties,
-        assignment__state=AssignmentState.ACTIVE, state=SeatState.DONE,
-    ).update(state=SeatState.IN_REVIEW, done_at=None)
+        assignment__state=AssignmentState.ACTIVE,
+    )
+    requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
 
     # Which policy was active, per resubmission, as the legacy path logs it
     # (IR-137, ADR-004's documentation requirement).
@@ -204,16 +198,14 @@ def submit_new_version(record, actor):
     )
 
     reviewers = list({
-        seat.reviewer for seat in ReviewerSeat.objects.filter(
-            assignment__record=record, assignment__party__in=parties,
-            assignment__state=AssignmentState.ACTIVE, state__in=OPEN_SEAT_STATES,
-            reviewer__isnull=False,
+        seat.reviewer for seat in requesting_seats.filter(
+            state__in=OPEN_SEAT_STATES, reviewer__isnull=False,
         ).select_related("reviewer")
     })
     from apps.notifications.services import notify_new_version
 
+    who = revisions.join_labels([_label(p) for p in parties])
     transaction.on_commit(lambda: notify_new_version(
-        record, version, submitted_by=actor, reviewers=reviewers,
-        rereview=[_label(p) for p in parties],
+        record, version, submitted_by=actor, reviewers=reviewers, asked_by=who,
     ))
     return version

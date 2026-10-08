@@ -259,8 +259,10 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
     - a detail that actually changed. That is the new `Record.details_edited_at` (`records/0016`), stamped only when a PATCH changes a value, so saving identical details answers nothing.
 
   Otherwise the act is refused, naming who asked and what would count.
-- **The manuscript lock** also opens while `awaiting_resubmission` (new model, a request open), **for an owner only**. Staff stay locked.
-- **Which manuscript is current.** Between the owner's upload and their new version, `/manuscript/` serves everyone but an owner the latest version's file. An owner reads their own upload, and record detail's `manuscript_unsubmitted` labels it. Paper Chat and chunking still read the stored file. That is the AI pipeline's, flagged to its owner, not changed here.
+- **The manuscript lock** also opens while `awaiting_resubmission` (new model, a request open), **for an owner only**. Staff stay locked. The frontend offers the upload under a new capability key, `replace_manuscript`, added to §10's list.
+- **Only an owner's edit counts as a change.** A staff member's details edit does not stamp `details_edited_at`: the revision is the owner's to make.
+- **Withdrawing the last open request puts the submitted manuscript back.** If the owner has uploaded a revised manuscript but not submitted it, and the last open request is withdrawn, no version can carry that upload. The stored manuscript is reset to the latest version's file and re-extracted. The upload's file stays in storage.
+- **Which manuscript is current.** Between the owner's upload and their new version, `/manuscript/` serves everyone but an owner the latest version's file. An owner reads their own upload, and record detail's `manuscript_unsubmitted` labels it. The owner's version picker then offers the latest submitted version too, as `?version=N`. Paper Chat and chunking still read the stored file. That is the AI pipeline's, flagged to its owner, not changed here.
 - **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else.
 
 ### 6. Lineage: an accepted Proposal continues as a new record

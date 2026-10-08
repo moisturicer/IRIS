@@ -173,6 +173,18 @@ def owns_or_staffs_record(user, record) -> bool:
     return record.owners.filter(user=user).exists()
 
 
+def is_record_owner(user, record) -> bool:
+    """
+    Does `user` own `record`? Ownership alone: no staff role, and no seat,
+    stands in for it. A revision is the owner's to make, so a new version, a
+    replacement manuscript and the details edit that answers a revision
+    request all ask this (IR-273).
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return record.owners.filter(user=user).exists()
+
+
 # --- reviewer seats (ADR-032 §4, §10; IR-415) --------------------------------
 #
 # Each new authority ADR-032 grants -- an office member may claim, a coordinator

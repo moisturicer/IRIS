@@ -21,15 +21,25 @@ export function VersionPicker({
   versions,
   viewing,
   onChoose,
+  unsubmitted = false,
 }: {
   versions: RecordVersion[];
   /** The version being read, or null for the current one. */
   viewing: number | null;
   /** The version chosen, or null for the current one. */
   onChoose: (number: number | null) => void;
+  /**
+   * The owner's current manuscript is a revision not yet submitted (IR-273).
+   * Then the current paper is that upload, offered as its own entry, and the
+   * newest version is a version like any other, so it can still be read.
+   */
+  unsubmitted?: boolean;
 }) {
   const id = useId();
   const latest = versions[versions.length - 1];
+  // The entry that stands for "the current paper": the newest version, or
+  // the owner's unsubmitted revision when there is one.
+  const currentValue = unsubmitted ? "" : String(latest.number);
 
   return (
     <div className="flex items-center gap-2 text-sm">
@@ -38,18 +48,15 @@ export function VersionPicker({
       </label>
       <select
         id={id}
-        value={viewing ?? latest.number}
-        onChange={(e) => {
-          const chosen = Number(e.target.value);
-          onChoose(chosen === latest.number ? null : chosen);
-        }}
+        value={viewing != null ? String(viewing) : currentValue}
+        onChange={(e) => onChoose(e.target.value === currentValue ? null : Number(e.target.value))}
         className={cn(
           "min-h-11 lg:min-h-9 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-800",
           FOCUS_RING,
         )}
       >
         {versions.map((v) => {
-          const current = v.number === latest.number;
+          const current = !unsubmitted && v.number === latest.number;
           // An earlier version submitted with no manuscript has nothing to open.
           const empty = !v.manuscript_url && !current;
           return (
@@ -60,6 +67,7 @@ export function VersionPicker({
             </option>
           );
         })}
+        {unsubmitted && <option value="">Your revision · not yet submitted (current)</option>}
       </select>
     </div>
   );

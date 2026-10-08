@@ -36,7 +36,7 @@ from core.permissions import (
     IsStaff,
     get_role_name,
 )
-from .download_service import file_response_for_record, resolve_record_download_file
+from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
@@ -196,24 +196,12 @@ class RecordViewSet(viewsets.ModelViewSet):
         # extraction on it costs nothing, and the alternative (comparing
         # file contents) costs a read on every save just to skip the common
         # case.
-        if "abstract_file" not in serializer.validated_data or not record.abstract_file:
+        if "abstract_file" not in serializer.validated_data:
             return
 
-        from apps.documents.models import DocumentKind, PdfExtraction
-        from apps.documents.tasks import extract_manuscript_text
+        from .services import queue_manuscript_extraction
 
-        # kind, explicitly: abstract_file *is* the manuscript, and IR-239
-        # moved that judgement onto the row so the chunker reads it there
-        # rather than inferring it from which task was queued.
-        PdfExtraction.objects.update_or_create(
-            record=record,
-            defaults={
-                "status": "queued",
-                "error": "",
-                "kind": DocumentKind.MANUSCRIPT,
-            },
-        )
-        transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
+        queue_manuscript_extraction(record)
 
     def perform_destroy(self, instance):
         # Accepted work goes through the delete request flow (RDCO review);
@@ -350,15 +338,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         else reads the latest version's (`versions.served_manuscript`,
         IR-273): no reviewer is handed a file nobody submitted.
         """
-        from .download_service import manuscript_download_name
-        from .versions import served_manuscript
+        from .download_service import resolve_served_manuscript
 
         record = self.get_object()
-        served = served_manuscript(record, request.user)
-        if served and served.name != record.abstract_file.name:
-            handle, filename = served.open("rb"), manuscript_download_name(record, served.name)
-        else:
-            handle, filename = resolve_record_download_file(record)
+        handle, filename = resolve_served_manuscript(record, request.user)
         if handle is None:
             return Response(
                 {"detail": "No paper has been uploaded for this record."},
