@@ -111,7 +111,9 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         reasoning_effort: Optional[str] = None,
         dialect: Optional[VendorDialect] = None,
         fallback_models: Sequence[str] = (),
+        max_tokens: Optional[int] = None,
     ) -> None:
+        self._max_tokens = max_tokens
         self._base_url = base_url
         self._api_key = api_key
         self._model = model
@@ -198,6 +200,8 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
+        if self._max_tokens:
+            extra["max_tokens"] = self._max_tokens
 
         try:
             response = client.chat.completions.create(

@@ -45,6 +45,11 @@ from apps.ai.evidence import (
 )
 from apps.ai.evidence.detector import EvidenceDetector
 from apps.ai.evidence.model_decision import ModelEvidenceDecision
+from apps.ai.evidence.route_label import (
+    ROUTE_LABEL_MAX_TOKENS,
+    RouteLabelDecision,
+    route_label_digest,
+)
 from apps.ai.inference import InferenceTask
 from apps.ai.providers.tool_calling import ToolCallingLLM
 
@@ -112,6 +117,21 @@ class Command(BaseCommand):
             "credits (IR-465).",
         )
         parser.add_argument(
+            "--decision-mode",
+            choices=("tools", "route-label"),
+            default="tools",
+            help="With --model-decision: 'tools' offers search_corpus (IR-465); "
+            "'route-label' asks for {\"route\":\"search\"|\"answer\"} through "
+            "plain generate, with no tool (IR-481).",
+        )
+        parser.add_argument(
+            "--max-tokens",
+            type=int,
+            default=ROUTE_LABEL_MAX_TOKENS,
+            help="Completion cap for --decision-mode route-label "
+            f"(default: {ROUTE_LABEL_MAX_TOKENS}).",
+        )
+        parser.add_argument(
             "--out",
             default=str(DEFAULT_OUT),
             help=f"Directory for the results file (default: {DEFAULT_OUT}).",
@@ -131,7 +151,16 @@ class Command(BaseCommand):
         except QuestionSetError as exc:
             raise CommandError(str(exc))
 
-        decider = self._decider() if options["model_decision"] else None
+        label_mode = options["decision_mode"] == "route-label"
+        if label_mode and not options["model_decision"]:
+            raise CommandError("--decision-mode route-label needs --model-decision.")
+        if options["max_tokens"] < 1:
+            raise CommandError("--max-tokens must be positive.")
+        decider = (
+            self._decider(label_mode, options["max_tokens"])
+            if options["model_decision"]
+            else None
+        )
 
         rule_set = active_rule_set()
         model_provenance = {}
@@ -140,8 +169,17 @@ class Command(BaseCommand):
             from apps.ai.evidence.shadow import generation_parameters
 
             model_provenance = {
-                "prompt_digest": prompt_digest(),
-                "generation": generation_parameters(),
+                "decision_mode": options["decision_mode"],
+                "prompt_digest": (
+                    route_label_digest(options["max_tokens"])
+                    if label_mode
+                    else prompt_digest()
+                ),
+                "generation": {
+                    **generation_parameters(),
+                    **({"max_tokens": options["max_tokens"]} if label_mode else {}),
+                },
+                "workers": 1,
             }
         report = run_curated(
             EvidenceDetector(rule_set),
@@ -182,7 +220,7 @@ class Command(BaseCommand):
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
 
-    def _decider(self) -> ModelEvidenceDecision:
+    def _decider(self, label_mode: bool = False, max_tokens: int = 0):
         """The decision over the `answer` task, refused when nothing is
         configured rather than scored as a column of fallbacks.
 
@@ -201,6 +239,8 @@ class Command(BaseCommand):
                 "question would fall back to evidence and the section would "
                 "measure nothing."
             )
+        if label_mode:
+            return RouteLabelDecision(self._capped_llm(root, max_tokens))
         llm = root.llm_for(InferenceTask.ANSWER)
         if not isinstance(llm, ToolCallingLLM):
             raise CommandError(
@@ -208,6 +248,21 @@ class Command(BaseCommand):
                 "tool-calling decision."
             )
         return ModelEvidenceDecision(llm)
+
+    def _capped_llm(self, root, max_tokens: int):
+        """The `answer` Profile's model with a completion cap, on its own
+        breaker so a run never opens the reader's. An injected provider (a test
+        fake) is used as it is."""
+        injected = getattr(root, "_llm", None)
+        if injected is not None:
+            return injected
+        from apps.ai.inference import build_profile_llm, profile_for
+
+        return build_profile_llm(
+            profile_for(InferenceTask.ANSWER),
+            breaker_key="evidence_route_label_eval",
+            max_tokens=max_tokens,
+        )
 
     def _widen_stream_encoding(self):
         """A Windows console defaults to cp1252 and the report holds a §."""

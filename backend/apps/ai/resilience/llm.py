@@ -515,6 +515,8 @@ class LLMProviderConfig:
     #: one request (IR-385). Empty for a vendor IRIS loops for, where each
     #: model is its own config with its own breaker.
     fallback_models: tuple[str, ...] = ()
+    #: Completion cap for `generate`, `None` for the vendor's own (IR-481).
+    max_tokens: Optional[int] = None
 
     @property
     def key(self) -> str:
@@ -539,6 +541,7 @@ def _build_retrying(config: LLMProviderConfig) -> LLMProvider:
         reasoning_effort=config.reasoning_effort,
         dialect=dialect_for(config.vendor),
         fallback_models=config.fallback_models,
+        max_tokens=config.max_tokens,
     )
     return RetryingLLMProvider(adapter)
 
