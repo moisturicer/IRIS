@@ -33,6 +33,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-08 (project lead, IR-416): §5 and §13.** The manuscript was never a `RecordUpload`, so a version names the stored manuscript file directly. The server locks the manuscript once a record is submitted. Earlier versions are participants-only. The backfill records only what can be known. See the *Amendment* notes under §5 and §13.
 
+**Amended 2026-10-08 (project lead, IR-272): §5.** Who may ask for a revision, one open request per party, what an open request blocks, and why *Changes requested* is derived rather than stored. See the *Amendment* note under §5.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -229,6 +231,21 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
 - **Opening an earlier version** sets `?version=N` and shows "You are viewing vN of M · Back to current". Citation highlights are off while an earlier version is open, because their coordinates are the current manuscript's (ADR-031). Paper Chat says it answers about the current version. Earlier versions are not indexed.
 - **The timeline** shows each version as its own entry ("v2 submitted"), and tags each review with `Review.version`. Nothing else is tagged from timestamps. A comment's version is IR-419's (`ReviewComment.version`).
 - **Settled, built in IR-273:** a non-owner's "current" manuscript is the latest version's, and an owner sees their unsubmitted upload, labelled as such. Until then, the gap exists only while a legacy record is `declined`, when no reviewer is acting.
+
+**Amendment, 2026-10-08 (project lead, IR-272): asking for a revision.** Settled in a design grilling.
+
+- **Who asks.** A holder of an **opened** seat (`in_review`), as that seat's party, on a record on the new model. An unopened seat is refused with "Open the review first", as Clear and Record finding are (§4 *Amendment*). The reason is required and shown to the owner as plain text.
+- **One open request per party, not per person.** A second reviewer from an office that already asked is refused and pointed at the existing request. Their point belongs in the review discussion (§7). This is ADR-022's "party, not person".
+- **What an open request blocks.**
+    - While **any** request is open, every *decision* is refused: accept & route today; accept & publish, keep unlisted, reject and the Proposal decisions when IR-270 and IR-271 build them, through the same predicate.
+    - While an office's **own** request is open, every seat of that office is refused both Clear and Record finding. This mirrors the §4 *Amendment*'s document-request rule, and narrows the completion rule, which already waits on it.
+    - **Other offices may still clear and record findings.** Their outcome then survives the new version, which is exactly what clearance-aware resubmission preserves.
+    - Routing and document requests still work.
+    - *Rejected:* refusing every Clear while any request is open, as the ticket first read. It splits `office_review` in two and refuses an outcome ADR-003 would preserve anyway.
+- **"Changes requested" is derived, not stored.** A party with an open request is shown as *Changes requested*, and `RecordClearance` is left alone. Writing `declined` to it would overwrite an earlier completed review round's outcome while the office has not completed, and the Adviser and RDCO have no clearance row at all. IR-273's resubmission resets the requesting parties' clearances.
+- **The version a request was made against** is its `Review`'s version. That `Review` is required and cannot be deleted from under the request, so no column is added.
+- **Withdrawal.** Any seat holder of the requesting party may withdraw its open request. No reason is asked for. The owners are told, and the tracker keeps the request as `withdrawn`.
+- **Notifications** go to every owner, and to nobody else. Reviewers see the *Waiting on author* badge (§9).
 
 ### 6. Lineage: an accepted Proposal continues as a new record
 

@@ -106,6 +106,10 @@ _Avoid_: Route to RDCO, escalation, final routing.
 One [[Specialist office]]'s review of a Record, from being routed the Record until its [[Seat]]s are done. An office routed the same Record again starts a new Review round, and the latest completed one sets the office's [[Clearance]]; the earlier outcome stands until then.
 _Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads as a person being assigned, which is a Seat), pass.
 
+**Revision request**:
+One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and nobody can decide it; the party that asked cannot finish its own review either. Answered by the next Version, or withdrawn by the party that asked. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
+_Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
+
 **Version**:
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
