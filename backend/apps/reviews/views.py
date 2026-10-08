@@ -5,12 +5,13 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 
 from core.permissions import IsReviewer, IsStaff
 from core.exceptions import InvalidPipelineTransition
 from apps.records import lifecycle
-from core.enums import PipelineStatus, ReviewDecision, RoleName
-from .models import Review, RecordAuthPin, RecordClearance
+from core.enums import ReviewDecision
+from .models import Review, RecordAuthPin
 from .serializers import ReviewSerializer, ReviewWriteSerializer
 from .services import (
     approve_record, decline_record, reject_record,
@@ -25,11 +26,11 @@ PIN_EXPIRY_HOURS = 24
 
 class ReviewViewSet(viewsets.GenericViewSet):
     """
-    GET  /reviews/pending/    -- records awaiting this user's review
     POST /reviews/submit/     -- submit a review or clearance decision
     POST /reviews/resubmit/   -- owner resubmits a declined record
-    GET  /reviews/approved/   -- records this user approved
-    GET  /reviews/declined/   -- records this user declined or rejected
+
+    The three queue lists (`pending/`, `approved/`, `declined/`) were replaced
+    by My Reviews, `MyReviewsView` below (IR-268).
     GET  /reviews/analytics/  -- per-stage average processing time (TODO stub, 501)
     """
     permission_classes = [IsAuthenticated, IsReviewer]
@@ -42,58 +43,6 @@ class ReviewViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         return Review.objects.filter(reviewed_by=self.request.user).select_related("record")
-
-    @action(detail=False, methods=["get"])
-    def pending(self, request):
-        """
-        Return records pending review/clearance by the current user.
-
-        Sequential roles:
-          Adviser  → adviser_review records assigned to THIS adviser
-          RDCO     → rdco_intake AND rdco_review records
-
-        Clearance roles (filtered to records where the office's clearance is pending):
-          ITSO     → itso_review records with a pending ITSO clearance
-          IERC     → parallel_review records with a pending IERC clearance
-          KTTO     → itso_review OR parallel_review records with a pending KTTO clearance
-        """
-        role_name = request.user.role.name if request.user.role else ""
-
-        # Map role → pipeline statuses to filter by
-        role_to_statuses: dict[str, list[str]] = {
-            RoleName.ADVISER: [PipelineStatus.ADVISER_REVIEW],
-            RoleName.RDCO:    [PipelineStatus.RDCO_INTAKE, PipelineStatus.RDCO_REVIEW],
-            RoleName.ITSO:    [PipelineStatus.ITSO_REVIEW],
-            RoleName.IERC:    [PipelineStatus.PARALLEL_REVIEW],
-            RoleName.KTTO:    [PipelineStatus.ITSO_REVIEW, PipelineStatus.PARALLEL_REVIEW],
-        }
-
-        pipeline_statuses = role_to_statuses.get(role_name)
-        if not pipeline_statuses:
-            return Response([])
-
-        records = Record.objects.filter(
-            pipeline_status__in=pipeline_statuses
-        ).select_related("classification", "record_type", "adviser")
-
-        # Advisers only see records assigned to them
-        if role_name == RoleName.ADVISER:
-            records = records.filter(adviser=request.user)
-
-        # Clearance roles: further filter to records where this office's clearance is pending
-        office = ROLE_TO_OFFICE.get(role_name)
-        if office:
-            pending_ids = RecordClearance.objects.filter(
-                office=office, status="pending"
-            ).values_list("record_id", flat=True)
-            records = records.filter(pk__in=pending_ids)
-
-        # The queryset above is already scoped to what this office may act on.
-        # queue_rows adds the context that says so -- stage, the office this
-        # viewer would be clearing for, peer decisions and waiting time (IR-139).
-        from .serializers import queue_rows
-        records = records.prefetch_related("clearances", "reviews")
-        return Response(queue_rows(records, viewer_office=office, request=request))
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsStaff])
     def analytics(self, request):
@@ -199,34 +148,37 @@ class ReviewViewSet(viewsets.GenericViewSet):
 
         return Response({"detail": "Record resubmitted successfully."})
 
-    @action(detail=False, methods=["get"])
-    def approved(self, request):
-        reviews = (
-            Review.objects.filter(reviewed_by=request.user, status="approved")
-            .select_related("record")
-            .prefetch_related("record__clearances", "record__reviews")
-        )
-        from .serializers import queue_rows
-        office = ROLE_TO_OFFICE.get(request.user.role.name if request.user.role else "")
-        return Response(
-            queue_rows([r.record for r in reviews], viewer_office=office, request=request)
-        )
 
-    @action(detail=False, methods=["get"])
-    def declined(self, request):
-        """Returns records this user declined or rejected."""
-        reviews = (
-            Review.objects.filter(
-                reviewed_by=request.user, status__in=["declined", "rejected"]
+class MyReviewsView(APIView):
+    """
+    GET /reviews/mine/?tab=&outcome=&office=&cursor=  -- My Reviews (IR-268)
+
+    A reviewer's own seats plus their office's pool, one tab at a time, with
+    every tab's count (ADR-032 §9 and its 2026-10-08 Amendment). `office` is a
+    coordinator's view of their own office: anyone else naming one is refused
+    with 403. Any signed-in user may ask; someone with no review work gets
+    empty tabs.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from . import my_reviews
+
+        params = request.query_params
+        try:
+            payload = my_reviews.my_reviews(
+                request.user,
+                tab=params.get("tab"),
+                outcome=params.get("outcome"),
+                office=params.get("office"),
+                cursor=params.get("cursor"),
             )
-            .select_related("record")
-            .prefetch_related("record__clearances", "record__reviews")
-        )
-        from .serializers import queue_rows
-        office = ROLE_TO_OFFICE.get(request.user.role.name if request.user.role else "")
-        return Response(
-            queue_rows([r.record for r in reviews], viewer_office=office, request=request)
-        )
+        except my_reviews.MyReviewsRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except my_reviews.MyReviewsError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload)
 
 
 class RecordAuthPinViewSet(viewsets.GenericViewSet):

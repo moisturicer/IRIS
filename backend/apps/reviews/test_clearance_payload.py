@@ -1,10 +1,9 @@
 """The clearance payload, end to end (IR-139).
 
 `test_clearance_state.py` proves the rule. This proves the API actually says
-it -- that `preserved` reaches the client, that `resubmission{}` reports what
-survived, and that a review-queue row carries the office context which made
-"a KTTO reviewer and an IERC reviewer see byte-identical rows" the defect
-IR-143 describes.
+it -- that `preserved` reaches the client and that `resubmission{}` reports
+what survived. The review-queue rows these tests also covered were replaced by
+My Reviews (IR-268), whose rows are tested in `test_my_reviews.py`.
 
 Run:
     docker compose exec -T backend python manage.py test apps.reviews.test_clearance_payload
@@ -15,7 +14,6 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
 from apps.reviews.models import RecordClearance, Review
-from apps.reviews.serializers import queue_rows
 
 
 def make_user(email, role_name=None, **extra):
@@ -110,73 +108,6 @@ class ClearancePayloadTests(APITestCase):
         self.record.save(update_fields=["resubmission_count", "last_resubmitted_at"])
 
         self.assertIsNone(self._detail()["resubmission"]["declining_office"])
-
-
-class QueueRowContextTests(APITestCase):
-    """The rows an office sees -- IR-143's precondition."""
-
-    def setUp(self):
-        self.owner = make_user("owner-q139@cit.edu", "Student")
-        self.record = Record.objects.create(
-            title="Queue row record",
-            record_type=RecordType.objects.first(),
-            added_by=self.owner,
-            pipeline_status="parallel_review",
-        )
-        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
-        RecordClearance.objects.create(record=self.record, office="ierc", status="pending")
-        RecordClearance.objects.create(record=self.record, office="ktto", status="cleared")
-
-    def test_a_row_states_which_office_the_viewer_would_be_clearing_for(self):
-        """The fix for byte-identical rows: an IERC reviewer is told they are
-        recording IERC's clearance, not approving the record."""
-        row = queue_rows([self.record], viewer_office="ierc")[0]
-        self.assertEqual(row["your_office"], "ierc")
-        self.assertEqual(row["your_office_label"], "IERC")
-
-    def test_two_offices_get_different_rows_for_the_same_record(self):
-        """The defect IR-143 names, asserted directly."""
-        ierc = queue_rows([self.record], viewer_office="ierc")[0]
-        ktto = queue_rows([self.record], viewer_office="ktto")[0]
-        self.assertNotEqual(ierc["your_office"], ktto["your_office"])
-        self.assertNotEqual(ierc["peers"], ktto["peers"])
-
-    def test_peers_exclude_the_viewers_own_office(self):
-        peers = queue_rows([self.record], viewer_office="ierc")[0]["peers"]
-        self.assertEqual([p["office"] for p in peers], ["ktto"])
-        self.assertEqual(peers[0]["status_label"], "Cleared")
-
-    def test_peers_never_carry_a_peer_comment(self):
-        """A reviewer should see *that* a peer decided, not their reasoning --
-        reading it first is what makes parallel clearances stop being
-        independent."""
-        RecordClearance.objects.filter(record=self.record, office="ktto").update(
-            comment="KTTO's private reasoning"
-        )
-        for peer in queue_rows([self.record], viewer_office="ierc")[0]["peers"]:
-            self.assertNotIn("comment", peer)
-
-    def test_a_row_carries_stage_and_waiting_time(self):
-        row = queue_rows([self.record], viewer_office="ierc")[0]
-        self.assertEqual(row["stage"], "parallel_review")
-        self.assertEqual(row["stage_label"], "Parallel Office Review")
-        self.assertIsNotNone(row["waiting_since"])
-        self.assertGreaterEqual(row["waiting_days"], 0)
-
-    def test_a_resubmitted_record_is_marked_in_the_list(self):
-        self.record.resubmission_count = 2
-        self.record.last_resubmitted_at = timezone.now()
-        self.record.save(update_fields=["resubmission_count", "last_resubmitted_at"])
-
-        row = queue_rows([self.record], viewer_office="ierc")[0]
-        self.assertTrue(row["resubmitted"])
-        self.assertEqual(row["resubmission_count"], 2)
-
-    def test_an_unreviewed_record_waits_from_submission(self):
-        """With no decision yet there is no review to date the wait from, and
-        falling back to 'now' would report every fresh queue as instant."""
-        row = queue_rows([self.record], viewer_office="ierc")[0]
-        self.assertEqual(row["waiting_since"], self.record.created_at.isoformat())
 
 
 class ViewerOfficeTests(APITestCase):
