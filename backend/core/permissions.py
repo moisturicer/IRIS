@@ -252,6 +252,38 @@ def is_record_participant(user, record) -> bool:
     return ReviewerSeat.objects.filter(assignment__record=record, reviewer=user).exists()
 
 
+def may_read_review(user, record) -> bool:
+    """
+    May `user` read `record`'s review content -- who reviewed it and what they
+    wrote? (IR-479, ADR-032 §10 Amendment 2026-10-08)
+
+    Reviewer names and review comments are internal workflow data, so reading
+    the Record is not enough: an office member reads every record, and once a
+    record is published every signed-in user does. Access is by participation:
+
+    - `is_record_participant`: an owner, or anyone who has ever held a seat;
+    - or a member of a party holding an **active** assignment on the record
+      right now, its pool included -- someone about to claim, or a reviewer on
+      the legacy pipeline deciding straight from the pool, needs the history
+      before acting. The server twin of the frontend's `isParticipant`.
+
+    No role reads it everywhere, RDCO included; an audit is Django admin's.
+    Document requests keep their own, party-wide rule (`may_read_requests`,
+    ADR-022 §Amendment 5), which this deliberately does not replace.
+    """
+    from apps.reviews.models import RecordAssignment
+    from apps.reviews.tracker import staffable_parties
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if is_record_participant(user, record):
+        return True
+    staffable = staffable_parties(record, user)
+    return bool(staffable) and RecordAssignment.objects.filter(
+        record=record, party__in=staffable, state=AssignmentState.ACTIVE,
+    ).exists()
+
+
 class IsOwnerOrStaff(BasePermission):
     """
     Object-level: the user owns the record OR is a staff member.

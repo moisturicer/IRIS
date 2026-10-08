@@ -70,9 +70,13 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
   const requestByReview = new Map<number, TrackerResubmission>(
     tracker.resubmissions.map((r) => [r.review, r]),
   );
-  const reviewIds = new Set(tracker.reviews.map((r) => r.id));
+  // Null to a viewer who may not read the review (IR-479). The timeline is
+  // drawn for participants only, who always get them; listing none is the
+  // honest reading for anyone else, never an invented empty history.
+  const reviews = tracker.reviews ?? [];
+  const reviewIds = new Set(reviews.map((r) => r.id));
 
-  for (const r of tracker.reviews) {
+  for (const r of reviews) {
     const request = requestByReview.get(r.id);
     entries.push({
       key: `review-${r.id}`,

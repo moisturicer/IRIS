@@ -43,7 +43,7 @@ from core.enums import (
     TrackerPartyState,
     WorkflowState,
 )
-from core.permissions import REVIEWER_ROLES, get_role_name, is_record_participant
+from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 
 from .clearance_state import clearance_payload, resubmission_payload
 from .models import (
@@ -307,28 +307,39 @@ def _iso(value) -> Optional[str]:
     return value.isoformat() if value else None
 
 
-def current_holders(record, user, *, active_assignments: Optional[list] = None) -> list[dict]:
+def current_holders(
+    record, user, *, active_assignments: Optional[list] = None, readable: Optional[bool] = None,
+) -> list[dict]:
+    """
+    Who holds the record now. Who opened each assignment is a reviewer's name,
+    so it is `None` -- not disclosed -- to a viewer who may not read the review
+    (IR-479); which party holds it is not.
+    """
     active = active_assignments if active_assignments is not None else _active_assignments(record)
     staff = is_staff_viewer(user)
+    if readable is None:
+        readable = may_read_review(user, record)
     return [
         {
             "party": a.party,
             "label": party_label(a.party, staff_viewer=staff),
             "opened_at": _iso(a.opened_at),
-            "opened_by": _name(a.opened_by),
+            "opened_by": _name(a.opened_by) if readable else None,
         }
         for a in active
     ]
 
 
-def workflow_fields(record, user) -> dict[str, Any]:
+def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[str, Any]:
     """The workflow fields Record detail carries (IR-258, IR-262)."""
     active = _active_assignments(record)
     state = workflow_state(record, active_assignments=active)
     return {
         "workflow_state": state,
         "workflow_state_label": workflow_state_label(state),
-        "current_holders": current_holders(record, user, active_assignments=active),
+        "current_holders": current_holders(
+            record, user, active_assignments=active, readable=readable,
+        ),
         "can_act": can_act(record, user, active_assignments=active),
         "can_request_document": requestable_parties(record, user, active_assignments=active),
     }
@@ -486,14 +497,16 @@ def _party_rows(
             ),
             "at": _iso(at),
             "preserved": (
-                clearance_payload(clearance, last_resubmitted_at=record.last_resubmitted_at)["preserved"]
+                clearance_payload(
+                    clearance, last_resubmitted_at=record.last_resubmitted_at, readable=False,
+                )["preserved"]
                 if clearance is not None else False
             ),
         })
     return rows
 
 
-def _routing_history(record, *, staff: bool) -> list[dict]:
+def _routing_history(record, *, staff: bool, readable: bool) -> list[dict]:
     groups: dict[Any, dict] = {}
     for event in (
         RoutingEvent.objects.filter(record=record)
@@ -507,8 +520,10 @@ def _routing_history(record, *, staff: bool) -> list[dict]:
                 "from_label": party_label(event.from_party, staff_viewer=staff),
                 "to": [],
                 "to_labels": [],
-                "actor": _name(event.actor),
-                "reason": event.reason,
+                # Who routed it and why are review content (IR-479); where it
+                # went is not.
+                "actor": _name(event.actor) if readable else None,
+                "reason": event.reason if readable else None,
                 "at": _iso(event.created_at),
             }
         group["to"].append(event.to_party)
@@ -525,7 +540,12 @@ def _routing_recorded_from() -> Optional[str]:
     return _iso(applied)
 
 
-def _resubmissions(record, *, staff: bool) -> list[dict]:
+def _resubmissions(record, *, staff: bool, readable: bool) -> list[dict]:
+    """
+    Every resubmission request. Its reason and who asked for it, and who
+    closed it, are review content: `None` to a viewer who may not read the
+    review (IR-479). That one was asked, by which party, and when, is not.
+    """
     return [
         {
             "id": r.pk,
@@ -533,15 +553,15 @@ def _resubmissions(record, *, staff: bool) -> list[dict]:
             "label": party_label(r.party, staff_viewer=staff),
             "state": r.state,
             "state_label": r.get_state_display(),
-            "reason": r.reason,
+            "reason": r.reason if readable else None,
             # The `declined` review carrying this request, one of `reviews`:
             # the same act, which a timeline shows once (IR-412).
             "review": r.review_id,
-            "requested_by": _name(r.requested_by),
+            "requested_by": _name(r.requested_by) if readable else None,
             "created_at": _iso(r.created_at),
             "resolved_at": _iso(r.resolved_at),
             # Who resubmitted, or withdrew, and so closed it.
-            "resolved_by": _name(r.resolved_by),
+            "resolved_by": _name(r.resolved_by) if readable else None,
         }
         for r in ResubmissionRequest.objects.filter(record=record)
         .select_related("requested_by", "resolved_by").order_by("created_at", "pk")
@@ -557,6 +577,9 @@ def tracker_payload(record, user) -> dict[str, Any]:
     # Document requests are internal workflow data (IR-349). A viewer who may
     # not read them gets `null` -- not `[]`, which would claim there are none.
     disclose_requests = may_read_requests(record, user)
+    # Who reviewed, and what they wrote, is internal workflow data too: one
+    # rule, `may_read_review`, for every field below that carries it (IR-479).
+    readable = may_read_review(user, record)
     reviews = list(
         Review.objects.filter(record=record)
         .select_related("reviewed_by").order_by("created_at", "pk")
@@ -569,15 +592,16 @@ def tracker_payload(record, user) -> dict[str, Any]:
     payload = {
         "record_id": record.pk,
         "record_type": lifecycle.type_name_of(record) or None,
-        **workflow_fields(record, user),
+        **workflow_fields(record, user, readable=readable),
         "parties": _party_rows(
             record, reviews=reviews, clearances=clearances, staff=staff,
             disclose_requests=disclose_requests,
-            disclose_seats=is_record_participant(user, record),
+            disclose_seats=readable,
         ),
-        "routing_history": _routing_history(record, staff=staff),
+        "routing_history": _routing_history(record, staff=staff, readable=readable),
         "routing_recorded_from": _routing_recorded_from(),
-        "reviews": [
+        # `None`, not `[]`: there may be reviews this viewer is not told about.
+        "reviews": None if not readable else [
             {
                 "id": r.pk,
                 "party": _party_value(r.stage),
@@ -590,12 +614,12 @@ def tracker_payload(record, user) -> dict[str, Any]:
             }
             for r in reviews
         ],
-        "resubmissions": _resubmissions(record, staff=staff),
+        "resubmissions": _resubmissions(record, staff=staff, readable=readable),
         "document_requests": (
             serialize_requests(record, user, requests_for(record)) if disclose_requests else None
         ),
         "clearances": [
-            clearance_payload(c, last_resubmitted_at=record.last_resubmitted_at)
+            clearance_payload(c, last_resubmitted_at=record.last_resubmitted_at, readable=readable)
             for c in clearances
         ],
         "resubmission": resubmission_payload(

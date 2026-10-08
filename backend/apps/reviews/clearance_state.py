@@ -63,16 +63,26 @@ def declining_office(latest_decline_stage: Optional[str]) -> Optional[str]:
     return None
 
 
-def clearance_payload(clearance, *, last_resubmitted_at: Optional[datetime]) -> dict[str, Any]:
-    """One office's clearance, as the API states it."""
+def clearance_payload(
+    clearance, *, last_resubmitted_at: Optional[datetime], readable: bool,
+) -> dict[str, Any]:
+    """
+    One office's clearance, as the API states it.
+
+    `readable` is `core.permissions.may_read_review` for the viewer, and is
+    required so no caller can forget it: the comment and who signed are review
+    content, `None` -- not disclosed -- to anyone else; the outcome is not
+    (IR-479).
+    """
     return {
         "office": clearance.office,
         "office_label": clearance.get_office_display(),
         "status": clearance.status,
         "status_label": clearance.get_status_display(),
-        "comment": clearance.comment,
+        "comment": clearance.comment if readable else None,
         "reviewed_by_name": (
-            clearance.reviewed_by.get_full_name() if clearance.reviewed_by else None
+            clearance.reviewed_by.get_full_name()
+            if readable and clearance.reviewed_by else None
         ),
         "updated_at": clearance.updated_at.isoformat(),
         "preserved": is_preserved(

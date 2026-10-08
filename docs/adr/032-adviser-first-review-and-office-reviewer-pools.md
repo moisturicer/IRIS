@@ -27,6 +27,7 @@ Details are in the *Amendment* notes under §8 and §10. The original text is ke
 - **§4** settles how an office's result is formed when it is routed more than once: the latest completed review round wins.
 - **§4** settles that an office cannot finish while its own document request is open.
 - **§10** settles when RDCO reads "Not required", and who sees the names of an office's reviewers.
+- **§10 (IR-479, same day)** settles who reads review content at all: reviewer names and review comments are read by participants only.
 
 See the *Amendment* notes under §4 and §10.
 
@@ -311,9 +312,27 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 **Amendment, 2026-10-08 (project lead, IR-269): the strip, settled in a design grilling.**
 
 - **"Not required" applies whenever no specialist office has ever held the record.** That includes a Thesis still with its Adviser, because nothing waits on RDCO there. The row reads "Waiting" from the moment an office is routed to.
-- **Per-seat detail is shown to participants only** (`is_record_participant`: the owners, and anyone who has ever held a seat). Who is reviewing is review-discussion information (§7). Anyone else who can see the record sees the strip without names.
+- **Per-seat detail is shown to participants only** (`is_record_participant`: the owners, and anyone who has ever held a seat). Who is reviewing is review-discussion information (§7). Anyone else who can see the record sees the strip without names. *Widened by the IR-479 amendment below to `may_read_review`, which also admits a member of an office holding the record now.*
 - **An office reviewing again** shows its earlier outcome beside the new round, as in *"Cleared (earlier review) · reviewing again"* (§4 *Amendment*).
 - **Clear and Record finding share one capability, `office_review`,** and `add_reviewer` stays its own. The key was renamed from `record_finding` so that it does not grant a "Clear" it does not name.
+
+**Amendment, 2026-10-08 (project lead, IR-479): who reads review content.** Settled in a design grilling, after IR-269 found the gap.
+
+- **Reviewer names and review comments are internal workflow data.** Reading the record is not enough to read them: every office member reads every record, and every signed-in user reads a published one.
+- **One predicate decides it, `may_read_review(user, record)`.** It is true for:
+    - an owner;
+    - anyone who has ever held a seat on the record (`is_record_participant`);
+    - a member of an office whose assignment on the record is **active now**, its pool included. A reviewer needs the history before claiming, and on the legacy pipeline one decides straight from the pool.
+- **What it gates:**
+    - on record detail: `reviews`, and each clearance's comment and signer;
+    - on the tracker: `reviews`, the per-seat detail, each resubmission request's reason and who asked for it and who closed it, who routed the record and why, and who opened each current assignment.
+- **What everyone else gets:** each gated field is `null`, meaning not disclosed. Every outcome stays visible: where the record went, each party's state and result, and `workflow_state`.
+- **No role reads it everywhere, RDCO included.** An audit goes through Django admin, superuser only, the escape hatch the 2026-10-06 amendment above already uses.
+- **Document requests keep their own rule** (ADR-022 §Amendment 5, `may_read_requests`). That rule admits every member of any office that *ever* took part. The two differ on purpose:
+    - an office's request to the author is its office's ongoing business;
+    - one reviewer's candid comment is not the business of every colleague who later joins.
+    
+    Aligning them would reopen ADR-022, so it was not done here.
 
 ### 11. Lifecycle
 
