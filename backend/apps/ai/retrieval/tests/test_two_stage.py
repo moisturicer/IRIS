@@ -245,6 +245,30 @@ class ScanDepthTests:
             cursor.execute("SET LOCAL enable_seqscan = off")
             cursor.execute("SET LOCAL enable_sort = off")
 
+    @pytest.mark.xfail(
+        reason=(
+            "IR-469: assertion is non-deterministic in CI (seen 40, 45, 45, "
+            "50 across four unrelated PRs/main, each resolved by a rerun "
+            "with no apps/ai change). Not reproduced locally after: full "
+            "apps/ai suite run 3x in a row before this test; direct noise "
+            "injection into the shared chunk_embedding table up to 50k rows "
+            "(random text, text sharing the 'passage' token, and rows with "
+            "the exact same token-count tie structure as the 60 target "
+            "chunks), both committed and rolled back; 15 fresh-process "
+            "repeats of this test alone. A sibling test in this area "
+            "(IR-470, test_index_health.py) flaked the same way on a "
+            "20-vector table with well-separated random embeddings -- no "
+            "ties, no shared table -- which weighs against the tie/shared-"
+            "index theories above and toward either CI-runner-specific HNSW "
+            "variance or the unpinned `pgvector/pgvector:pg16` CI image "
+            "tag. `scan_depth()` not restoring `hnsw.ef_search` afterward "
+            "(fixed in this same change, see scan_depth.py) is a real but "
+            "unverified-as-root-cause defect: it could not leak across "
+            "tests, only within one, and no test here calls retrieve() "
+            "twice at different depths."
+        ),
+        strict=False,
+    )
     def test_a_limit_above_forty_is_reached(
         self, embedder, space, reader, index_is_used, settings
     ):

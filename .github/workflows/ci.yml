@@ -37,9 +37,15 @@ jobs:
     # running. A gate that cannot fail is not a gate (IR-165).
     # pgvector/pgvector rather than plain postgres: apps/ai migrations create a
     # VectorField and need the extension available.
+    #
+    # Pinned by digest (IR-469): `pg16` is a mutable tag, so two CI runs days
+    # apart can silently pull different pgvector builds with different HNSW
+    # behaviour -- raised, not ruled out, while investigating that ticket's
+    # flaky scan-depth recall. 0.8.7 on Postgres 16.15, current as of
+    # 2026-10-08. Bump deliberately, not by the tag moving under us.
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        image: pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
         env:
           POSTGRES_DB: iris
           POSTGRES_USER: iris
