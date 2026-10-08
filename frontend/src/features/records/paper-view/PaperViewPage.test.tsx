@@ -101,6 +101,7 @@ const record: RecordDetail = {
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
+  office_review: { party: null, label: null, blocked: null, assignment: null },
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -153,6 +154,7 @@ const approvedProposal: RecordDetail = {
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
+  office_review: { party: null, label: null, blocked: null, assignment: null },
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -375,6 +377,7 @@ const inReview: RecordDetail = {
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
+  office_review: { party: null, label: null, blocked: null, assignment: null },
 };
 
 async function waitForRecord(title: string) {

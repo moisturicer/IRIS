@@ -22,6 +22,14 @@ Details are in the *Amendment* notes under §8 and §10. The original text is ke
 
 **Amended 2026-10-06 (project lead, IR-411): §10 gains two capabilities**, `continue_draft` and `attach_file`. See the *Amendment* note under §10.
 
+**Amended 2026-10-08 (project lead, IR-269): §4 and §10.**
+
+- **§4** settles how an office's result is formed when it is routed more than once: the latest completed review round wins.
+- **§4** settles that an office cannot finish while its own document request is open.
+- **§10** settles when RDCO reads "Not required", and who sees the names of an office's reviewers.
+
+See the *Amendment* notes under §4 and §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -165,6 +173,17 @@ NEW  ReviewerSeat   assignment (FK RecordAssignment), reviewer (FK User),
 
 Nothing routes to `adviser` or `rdco`. Routing to an office that already has an active assignment opens nothing new. With a nomination, it adds a seat. **An existing `cleared` clearance is never reset by routing** (ADR-021 §6, kept).
 
+**Amendment, 2026-10-08 (project lead, IR-269): an office's result, and when it may finish.** Settled in a design grilling.
+
+- **A review round** is one office's assignment, from routing until it completes. An office routed the same record again starts a new round.
+- **The latest completed round wins, in both directions.** While a new round runs, the earlier `cleared` or `not_cleared` stands, and routing never resets it. When the round completes, its outcome replaces the clearance: `not_cleared` if any seat in *that* round recorded a finding, `cleared` otherwise.
+    - *Rejected:* making a first clearance permanent. A finding from a second look would then never reach RDCO.
+    - *Rejected:* refusing to route to an office that already finished. That contradicts the routing graph above.
+- **The clearance row records the office's outcome only.** Each seat's verdict, and its reason, is that seat's own `Review`.
+- **An office cannot finish while its own `DocumentRequest` is open.** Both Clear and Record finding are refused until that office withdraws the request or it is settled. A record must never read "awaiting document" after the office that asked has finished. This narrows the completion rule above; it adds no state.
+- **Clear and Record finding need an opened seat.** A seat still `assigned` is refused, so `opened_at` is always set for time-on-task.
+- **The hand-back (§3) fires whenever the last specialist office completes.** That includes completion by a coordinator withdrawing the last unfinished seat. If RDCO already holds the record, nothing new opens. An office whose seats were *all* withdrawn has not completed: it returns to its pool.
+
 ### 5. Versions
 
 ```
@@ -288,6 +307,13 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 - **Out of scope:** KTTO filing on a published record (for example a patent receipt). If needed, it becomes its own capability.
 
 **The party status strip** follows ADR-021 §14, with two changes. The Intake row is gone. The RDCO row reads **"Not required"** on a record no office was routed to, instead of "awaiting".
+
+**Amendment, 2026-10-08 (project lead, IR-269): the strip, settled in a design grilling.**
+
+- **"Not required" applies whenever no specialist office has ever held the record.** That includes a Thesis still with its Adviser, because nothing waits on RDCO there. The row reads "Waiting" from the moment an office is routed to.
+- **Per-seat detail is shown to participants only** (`is_record_participant`: the owners, and anyone who has ever held a seat). Who is reviewing is review-discussion information (§7). Anyone else who can see the record sees the strip without names.
+- **An office reviewing again** shows its earlier outcome beside the new round, as in *"Cleared (earlier review) · reviewing again"* (§4 *Amendment*).
+- **Clear and Record finding share one capability, `office_review`,** and `add_reviewer` stays its own. The key was renamed from `record_finding` so that it does not grant a "Clear" it does not name.
 
 ### 11. Lifecycle
 

@@ -72,6 +72,7 @@ const base: RecordDetail = {
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
+  office_review: { party: null, label: null, blocked: null, assignment: null },
 };
 
 /** The student-facing holder labels the API serves (ADR-021 §2). */

@@ -27,6 +27,8 @@ const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted
   withdrawn:     { glyph: "–", tone: "text-stone-500",   muted: true },
   awaiting:      { glyph: "○", tone: "text-stone-500",   muted: true },
   not_requested: { glyph: "○", tone: "text-stone-500",   muted: true },
+  // RDCO on a record no office has held: nothing waits on it (IR-269).
+  not_required:  { glyph: "—", tone: "text-stone-500",   muted: true },
 };
 
 /** Outcome colour. Exhaustive, so an unstyled outcome fails `tsc`. */
@@ -214,8 +216,18 @@ function TrackerBody({ data }: { data: RecordTracker }) {
  */
 const AWAITING_DOCUMENT_META = { glyph: "◐", tone: "text-brand", muted: false };
 
+/**
+ * ui-ux/16's ◌: an active office whose pool nobody has claimed yet (ADR-032
+ * §4). Overrides the glyph only.
+ */
+const IN_POOL_META = { glyph: "◌", tone: "text-brand", muted: false };
+
 function PartyRow({ row }: { row: TrackerPartyRow }) {
-  const meta = row.awaiting_document ? AWAITING_DOCUMENT_META : STATE_META[row.state];
+  const meta = row.awaiting_document
+    ? AWAITING_DOCUMENT_META
+    : row.in_pool
+      ? IN_POOL_META
+      : STATE_META[row.state];
   // An outcome is shown once there is one. "Pending" is not a conclusion.
   const outcome = row.outcome && row.outcome !== "pending" ? row.outcome : null;
 
@@ -244,6 +256,7 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
               · {row.outcome_label}
             </span>
           )}
+          {row.in_pool && <span className="font-semibold text-brand">· Unassigned</span>}
           {row.awaiting_document && (
             <span className="font-semibold text-brand">· Awaiting document</span>
           )}
@@ -257,6 +270,29 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
             </span>
           )}
         </span>
+        {/* Who is reviewing, per seat: participants only, so `seats` is null
+            for anyone else and nothing is drawn (ADR-032 §10, IR-269). Always
+            shown rather than on hover, so touch and keyboard read it too. */}
+        {row.seats && row.seats.length > 0 && (
+          <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-0.5 text-2xs text-stone-600">
+            {row.seats.map((seat, i) => (
+              <li key={i}>
+                {seat.reviewer_name ?? "A reviewer"} — {seat.state_label.toLowerCase()}
+                {seat.verdict_label && (
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      seat.verdict === "negative_finding" ? "text-brand" : "text-stone-900",
+                    )}
+                  >
+                    {" "}
+                    · {seat.verdict_label}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </td>
       <td className="py-1.5 text-right text-2xs text-stone-500 whitespace-nowrap">
         {row.at ? formatDate(row.at, "MMM d") : ""}

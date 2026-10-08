@@ -39,6 +39,8 @@ export type Capability =
   | "request_revision"
   | "route"
   | "accept_route"
+  | "office_review"
+  | "add_reviewer"
   | "decide"
   | "create_version"
   | "edit_details"
@@ -67,6 +69,7 @@ type CapabilityInputs = Pick<
   | "my_seats"
   | "is_participant"
   | "routing"
+  | "office_review"
   | "workflow_state"
   | "pipeline_status"
   | "abstract_file"
@@ -132,6 +135,13 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
   // Routing (ADR-032 §4, IR-261): the server's own flags, never derived here.
   if (record.routing.accept_and_route) granted.add("accept_route");
   if (record.routing.route_as != null) granted.add("route");
+  // An office reviewer (ADR-032 §3-§4, IR-269), from the server's flag: one
+  // capability for *Clear* and *Record finding*, which share every rule
+  // (ADR-032 §10 Amendment, 2026-10-08), and *Add reviewer* from the same seat.
+  if (record.office_review.party != null) {
+    granted.add("office_review");
+    granted.add("add_reviewer");
+  }
   if (record.can_request_document.length > 0) granted.add("request_document");
 
   if (isOwner(record, viewer)) {

@@ -31,6 +31,7 @@ from apps.records import lifecycle
 from core.enums import (
     ASSIGNABLE_PARTIES,
     AssignmentState,
+    ClearanceStatus,
     DocumentRequestState,
     Office,
     Party,
@@ -38,14 +39,15 @@ from core.enums import (
     ResubmissionRequestState,
     ReviewDecision,
     RoleName,
+    SeatState,
     TrackerPartyState,
     WorkflowState,
 )
-from core.permissions import REVIEWER_ROLES, get_role_name
+from core.permissions import REVIEWER_ROLES, get_role_name, is_record_participant
 
 from .clearance_state import clearance_payload, resubmission_payload
 from .models import (
-    RecordAssignment, RecordClearance, ResubmissionRequest, Review, RoutingEvent,
+    RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
 )
 from .shadow import party_for_stage
 
@@ -334,12 +336,49 @@ def workflow_fields(record, user) -> dict[str, Any]:
 
 # --- the tracker --------------------------------------------------------------
 
+def _seat_rows(assignment, reviews: list) -> list[dict]:
+    """
+    Who is reviewing for `assignment`'s party, and how far each has got
+    (ui-ux/16: *Maria Reyes -- reviewing · Juan Santos -- done*). Withdrawn
+    seats are left out; a finished seat carries its own verdict.
+    """
+    verdicts = {
+        r.reviewed_by_id: r for r in reviews if r.assignment_id == assignment.pk
+    }  # oldest first, so a later verdict by the same reviewer wins
+    clearing = assignment.party in _CLEARING_OFFICES
+    rows = []
+    for seat in (
+        ReviewerSeat.objects.filter(assignment=assignment)
+        .exclude(state=SeatState.WITHDRAWN)
+        .select_related("reviewer").order_by("assigned_at", "pk")
+    ):
+        verdict = verdicts.get(seat.reviewer_id) if seat.state == SeatState.DONE else None
+        verdict_label = verdict.get_status_display() if verdict else None
+        if verdict and clearing and verdict.status == ReviewDecision.APPROVED:
+            # An office clears its own question; it does not approve the record.
+            verdict_label = str(ClearanceStatus.CLEARED.label)
+        rows.append({
+            "reviewer_name": _name(seat.reviewer),
+            "state": seat.state,
+            "state_label": seat.get_state_display(),
+            "verdict": verdict.status if verdict else None,
+            "verdict_label": verdict_label,
+        })
+    return rows
+
+
 def _party_rows(
     record, *, reviews: list, clearances: list, staff: bool, disclose_requests: bool,
+    disclose_seats: bool = False,
 ) -> list[dict]:
     assignments: dict[str, RecordAssignment] = {}
     for a in RecordAssignment.objects.filter(record=record).order_by("opened_at", "pk"):
         assignments[a.party] = a  # last one wins: the party's latest turn
+    # The adviser-first model's rule for the RDCO row applies while a record
+    # is on it (stored `in_review`, IR-261). A decided record says nothing
+    # about which model reviewed it until IR-260 migrates the legacy ones.
+    new_model = record.pipeline_status == PipelineStatus.IN_REVIEW
+    specialist_ever = any(party in _CLEARING_OFFICES for party in assignments)
 
     latest_review: dict[str, Review] = {}
     for r in reviews:  # oldest first, so the last write is the latest
@@ -360,7 +399,16 @@ def _party_rows(
         review = latest_review.get(party)
         clearance = clearance_by_office.get(party) if party in _CLEARING_OFFICES else None
 
-        if assignment is None:
+        if assignment is None and party == Party.RDCO and new_model:
+            # ADR-032 §10 (amended 2026-10-08, IR-269): RDCO enters only by
+            # the hand-back, so it is awaited only once a specialist office
+            # has held the record, and "not required" until then.
+            state = (
+                TrackerPartyState.AWAITING if specialist_ever
+                else TrackerPartyState.NOT_REQUIRED
+            )
+            at = None
+        elif assignment is None:
             # RDCO always decides a Thesis/Research or Project, so it is
             # awaited there, never "not requested"; on a Proposal, which the
             # Adviser may decide alone, it is not requested until routed to
@@ -381,10 +429,19 @@ def _party_rows(
         # An outcome belongs to a party that was actually asked. A party with
         # no assignment shows none, even if an old clearance row exists (§8.2:
         # "never requested" means no assignment at all).
+        earlier = False
         if assignment is None:
             outcome = outcome_label = None
         elif clearance is not None:
             outcome, outcome_label = clearance.status, clearance.get_status_display()
+            # An office routed again keeps its earlier outcome until the new
+            # review round completes (ADR-032 §4 Amendment, 2026-10-08).
+            earlier = (
+                new_model and state is TrackerPartyState.ACTIVE
+                and clearance.status in (ClearanceStatus.CLEARED, ClearanceStatus.NOT_CLEARED)
+            )
+            if earlier:
+                outcome_label = f"{outcome_label} (earlier review) · reviewing again"
         elif review is not None:
             outcome, outcome_label = review.status, review.get_status_display()
         else:
@@ -410,6 +467,23 @@ def _party_rows(
             ),
             "outcome": outcome,
             "outcome_label": outcome_label,
+            # The outcome is an earlier review round's, standing while a new
+            # one runs (IR-269).
+            "outcome_earlier": earlier,
+            # ◌ on the strip: an active office nobody there is reviewing yet.
+            # New model only: the legacy pipeline decides from the pool
+            # without seating anyone, so "unassigned" would be false there.
+            "in_pool": (
+                new_model and state is TrackerPartyState.ACTIVE and assignment is not None
+                and not assignment.seats.exclude(state=SeatState.WITHDRAWN).exists()
+            ),
+            # Who is reviewing, per seat. Names are review-discussion
+            # information, so `None` -- not disclosed -- to a viewer who does
+            # not take part (ADR-032 §10 Amendment, 2026-10-08).
+            "seats": (
+                _seat_rows(assignment, reviews)
+                if disclose_seats and assignment is not None else None
+            ),
             "at": _iso(at),
             "preserved": (
                 clearance_payload(clearance, last_resubmitted_at=record.last_resubmitted_at)["preserved"]
@@ -499,6 +573,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
         "parties": _party_rows(
             record, reviews=reviews, clearances=clearances, staff=staff,
             disclose_requests=disclose_requests,
+            disclose_seats=is_record_participant(user, record),
         ),
         "routing_history": _routing_history(record, staff=staff),
         "routing_recorded_from": _routing_recorded_from(),

@@ -36,6 +36,7 @@ function row(
     withdrawn: "Withdrawn",
     not_requested: "Not requested",
     awaiting: "Awaiting",
+    not_required: "Not required",
   } as const;
   return {
     party,
@@ -45,9 +46,12 @@ function row(
     started: false,
     outcome: null,
     outcome_label: null,
-    at: state === "not_requested" || state === "awaiting" ? null : "2026-09-18T02:00:00Z",
+    at: state === "not_requested" || state === "awaiting" || state === "not_required" ? null : "2026-09-18T02:00:00Z",
     preserved: false,
     awaiting_document: false,
+    outcome_earlier: false,
+    in_pool: false,
+    seats: null,
     ...extra,
   };
 }
@@ -219,6 +223,56 @@ describe("ReviewRoutingTracker", () => {
     expect(ierc).not.toHaveTextContent(/preserved/i);
 
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("on the new model: RDCO not required, a pool unassigned, and who reviews per seat (IR-269)", async () => {
+    tracker.mockResolvedValue({
+      data: payload({
+        workflow_state: "in_review",
+        workflow_state_label: "In review",
+        parties: [
+          row("intake", "Intake", "not_requested"),
+          row("adviser", "Adviser", "completed", { outcome: "approved", outcome_label: "Approved" }),
+          row("itso", "ITSO", "active", {
+            outcome: "cleared",
+            outcome_label: "Cleared (earlier review) · reviewing again",
+            outcome_earlier: true,
+            seats: [
+              { reviewer_name: "Maria Reyes", state: "in_review", state_label: "In review", verdict: null, verdict_label: null },
+              { reviewer_name: "Juan Santos", state: "done", state_label: "Done", verdict: "negative_finding", verdict_label: "Negative finding" },
+            ],
+          }),
+          row("ierc", "IERC", "active", { outcome: "pending", outcome_label: "Pending", in_pool: true, seats: [] }),
+          row("ktto", "KTTO", "not_requested"),
+          row("rdco", "RDCO", "not_required"),
+        ],
+      }),
+    });
+    const { container } = renderTracker();
+
+    const itso = await partyRow(/^itso/i);
+    expect(itso).toHaveTextContent("Cleared (earlier review) · reviewing again");
+    const reviewing = within(itso).getByRole("list", { name: "Reviewing for ITSO" });
+    expect(within(reviewing).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "Maria Reyes — in review",
+      "Juan Santos — done · Negative finding",
+    ]);
+    expect(await partyRow(/^ierc/i)).toHaveTextContent(/unassigned/i);
+    expect(await partyRow(/^rdco/i)).toHaveTextContent("Not required");
+
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("names no reviewer to a viewer who takes no part in the review", async () => {
+    tracker.mockResolvedValue({
+      data: payload({
+        parties: [row("itso", "ITSO", "active", { seats: null })],
+      }),
+    });
+    renderTracker();
+
+    const itso = await partyRow(/^itso/i);
+    expect(within(itso).queryByRole("list")).not.toBeInTheDocument();
   });
 
   it("groups one routing decision to several parties into one line", async () => {

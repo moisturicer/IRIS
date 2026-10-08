@@ -117,7 +117,7 @@ Each entry carries its version tag. The comment box is at the bottom, as on GitH
 |---|---|
 | Adviser on a **Proposal** | **Request revision** (`request_revision`) · **Reject** (`decide_proposal`) · **Accept** (`decide_proposal`) · Request document |
 | Adviser on a **Thesis / Project** | Request revision · Reject · **Accept & publish** (`accept_publish`) · **Accept & route…** (`accept_route`) · Request document |
-| ITSO / IERC / KTTO | **Clear** · **Record finding** (`record_finding`) · Request revision · Request document · **Add reviewer** (`add_reviewer`) · **Route to office…** (`route`) |
+| ITSO / IERC / KTTO | **Clear** · **Record finding** (both `office_review`; ADR-032 §10 *Amendment* 2026-10-08) · Request revision · Request document · **Add reviewer** (`add_reviewer`) · **Route to office…** (`route`) |
 | RDCO | Request revision · Reject · **Accept & publish** · **Accept, keep unlisted** (`final_decide`) · Route to office… · Request document |
 
 **Destructive or terminal actions** (Reject, both Accept & publish) open `ConfirmDialog` and state the consequence:

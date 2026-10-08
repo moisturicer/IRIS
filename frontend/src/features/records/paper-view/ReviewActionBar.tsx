@@ -64,6 +64,16 @@ export function ReviewActionBar({
   ];
   if (ordered.length === 0 && !secondary) return null;
 
+  // Two actions may share a capability and a reason (*Clear* and *Record
+  // finding*, IR-269). Adjacent actions blocked for the same reason state it
+  // once, after the last of them, and each names that one sentence.
+  const blockedOf = ordered.map((a) => a.blockedReason?.(record) ?? null);
+  const reasonAt = (i: number) => {
+    let last = i;
+    while (last + 1 < ordered.length && blockedOf[last + 1] === blockedOf[i]) last += 1;
+    return last;
+  };
+
   const done = (message: string) => {
     setOpenDialog(null);
     setConfirming(null);
@@ -108,10 +118,10 @@ export function ReviewActionBar({
           className="flex flex-wrap items-center gap-2"
         >
           {ordered.map((action, i) => {
-            const blocked = action.blockedReason?.(record) ?? null;
-            const reasonId = `${ids}-blocked-${i}`;
+            const blocked = blockedOf[i];
+            const reasonId = `${ids}-blocked-${reasonAt(i)}`;
             return (
-              <span key={action.capability} className="contents">
+              <span key={action.label} className="contents">
                 <button
                   type="button"
                   disabled={blocked != null}
@@ -129,7 +139,7 @@ export function ReviewActionBar({
                   <i className={cn("fas text-2xs", action.icon)} aria-hidden />
                   {action.label}
                 </button>
-                {blocked && (
+                {blocked && reasonAt(i) === i && (
                   <span id={reasonId} className="basis-full text-2xs text-stone-600">
                     {blocked}
                   </span>

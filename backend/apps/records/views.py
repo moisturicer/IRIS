@@ -552,6 +552,36 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         return self._routing_response(request, routing.route)
 
+    @action(detail=True, methods=["post"], url_path="office-review")
+    def office_review(self, request, pk=None):
+        """
+        POST /records/<id>/office-review/
+        `{"outcome": "cleared" | "finding", "comment": str}`
+
+        An ITSO, IERC or KTTO seat holder clears the record, or records a
+        finding, which needs a comment (ADR-032 §3-§4, IR-269). Their seat is
+        done; when it was their office's last, the office's clearance settles
+        and, once no office is still reviewing, RDCO's pool opens. Answers
+        with the tracker. 404 for a record the caller cannot see, 403 for a
+        caller seated for no office here, 400 for what cannot be done now.
+        """
+        from apps.reviews import office_review
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            office_review.record_office_review(
+                record, request.user,
+                outcome=request.data.get("outcome"),
+                comment=request.data.get("comment", ""),
+            )
+        except office_review.OfficeReviewRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except office_review.OfficeReviewError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
+
     @action(detail=True, methods=["get"], url_path="route-options")
     def route_options(self, request, pk=None):
         """

@@ -17,7 +17,9 @@ seat in one of five ways (`SeatSource`):
 **The office completion rule** (§4) is `office_complete()`: at least one seat,
 every seat not withdrawn is `done`, and the party has no open resubmission
 request. `complete_seat()` is how a reviewer's part ends; IR-269 calls it when
-a seat holder clears or records a finding.
+a seat holder clears or records a finding. When an assignment completes,
+`office_review.office_completed()` settles a specialist office's clearance and
+hands back to RDCO.
 
 **Two pipelines, one table.** Until IR-260, the legacy pipeline is still
 authoritative and `shadow.sync()` decides when an assignment opens and closes.
@@ -157,6 +159,12 @@ def _close_if_complete(assignment, actor) -> bool:
     assignment.closed_by = actor
     assignment.closed_at = timezone.now()
     assignment.save(update_fields=["state", "closed_by", "closed_at"])
+    # A specialist office's clearance, the RDCO hand-back and their
+    # notifications (IR-269). Here rather than in the caller, so a verdict and
+    # a coordinator's withdrawal complete an office the same way.
+    from .office_review import office_completed
+
+    office_completed(assignment, actor)
     return True
 
 
@@ -219,6 +227,38 @@ def add_reviewer(assignment, holder, reviewer) -> ReviewerSeat:
             f"Only a reviewer seated for {_label(assignment.party)} may add a colleague."
         )
     return _seat(assignment, reviewer, source=SeatSource.ADDED, by=holder)
+
+
+def add_reviewer_options(assignment, holder) -> dict:
+    """
+    Who `holder` may add to `assignment` (IR-269): every active member of the
+    office, marked `seated` when they already hold a live seat on it. Refused
+    as `add_reviewer` is: the office must be one, the holder seated on it.
+    """
+    from django.contrib.auth import get_user_model
+
+    if str(assignment.party) not in OFFICE_PARTIES:
+        raise SeatError(
+            f"{_label(assignment.party)} is not an office, so there is nobody to add."
+        )
+    if not holds_seat(holder, assignment.record, assignment.party):
+        raise SeatRefused(
+            f"Only a reviewer seated for {_label(assignment.party)} may add a colleague."
+        )
+    roles = [role for role, party in OFFICE_PARTY_BY_ROLE.items() if str(party) == str(assignment.party)]
+    seated = set(_live_seats(assignment).values_list("reviewer_id", flat=True))
+    members = get_user_model().objects.filter(
+        is_active=True, role__name__in=roles,
+    ).order_by("last_name", "first_name", "pk")
+    return {
+        "assignment": assignment.pk,
+        "party": str(assignment.party),
+        "party_label": _label(assignment.party),
+        "members": [
+            {"id": u.pk, "name": u.get_full_name() or f"Member #{u.pk}", "seated": u.pk in seated}
+            for u in members
+        ],
+    }
 
 
 @transaction.atomic

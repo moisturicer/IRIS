@@ -615,6 +615,79 @@ def notify_routed(
         pass
 
 
+def notify_office_completed(
+    record, *, actor, office_label, outcome_label, handed_back, rdco_holding, rdco_holders,
+):
+    """
+    A specialist office finished its review round (ADR-032 §3-§4, IR-269).
+
+    - The owners hear the office's outcome. A single reviewer's verdict is
+      not announced: it shows on the record, and the office's outcome is the
+      fact the author can act on.
+    - On the hand-back, every RDCO member hears, in-app and by email: RDCO's
+      pool is shared work, as an office pool is in `notify_routed`. The owners
+      hear that the record is with RDCO.
+    - When RDCO already holds the record -- it routed it back for another
+      look -- RDCO's seat holders hear that the office finished, or the whole
+      office when nobody there is seated yet.
+    """
+    try:
+        notif_type = NotificationType.objects.get_or_create(name="Office Review Complete")[0]
+        url = _record_url(record)
+        title = record.title
+        owners = [o.user for o in record.owners.select_related("user").all()]
+
+        message = f'{office_label} finished its review of "{title}": {outcome_label}.'
+        if handed_back:
+            message += " It is now with RDCO for its final decision."
+        for owner in owners:
+            Notification.objects.create(
+                sender=actor, recipient=owner, record=record,
+                notif_type=notif_type, message=message,
+            )
+
+        rdco_message = None
+        if handed_back:
+            rdco_message = (
+                f'Every office has finished reviewing "{title}". It is in RDCO\'s '
+                f"pool for its final decision until someone claims it."
+            )
+        elif rdco_holding:
+            rdco_message = f'{office_label} finished its review of "{title}": {outcome_label}.'
+        if rdco_message is None:
+            return
+
+        if rdco_holding and rdco_holders:
+            for holder in rdco_holders:
+                Notification.objects.create(
+                    sender=actor, recipient=holder, record=record,
+                    notif_type=notif_type, message=rdco_message,
+                )
+            emails = [u.email for u in rdco_holders if u.email]
+        else:
+            role = _role_for_party(Party.RDCO)
+            if role is None:
+                return
+            Notification.objects.create(
+                sender=actor, broadcast_to_role=role, record=record,
+                notif_type=notif_type, message=rdco_message,
+            )
+            from apps.accounts.models import User as UserModel
+
+            emails = list(
+                UserModel.objects.filter(role=role, is_active=True).values_list("email", flat=True)
+            )
+        if emails:
+            send_email_async(
+                subject=f"[IRIS] For final review: {title[:60]}" if handed_back
+                else f"[IRIS] {office_label} finished: {title[:60]}",
+                message=f"Hello,\n\n{rdco_message}\n\n{url}\n\n-- The IRIS Team",
+                recipient_list=emails,
+            )
+    except Exception:
+        pass
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).

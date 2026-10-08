@@ -5,7 +5,7 @@
  * **Adding an action is adding an entry to `REVIEW_ACTIONS`**, and nothing
  * else: the bar (`ReviewActionBar`) renders one button per entry whose
  * capability the adapter grants, so an entry the viewer was not granted is
- * never shown. Route (IR-261), finding (IR-269), accept & publish (IR-270),
+ * never shown. Route (IR-261), clear and finding (IR-269), accept & publish (IR-270),
  * the Proposal decision (IR-271) and revision against a version (IR-272) each
  * add one here, with their own dialog; their held frontend criteria are met
  * in this bar, not on a separate screen.
@@ -31,6 +31,8 @@ import { RequestDocumentDialog } from "@/features/document-requests/RequestDocum
 import type { Capability } from "@/features/records/capabilities";
 import type { RecordDetail } from "@/types/records";
 
+import { AddReviewerDialog } from "./AddReviewerDialog";
+import { OfficeReviewDialog } from "./OfficeReviewDialog";
 import { RouteDialog } from "./RouteDialog";
 
 export interface ReviewActionDialogProps {
@@ -115,10 +117,38 @@ function RouteAction({ record, onClose, onDone }: ReviewActionDialogProps) {
   );
 }
 
+/** An office seat holder clears: their part of the office's review ends (ADR-032 §4, IR-269). */
+function ClearAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return <OfficeReviewDialog record={record} outcome="cleared" onClose={onClose} onDone={onDone} />;
+}
+
+/** An office seat holder records a finding, with its reason. Never a rejection (ADR-032 §3). */
+function RecordFindingAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return <OfficeReviewDialog record={record} outcome="finding" onClose={onClose} onDone={onDone} />;
+}
+
+/** A seat holder brings in a colleague from their own office (ADR-032 §4). */
+function AddReviewerAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  const assignment = record.office_review.assignment;
+  if (assignment == null) return null;
+  return (
+    <AddReviewerDialog
+      assignmentId={assignment}
+      onClose={onClose}
+      onAdded={(name, office) => onDone(`${name} is now reviewing for ${office}.`)}
+    />
+  );
+}
+
+/** Why the office reviewer cannot clear or record a finding yet, from the server. */
+const officeReviewBlocked = (record: RecordDetail) => record.office_review.blocked;
+
 /**
  * Order matters: the bar fills its first granted action. The Adviser's primary
- * is *Accept & route*; an office's stays *Request documents*, with *Route to
- * office* beside it.
+ * is *Accept & route*; an office reviewer's is *Clear*, with *Record finding*
+ * beside it (ui-ux/16's order), then *Request documents*, *Add reviewer* and
+ * *Route to office*. *Clear* and *Record finding* share one capability,
+ * `office_review` (ADR-032 §10 Amendment, 2026-10-08).
  */
 export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   {
@@ -130,10 +160,33 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   },
   {
     kind: "dialog",
+    capability: "office_review",
+    label: "Clear…",
+    icon: "fa-circle-check",
+    blockedReason: officeReviewBlocked,
+    Dialog: ClearAction,
+  },
+  {
+    kind: "dialog",
+    capability: "office_review",
+    label: "Record finding…",
+    icon: "fa-flag",
+    blockedReason: officeReviewBlocked,
+    Dialog: RecordFindingAction,
+  },
+  {
+    kind: "dialog",
     capability: "request_document",
     label: "Request documents",
     icon: "fa-file-circle-plus",
     Dialog: RequestDocumentAction,
+  },
+  {
+    kind: "dialog",
+    capability: "add_reviewer",
+    label: "Add reviewer…",
+    icon: "fa-user-plus",
+    Dialog: AddReviewerAction,
   },
   {
     kind: "dialog",

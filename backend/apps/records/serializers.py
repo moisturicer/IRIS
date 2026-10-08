@@ -81,6 +81,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # `{accept_and_route: bool, route_as: party | null}`. A rendering hint;
     # the routing endpoints re-check both.
     routing              = serializers.SerializerMethodField()
+    # What the action bar may offer an office reviewer (IR-269): `{party,
+    # label, blocked, assignment}` -- the office the viewer may clear or
+    # record a finding as, why not yet, and its assignment for *Add reviewer*.
+    # A rendering hint; `office-review/` and `add-reviewer/` re-check it.
+    office_review        = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -127,6 +132,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         from apps.reviews.routing import routing_flags
 
         return routing_flags(obj, self._viewer())
+
+    def get_office_review(self, obj):
+        from apps.reviews.office_review import office_review_flags
+
+        return office_review_flags(obj, self._viewer())
 
     def get_reviews(self, obj):
         from apps.reviews.models import Review
@@ -258,6 +268,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "your_office", "your_office_label",
             "workflow_state", "workflow_state_label", "current_holders", "can_act",
             "can_request_document", "my_seats", "is_participant", "routing",
+            "office_review",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

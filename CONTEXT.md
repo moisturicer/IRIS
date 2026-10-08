@@ -67,3 +67,37 @@ _Avoid_: Consent alone (ambiguous next to the DPA acceptance the disclosure gate
 **Novelty check**:
 Comparing a newly submitted Proposal against work the institution has already completed, to tell a proposer that something close to their idea has been done here before. Distinct from collaboration matching, which compares one Proposal against other Proposals: a Novelty check looks only at finished work that is already in the public catalogue, so it discloses nothing and needs no [[Collaboration opt-in]].
 _Avoid_: Duplicate detection (that is about two Proposals overlapping with each other), plagiarism check (a different question about finished work, deliberately out of scope), similarity search.
+
+### Review workflow
+
+**Specialist office**:
+ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (IP, ethics, commercialisation). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
+_Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
+
+**Specialist path**:
+A Thesis/Research or Project that its Adviser accepted and routed to at least one [[Specialist office]]. The only path on which RDCO takes part; the alternative is the Adviser's accept & publish, where RDCO is never involved.
+_Avoid_: Full review, RDCO path.
+
+**Pool**:
+An office holding a Record that nobody in it is reviewing yet: the office's shared work, until a member claims it, a coordinator assigns someone, or whoever routed it nominated someone.
+_Avoid_: Queue (My Reviews is the queue; a Pool is one of the things in it), unassigned.
+
+**Seat**:
+One person's part in an office's review of a Record: "this member is reviewing it for that office". An office can hold a Record with several Seats, and its review is finished only when every Seat that was not withdrawn is done.
+_Avoid_: Assignment (the office holding the Record, not a person), reviewer slot.
+
+**Finding**:
+A [[Seat]] holder's recorded negative verdict on a Record, always with a written reason. A Finding never rejects and never sends the Record back: specialist offices cannot do either. It travels to RDCO, which decides.
+_Avoid_: Rejection, decline, negative review, Not cleared (an office's outcome, not one reviewer's verdict).
+
+**Clearance**:
+A [[Specialist office]]'s outcome on a Record, *Cleared* or *Not cleared*, settled when that office's review completes. *Not cleared* means at least one [[Seat]] recorded a [[Finding]]. Each Seat's own verdict is separate from the Clearance and stays visible beside it.
+_Avoid_: Approval (an office clears its own question; it does not approve the Record), office decision.
+
+**Hand-back**:
+IRIS opening RDCO's [[Pool]] on a Record when the last active specialist office finishes. Happens only on the [[Specialist path]]; nobody routes to RDCO by hand.
+_Avoid_: Route to RDCO, escalation, final routing.
+
+**Review round**:
+One [[Specialist office]]'s review of a Record, from being routed the Record until its [[Seat]]s are done. An office routed the same Record again starts a new Review round, and the latest completed one sets the office's [[Clearance]]; the earlier outcome stands until then.
+_Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads as a person being assigned, which is a Seat), pass.

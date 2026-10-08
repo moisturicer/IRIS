@@ -4,7 +4,7 @@ import type {
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest, RecordTracker,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
-  DocumentRequestSlot, Party, RouteOptions, RouteRequest,
+  DocumentRequestSlot, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -60,6 +60,12 @@ export const recordsApi = {
   /** A seat holder routes onward; their own review continues (ADR-032 §4). */
   route: (id: number, body: RouteRequest) =>
     apiClient.post<RecordTracker>(`/records/${id}/route/`, body),
+  /**
+   * An office seat holder clears the record or records a finding (ADR-032
+   * §3-§4, IR-269). A finding needs a comment. Answers with the tracker.
+   */
+  officeReview: (id: number, body: { outcome: OfficeReviewOutcome; comment: string }) =>
+    apiClient.post<RecordTracker>(`/records/${id}/office-review/`, body),
   /** The picklist: the record type's upload slots. */
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),
