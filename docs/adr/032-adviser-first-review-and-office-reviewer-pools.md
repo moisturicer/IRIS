@@ -247,6 +247,22 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
 - **Withdrawal.** Any seat holder of the requesting party may withdraw its open request. No reason is asked for. The owners are told, and the tracker keeps the request as `withdrawn`.
 - **Notifications** go to every owner, and to nobody else. Reviewers see the *Waiting on author* badge (§9).
 
+**Amendment, 2026-10-08 (IR-273): answering with a new version.** Built to the card and to the IR-416 hand-off above. The points the card left open were decided in the implementation and are **pending the project lead's review** on the IR-273 pull request.
+
+- **The act.** `POST /records/<id>/new-version/`, by an **owner** only. A reviewer who can see the record gets a 403; anyone else gets a 404. It needs a record on the new model with at least one open request. It writes v(n+1) through the one writer, resolves **every** open request as `resubmitted`, and records `resubmission_count` and `last_resubmitted_at`, so `preserved` is derived exactly as on the legacy path.
+- **What resets.** Under `CLEARANCE_AWARE`, only the requesting parties' clearance rows go back to pending. Under `RESTART_ALL`, every row does.
+    - Seats are the same under both policies, which is the card's "the two policies differ only in which clearances reset". Every `done` seat on a requesting party's active assignment returns to `in_review`, so an office whose second reviewer asked re-reviews the new version in full. Nobody else's seat changes.
+    - *Consequence, for review:* under `RESTART_ALL`, an office that had already completed keeps its completed assignment, and its pending clearance is re-cleared only if it is routed again. If the comparison arm should instead reopen those offices, that is a change to this rule.
+- **What counts as a change** since the **newest** open request:
+    - a manuscript other than the latest version's;
+    - a supporting document an owner uploaded (`RecordUpload`);
+    - a detail that actually changed. That is the new `Record.details_edited_at` (`records/0016`), stamped only when a PATCH changes a value, so saving identical details answers nothing.
+
+  Otherwise the act is refused, naming who asked and what would count.
+- **The manuscript lock** also opens while `awaiting_resubmission` (new model, a request open), **for an owner only**. Staff stay locked.
+- **Which manuscript is current.** Between the owner's upload and their new version, `/manuscript/` serves everyone but an owner the latest version's file. An owner reads their own upload, and record detail's `manuscript_unsubmitted` labels it. Paper Chat and chunking still read the stored file. That is the AI pipeline's, flagged to its owner, not changed here.
+- **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else.
+
 ### 6. Lineage: an accepted Proposal continues as a new record
 
 ```
