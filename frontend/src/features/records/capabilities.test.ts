@@ -368,8 +368,9 @@ describe("the capabilities adapter", () => {
   });
 
   it("never grants an action whose backend does not exist yet", () => {
+    // `request_revision` left this list with IR-272, which built its endpoint.
     const unbuilt: Capability[] = [
-      "request_revision", "continue_as", "set_visibility", "comment_review", "comment_public",
+      "continue_as", "set_visibility", "comment_review", "comment_public",
     ];
     for (const { record: r, viewer } of ROWS) {
       const granted = capabilitiesFor(r, viewer);
