@@ -254,6 +254,14 @@ class AdapterRequestTests:
         assert messages[0]["content"] == "rules"
         assert messages[1]["content"] == "question"
 
+    def test_a_completion_cap_is_sent_only_when_one_was_given(self):
+        capped, uncapped = _FakeClient(), _FakeClient()
+        OpenAICompatibleAdapter(client=capped, max_tokens=300).generate(system="s", user="u")
+        OpenAICompatibleAdapter(client=uncapped).generate(system="s", user="u")
+
+        assert capped.calls[0]["max_tokens"] == 300
+        assert "max_tokens" not in uncapped.calls[0]
+
     def test_a_vendor_error_becomes_one_domain_exception(self):
         """Anti-corruption at the seam: a Groq 429 and an OpenRouter timeout
         become the same thing, so the resilience stack has one type to catch

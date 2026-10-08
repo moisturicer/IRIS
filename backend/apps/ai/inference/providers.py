@@ -44,12 +44,15 @@ from .profiles import Profile
 
 
 def build_profile_llm(
-    profile: Profile, breaker_key: Optional[str] = None
+    profile: Profile,
+    breaker_key: Optional[str] = None,
+    max_tokens: Optional[int] = None,
 ) -> LLMProvider:
     """The provider `profile`'s task reaches its model through.
 
     `breaker_key` defaults to the task's own. The evidence shadow passes its
     own key (IR-466), so its failures never open the reader's breaker.
+    `max_tokens` caps each completion (IR-481); `None` sends no cap.
     """
     if not profile.is_configured:
         raise LLMUnavailable(
@@ -72,6 +75,7 @@ def build_profile_llm(
             reasoning_effort=reasoning_effort,
             vendor=profile.vendor.value,
             fallback_models=fallback_models,
+            max_tokens=max_tokens,
         )
 
     if dialect_for(profile.vendor.value).resolves_fallback:
