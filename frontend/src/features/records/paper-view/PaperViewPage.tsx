@@ -964,15 +964,19 @@ export default function PaperViewPage() {
                     )}
                   </section>
                 )}
-                {/* Always rendered, so the announcement lands when it fills. */}
-                <p
-                  role="status"
-                  aria-live="polite"
-                  className={newVersionDone ? "text-sm text-stone-700 flex items-center gap-2" : "sr-only"}
-                >
-                  {newVersionDone && <i className="fas fa-check text-brand text-xs" aria-hidden />}
-                  {newVersionDone ?? ""}
-                </p>
+                {/* Rendered while a version can be submitted, so the
+                    announcement lands when it fills; nowhere else, so the page
+                    keeps one status region (Share's) otherwise. */}
+                {(record.revision.new_version != null || newVersionDone) && (
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    className={newVersionDone ? "text-sm text-stone-700 flex items-center gap-2" : "sr-only"}
+                  >
+                    {newVersionDone && <i className="fas fa-check text-brand text-xs" aria-hidden />}
+                    {newVersionDone ?? ""}
+                  </p>
+                )}
                 {newVersionOpen && record.revision.new_version && (
                   <NewVersionDialog
                     recordId={record.id}
