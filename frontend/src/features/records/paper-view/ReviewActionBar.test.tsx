@@ -39,7 +39,7 @@ const record = {
   title: "Groundwater Recharge Mapping in Metro Cebu",
   can_request_document: ["ierc"],
   current_holders: [{ party: "ierc", label: "IERC", opened_at: null, opened_by: null }],
-  revision: { party: "ierc", label: "IERC", blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+  revision: { party: "ierc", label: "IERC", blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   versions: [],
 } as unknown as RecordDetail;
 

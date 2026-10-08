@@ -75,6 +75,12 @@ export const recordsApi = {
   /** A seat holder of the party that asked withdraws its open revision request (IR-272). */
   withdrawRevisionRequest: (id: number, requestId: number) =>
     apiClient.post<RecordTracker>(`/records/${id}/revision-requests/${requestId}/withdraw/`),
+  /**
+   * An owner answers every open revision request with the record's next
+   * version (ADR-032 §5, IR-273). Only the parties that asked review it again.
+   */
+  submitNewVersion: (id: number) =>
+    apiClient.post<RecordTracker>(`/records/${id}/new-version/`),
   /** The picklist: the record type's upload slots. */
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),

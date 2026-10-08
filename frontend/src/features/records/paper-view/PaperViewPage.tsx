@@ -44,6 +44,7 @@ import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
+import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
@@ -314,6 +315,9 @@ export default function PaperViewPage() {
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const [resubmitting, setResubmitting] = useState(false);
   const [resubmitError, setResubmitError] = useState<string | null>(null);
+  /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
+  const [newVersionOpen, setNewVersionOpen] = useState(false);
+  const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
   /** Bumped when a document request changes, so the tracker reloads. */
   const [trackerVersion, setTrackerVersion] = useState(0);
 
@@ -570,6 +574,20 @@ export default function PaperViewPage() {
           latest={latestVersion.number}
           onBack={() => setViewParam("version", null)}
         />
+      )}
+      {/* The owner reads their own unsubmitted upload; nobody else is served
+          it (IR-273), so only they are told. */}
+      {!viewedVersion && record.manuscript_unsubmitted && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 flex items-start gap-3">
+          <i className="fas fa-file-pen text-sm text-brand mt-0.5" aria-hidden />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-semibold text-stone-900">Your revised manuscript, not yet submitted</p>
+            <p className="text-stone-700 mt-0.5">
+              Reviewers still read {latestVersion ? `v${latestVersion.number}` : "the submitted version"} until
+              you submit the new version.
+            </p>
+          </div>
+        </div>
       )}
       <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
         <PaperPdfReader
@@ -855,7 +873,7 @@ export default function PaperViewPage() {
               <>
                 {/* Action required (spec §4.10): what is waiting on the
                     owner comes first. */}
-                {can.has("create_version") && (
+                {can.has("create_version") && record.revision.new_version == null && (
                   <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
                     <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
                       <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
@@ -881,9 +899,9 @@ export default function PaperViewPage() {
 
                 {/* Revision requests on the adviser-first model (IR-272): what
                     each party asked for, as plain text, and the version it
-                    asked about. The legacy banner above keeps its own
-                    Resubmit; the new model's *New version* is IR-273's. */}
-                {userIsOwner && !can.has("create_version") && record.revision.open.length > 0 && (
+                    asked about, answered with *Submit new version* (IR-273).
+                    The legacy banner above keeps its own Resubmit. */}
+                {userIsOwner && record.revision.open.length > 0 && (
                   <section
                     aria-labelledby="revision-requested-heading"
                     className="rounded-2xl border border-brand-200 bg-brand-50 p-4"
@@ -914,7 +932,53 @@ export default function PaperViewPage() {
                         </li>
                       ))}
                     </ul>
+                    {can.has("create_version") && record.revision.new_version && (
+                      <div className="mt-4 border-t border-brand-200 pt-3">
+                        <p className="text-sm text-stone-700 leading-relaxed">
+                          Upload a revised manuscript or a requested document in Files, or edit the
+                          details, then submit. {newVersionSummary(record.revision.new_version)}
+                        </p>
+                        {record.revision.new_version.blocked && (
+                          <p id="new-version-blocked" className="text-sm text-brand mt-2">
+                            {record.revision.new_version.blocked}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setNewVersionOpen(true)}
+                          disabled={record.revision.new_version.blocked != null}
+                          aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
+                          className={cn(PILL_PRIMARY, "mt-3")}
+                        >
+                          <i className="fas fa-paper-plane text-2xs" aria-hidden />
+                          Submit new version
+                        </button>
+                      </div>
+                    )}
                   </section>
+                )}
+                {/* Always rendered, so the announcement lands when it fills. */}
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className={newVersionDone ? "text-sm text-stone-700 flex items-center gap-2" : "sr-only"}
+                >
+                  {newVersionDone && <i className="fas fa-check text-brand text-xs" aria-hidden />}
+                  {newVersionDone ?? ""}
+                </p>
+                {newVersionOpen && record.revision.new_version && (
+                  <NewVersionDialog
+                    recordId={record.id}
+                    hint={record.revision.new_version}
+                    newManuscript={record.manuscript_unsubmitted}
+                    onClose={() => setNewVersionOpen(false)}
+                    onDone={(outcome) => {
+                      setNewVersionOpen(false);
+                      setNewVersionDone(outcome);
+                      setTrackerVersion((n) => n + 1);
+                      void recordsApi.detail(record.id).then(({ data }) => setRecord(data));
+                    }}
+                  />
                 )}
 
                 {userIsOwner && (

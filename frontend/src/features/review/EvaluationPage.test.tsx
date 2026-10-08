@@ -97,8 +97,9 @@ const record: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
-  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   versions: null,
+  manuscript_unsubmitted: false,
 };
 
 /** What the mocked detail endpoint returns; a test may park it at another stage. */

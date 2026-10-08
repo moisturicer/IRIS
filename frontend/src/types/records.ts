@@ -180,6 +180,12 @@ export interface RecordDetail extends RecordListItem {
    * empty before the record is first submitted.
    */
   versions:             RecordVersion[] | null;
+  /**
+   * The manuscript is the owner's upload for a version not yet submitted
+   * (IR-273). True for an owner only: everyone else is still served the
+   * latest version's manuscript.
+   */
+  manuscript_unsubmitted: boolean;
 }
 
 /** One numbered snapshot of what the record put in front of its reviewers. */
@@ -214,6 +220,23 @@ export interface RevisionFlags {
   decision_blocked: string | null;
   /** Every open request, oldest first. */
   open:             OpenRevisionRequest[];
+  /**
+   * For an owner, the version that would answer the open requests (IR-273);
+   * null for anyone else, or with none open.
+   */
+  new_version:      NewVersionHint | null;
+}
+
+/** What submitting a new version would do, for its confirmation (IR-273). */
+export interface NewVersionHint {
+  /** The version it would be. */
+  number:   number;
+  /** The parties that asked, who review it. */
+  rereview: string[];
+  /** The offices whose clearance it keeps; empty under the restart-all policy. */
+  kept:     string[];
+  /** Why it cannot be submitted yet: nothing has changed since the newest request. */
+  blocked:  string | null;
 }
 
 export interface OpenRevisionRequest {

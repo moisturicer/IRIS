@@ -24,7 +24,7 @@ vi.mock("@/api/records", () => ({
 
 const RECORD = {
   id: 7,
-  revision: { party: "ierc", label: "IERC", blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+  revision: { party: "ierc", label: "IERC", blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   versions: [{ number: 1 }, { number: 2 }],
 } as unknown as RecordDetail;
 

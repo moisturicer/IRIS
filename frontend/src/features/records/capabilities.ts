@@ -159,11 +159,14 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
       granted.add("edit_details");
     }
     if (record.workflow_state === "awaiting_resubmission") {
-      // Today's act is the legacy "Resubmit for review", which answers a
-      // stored `declined` only. On the adviser-first model (stored
-      // `in_review`) the owner answers with a new version, which IR-273
-      // builds: offering the legacy act there would only be refused (IR-272).
-      if (record.pipeline_status !== "in_review") granted.add("create_version");
+      // Two acts answer a revision request. A stored `declined` (the legacy
+      // pipeline) takes "Resubmit for review". On the adviser-first model
+      // (stored `in_review`) the owner submits a new version, which the
+      // server offers through `revision.new_version` (IR-273); without it,
+      // the legacy act would only be refused (IR-272).
+      if (record.pipeline_status !== "in_review" || record.revision.new_version != null) {
+        granted.add("create_version");
+      }
       // The edit becomes part of the next version (IR-273, invariant 4).
       granted.add("edit_details");
     }
