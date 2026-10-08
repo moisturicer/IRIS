@@ -10,7 +10,11 @@
 
 services:
   db:
-    image: pgvector/pgvector:pg16
+    # Pinned by digest (IR-469), matching CI's reasoning in
+    # .github/workflows/ci.yml: `pg16` is a mutable tag, so dev and CI can
+    # silently drift onto different pgvector builds. 0.8.7 on Postgres
+    # 16.15, current as of 2026-10-08.
+    image: pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
     restart: unless-stopped
     environment:
       # Sourced from the repo-root .env (see .env.example). ":?" makes an
