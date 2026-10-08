@@ -1,0 +1,6487 @@
+{
+  "instrument": "curated",
+  "question_set": {
+    "name": "proxy-starter",
+    "source": "..\\docs\\evaluation\\proxy_starter.json",
+    "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+    "tier": "proxy",
+    "questions": 113,
+    "without_passages": 40,
+    "with_resolved_question": 20,
+    "labels": 78,
+    "skipped_questions": []
+  },
+  "coverage": {
+    "questions_in_set": 113,
+    "annotated": 113,
+    "annotated_fraction": 1.0,
+    "with_resolved_question": 20,
+    "unannotated": 0
+  },
+  "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+  "rule_set": {
+    "digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+    "summary": "5 rules (aggregate_shape=33, document_reference=39, institution_term=6, sourcing_demand=24) digest=cdbeb62020fd",
+    "term_counts": {
+      "institution_term": 6,
+      "document_reference": 39,
+      "sourcing_demand": 24,
+      "aggregate_shape": 33
+    },
+    "definition": {
+      "version": 1,
+      "codes": [
+        "scope_record",
+        "institution_term",
+        "document_reference",
+        "sourcing_demand",
+        "aggregate_shape"
+      ],
+      "rules": [
+        {
+          "code": "scope_record",
+          "kind": "structural",
+          "terms": []
+        },
+        {
+          "code": "institution_term",
+          "kind": "lexical",
+          "terms": [
+            "cebu institute of technology",
+            "cit u",
+            "cit university",
+            "iris",
+            "the repository",
+            "this repository"
+          ]
+        },
+        {
+          "code": "document_reference",
+          "kind": "lexical",
+          "terms": [
+            "abstract",
+            "article",
+            "articles",
+            "author",
+            "authors",
+            "bibliography",
+            "chapter",
+            "citation",
+            "citations",
+            "cite",
+            "cited",
+            "conference",
+            "dissertation",
+            "dissertations",
+            "doi",
+            "et al",
+            "figure",
+            "findings",
+            "journal",
+            "manuscript",
+            "manuscripts",
+            "paper",
+            "papers",
+            "preprint",
+            "preprints",
+            "proceedings",
+            "publication",
+            "publications",
+            "published",
+            "section",
+            "studies",
+            "study",
+            "table",
+            "theses",
+            "thesis",
+            "this document",
+            "this paper",
+            "this record",
+            "this study"
+          ]
+        },
+        {
+          "code": "sourcing_demand",
+          "kind": "lexical",
+          "terms": [
+            "according to",
+            "back that up",
+            "citation",
+            "citations",
+            "cite your",
+            "evidence for",
+            "evidence that",
+            "give me the source",
+            "on what basis",
+            "page number",
+            "quote",
+            "quoted",
+            "reference",
+            "references",
+            "show me where",
+            "source",
+            "sources",
+            "verbatim",
+            "what does it say",
+            "where does it say",
+            "which page",
+            "who said",
+            "with citations",
+            "with sources"
+          ]
+        },
+        {
+          "code": "aggregate_shape",
+          "kind": "lexical",
+          "terms": [
+            "across the",
+            "all of the papers",
+            "all the papers",
+            "any papers",
+            "body of work",
+            "common themes",
+            "corpus",
+            "gap",
+            "gaps",
+            "how many",
+            "landscape",
+            "list every",
+            "list of",
+            "list the",
+            "literature",
+            "most cited",
+            "most common",
+            "most studied",
+            "number of",
+            "overall trend",
+            "overview of the",
+            "research gap",
+            "research gaps",
+            "state of the art",
+            "survey of",
+            "trend",
+            "trends",
+            "under researched",
+            "what papers",
+            "which papers",
+            "which theses",
+            "who has written",
+            "whole collection"
+          ]
+        }
+      ]
+    }
+  },
+  "detector": {
+    "lanes": [
+      {
+        "lane": "raw",
+        "judged": 113,
+        "correct": 55,
+        "accuracy": 0.4867,
+        "over_fires": [],
+        "misses": [
+          "q01",
+          "q02",
+          "q03",
+          "q04",
+          "q05",
+          "q06",
+          "q07",
+          "q08",
+          "q09",
+          "q10",
+          "q11",
+          "q12",
+          "q13",
+          "q14",
+          "q15",
+          "q16",
+          "q17",
+          "q18",
+          "q22",
+          "q24",
+          "q25",
+          "q26",
+          "q27",
+          "q28",
+          "q31",
+          "q32",
+          "q34",
+          "q35",
+          "q36",
+          "q37",
+          "q38",
+          "q40",
+          "q41",
+          "q42",
+          "q43",
+          "q44",
+          "q45",
+          "q46",
+          "q47",
+          "q48",
+          "q49",
+          "q50",
+          "q51",
+          "q61",
+          "q66",
+          "q77",
+          "q83",
+          "q85",
+          "q87",
+          "q99",
+          "q100",
+          "q105",
+          "q106",
+          "q108",
+          "q109",
+          "q110",
+          "q111",
+          "q112"
+        ],
+        "undetermined": [],
+        "rules": [
+          {
+            "code": "scope_record",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q20",
+              "q21",
+              "q22",
+              "q23",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q52",
+              "q55",
+              "q56",
+              "q61",
+              "q62",
+              "q66",
+              "q67",
+              "q68",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q84",
+              "q85",
+              "q86",
+              "q87",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "institution_term",
+            "fired": 5,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q20",
+              "q21",
+              "q22",
+              "q23",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q52",
+              "q55",
+              "q61",
+              "q62",
+              "q66",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "fired": 10,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q20",
+              "q21",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q55",
+              "q61",
+              "q66",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q85",
+              "q86",
+              "q87",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "fired": 2,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q21",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q52",
+              "q55",
+              "q56",
+              "q61",
+              "q62",
+              "q66",
+              "q67",
+              "q68",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q84",
+              "q85",
+              "q86",
+              "q87",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "fired": 15,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q23",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q56",
+              "q61",
+              "q62",
+              "q66",
+              "q67",
+              "q68",
+              "q77",
+              "q83",
+              "q84",
+              "q85",
+              "q86",
+              "q87",
+              "q99",
+              "q100",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ]
+          }
+        ]
+      },
+      {
+        "lane": "resolved",
+        "judged": 20,
+        "correct": 16,
+        "accuracy": 0.8,
+        "over_fires": [],
+        "misses": [
+          "q62",
+          "q77",
+          "q99",
+          "q100"
+        ],
+        "undetermined": [],
+        "rules": [
+          {
+            "code": "scope_record",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62",
+              "q75",
+              "q76",
+              "q77",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102"
+            ]
+          },
+          {
+            "code": "institution_term",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62",
+              "q75",
+              "q76",
+              "q77",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "fired": 1,
+            "over_fires": [],
+            "silent_on_required": [
+              "q62",
+              "q75",
+              "q76",
+              "q77",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "fired": 1,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62",
+              "q75",
+              "q76",
+              "q77",
+              "q99",
+              "q100",
+              "q101",
+              "q102"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "fired": 5,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62",
+              "q77",
+              "q99",
+              "q100"
+            ]
+          }
+        ]
+      },
+      {
+        "lane": "combined",
+        "judged": 113,
+        "correct": 56,
+        "accuracy": 0.4956,
+        "over_fires": [],
+        "misses": [
+          "q01",
+          "q02",
+          "q03",
+          "q04",
+          "q05",
+          "q06",
+          "q07",
+          "q08",
+          "q09",
+          "q10",
+          "q11",
+          "q12",
+          "q13",
+          "q14",
+          "q15",
+          "q16",
+          "q17",
+          "q18",
+          "q22",
+          "q24",
+          "q25",
+          "q26",
+          "q27",
+          "q28",
+          "q31",
+          "q32",
+          "q34",
+          "q35",
+          "q36",
+          "q37",
+          "q38",
+          "q40",
+          "q41",
+          "q42",
+          "q43",
+          "q44",
+          "q45",
+          "q46",
+          "q47",
+          "q48",
+          "q49",
+          "q50",
+          "q51",
+          "q66",
+          "q77",
+          "q83",
+          "q85",
+          "q87",
+          "q99",
+          "q100",
+          "q105",
+          "q106",
+          "q108",
+          "q109",
+          "q110",
+          "q111",
+          "q112"
+        ],
+        "undetermined": [],
+        "rules": [
+          {
+            "code": "scope_record",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q20",
+              "q21",
+              "q22",
+              "q23",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q52",
+              "q55",
+              "q56",
+              "q61",
+              "q62",
+              "q66",
+              "q67",
+              "q68",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q84",
+              "q85",
+              "q86",
+              "q87",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "institution_term",
+            "fired": 5,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q20",
+              "q21",
+              "q22",
+              "q23",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q52",
+              "q55",
+              "q61",
+              "q62",
+              "q66",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "fired": 11,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q20",
+              "q21",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q55",
+              "q66",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q85",
+              "q86",
+              "q87",
+              "q98",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "fired": 3,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q19",
+              "q21",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q29",
+              "q30",
+              "q31",
+              "q32",
+              "q33",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q39",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q52",
+              "q55",
+              "q56",
+              "q61",
+              "q62",
+              "q66",
+              "q67",
+              "q68",
+              "q75",
+              "q76",
+              "q77",
+              "q83",
+              "q84",
+              "q85",
+              "q86",
+              "q87",
+              "q99",
+              "q100",
+              "q101",
+              "q102",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112",
+              "q113"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "fired": 15,
+            "over_fires": [],
+            "silent_on_required": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q23",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q56",
+              "q61",
+              "q62",
+              "q66",
+              "q67",
+              "q68",
+              "q77",
+              "q83",
+              "q84",
+              "q85",
+              "q86",
+              "q87",
+              "q99",
+              "q100",
+              "q103",
+              "q104",
+              "q105",
+              "q106",
+              "q107",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ]
+          }
+        ]
+      }
+    ],
+    "categories": [
+      {
+        "kind": "ambiguous",
+        "judged": 10,
+        "correct": 10,
+        "accuracy": 1.0,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "cross-paper",
+        "judged": 10,
+        "correct": 1,
+        "accuracy": 0.1,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "exact-term",
+        "judged": 10,
+        "correct": 7,
+        "accuracy": 0.7,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "follow-up-after-direct",
+        "judged": 10,
+        "correct": 10,
+        "accuracy": 1.0,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "follow-up-after-grounded",
+        "judged": 10,
+        "correct": 7,
+        "accuracy": 0.7,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "general-knowledge",
+        "judged": 10,
+        "correct": 10,
+        "accuracy": 1.0,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "mechanism",
+        "judged": 33,
+        "correct": 1,
+        "accuracy": 0.0303,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "near-duplicate",
+        "judged": 10,
+        "correct": 4,
+        "accuracy": 0.4,
+        "inconclusive": false,
+        "min_examples": 10
+      },
+      {
+        "kind": "off-corpus-research",
+        "judged": 10,
+        "correct": 6,
+        "accuracy": 0.6,
+        "inconclusive": false,
+        "min_examples": 10
+      }
+    ],
+    "institutional": {
+      "judged": 5,
+      "incorrect": []
+    }
+  },
+  "model": {
+    "models": [
+      "openai/gpt-oss-120b"
+    ],
+    "questions": 113,
+    "fallbacks": 0,
+    "model_alone": {
+      "judged": 113,
+      "correct": 94,
+      "accuracy": 0.8319,
+      "over_searches": [
+        "q57",
+        "q58",
+        "q69",
+        "q70",
+        "q71",
+        "q88",
+        "q89",
+        "q91",
+        "q92"
+      ],
+      "missed_searches": [
+        "q04",
+        "q07",
+        "q12",
+        "q13",
+        "q16",
+        "q32",
+        "q35",
+        "q36",
+        "q40",
+        "q43"
+      ]
+    },
+    "model_alone_decided_only": {
+      "judged": 113,
+      "correct": 94,
+      "accuracy": 0.8319
+    },
+    "union": {
+      "judged": 113,
+      "correct": 94,
+      "accuracy": 0.8319,
+      "over_searches": [
+        "q57",
+        "q58",
+        "q69",
+        "q70",
+        "q71",
+        "q88",
+        "q89",
+        "q91",
+        "q92"
+      ],
+      "missed_searches": [
+        "q04",
+        "q07",
+        "q12",
+        "q13",
+        "q16",
+        "q32",
+        "q35",
+        "q36",
+        "q40",
+        "q43"
+      ]
+    },
+    "agreement_with_detector": {
+      "both_evidence": 26,
+      "both_direct": 31,
+      "detector_only_evidence": 0,
+      "model_only_evidence": 56,
+      "agreement": 0.5044
+    },
+    "reasons": {
+      "search_requested": 82,
+      "answered_directly": 31,
+      "empty_completion": 0,
+      "several_calls": 0,
+      "text_and_tool_call": 0,
+      "unknown_tool": 0,
+      "malformed_arguments": 0,
+      "timeout": 0,
+      "rate_limited": 0,
+      "provider_failure": 0
+    },
+    "anomalies": {
+      "arguments_supplied": 1
+    },
+    "latency_ms": {
+      "mean": 3827,
+      "p95": 9107
+    },
+    "tokens": {
+      "input": 32847,
+      "output": 28540
+    },
+    "hypothetical_answers": {
+      "count": 31,
+      "chars_total": 71389
+    },
+    "per_question": [
+      {
+        "id": "q01",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2275,
+        "input_tokens": 272,
+        "output_tokens": 135,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q02",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 866,
+        "input_tokens": 274,
+        "output_tokens": 100,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q03",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 980,
+        "input_tokens": 529,
+        "output_tokens": 175,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q04",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 6739,
+        "input_tokens": 530,
+        "output_tokens": 1852,
+        "answer_present": true,
+        "answer_chars": 7403,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q05",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 13085,
+        "input_tokens": 529,
+        "output_tokens": 159,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q06",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3102,
+        "input_tokens": 270,
+        "output_tokens": 200,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q07",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1810,
+        "input_tokens": 275,
+        "output_tokens": 604,
+        "answer_present": true,
+        "answer_chars": 2418,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q08",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 8260,
+        "input_tokens": 266,
+        "output_tokens": 126,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q09",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2864,
+        "input_tokens": 269,
+        "output_tokens": 99,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q10",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 794,
+        "input_tokens": 271,
+        "output_tokens": 120,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q11",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4080,
+        "input_tokens": 280,
+        "output_tokens": 150,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q12",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 5420,
+        "input_tokens": 528,
+        "output_tokens": 732,
+        "answer_present": true,
+        "answer_chars": 2954,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q13",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 6618,
+        "input_tokens": 271,
+        "output_tokens": 922,
+        "answer_present": true,
+        "answer_chars": 4112,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q14",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 9241,
+        "input_tokens": 273,
+        "output_tokens": 124,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q15",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 730,
+        "input_tokens": 273,
+        "output_tokens": 104,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q16",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 3093,
+        "input_tokens": 267,
+        "output_tokens": 1200,
+        "answer_present": true,
+        "answer_chars": 4504,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q17",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 12969,
+        "input_tokens": 272,
+        "output_tokens": 90,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q18",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 592,
+        "input_tokens": 273,
+        "output_tokens": 161,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q19",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 5125,
+        "input_tokens": 268,
+        "output_tokens": 123,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q20",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 813,
+        "input_tokens": 265,
+        "output_tokens": 125,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q21",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 5039,
+        "input_tokens": 266,
+        "output_tokens": 89,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q22",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 797,
+        "input_tokens": 270,
+        "output_tokens": 106,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q23",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3013,
+        "input_tokens": 272,
+        "output_tokens": 92,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q24",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4214,
+        "input_tokens": 270,
+        "output_tokens": 99,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q25",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2399,
+        "input_tokens": 270,
+        "output_tokens": 314,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q26",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2913,
+        "input_tokens": 270,
+        "output_tokens": 134,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q27",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3975,
+        "input_tokens": 271,
+        "output_tokens": 113,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q28",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 1959,
+        "input_tokens": 275,
+        "output_tokens": 115,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q29",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4098,
+        "input_tokens": 271,
+        "output_tokens": 104,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q30",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2979,
+        "input_tokens": 267,
+        "output_tokens": 92,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q31",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 900,
+        "input_tokens": 267,
+        "output_tokens": 102,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q32",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 3620,
+        "input_tokens": 269,
+        "output_tokens": 874,
+        "answer_present": true,
+        "answer_chars": 3508,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q33",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 7001,
+        "input_tokens": 273,
+        "output_tokens": 79,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q34",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4244,
+        "input_tokens": 270,
+        "output_tokens": 117,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q35",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 3282,
+        "input_tokens": 276,
+        "output_tokens": 1290,
+        "answer_present": true,
+        "answer_chars": 4738,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q36",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 7841,
+        "input_tokens": 275,
+        "output_tokens": 545,
+        "answer_present": true,
+        "answer_chars": 1234,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q37",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 9107,
+        "input_tokens": 276,
+        "output_tokens": 101,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q38",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 933,
+        "input_tokens": 273,
+        "output_tokens": 149,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q39",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4896,
+        "input_tokens": 273,
+        "output_tokens": 78,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q40",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1661,
+        "input_tokens": 269,
+        "output_tokens": 489,
+        "answer_present": true,
+        "answer_chars": 2224,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q41",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4113,
+        "input_tokens": 272,
+        "output_tokens": 162,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q42",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 6120,
+        "input_tokens": 274,
+        "output_tokens": 106,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q43",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1379,
+        "input_tokens": 530,
+        "output_tokens": 381,
+        "answer_present": true,
+        "answer_chars": 1477,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q44",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3625,
+        "input_tokens": 272,
+        "output_tokens": 97,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q45",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 766,
+        "input_tokens": 275,
+        "output_tokens": 93,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q46",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 5104,
+        "input_tokens": 274,
+        "output_tokens": 93,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q47",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3283,
+        "input_tokens": 272,
+        "output_tokens": 77,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q48",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3083,
+        "input_tokens": 274,
+        "output_tokens": 136,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q49",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2985,
+        "input_tokens": 271,
+        "output_tokens": 140,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q50",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3099,
+        "input_tokens": 267,
+        "output_tokens": 148,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q51",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 627,
+        "input_tokens": 270,
+        "output_tokens": 90,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q52",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4853,
+        "input_tokens": 269,
+        "output_tokens": 90,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q53",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1516,
+        "input_tokens": 267,
+        "output_tokens": 447,
+        "answer_present": true,
+        "answer_chars": 1691,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q54",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 6799,
+        "input_tokens": 268,
+        "output_tokens": 471,
+        "answer_present": true,
+        "answer_chars": 1554,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q55",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 1179,
+        "input_tokens": 271,
+        "output_tokens": 78,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q56",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 729,
+        "input_tokens": 269,
+        "output_tokens": 95,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q57",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 9157,
+        "input_tokens": 261,
+        "output_tokens": 102,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q58",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 728,
+        "input_tokens": 262,
+        "output_tokens": 138,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q59",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 5660,
+        "input_tokens": 283,
+        "output_tokens": 529,
+        "answer_present": true,
+        "answer_chars": 1623,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q60",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1525,
+        "input_tokens": 279,
+        "output_tokens": 513,
+        "answer_present": true,
+        "answer_chars": 2381,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q61",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 6085,
+        "input_tokens": 285,
+        "output_tokens": 96,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q62",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 5971,
+        "input_tokens": 295,
+        "output_tokens": 103,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q63",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 3246,
+        "input_tokens": 265,
+        "output_tokens": 276,
+        "answer_present": true,
+        "answer_chars": 1112,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q64",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 5925,
+        "input_tokens": 265,
+        "output_tokens": 696,
+        "answer_present": true,
+        "answer_chars": 2839,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q65",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1770,
+        "input_tokens": 268,
+        "output_tokens": 550,
+        "answer_present": true,
+        "answer_chars": 2392,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q66",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 1070,
+        "input_tokens": 527,
+        "output_tokens": 82,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q67",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 6782,
+        "input_tokens": 528,
+        "output_tokens": 74,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q68",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 803,
+        "input_tokens": 268,
+        "output_tokens": 88,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q69",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 7132,
+        "input_tokens": 261,
+        "output_tokens": 122,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q70",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 818,
+        "input_tokens": 263,
+        "output_tokens": 189,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q71",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 896,
+        "input_tokens": 262,
+        "output_tokens": 165,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q72",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1536,
+        "input_tokens": 284,
+        "output_tokens": 463,
+        "answer_present": true,
+        "answer_chars": 1809,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q73",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 12981,
+        "input_tokens": 286,
+        "output_tokens": 569,
+        "answer_present": true,
+        "answer_chars": 2432,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q74",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 2820,
+        "input_tokens": 283,
+        "output_tokens": 932,
+        "answer_present": true,
+        "answer_chars": 3958,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q75",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 8124,
+        "input_tokens": 293,
+        "output_tokens": 101,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q76",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 747,
+        "input_tokens": 282,
+        "output_tokens": 89,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q77",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 807,
+        "input_tokens": 297,
+        "output_tokens": 90,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q78",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 5468,
+        "input_tokens": 263,
+        "output_tokens": 349,
+        "answer_present": true,
+        "answer_chars": 1294,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q79",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 5103,
+        "input_tokens": 266,
+        "output_tokens": 629,
+        "answer_present": true,
+        "answer_chars": 2796,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q80",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 6053,
+        "input_tokens": 263,
+        "output_tokens": 157,
+        "answer_present": true,
+        "answer_chars": 555,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q81",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 6602,
+        "input_tokens": 262,
+        "output_tokens": 360,
+        "answer_present": true,
+        "answer_chars": 1393,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q82",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 5548,
+        "input_tokens": 262,
+        "output_tokens": 752,
+        "answer_present": true,
+        "answer_chars": 2953,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q83",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2815,
+        "input_tokens": 267,
+        "output_tokens": 72,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q84",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 5909,
+        "input_tokens": 267,
+        "output_tokens": 71,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q85",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3043,
+        "input_tokens": 266,
+        "output_tokens": 185,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q86",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2965,
+        "input_tokens": 266,
+        "output_tokens": 118,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q87",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 999,
+        "input_tokens": 271,
+        "output_tokens": 70,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q88",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 869,
+        "input_tokens": 262,
+        "output_tokens": 127,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q89",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2150,
+        "input_tokens": 264,
+        "output_tokens": 114,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q90",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 902,
+        "input_tokens": 262,
+        "output_tokens": 151,
+        "answer_present": true,
+        "answer_chars": 133,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q91",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 6210,
+        "input_tokens": 262,
+        "output_tokens": 159,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q92",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 7065,
+        "input_tokens": 263,
+        "output_tokens": 144,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q93",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1345,
+        "input_tokens": 281,
+        "output_tokens": 347,
+        "answer_present": true,
+        "answer_chars": 727,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q94",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 792,
+        "input_tokens": 282,
+        "output_tokens": 131,
+        "answer_present": true,
+        "answer_chars": 444,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q95",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 8723,
+        "input_tokens": 282,
+        "output_tokens": 360,
+        "answer_present": true,
+        "answer_chars": 1463,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q96",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 4950,
+        "input_tokens": 274,
+        "output_tokens": 591,
+        "answer_present": true,
+        "answer_chars": 2008,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q97",
+        "expects_evidence": false,
+        "detector": false,
+        "route": "direct",
+        "reason": "answered_directly",
+        "anomalies": [],
+        "latency_ms": 1260,
+        "input_tokens": 278,
+        "output_tokens": 315,
+        "answer_present": true,
+        "answer_chars": 1260,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q98",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 9099,
+        "input_tokens": 282,
+        "output_tokens": 99,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q99",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 889,
+        "input_tokens": 291,
+        "output_tokens": 118,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q100",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4992,
+        "input_tokens": 294,
+        "output_tokens": 116,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q101",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 548,
+        "input_tokens": 291,
+        "output_tokens": 84,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q102",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 766,
+        "input_tokens": 287,
+        "output_tokens": 110,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q103",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 8286,
+        "input_tokens": 278,
+        "output_tokens": 98,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q104",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 735,
+        "input_tokens": 279,
+        "output_tokens": 93,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q105",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [
+          "arguments_supplied"
+        ],
+        "latency_ms": 1508,
+        "input_tokens": 277,
+        "output_tokens": 409,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q106",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 954,
+        "input_tokens": 276,
+        "output_tokens": 258,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q107",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2935,
+        "input_tokens": 530,
+        "output_tokens": 91,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q108",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 2797,
+        "input_tokens": 271,
+        "output_tokens": 102,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q109",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 9088,
+        "input_tokens": 273,
+        "output_tokens": 110,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q110",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 489,
+        "input_tokens": 270,
+        "output_tokens": 112,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q111",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 5059,
+        "input_tokens": 274,
+        "output_tokens": 150,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q112",
+        "expects_evidence": true,
+        "detector": false,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 3117,
+        "input_tokens": 275,
+        "output_tokens": 193,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      },
+      {
+        "id": "q113",
+        "expects_evidence": true,
+        "detector": true,
+        "route": "evidence",
+        "reason": "search_requested",
+        "anomalies": [],
+        "latency_ms": 4292,
+        "input_tokens": 266,
+        "output_tokens": 141,
+        "answer_present": false,
+        "answer_chars": 0,
+        "model": "openai/gpt-oss-120b"
+      }
+    ]
+  },
+  "provenance": {
+    "git_commit": "v0.1.0-622-g455d3d7",
+    "question_set_path": "..\\docs\\evaluation\\proxy_starter.json",
+    "question_set_sha256": "cafe5d976e0d1101a9d03ef13dcfeb932b82eb04c0c82cf401de87b0418dee93",
+    "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+    "AI_EVIDENCE_DECISION": "off",
+    "institution_terms": 6,
+    "model_decision": true,
+    "model": "answer task",
+    "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+    "generation": {
+      "vendor": "groq",
+      "model": "openai/gpt-oss-120b",
+      "fallback_models": [],
+      "temperature": 0.5,
+      "reasoning_effort": "medium"
+    }
+  },
+  "min_examples": 10,
+  "questions": [
+    {
+      "id": "q01",
+      "question": "how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q02",
+      "question": "what does the training loop do with a problem the model has not managed to solve yet?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q03",
+      "question": "how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q04",
+      "question": "how do they make the generator produce the rare in-between arrangements instead of the common ones?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q05",
+      "question": "with the next view not yet visible, how does the agent decide where to look?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q06",
+      "question": "how does the smaller model learn where each word sits in the audio?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q07",
+      "question": "how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q08",
+      "question": "where is the waveform actually held in their scheme?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q09",
+      "question": "how did they choose which text descriptions to keep for each track?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q10",
+      "question": "how did the older approach get the emotion label back out of the model?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q11",
+      "question": "has anyone asked what a similarity score between two economies actually means, instead of only using it to sort them into groups?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q12",
+      "question": "what can settle down a learner that swings wildly when the data shifts a little?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q13",
+      "question": "what do the two fields each actually care about when they judge a model?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q14",
+      "question": "when the treatment has more than two levels, what do the existing fixes actually recover?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q15",
+      "question": "what happens to the correction when the assumed rate of spurious links is slightly wrong?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q16",
+      "question": "why was reaching memory on another machine historically so slow?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q17",
+      "question": "what two different kinds of unevenness do they separate when analysing flash-held caches?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q18",
+      "question": "how do they stop the two kinds of on-chip traffic from jamming each other?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q19",
+      "question": "how many qubits are needed to index the signal samples?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q20",
+      "question": "how many commercially released reference tracks were used?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "sourcing_demand",
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "sourcing_demand",
+            "source": "raw",
+            "matched": [
+              "reference"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "sourcing_demand",
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "sourcing_demand",
+            "source": "raw",
+            "matched": [
+              "reference"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q21",
+      "question": "how many target entities went into the entity pool?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q22",
+      "question": "which model and numeric precision were instrumented to observe cache access patterns?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q23",
+      "question": "which paper reports a source of energy loss that had not been written about before?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference",
+          "sourcing_demand"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "source": "raw",
+            "matched": [
+              "source"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference",
+          "sourcing_demand"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "source": "raw",
+            "matched": [
+              "source"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q24",
+      "question": "in the supply-waveform sweep, which phase lengths came out cheapest?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q25",
+      "question": "which design keeps the cache in NAND flash rather than on-chip memory?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q26",
+      "question": "which work puts a large language model at the centre of speech transcription?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q27",
+      "question": "which work is about deciding who should get a treatment based on an experiment?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q28",
+      "question": "which work simulates adiabatic logic gates in a 16 nm FinFET process?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q29",
+      "question": "how did they assemble the list of candidate young galaxy clusters to follow up?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "list of"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "list of"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q30",
+      "question": "how many candidate protoclusters did the network flag?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q31",
+      "question": "what did they run the dust calculations on top of?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q32",
+      "question": "how did they work out the mass of the central black hole?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q33",
+      "question": "how many recently-quenched objects hosting a bright active nucleus did they pick out?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q34",
+      "question": "which work estimates how heavy a black hole is in the early universe?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q35",
+      "question": "how do they show that the ultraviolet glow of the sky tracks how much dust dims starlight?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q36",
+      "question": "instead of describing a dark-matter halo by its density, what do they describe it by?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q37",
+      "question": "by how much did the total light reaching the instrument grow in the L band on the test star?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q38",
+      "question": "why use a middle resolution rather than the coarsest one for these early galaxies?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q39",
+      "question": "how many galaxies were used to build the map of where galaxies cluster on the sky?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q40",
+      "question": "why pick galaxies with no close companions when studying an active nucleus?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q41",
+      "question": "how do they remove the distortion the upper atmosphere adds to the polarisation measurements?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q42",
+      "question": "which two solvers did they implement, one for easy equations and one for hard ones?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q43",
+      "question": "what does choosing a Gaussian or Lorentzian damping shape quietly assume about how galaxies move?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q44",
+      "question": "how do they connect simulated binary populations to what a radio telescope would actually detect?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q45",
+      "question": "why does the heavier dark-matter state survive long enough to show up in X-ray data?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q46",
+      "question": "what changes how a rare high-energy event in a dark-matter detector should be read?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q47",
+      "question": "how is the handedness imbalance of the hot gluon bath defined in practice?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q48",
+      "question": "can a bump in the early density fluctuations explain why so many bright young galaxies are seen?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q49",
+      "question": "what are the two competing pictures for where these small carbon molecules come from?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q50",
+      "question": "how does this approach treat regions larger than the horizon?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q51",
+      "question": "how were the halos split into two groups to test shape-dependent selection?",
+      "kind": "mechanism",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q52",
+      "question": "which papers present a new simulation tool rather than a new observation?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference",
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "papers"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "which papers"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference",
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "papers"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "which papers"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q53",
+      "question": "what is the difference between a mean and a median?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q54",
+      "question": "what does it mean for an optimization problem to be convex?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q55",
+      "question": "what did the 2019 survey of reinforcement learning for protein folding conclude?",
+      "kind": "off-corpus-research",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "survey of"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "survey of"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q56",
+      "question": "which paper in the repository introduced a diffusion model for weather forecasting?",
+      "kind": "off-corpus-research",
+      "institutional": true,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q57",
+      "question": "how does it compare?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q58",
+      "question": "is the second approach better?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q59",
+      "question": "can you give a simpler example of that?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "can you give a simpler example of a convex optimization problem?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q60",
+      "question": "and why does that matter in practice?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "and why does convexity matter in practice?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q61",
+      "question": "what exactly did they say about that?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "what exactly did the authors say about quantifying uncertainties around Pareto fronts?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "resolved",
+            "matched": [
+              "authors"
+            ]
+          }
+        ]
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "resolved",
+            "matched": [
+              "authors"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q62",
+      "question": "and how does that paper define it?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "and how does Learning to Solve Hard Problems in RL for LLMs by Never Giving Up define continuing to sample a prompt?",
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q63",
+      "question": "what is overfitting in machine learning?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q64",
+      "question": "what does a p-value actually tell you?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q65",
+      "question": "what is the difference between supervised and unsupervised learning?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q66",
+      "question": "what did the 2021 trial of intermittent fasting on blood pressure conclude?",
+      "kind": "off-corpus-research",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q67",
+      "question": "which paper in the repository studied off-target effects of CRISPR gene editing?",
+      "kind": "off-corpus-research",
+      "institutional": true,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q68",
+      "question": "which thesis from CIT-U studied mangrove restoration in Cebu?",
+      "kind": "off-corpus-research",
+      "institutional": true,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "cit u"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "thesis"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "cit u"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "thesis"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q69",
+      "question": "is that result significant?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q70",
+      "question": "which of the two is faster?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q71",
+      "question": "can you summarise it?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q72",
+      "question": "what would a concrete example of that look like?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "what would a concrete example of overfitting look like?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q73",
+      "question": "and is it different when there is very little data?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "and is overfitting different when there is very little data?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q74",
+      "question": "so when should I be wary of that?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "so when should I be wary of a small p-value?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q75",
+      "question": "and how many of those does it need?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "and how many qubits does State-Space-Based FIR Filtering on a Quantum Computer need for the sample position?",
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q76",
+      "question": "so how many did it flag?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "so how many protocluster candidates did PCFNet flag?",
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q77",
+      "question": "which two of those did they build?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "which two ODE solvers did the GPU-accelerated ensembles work implement, one for non-stiff and one for stiff systems?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q78",
+      "question": "what is a derivative in calculus?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q79",
+      "question": "what is the difference between correlation and causation?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q80",
+      "question": "what does big O notation mean?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q81",
+      "question": "what is an eigenvalue?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q82",
+      "question": "how does photosynthesis work?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q83",
+      "question": "what is known about coral bleaching recovery in the Philippines?",
+      "kind": "off-corpus-research",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q84",
+      "question": "which paper in the repository covers the rice blast fungus?",
+      "kind": "off-corpus-research",
+      "institutional": true,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q85",
+      "question": "what does Philippine labor law say about overtime pay?",
+      "kind": "off-corpus-research",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q86",
+      "question": "which CIT-U research examined seismic design of bridges?",
+      "kind": "off-corpus-research",
+      "institutional": true,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "cit u"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "cit u"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q87",
+      "question": "how effective was the 2019 measles vaccination campaign in Southeast Asia?",
+      "kind": "off-corpus-research",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q88",
+      "question": "how big is the difference?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q89",
+      "question": "does it work on the other dataset?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q90",
+      "question": "what about the second one?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q91",
+      "question": "is it better than before?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q92",
+      "question": "why did they pick that one?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q93",
+      "question": "can you give a numeric example of that?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "can you give a numeric example of a derivative?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q94",
+      "question": "what is a common mistake with that?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "what is a common mistake when reading correlation as causation?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q95",
+      "question": "and why does that matter for large inputs?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "and why does big O notation matter for large inputs?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q96",
+      "question": "does it always exist?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "does an eigenvalue always exist?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q97",
+      "question": "and what happens at night then?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "and what happens to photosynthesis at night?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q98",
+      "question": "and how many were there?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "and how many commercially released reference tracks does TTM-Bench use?",
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": {
+        "evidence_required": true,
+        "codes": [
+          "sourcing_demand",
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "sourcing_demand",
+            "source": "resolved",
+            "matched": [
+              "reference"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "sourcing_demand",
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "source": "resolved",
+            "matched": [
+              "reference"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q99",
+      "question": "what was the size of that pool?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "what was the size of the target entity pool in the multimodal conversational context ASR data construction work?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q100",
+      "question": "by how much did it grow?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "by how much did the total light in the L band grow in MATISSE in the era of GRAVITY+?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q101",
+      "question": "how many went into that map?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "how many galaxies were used for the galaxy density map in the IGM transmission and Lyman-alpha visibility work?",
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q102",
+      "question": "and how many did they pick out?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "and how many post-starburst quasars did the extreme MgII emission work identify?",
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "source": "resolved",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q103",
+      "question": "which adiabatic logic study found the best supply signal looks more like a triangle than a trapezoid?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "study"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "study"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q104",
+      "question": "which adiabatic logic study feeds each gate under test through buffer stages so its input looks like a real one?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "study"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "study"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q105",
+      "question": "which cache design treats the stored keys and values as traffic to be routed rather than as a storage problem?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q106",
+      "question": "which memory design names writes getting in the way of reads as a problem with serving from flash alone?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q107",
+      "question": "which dark matter paper uses a high-energy recoil seen in a detector as its case study?",
+      "kind": "near-duplicate",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper",
+              "study"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper",
+              "study"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q108",
+      "question": "which work asks how to balance expected welfare against the risk from random sampling?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q109",
+      "question": "which work compares ordinary regressions with flexible curve-fitting versions of the newer estimators?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q110",
+      "question": "which work extends a classic parallel computing model by nesting it inside itself?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q111",
+      "question": "which work brings model evaluation ideas from one field into another in order to judge model performance?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q112",
+      "question": "which work corrects a measure of how much a network changed for mistakes in estimating its links?",
+      "kind": "cross-paper",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q113",
+      "question": "how many regressions were reanalysed?",
+      "kind": "exact-term",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "how many"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

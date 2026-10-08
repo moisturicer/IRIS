@@ -8,6 +8,9 @@
       "id": "q01",
       "kind": "mechanism",
       "question": "how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
@@ -20,6 +23,9 @@
       "id": "q02",
       "kind": "mechanism",
       "question": "what does the training loop do with a problem the model has not managed to solve yet?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
@@ -32,6 +38,9 @@
       "id": "q03",
       "kind": "mechanism",
       "question": "how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
@@ -44,6 +53,9 @@
       "id": "q04",
       "kind": "mechanism",
       "question": "how do they make the generator produce the rare in-between arrangements instead of the common ones?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
@@ -56,6 +68,9 @@
       "id": "q05",
       "kind": "mechanism",
       "question": "with the next view not yet visible, how does the agent decide where to look?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Towards Active Cross-View Object Geo-Localization",
@@ -68,6 +83,9 @@
       "id": "q06",
       "kind": "mechanism",
       "question": "how does the smaller model learn where each word sits in the audio?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
@@ -80,6 +98,9 @@
       "id": "q07",
       "kind": "mechanism",
       "question": "how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
@@ -92,6 +113,9 @@
       "id": "q08",
       "kind": "mechanism",
       "question": "where is the waveform actually held in their scheme?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "State-Space-Based FIR Filtering on a Quantum Computer",
@@ -104,6 +128,9 @@
       "id": "q09",
       "kind": "mechanism",
       "question": "how did they choose which text descriptions to keep for each track?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
@@ -116,6 +143,9 @@
       "id": "q10",
       "kind": "mechanism",
       "question": "how did the older approach get the emotion label back out of the model?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
@@ -128,6 +158,9 @@
       "id": "q11",
       "kind": "mechanism",
       "question": "has anyone asked what a similarity score between two economies actually means, instead of only using it to sort them into groups?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Cosine metric as a structural economic similarity measure",
@@ -140,6 +173,9 @@
       "id": "q12",
       "kind": "mechanism",
       "question": "what can settle down a learner that swings wildly when the data shifts a little?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Stable Policy Learning",
@@ -152,6 +188,9 @@
       "id": "q13",
       "kind": "mechanism",
       "question": "what do the two fields each actually care about when they judge a model?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
@@ -164,6 +203,9 @@
       "id": "q14",
       "kind": "mechanism",
       "question": "when the treatment has more than two levels, what do the existing fixes actually recover?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
@@ -176,6 +218,9 @@
       "id": "q15",
       "kind": "mechanism",
       "question": "what happens to the correction when the assumed rate of spurious links is slightly wrong?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Noise-adjusted turnover in estimated networks",
@@ -188,6 +233,9 @@
       "id": "q16",
       "kind": "mechanism",
       "question": "why was reaching memory on another machine historically so slow?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Nested Parallel von Neumann Architecture and Nested BSP",
@@ -200,6 +248,9 @@
       "id": "q17",
       "kind": "mechanism",
       "question": "what two different kinds of unevenness do they separate when analysing flash-held caches?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
@@ -212,6 +263,9 @@
       "id": "q18",
       "kind": "mechanism",
       "question": "how do they stop the two kinds of on-chip traffic from jamming each other?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
@@ -224,6 +278,9 @@
       "id": "q19",
       "kind": "exact-term",
       "question": "how many qubits are needed to index the signal samples?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "State-Space-Based FIR Filtering on a Quantum Computer",
@@ -236,6 +293,9 @@
       "id": "q20",
       "kind": "exact-term",
       "question": "how many commercially released reference tracks were used?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
@@ -248,6 +308,9 @@
       "id": "q21",
       "kind": "exact-term",
       "question": "how many target entities went into the entity pool?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
@@ -260,6 +323,9 @@
       "id": "q22",
       "kind": "exact-term",
       "question": "which model and numeric precision were instrumented to observe cache access patterns?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
@@ -272,6 +338,9 @@
       "id": "q23",
       "kind": "near-duplicate",
       "question": "which paper reports a source of energy loss that had not been written about before?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
@@ -284,6 +353,9 @@
       "id": "q24",
       "kind": "near-duplicate",
       "question": "in the supply-waveform sweep, which phase lengths came out cheapest?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
@@ -296,6 +368,9 @@
       "id": "q25",
       "kind": "near-duplicate",
       "question": "which design keeps the cache in NAND flash rather than on-chip memory?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
@@ -308,6 +383,9 @@
       "id": "q26",
       "kind": "cross-paper",
       "question": "which work puts a large language model at the centre of speech transcription?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
@@ -325,6 +403,9 @@
       "id": "q27",
       "kind": "cross-paper",
       "question": "which work is about deciding who should get a treatment based on an experiment?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Stable Policy Learning",
@@ -342,6 +423,9 @@
       "id": "q28",
       "kind": "cross-paper",
       "question": "which work simulates adiabatic logic gates in a 16 nm FinFET process?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
@@ -359,6 +443,9 @@
       "id": "q29",
       "kind": "mechanism",
       "question": "how did they assemble the list of candidate young galaxy clusters to follow up?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
@@ -371,6 +458,9 @@
       "id": "q30",
       "kind": "exact-term",
       "question": "how many candidate protoclusters did the network flag?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
@@ -383,6 +473,9 @@
       "id": "q31",
       "kind": "mechanism",
       "question": "what did they run the dust calculations on top of?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
@@ -395,6 +488,9 @@
       "id": "q32",
       "kind": "mechanism",
       "question": "how did they work out the mass of the central black hole?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
@@ -407,6 +503,9 @@
       "id": "q33",
       "kind": "exact-term",
       "question": "how many recently-quenched objects hosting a bright active nucleus did they pick out?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
@@ -419,6 +518,9 @@
       "id": "q34",
       "kind": "cross-paper",
       "question": "which work estimates how heavy a black hole is in the early universe?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
@@ -436,6 +538,9 @@
       "id": "q35",
       "kind": "mechanism",
       "question": "how do they show that the ultraviolet glow of the sky tracks how much dust dims starlight?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
@@ -448,6 +553,9 @@
       "id": "q36",
       "kind": "mechanism",
       "question": "instead of describing a dark-matter halo by its density, what do they describe it by?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
@@ -460,6 +568,9 @@
       "id": "q37",
       "kind": "exact-term",
       "question": "by how much did the total light reaching the instrument grow in the L band on the test star?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "MATISSE in the era of GRAVITY+",
@@ -472,6 +583,9 @@
       "id": "q38",
       "kind": "mechanism",
       "question": "why use a middle resolution rather than the coarsest one for these early galaxies?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
@@ -484,6 +598,9 @@
       "id": "q39",
       "kind": "exact-term",
       "question": "how many galaxies were used to build the map of where galaxies cluster on the sky?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
@@ -496,6 +613,9 @@
       "id": "q40",
       "kind": "mechanism",
       "question": "why pick galaxies with no close companions when studying an active nucleus?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "The 2MIG isolated AGNs 4 Hot-dust reverberation and BLR scales",
@@ -508,6 +628,9 @@
       "id": "q41",
       "kind": "mechanism",
       "question": "how do they remove the distortion the upper atmosphere adds to the polarisation measurements?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "ViCTORIA project M49 region in the Virgo cluster in polarisation",
@@ -520,6 +643,9 @@
       "id": "q42",
       "kind": "exact-term",
       "question": "which two solvers did they implement, one for easy equations and one for hard ones?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
@@ -532,6 +658,9 @@
       "id": "q43",
       "kind": "mechanism",
       "question": "what does choosing a Gaussian or Lorentzian damping shape quietly assume about how galaxies move?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Can Fingers of God be Resummed",
@@ -544,6 +673,9 @@
       "id": "q44",
       "kind": "mechanism",
       "question": "how do they connect simulated binary populations to what a radio telescope would actually detect?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Empirical Galactic neutron star black hole merger rate StarTrack",
@@ -556,6 +688,9 @@
       "id": "q45",
       "kind": "near-duplicate",
       "question": "why does the heavier dark-matter state survive long enough to show up in X-ray data?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Freeze-in of anapole and charge-radius inelastic dark matter",
@@ -568,6 +703,9 @@
       "id": "q46",
       "kind": "near-duplicate",
       "question": "what changes how a rare high-energy event in a dark-matter detector should be read?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
@@ -580,6 +718,9 @@
       "id": "q47",
       "kind": "mechanism",
       "question": "how is the handedness imbalance of the hot gluon bath defined in practice?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Gauge Backreaction in Standard Model Warm Inflation",
@@ -592,6 +733,9 @@
       "id": "q48",
       "kind": "mechanism",
       "question": "can a bump in the early density fluctuations explain why so many bright young galaxies are seen?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Localized Enhancements of the Primordial Power Spectrum",
@@ -604,6 +748,9 @@
       "id": "q49",
       "kind": "mechanism",
       "question": "what are the two competing pictures for where these small carbon molecules come from?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "The abundance and emission of PAHs from the local to early Universe",
@@ -616,6 +763,9 @@
       "id": "q50",
       "kind": "mechanism",
       "question": "how does this approach treat regions larger than the horizon?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "The separate universe approach with non minimal coupling to gravity",
@@ -628,6 +778,9 @@
       "id": "q51",
       "kind": "mechanism",
       "question": "how were the halos split into two groups to test shape-dependent selection?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest",
@@ -640,6 +793,9 @@
       "id": "q52",
       "kind": "cross-paper",
       "question": "which papers present a new simulation tool rather than a new observation?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
       "expected": [
         {
           "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
@@ -756,6 +912,595 @@
           "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
           "page": 2,
           "quote": "puts the prompt back in the queue to continue sampling"
+        }
+      ]
+    },
+    {
+      "id": "q63",
+      "kind": "general-knowledge",
+      "question": "what is overfitting in machine learning?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q64",
+      "kind": "general-knowledge",
+      "question": "what does a p-value actually tell you?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q65",
+      "kind": "general-knowledge",
+      "question": "what is the difference between supervised and unsupervised learning?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q66",
+      "kind": "off-corpus-research",
+      "question": "what did the 2021 trial of intermittent fasting on blood pressure conclude?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q67",
+      "kind": "off-corpus-research",
+      "question": "which paper in the repository studied off-target effects of CRISPR gene editing?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": true,
+      "expected": []
+    },
+    {
+      "id": "q68",
+      "kind": "off-corpus-research",
+      "question": "which thesis from CIT-U studied mangrove restoration in Cebu?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": true,
+      "expected": []
+    },
+    {
+      "id": "q69",
+      "kind": "ambiguous",
+      "question": "is that result significant?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q70",
+      "kind": "ambiguous",
+      "question": "which of the two is faster?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q71",
+      "kind": "ambiguous",
+      "question": "can you summarise it?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q72",
+      "kind": "follow-up-after-direct",
+      "question": "what would a concrete example of that look like?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "what would a concrete example of overfitting look like?",
+      "expected": []
+    },
+    {
+      "id": "q73",
+      "kind": "follow-up-after-direct",
+      "question": "and is it different when there is very little data?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "and is overfitting different when there is very little data?",
+      "expected": []
+    },
+    {
+      "id": "q74",
+      "kind": "follow-up-after-direct",
+      "question": "so when should I be wary of that?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "so when should I be wary of a small p-value?",
+      "expected": []
+    },
+    {
+      "id": "q75",
+      "kind": "follow-up-after-grounded",
+      "question": "and how many of those does it need?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "and how many qubits does State-Space-Based FIR Filtering on a Quantum Computer need for the sample position?",
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 2,
+          "quote": "qubits are needed for the sample position"
+        }
+      ]
+    },
+    {
+      "id": "q76",
+      "kind": "follow-up-after-grounded",
+      "question": "so how many did it flag?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "so how many protocluster candidates did PCFNet flag?",
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 3,
+          "quote": "121 protocluster candidates identified by PCFNet"
+        }
+      ]
+    },
+    {
+      "id": "q77",
+      "kind": "follow-up-after-grounded",
+      "question": "which two of those did they build?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "which two ODE solvers did the GPU-accelerated ensembles work implement, one for non-stiff and one for stiff systems?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 2,
+          "quote": "explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P"
+        }
+      ]
+    },
+    {
+      "id": "q78",
+      "kind": "general-knowledge",
+      "question": "what is a derivative in calculus?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q79",
+      "kind": "general-knowledge",
+      "question": "what is the difference between correlation and causation?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q80",
+      "kind": "general-knowledge",
+      "question": "what does big O notation mean?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q81",
+      "kind": "general-knowledge",
+      "question": "what is an eigenvalue?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q82",
+      "kind": "general-knowledge",
+      "question": "how does photosynthesis work?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q83",
+      "kind": "off-corpus-research",
+      "question": "what is known about coral bleaching recovery in the Philippines?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q84",
+      "kind": "off-corpus-research",
+      "question": "which paper in the repository covers the rice blast fungus?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": true,
+      "expected": []
+    },
+    {
+      "id": "q85",
+      "kind": "off-corpus-research",
+      "question": "what does Philippine labor law say about overtime pay?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q86",
+      "kind": "off-corpus-research",
+      "question": "which CIT-U research examined seismic design of bridges?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": true,
+      "expected": []
+    },
+    {
+      "id": "q87",
+      "kind": "off-corpus-research",
+      "question": "how effective was the 2019 measles vaccination campaign in Southeast Asia?",
+      "evidence_required": "corpus",
+      "expected_outcome": "decline-no-evidence",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q88",
+      "kind": "ambiguous",
+      "question": "how big is the difference?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q89",
+      "kind": "ambiguous",
+      "question": "does it work on the other dataset?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q90",
+      "kind": "ambiguous",
+      "question": "what about the second one?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q91",
+      "kind": "ambiguous",
+      "question": "is it better than before?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q92",
+      "kind": "ambiguous",
+      "question": "why did they pick that one?",
+      "evidence_required": "none",
+      "expected_outcome": "clarify",
+      "institutional": false,
+      "expected": []
+    },
+    {
+      "id": "q93",
+      "kind": "follow-up-after-direct",
+      "question": "can you give a numeric example of that?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "can you give a numeric example of a derivative?",
+      "expected": []
+    },
+    {
+      "id": "q94",
+      "kind": "follow-up-after-direct",
+      "question": "what is a common mistake with that?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "what is a common mistake when reading correlation as causation?",
+      "expected": []
+    },
+    {
+      "id": "q95",
+      "kind": "follow-up-after-direct",
+      "question": "and why does that matter for large inputs?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "and why does big O notation matter for large inputs?",
+      "expected": []
+    },
+    {
+      "id": "q96",
+      "kind": "follow-up-after-direct",
+      "question": "does it always exist?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "does an eigenvalue always exist?",
+      "expected": []
+    },
+    {
+      "id": "q97",
+      "kind": "follow-up-after-direct",
+      "question": "and what happens at night then?",
+      "evidence_required": "none",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "and what happens to photosynthesis at night?",
+      "expected": []
+    },
+    {
+      "id": "q98",
+      "kind": "follow-up-after-grounded",
+      "question": "and how many were there?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "and how many commercially released reference tracks does TTM-Bench use?",
+      "expected": [
+        {
+          "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+          "page": 3,
+          "quote": "The reference collection comprises 100 commercially released tracks"
+        }
+      ]
+    },
+    {
+      "id": "q99",
+      "kind": "follow-up-after-grounded",
+      "question": "what was the size of that pool?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "what was the size of the target entity pool in the multimodal conversational context ASR data construction work?",
+      "expected": [
+        {
+          "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+          "page": 3,
+          "quote": "We select about 175k target entities"
+        }
+      ]
+    },
+    {
+      "id": "q100",
+      "kind": "follow-up-after-grounded",
+      "question": "by how much did it grow?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "by how much did the total light in the L band grow in MATISSE in the era of GRAVITY+?",
+      "expected": [
+        {
+          "record": "MATISSE in the era of GRAVITY+",
+          "page": 4,
+          "quote": "increases by a factor of 1.3 to 1.4 depending on the telescope"
+        }
+      ]
+    },
+    {
+      "id": "q101",
+      "kind": "follow-up-after-grounded",
+      "question": "how many went into that map?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "how many galaxies were used for the galaxy density map in the IGM transmission and Lyman-alpha visibility work?",
+      "expected": [
+        {
+          "record": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+          "page": 3,
+          "quote": "projected galaxy density map from the sky distribution of the full parent sample of 84 HAEs"
+        }
+      ]
+    },
+    {
+      "id": "q102",
+      "kind": "follow-up-after-grounded",
+      "question": "and how many did they pick out?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "and how many post-starburst quasars did the extreme MgII emission work identify?",
+      "expected": [
+        {
+          "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+          "page": 3,
+          "quote": "identify ten post-starburst quasars"
+        }
+      ]
+    },
+    {
+      "id": "q103",
+      "kind": "near-duplicate",
+      "question": "which adiabatic logic study found the best supply signal looks more like a triangle than a trapezoid?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+          "page": 1,
+          "quote": "the minimum-energy waveform approaches a triangular shape rather than a conventional trapezoid"
+        }
+      ]
+    },
+    {
+      "id": "q104",
+      "kind": "near-duplicate",
+      "question": "which adiabatic logic study feeds each gate under test through buffer stages so its input looks like a real one?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+          "page": 6,
+          "quote": "to provide a realistic adiabatic input waveform"
+        }
+      ]
+    },
+    {
+      "id": "q105",
+      "kind": "near-duplicate",
+      "question": "which cache design treats the stored keys and values as traffic to be routed rather than as a storage problem?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+          "page": 1,
+          "quote": "We treat the KV cache as a communication substrate"
+        }
+      ]
+    },
+    {
+      "id": "q106",
+      "kind": "near-duplicate",
+      "question": "which memory design names writes getting in the way of reads as a problem with serving from flash alone?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+          "page": 1,
+          "quote": "incremental writes interfere with foreground reads"
+        }
+      ]
+    },
+    {
+      "id": "q107",
+      "kind": "near-duplicate",
+      "question": "which dark matter paper uses a high-energy recoil seen in a detector as its case study?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+          "page": 1,
+          "quote": "offers an interesting setting to explore this interplay between particle physics and galactic dynamics"
+        }
+      ]
+    },
+    {
+      "id": "q108",
+      "kind": "cross-paper",
+      "question": "which work asks how to balance expected welfare against the risk from random sampling?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Stable Policy Learning",
+          "page": 1,
+          "quote": "how should policy learning algorithms balance expected welfare against sampling risk"
+        }
+      ]
+    },
+    {
+      "id": "q109",
+      "kind": "cross-paper",
+      "question": "which work compares ordinary regressions with flexible curve-fitting versions of the newer estimators?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+          "page": 1,
+          "quote": "we compare standard linear regressions against parametric and semiparametric versions of three contamination-robust estimators"
+        }
+      ]
+    },
+    {
+      "id": "q110",
+      "kind": "cross-paper",
+      "question": "which work extends a classic parallel computing model by nesting it inside itself?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Nested Parallel von Neumann Architecture and Nested BSP",
+          "page": 1,
+          "quote": "Nested BSP extends classic BSP by nesting it recursively"
+        }
+      ]
+    },
+    {
+      "id": "q111",
+      "kind": "cross-paper",
+      "question": "which work brings model evaluation ideas from one field into another in order to judge model performance?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+          "page": 1,
+          "quote": "we specifically focus on knowledge transfer from ML into CM in the context of model performance evaluation"
+        }
+      ]
+    },
+    {
+      "id": "q112",
+      "kind": "cross-paper",
+      "question": "which work corrects a measure of how much a network changed for mistakes in estimating its links?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Noise-adjusted turnover in estimated networks",
+          "page": 1,
+          "quote": "latent turnover admits a closed-form unbiased adjustment based only on observed turnover and the two estimated graph sizes"
+        }
+      ]
+    },
+    {
+      "id": "q113",
+      "kind": "exact-term",
+      "question": "how many regressions were reanalysed?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+          "page": 1,
+          "quote": "Reanalyzing 18 regressions across 11 studies"
         }
       ]
     }
