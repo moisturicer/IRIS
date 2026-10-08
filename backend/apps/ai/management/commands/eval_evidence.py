@@ -44,16 +44,62 @@ from apps.ai.evidence import (
     institution_terms,
 )
 from apps.ai.evidence.detector import EvidenceDetector
-from apps.ai.evidence.model_decision import ModelEvidenceDecision
+from apps.ai.evidence.jev_noul import (
+    CORPUS_DESCRIPTION_VERSION,
+    JevNoulDecision,
+    jev_digest,
+)
+from apps.ai.evidence.model_decision import MAX_PRIOR_QUESTIONS, ModelEvidenceDecision
 from apps.ai.evidence.route_label import (
     ROUTE_LABEL_MAX_TOKENS,
     RouteLabelDecision,
     route_label_digest,
 )
-from apps.ai.inference import InferenceTask
+from apps.ai.inference import InferenceTask, Vendor, profile_for
+from apps.ai.providers.openrouter_decisions import (
+    DECISIONS_URL,
+    PINNED_MODEL,
+    OpenRouterDecisionsAdapter,
+)
 from apps.ai.providers.tool_calling import ToolCallingLLM
 
 DEFAULT_OUT = Path("docs") / "evaluation" / "runs"
+
+#: Recorded in every Jev run file (IR-482, ADR-036 amendment).
+JEV_VENDOR_TERMS = (
+    "UNVERIFIED: OpenRouter's docs state no retention, training or rate-limit "
+    "terms for the alpha Decisions API. Treat everything sent as retained."
+)
+JEV_APPROVAL = {
+    "approver": "JIVE",
+    "date": "2026-10-08",
+    "scope": "live requests to the alpha Decisions API with the public proxy "
+    "question set only; not reader questions, private documents, sensitive "
+    "school data, or any run through shadow or the answer path",
+}
+JEV_STATE_FIELDS = (
+    "corpus",
+    "question",
+    "rewritten_question_untrusted",
+    "earlier_questions",
+)
+
+
+def _openrouter_decision_model():
+    """The Decisions adapter, on the key of a task already at OpenRouter.
+
+    No new setting: the first Inference task whose Profile is at OpenRouter and
+    carries a key lends it. Another vendor's key is never sent here.
+    """
+    for task in InferenceTask:
+        profile = profile_for(task)
+        if profile.vendor is Vendor.OPENROUTER and profile.api_key:
+            return OpenRouterDecisionsAdapter(profile.api_key)
+    raise CommandError(
+        "--decision-mode jev-noul needs an OpenRouter key, and no Inference "
+        "task is at OpenRouter with one. Set e.g. LLM_SUMMARY_VENDOR=openrouter "
+        "and LLM_SUMMARY_API_KEY (a Groq key is never sent to OpenRouter)."
+    )
 
 
 def _git_commit() -> str:
@@ -118,11 +164,13 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--decision-mode",
-            choices=("tools", "route-label"),
+            choices=("tools", "route-label", "jev-noul"),
             default="tools",
             help="With --model-decision: 'tools' offers search_corpus (IR-465); "
             "'route-label' asks for {\"route\":\"search\"|\"answer\"} through "
-            "plain generate, with no tool (IR-481).",
+            "plain generate, with no tool (IR-481); 'jev-noul' asks "
+            "OpenRouter's Decisions API (typesafe/jev-1.13) for a probability "
+            "and reports a threshold curve (IR-482). Public proxy set only.",
         )
         parser.add_argument(
             "--max-tokens",
@@ -151,20 +199,44 @@ class Command(BaseCommand):
         except QuestionSetError as exc:
             raise CommandError(str(exc))
 
-        label_mode = options["decision_mode"] == "route-label"
-        if label_mode and not options["model_decision"]:
-            raise CommandError("--decision-mode route-label needs --model-decision.")
+        mode = options["decision_mode"]
+        label_mode = mode == "route-label"
+        jev_mode = mode == "jev-noul"
+        if mode != "tools" and not options["model_decision"]:
+            raise CommandError(f"--decision-mode {mode} needs --model-decision.")
         if options["max_tokens"] < 1:
             raise CommandError("--max-tokens must be positive.")
+        if jev_mode and question_set.tier != "proxy":
+            raise CommandError(
+                "--decision-mode jev-noul is approved for the public proxy "
+                f"question set only (IR-482); this set's tier is "
+                f"{question_set.tier!r}. Retention terms are unverified."
+            )
         decider = (
-            self._decider(label_mode, options["max_tokens"])
+            self._decider(mode, options["max_tokens"])
             if options["model_decision"]
             else None
         )
 
         rule_set = active_rule_set()
         model_provenance = {}
-        if decider:
+        if decider and jev_mode:
+            model_provenance = {
+                "decision_mode": mode,
+                "prompt_digest": jev_digest(PINNED_MODEL),
+                "request": {
+                    "endpoint": DECISIONS_URL,
+                    "model_requested": PINNED_MODEL,
+                    "question_type": "noul",
+                    "state_fields": list(JEV_STATE_FIELDS),
+                    "corpus_description_version": CORPUS_DESCRIPTION_VERSION,
+                    "max_prior_questions": MAX_PRIOR_QUESTIONS,
+                },
+                "vendor_terms": JEV_VENDOR_TERMS,
+                "approval": JEV_APPROVAL,
+                "workers": 1,
+            }
+        elif decider:
             from apps.ai.evidence.model_decision import prompt_digest
             from apps.ai.evidence.shadow import generation_parameters
 
@@ -196,7 +268,9 @@ class Command(BaseCommand):
                 # Recorded as absent rather than omitted, so a results file
                 # without a model run can still be compared with one that has.
                 "model_decision": bool(decider),
-                "model": "answer task" if decider else None,
+                "model": (
+                    PINNED_MODEL if jev_mode else "answer task" if decider else None
+                ),
                 **model_provenance,
             },
         )
@@ -220,13 +294,17 @@ class Command(BaseCommand):
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
 
-    def _decider(self, label_mode: bool = False, max_tokens: int = 0):
+    def _decider(self, mode: str = "tools", max_tokens: int = 0):
         """The decision over the `answer` task, refused when nothing is
         configured rather than scored as a column of fallbacks.
 
         A run with no model would report every question as a fallback to
         evidence: a plausible-looking number measuring nothing.
         """
+        if mode == "jev-noul":
+            # Never builds the composition root: nothing here is the answer path.
+            return JevNoulDecision(_openrouter_decision_model())
+        label_mode = mode == "route-label"
         # Imported here so that a run without the flag never reaches it, and a
         # test that makes the root explode can prove that.
         from apps.ai.composition import composition_root

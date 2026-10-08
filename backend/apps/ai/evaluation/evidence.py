@@ -37,6 +37,7 @@ from typing import Any, Optional, Sequence
 
 from apps.ai.evidence import REASON_CODES, SOURCE_RAW, SOURCE_RESOLVED, Verdict
 from apps.ai.evidence.detector import EvidenceDetector
+from apps.ai.evidence.jev_noul import REFERENCE_THRESHOLD
 from apps.ai.evidence.model_decision import (
     REASONS as MODEL_REASONS,
     ModelDecision,
@@ -60,6 +61,10 @@ LANES = (LANE_RAW, LANE_RESOLVED, LANE_COMBINED)
 #: for it; answering directly is still correct. Recorded in every results file
 #: as `scoring`, because it changes what an over-fire means.
 SEARCH_TOLERATED_KINDS = ("ambiguous",)
+
+#: The thresholds a probability is evaluated at (IR-482). A fixed grid; the
+#: report draws the whole curve and chooses no point on it.
+THRESHOLDS = tuple(round(0.05 * i, 2) for i in range(1, 20))
 
 #: `evidence_required` to whether the question needs the corpus at all.
 _NEEDS_CORPUS = {"none": False, "corpus": True, "corpus_multi": True}
@@ -334,10 +339,81 @@ class ModelResult:
     def models(self) -> list[str]:
         return sorted({d.model for d in self.decisions if d.model})
 
+    @property
+    def has_probabilities(self) -> bool:
+        return any(d.probability is not None for d in self.decisions)
+
+    @property
+    def curve(self) -> list[dict[str, Any]]:
+        """Missed searches and over-searches at every threshold, by category.
+
+        A decision searches when its probability reaches the threshold; a
+        fallback has none and searches at every threshold, so it can only be an
+        over-search. The union adds the detector as a floor (ADR-035 §3). Empty
+        for a mode that returns no probability.
+        """
+        if not self.has_probabilities:
+            return []
+
+        def by_kind(ids: list[str]) -> dict[str, int]:
+            kinds = {j.question_id: j.kind or "unspecified" for j in self.judgements}
+            counts: dict[str, int] = {}
+            for question_id in ids:
+                counts[kinds[question_id]] = counts.get(kinds[question_id], 0) + 1
+            return dict(sorted(counts.items()))
+
+        rows = []
+        for threshold in THRESHOLDS:
+            missed, over, union_missed, union_over = [], [], [], []
+            for judgement, decision in self._pairs():
+                searches = (
+                    decision.probability is None or decision.probability >= threshold
+                )
+                with_detector = searches or judgement.combined.evidence_required
+                if judgement.expects_evidence:
+                    if not searches:
+                        missed.append(judgement.question_id)
+                    if not with_detector:
+                        union_missed.append(judgement.question_id)
+                elif judgement.counts_as_over_search:
+                    if searches:
+                        over.append(judgement.question_id)
+                    if with_detector:
+                        union_over.append(judgement.question_id)
+            rows.append(
+                {
+                    "threshold": threshold,
+                    "missed_searches": missed,
+                    "over_searches": over,
+                    "missed_by_kind": by_kind(missed),
+                    "over_by_kind": by_kind(over),
+                    "union_missed_searches": union_missed,
+                    "union_over_searches": union_over,
+                }
+            )
+        return rows
+
+    def _curve_dict(self) -> dict[str, Any]:
+        return {
+            "evidence_required": sum(1 for j in self.judgements if j.expects_evidence),
+            "no_evidence_needed": sum(1 for j in self.judgements if j.counts_as_over_search),
+            "thresholds": self.curve,
+        }
+
     def as_dict(self) -> dict[str, Any]:
         latencies = [d.latency_ms for d in self.decisions]
         answers = [d for d in self.decisions if d.answer_present]
+        curve = (
+            {
+                "threshold_curve": self._curve_dict(),
+                "reference_threshold": REFERENCE_THRESHOLD,
+                "operating_point": None,
+            }
+            if self.has_probabilities
+            else {}
+        )
         return {
+            **curve,
             "models": self.models,
             "questions": len(self.decisions),
             "fallbacks": self.fallbacks,
@@ -383,7 +459,13 @@ class ModelResult:
 
         lines = [
             "Model decision - the model's route beside the detector "
-            "(ADR-035 §3, §10)",
+            "(ADR-035 §3, §10)"
+            + (
+                f"; route at reference threshold {REFERENCE_THRESHOLD}, "
+                "not an operating point"
+                if self.has_probabilities
+                else ""
+            ),
             f"  model(s): {', '.join(self.models) or 'unknown'}; "
             f"{len(self.decisions)} calls, {self.fallbacks} fell back to evidence",
             f"  {'model alone':<28} {fmt(alone):>16}   "
@@ -421,6 +503,26 @@ class ModelResult:
             f"{sum(d.answer_chars for d in answers)} characters in all; "
             "none retained."
         )
+        if self.has_probabilities:
+            curve = self._curve_dict()
+            lines.append(
+                f"  threshold curve: missed searches over the "
+                f"{curve['evidence_required']} evidence-required, over-searches "
+                f"over the {curve['no_evidence_needed']} others; fallbacks search at "
+                "every threshold"
+            )
+            lines.append(
+                f"    {'threshold':>9} {'missed':>7} {'over':>5} "
+                f"{'union missed':>13} {'union over':>11}"
+            )
+            for row in curve["thresholds"]:
+                lines.append(
+                    f"    {row['threshold']:>9.2f} {len(row['missed_searches']):>7} "
+                    f"{len(row['over_searches']):>5} "
+                    f"{len(row['union_missed_searches']):>13} "
+                    f"{len(row['union_over_searches']):>11}"
+                )
+            lines.append("  no operating point chosen.")
         return lines
 
 
