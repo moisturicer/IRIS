@@ -26,9 +26,6 @@ const NOT_YET_CONVERTED: readonly string[] = [
   "src/features/records/WorkspaceOfficePills.tsx",
   "src/features/review/ApprovedProposalsPage.tsx",
   "src/features/review/EvaluationPage.tsx",
-  "src/features/review/PeerClearanceStrip.tsx",
-  "src/features/review/queueFilters.ts",
-  "src/features/review/ReviewQueuePage.tsx",
   // IR-362 -- Discover, My Library, Calls & Conferences, Notifications
   "src/features/discover/DiscoverRecordCard.tsx",
   "src/features/discover/discoverUtils.ts",

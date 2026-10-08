@@ -1,6 +1,4 @@
-import type { RecordListItem } from "@/types/records";
-import type { PipelineStatus } from "@/lib/constants";
-export type ReviewStage  = "adviser" | "rdco_intake" | "itso" | "ktto" | "rdco";
+export type ReviewStage  = "adviser" | "rdco_intake" | "itso" | "ierc" | "ktto" | "rdco";
 export type ReviewStatus = "approved" | "declined" | "rejected";
 
 export interface Review {
@@ -20,33 +18,75 @@ export interface ReviewSubmitPayload {
   comment?:  string;
 }
 
-/** One office's decision on a record, as shown to a *peer* reviewer. */
-export interface PeerClearance {
-  office:       "itso" | "ierc" | "ktto";
-  office_label: string;
-  status:       "pending" | "cleared" | "declined" | "rejected";
-  status_label: string;
-}
+/** The three tabs of My Reviews (ADR-032 §9). */
+export type MyReviewsTab = "to_review" | "in_review" | "done";
 
 /**
- * A review-queue row (IR-139).
- *
- * A `RecordListItem` plus the context that makes the row mean something to the
- * office looking at it. Before this, every reviewer saw title/type/date and had
- * no way to tell which clearance was theirs or whether anyone else had acted.
+ * A Done row's outcome (ADR-032 §9 Amendment, 2026-10-08), derived by the
+ * server from the reviewer's own verdict. `revision_requested` is the old
+ * pipeline's decline: shown, but never a filter.
  */
-export interface ReviewQueueRow extends RecordListItem {
-  stage:              PipelineStatus;
-  /** Server-worded. Never map a stage key to English on the client. */
-  stage_label:        string;
-  /** The office *this viewer* would be recording a clearance for; null for
-   *  sequential reviewers (Adviser, RDCO), who decide the record itself. */
-  your_office:        "itso" | "ierc" | "ktto" | null;
-  your_office_label:  string | null;
-  /** The other offices' decisions. Status only — never their comments. */
-  peers:              PeerClearance[];
-  waiting_since:      string;
-  waiting_days:       number;
-  resubmitted:        boolean;
-  resubmission_count: number;
+export type ReviewOutcome =
+  | "cleared" | "finding" | "accepted" | "rejected" | "published" | "revision_requested";
+
+/**
+ * The parties a My Reviews row names. No `intake`: it is retired, and the
+ * server shows an intake decision as RDCO's. The stored `Party` and
+ * `ReviewStage` are narrowed by IR-260 and IR-274.
+ */
+export type MyReviewsParty = "adviser" | "itso" | "ierc" | "ktto" | "rdco";
+
+/**
+ * One row of My Reviews (`GET /reviews/mine/`, IR-268).
+ *
+ * - `seat`: a reviewer's part, theirs or (in a coordinator's office view) a colleague's;
+ * - `pool`: an office's unclaimed record, which carries the `assignment` that
+ *   *Claim* and *Assign* address;
+ * - `legacy`: a record still on the old pipeline, listed as its old queue listed it;
+ * - `review`: a Done decision with no seat behind it, from before seats existed.
+ *
+ * Every label is server-worded.
+ */
+export interface MyReviewsRow {
+  key:              string;
+  kind:             "seat" | "pool" | "legacy" | "review";
+  record:           number;
+  title:            string;
+  record_type_name: string | null;
+  party:            MyReviewsParty;
+  party_label:      string;
+  /** The old pipeline's stage, on a `legacy` row only. */
+  stage_label:      string | null;
+  seat:             number | null;
+  assignment:       number | null;
+  holder:           number | null;
+  holder_name:      string | null;
+  is_mine:          boolean;
+  routed_by:        string | null;
+  routed_reason:    string;
+  submitted_by:     string | null;
+  waiting_since:    string | null;
+  waiting_days:     number | null;
+  /** The record waits on its author, or on a requested document. Record-level. */
+  waiting_on:       "author" | "document" | null;
+  outcome:          ReviewOutcome | null;
+  outcome_label:    string | null;
+  decided_at:       string | null;
+  can_claim:        boolean;
+  can_assign:       boolean;
+}
+
+export interface MyReviewsPage {
+  rows:   MyReviewsRow[];
+  /** Every tab's size in this view. The office view narrows them; the outcome filter never does. */
+  counts: Record<MyReviewsTab, number>;
+  /** The next page of Done, or null. */
+  next:   string | null;
+}
+
+export interface MyReviewsQuery {
+  tab:      MyReviewsTab;
+  outcome?: ReviewOutcome | null;
+  office?:  string | null;
+  cursor?:  string | null;
 }
