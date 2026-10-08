@@ -35,6 +35,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-08 (project lead, IR-272): §5.** Who may ask for a revision, one open request per party, what an open request blocks, and why *Changes requested* is derived rather than stored. See the *Amendment* note under §5.
 
+**Amended 2026-10-08 (project lead, IR-268): §9.** What each My Reviews tab is made of. Current work splits by model until IR-260, and Done is history assembled from seats plus the old pipeline's unseated Reviews. It also settles how a Done row's outcome is derived, that the waiting badge is record-level, and the coordinator's office view. See the *Amendment* note under §9.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -334,6 +336,37 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
 | **Done** | Your seats in `done`, as your decision history. |
 
 **Why these are not outcome tabs.** Rejected, Cleared and Archived are outcomes, not work, so they are filters on Done. They are not tabs.
+
+**Amendment, 2026-10-08 (project lead, IR-268): what each tab is made of.** Settled in a design grilling.
+
+- **Current work and history are sourced differently.**
+    - **To review** and **In review** are current work, so they split by model.
+        - A record on the new model (`in_review`) comes from seats and pools.
+        - Every other record comes from the old pipeline's own queue, unchanged, until IR-260. Its pending work is in To review. In review holds none of it, because the old pipeline has no "opened" state.
+    - **Done** is history, and it is never split by model or by `pipeline_status`. A new-model record that gets published stops being `in_review`, so a split by status would misfile it. Done is the union of two sets:
+        1. Every `done` seat of yours, on any record.
+        2. Every `Review` of yours with no seat of yours behind it: its assignment is null, or it never seated you. This is the old pipeline's history from before IR-415, which the seat backfill (`0010`) did not seat.
+    - Rule 2 excludes on purpose a revision request's `Review` whose seat is still `in_review`. Otherwise the same work would show as both current and done.
+- **Rows.**
+    - **One row per seat, and one per unclaimed assignment**, so an office routed the same record twice shows two Done rows, one per Review round.
+    - Every row leads to Paper View's Review section (`/records/<id>?section=review`). My Reviews never links to the old decision form; the Review section reaches it for an old-pipeline decision.
+    - *Open review* stays in Paper View, so the time-on-task start (IR-144) is one act in one place.
+    - A row shows the party and holder ("ITSO · Unassigned", "ITSO · You"), who routed it and why, from the latest routing event into that party, or "Submitted by" for an Adviser's entry seat, and how long it has waited. The peer-clearance strip is not on rows; Paper View's tracker shows it.
+- **A Done row's outcome is the holder's own verdict `Review`** on that seat's assignment.
+    - An office's `approved` is *cleared*; a `negative_finding` is *finding*.
+    - An Adviser's or RDCO's `approved` is *accepted*, or *published* when that decision published the record.
+    - `rejected` is *rejected*.
+    - The old pipeline's `declined` is *revision requested*: shown, and listed under *All*, with no filter of its own, since the new model never closes a seat that way.
+    - A seat done with no verdict of its holder's, because a colleague's verdict completed the office, has no outcome. It reads "Completed by your office" and is listed under *All* only. *All* is the default filter.
+- **Waiting on author / document is record-level.** Any party's open revision request sets *author*, and any open document request sets *document*. *Author* wins when both are open, matching `workflow_state`. The badge replaces the row's action, and the title still opens the record, so a reviewer who may still act is never locked out.
+- **The coordinator's office view**, `?office=<party>`, works inside every tab: every seat of that office in that state, each with its holder, plus the pool in To review. Anyone but a coordinator of that office is refused with **403**. In that view an old-pipeline row reads "<Office> · Old pipeline" and offers no *Assign*, because it has no seat a coordinator could fill until IR-260.
+- **Assign has its own picklist**, `GET /assignments/<id>/assign/`, refused exactly as the act is. The *Add reviewer* list serves only seat holders, and the two acts have different rules.
+- **Counts and paging.**
+    - The response carries the rows and all three tab counts. The counts honour `office` and ignore `outcome`, so changing the filter never changes them.
+    - The query count is flat in the number of rows.
+    - Done is paged newest first, with *Show more*. To review and In review are not paged.
+- **The URL holds the view.** `?tab=` defaults to `to_review`, `?outcome=` to All, and `?office=` to Mine. The old `?status=pending|approved|declined` maps once to `to_review` / `done` / `done` and is then replaced.
+- **After *Claim* or *Assign*** the page refetches and announces where the row went. In Mine view an *Assign* to someone else removes the row; in the office view it stays, with the new holder. A failed act is reported on its row and announces nothing. There is no polling.
 
 ### 10. One Paper View, driven by capabilities
 

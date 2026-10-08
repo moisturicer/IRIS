@@ -86,6 +86,10 @@ _Avoid_: Full review, RDCO path.
 An office holding a Record that nobody in it is reviewing yet: the office's shared work, until a member claims it, a coordinator assigns someone, or whoever routed it nominated someone.
 _Avoid_: Queue (My Reviews is the queue; a Pool is one of the things in it), unassigned.
 
+**My Reviews**:
+A reviewer's own [[Seat]]s, plus their office's [[Pool]], arranged as the work to do (To review), the work under way (In review) and the decisions already made (Done). Nobody sees another reviewer's My Reviews; an office coordinator alone may see every Seat in their own office. Rejected, Cleared and the other outcomes are filters on Done, never tabs, because they are results rather than work.
+_Avoid_: Review Queue (the retired page, whose tabs were outcomes), queue or inbox alone (both suggest a shared list everyone works from).
+
 **Seat**:
 One person's part in an office's review of a Record: "this member is reviewing it for that office". An office can hold a Record with several Seats, and its review is finished only when every Seat that was not withdrawn is done.
 _Avoid_: Assignment (the office holding the Record, not a person), reviewer slot.
