@@ -1,0 +1,2495 @@
+{
+  "cannot_measure": [
+    "Answer quality and claim support. The hypothetical direct answer is discarded in process by design, so neither is observable. They become measurable only through a separately approved capture, which is out of scope.",
+    "Reader-visible end-to-end latency for a direct answer. Shadow always retrieves afterwards, so no request ever takes the shape a production direct answer would. The latencies below are the decision call's and the task's, not a reader's.",
+    "Page precision. There is no instrument: labels match on record identity plus normalised quote containment, and the page is reported and never scored. ADR-028's central objection can be neither confirmed nor refuted today."
+  ],
+  "curated": {
+    "denominators": "Each lane's denominator is the annotated questions carrying that lane's text (the Resolved lane only those with a Resolved question). Each category's is its own annotated questions. The model section's is every annotated question put to the model.",
+    "has_ground_truth": true,
+    "instrument": "curated",
+    "max_model_runs_on_one_question_set": 4,
+    "model_runs": 4,
+    "runs": [
+      {
+        "categories": [
+          {
+            "accuracy": null,
+            "correct": 2,
+            "judged": 2,
+            "kind": "ambiguous",
+            "min_examples": 5,
+            "status": "inconclusive"
+          },
+          {
+            "accuracy": null,
+            "correct": 2,
+            "judged": 2,
+            "kind": "follow-up-after-direct",
+            "min_examples": 5,
+            "status": "inconclusive"
+          },
+          {
+            "accuracy": null,
+            "correct": 2,
+            "judged": 2,
+            "kind": "follow-up-after-grounded",
+            "min_examples": 5,
+            "status": "inconclusive"
+          },
+          {
+            "accuracy": null,
+            "correct": 2,
+            "judged": 2,
+            "kind": "general-knowledge",
+            "min_examples": 5,
+            "status": "inconclusive"
+          },
+          {
+            "accuracy": null,
+            "correct": 2,
+            "judged": 2,
+            "kind": "off-corpus-research",
+            "min_examples": 5,
+            "status": "inconclusive"
+          }
+        ],
+        "conclusive_categories": 0,
+        "coverage": {
+          "annotated": 10,
+          "annotated_fraction": 0.1613,
+          "questions_in_set": 62,
+          "unannotated": 52,
+          "with_resolved_question": 4
+        },
+        "inconclusive_categories": [
+          "ambiguous",
+          "follow-up-after-direct",
+          "follow-up-after-grounded",
+          "general-knowledge",
+          "off-corpus-research"
+        ],
+        "institutional": {
+          "incorrect": [],
+          "judged": 1
+        },
+        "lanes": {
+          "combined": {
+            "correct": 10,
+            "judged": 10,
+            "miss_ids": [],
+            "misses": 0,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 4
+              },
+              {
+                "code": "institution_term",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 3
+              },
+              {
+                "code": "document_reference",
+                "fired": 3,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 1
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 4
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 3
+              }
+            ],
+            "undetermined": 0
+          },
+          "raw": {
+            "correct": 9,
+            "judged": 10,
+            "miss_ids": [
+              "q61"
+            ],
+            "misses": 1,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 4
+              },
+              {
+                "code": "institution_term",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 3
+              },
+              {
+                "code": "document_reference",
+                "fired": 2,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 2
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 4
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 3
+              }
+            ],
+            "undetermined": 0
+          },
+          "resolved": {
+            "correct": 3,
+            "judged": 4,
+            "miss_ids": [
+              "q62"
+            ],
+            "misses": 1,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 2
+              },
+              {
+                "code": "institution_term",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 2
+              },
+              {
+                "code": "document_reference",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 1
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 2
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 2
+              }
+            ],
+            "undetermined": 0
+          }
+        },
+        "model": null,
+        "provenance": {
+          "AI_EVIDENCE_DECISION": "off",
+          "generation": "not recorded",
+          "git_commit": "v0.1.0-619-gafe6976-dirty",
+          "model_decision_run": false,
+          "models": [],
+          "prompt_digest": "not recorded",
+          "question_set": "proxy-starter",
+          "question_set_sha256": "553696988bac8487d447985d30a8df55ef5144bd0981611637f9b586d902ca1b",
+          "retrieval_configuration": "not applicable (no retrieval runs)",
+          "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33"
+        },
+        "source": "20261008-024428-evidence-proxy-starter.json"
+      },
+      {
+        "categories": [
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "ambiguous",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.1,
+            "correct": 1,
+            "judged": 10,
+            "kind": "cross-paper",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "exact-term",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "follow-up-after-direct",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "follow-up-after-grounded",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "general-knowledge",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.0303,
+            "correct": 1,
+            "judged": 33,
+            "kind": "mechanism",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.4,
+            "correct": 4,
+            "judged": 10,
+            "kind": "near-duplicate",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.6,
+            "correct": 6,
+            "judged": 10,
+            "kind": "off-corpus-research",
+            "min_examples": 10,
+            "status": "conclusive"
+          }
+        ],
+        "conclusive_categories": 9,
+        "coverage": {
+          "annotated": 113,
+          "annotated_fraction": 1.0,
+          "questions_in_set": 113,
+          "unannotated": 0,
+          "with_resolved_question": 20
+        },
+        "inconclusive_categories": [],
+        "institutional": {
+          "incorrect": [],
+          "judged": 5
+        },
+        "lanes": {
+          "combined": {
+            "correct": 56,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 57,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 11,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 72
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 3,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 80
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "raw": {
+            "correct": 55,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q61",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 58,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 10,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 73
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 2,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 81
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "resolved": {
+            "correct": 16,
+            "judged": 20,
+            "miss_ids": [
+              "q62",
+              "q77",
+              "q99",
+              "q100"
+            ],
+            "misses": 4,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "institution_term",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "document_reference",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 5
+              }
+            ],
+            "undetermined": 0
+          }
+        },
+        "model": null,
+        "provenance": {
+          "AI_EVIDENCE_DECISION": "off",
+          "generation": "not recorded",
+          "git_commit": "v0.1.0-620-g3fba71f-dirty",
+          "model_decision_run": false,
+          "models": [],
+          "prompt_digest": "not recorded",
+          "question_set": "proxy-starter",
+          "question_set_sha256": "cafe5d976e0d1101a9d03ef13dcfeb932b82eb04c0c82cf401de87b0418dee93",
+          "retrieval_configuration": "not applicable (no retrieval runs)",
+          "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33"
+        },
+        "source": "20261008-044833-evidence-proxy-starter.json"
+      },
+      {
+        "categories": [
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "ambiguous",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.1,
+            "correct": 1,
+            "judged": 10,
+            "kind": "cross-paper",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "exact-term",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "follow-up-after-direct",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "follow-up-after-grounded",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "general-knowledge",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.0303,
+            "correct": 1,
+            "judged": 33,
+            "kind": "mechanism",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.4,
+            "correct": 4,
+            "judged": 10,
+            "kind": "near-duplicate",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.6,
+            "correct": 6,
+            "judged": 10,
+            "kind": "off-corpus-research",
+            "min_examples": 10,
+            "status": "conclusive"
+          }
+        ],
+        "conclusive_categories": 9,
+        "coverage": {
+          "annotated": 113,
+          "annotated_fraction": 1.0,
+          "questions_in_set": 113,
+          "unannotated": 0,
+          "with_resolved_question": 20
+        },
+        "inconclusive_categories": [],
+        "institutional": {
+          "incorrect": [],
+          "judged": 5
+        },
+        "lanes": {
+          "combined": {
+            "correct": 56,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 57,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 11,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 72
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 3,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 80
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "raw": {
+            "correct": 55,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q61",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 58,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 10,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 73
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 2,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 81
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "resolved": {
+            "correct": 16,
+            "judged": 20,
+            "miss_ids": [
+              "q62",
+              "q77",
+              "q99",
+              "q100"
+            ],
+            "misses": 4,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "institution_term",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "document_reference",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 5
+              }
+            ],
+            "undetermined": 0
+          }
+        },
+        "model": {
+          "anomalies": {},
+          "decision_latency_ms": {
+            "mean": 3467,
+            "p95": 7262
+          },
+          "detector_model_agreement": {
+            "agreement": 0.5133,
+            "both_direct": 33,
+            "both_evidence": 25,
+            "detector_only_evidence": 1,
+            "model_only_evidence": 54
+          },
+          "failure_rate": 0.0,
+          "fallbacks": 0,
+          "model_alone": {
+            "accuracy": 0.8407,
+            "correct": 95,
+            "judged": 113,
+            "missed_search_ids": [
+              "q03",
+              "q06",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q19",
+              "q32",
+              "q36",
+              "q40",
+              "q43"
+            ],
+            "missed_searches": 11,
+            "over_searches": 7
+          },
+          "model_alone_decided_only": {
+            "accuracy": 0.8407,
+            "correct": 95,
+            "judged": 113
+          },
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "questions": 113,
+          "reasons": {
+            "answered_directly": 34,
+            "search_requested": 79
+          },
+          "tokens": {
+            "input": 30799,
+            "output": 28240
+          },
+          "union": {
+            "accuracy": 0.8496,
+            "correct": 96,
+            "judged": 113,
+            "missed_search_ids": [
+              "q03",
+              "q06",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q36",
+              "q40",
+              "q43"
+            ],
+            "missed_searches": 10,
+            "over_searches": 7
+          }
+        },
+        "provenance": {
+          "AI_EVIDENCE_DECISION": "off",
+          "generation": {
+            "fallback_models": [],
+            "model": "openai/gpt-oss-120b",
+            "reasoning_effort": "medium",
+            "temperature": 0.5,
+            "vendor": "groq"
+          },
+          "git_commit": "v0.1.0-621-g4418b1a",
+          "model_decision_run": true,
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+          "question_set": "proxy-starter",
+          "question_set_sha256": "cafe5d976e0d1101a9d03ef13dcfeb932b82eb04c0c82cf401de87b0418dee93",
+          "retrieval_configuration": "not applicable (no retrieval runs)",
+          "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33"
+        },
+        "source": "20261008-051409-evidence-proxy-starter.json"
+      },
+      {
+        "categories": [
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "ambiguous",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.1,
+            "correct": 1,
+            "judged": 10,
+            "kind": "cross-paper",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "exact-term",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "follow-up-after-direct",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "follow-up-after-grounded",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "general-knowledge",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.0303,
+            "correct": 1,
+            "judged": 33,
+            "kind": "mechanism",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.4,
+            "correct": 4,
+            "judged": 10,
+            "kind": "near-duplicate",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.6,
+            "correct": 6,
+            "judged": 10,
+            "kind": "off-corpus-research",
+            "min_examples": 10,
+            "status": "conclusive"
+          }
+        ],
+        "conclusive_categories": 9,
+        "coverage": {
+          "annotated": 113,
+          "annotated_fraction": 1.0,
+          "questions_in_set": 113,
+          "unannotated": 0,
+          "with_resolved_question": 20
+        },
+        "inconclusive_categories": [],
+        "institutional": {
+          "incorrect": [],
+          "judged": 5
+        },
+        "lanes": {
+          "combined": {
+            "correct": 56,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 57,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 11,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 72
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 3,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 80
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "raw": {
+            "correct": 55,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q61",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 58,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 10,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 73
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 2,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 81
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "resolved": {
+            "correct": 16,
+            "judged": 20,
+            "miss_ids": [
+              "q62",
+              "q77",
+              "q99",
+              "q100"
+            ],
+            "misses": 4,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "institution_term",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "document_reference",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 5
+              }
+            ],
+            "undetermined": 0
+          }
+        },
+        "model": {
+          "anomalies": {},
+          "decision_latency_ms": {
+            "mean": 3406,
+            "p95": 9528
+          },
+          "detector_model_agreement": {
+            "agreement": 0.5044,
+            "both_direct": 32,
+            "both_evidence": 25,
+            "detector_only_evidence": 1,
+            "model_only_evidence": 55
+          },
+          "failure_rate": 0.0088,
+          "fallbacks": 1,
+          "model_alone": {
+            "accuracy": 0.8496,
+            "correct": 96,
+            "judged": 113,
+            "missed_search_ids": [
+              "q04",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q19",
+              "q32",
+              "q40",
+              "q43",
+              "q106"
+            ],
+            "missed_searches": 10,
+            "over_searches": 7
+          },
+          "model_alone_decided_only": {
+            "accuracy": 0.8482,
+            "correct": 95,
+            "judged": 112
+          },
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "questions": 113,
+          "reasons": {
+            "answered_directly": 33,
+            "rate_limited": 1,
+            "search_requested": 79
+          },
+          "tokens": {
+            "input": 31038,
+            "output": 28047
+          },
+          "union": {
+            "accuracy": 0.8584,
+            "correct": 97,
+            "judged": 113,
+            "missed_search_ids": [
+              "q04",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q40",
+              "q43",
+              "q106"
+            ],
+            "missed_searches": 9,
+            "over_searches": 7
+          }
+        },
+        "provenance": {
+          "AI_EVIDENCE_DECISION": "off",
+          "generation": {
+            "fallback_models": [],
+            "model": "openai/gpt-oss-120b",
+            "reasoning_effort": "medium",
+            "temperature": 0.5,
+            "vendor": "groq"
+          },
+          "git_commit": "v0.1.0-622-g455d3d7",
+          "model_decision_run": true,
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+          "question_set": "proxy-starter",
+          "question_set_sha256": "cafe5d976e0d1101a9d03ef13dcfeb932b82eb04c0c82cf401de87b0418dee93",
+          "retrieval_configuration": "not applicable (no retrieval runs)",
+          "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33"
+        },
+        "source": "20261008-053345-evidence-proxy-starter.json"
+      },
+      {
+        "categories": [
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "ambiguous",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.1,
+            "correct": 1,
+            "judged": 10,
+            "kind": "cross-paper",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "exact-term",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "follow-up-after-direct",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "follow-up-after-grounded",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "general-knowledge",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.0303,
+            "correct": 1,
+            "judged": 33,
+            "kind": "mechanism",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.4,
+            "correct": 4,
+            "judged": 10,
+            "kind": "near-duplicate",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.6,
+            "correct": 6,
+            "judged": 10,
+            "kind": "off-corpus-research",
+            "min_examples": 10,
+            "status": "conclusive"
+          }
+        ],
+        "conclusive_categories": 9,
+        "coverage": {
+          "annotated": 113,
+          "annotated_fraction": 1.0,
+          "questions_in_set": 113,
+          "unannotated": 0,
+          "with_resolved_question": 20
+        },
+        "inconclusive_categories": [],
+        "institutional": {
+          "incorrect": [],
+          "judged": 5
+        },
+        "lanes": {
+          "combined": {
+            "correct": 56,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 57,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 11,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 72
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 3,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 80
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "raw": {
+            "correct": 55,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q61",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 58,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 10,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 73
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 2,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 81
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "resolved": {
+            "correct": 16,
+            "judged": 20,
+            "miss_ids": [
+              "q62",
+              "q77",
+              "q99",
+              "q100"
+            ],
+            "misses": 4,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "institution_term",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "document_reference",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 5
+              }
+            ],
+            "undetermined": 0
+          }
+        },
+        "model": {
+          "anomalies": {
+            "arguments_supplied": 1
+          },
+          "decision_latency_ms": {
+            "mean": 3827,
+            "p95": 9107
+          },
+          "detector_model_agreement": {
+            "agreement": 0.5044,
+            "both_direct": 31,
+            "both_evidence": 26,
+            "detector_only_evidence": 0,
+            "model_only_evidence": 56
+          },
+          "failure_rate": 0.0,
+          "fallbacks": 0,
+          "model_alone": {
+            "accuracy": 0.8319,
+            "correct": 94,
+            "judged": 113,
+            "missed_search_ids": [
+              "q04",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q35",
+              "q36",
+              "q40",
+              "q43"
+            ],
+            "missed_searches": 10,
+            "over_searches": 9
+          },
+          "model_alone_decided_only": {
+            "accuracy": 0.8319,
+            "correct": 94,
+            "judged": 113
+          },
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "questions": 113,
+          "reasons": {
+            "answered_directly": 31,
+            "search_requested": 82
+          },
+          "tokens": {
+            "input": 32847,
+            "output": 28540
+          },
+          "union": {
+            "accuracy": 0.8319,
+            "correct": 94,
+            "judged": 113,
+            "missed_search_ids": [
+              "q04",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q35",
+              "q36",
+              "q40",
+              "q43"
+            ],
+            "missed_searches": 10,
+            "over_searches": 9
+          }
+        },
+        "provenance": {
+          "AI_EVIDENCE_DECISION": "off",
+          "generation": {
+            "fallback_models": [],
+            "model": "openai/gpt-oss-120b",
+            "reasoning_effort": "medium",
+            "temperature": 0.5,
+            "vendor": "groq"
+          },
+          "git_commit": "v0.1.0-622-g455d3d7",
+          "model_decision_run": true,
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+          "question_set": "proxy-starter",
+          "question_set_sha256": "cafe5d976e0d1101a9d03ef13dcfeb932b82eb04c0c82cf401de87b0418dee93",
+          "retrieval_configuration": "not applicable (no retrieval runs)",
+          "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33"
+        },
+        "source": "20261008-054102-evidence-proxy-starter.json"
+      },
+      {
+        "categories": [
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "ambiguous",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.1,
+            "correct": 1,
+            "judged": 10,
+            "kind": "cross-paper",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "exact-term",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "follow-up-after-direct",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.7,
+            "correct": 7,
+            "judged": 10,
+            "kind": "follow-up-after-grounded",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 1.0,
+            "correct": 10,
+            "judged": 10,
+            "kind": "general-knowledge",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.0303,
+            "correct": 1,
+            "judged": 33,
+            "kind": "mechanism",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.4,
+            "correct": 4,
+            "judged": 10,
+            "kind": "near-duplicate",
+            "min_examples": 10,
+            "status": "conclusive"
+          },
+          {
+            "accuracy": 0.6,
+            "correct": 6,
+            "judged": 10,
+            "kind": "off-corpus-research",
+            "min_examples": 10,
+            "status": "conclusive"
+          }
+        ],
+        "conclusive_categories": 9,
+        "coverage": {
+          "annotated": 113,
+          "annotated_fraction": 1.0,
+          "questions_in_set": 113,
+          "unannotated": 0,
+          "with_resolved_question": 20
+        },
+        "inconclusive_categories": [],
+        "institutional": {
+          "incorrect": [],
+          "judged": 5
+        },
+        "lanes": {
+          "combined": {
+            "correct": 56,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 57,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 11,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 72
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 3,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 80
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "raw": {
+            "correct": 55,
+            "judged": 113,
+            "miss_ids": [
+              "q01",
+              "q02",
+              "q03",
+              "q04",
+              "q05",
+              "q06",
+              "q07",
+              "q08",
+              "q09",
+              "q10",
+              "q11",
+              "q12",
+              "q13",
+              "q14",
+              "q15",
+              "q16",
+              "q17",
+              "q18",
+              "q22",
+              "q24",
+              "q25",
+              "q26",
+              "q27",
+              "q28",
+              "q31",
+              "q32",
+              "q34",
+              "q35",
+              "q36",
+              "q37",
+              "q38",
+              "q40",
+              "q41",
+              "q42",
+              "q43",
+              "q44",
+              "q45",
+              "q46",
+              "q47",
+              "q48",
+              "q49",
+              "q50",
+              "q51",
+              "q61",
+              "q66",
+              "q77",
+              "q83",
+              "q85",
+              "q87",
+              "q99",
+              "q100",
+              "q105",
+              "q106",
+              "q108",
+              "q109",
+              "q110",
+              "q111",
+              "q112"
+            ],
+            "misses": 58,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 83
+              },
+              {
+                "code": "institution_term",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 78
+              },
+              {
+                "code": "document_reference",
+                "fired": 10,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 73
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 2,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 81
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 15,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 68
+              }
+            ],
+            "undetermined": 0
+          },
+          "resolved": {
+            "correct": 16,
+            "judged": 20,
+            "miss_ids": [
+              "q62",
+              "q77",
+              "q99",
+              "q100"
+            ],
+            "misses": 4,
+            "over_fire_ids": [],
+            "over_fires": 0,
+            "per_rule": [
+              {
+                "code": "scope_record",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "institution_term",
+                "fired": 0,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 10
+              },
+              {
+                "code": "document_reference",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "sourcing_demand",
+                "fired": 1,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 9
+              },
+              {
+                "code": "aggregate_shape",
+                "fired": 5,
+                "over_fire_ids": [],
+                "over_fires": 0,
+                "silent_on_required": 5
+              }
+            ],
+            "undetermined": 0
+          }
+        },
+        "model": {
+          "anomalies": {
+            "arguments_supplied": 1
+          },
+          "decision_latency_ms": {
+            "mean": 1876,
+            "p95": 8979
+          },
+          "detector_model_agreement": {
+            "agreement": 0.3274,
+            "both_direct": 11,
+            "both_evidence": 26,
+            "detector_only_evidence": 0,
+            "model_only_evidence": 76
+          },
+          "failure_rate": 0.469,
+          "fallbacks": 53,
+          "model_alone": {
+            "accuracy": 0.708,
+            "correct": 80,
+            "judged": 113,
+            "missed_search_ids": [
+              "q06",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q40"
+            ],
+            "missed_searches": 7,
+            "over_searches": 26
+          },
+          "model_alone_decided_only": {
+            "accuracy": 0.85,
+            "correct": 51,
+            "judged": 60
+          },
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "questions": 113,
+          "reasons": {
+            "answered_directly": 11,
+            "provider_failure": 48,
+            "rate_limited": 5,
+            "search_requested": 49
+          },
+          "tokens": {
+            "input": 18326,
+            "output": 14256
+          },
+          "union": {
+            "accuracy": 0.708,
+            "correct": 80,
+            "judged": 113,
+            "missed_search_ids": [
+              "q06",
+              "q07",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q40"
+            ],
+            "missed_searches": 7,
+            "over_searches": 26
+          }
+        },
+        "provenance": {
+          "AI_EVIDENCE_DECISION": "off",
+          "generation": {
+            "fallback_models": [],
+            "model": "openai/gpt-oss-120b",
+            "reasoning_effort": "medium",
+            "temperature": 0.5,
+            "vendor": "groq"
+          },
+          "git_commit": "v0.1.0-622-g455d3d7",
+          "model_decision_run": true,
+          "models": [
+            "openai/gpt-oss-120b"
+          ],
+          "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+          "question_set": "proxy-starter",
+          "question_set_sha256": "cafe5d976e0d1101a9d03ef13dcfeb932b82eb04c0c82cf401de87b0418dee93",
+          "retrieval_configuration": "not applicable (no retrieval runs)",
+          "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33"
+        },
+        "source": "20261008-054438-evidence-proxy-starter.json"
+      }
+    ]
+  },
+  "on_gates": [
+    "Routing thresholds met across repeated runs.",
+    "An offline review of hypothetical direct answers passed.",
+    "The landscape policy (ADR-035 §9) resolved with an accountable owner named by a person, never inferred.",
+    "The reader-facing 'search the papers instead' override built.",
+    "ADR-035 accepted (it is, as of 2026-10-06; that does not make the other four true)."
+  ],
+  "recommendation": [
+    "5 categories are inconclusive: label more questions before any per-category claim.",
+    "20261008-051409-evidence-proxy-starter.json: the union missed 10 question(s) needing the corpus (q03, q06, q07, q12, q13, q16, q32, q36, q40, q43). That is the expensive direction (ADR-035 §3).",
+    "20261008-053345-evidence-proxy-starter.json: the union missed 9 question(s) needing the corpus (q04, q07, q12, q13, q16, q32, q40, q43, q106). That is the expensive direction (ADR-035 §3).",
+    "20261008-054102-evidence-proxy-starter.json: the union missed 10 question(s) needing the corpus (q04, q07, q12, q13, q16, q32, q35, q36, q40, q43). That is the expensive direction (ADR-035 §3).",
+    "20261008-054438-evidence-proxy-starter.json: the union missed 7 question(s) needing the corpus (q06, q07, q12, q13, q16, q32, q40). That is the expensive direction (ADR-035 §3).",
+    "No shadow rows: the operational side of the pilot has not run on any traffic, so coverage, latency and contention are unmeasured. ADR-035 §11 keeps shadow off real reader questions until the vendor-retention check is recorded.",
+    "The exploratory sample plan is not declared.",
+    "The confirmatory sample plan is not declared.",
+    "Recommendation: do not move toward production `on` on this evidence. The pilot is evidence for that decision, not authorization to make it, and none of the other gates below is satisfied by it."
+  ],
+  "report": "evidence-decision-pilot",
+  "safety_properties_asserted_by_test": {
+    "no reader-visible change": [
+      "apps/ai/tests/test_evidence_shadow.py::test_shadow_changes_nothing_a_reader_receives",
+      "apps/ai/tests/test_shadow_off_snapshot.py",
+      "apps/ai/tests/test_evidence_shadow.py::test_a_failing_enqueue_never_reaches_the_reader"
+    ],
+    "no shadow-attributable degradation of the answer path": [
+      "apps/ai/tests/test_evidence_shadow.py::test_the_reader_path_spends_against_no_bucket",
+      "apps/ai/tests/test_evidence_shadow.py::test_shadow_is_skipped_when_the_answer_breaker_is_open",
+      "apps/ai/tests/test_evidence_shadow.py::test_shadow_is_skipped_when_its_budget_is_spent"
+    ]
+  },
+  "sample_plan": {
+    "confirmatory_assessment": null,
+    "note": "The figure of 200 decisions that circulated during design is an exploratory planning estimate with no demonstrated statistical basis. It certifies nothing and is not used here.",
+    "stage_reported": "exploratory",
+    "stages": {
+      "confirmatory": {
+        "status": "not_declared"
+      },
+      "exploratory": {
+        "status": "not_declared"
+      }
+    },
+    "window": {
+      "since": null,
+      "until": null
+    }
+  },
+  "shadow": {
+    "accuracy": "not computed: real traffic carries no labels (ADR-035 §10). Any accuracy figure drawn from this section is a category error.",
+    "available": true,
+    "configurations": [],
+    "coverage": {
+      "completed_rows": 0,
+      "enqueue_failed_events": 0,
+      "fenced_out_completions": 0,
+      "mismatched": 0,
+      "missing": 0,
+      "missing_breakdown": {
+        "failed": 0,
+        "no_row_record_failed": 0,
+        "no_row_turn_deleted": 0,
+        "skipped": 0,
+        "unfinished": 0
+      },
+      "parity_checked": 0,
+      "reclaimed_rows": 0,
+      "reclaims": 0
+    },
+    "denominators": "Coverage is over eligible questions. Latency is over completed rows that recorded it. Parity is over completed rows. Detector/model cells are over rows where the model ruled.",
+    "detector_codes_fired": {},
+    "detector_model_cells": {
+      "both_direct": 0,
+      "both_evidence": 0,
+      "detector_only_evidence": 0,
+      "model_only_evidence": 0,
+      "n": 0
+    },
+    "eligible": 0,
+    "failures": {
+      "by_reason": {},
+      "model_fell_back_to_evidence": 0,
+      "rows_failed": {}
+    },
+    "has_ground_truth": false,
+    "instrument": "shadow",
+    "latency_ms": {
+      "decision_call": {
+        "max": null,
+        "mean": null,
+        "n": 0,
+        "p50": null,
+        "p95": null
+      },
+      "task_created_to_finished": {
+        "max": null,
+        "mean": null,
+        "n": 0,
+        "p50": null,
+        "p95": null
+      }
+    },
+    "single_configuration": true,
+    "skips": {
+      "breaker": 0,
+      "by_outcome": {},
+      "capacity": 0
+    },
+    "status": {},
+    "tallies_attributed": true,
+    "tokens": {
+      "input_total": 0,
+      "output_total": 0,
+      "rows_reporting_input": 0,
+      "rows_reporting_output": 0
+    },
+    "volume_by_day": {}
+  },
+  "ticket": "IR-467",
+  "version": 1
+}
