@@ -31,6 +31,8 @@ Details are in the *Amendment* notes under §8 and §10. The original text is ke
 
 See the *Amendment* notes under §4 and §10.
 
+**Amended 2026-10-08 (project lead, IR-416): §5 and §13.** The manuscript was never a `RecordUpload`, so a version names the stored manuscript file directly. The server locks the manuscript once a record is submitted. Earlier versions are participants-only. The backfill records only what can be known. See the *Amendment* notes under §5 and §13.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -203,6 +205,30 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
   - Every other party's `cleared` clearance and `done` seat survive.
   - If RDCO requests a revision, only RDCO re-reviews. An Adviser-stage revision returns to the Adviser alone.
 - The Paper View's **version picker** opens that version's manuscript. The review timeline marks which version each review and comment was made against.
+
+**Amendment, 2026-10-08 (project lead, IR-416): what a version points at, who sees it, and what writes one.** Settled in a design grilling.
+
+- **The manuscript is not a `RecordUpload`.** It is `Record.abstract_file`, one file field replaced in place, with no history. The `manuscript (FK RecordUpload)` above, and "`RecordUpload.version` keeps numbering files" as a description of the manuscript, assumed otherwise. **`RecordVersion.manuscript` is a file field naming the stored manuscript file** current when the version was written. It is **nullable**, because the server has never refused a submission with no manuscript, and this ticket adds no such rule.
+    - Each upload is stored under a fresh random name, so a later upload never touches a file an earlier version names. **No code may delete a manuscript file that a version still names**, and a test pins that.
+    - *Rejected:* copying the file into version-owned storage. That doubles storage for no gain the shared name lacks.
+    - *Rejected:* moving the manuscript into `RecordUpload` under a slot. It would rewrite the manuscript extraction, chunking, `/manuscript/`, `load_corpus` and the serializers for a field nobody needs moved.
+- **The server locks the manuscript once a record is submitted.** A request that replaces `abstract_file` is refused (400, naming the status) unless the record is a `draft`, or a legacy `declined` until IR-274. IR-273 adds `awaiting_resubmission`. Staff are not exempt. Correcting a published paper's file would be a deliberate act of its own, not an edit. Other detail fields are the `edit_details` capability's concern, not this rule's.
+- **One function writes every version**, called by:
+    - the legacy `POST /records/<id>/submit/` (v1, `submission`);
+    - `routing.enter_at_adviser()` (v1, `submission`);
+    - the legacy `resubmit_record()` (the next version, `revision`);
+    - IR-273's resubmission.
+
+  So every record submitted from today on has an accurate history. IR-274 deletes the legacy call sites with the rest of the old pipeline.
+- **A review records the latest version when it is written**, wherever it is written:
+    - the legacy services;
+    - Clear and Record finding (IR-269);
+    - accept & route (IR-261).
+- **Earlier versions are review material** and follow IR-479's rule, `may_read_review`. A participant gets the version list in the record payload, the picker, and `GET /records/<id>/versions/<n>/manuscript/`. Anyone else gets no list and a 404, and reads the current manuscript as before. Serving a version is audited as a `DOWNLOAD` carrying the version number.
+- **The picker renders only when a record has two or more versions.** There is nothing to choose between with one.
+- **Opening an earlier version** sets `?version=N` and shows "You are viewing vN of M · Back to current". Citation highlights are off while an earlier version is open, because their coordinates are the current manuscript's (ADR-031). Paper Chat says it answers about the current version. Earlier versions are not indexed.
+- **The timeline** shows each version as its own entry ("v2 submitted"), and tags each review with `Review.version`. Nothing else is tagged from timestamps. A comment's version is IR-419's (`ReviewComment.version`).
+- **Settled, built in IR-273:** a non-owner's "current" manuscript is the latest version's, and an owner sees their unsubmitted upload, labelled as such. Until then, the gap exists only while a legacy record is `declined`, when no reviewer is acting.
 
 ### 6. Lineage: an accepted Proposal continues as a new record
 
@@ -385,6 +411,17 @@ The migration is additive first, following ADR-021 §7's expand/contract plan.
 
 - **Seats.** One seat per existing active assignment. It goes to `record.adviser` for Adviser assignments, and to the most recent reviewer of that party where one exists. Otherwise it is left seatless, which puts it in the pool.
 - **Versions.** v1 per submitted record, from its current manuscript upload. Older uploads become earlier versions only where their dates bracket a recorded resubmission. Nothing is invented.
+
+**Amendment, 2026-10-08 (project lead, IR-416): the version backfill.** No older manuscript is recorded anywhere (§5 *Amendment*), so the "older uploads" clause can never apply. The backfill is, per non-draft record:
+
+- **never resubmitted** (`resubmission_count = 0`): one **v1**, `submission`, naming the current manuscript;
+- **resubmitted k times**: one version numbered **k + 1**, `revision`, dated `last_resubmitted_at`, naming the current manuscript. No v1…vk rows are made up, so that history starts at v(k + 1), and the next resubmission writes v(k + 2).
+
+The rules that apply to both:
+
+- Records made by import, seed or `load_corpus` get a version with no `created_by`.
+- A record with no manuscript gets a version with none.
+- **Every existing `Review.version` stays null**, as IR-257 left `Review.assignment`. Dating a review against a reconstructed version would invent the link.
 - **In-flight records at `intake`.** Where the record has an Adviser, an Adviser assignment is opened and the intake assignment is withdrawn with reason "ADR-032: intake retired". Records **without** an Adviser are listed by a management command for a person to assign. They are never guessed.
 
 ## Alternatives Considered

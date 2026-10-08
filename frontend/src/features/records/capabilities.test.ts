@@ -70,6 +70,7 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     is_participant: false,
     routing: { accept_and_route: false, route_as: null },
     office_review: { party: null, label: null, blocked: null, assignment: null },
+    versions: null,
     ...overrides,
   };
 }

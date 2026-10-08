@@ -258,6 +258,18 @@ class SeatSource(models.TextChoices):
     ADDED = "added", "Added"
 
 
+class VersionCause(models.TextChoices):
+    """
+    Why a record has a new Version. `RecordVersion.cause`. ADR-032 §5.
+
+    - `SUBMISSION`: the record was first submitted (v1).
+    - `REVISION`: the owner resubmitted after a reviewer asked for changes.
+    """
+
+    SUBMISSION = "submission", "Submission"
+    REVISION = "revision", "Revision"
+
+
 class ResubmissionRequestState(models.TextChoices):
     """
     Where one party's request for changes stands. `ResubmissionRequest.state`.

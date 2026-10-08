@@ -121,6 +121,12 @@ interface PaperChatPanelProps {
   onRestore?: () => void;
   /** Positioning is the caller's job — the panel only styles its own interior. */
   className?: string;
+  /**
+   * The earlier version the reader has open beside the chat, or null for
+   * the current paper (IR-416). Answers are always about the current paper,
+   * so the panel says so while an earlier one is open.
+   */
+  viewingVersion?: number | null;
 }
 
 /** The paper a Paper Chat conversation is about. */
@@ -157,6 +163,7 @@ export function PaperChatPanel({
   minimized = false,
   onRestore,
   className,
+  viewingVersion = null,
 }: PaperChatPanelProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -302,6 +309,11 @@ export function PaperChatPanel({
             <p className="text-2xs text-stone-500 truncate">
               {pinned ? `Chatting about ${subject.title}` : record.title}
             </p>
+            {viewingVersion != null && !pinned && (
+              <p className="text-2xs text-stone-700">
+                Answers are about the current version, not v{viewingVersion}.
+              </p>
+            )}
           </div>
 
           {canChangePosition && (

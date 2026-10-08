@@ -109,6 +109,12 @@ export const recordsApi = {
    */
   manuscriptBlob: (id: number) =>
     apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob" }),
+  /**
+   * An earlier version's manuscript (IR-416), fetched the same way and for
+   * the same reason. Participants only: anyone else gets a 404.
+   */
+  versionManuscriptBlob: (id: number, version: number) =>
+    apiClient.get<Blob>(`/records/${id}/versions/${version}/manuscript/`, { responseType: "blob" }),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // `dpaAccepted` is required, not optional (IR-226). The backend refuses a
   // submit without consent, and an optional flag would let a future caller

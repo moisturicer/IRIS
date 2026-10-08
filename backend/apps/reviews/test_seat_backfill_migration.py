@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordType
-from apps.reviews.models import RecordAssignment, RecordClearance, Review, ReviewerSeat
+from apps.reviews.models import RecordAssignment, RecordClearance, ReviewerSeat
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -43,6 +43,16 @@ def _migrate(target):
     executor = MigrationExecutor(connection)
     executor.loader.build_graph()
     executor.migrate(target)
+
+
+def _review_model(target):
+    """
+    `Review` as of `target`. The live model carries `Review.version` (IR-416,
+    `reviews/0011`), a column the rewound table does not have yet, so a row
+    written through it would name a column that does not exist.
+    """
+    executor = MigrationExecutor(connection)
+    return executor.loader.project_state(target).apps.get_model("reviews", "Review")
 
 
 def _seats(assignment):
@@ -73,9 +83,12 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
             )
 
         def review(record_, stage, by, minutes, decision="approved"):
-            r = Review.objects.create(record=record_, reviewed_by=by, stage=stage, status=decision)
+            HistoricalReview = _review_model(_BEFORE)
+            r = HistoricalReview.objects.create(
+                record_id=record_.pk, reviewed_by_id=by.pk, stage=stage, status=decision,
+            )
             at = T0 + timedelta(minutes=minutes)
-            Review.objects.filter(pk=r.pk).update(created_at=at)
+            HistoricalReview.objects.filter(pk=r.pk).update(created_at=at)
             return at
 
         # An Adviser who has not reviewed yet: an `assigned` entry seat.

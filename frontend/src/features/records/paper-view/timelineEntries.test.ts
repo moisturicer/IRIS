@@ -21,6 +21,7 @@ function tracker(overrides: Partial<RecordTracker> = {}): RecordTracker {
     routing_history: [],
     routing_recorded_from: null,
     reviews: [],
+    versions: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
@@ -38,6 +39,7 @@ const review = (overrides: Partial<TrackerReview>): TrackerReview => ({
   comment: "",
   reviewed_by_name: "Mara Santos",
   created_at: "2026-09-05T08:00:00Z",
+  version: null,
   ...overrides,
 });
 
@@ -252,5 +254,43 @@ describe("timelineEntries", () => {
     );
 
     expect(entries.map((e) => e.act)).toEqual(["Negative finding", "Approved"]);
+  });
+
+  it("makes each version an entry, and tags each review with the version it was made against", () => {
+    const entries = timelineEntries(
+      tracker({
+        versions: [
+          {
+            number: 1, cause: "submission", cause_label: "Submission",
+            created_at: "2026-09-01T08:00:00Z", created_by_name: "Rhea Owner",
+            manuscript_url: "/api/v1/records/7/versions/1/manuscript/",
+          },
+          {
+            number: 2, cause: "revision", cause_label: "Revision",
+            created_at: "2026-09-07T08:00:00Z", created_by_name: "Rhea Owner", manuscript_url: null,
+          },
+        ],
+        reviews: [
+          review({ id: 1, status_label: "Approved", created_at: "2026-09-05T08:00:00Z", version: 1 }),
+          review({ id: 2, status_label: "Approved", created_at: "2026-09-08T08:00:00Z", version: 2 }),
+        ],
+      }),
+    );
+
+    expect(entries.map((e) => [e.act, e.version])).toEqual([
+      ["v1 submitted", null],
+      ["Approved", 1],
+      ["v2 submitted", null],
+      ["Approved", 2],
+    ]);
+    expect(entries[0].actor).toBe("Rhea Owner");
+    expect(entries[0].party).toBeNull();
+    expect(entries[2].details).toEqual(["Revision · no manuscript"]);
+  });
+
+  it("tags no review written before versions, rather than invent v1", () => {
+    const entries = timelineEntries(tracker({ reviews: [review({ version: null })], versions: null }));
+
+    expect(entries.map((e) => e.version)).toEqual([null]);
   });
 });

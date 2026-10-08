@@ -102,6 +102,7 @@ const record: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  versions: null,
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -155,6 +156,7 @@ const approvedProposal: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  versions: null,
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -231,15 +233,17 @@ vi.mock("./PaperPdfReader", () => ({
     scrollToPage,
     highlightRegions,
     toolbarStart,
+    version,
   }: {
     scrollToPage: number | null;
     highlightRegions: unknown[];
     toolbarStart?: ReactNode;
+    version?: number | null;
   }) => (
     <div>
       {toolbarStart}
       Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
-      highlight
+      highlight{version != null ? `, reading v${version}` : ", reading the current paper"}
     </div>
   ),
 }));
@@ -378,6 +382,7 @@ const inReview: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  versions: null,
 };
 
 async function waitForRecord(title: string) {
@@ -1400,6 +1405,7 @@ describe("the Review section (IR-412)", () => {
     ],
     routing_recorded_from: null,
     reviews: [],
+    versions: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
@@ -1541,5 +1547,119 @@ describe("a record the viewer cannot read (IR-411)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitForRecord(record.title);
+  });
+});
+
+// Record versions (IR-416; ADR-032 §5 Amendment). The server sends
+// `versions` only to a participant, so what is under test here is what the
+// page does with the list it was given.
+describe("record versions (IR-416)", () => {
+  const version = (number: number, cause: "submission" | "revision", manuscript = true) => ({
+    number,
+    cause,
+    cause_label: cause === "submission" ? "Submission" : "Revision",
+    created_at: `2026-09-0${number}T08:00:00Z`,
+    created_by_name: "Rhea Owner",
+    manuscript_url: manuscript ? `/api/v1/records/${RECORD_ID}/versions/${number}/manuscript/` : null,
+  });
+  const twoVersions = [version(1, "submission"), version(2, "revision")];
+  const PICKER = { name: "Version" };
+
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  afterEach(() => localStorage.removeItem(DOCK_KEY));
+
+  it("offers no picker with one version, or with none disclosed", async () => {
+    for (const versions of [[version(1, "submission")], null]) {
+      shownRecord = { ...record, versions };
+      const { unmount } = renderPaperView();
+      await waitForRecord(record.title);
+
+      expect(screen.queryByRole("combobox", PICKER)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^v1\b/)).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("lists every version, the newest marked current and chosen", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+
+    const picker = screen.getByRole("combobox", PICKER);
+    expect(picker).toHaveValue("2");
+    expect(within(picker).getByRole("option", { name: /^v2 · Revision · .* \(current\)$/ })).toBeInTheDocument();
+    expect(within(picker).getByRole("option", { name: /^v1 · Submission/ })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("opens an earlier version on the Paper tab, says so, and drops a citation's page and highlight", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    const citation = {
+      marker: 1, chunk_id: 11, record_id: RECORD_ID, record_title: record.title,
+      page: 4, text: "a passage", context_path: [record.title],
+      regions: [{ page: 4, left: 0.1, top: 0.2, right: 0.6, bottom: 0.3 }],
+    };
+    renderPaper(`/records/${RECORD_ID}?page=4`, { citation });
+    expect(await screen.findByText(/open at page 4, 1 region\(s\) to highlight, reading the current paper/i))
+      .toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByRole("combobox", PICKER), "1");
+
+    expect(await screen.findByText(/open at page none, 0 region\(s\) to highlight, reading v1/i))
+      .toBeInTheDocument();
+    expect(screen.getByText("You are viewing v1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Citation highlights and Ask IRIS use the current version.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to current" }));
+
+    expect(await screen.findByText(/reading the current paper/i)).toBeInTheDocument();
+    expect(screen.queryByText("You are viewing v1 of 2")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", PICKER)).toHaveValue("2");
+  });
+
+  it("moves from Overview to the Paper tab when a version is chosen", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    renderPaperView();
+    await waitForRecord(record.title);
+    expect(screen.getByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByRole("combobox", PICKER), "1");
+
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/reading v1/i)).toBeInTheDocument();
+  });
+
+  it("tells Paper Chat's reader that answers are about the current version", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    renderPaper(`/records/${RECORD_ID}?section=paper&version=1`);
+    await screen.findByText(/reading v1/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    const panel = await screen.findByRole("complementary", { name: "Paper Chat" });
+    expect(within(panel).getByText("Answers are about the current version, not v1.")).toBeInTheDocument();
+  });
+
+  it("reads the current paper for a version that is current, missing or has no manuscript", async () => {
+    shownRecord = {
+      ...record,
+      versions: [version(1, "submission", false), version(2, "revision"), version(3, "revision")],
+    };
+    for (const asked of ["3", "1", "9"]) {
+      const { unmount } = renderPaper(`/records/${RECORD_ID}?section=paper&version=${asked}`);
+
+      expect(await screen.findByText(/reading the current paper/i)).toBeInTheDocument();
+      expect(screen.queryByText(/You are viewing/)).not.toBeInTheDocument();
+      unmount();
+    }
+    const { unmount } = renderPaperView();
+    await waitForRecord(record.title);
+    expect(
+      within(screen.getByRole("combobox", PICKER)).getByRole("option", { name: /^v1 .*\(no manuscript\)$/ }),
+    ).toBeDisabled();
+    unmount();
   });
 });

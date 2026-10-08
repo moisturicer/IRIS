@@ -23,8 +23,10 @@ from core.enums import (
     RequestStatus,
     ReviewStage,
     RoleName,
+    VersionCause,
 )
 from . import lifecycle
+from .versions import write_version
 from core.permissions import (
     IsAdmin,
     IsAdviser,
@@ -302,7 +304,11 @@ class RecordViewSet(viewsets.ModelViewSet):
             record.dpa_accepted_by = request.user
             record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
 
-        lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, request.user)
+        # The move and the record's v1 are one write (ADR-032 §5, IR-416): a
+        # submitted record never lacks the version reviewers are handed.
+        with transaction.atomic():
+            lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, request.user)
+            write_version(record, request.user, VersionCause.SUBMISSION)
 
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
@@ -355,6 +361,50 @@ class RecordViewSet(viewsets.ModelViewSet):
         response = FileResponse(
             handle, content_type="application/pdf", as_attachment=False,
             filename=filename,
+        )
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        response["Accept-Ranges"] = "bytes"
+        return response
+
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"versions/(?P<number>[0-9]+)/manuscript", url_name="version-manuscript",
+    )
+    def version_manuscript(self, request, pk=None, number=None):
+        """
+        GET /records/<id>/versions/<n>/manuscript/ -- the manuscript as it
+        stood at version n (ADR-032 §5 Amendment, IR-416).
+
+        Earlier versions are review material, so this follows IR-479's rule:
+        a viewer who may not read the review gets the same 404 as for a
+        version that does not exist, and so does a version with no manuscript.
+        `get_object()` has already turned away a viewer who cannot see the
+        record at all. Served and audited as `manuscript` is.
+        """
+        from core.permissions import may_read_review
+
+        from .download_service import manuscript_download_name
+        from .models import RecordVersion
+
+        record = self.get_object()
+        version = (
+            RecordVersion.objects.filter(record=record, number=number).first()
+            if may_read_review(request.user, record) else None
+        )
+        if version is None or not version.manuscript:
+            return Response(
+                {"detail": "No such version of this paper."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "manuscript", "inline": True, "version": version.number},
+        )
+        filename = manuscript_download_name(record, version.manuscript.name, version=version.number)
+        response = FileResponse(
+            version.manuscript.open("rb"), content_type="application/pdf",
+            as_attachment=False, filename=filename,
         )
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"

@@ -15,6 +15,7 @@ const KIND_ICON: Record<TimelineKind, string> = {
   revision: "fa-arrow-rotate-left",
   revision_resolved: "fa-paper-plane",
   document_request: "fa-file-circle-plus",
+  version: "fa-code-commit",
 };
 
 /**
@@ -113,6 +114,11 @@ function TimelineItem({ entry }: { entry: TimelineEntry }) {
         {entry.status && (
           <span className="px-1.5 py-0.5 rounded bg-stone-100 text-2xs font-semibold text-stone-700">
             {entry.status}
+          </span>
+        )}
+        {entry.version !== null && (
+          <span className="px-1.5 py-0.5 rounded ring-1 ring-stone-200 text-2xs font-semibold text-stone-700 tabular-nums">
+            <span className="sr-only">Made against </span>v{entry.version}
           </span>
         )}
       </div>

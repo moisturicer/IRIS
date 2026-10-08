@@ -45,6 +45,7 @@ import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { ReviewSection } from "./ReviewSection";
+import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -338,15 +339,18 @@ export default function PaperViewPage() {
     else arrivalKey.current = location.key;
   }
 
-  /** Set or clear one view parameter in place, keeping the rest and the router state. */
-  const setViewParam = (name: string, value: string | null) => {
+  /** Set or clear view parameters in place, keeping the rest and the router state. */
+  const setViewParams = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
-    if (value == null) next.delete(name);
-    else next.set(name, value);
+    for (const [name, value] of Object.entries(changes)) {
+      if (value == null) next.delete(name);
+      else next.set(name, value);
+    }
     const search = next.toString();
     viewChange.current = `${location.pathname}${search ? `?${search}` : ""}`;
     setSearchParams(next, { replace: true, state: location.state });
   };
+  const setViewParam = (name: string, value: string | null) => setViewParams({ [name]: value });
 
   // Below `lg` the docked chat is a bottom sheet over the paper; at `lg` it
   // is a column beside it (IR-352).
@@ -533,22 +537,51 @@ export default function PaperViewPage() {
           ? DOCKED_PANEL_CLASS
           : FLOATING_PANEL_CLASS;
   const showRail = section === "overview" && !chatDocked && !arriving;
+  // Versions (IR-416). Null to a viewer who may not read the review, so a
+  // reader of a published paper has none, and `?version=` means nothing to
+  // them. An earlier version is open only while it is asked for, exists and
+  // has a manuscript; the newest is the current paper, read as it always was.
+  const versions = record.versions ?? [];
+  const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
+  const askedVersion = Number(searchParams.get("version"));
+  const viewedVersion =
+    versions.find((v) => v.number === askedVersion && v !== latestVersion && v.manuscript_url) ?? null;
+  /** Open version `n`, or the current paper for null, in a section that shows the paper. */
+  const chooseVersion = (n: number | null) =>
+    setViewParams({
+      version: n == null ? null : String(n),
+      ...(section !== "paper" && section !== "review" && sections.includes("paper")
+        ? { section: "paper" }
+        : {}),
+    });
+  // A citation's regions and page are the current paper's (ADR-031), so an
+  // earlier version opens at its start with nothing highlighted.
   const highlightRegions: Region[] =
-    navCitation && navCitation.record_id === record.id && "regions" in navCitation
+    !viewedVersion && navCitation && navCitation.record_id === record.id && "regions" in navCitation
       ? navCitation.regions
       : [];
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = (toolbarStart?: ReactNode) => (
-    <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
-      <PaperPdfReader
-        recordId={record.id}
-        scrollToPage={openAtPage}
-        highlightRegions={highlightRegions}
-        navKey={arrivalKey.current}
-        toolbarStart={toolbarStart}
-      />
-    </Suspense>
+    <>
+      {viewedVersion && latestVersion && (
+        <VersionBanner
+          viewing={viewedVersion.number}
+          latest={latestVersion.number}
+          onBack={() => setViewParam("version", null)}
+        />
+      )}
+      <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
+        <PaperPdfReader
+          recordId={record.id}
+          version={viewedVersion?.number ?? null}
+          scrollToPage={viewedVersion ? null : openAtPage}
+          highlightRegions={highlightRegions}
+          navKey={arrivalKey.current}
+          toolbarStart={toolbarStart}
+        />
+      </Suspense>
+    </>
   );
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
@@ -697,9 +730,16 @@ export default function PaperViewPage() {
               </div>
 
               {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
-                  and the version picker (IR-416) render here once the
-                  payload carries them. Until then, nothing -- never an
-                  empty or made-up state (spec §4.11). */}
+                  renders here once the payload carries it -- never an empty
+                  or made-up state (spec §4.11). The version picker (IR-416)
+                  only with two or more versions to choose between. */}
+              {versions.length >= 2 && (
+                <VersionPicker
+                  versions={versions}
+                  viewing={viewedVersion?.number ?? null}
+                  onChoose={chooseVersion}
+                />
+              )}
 
               <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-stone-500">
                 <span className="inline-flex items-center gap-1.5">
@@ -976,6 +1016,7 @@ export default function PaperViewPage() {
           canChangePosition={!onPaperTab}
           minimized={chatMinimized}
           onRestore={() => chat.setMinimized(false)}
+          viewingVersion={viewedVersion?.number ?? null}
           className={chatPanelClass}
         />
       ) : (
