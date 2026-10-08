@@ -40,6 +40,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.records import versions
 from apps.records.lifecycle import type_name_of
 
 from core.enums import (
@@ -52,6 +53,7 @@ from core.enums import (
     RecordTypeName,
     ReviewDecision,
     SeatState,
+    VersionCause,
 )
 from core.permissions import OFFICE_PARTY_BY_ROLE, holds_seat, is_office_member
 
@@ -143,6 +145,8 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
         record=record, actor=actor, from_party=None, to_party=Party.ADVISER,
         group_id=uuid.uuid4(), created_at=now,
     )
+    # What the Adviser is handed is v1 (ADR-032 §5, IR-416).
+    versions.write_version(record, actor, VersionCause.SUBMISSION)
     return assignment
 
 
@@ -426,7 +430,7 @@ def accept_and_route(record, actor, *, to, reason):
     Review.objects.create(
         record=record, reviewed_by=actor, stage=Party.ADVISER,
         status=ReviewDecision.APPROVED, comment=plan.reason,
-        assignment=adviser_seat.assignment,
+        assignment=adviser_seat.assignment, version=versions.latest_version(record),
     )
     def accept_then_route():
         seats.complete_seat(adviser_seat, actor)

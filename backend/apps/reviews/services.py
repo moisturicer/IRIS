@@ -55,11 +55,13 @@ from core.enums import (
     PipelineStatus,
     ReviewDecision,
     RoleName,
+    VersionCause,
 )
 from core.exceptions import InvalidPipelineTransition
 from apps.records import lifecycle
 from .models import Review, RecordClearance
 from apps.records.models import Record
+from apps.records.versions import latest_version, write_version
 from apps.notifications.services import (
     notify_record_reviewed,
     notify_resubmit,
@@ -225,6 +227,7 @@ def approve_record(record: Record, reviewed_by, comment: str = "") -> Review:
         review = Review.objects.create(
             record=record, reviewed_by=reviewed_by,
             stage=stage, status=ReviewDecision.APPROVED, comment=comment,
+            version=latest_version(record),
         )
 
         # Where this lands is the table's call now (IR-136). The four-branch
@@ -263,6 +266,7 @@ def decline_record(record: Record, reviewed_by, comment: str = "") -> Review:
         review = Review.objects.create(
             record=record, reviewed_by=reviewed_by,
             stage=stage, status=ReviewDecision.DECLINED, comment=comment,
+            version=latest_version(record),
         )
         lifecycle.apply(
             record, lifecycle.WorkflowEvent.DECLINE, reviewed_by, review=review
@@ -298,6 +302,7 @@ def reject_record(record: Record, reviewed_by, comment: str = "") -> Review:
         review = Review.objects.create(
             record=record, reviewed_by=reviewed_by,
             stage=stage, status=ReviewDecision.REJECTED, comment=comment,
+            version=latest_version(record),
         )
         lifecycle.apply(
             record, lifecycle.WorkflowEvent.REJECT, reviewed_by, review=review
@@ -371,6 +376,7 @@ def submit_clearance(
         review = Review.objects.create(
             record=record, reviewed_by=reviewed_by,
             stage=office, status=review_status, comment=comment,
+            version=latest_version(record),
         )
 
         # Update (or create) the RecordClearance row for this office
@@ -494,6 +500,8 @@ def resubmit_record(record: Record, submitted_by) -> Record:
                 "updated_at",
             ]
         )
+        # Each resubmission is the record's next version (ADR-032 §5, IR-416).
+        write_version(record, submitted_by, VersionCause.REVISION)
     # Which policy was active, recorded per resubmission (IR-137, ADR-004's
     # documentation requirement). An evaluation run whose arm cannot be
     # established afterwards cannot be interpreted, and the policy is

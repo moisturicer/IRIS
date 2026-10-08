@@ -86,6 +86,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # record a finding as, why not yet, and its assignment for *Add reviewer*.
     # A rendering hint; `office-review/` and `add-reviewer/` re-check it.
     office_review        = serializers.SerializerMethodField()
+    # The record's versions, for the header's version picker (IR-416).
+    # Participants only, like `reviews`.
+    versions             = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -167,7 +170,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         qs = (
             Review.objects
             .filter(record=obj)
-            .select_related("reviewed_by")
+            .select_related("reviewed_by", "version")
             .order_by("created_at")
         )
         return [
@@ -178,9 +181,23 @@ class RecordDetailSerializer(serializers.ModelSerializer):
                 "comment":          r.comment,
                 "reviewed_by_name": r.reviewed_by.get_full_name() if r.reviewed_by else None,
                 "created_at":       r.created_at.isoformat(),
+                # The version it was made against; null before IR-416.
+                "version":          r.version.number if r.version else None,
             }
             for r in qs
         ]
+
+    def get_versions(self, obj):
+        """
+        The record's versions, oldest first (ADR-032 §5, IR-416). Review
+        material: `None` -- not disclosed, which is not `[]` -- to a viewer
+        who may not read the review (IR-479).
+        """
+        from .versions import versions_payload
+
+        if not self._readable(obj):
+            return None
+        return versions_payload(obj)
 
     def _ordered_clearances(self, obj):
         return list(obj.clearances.select_related("reviewed_by").order_by("office"))
@@ -297,6 +314,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
+            "versions",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as
@@ -341,6 +359,17 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         the one module both use. Publish checks it in the browser first; this
         is the boundary.
         """
+        # Once submitted, the manuscript changes only through a new version
+        # (ADR-032 §5 Amendment, IR-416). Staff are not exempt, and clearing it
+        # is a change too.
+        from .versions import may_replace_manuscript
+
+        if self.instance is not None and not may_replace_manuscript(self.instance):
+            raise serializers.ValidationError(
+                "The manuscript cannot be replaced while this record is "
+                f"'{self.instance.pipeline_status}'. Once a record is submitted, "
+                "its manuscript changes only when a new version is submitted."
+            )
         if not file:
             return file
         problem = pdf_upload_problem(file)

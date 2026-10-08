@@ -47,9 +47,10 @@ const payload: RecordTracker = {
   reviews: [
     {
       id: 1, party: "itso", label: "ITSO", status: "approved", status_label: "Approved",
-      comment: "Cleared.", reviewed_by_name: "Mara Santos", created_at: "2026-09-05T08:00:00Z",
+      comment: "Cleared.", reviewed_by_name: "Mara Santos", created_at: "2026-09-05T08:00:00Z", version: null,
     },
   ],
+  versions: [],
   resubmissions: [],
   document_requests: null,
   clearances: [],
@@ -90,6 +91,28 @@ describe("ReviewTimeline", () => {
     // where it is now, Intake least of all.
     expect(screen.queryByText(/currently with|current step|now with/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^now$/i)).not.toBeInTheDocument();
+  });
+
+  it("shows each version, and which version a review was made against", async () => {
+    respond({
+      ...payload,
+      versions: [
+        {
+          number: 1, cause: "submission", cause_label: "Submission",
+          created_at: "2026-09-01T09:00:00Z", created_by_name: "Rhea Owner",
+          manuscript_url: "/api/v1/records/7/versions/1/manuscript/",
+        },
+      ],
+      reviews: [{ ...payload.reviews![0], version: 1 }],
+    });
+    const { container } = renderScreen(<ReviewTimeline recordId={7} />);
+
+    const list = await screen.findByRole("list", { name: "Review timeline" });
+    const submitted = within(list).getByText("v1 submitted").closest("li")!;
+    const approved = within(list).getByText("Approved").closest("li")!;
+    expect(submitted).toHaveTextContent("Rhea Owner");
+    expect(approved).toHaveTextContent("Made against v1");
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("says so when nothing has happened yet", async () => {

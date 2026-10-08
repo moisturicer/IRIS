@@ -45,6 +45,13 @@ class Review(models.Model):
         "reviews.RecordAssignment", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="reviews",
     )
+    #: The record's Version this review was made against (ADR-032 §5, IR-416):
+    #: its latest when the review was written. Null on every review written
+    #: before IR-416, and the backfill does not date one against a version.
+    version     = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="reviews",
+    )
 
     class Meta:
         ordering = ["-created_at"]

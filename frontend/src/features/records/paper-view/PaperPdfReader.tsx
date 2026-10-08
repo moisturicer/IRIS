@@ -157,6 +157,12 @@ function PdfPageView({
 
 export interface PaperPdfReaderProps {
   recordId: number;
+  /**
+   * An earlier version to read instead of the current paper (IR-416), or
+   * null/absent for the current one. Highlights and a citation's page belong
+   * to the current paper, so the caller passes neither with a version.
+   */
+  version?: number | null;
   /** The page to scroll to once the document is ready, or `null` for none. */
   scrollToPage: number | null;
   /** Regions to highlight, already page-tagged -- filtered per page below. */
@@ -193,6 +199,7 @@ export interface PaperPdfReaderProps {
  */
 export function PaperPdfReader({
   recordId,
+  version = null,
   scrollToPage,
   highlightRegions,
   navKey,
@@ -252,7 +259,9 @@ export function PaperPdfReader({
 
     (async () => {
       try {
-        const { data } = await recordsApi.manuscriptBlob(recordId);
+        const { data } = version == null
+          ? await recordsApi.manuscriptBlob(recordId)
+          : await recordsApi.versionManuscriptBlob(recordId, version);
         if (cancelled) return;
         const buffer = await data.arrayBuffer();
         const { document: doc, destroy } = await loadPdfDocument(buffer);
@@ -282,7 +291,7 @@ export function PaperPdfReader({
       void destroyRef.current?.();
       destroyRef.current = null;
     };
-  }, [recordId, attempt]);
+  }, [recordId, version, attempt]);
 
   useEffect(() => {
     return () => {
@@ -380,7 +389,7 @@ export function PaperPdfReader({
   const zoomOut = () => setZoom(Math.max(MIN_SCALE, +(scale - SCALE_STEP).toFixed(2)));
 
   const handleDownload = () => {
-    if (downloadBytes) downloadBlob(downloadBytes, `record-${recordId}.pdf`);
+    if (downloadBytes) downloadBlob(downloadBytes, version == null ? `record-${recordId}.pdf` : `record-${recordId}-v${version}.pdf`);
   };
 
   if (status === "error") {

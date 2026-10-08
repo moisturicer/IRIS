@@ -2,6 +2,7 @@ import uuid
 from pathlib import Path
 
 from django.db import models
+from django.utils import timezone
 from django.contrib.postgres.search import SearchVectorField
 from django.contrib.postgres.indexes import GinIndex
 
@@ -15,6 +16,7 @@ from core.enums import (  # noqa: F401
     IPType,
     PipelineStatus,
     RequestStatus,
+    VersionCause,
 )
 
 
@@ -266,6 +268,53 @@ class Record(models.Model):
 
     def __str__(self):
         return self.title[:80]
+
+
+class RecordVersion(models.Model):
+    """
+    A numbered snapshot of what a record put in front of its reviewers
+    (ADR-032 §5, as amended 2026-10-08 for IR-416).
+
+    v1 is written when the record is first submitted, and each resubmission
+    writes the next. Every write goes through `apps.records.versions`, which
+    numbers them.
+
+    **`manuscript` names the stored manuscript file; it is not an FK.** The
+    manuscript is `Record.abstract_file`, one field replaced in place, not a
+    `RecordUpload`. A new upload is stored under a fresh random name
+    (`abstract_file_path`), so it never touches the file an earlier version
+    names. Nothing may delete a file a version still names;
+    `test_record_versions.py` pins that. Null when the record was submitted
+    with no manuscript, which the server has never refused.
+
+    `created_at` has a default rather than `auto_now_add` so the backfill
+    (`records/0015`) can date a version it reconstructs. `created_by` is null
+    where nobody is recorded: imported, seeded and corpus records, and
+    backfilled revisions.
+    """
+
+    record     = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="versions")
+    number     = models.PositiveIntegerField()
+    manuscript = models.FileField(
+        upload_to=abstract_file_path, max_length=255, null=True, blank=True,
+    )
+    cause      = models.CharField(max_length=16, choices=VersionCause.choices)
+    created_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="record_versions",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["record", "number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["record", "number"], name="record_version_number_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.record_id} v{self.number}"
 
 
 class RecordOwner(models.Model):

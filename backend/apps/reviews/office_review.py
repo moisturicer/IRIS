@@ -43,6 +43,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.records.lifecycle import type_name_of
+from apps.records.versions import latest_version
 
 from core.enums import (
     OPEN_SEAT_STATES,
@@ -184,6 +185,7 @@ def record_office_review(record, actor, *, outcome, comment=""):
     Review.objects.create(
         record=record, reviewed_by=actor, stage=party, status=OUTCOMES[outcome],
         comment=comment, assignment=seat.assignment,
+        version=latest_version(record),
     )
     try:
         completed = seats.complete_seat(seat, actor)

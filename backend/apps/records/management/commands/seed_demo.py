@@ -63,13 +63,14 @@ from apps.records.models import (
     RecordOwner,
     RecordType,
 )
+from apps.records.versions import write_version
 from apps.reviews.services import (
     approve_record,
     reject_record,
     resubmit_record,
     submit_clearance,
 )
-from core.enums import IPType, Office, RecordTypeName, ReviewDecision, RoleName
+from core.enums import IPType, Office, RecordTypeName, ReviewDecision, RoleName, VersionCause
 
 #: The convention that already existed, kept deliberately (see module docstring).
 PASSWORD = "IrisDemo123!"
@@ -357,6 +358,8 @@ class Command(BaseCommand):
         record.dpa_accepted_by = owner
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
         lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, owner)
+        # ...and writes v1, as the view does (IR-416).
+        write_version(record, owner, VersionCause.SUBMISSION)
 
     @transaction.atomic
     def _scenario_draft(self, users):

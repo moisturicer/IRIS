@@ -49,6 +49,8 @@ export interface RecordReview {
   comment:          string;
   reviewed_by_name: string | null;
   created_at:       string;
+  /** The version it was made against; null for reviews written before IR-416. */
+  version:          number | null;
 }
 
 export interface RecordClearance {
@@ -165,6 +167,23 @@ export interface RecordDetail extends RecordListItem {
    * assignment for *Add reviewer*. A rendering hint; the endpoints re-check it.
    */
   office_review:        OfficeReviewFlags;
+  /**
+   * The record's versions, oldest first (ADR-032 §5, IR-416). Review
+   * material: null to a viewer who may not read the review (IR-479), and
+   * empty before the record is first submitted.
+   */
+  versions:             RecordVersion[] | null;
+}
+
+/** One numbered snapshot of what the record put in front of its reviewers. */
+export interface RecordVersion {
+  number:          number;
+  cause:           "submission" | "revision";
+  cause_label:     string;
+  created_at:      string;
+  created_by_name: string | null;
+  /** Null when this version was submitted with no manuscript. */
+  manuscript_url:  string | null;
 }
 
 export interface OfficeReviewFlags {
@@ -291,6 +310,8 @@ export interface TrackerReview {
   comment:          string;
   reviewed_by_name: string | null;
   created_at:       string | null;
+  /** The version it was made against; null for reviews written before IR-416. */
+  version:          number | null;
 }
 
 export interface TrackerHolder {
@@ -391,6 +412,8 @@ export interface RecordTracker {
    * what they wrote is internal workflow data, as document requests are.
    */
   reviews:               TrackerReview[] | null;
+  /** Each a timeline entry of its own (IR-416). Null as `reviews` is. */
+  versions:              RecordVersion[] | null;
   resubmissions:         TrackerResubmission[];
   /** Null when the viewer may not read them (IR-349) -- not "there are none". */
   document_requests:     DocumentRequest[] | null;

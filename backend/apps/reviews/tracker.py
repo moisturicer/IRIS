@@ -28,6 +28,7 @@ from typing import Any, Iterable, Optional
 from django.db.migrations.recorder import MigrationRecorder
 
 from apps.records import lifecycle
+from apps.records.versions import versions_payload
 from core.enums import (
     ASSIGNABLE_PARTIES,
     AssignmentState,
@@ -582,7 +583,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
     readable = may_read_review(user, record)
     reviews = list(
         Review.objects.filter(record=record)
-        .select_related("reviewed_by").order_by("created_at", "pk")
+        .select_related("reviewed_by", "version").order_by("created_at", "pk")
     )
     clearances = list(record.clearances.select_related("reviewed_by").order_by("office"))
     latest_decline = next(
@@ -611,9 +612,14 @@ def tracker_payload(record, user) -> dict[str, Any]:
                 "comment": r.comment,
                 "reviewed_by_name": _name(r.reviewed_by),
                 "created_at": _iso(r.created_at),
+                # The version it was made against; null before IR-416.
+                "version": r.version.number if r.version else None,
             }
             for r in reviews
         ],
+        # Each version is a timeline entry of its own (ADR-032 §5, IR-416).
+        # Review material, so `None` to a viewer who may not read the review.
+        "versions": versions_payload(record) if readable else None,
         "resubmissions": _resubmissions(record, staff=staff, readable=readable),
         "document_requests": (
             serialize_requests(record, user, requests_for(record)) if disclose_requests else None
