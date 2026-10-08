@@ -591,6 +591,10 @@ export default function PaperViewPage() {
               Reviewers still read {latestVersion ? `v${latestVersion.number}` : "the submitted version"} until
               you submit the new version.
             </p>
+            <p className="text-stone-700 mt-0.5">
+              Ask IRIS answers about the submitted version
+              {latestVersion ? ` (v${latestVersion.number})` : ""} until you submit.
+            </p>
           </div>
         </div>
       )}

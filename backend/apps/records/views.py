@@ -196,11 +196,18 @@ class RecordViewSet(viewsets.ModelViewSet):
         # extraction on it costs nothing, and the alternative (comparing
         # file contents) costs a read on every save just to skip the common
         # case.
+        #
+        # Except an owner's revised manuscript, which waits for its version
+        # (IR-273): reviewers are served the submitted one meanwhile, and the
+        # chunks Ask IRIS answers from must be the same file.
         if "abstract_file" not in serializer.validated_data:
             return
 
         from .services import queue_manuscript_extraction
+        from .versions import manuscript_awaits_submission
 
+        if manuscript_awaits_submission(record):
+            return
         queue_manuscript_extraction(record)
 
     def perform_destroy(self, instance):

@@ -230,8 +230,7 @@ class UploadVersionTests(NewVersionTestBase):
         request = self.open_requests(record).get()
         self.upload_manuscript(record)
 
-        with patch("apps.documents.tasks.extract_manuscript_text.delay"):
-            response = self.withdraw(record, self.ierc, request.pk)
+        response = self.withdraw(record, self.ierc, request.pk)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         record.refresh_from_db()
@@ -251,6 +250,64 @@ class UploadVersionTests(NewVersionTestBase):
         self.withdraw(record, self.ierc, ierc_request.pk)
 
         self.assertEqual(self.read_manuscript(record, self.owner), b"%PDF-1.7 v2")
+
+
+# --- what Ask IRIS answers from (settled 2026-10-08, after review) ----------------------
+
+class ExtractionFollowsSubmissionTests(NewVersionTestBase):
+    """
+    The chunks Ask IRIS and Paper Chat answer from are the submitted
+    manuscript's, the same file reviewers are served: an owner's revision is
+    extracted when its version is submitted, never on upload.
+    """
+
+    EXTRACT = "apps.documents.tasks.extract_manuscript_text.delay"
+
+    def test_an_unsubmitted_revision_is_not_extracted(self):
+        record = self.itso_cleared_and_ierc_asked()
+
+        with patch(self.EXTRACT) as extract, self.captureOnCommitCallbacks(execute=True):
+            response = self.upload_manuscript(record)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        extract.assert_not_called()
+
+    def test_submitting_the_version_extracts_its_manuscript(self):
+        record = self.itso_cleared_and_ierc_asked()
+        self.upload_manuscript(record)
+
+        with patch(self.EXTRACT) as extract, self.captureOnCommitCallbacks(execute=True):
+            self.submitted(record)
+
+        extract.assert_called_once_with(record.pk)
+
+    def test_a_metadata_only_version_extracts_nothing(self):
+        record = self.itso_cleared_and_ierc_asked()
+        self.edit_title(record)
+
+        with patch(self.EXTRACT) as extract, self.captureOnCommitCallbacks(execute=True):
+            self.submitted(record)
+
+        extract.assert_not_called()
+
+    def test_withdrawing_puts_the_file_back_without_extracting_again(self):
+        record = self.itso_cleared_and_ierc_asked()
+        request = self.open_requests(record).get()
+        self.upload_manuscript(record)
+
+        with patch(self.EXTRACT) as extract, self.captureOnCommitCallbacks(execute=True):
+            self.withdraw(record, self.ierc, request.pk)
+
+        extract.assert_not_called()
+
+    def test_a_draft_s_manuscript_is_still_extracted_on_upload(self):
+        record = self.make_record()
+
+        with patch(self.EXTRACT) as extract, self.captureOnCommitCallbacks(execute=True):
+            response = self.upload_manuscript(record)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        extract.assert_called_once_with(record.pk)
 
 
 # --- AC: nothing changed -----------------------------------------------------------------

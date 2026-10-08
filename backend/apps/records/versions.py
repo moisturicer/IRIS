@@ -19,7 +19,9 @@ that last case only an owner may: the revision is theirs to make.
 the owner's upload and their new version, the stored manuscript is a file no
 reviewer was ever handed. `served_manuscript()` gives everyone but an owner
 the latest version's file meanwhile; an owner reads their own upload, and
-`manuscript_unsubmitted()` says so. If the last request is withdrawn first,
+`manuscript_unsubmitted()` says so. The upload is not extracted until its
+version is submitted (`manuscript_awaits_submission()`), so the chunks Ask
+IRIS answers from are always the submitted manuscript's. If the last request is withdrawn first,
 `restore_submitted_manuscript()` puts the latest version's file back, so an
 upload no version can carry is never left as the record's manuscript.
 """
@@ -68,6 +70,16 @@ def stored_manuscript_unsubmitted(record) -> bool:
     return latest is not None and (latest.manuscript.name or None) != (record.abstract_file.name or None)
 
 
+def manuscript_awaits_submission(record) -> bool:
+    """
+    Is the stored manuscript an owner's revision on the new model, waiting
+    for its version? Then it is not extracted yet (IR-273): the chunks Ask
+    IRIS answers from stay the submitted manuscript's, the same file every
+    reviewer is served, until `submit_new_version` sends the new one.
+    """
+    return record.pipeline_status == PipelineStatus.IN_REVIEW and stored_manuscript_unsubmitted(record)
+
+
 def manuscript_unsubmitted(record, user) -> bool:
     """
     Is the stored manuscript one `user`, an owner, uploaded for a version
@@ -97,15 +109,14 @@ def restore_submitted_manuscript(record) -> bool:
     owner's upload was never submitted. The last revision request was
     withdrawn, so no version can carry it any more, and the lock that let it
     in has closed again (IR-273). The upload's file stays in storage, as every
-    manuscript file does. Returns whether anything changed.
+    manuscript file does. Nothing is re-extracted: the upload never was
+    (`manuscript_awaits_submission`), so the chunks are still this file's.
+    Returns whether anything changed.
     """
     if not stored_manuscript_unsubmitted(record):
         return False
-    from .services import queue_manuscript_extraction
-
     record.abstract_file = latest_version(record).manuscript.name or None
     record.save(update_fields=["abstract_file", "updated_at"])
-    queue_manuscript_extraction(record)
     return True
 
 

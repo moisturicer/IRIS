@@ -24,6 +24,12 @@ changed since the newest request:
 
 Nothing is deleted: every round stays visible as a version in the timeline.
 
+**A revised manuscript is extracted here, not on upload.** Until the version
+is submitted, reviewers are served the latest version's manuscript, so the
+chunks Ask IRIS and Paper Chat answer from must stay that file's too
+(`versions.manuscript_awaits_submission`). A metadata-only version re-extracts
+nothing.
+
 **What counts as a change** (`unchanged_reason`): a manuscript other than the
 latest version's, a supporting document an owner uploaded since the newest
 request, or a detail edited since then (`Record.details_edited_at`). The
@@ -41,6 +47,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.records import lifecycle
+from apps.records.services import queue_manuscript_extraction
 from apps.records.versions import latest_version, stored_manuscript_unsubmitted, write_version
 from core.enums import (
     OPEN_SEAT_STATES,
@@ -171,7 +178,13 @@ def submit_new_version(record, actor):
     reset = _reset_offices(record, parties)
     now = timezone.now()
 
+    previous = latest_version(record)
     version = write_version(record, actor, VersionCause.REVISION)
+    if (version.manuscript.name or None) != (previous.manuscript.name or None):
+        # The revised manuscript waited for this version to be extracted
+        # (`versions.manuscript_awaits_submission`); now it is the one
+        # reviewers are served, so it is the one Ask IRIS answers from.
+        queue_manuscript_extraction(record)
     ResubmissionRequest.objects.filter(pk__in=[r.pk for r in requests]).update(
         state=ResubmissionRequestState.RESUBMITTED, resolved_by=actor, resolved_at=now,
     )

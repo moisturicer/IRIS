@@ -157,8 +157,9 @@ def queue_manuscript_extraction(record: Record) -> None:
     """
     Send `record`'s manuscript to extraction, after commit, so the chunker
     reads the file the record now names (IR-195 / ADR-013's 2026-09-08
-    amendment). Called by every write that changes `abstract_file`: an
-    update through the API, and a revision's manuscript put back (IR-273).
+    amendment). Called by every write that changes `abstract_file` through the
+    API, except an owner's revised manuscript, which is sent when its new
+    version is submitted (IR-273).
     """
     from django.db import transaction
 

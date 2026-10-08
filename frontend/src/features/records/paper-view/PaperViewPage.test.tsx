@@ -1709,6 +1709,8 @@ describe("record versions (IR-416)", () => {
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=paper`);
     expect(await screen.findByText("Your revised manuscript, not yet submitted")).toBeInTheDocument();
+    expect(screen.getByText("Ask IRIS answers about the submitted version (v2) until you submit."))
+      .toBeInTheDocument();
 
     const picker = screen.getByRole("combobox", PICKER);
     expect(picker).toHaveValue("");
