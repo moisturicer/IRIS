@@ -345,8 +345,9 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
         - Every other record comes from the old pipeline's own queue, unchanged, until IR-260. Its pending work is in To review. In review holds none of it, because the old pipeline has no "opened" state.
     - **Done** is history, and it is never split by model or by `pipeline_status`. A new-model record that gets published stops being `in_review`, so a split by status would misfile it. Done is the union of two sets:
         1. Every `done` seat of yours, on any record.
-        2. Every `Review` of yours with no seat of yours behind it: its assignment is null, or it never seated you. This is the old pipeline's history from before IR-415, which the seat backfill (`0010`) did not seat.
+        2. Every `Review` of yours with no seat behind it that My Reviews already shows. That means no `done` seat of yours on its assignment, and no open one on a new-model record. This is the old pipeline's history from before IR-415, which the seat backfill (`0010`) did not seat.
     - Rule 2 excludes on purpose a revision request's `Review` whose seat is still `in_review`. Otherwise the same work would show as both current and done.
+    - *Refined in the implementation:* rule 2 was first worded as "no seat of yours behind it". An old-pipeline record that was declined when the backfill ran has its decider seated `in_review`, and In review never shows an old-pipeline seat. Under that wording, that decline would have disappeared from both tabs. So rule 2 excludes only the seats My Reviews shows.
 - **Rows.**
     - **One row per seat, and one per unclaimed assignment**, so an office routed the same record twice shows two Done rows, one per Review round.
     - Every row leads to Paper View's Review section (`/records/<id>?section=review`). My Reviews never links to the old decision form; the Review section reaches it for an old-pipeline decision.
