@@ -414,8 +414,15 @@ def accept_and_route(record, actor, *, to, reason):
     reason; their seat is done, so their assignment completes. The record stays
     `in_review`.
     """
+    from .revisions import decision_blocked_reason
+
     record = _locked(record)
     from_party = _from_party_for(record, actor, accepting=True)
+    # Accepting is a decision, refused while any revision request is open
+    # (ADR-032 §11, IR-272). Routing alone is not.
+    blocked = decision_blocked_reason(record)
+    if blocked:
+        raise RoutingError(blocked)
     plan = _plan(record, from_party, to, reason)
 
     adviser_seat = (

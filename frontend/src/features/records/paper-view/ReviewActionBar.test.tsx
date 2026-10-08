@@ -29,6 +29,8 @@ vi.mock("@/api/records", () => ({
     routeOptions: vi.fn(() => new Promise(() => {})),
     acceptAndRoute: vi.fn(),
     route: vi.fn(),
+    requestRevision: vi.fn(() => Promise.resolve({ data: {} })),
+    withdrawRevisionRequest: vi.fn(() => Promise.resolve({ data: {} })),
   },
 }));
 
@@ -37,6 +39,8 @@ const record = {
   title: "Groundwater Recharge Mapping in Metro Cebu",
   can_request_document: ["ierc"],
   current_holders: [{ party: "ierc", label: "IERC", opened_at: null, opened_by: null }],
+  revision: { party: "ierc", label: "IERC", blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+  versions: [],
 } as unknown as RecordDetail;
 
 function RouteDialog({ onClose, onDone }: ReviewActionDialogProps) {
@@ -277,6 +281,52 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
 
     await userEvent.click(within(bar).getByRole("button", { name: "Route to office…" }));
     expect(screen.getByRole("dialog", { name: "Route to office" })).toBeInTheDocument();
+  });
+
+  // IR-272: accepting is a decision, so an open revision request disables it
+  // and says why; the party that asked is offered the withdrawal, last.
+  it("holds Accept & route while a revision is requested, and lets the asking party withdraw", async () => {
+    const onChanged = vi.fn();
+    const asked = {
+      ...record,
+      revision: {
+        party: "ierc", label: "IERC", blocked: null, withdrawable: 5,
+        decision_blocked: "Waiting on the author: IERC asked for a revision.",
+        open: [],
+      },
+    } as unknown as RecordDetail;
+    renderScreen(
+      <ReviewActionBar
+        record={asked}
+        can={new Set<Capability>(["accept_route", "withdraw_revision"])}
+        onChanged={onChanged}
+      />,
+    );
+
+    const accept = screen.getByRole("button", { name: "Accept & route…" });
+    expect(accept).toBeDisabled();
+    expect(accept).toHaveAccessibleDescription("Waiting on the author: IERC asked for a revision.");
+    expect(buttonNames()).toEqual(["Accept & route…", "Withdraw revision request"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Withdraw revision request" }));
+    const confirm = screen.getByRole("dialog", { name: "Withdraw the revision request?" });
+    await userEvent.click(within(confirm).getByRole("button", { name: "Withdraw request" }));
+
+    expect(recordsApi.withdrawRevisionRequest).toHaveBeenCalledWith(7, 5);
+    expect(await screen.findByRole("status")).toHaveTextContent("Revision request withdrawn.");
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  it("offers Request Revision under `request_revision`, through its own dialog", async () => {
+    renderBar(["request_revision"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Request Revision…" }));
+    const dialog = screen.getByRole("dialog", { name: "Request Revision" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "What needs revising?" }), "Cite the 2019 survey.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Request Revision" }));
+
+    expect(recordsApi.requestRevision).toHaveBeenCalledWith(7, { reason: "Cite the 2019 survey." });
+    expect(await screen.findByRole("status")).toHaveTextContent("Revision requested. The owner has been notified.");
   });
 
   it("offers nothing a viewer with no review capability was not granted", () => {

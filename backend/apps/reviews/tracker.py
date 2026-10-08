@@ -403,6 +403,11 @@ def _party_rows(
     awaiting_document = (
         set(_open_document_request_parties(record)) if disclose_requests else None
     )
+    asking = set(
+        ResubmissionRequest.objects.filter(
+            record=record, state=ResubmissionRequestState.OPEN,
+        ).values_list("party", flat=True)
+    )
 
     rows = []
     for member in TRACKER_ORDER:
@@ -479,6 +484,11 @@ def _party_rows(
             ),
             "outcome": outcome,
             "outcome_label": outcome_label,
+            # *Changes requested*: this party has an open revision request.
+            # Derived, never written to the clearance, so an office's earlier
+            # completed round still stands beside it (ADR-032 §5 Amendment,
+            # IR-272). Which party asked is not review content (IR-479).
+            "changes_requested": party in asking,
             # The outcome is an earlier review round's, standing while a new
             # one runs (IR-269).
             "outcome_earlier": earlier,
@@ -558,6 +568,9 @@ def _resubmissions(record, *, staff: bool, readable: bool) -> list[dict]:
             # The `declined` review carrying this request, one of `reviews`:
             # the same act, which a timeline shows once (IR-412).
             "review": r.review_id,
+            # The version it was made against: its review's (IR-272). Null
+            # for a request made before IR-416 recorded versions.
+            "version": r.review.version.number if r.review.version_id else None,
             "requested_by": _name(r.requested_by) if readable else None,
             "created_at": _iso(r.created_at),
             "resolved_at": _iso(r.resolved_at),
@@ -565,7 +578,8 @@ def _resubmissions(record, *, staff: bool, readable: bool) -> list[dict]:
             "resolved_by": _name(r.resolved_by) if readable else None,
         }
         for r in ResubmissionRequest.objects.filter(record=record)
-        .select_related("requested_by", "resolved_by").order_by("created_at", "pk")
+        .select_related("requested_by", "resolved_by", "review__version")
+        .order_by("created_at", "pk")
     ]
 
 

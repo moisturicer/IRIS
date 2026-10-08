@@ -17,7 +17,8 @@ outcome is refused.
 - a seat not yet opened: *Open review* stamps the time-on-task start, so
   finishing an unopened seat would leave it empty;
 - an office with its own document request still open. An office never
-  finishes while it is still asking the author for something.
+  finishes while it is still asking the author for something; likewise an
+  office with its own revision request open (IR-272).
 
 **When an office completes** -- every seat it did not withdraw is done, by the
 last verdict or by a coordinator withdrawing the last unfinished seat --
@@ -56,7 +57,7 @@ from core.enums import (
 )
 from core.permissions import holds_seat
 
-from . import routing, seats
+from . import revisions, routing, seats
 from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat, RoutingEvent
 
 #: The specialist offices (ADR-032 §3): the only parties that clear.
@@ -125,7 +126,9 @@ def _blocked_reason(record, user, party):
             f"Withdraw {_label(party)}'s document request first. An office "
             f"finishes only once it is no longer asking the author for anything."
         )
-    return None
+    # Its own revision request, likewise (ADR-032 §5 Amendment, IR-272).
+    # Another office's request blocks nothing here.
+    return revisions.office_blocked_reason(record, party)
 
 
 def office_review_flags(record, user) -> dict:

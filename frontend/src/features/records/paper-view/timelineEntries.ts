@@ -120,8 +120,9 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
 
   // One resubmission answers every open request at once, so the requests it
   // closed share a time, a state and who closed them: one entry, naming every
-  // party answered. A withdrawal (the record was withdrawn) closes them too,
-  // unanswered, and says so.
+  // party answered. A withdrawal closes them too, unanswered, and says so:
+  // the record was withdrawn, or the party that asked took its request back
+  // (IR-272).
   const resolutions = new Map<string, TrackerResubmission[]>();
   for (const r of tracker.resubmissions) {
     if (r.state === "open" || !r.resolved_at) continue;

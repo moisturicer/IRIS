@@ -688,6 +688,62 @@ def notify_office_completed(
         pass
 
 
+def notify_revision_requested(revision_request, *, party_label: str):
+    """
+    Tell every owner that a party has asked for a revision (ADR-032 §5
+    Amendment, IR-272). The owners only: reviewers see *Waiting on author*.
+    """
+    try:
+        record = revision_request.record
+        message = (
+            f'{party_label} asked for a revision of "{record.title}". '
+            f"Nothing can be decided until you submit a new version."
+        )
+        owners = list(record.owners.select_related("user").all())
+        notif_type = NotificationType.objects.get_or_create(name="Revision Requested")[0]
+        for ownership in owners:
+            Notification.objects.create(
+                sender=revision_request.requested_by,
+                recipient=ownership.user,
+                record=record,
+                notif_type=notif_type,
+                message=message,
+            )
+        if owners:
+            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
+            send_email_async(
+                subject=f"[IRIS] Revision requested: {record.title[:60]}",
+                message=(
+                    f"Hello {primary.first_name},\n\n"
+                    f"{message}\n\n"
+                    f"{party_label} wrote:\n{revision_request.reason}\n\n"
+                    f"{_record_url(record)}\n\n"
+                    f"-- The IRIS Team"
+                ),
+                recipient_list=[primary.email],
+            )
+    except Exception:
+        pass
+
+
+def notify_revision_withdrawn(revision_request, *, party_label: str, withdrawn_by):
+    """Tell every owner that a party withdrew its revision request (IR-272). In-app only."""
+    try:
+        record = revision_request.record
+        message = f'{party_label} withdrew its revision request for "{record.title}".'
+        notif_type = NotificationType.objects.get_or_create(name="Revision Requested")[0]
+        for ownership in record.owners.select_related("user").all():
+            Notification.objects.create(
+                sender=withdrawn_by,
+                recipient=ownership.user,
+                record=record,
+                notif_type=notif_type,
+                message=message,
+            )
+    except Exception:
+        pass
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).

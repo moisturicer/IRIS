@@ -30,7 +30,8 @@ const payload: RecordTracker = {
     {
       party: "intake", label: "Intake (retired)", state: "active", state_label: "Reviewing",
       started: false, outcome: null, outcome_label: null, at: null, preserved: false,
-      awaiting_document: null, outcome_earlier: false, in_pool: false, seats: null,
+      awaiting_document: null, outcome_earlier: false, in_pool: false, changes_requested: false,
+      seats: null,
     },
   ],
   routing_history: [

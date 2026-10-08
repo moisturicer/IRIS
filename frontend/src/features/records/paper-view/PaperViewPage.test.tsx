@@ -102,6 +102,7 @@ const record: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
   versions: null,
 };
 
@@ -156,6 +157,7 @@ const approvedProposal: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
   versions: null,
 };
 
@@ -382,6 +384,7 @@ const inReview: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
   versions: null,
 };
 
@@ -477,8 +480,11 @@ describe("the resubmit control follows workflow_state", () => {
     vi.clearAllMocks();
   });
 
+  // The legacy pipeline's revision: stored `declined`, which is what its
+  // Resubmit answers. The adviser-first model's is the last case (IR-272).
   const awaiting: RecordDetail = {
     ...inReview,
+    pipeline_status: "declined",
     workflow_state: "awaiting_resubmission",
     workflow_state_label: "Awaiting resubmission",
   };
@@ -506,6 +512,28 @@ describe("the resubmit control follows workflow_state", () => {
     renderPaperView();
 
     await waitForRecord(inReview.title);
+    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+  });
+
+  it("on the adviser-first model, shows the owner what was asked instead of the legacy Resubmit (IR-272)", async () => {
+    shownRecord = {
+      ...inReview,
+      workflow_state: "awaiting_resubmission",
+      workflow_state_label: "Awaiting resubmission",
+      revision: {
+        party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null,
+        open: [{
+          id: 3, party: "ierc", label: "IERC", reason: "Add the assent form\nfor participants under 18.",
+          requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
+        }],
+      },
+    };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const banner = await screen.findByRole("region", { name: "Revision requested" });
+    expect(banner).toHaveTextContent("IERC asked for changes · on v2");
+    expect(banner).toHaveTextContent("Add the assent form for participants under 18.");
     expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
   });
 });

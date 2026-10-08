@@ -51,6 +51,7 @@ function row(
     awaiting_document: false,
     outcome_earlier: false,
     in_pool: false,
+    changes_requested: false,
     seats: null,
     ...extra,
   };
@@ -134,7 +135,7 @@ const afterResubmission = payload({
   resubmissions: [
     {
       id: 1, party: "ierc", label: "IERC", state: "resubmitted", state_label: "Resubmitted",
-      reason: "Consent form is missing.", review: 1, requested_by: "Test IERC",
+      reason: "Consent form is missing.", review: 1, version: null, requested_by: "Test IERC",
       created_at: "2026-09-18T04:00:00Z", resolved_at: "2026-09-18T05:00:00Z",
       resolved_by: "Andrea Lim",
     },
@@ -262,6 +263,37 @@ describe("ReviewRoutingTracker", () => {
     expect(await partyRow(/^rdco/i)).toHaveTextContent("Not required");
 
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows a party with an open revision request as Changes requested, beside its earlier outcome (IR-272)", async () => {
+    tracker.mockResolvedValue({
+      data: payload({
+        workflow_state: "awaiting_resubmission",
+        workflow_state_label: "Awaiting resubmission",
+        parties: [
+          row("adviser", "Adviser", "active", {
+            outcome: "declined", outcome_label: "Resubmission requested", changes_requested: true,
+          }),
+          row("itso", "ITSO", "active", {
+            outcome: "cleared",
+            outcome_label: "Cleared (earlier review) · reviewing again",
+            outcome_earlier: true,
+            changes_requested: true,
+          }),
+          row("ierc", "IERC", "completed", { outcome: "cleared", outcome_label: "Cleared" }),
+        ],
+      }),
+    });
+    renderTracker();
+
+    const adviser = await partyRow(/^adviser/i);
+    expect(adviser).toHaveTextContent("Changes requested");
+    // The request reads once, as Changes requested, not also as the review that made it.
+    expect(adviser).not.toHaveTextContent("Resubmission requested");
+    const itso = await partyRow(/^itso/i);
+    expect(itso).toHaveTextContent("Cleared (earlier review) · reviewing again");
+    expect(itso).toHaveTextContent("Changes requested");
+    expect(await partyRow(/^ierc/i)).not.toHaveTextContent("Changes requested");
   });
 
   it("names no reviewer to a viewer who takes no part in the review", async () => {
