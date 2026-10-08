@@ -54,6 +54,13 @@ LANE_RESOLVED = SOURCE_RESOLVED
 LANE_COMBINED = "combined"
 LANES = (LANE_RAW, LANE_RESOLVED, LANE_COMBINED)
 
+#: A question of one of these kinds is too vague to answer, so the right reply
+#: is a clarifying question and a retrieval beforehand costs nothing a reader
+#: sees. Requiring evidence is therefore not an over-fire or an over-search
+#: for it; answering directly is still correct. Recorded in every results file
+#: as `scoring`, because it changes what an over-fire means.
+SEARCH_TOLERATED_KINDS = ("ambiguous",)
+
 #: `evidence_required` to whether the question needs the corpus at all.
 _NEEDS_CORPUS = {"none": False, "corpus": True, "corpus_multi": True}
 
@@ -78,6 +85,7 @@ class Judgement:
     combined: Verdict
     resolved: Optional[Verdict] = None
     resolved_question: Optional[str] = None
+    search_tolerated: bool = False
 
     def verdict(self, lane: str) -> Optional[Verdict]:
         return {
@@ -90,7 +98,15 @@ class Judgement:
         verdict = self.verdict(lane)
         if verdict is None:
             return None
+        if verdict.evidence_required and self.search_tolerated:
+            return True
         return verdict.evidence_required == self.expects_evidence
+
+    @property
+    def counts_as_over_search(self) -> bool:
+        """Needing evidence is an error only where it was not expected and
+        searching was not tolerated."""
+        return not self.expects_evidence and not self.search_tolerated
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -99,6 +115,7 @@ class Judgement:
             "kind": self.kind,
             "institutional": self.institutional,
             "expects_evidence": self.expects_evidence,
+            "search_tolerated": self.search_tolerated,
             "resolved_question": self.resolved_question,
             "raw": self.raw.as_dict(),
             "resolved": self.resolved.as_dict() if self.resolved else None,
@@ -229,7 +246,7 @@ class ModelResult:
         missed: list[str] = []
         for judgement, decision in self._pairs():
             needed = requires(judgement, decision)
-            if needed and not judgement.expects_evidence:
+            if needed and judgement.counts_as_over_search:
                 over.append(judgement.question_id)
             elif judgement.expects_evidence and not needed:
                 missed.append(judgement.question_id)
@@ -257,7 +274,12 @@ class ModelResult:
     def decided(self) -> dict[str, Any]:
         """The model alone, over the calls where it actually ruled."""
         ruled = [(j, d) for j, d in self._pairs() if d.decided]
-        correct = sum(1 for j, d in ruled if d.evidence_required == j.expects_evidence)
+        correct = sum(
+            1
+            for j, d in ruled
+            if d.evidence_required == j.expects_evidence
+            or (d.evidence_required and j.search_tolerated)
+        )
         return {
             "judged": len(ruled),
             "correct": correct,
@@ -342,6 +364,7 @@ class ModelResult:
                 {
                     "id": j.question_id,
                     "expects_evidence": j.expects_evidence,
+                    "search_tolerated": j.search_tolerated,
                     "detector": j.combined.evidence_required,
                     **d.as_dict(),
                 }
@@ -452,6 +475,7 @@ class EvidenceReport:
     def as_dict(self) -> dict[str, Any]:
         return {
             "instrument": "curated",
+            "scoring": {"search_tolerated_kinds": list(SEARCH_TOLERATED_KINDS)},
             "question_set": self.question_set.as_dict(),
             "coverage": self.coverage,
             "rule_set_digest": self.rule_set_digest,
@@ -529,6 +553,12 @@ class EvidenceReport:
         )
         lines.append("")
 
+        lines.append(
+            "Scoring: requiring evidence is not counted as an error for "
+            f"kind {', '.join(SEARCH_TOLERATED_KINDS)} (too vague to answer; "
+            "the right reply is a clarifying question)."
+        )
+        lines.append("")
         lines.append("Categories (by kind), combined lane")
         for category in self.categories:
             accuracy = (
@@ -581,7 +611,7 @@ def _tally(code: str, judgements: Sequence[Judgement], lane: str) -> RuleTally:
             continue
         if verdict.fired(code):
             fired.append(judgement.question_id)
-            if not judgement.expects_evidence:
+            if judgement.counts_as_over_search:
                 over_fires.append(judgement.question_id)
         elif judgement.expects_evidence:
             silent.append(judgement.question_id)
@@ -601,7 +631,7 @@ def _lane_result(lane: str, judgements: Sequence[Judgement]) -> LaneResult:
         over_fires=tuple(
             j.question_id
             for j in judged
-            if j.verdict(lane).evidence_required and not j.expects_evidence
+            if j.verdict(lane).evidence_required and j.counts_as_over_search
         ),
         misses=tuple(
             j.question_id
@@ -664,6 +694,7 @@ def judge(
         kind=question.kind,
         institutional=question.institutional,
         expects_evidence=_NEEDS_CORPUS[question.evidence_required],
+        search_tolerated=question.kind in SEARCH_TOLERATED_KINDS,
         raw=raw,
         resolved=resolved,
         combined=combined,

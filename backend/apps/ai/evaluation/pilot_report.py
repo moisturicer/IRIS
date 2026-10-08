@@ -225,6 +225,7 @@ def summarize_curated_run(data: Mapping[str, Any], source: str) -> dict[str, Any
             "models": model["models"] if model else [],
             "prompt_digest": provenance.get("prompt_digest", NOT_RECORDED),
             "generation": provenance.get("generation", NOT_RECORDED),
+            "scoring": data.get("scoring", NOT_RECORDED),
             # Detector-only: no retrieval runs, so there is no configuration.
             "retrieval_configuration": "not applicable (no retrieval runs)",
         },
@@ -516,6 +517,18 @@ def recommend(report: Mapping[str, Any]) -> list[str]:
             "(ADR-035 §Context), so one run is not a measurement; the gate "
             "asks for repeated runs."
         )
+    rules = {json.dumps(r["provenance"]["scoring"], sort_keys=True) for r in curated["runs"]}
+    if len(rules) > 1:
+        lines.append(
+            "Curated runs were scored under different rules (a file without a "
+            "`scoring` record predates the rule that a vague question may be "
+            "searched without penalty), so their over-fire and over-search "
+            "counts are not comparable: "
+            + "; ".join(
+                f"{r['source']}: {json.dumps(r['provenance']['scoring'], sort_keys=True)}"
+                for r in curated["runs"]
+            )
+        )
     inconclusive = {
         c for run in curated["runs"] for c in run["inconclusive_categories"]
     }
@@ -668,6 +681,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             f"- model run: {prov['model_decision_run']}"
             + (f"; model(s) {', '.join(prov['models'])}" if prov["models"] else ""),
             f"- prompt digest: {prov['prompt_digest']}; generation: {prov['generation']}",
+            f"- scoring: {prov['scoring']}",
             f"- retrieval configuration: {prov['retrieval_configuration']}",
             f"- coverage: {run['coverage']['annotated']} of "
             f"{run['coverage']['questions_in_set']} questions annotated, "

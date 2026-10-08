@@ -345,6 +345,19 @@ def test_mixed_configurations_are_flagged_not_pooled():
     assert shadow["single_configuration"] is False and len(shadow["configurations"]) == 2
 
 
+def test_runs_scored_under_different_rules_are_flagged_as_not_comparable(curated_file):
+    old = json.loads(json.dumps(curated_file))
+    old.pop("scoring", None)
+    report = _build([("old.json", old), ("new.json", curated_file)])
+
+    assert report["curated"]["runs"][0]["provenance"]["scoring"] == NOT_RECORDED
+    assert any("different rules" in line for line in report["recommendation"])
+    assert not any(
+        "different rules" in line
+        for line in _build([("a.json", curated_file), ("b.json", curated_file)])["recommendation"]
+    )
+
+
 # -- the confirmatory plan -------------------------------------------------
 
 
