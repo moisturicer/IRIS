@@ -36,7 +36,7 @@ from core.permissions import (
     IsStaff,
     get_role_name,
 )
-from .download_service import file_response_for_record, resolve_record_download_file
+from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
@@ -196,24 +196,19 @@ class RecordViewSet(viewsets.ModelViewSet):
         # extraction on it costs nothing, and the alternative (comparing
         # file contents) costs a read on every save just to skip the common
         # case.
-        if "abstract_file" not in serializer.validated_data or not record.abstract_file:
+        #
+        # Except an owner's revised manuscript, which waits for its version
+        # (IR-273): reviewers are served the submitted one meanwhile, and the
+        # chunks Ask IRIS answers from must be the same file.
+        if "abstract_file" not in serializer.validated_data:
             return
 
-        from apps.documents.models import DocumentKind, PdfExtraction
-        from apps.documents.tasks import extract_manuscript_text
+        from .services import queue_manuscript_extraction
+        from .versions import manuscript_awaits_submission
 
-        # kind, explicitly: abstract_file *is* the manuscript, and IR-239
-        # moved that judgement onto the row so the chunker reads it there
-        # rather than inferring it from which task was queued.
-        PdfExtraction.objects.update_or_create(
-            record=record,
-            defaults={
-                "status": "queued",
-                "error": "",
-                "kind": DocumentKind.MANUSCRIPT,
-            },
-        )
-        transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
+        if manuscript_awaits_submission(record):
+            return
+        queue_manuscript_extraction(record)
 
     def perform_destroy(self, instance):
         # Accepted work goes through the delete request flow (RDCO review);
@@ -345,9 +340,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         `get_object()` resolves through `visible_to(user)`, so a reader
         without access gets the same 404 as a missing record — never a 403,
         which would confirm the record exists.
+
+        While an owner's revised manuscript is not yet submitted, everyone
+        else reads the latest version's (`versions.served_manuscript`,
+        IR-273): no reviewer is handed a file nobody submitted.
         """
+        from .download_service import resolve_served_manuscript
+
         record = self.get_object()
-        handle, filename = resolve_record_download_file(record)
+        handle, filename = resolve_served_manuscript(record, request.user)
         if handle is None:
             return Response(
                 {"detail": "No paper has been uploaded for this record."},
@@ -686,6 +687,31 @@ class RecordViewSet(viewsets.ModelViewSet):
         return self._revision_response(request, lambda record: revisions.withdraw_revision_request(
             record, request.user, int(request_id),
         ))
+
+    @action(detail=True, methods=["post"], url_path="new-version")
+    def new_version(self, request, pk=None):
+        """
+        POST /records/<id>/new-version/  (no body)
+
+        An owner answers every open revision request with the record's next
+        version (ADR-032 §5, IR-273). Only the parties that asked review it
+        again; under the default policy every other clearance is kept.
+        Answers with the tracker. 404 for a record the caller cannot see, 403
+        for a caller who does not own it, 400 for what cannot be done now --
+        among it, a record that has not changed since the newest request.
+        """
+        from apps.reviews import new_version
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            new_version.submit_new_version(record, request.user)
+        except new_version.NewVersionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except new_version.NewVersionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
 
     @action(detail=True, methods=["get"], url_path="route-options")
     def route_options(self, request, pk=None):

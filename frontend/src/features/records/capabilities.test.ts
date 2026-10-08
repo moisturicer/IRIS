@@ -70,8 +70,9 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     is_participant: false,
     routing: { accept_and_route: false, route_as: null },
     office_review: { party: null, label: null, blocked: null, assignment: null },
-    revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+    revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
     versions: null,
+    manuscript_unsubmitted: false,
     ...overrides,
   };
 }
@@ -310,7 +311,7 @@ const ROWS: Row[] = [
       workflow_state: "in_review",
       my_seats: [seat("in_review")],
       is_participant: true,
-      revision: { party: "itso", label: "ITSO", blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+      revision: { party: "itso", label: "ITSO", blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
     }),
     viewer: itsoStaff,
     capabilities: ["cite", "open_review", "request_revision"],
@@ -327,6 +328,7 @@ const ROWS: Row[] = [
         party: "itso", label: "ITSO", blocked: null, withdrawable: 5,
         decision_blocked: "Waiting on the author: ITSO asked for a revision.",
         open: [],
+        new_version: null,
       },
     }),
     viewer: itsoStaff,
@@ -334,7 +336,23 @@ const ROWS: Row[] = [
     sections: ["overview", "paper", "review", "files"],
   },
   {
-    name: "on the adviser-first model the owner is not offered the legacy resubmit (IR-273 builds New version)",
+    name: "on the adviser-first model the owner is offered a new version when the server says so (IR-273)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "awaiting_resubmission",
+      revision: {
+        party: null, label: null, blocked: null, withdrawable: null,
+        decision_blocked: "Waiting on the author: IERC asked for a revision.",
+        open: [],
+        new_version: { number: 2, rereview: ["IERC"], kept: ["ITSO"], blocked: null },
+      },
+    }),
+    viewer: owner,
+    capabilities: ["cite", "create_version", "replace_manuscript", "edit_details"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "on the adviser-first model, without the server's offer, the owner is not offered the legacy resubmit",
     record: record({ pipeline_status: "in_review", workflow_state: "awaiting_resubmission" }),
     viewer: owner,
     capabilities: ["cite", "edit_details"],

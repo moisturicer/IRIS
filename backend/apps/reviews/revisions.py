@@ -31,10 +31,11 @@ Routing and document requests still work.
 **Withdrawal.** Any seat holder of the requesting party may withdraw its open
 request. No reason is asked for. Nothing else changes: whoever withdraws holds
 an open seat, so their office has not finished, and completes as it would
-have.
+have. When it was the last open request, a revised manuscript the owner
+uploaded but never submitted is replaced by the submitted one (IR-273).
 
-The owners are told of both, after commit. IR-273 answers a request with a
-new version.
+The owners are told of both, after commit. The owner answers every open
+request at once with a new version (`new_version.py`, IR-273).
 """
 
 from __future__ import annotations
@@ -44,7 +45,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
-from apps.records.versions import latest_version
+from apps.records.versions import latest_version, restore_submitted_manuscript
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
@@ -88,7 +89,8 @@ def open_request_for(record, party) -> Optional[ResubmissionRequest]:
     return open_requests(record).filter(party=str(party)).first()
 
 
-def _join(labels: list[str]) -> str:
+def join_labels(labels: list[str]) -> str:
+    """"IERC", "IERC and KTTO", "ITSO, IERC and KTTO"."""
     return labels[0] if len(labels) == 1 else f"{', '.join(labels[:-1])} and {labels[-1]}"
 
 
@@ -100,7 +102,7 @@ def decision_blocked_reason(record) -> Optional[str]:
     parties = list(dict.fromkeys(open_requests(record).values_list("party", flat=True)))
     if not parties:
         return None
-    who = _join([_label(p) for p in parties])
+    who = join_labels([_label(p) for p in parties])
     return (
         f"Waiting on the author: {who} asked for a revision. Nothing can be "
         f"decided until the owner submits a new version, or the request is withdrawn."
@@ -149,8 +151,12 @@ def revision_flags(record, user, *, readable: bool) -> dict:
     - `decision_blocked`: why nobody may decide the record now;
     - `open`: every open request, for the owner's *Action required*. Who
       asked and why are review content, `None` to anyone who may not read
-      the review (IR-479).
+      the review (IR-479);
+    - `new_version`: for an owner, the version that would answer them
+      (`new_version.new_version_hint`, IR-273).
     """
+    from .new_version import new_version_hint
+
     new_model = routing.is_new_model(record)
     requests = list(
         open_requests(record).select_related("requested_by", "review__version")
@@ -170,6 +176,7 @@ def revision_flags(record, user, *, readable: bool) -> dict:
         "withdrawable": mine.pk if mine else None,
         "decision_blocked": decision_blocked_reason(record) if requests else None,
         "open": [request_payload(r, readable=readable) for r in requests],
+        "new_version": new_version_hint(record, user) if requests else None,
     }
 
 
@@ -264,6 +271,11 @@ def withdraw_revision_request(record, actor, request_id) -> ResubmissionRequest:
     request.resolved_by = actor
     request.resolved_at = timezone.now()
     request.save(update_fields=["state", "resolved_by", "resolved_at"])
+    if not open_requests(record).exists():
+        # Nothing is asked for any more, so no version can carry a revised
+        # manuscript the owner uploaded meanwhile: the submitted one is put
+        # back (IR-273).
+        restore_submitted_manuscript(record)
 
     from apps.notifications.services import notify_revision_withdrawn
 

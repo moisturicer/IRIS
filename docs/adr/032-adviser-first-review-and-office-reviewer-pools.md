@@ -247,6 +247,29 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
 - **Withdrawal.** Any seat holder of the requesting party may withdraw its open request. No reason is asked for. The owners are told, and the tracker keeps the request as `withdrawn`.
 - **Notifications** go to every owner, and to nobody else. Reviewers see the *Waiting on author* badge (§9).
 
+**Amendment, 2026-10-08 (IR-273): answering with a new version.** Built to the card and to the IR-416 hand-off above. The points the card left open were decided in the implementation and are **pending the project lead's review** on the IR-273 pull request.
+
+- **The act.** `POST /records/<id>/new-version/`, by an **owner** only. A reviewer who can see the record gets a 403; anyone else gets a 404. It needs a record on the new model with at least one open request. It writes v(n+1) through the one writer, resolves **every** open request as `resubmitted`, and records `resubmission_count` and `last_resubmitted_at`, so `preserved` is derived exactly as on the legacy path.
+- **What resets.** Under `CLEARANCE_AWARE`, only the requesting parties' clearance rows go back to pending. Under `RESTART_ALL`, every row does.
+    - Seats are the same under both policies, which is the card's "the two policies differ only in which clearances reset". Every `done` seat on a requesting party's active assignment returns to `in_review`, so an office whose second reviewer asked re-reviews the new version in full. Nobody else's seat changes.
+    - *Consequence, for review:* under `RESTART_ALL`, an office that had already completed keeps its completed assignment, and its pending clearance is re-cleared only if it is routed again. If the comparison arm should instead reopen those offices, that is a change to this rule.
+- **What counts as a change** since the **newest** open request:
+    - a manuscript other than the latest version's;
+    - a supporting document an owner uploaded (`RecordUpload`);
+    - a detail that actually changed. That is the new `Record.details_edited_at` (`records/0016`), stamped only when a PATCH changes a value, so saving identical details answers nothing.
+
+  Otherwise the act is refused, naming who asked and what would count.
+- **The manuscript lock** also opens while `awaiting_resubmission` (new model, a request open), **for an owner only**. Staff stay locked. The frontend offers the upload under a new capability key, `replace_manuscript`, added to §10's list.
+- **Only an owner's edit counts as a change.** A staff member's details edit does not stamp `details_edited_at`: the revision is the owner's to make.
+- **Withdrawing the last open request puts the submitted manuscript back.** If the owner has uploaded a revised manuscript but not submitted it, and the last open request is withdrawn, no version can carry that upload. The stored manuscript is reset to the latest version's file. The upload's file stays in storage. Nothing is re-extracted, since the upload never was (next point).
+- **What Ask IRIS answers from (settled with the project lead, 2026-10-08).** An owner's revised manuscript on the new model is **not extracted on upload**. It is extracted when its version is submitted, by `submit_new_version`. A metadata-only version re-extracts nothing. So the active chunk set, which is what Ask IRIS, Paper Chat and the degraded full-text path read, is always the **latest submitted version's manuscript**, the same file reviewers are served.
+    - The fix is in the extraction *trigger* (`versions.manuscript_awaits_submission`, called where an upload queues extraction). `apps/ai/` is unchanged. The AI pipeline now relies on this invariant without owning it.
+    - The owner's reader says that Ask IRIS answers about the submitted version until they submit. Indexing the revision separately for the owner was *rejected*: a second chunk set and owner-scoped retrieval are AI-pipeline work for little gain.
+    - The legacy `declined` path keeps extracting on upload. No reviewer is acting on a declined record, and IR-274 deletes the path.
+    - *Accepted:* for the extraction latency after a submission, Paper Chat may still quote the previous version. That is the same window every upload has.
+- **Which manuscript is current.** Between the owner's upload and their new version, `/manuscript/` serves everyone but an owner the latest version's file. An owner reads their own upload, and record detail's `manuscript_unsubmitted` labels it. The owner's version picker then offers the latest submitted version too, as `?version=N`.
+- **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else.
+
 ### 6. Lineage: an accepted Proposal continues as a new record
 
 ```

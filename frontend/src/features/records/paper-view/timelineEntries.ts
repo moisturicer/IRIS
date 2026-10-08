@@ -14,6 +14,7 @@
  * tagged: a version is never worked out from a timestamp. Review comments
  * join when their backend lands (IR-419).
  */
+import { joinLabels } from "@/lib/utils";
 import type { RecordTracker, TrackerResubmission } from "@/types/records";
 
 export type TimelineKind =
@@ -47,12 +48,6 @@ export interface TimelineEntry {
    * is shown rather than an invented "v1" (spec §4.11).
    */
   version: number | null;
-}
-
-/** "IERC", "IERC and KTTO", "ITSO, IERC and KTTO". */
-function joinLabels(labels: string[]): string {
-  if (labels.length <= 1) return labels.join("");
-  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
 export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {

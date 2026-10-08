@@ -7,8 +7,10 @@ resubmitted k times, with no v1 to vk made up. Every existing `Review.version`
 stays null.
 
 Mechanics follow `apps/reviews/test_seat_backfill_migration.py`: rewind
-`records` only and write rows through the current models, which is safe
-because `0015` changes no schema.
+`records` only. `Record` and `RecordVersion` rows are written through their
+models as of `0014`, because the live `Record` carries columns added after it
+(`details_edited_at`, IR-273) that the rewound table does not have. Other
+apps' rows go through the current models.
 """
 
 from datetime import timedelta
@@ -20,7 +22,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.records.models import Record, RecordType, RecordVersion
+from apps.records.models import RecordType, RecordVersion
 from apps.reviews.models import Review
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
@@ -44,10 +46,16 @@ def _migrate(target):
     executor.migrate(target)
 
 
+def _records_model(name):
+    """`records.<name>` as of `_BEFORE` (module note)."""
+    executor = MigrationExecutor(connection)
+    return executor.loader.project_state(_BEFORE).apps.get_model("records", name)
+
+
 def _versions(record):
     return [
         (v.number, v.cause, v.manuscript.name or None, v.created_by_id, v.created_at)
-        for v in RecordVersion.objects.filter(record=record).order_by("number")
+        for v in RecordVersion.objects.filter(record_id=record.pk).order_by("number")
     ]
 
 
@@ -59,13 +67,15 @@ def test_the_backfill_records_one_knowable_version_per_submitted_record():
         # get_or_create: a flushing TransactionTestCase earlier in the run
         # removes the rows records/0002 seeds.
         thesis = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        OldRecord = _records_model("Record")
+        OldRecordVersion = _records_model("RecordVersion")
 
         def record(title, status, **extra):
-            r = Record.objects.create(
-                title=title, record_type=thesis, added_by=owner,
+            r = OldRecord.objects.create(
+                title=title, record_type_id=thesis.pk, added_by_id=owner.pk,
                 pipeline_status=status, **extra,
             )
-            Record.objects.filter(pk=r.pk).update(created_at=T0)
+            OldRecord.objects.filter(pk=r.pk).update(created_at=T0)
             r.refresh_from_db()
             return r
 
@@ -78,17 +88,17 @@ def test_the_backfill_records_one_knowable_version_per_submitted_record():
         # Submitted once, consent stamped: v1, credited to the submitter.
         once = record(
             "once", "itso_review", abstract_file="abstracts/once.pdf",
-            dpa_accepted_at=submitted_at, dpa_accepted_by=owner,
+            dpa_accepted_at=submitted_at, dpa_accepted_by_id=owner.pk,
         )
         # Its earlier review is not dated against the reconstructed version.
         review = Review.objects.create(
-            record=once, reviewed_by=adviser, stage="adviser", status="approved",
+            record_id=once.pk, reviewed_by=adviser, stage="adviser", status="approved",
         )
 
         # Resubmitted twice: one version, v3, no v1 or v2 made up.
         twice = record(
             "twice", "rdco_review", abstract_file="abstracts/twice.pdf",
-            dpa_accepted_at=submitted_at, dpa_accepted_by=owner,
+            dpa_accepted_at=submitted_at, dpa_accepted_by_id=owner.pk,
             resubmission_count=2, last_resubmitted_at=resubmitted_at,
         )
 
@@ -101,9 +111,9 @@ def test_the_backfill_records_one_knowable_version_per_submitted_record():
 
         # Already versioned by the live code: left alone.
         live = record("live", "in_review", abstract_file="abstracts/live.pdf")
-        RecordVersion.objects.create(
-            record=live, number=1, cause="submission",
-            manuscript="abstracts/live.pdf", created_by=owner, created_at=submitted_at,
+        OldRecordVersion.objects.create(
+            record_id=live.pk, number=1, cause="submission",
+            manuscript="abstracts/live.pdf", created_by_id=owner.pk, created_at=submitted_at,
         )
 
         _migrate(_AFTER)
@@ -127,7 +137,7 @@ def test_the_backfill_records_one_knowable_version_per_submitted_record():
         # Re-running finds every submitted record already versioned.
         _migrate(_BEFORE)
         _migrate(_AFTER)
-        assert RecordVersion.objects.filter(record=once).count() == 1
-        assert RecordVersion.objects.filter(record=twice).count() == 1
+        assert RecordVersion.objects.filter(record_id=once.pk).count() == 1
+        assert RecordVersion.objects.filter(record_id=twice.pk).count() == 1
     finally:
         call_command("migrate", verbosity=0)

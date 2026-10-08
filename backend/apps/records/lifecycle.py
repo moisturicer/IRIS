@@ -570,7 +570,7 @@ def _resolve_after_clearance(record, office=None, **_) -> str:
     return record.pipeline_status  # still waiting on a peer office
 
 
-def _clearance_reset_fields() -> dict:
+def clearance_reset_fields() -> dict:
     """
     What resetting a clearance means, written once.
 
@@ -637,11 +637,11 @@ def _resolve_after_resubmission(record, declining_stage=None, **_) -> str:
             # the record re-enters, and re-reading it afterwards would be a
             # second query for an answer that cannot have changed.
             offices = set(clearances.values_list("office", flat=True))
-            clearances.update(**_clearance_reset_fields())
+            clearances.update(**clearance_reset_fields())
             return _clearance_entry_for(offices)
 
         office = declining_stage
-        clearances.filter(office=office).update(**_clearance_reset_fields())
+        clearances.filter(office=office).update(**clearance_reset_fields())
         return _stage_reviewed_by(record, office)
 
     RecordClearance.objects.filter(record=record).delete()

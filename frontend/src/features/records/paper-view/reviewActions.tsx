@@ -29,6 +29,7 @@
 import type { ComponentType } from "react";
 
 import { recordsApi } from "@/api/records";
+import { joinLabels } from "@/lib/utils";
 import { RequestDocumentDialog } from "@/features/document-requests/RequestDocumentDialog";
 import type { Capability } from "@/features/records/capabilities";
 import type { RecordDetail } from "@/types/records";
@@ -89,11 +90,6 @@ function RequestDocumentAction({ record, onClose, onDone }: ReviewActionDialogPr
       onCreated={() => onDone("Documents requested. The owner has been notified.")}
     />
   );
-}
-
-/** "ITSO and IERC", "ITSO, IERC and KTTO". */
-function joinLabels(labels: string[]): string {
-  return labels.length <= 1 ? labels.join("") : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
 /** The Adviser accepts the work and routes it to offices (ADR-032 §3, IR-261). */

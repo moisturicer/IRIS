@@ -102,8 +102,9 @@ const record: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
-  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   versions: null,
+  manuscript_unsubmitted: false,
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -157,8 +158,9 @@ const approvedProposal: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
-  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   versions: null,
+  manuscript_unsubmitted: false,
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -384,8 +386,9 @@ const inReview: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
-  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   versions: null,
+  manuscript_unsubmitted: false,
 };
 
 async function waitForRecord(title: string) {
@@ -526,6 +529,7 @@ describe("the resubmit control follows workflow_state", () => {
           id: 3, party: "ierc", label: "IERC", reason: "Add the assent form\nfor participants under 18.",
           requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
         }],
+        new_version: null,
       },
     };
     signInAs(OWNER_ID, "Student");
@@ -535,6 +539,46 @@ describe("the resubmit control follows workflow_state", () => {
     expect(banner).toHaveTextContent("IERC asked for changes · on v2");
     expect(banner).toHaveTextContent("Add the assent form for participants under 18.");
     expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+  });
+
+  /** The adviser-first model's revision, with the server offering a new version (IR-273). */
+  const asked = (blocked: string | null): RecordDetail => ({
+    ...inReview,
+    workflow_state: "awaiting_resubmission",
+    workflow_state_label: "Awaiting resubmission",
+    revision: {
+      party: null, label: null, blocked: null, withdrawable: null,
+      decision_blocked: "Waiting on the author: IERC asked for a revision.",
+      open: [{
+        id: 3, party: "ierc", label: "IERC", reason: "Add the assent form.",
+        requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
+      }],
+      new_version: { number: 3, rereview: ["IERC"], kept: ["ITSO"], blocked },
+    },
+  });
+
+  it("on the adviser-first model, offers the owner a new version that names who reviews it (IR-273)", async () => {
+    shownRecord = asked(null);
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const banner = await screen.findByRole("region", { name: "Revision requested" });
+    expect(banner).toHaveTextContent("IERC will review v3. ITSO's clearance is kept.");
+    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Submit new version" }));
+
+    expect(await screen.findByRole("dialog", { name: "Submit new version" })).toBeInTheDocument();
+  });
+
+  it("holds the new version, saying why, until something has changed (IR-273)", async () => {
+    shownRecord = asked("Nothing has changed since IERC asked for a revision.");
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const submit = await screen.findByRole("button", { name: "Submit new version" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
   });
 });
 
@@ -1658,6 +1702,25 @@ describe("record versions (IR-416)", () => {
 
     expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
     expect(await screen.findByText(/reading v1/i)).toBeInTheDocument();
+  });
+
+  it("lets an owner with an unsubmitted revision still read the submitted latest version (IR-273)", async () => {
+    shownRecord = { ...record, versions: twoVersions, manuscript_unsubmitted: true };
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    expect(await screen.findByText("Your revised manuscript, not yet submitted")).toBeInTheDocument();
+    expect(screen.getByText("Ask IRIS answers about the submitted version (v2) until you submit."))
+      .toBeInTheDocument();
+
+    const picker = screen.getByRole("combobox", PICKER);
+    expect(picker).toHaveValue("");
+    expect(within(picker).getByRole("option", { name: "Your revision · not yet submitted (current)" }))
+      .toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: /^v2 .*\(current\)$/ })).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(picker, "2");
+
+    expect(await screen.findByText(/reading v2/i)).toBeInTheDocument();
   });
 
   it("tells Paper Chat's reader that answers are about the current version", async () => {

@@ -34,6 +34,7 @@ let attachments: RecordFile[];
 const upload = vi.fn();
 const uploadForRequestItem = vi.fn();
 const uploadRecordFile = vi.fn();
+const uploadManuscript = vi.fn();
 const deleteFile = vi.fn();
 
 /** The server's answer to an owner's upload: every open missing item it answers. */
@@ -54,6 +55,7 @@ vi.mock("@/api/records", () => ({
   recordsApi: {
     documentRequests: () => Promise.resolve({ data: structuredClone(requests) }),
     documentRequestSlots: () => Promise.resolve({ data: [] }),
+    uploadManuscript: (recordId: number, file: File, options: unknown) => uploadManuscript(recordId, file, options),
   },
 }));
 vi.mock("@/api/documents", () => ({
@@ -94,7 +96,18 @@ const record = {
   abstract_file: "/api/v1/records/9/manuscript/",
   can_request_document: [],
   current_holders: [],
+  manuscript_unsubmitted: false,
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
 } as unknown as RecordDetail;
+
+/** A record on the new model with a revision asked for (IR-273): the owner is offered a new version. */
+const revising = {
+  ...record,
+  revision: {
+    ...record.revision,
+    new_version: { number: 2, rereview: ["IERC"], kept: ["ITSO"], blocked: null },
+  },
+} as RecordDetail;
 
 function slot(id: number, name: string): SlotWithUploads {
   return { id, name, record_type: 1, is_required: false, uploads: [] };
@@ -130,9 +143,12 @@ function attachment(id: number, filename: string, canRemove = false): RecordFile
   };
 }
 
-function renderFiles(props: Partial<{ owner: boolean; editable: boolean; reviewing: boolean; attach: boolean }> = {}) {
+function renderFiles(
+  props: Partial<{ owner: boolean; editable: boolean; reviewing: boolean; attach: boolean; replaceManuscript: boolean }> = {},
+  shown: RecordDetail = record,
+) {
   return renderScreen(
-    <FilesSection record={record} owner editable={false} reviewing={false} attach={false} {...props} />,
+    <FilesSection record={shown} owner editable={false} reviewing={false} attach={false} {...props} />,
   );
 }
 
@@ -280,4 +296,50 @@ describe("supplementary attachments", () => {
     expect(screen.queryByRole("button", { name: /^Remove clearance/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Attach a supplementary file" })).not.toBeInTheDocument();
   });
+});
+
+describe("the manuscript, while a revision is asked for (IR-273)", () => {
+  beforeEach(() => {
+    uploadManuscript.mockReset().mockResolvedValue({ data: {} });
+  });
+
+  it("lets the owner upload a revised manuscript for the new version", async () => {
+    const onChanged = vi.fn();
+    renderScreen(
+      <FilesSection
+        record={revising}
+        owner
+        editable
+        reviewing={false}
+        attach={false}
+        replaceManuscript
+        onChanged={onChanged}
+      />,
+    );
+    const zone = await screen.findByRole("button", { name: "Upload revised manuscript" });
+    const file = pdf("revised.pdf");
+
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => expect(uploadManuscript).toHaveBeenCalledWith(RECORD_ID, file, expect.any(Object)));
+    // The page re-reads the record, which now says the manuscript is unsubmitted.
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  it("labels an uploaded manuscript that is not yet submitted", async () => {
+    const { container } = renderFiles(
+      { editable: true, replaceManuscript: true },
+      { ...revising, manuscript_unsubmitted: true } as RecordDetail,
+    );
+
+    expect(await screen.findByText("Revised, not yet submitted")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("offers no manuscript upload without the replace_manuscript capability", async () => {
+    renderFiles({ editable: true });
+    await screen.findByRole("button", { name: "Upload Ethics Clearance" });
+    expect(screen.queryByRole("button", { name: "Upload revised manuscript" })).not.toBeInTheDocument();
+  });
+
 });
