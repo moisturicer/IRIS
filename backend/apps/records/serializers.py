@@ -97,7 +97,23 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             from apps.reviews.tracker import workflow_fields
 
             request = self.context.get("request")
-            cache[obj.pk] = workflow_fields(obj, getattr(request, "user", None))
+            cache[obj.pk] = workflow_fields(
+                obj, getattr(request, "user", None), readable=self._readable(obj),
+            )
+        return cache[obj.pk]
+
+    def _readable(self, obj) -> bool:
+        """
+        May the viewer read this record's review content -- who reviewed it
+        and what they wrote (IR-479)? Once per record; `reviews`, the
+        clearances' comments and signers, and `current_holders[].opened_by`
+        all follow it.
+        """
+        cache = self.__dict__.setdefault("_readable_cache", {})
+        if obj.pk not in cache:
+            from core.permissions import may_read_review
+
+            cache[obj.pk] = may_read_review(self._viewer(), obj)
         return cache[obj.pk]
 
     def get_workflow_state(self, obj):
@@ -139,7 +155,15 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         return office_review_flags(obj, self._viewer())
 
     def get_reviews(self, obj):
+        """
+        Every review on the record, with its comment and reviewer. Internal
+        workflow data: `None` -- not disclosed, which is not `[]` -- to a
+        viewer who may not read the review (IR-479).
+        """
         from apps.reviews.models import Review
+
+        if not self._readable(obj):
+            return None
         qs = (
             Review.objects
             .filter(record=obj)
@@ -171,8 +195,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         its only author -- `PaperViewPage` used to re-derive it in TypeScript
         against a different definition (IR-139).
         """
+        readable = self._readable(obj)
         return [
-            clearance_payload(c, last_resubmitted_at=obj.last_resubmitted_at)
+            clearance_payload(c, last_resubmitted_at=obj.last_resubmitted_at, readable=readable)
             for c in self._ordered_clearances(obj)
         ]
 

@@ -57,7 +57,11 @@ export interface RecordClearance {
   status:           "pending" | "cleared" | "declined" | "rejected" | "not_cleared";
   /** Server-supplied wording, so a status can be renamed without a release. */
   status_label:     string;
-  comment:          string;
+  /**
+   * The comment and who signed are review content: null to a viewer who may
+   * not read the review (IR-479). The status is not.
+   */
+  comment:          string | null;
   reviewed_by_name: string | null;
   updated_at:       string;
   /**
@@ -109,7 +113,8 @@ export interface RecordDetail extends RecordListItem {
   owners:          RecordOwner[];
   keywords?:       string[];
   is_deleted:      boolean;
-  reviews:         RecordReview[];
+  /** Null to a viewer who may not read the review: not disclosed, which is not none (IR-479). */
+  reviews:         RecordReview[] | null;
   /** Per-office clearance state — makes clearance-aware resubmission visible. */
   clearances:      RecordClearance[];
   resubmission:    RecordResubmission;
@@ -347,8 +352,9 @@ export interface TrackerRoutingGroup {
   from_label: string | null;
   to:         Party[];
   to_labels:  string[];
+  /** Who routed it, and why: null to a viewer who may not read the review (IR-479). */
   actor:      string | null;
-  reason:     string;
+  reason:     string | null;
   at:         string | null;
 }
 
@@ -358,7 +364,8 @@ export interface TrackerResubmission {
   label:        string;
   state:        "open" | "resubmitted" | "withdrawn";
   state_label:  string;
-  reason:       string;
+  /** Null, as `requested_by` and `resolved_by` are, to a viewer who may not read the review (IR-479). */
+  reason:       string | null;
   /** The `declined` review that made this request, one of `reviews` (IR-412). */
   review:       number;
   requested_by: string | null;
@@ -379,7 +386,11 @@ export interface RecordTracker {
   routing_history:       TrackerRoutingGroup[];
   /** Routing was not recorded before this date (IR-257's backfill wrote none). */
   routing_recorded_from: string | null;
-  reviews:               TrackerReview[];
+  /**
+   * Null to a viewer who may not read the review (IR-479): who reviewed and
+   * what they wrote is internal workflow data, as document requests are.
+   */
+  reviews:               TrackerReview[] | null;
   resubmissions:         TrackerResubmission[];
   /** Null when the viewer may not read them (IR-349) -- not "there are none". */
   document_requests:     DocumentRequest[] | null;
