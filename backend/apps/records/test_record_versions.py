@@ -46,10 +46,12 @@ def _pdf(name="thesis.pdf", body=b"%PDF-1.7 first"):
 
 
 def _versions(record):
-    return list(
-        RecordVersion.objects.filter(record=record)
+    """(number, cause, manuscript), an empty file field read as None."""
+    return [
+        (number, cause, manuscript or None)
+        for number, cause, manuscript in RecordVersion.objects.filter(record=record)
         .order_by("number").values_list("number", "cause", "manuscript")
-    )
+    ]
 
 
 def version_manuscript_url(record, number):

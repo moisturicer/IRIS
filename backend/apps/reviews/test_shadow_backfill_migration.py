@@ -28,7 +28,6 @@ from apps.reviews.models import (
     RecordAssignment,
     RecordClearance,
     ResubmissionRequest,
-    Review,
     RoutingEvent,
 )
 
@@ -52,6 +51,16 @@ def _migrate(target):
     executor = MigrationExecutor(connection)
     executor.loader.build_graph()
     executor.migrate(target)
+
+
+def _review_model(target):
+    """
+    `Review` as of `target`. The live model carries `Review.version` (IR-416,
+    `reviews/0011`), a column the rewound table does not have yet, so a row
+    written through it would name a column that does not exist.
+    """
+    executor = MigrationExecutor(connection)
+    return executor.loader.project_state(target).apps.get_model("reviews", "Review")
 
 
 def _rows(record):
@@ -100,11 +109,13 @@ class _World:
         """A Review at a strictly later, known time, so dating can be asserted."""
         self.minute += 1
         by = by or (self.office.get(stage) or (self.adviser if stage == "adviser" else self.rdco))
-        review = Review.objects.create(
-            record=record, reviewed_by=by, stage=stage, status=decision, comment=comment,
+        HistoricalReview = _review_model(_BEFORE)
+        review = HistoricalReview.objects.create(
+            record_id=record.pk, reviewed_by_id=by.pk, stage=stage, status=decision,
+            comment=comment,
         )
         at = T0 + timedelta(minutes=self.minute)
-        Review.objects.filter(pk=review.pk).update(created_at=at)
+        HistoricalReview.objects.filter(pk=review.pk).update(created_at=at)
         review.created_at = at
         return review
 
