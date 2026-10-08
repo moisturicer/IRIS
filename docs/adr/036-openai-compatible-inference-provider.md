@@ -131,6 +131,34 @@ honestly rather than boot into a broken generative path. The task set itself is
 closed and defined outside this ADR — see IR-375 (*Spec: Inference tasks and
 Profiles*) and IR-378 (*C · Profile and the closed Inference task set*).
 
+## Amendment — 2026-10-08 (IR-482): an evaluation-only Decisions adapter
+
+OpenRouter also serves a **Decisions API** (`POST https://openrouter.ai/api/alpha/decisions`)
+that answers a typed question about a state with a probability and no text.
+It is not the chat endpoint, so `OpenAICompatibleAdapter` cannot reach it, and
+it generates nothing, so it does not fit `LLMProvider` or the closed Inference
+task set above. This amendment permits one narrow exception:
+
+* **A separate adapter**, `apps/ai/providers/openrouter_decisions.py`, behind a
+  small `DecisionModel` port that returns a probability. It reuses only the
+  OpenRouter key an Inference task already holds; no new setting.
+* **Pinned to `typesafe/jev-1.13`.** The `~typesafe/jev-latest` alias is
+  refused at construction, so a run is reproducible. The dated build the vendor
+  actually served is recorded in each run file.
+* **Evaluation only.** `manage.py eval_evidence --decision-mode jev-noul` is the
+  sole caller. Nothing on a reader's path, the shadow pilot or the answer path
+  constructs it, and it adds no Inference task.
+* **The endpoint is alpha** (the path says so) and may change without notice.
+* **Retention, training and rate-limit terms are unverified.** OpenRouter's
+  docs state none for this endpoint. Live runs are therefore limited to the
+  public arXiv proxy question set, and every run file says the terms are
+  unverified. Reader questions, private documents and sensitive school data are
+  out of scope until the terms are recorded here.
+* **Removal or deferral.** If Jev is not selected for the evidence decision, or
+  the terms cannot be verified, delete the adapter, the port and the mode. They
+  are additive and nothing else depends on them. The ADR-035 detector stays an
+  independent safeguard throughout: a probability can never override it.
+
 ## Consequences
 
 **Good.** Switching Groq to OpenRouter, or either to a self-hosted vLLM, is
