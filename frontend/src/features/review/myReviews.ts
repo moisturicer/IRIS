@@ -76,7 +76,7 @@ export function viewSearch(view: MyReviewsView): string {
 
 /** Who holds a row: the office, then you, a colleague, nobody yet, or the old pipeline. */
 export function holderLine(row: MyReviewsRow): string {
-  if (row.kind === "legacy") return `${row.stage_label ?? row.party_label} · Old pipeline`;
+  if (row.kind === "legacy") return `${row.party_label} · Old pipeline`;
   if (row.kind === "pool") return `${row.party_label} · Unassigned`;
   if (row.is_mine) return `${row.party_label} · You`;
   return `${row.party_label} · ${row.holder_name ?? "A former member"}`;

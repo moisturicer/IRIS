@@ -67,14 +67,17 @@ export default function MyReviewsPage() {
 
   const { tab, outcome, office } = view;
 
-  const load = useCallback(async () => {
+  /** Reload the tab; whether it worked, so an act announces only what is shown. */
+  const load = useCallback(async (): Promise<boolean> => {
     setLoadError(null);
     try {
       const { data } = await reviewsApi.mine({ tab, outcome, office, cursor: null });
       setPage(data);
+      return true;
     } catch {
       // An empty tab and a failed request must not look alike.
       setLoadError("My Reviews could not be loaded.");
+      return false;
     }
   }, [tab, outcome, office]);
 
@@ -117,8 +120,7 @@ export default function MyReviewsPage() {
     setRowErrors((e) => ({ ...e, [row.key]: "" }));
     try {
       await seatsApi.claim(row.assignment);
-      await load();
-      setAnnouncement("Claimed. It's in To review as yours.");
+      if (await load()) setAnnouncement("Claimed. It's in To review as yours.");
     } catch (err) {
       setRowErrors((e) => ({ ...e, [row.key]: errorDetail(err, "The review could not be claimed.") }));
     } finally {
@@ -128,7 +130,7 @@ export default function MyReviewsPage() {
 
   const assigned = async (name: string, self: boolean) => {
     setAssigning(null);
-    await load();
+    if (!(await load())) return;
     setAnnouncement(self ? "Assigned to you. It's in To review as yours." : `Assigned to ${name}. It's in their To review.`);
   };
 
@@ -348,6 +350,7 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
   const status = (
     <>
       <span className="font-semibold text-stone-800">{holderLine(row)}</span>
+      {row.kind === "legacy" && row.stage_label && <Badge>{row.stage_label}</Badge>}
       {row.waiting_on && tab !== "done" && <Badge variant="warning">{WAITING_ON_LABEL[row.waiting_on]}</Badge>}
       {tab === "done" && (
         <Badge variant={row.outcome == null ? "default" : "success"}>
@@ -362,8 +365,13 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
       ? row.decided_at && <span>{formatDate(row.decided_at)}</span>
       : row.waiting_days != null && <span>Waiting {waitLabel(row.waiting_days)}</span>;
 
+  // A record waiting on its author shows the badge in place of any action
+  // (ADR-032 §9 Amendment); its title still opens it.
+  const waiting = tab !== "done" && row.waiting_on != null;
   let actions = null;
-  if (row.kind === "pool") {
+  if (waiting || tab === "done") {
+    // No action: the badge, or the outcome, says where the record stands.
+  } else if (row.kind === "pool") {
     actions = (
       <>
         {row.can_assign && (
@@ -378,7 +386,7 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
         )}
       </>
     );
-  } else if (tab !== "done" && !row.waiting_on) {
+  } else {
     // A link, not a button: *Open review* is recorded in Paper View alone.
     const label = tab === "in_review" ? "Continue review" : "Open review";
     actions = (

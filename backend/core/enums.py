@@ -392,15 +392,6 @@ class ReviewOutcome(models.TextChoices):
     REVISION_REQUESTED = "revision_requested", "Revision requested"
 
 
-#: The Done filters My Reviews offers (ADR-032 §9).
-FILTERABLE_OUTCOMES = (
-    ReviewOutcome.CLEARED,
-    ReviewOutcome.FINDING,
-    ReviewOutcome.ACCEPTED,
-    ReviewOutcome.REJECTED,
-    ReviewOutcome.PUBLISHED,
-)
-
 
 class RequestStatus(models.TextChoices):
     """

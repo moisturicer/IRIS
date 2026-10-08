@@ -173,13 +173,17 @@ def _tab(raw) -> MyReviewsTab:
         raise MyReviewsError(f"Unknown tab {raw!r}.")
 
 
+#: Done's filters (ADR-032 §9). `REVISION_REQUESTED` is shown on its rows
+#: and listed under All, but is not a filter of its own.
+_FILTERS = tuple(o for o in ReviewOutcome if o is not ReviewOutcome.REVISION_REQUESTED)
+
+
 def _outcome_filter(raw):
     if not raw:
         return None
-    try:
-        return ReviewOutcome(raw)
-    except ValueError:
-        raise MyReviewsError(f"Unknown outcome {raw!r}.")
+    if raw not in _FILTERS:
+        raise MyReviewsError(f"Unknown outcome filter {raw!r}.")
+    return ReviewOutcome(raw)
 
 
 # --- the sources ----------------------------------------------------------------------
@@ -220,7 +224,9 @@ def _legacy(scope):
     statuses = _LEGACY_STATUSES.get(role)
     if not statuses:
         return Record.objects.none()
-    records = Record.objects.filter(pipeline_status__in=statuses)
+    records = Record.objects.filter(pipeline_status__in=statuses).filter(
+        pk__in=_visible(scope.user).values("pk"),
+    )
     if role == RoleName.ADVISER:
         records = records.filter(adviser=scope.user)
     office = _PARTY_OF_ROLE[role]
@@ -266,7 +272,11 @@ def _seatless_reviews(scope):
         assignment=OuterRef("assignment"), reviewer=OuterRef("reviewed_by"),
     ).filter(
         Q(state=SeatState.DONE)
-        | Q(state__in=OPEN_SEAT_STATES, assignment__record__pipeline_status=PipelineStatus.IN_REVIEW)
+        | Q(
+            state__in=OPEN_SEAT_STATES,
+            assignment__state=AssignmentState.ACTIVE,
+            assignment__record__pipeline_status=PipelineStatus.IN_REVIEW,
+        )
     )
     return scope.reviews().filter(record__in=_visible(scope.user)).exclude(Exists(shown)).annotate(
         when=F("created_at"),
@@ -451,7 +461,7 @@ def _current_rows(scope, tab) -> list[dict]:
             party = _PARTY_OF_ROLE[role]
             rows.append(_row(
                 kind=LEGACY, pk=record.pk, record=record,
-                party=party, party_label=str(Party(party).label),
+                party=party, party_label=str(RoleName(role).label),
                 stage_label=record.get_pipeline_status_display(),
                 routing_party=_ROUTED_PARTY_AT.get(record.pipeline_status, party),
                 **_since(record.last_review or record.created_at),
@@ -546,7 +556,7 @@ def _done_rows(scope, outcome, cursor) -> tuple[list[dict], str | None]:
             rows.append(_row(
                 kind=REVIEW, pk=item.pk, record=item.record,
                 party=_row_party(item.stage), party_label=str(ReviewStage(item.stage).label),
-                        holder=item.reviewed_by_id, holder_name=_name(item.reviewed_by),
+                holder=item.reviewed_by_id, holder_name=_name(item.reviewed_by),
                 is_mine=item.reviewed_by_id == scope.user.pk,
                 **decided,
             ))

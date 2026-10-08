@@ -28,12 +28,12 @@ class ReviewViewSet(viewsets.GenericViewSet):
     """
     POST /reviews/submit/     -- submit a review or clearance decision
     POST /reviews/resubmit/   -- owner resubmits a declined record
-
-    The three queue lists (`pending/`, `approved/`, `declined/`) were replaced
-    by My Reviews, `MyReviewsView` below (IR-268).
     GET  /reviews/analytics/  -- per-stage average processing time (TODO stub, 501)
     """
     permission_classes = [IsAuthenticated, IsReviewer]
+
+    # The three queue lists (`pending/`, `approved/`, `declined/`) were
+    # replaced by My Reviews, `MyReviewsView` below (IR-268).
 
     def get_permissions(self):
         # resubmit is called by record owners (students), not reviewers

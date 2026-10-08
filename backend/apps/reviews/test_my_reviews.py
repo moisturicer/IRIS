@@ -73,6 +73,16 @@ class MyReviewsTestBase(RoutingTestBase):
         seat.save(update_fields=["state", "opened_at"])
         return seat
 
+    def done_seat(self, record, when):
+        """`self.itso`'s finished seat on a closed ITSO assignment of `record`."""
+        assignment = RecordAssignment.objects.create(
+            record=record, party=Party.ITSO, state=AssignmentState.COMPLETED,
+        )
+        return ReviewerSeat.objects.create(
+            assignment=assignment, reviewer=self.itso, source=SeatSource.CLAIMED,
+            state=SeatState.DONE, done_at=when,
+        )
+
     def legacy(self, pipeline_status, **extra):
         """An old-pipeline record parked at `pipeline_status`."""
         record = Record.objects.create(
@@ -329,6 +339,27 @@ class DoneTests(MyReviewsTestBase):
         self.assertIsNone(second["next"])
 
 
+    def test_done_pages_across_seats_and_seatless_reviews_as_one_list(self):
+        """Settled 2026-10-08 (Q16): one ordering key across both sources."""
+        now = timezone.now()
+        expected = []
+        for i in range(60):
+            record = self.legacy(PipelineStatus.PUBLISHED)
+            when = now - timezone.timedelta(minutes=i)
+            if i % 2:
+                review = self.legacy_review(record, self.itso, "itso", "approved")
+                Review.objects.filter(pk=review.pk).update(created_at=when)
+            else:
+                self.done_seat(record, when)
+            expected.append(record.pk)
+
+        first = self.page(self.itso, tab="done")
+        second = self.page(self.itso, tab="done", cursor=first["next"])
+        self.assertEqual([r["record"] for r in first["rows"] + second["rows"]], expected)
+        self.assertEqual(len(first["rows"]), 50)
+        self.assertIsNone(second["next"])
+
+
 # --- AC: Coordinator ----------------------------------------------------------------------
 
 class CoordinatorTests(MyReviewsTestBase):
@@ -400,6 +431,7 @@ class OldPipelineTests(MyReviewsTestBase):
         self.legacy(PipelineStatus.RDCO_INTAKE)
         row = self.rows(self.rdco, tab="to_review")[0]
         self.assertEqual(row["stage_label"], "RDCO Intake Review")
+        self.assertEqual(row["party_label"], "RDCO")
         self.assertFalse(row["can_claim"])
         self.assertEqual(self.rows(self.rdco, tab="in_review"), [])
 
@@ -428,6 +460,7 @@ class ContractTests(MyReviewsTestBase):
 
     def test_a_parameter_it_cannot_read_is_a_400(self):
         for params in ({"tab": "awaiting"}, {"tab": "done", "outcome": "approved"},
+                       {"tab": "done", "outcome": "revision_requested"},
                        {"tab": "done", "cursor": "not-a-cursor"}):
             with self.subTest(params=params):
                 self.assertEqual(self.mine(self.itso, **params).status_code, status.HTTP_400_BAD_REQUEST)
@@ -446,6 +479,7 @@ class ContractTests(MyReviewsTestBase):
                 RecordClearance.objects.create(record=legacy, office="itso", status="pending")
                 done = self.legacy(PipelineStatus.PUBLISHED)
                 Review.objects.create(record=done, reviewed_by=self.itso, stage="itso", status="approved")
+                self.done_seat(self.legacy(PipelineStatus.PUBLISHED), timezone.now())
 
         def queries(tab):
             self.client.force_authenticate(self.itso)

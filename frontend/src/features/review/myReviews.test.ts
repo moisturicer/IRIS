@@ -84,9 +84,9 @@ describe("holderLine", () => {
       .toBe("ITSO · Unassigned");
   });
 
-  it("says a record is still on the old pipeline, at its old stage", () => {
-    expect(holderLine(row({ kind: "legacy", stage_label: "ITSO Review", is_mine: false })))
-      .toBe("ITSO Review · Old pipeline");
+  it("says a record is still on the old pipeline, naming the office (ADR-032 §9 Amendment)", () => {
+    expect(holderLine(row({ kind: "legacy", stage_label: "ITSO Technical Review", is_mine: false })))
+      .toBe("ITSO · Old pipeline");
   });
 });
 

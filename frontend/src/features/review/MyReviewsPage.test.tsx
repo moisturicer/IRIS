@@ -169,6 +169,24 @@ describe("MyReviewsPage", () => {
     expect(screen.getByRole("link", { name: "Smart Campus Energy Monitor" })).toBeInTheDocument();
   });
 
+  it("replaces Claim with the waiting badge on an unclaimed record waiting on its author", async () => {
+    mine.mockResolvedValue(page([{ ...POOL, waiting_on: "author" }]));
+    show();
+
+    expect(await screen.findByText("Waiting on author")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Claim review/ })).not.toBeInTheDocument();
+  });
+
+  it("announces nothing when the refetch after a claim fails", async () => {
+    show();
+    const button = await screen.findByRole("button", { name: "Claim review: AI-Based Medical Imaging" });
+    mine.mockRejectedValueOnce(new Error("offline"));
+    await userEvent.click(button);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("My Reviews could not be loaded.");
+    expect(screen.getByRole("status")).toHaveTextContent("");
+  });
+
   it("filters Done by outcome, keeps the filter in the URL, and pages with Show more", async () => {
     const done = row({ key: "seat:9", outcome: "cleared", outcome_label: "Cleared", decided_at: "2026-10-05T00:00:00Z" });
     mine.mockResolvedValue(page([done], { next: "cursor-2" }));
