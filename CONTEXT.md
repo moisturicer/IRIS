@@ -20,6 +20,10 @@ _Avoid_: RAG chat, chatbot (fine in casual conversation, but "Ask IRIS" is the p
 An AI-generated account of a Record's content, grounded in that Record's own passages and cached per active `ChunkSet`. Shown on the record's detail page. Deliberately distinct from **Abstract** (below) — the Abstract is what the author wrote, the AI Overview is what IRIS derived, and the two must never be presented as interchangeable.
 _Avoid_: AI Summary (the earlier name for this, now retired — the code, the API field and the UI all say Overview), Summary alone (ambiguous next to Abstract), DocumentSummary (an internal name that no longer matches the model).
 
+**Manuscript**:
+The paper itself: the one document a Record is about, which a reader opens, a citation points into, and reviewers review. Distinct from a supplementary file, which supports the Record without being it (an ethics form, a data sheet, a file an office attached). Once a Record has been submitted, its Manuscript changes only through a new [[Version]].
+_Avoid_: Abstract file (the code's historical field name; the Manuscript is the whole paper, not its abstract), upload or document alone (both also cover supplementary files), paper in specs (fine in UI copy).
+
 **Abstract**:
 The author-submitted summary of a Record, provided at submission time. Existed before AI Summary; not generated, not cached, not related to the chunk pipeline.
 _Avoid_: Summary alone.
@@ -101,3 +105,7 @@ _Avoid_: Route to RDCO, escalation, final routing.
 **Review round**:
 One [[Specialist office]]'s review of a Record, from being routed the Record until its [[Seat]]s are done. An office routed the same Record again starts a new Review round, and the latest completed one sets the office's [[Clearance]]; the earlier outcome stands until then.
 _Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads as a person being assigned, which is a Seat), pass.
+
+**Version**:
+A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
+_Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
