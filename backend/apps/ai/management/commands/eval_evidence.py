@@ -46,6 +46,7 @@ from apps.ai.evidence import (
 from apps.ai.evidence.detector import EvidenceDetector
 from apps.ai.evidence.jev_noul import (
     CORPUS_DESCRIPTION_VERSION,
+    STATE_FIELDS,
     JevNoulDecision,
     jev_digest,
 )
@@ -65,6 +66,9 @@ from apps.ai.providers.tool_calling import ToolCallingLLM
 
 DEFAULT_OUT = Path("docs") / "evaluation" / "runs"
 
+#: A run with more fallbacks than this is reported alone, never pooled.
+FALLBACK_POOLING_LIMIT = 0.05
+
 #: Recorded in every Jev run file (IR-482, ADR-036 amendment).
 JEV_VENDOR_TERMS = (
     "UNVERIFIED: OpenRouter's docs state no retention, training or rate-limit "
@@ -77,12 +81,14 @@ JEV_APPROVAL = {
     "question set only; not reader questions, private documents, sensitive "
     "school data, or any run through shadow or the answer path",
 }
-JEV_STATE_FIELDS = (
-    "corpus",
-    "question",
-    "rewritten_question_untrusted",
-    "earlier_questions",
-)
+
+
+def _declared_tier(path) -> str:
+    """The tier the file itself declares; a missing one is not assumed proxy."""
+    try:
+        return str(json.loads(Path(path).read_text(encoding="utf-8")).get("tier") or "")
+    except (OSError, ValueError, AttributeError):
+        return ""
 
 
 def _openrouter_decision_model():
@@ -206,11 +212,13 @@ class Command(BaseCommand):
             raise CommandError(f"--decision-mode {mode} needs --model-decision.")
         if options["max_tokens"] < 1:
             raise CommandError("--max-tokens must be positive.")
-        if jev_mode and question_set.tier != "proxy":
+        if jev_mode and _declared_tier(question_set.source) != "proxy":
             raise CommandError(
                 "--decision-mode jev-noul is approved for the public proxy "
-                f"question set only (IR-482); this set's tier is "
-                f"{question_set.tier!r}. Retention terms are unverified."
+                f"question set only (IR-482), and the set must declare "
+                f'"tier": "proxy" itself; this one declares '
+                f"{_declared_tier(question_set.source)!r}. Retention terms are "
+                "unverified."
             )
         decider = (
             self._decider(mode, options["max_tokens"])
@@ -228,7 +236,7 @@ class Command(BaseCommand):
                     "endpoint": DECISIONS_URL,
                     "model_requested": PINNED_MODEL,
                     "question_type": "noul",
-                    "state_fields": list(JEV_STATE_FIELDS),
+                    "state_fields": list(STATE_FIELDS),
                     "corpus_description_version": CORPUS_DESCRIPTION_VERSION,
                     "max_prior_questions": MAX_PRIOR_QUESTIONS,
                 },
@@ -372,6 +380,15 @@ class Command(BaseCommand):
                     f"{coverage['unannotated']} of "
                     f"{coverage['questions_in_set']} questions carry no "
                     f"evidence annotation and were not judged."
+                )
+            )
+        model = report.model
+        if model and model.decisions and model.fallbacks / len(model.decisions) > FALLBACK_POOLING_LIMIT:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{model.fallbacks} of {len(model.decisions)} calls fell back "
+                    f"to evidence (over {FALLBACK_POOLING_LIMIT:.0%}). Report this "
+                    "run on its own; do not pool it with the others."
                 )
             )
         combined = report.lane("combined")

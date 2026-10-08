@@ -15,7 +15,7 @@ from django.core.management.base import CommandError
 from django.test import override_settings
 
 import apps.ai.management.commands.eval_evidence as command
-from apps.ai.evidence.jev_noul import jev_digest
+from apps.ai.evidence.jev_noul import STATE_FIELDS, jev_digest
 from apps.ai.models import Conversation, Turn
 from apps.ai.providers.decisions import NoulAnswer, ScriptedDecisionModel
 from apps.ai.providers.openrouter_decisions import PINNED_MODEL
@@ -79,7 +79,7 @@ class TheRunTests:
         assert prov["model"] == PINNED_MODEL
         assert prov["workers"] == 1
         assert prov["request"]["endpoint"].endswith("/api/alpha/decisions")
-        assert prov["request"]["state_fields"]
+        assert prov["request"]["state_fields"] == list(STATE_FIELDS)
         assert "Model decision" in capsys.readouterr().out
 
     def test_unverified_retention_terms_and_the_approval_scope_are_in_the_file(
@@ -100,9 +100,7 @@ class TheRunTests:
 
         assert len(fake.calls) == 2
         for call in fake.calls:
-            assert set(call["state"]) <= {
-                "corpus", "question", "rewritten_question_untrusted", "earlier_questions"
-            }
+            assert set(call["state"]) <= set(STATE_FIELDS)
 
     def test_it_creates_no_conversation_and_no_turn(self, fake, questions):
         run(questions, "--no-write")
@@ -138,6 +136,30 @@ class TheRefusalTests:
         with pytest.raises(CommandError, match="public proxy"):
             run(str(path), "--no-write")
         assert fake.calls == []
+
+    def test_a_set_that_does_not_declare_its_tier_is_refused(self, fake, tmp_path):
+        path = tmp_path / "untiered.json"
+        path.write_text(
+            json.dumps({"name": "x", "questions": [grounded("q1", "what did the paper find?")]}),
+            encoding="utf-8",
+        )
+        with pytest.raises(CommandError, match="declare"):
+            run(str(path), "--no-write")
+        assert fake.calls == []
+
+    def test_a_run_over_five_percent_fallbacks_says_not_to_pool_it(
+        self, monkeypatch, questions, capsys
+    ):
+        from apps.ai.providers.decisions import DecisionUnavailable
+
+        down = ScriptedDecisionModel(DecisionUnavailable("x"), DecisionUnavailable("x"))
+        monkeypatch.setattr(command, "_openrouter_decision_model", lambda: down)
+        run(questions, "--no-write")
+        assert "do not pool" in capsys.readouterr().out
+
+    def test_a_clean_run_carries_no_pooling_warning(self, fake, questions, capsys):
+        run(questions, "--no-write")
+        assert "do not pool" not in capsys.readouterr().out
 
     def test_no_openrouter_key_is_refused_by_name(self, questions):
         with override_settings(

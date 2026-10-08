@@ -58,6 +58,14 @@ NOUL_CRITERIA = {
     "false": "Answering needs no corpus: general knowledge, small talk, or this conversation.",
 }
 
+#: The keys `build_state` may emit; the digest and the run provenance read this.
+STATE_FIELDS = (
+    "corpus",
+    "question",
+    "rewritten_question_untrusted",
+    "earlier_questions",
+)
+
 #: Fills `ModelDecision.route` for the shared tallies. **Not an operating
 #: point**: the curve reports every threshold and chooses none.
 REFERENCE_THRESHOLD = 0.5
@@ -97,12 +105,7 @@ def jev_digest(model: str) -> str:
             "instructions": NOUL_INSTRUCTIONS,
             "criteria": NOUL_CRITERIA,
             "max_prior_questions": MAX_PRIOR_QUESTIONS,
-            "state_fields": [
-                "corpus",
-                "question",
-                "rewritten_question_untrusted",
-                "earlier_questions",
-            ],
+            "state_fields": list(STATE_FIELDS),
         },
         sort_keys=True,
     )
