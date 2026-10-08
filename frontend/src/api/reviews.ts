@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { ReviewerSeat } from "@/types/records";
+import type { AddReviewerOptions, ReviewerSeat } from "@/types/records";
 import type { Review, ReviewSubmitPayload, ReviewQueueRow } from "@/types/reviews";
 
 /**
@@ -17,6 +17,9 @@ export const seatsApi = {
   /** A coordinator seats a member of their own office. */
   assign: (assignmentId: number, reviewerId: number) =>
     apiClient.post<ReviewerSeat>(`/assignments/${assignmentId}/assign/`, { reviewer: reviewerId }),
+  /** Who a seat holder may add: their office's members, marked when already seated (IR-269). */
+  addReviewerOptions: (assignmentId: number) =>
+    apiClient.get<AddReviewerOptions>(`/assignments/${assignmentId}/add-reviewer/`),
   /** A seat holder brings in a colleague from their own office. Never another office: that is routing. */
   addReviewer: (assignmentId: number, reviewerId: number) =>
     apiClient.post<ReviewerSeat>(`/assignments/${assignmentId}/add-reviewer/`, { reviewer: reviewerId }),

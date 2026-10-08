@@ -154,6 +154,32 @@ export interface RecordDetail extends RecordListItem {
    * acts as for a seat holder. A rendering hint; the endpoints re-check it.
    */
   routing:              RoutingFlags;
+  /**
+   * What the action bar may offer an office reviewer (IR-269): the office the
+   * viewer may *Clear* or *Record finding* as, why not yet, and the office's
+   * assignment for *Add reviewer*. A rendering hint; the endpoints re-check it.
+   */
+  office_review:        OfficeReviewFlags;
+}
+
+export interface OfficeReviewFlags {
+  /** The specialist office the viewer holds an open seat for, or null. */
+  party:      Party | null;
+  label:      string | null;
+  /** Why the act cannot be taken yet (an unopened seat, an open document request). */
+  blocked:    string | null;
+  assignment: number | null;
+}
+
+/** An office reviewer's two outcomes (ADR-032 §3): offices never reject or publish. */
+export type OfficeReviewOutcome = "cleared" | "finding";
+
+/** `GET /assignments/<id>/add-reviewer/`: the office's members, marked when already seated. */
+export interface AddReviewerOptions {
+  assignment:  number;
+  party:       Party;
+  party_label: string;
+  members:     { id: number; name: string; seated: boolean }[];
 }
 
 export interface RoutingFlags {
@@ -236,7 +262,9 @@ export type TrackerPartyState =
   | "completed"
   | "withdrawn"
   | "not_requested"
-  | "awaiting";
+  | "awaiting"
+  /** RDCO on a new-model record no specialist office has held (ADR-032 §10, IR-269). */
+  | "not_required";
 
 /**
  * What a finished (or reviewing) party concluded: its clearance status for an
@@ -289,6 +317,27 @@ export interface TrackerPartyRow {
    * not disclosed, which is not the same as false.
    */
   awaiting_document: boolean | null;
+  /**
+   * The outcome is an earlier review round's, standing while the office
+   * reviews again; `outcome_label` already says so (IR-269).
+   */
+  outcome_earlier: boolean;
+  /** Active, with nobody there reviewing it yet: the office's pool (◌). */
+  in_pool:         boolean;
+  /**
+   * Who is reviewing for this party, per seat. Null when the viewer does not
+   * take part in the review: not disclosed, which is not the same as none.
+   */
+  seats:           TrackerSeat[] | null;
+}
+
+export interface TrackerSeat {
+  reviewer_name: string | null;
+  state:         SeatState;
+  state_label:   string;
+  /** A finished seat's own verdict: `approved` (cleared) or `negative_finding`. */
+  verdict:       string | null;
+  verdict_label: string | null;
 }
 
 export interface TrackerRoutingGroup {

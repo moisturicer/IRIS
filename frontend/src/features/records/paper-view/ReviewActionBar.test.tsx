@@ -139,6 +139,22 @@ describe("ReviewActionBar", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("states a reason two actions share once, and both name it (IR-269)", async () => {
+    const shared = () => "Open the review first.";
+    const clear: ReviewAction = { ...route, capability: "office_review", label: "Clear…", blockedReason: shared };
+    const finding: ReviewAction = { ...route, capability: "office_review", label: "Record finding…", blockedReason: shared };
+    const { container } = renderBar(["office_review"], [clear, finding]);
+
+    expect(buttonNames()).toEqual(["Clear…", "Record finding…"]);
+    expect(screen.getAllByText("Open the review first.")).toHaveLength(1);
+    for (const name of ["Clear…", "Record finding…"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription("Open the review first.");
+    }
+    await expectNoBlockingA11yViolations(container);
+  });
+
   it("opens an action's own dialog, and reports its outcome when it is done", async () => {
     const onChanged = vi.fn();
     renderBar(["route"], [route], { onChanged });

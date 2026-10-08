@@ -69,6 +69,7 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     my_seats: [],
     is_participant: false,
     routing: { accept_and_route: false, route_as: null },
+    office_review: { party: null, label: null, blocked: null, assignment: null },
     ...overrides,
   };
 }
@@ -284,6 +285,20 @@ const ROWS: Row[] = [
     }),
     viewer: itsoStaff,
     capabilities: ["cite", "open_review", "route"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "an office seat holder may clear, record a finding and add a colleague (IR-269)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "in_review",
+      my_seats: [seat("in_review")],
+      is_participant: true,
+      routing: { accept_and_route: false, route_as: "itso" },
+      office_review: { party: "itso", label: "ITSO", blocked: null, assignment: 11 },
+    }),
+    viewer: itsoStaff,
+    capabilities: ["cite", "open_review", "route", "office_review", "add_reviewer"],
     sections: ["overview", "paper", "review", "files"],
   },
   {
