@@ -632,6 +632,61 @@ class RecordViewSet(viewsets.ModelViewSet):
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
+    def _revision_response(self, request, act):
+        """
+        Run a revision act on the record and answer with its tracker (IR-272).
+        404 for a record the caller cannot see, or a request not on it; 403
+        for a caller who may not act; 400 for what cannot be done now.
+        """
+        from apps.reviews import revisions
+        from apps.reviews.models import ResubmissionRequest
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            act(record)
+        except ResubmissionRequest.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        except revisions.RevisionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except revisions.RevisionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
+
+    @action(detail=True, methods=["post"], url_path="request-revision")
+    def request_revision(self, request, pk=None):
+        """
+        POST /records/<id>/request-revision/  `{"reason": str}`
+
+        A holder of an opened seat -- the Adviser, an office reviewer or RDCO
+        -- asks the owners to revise the record (ADR-032 §5, IR-272). Their
+        seat stays in review; nobody may decide the record until the owner
+        submits a new version. One open request per party.
+        """
+        from apps.reviews import revisions
+
+        return self._revision_response(request, lambda record: revisions.request_revision(
+            record, request.user, reason=request.data.get("reason"),
+        ))
+
+    @action(
+        detail=True, methods=["post"],
+        url_path=r"revision-requests/(?P<request_id>[0-9]+)/withdraw",
+    )
+    def withdraw_revision_request(self, request, pk=None, request_id=None):
+        """
+        POST /records/<id>/revision-requests/<request_id>/withdraw/
+
+        A seat holder of the party that asked withdraws its open revision
+        request. No reason (IR-263's rule for document requests).
+        """
+        from apps.reviews import revisions
+
+        return self._revision_response(request, lambda record: revisions.withdraw_revision_request(
+            record, request.user, int(request_id),
+        ))
+
     @action(detail=True, methods=["get"], url_path="route-options")
     def route_options(self, request, pk=None):
         """

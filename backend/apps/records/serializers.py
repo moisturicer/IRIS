@@ -86,6 +86,12 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # record a finding as, why not yet, and its assignment for *Add reviewer*.
     # A rendering hint; `office-review/` and `add-reviewer/` re-check it.
     office_review        = serializers.SerializerMethodField()
+    # Revision requests (IR-272): `{party, label, blocked, withdrawable,
+    # decision_blocked, open}` -- whether the viewer may ask for a revision
+    # or withdraw their party's, why nothing can be decided now, and every
+    # open request for the owner's *Action required*. A rendering hint;
+    # `request-revision/` and the withdraw endpoint re-check it.
+    revision             = serializers.SerializerMethodField()
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
@@ -156,6 +162,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         from apps.reviews.office_review import office_review_flags
 
         return office_review_flags(obj, self._viewer())
+
+    def get_revision(self, obj):
+        from apps.reviews.revisions import revision_flags
+
+        return revision_flags(obj, self._viewer(), readable=self._readable(obj))
 
     def get_reviews(self, obj):
         """
@@ -310,7 +321,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "your_office", "your_office_label",
             "workflow_state", "workflow_state_label", "current_holders", "can_act",
             "can_request_document", "my_seats", "is_participant", "routing",
-            "office_review",
+            "office_review", "revision",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
