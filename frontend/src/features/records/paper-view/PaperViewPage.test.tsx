@@ -523,8 +523,7 @@ describe("the resubmit control follows workflow_state", () => {
       revision: {
         party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null,
         open: [{
-          id: 3, party: "ierc", label: "IERC", reason: "Add the assent form
-for participants under 18.",
+          id: 3, party: "ierc", label: "IERC", reason: "Add the assent form\nfor participants under 18.",
           requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
         }],
       },
