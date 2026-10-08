@@ -33,8 +33,8 @@ request. No reason is asked for. Nothing else changes: whoever withdraws holds
 an open seat, so their office has not finished, and completes as it would
 have.
 
-The owners are told of both, after commit. IR-273 answers a request with a
-new version.
+The owners are told of both, after commit. The owner answers every open
+request at once with a new version (`new_version.py`, IR-273).
 """
 
 from __future__ import annotations
@@ -149,8 +149,12 @@ def revision_flags(record, user, *, readable: bool) -> dict:
     - `decision_blocked`: why nobody may decide the record now;
     - `open`: every open request, for the owner's *Action required*. Who
       asked and why are review content, `None` to anyone who may not read
-      the review (IR-479).
+      the review (IR-479);
+    - `new_version`: for an owner, the version that would answer them
+      (`new_version.new_version_hint`, IR-273).
     """
+    from .new_version import new_version_hint
+
     new_model = routing.is_new_model(record)
     requests = list(
         open_requests(record).select_related("requested_by", "review__version")
@@ -170,6 +174,7 @@ def revision_flags(record, user, *, readable: bool) -> dict:
         "withdrawable": mine.pk if mine else None,
         "decision_blocked": decision_blocked_reason(record) if requests else None,
         "open": [request_payload(r, readable=readable) for r in requests],
+        "new_version": new_version_hint(record, user) if requests else None,
     }
 
 

@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from core.enums import ReviewDecision
 
@@ -95,6 +96,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
+    # The stored manuscript is the owner's upload for a version not yet
+    # submitted (IR-273). True for an owner only; everyone else is served the
+    # latest version's manuscript meanwhile, so it is never theirs to label.
+    manuscript_unsubmitted = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -209,6 +214,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         if not self._readable(obj):
             return None
         return versions_payload(obj)
+
+    def get_manuscript_unsubmitted(self, obj):
+        from .versions import manuscript_unsubmitted
+
+        return manuscript_unsubmitted(obj, self._viewer())
 
     def _ordered_clearances(self, obj):
         return list(obj.clearances.select_related("reviewed_by").order_by("office"))
@@ -325,7 +335,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
-            "versions",
+            "versions", "manuscript_unsubmitted",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as
@@ -372,10 +382,12 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         """
         # Once submitted, the manuscript changes only through a new version
         # (ADR-032 §5 Amendment, IR-416). Staff are not exempt, and clearing it
-        # is a change too.
+        # is a change too. While a revision is asked for, only an owner may
+        # (IR-273).
         from .versions import may_replace_manuscript
 
-        if self.instance is not None and not may_replace_manuscript(self.instance):
+        user = getattr(self.context.get("request"), "user", None)
+        if self.instance is not None and not may_replace_manuscript(self.instance, user):
             raise serializers.ValidationError(
                 "The manuscript cannot be replaced while this record is "
                 f"'{self.instance.pipeline_status}'. Once a record is submitted, "
@@ -405,10 +417,28 @@ class RecordWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         authors_data = validated_data.pop("authors", None)
+        if self._details_changed(instance, validated_data, authors_data):
+            # What a new version answers a revision request with, when no file
+            # changed (IR-273). Only a real change: saving the same details
+            # again answers nothing.
+            validated_data["details_edited_at"] = timezone.now()
         record = super().update(instance, validated_data)
         if authors_data is not None:           # only replace when field was explicitly sent
             self._sync_authors(record, authors_data)
         return record
+
+    @staticmethod
+    def _details_changed(instance, validated_data, authors_data) -> bool:
+        """Does this update change a detail? The manuscript is not one (IR-273)."""
+        for field, value in validated_data.items():
+            if field == "abstract_file":
+                continue
+            if getattr(instance, field) != value:
+                return True
+        if authors_data is None:
+            return False
+        sent = [name.strip() for name in authors_data if name.strip()]
+        return sent != list(instance.authors.order_by("pk").values_list("name", flat=True))
 
 
 class DownloadRequestSerializer(serializers.ModelSerializer):

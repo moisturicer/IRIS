@@ -345,9 +345,20 @@ class RecordViewSet(viewsets.ModelViewSet):
         `get_object()` resolves through `visible_to(user)`, so a reader
         without access gets the same 404 as a missing record — never a 403,
         which would confirm the record exists.
+
+        While an owner's revised manuscript is not yet submitted, everyone
+        else reads the latest version's (`versions.served_manuscript`,
+        IR-273): no reviewer is handed a file nobody submitted.
         """
+        from .download_service import manuscript_download_name
+        from .versions import served_manuscript
+
         record = self.get_object()
-        handle, filename = resolve_record_download_file(record)
+        served = served_manuscript(record, request.user)
+        if served and served.name != record.abstract_file.name:
+            handle, filename = served.open("rb"), manuscript_download_name(record, served.name)
+        else:
+            handle, filename = resolve_record_download_file(record)
         if handle is None:
             return Response(
                 {"detail": "No paper has been uploaded for this record."},
@@ -686,6 +697,31 @@ class RecordViewSet(viewsets.ModelViewSet):
         return self._revision_response(request, lambda record: revisions.withdraw_revision_request(
             record, request.user, int(request_id),
         ))
+
+    @action(detail=True, methods=["post"], url_path="new-version")
+    def new_version(self, request, pk=None):
+        """
+        POST /records/<id>/new-version/  (no body)
+
+        An owner answers every open revision request with the record's next
+        version (ADR-032 §5, IR-273). Only the parties that asked review it
+        again; under the default policy every other clearance is kept.
+        Answers with the tracker. 404 for a record the caller cannot see, 403
+        for a caller who does not own it, 400 for what cannot be done now --
+        among it, a record that has not changed since the newest request.
+        """
+        from apps.reviews import new_version
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            new_version.submit_new_version(record, request.user)
+        except new_version.NewVersionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except new_version.NewVersionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
 
     @action(detail=True, methods=["get"], url_path="route-options")
     def route_options(self, request, pk=None):

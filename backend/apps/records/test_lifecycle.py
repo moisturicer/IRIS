@@ -434,6 +434,10 @@ class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
         "apps/records/lifecycle.py",  # defines it
         "apps/records/apps.py",  # validates it at startup
         "apps/reviews/services.py",  # reads it to log which arm ran
+        # Applies it to the new model's resubmission (IR-273), and logs which
+        # arm ran. Serializes no policy: only which offices a version keeps,
+        # as `offices_preserved` already does.
+        "apps/reviews/new_version.py",
         "config/settings/base.py",  # loads it from the environment
     }
 

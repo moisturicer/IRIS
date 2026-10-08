@@ -211,6 +211,12 @@ class Record(models.Model):
     # preserved whenever an office happened to clear before the decline landed.
     resubmission_count   = models.PositiveIntegerField(default=0)
     last_resubmitted_at  = models.DateTimeField(null=True, blank=True)
+    # When a detail field last actually changed (IR-273), stamped by
+    # `RecordWriteSerializer.update`. A new version answers a revision request
+    # only if something changed since the request; `updated_at` cannot say
+    # that, because every workflow save moves it too. The manuscript is not a
+    # detail: a new one is told apart by the file a version names.
+    details_edited_at    = models.DateTimeField(null=True, blank=True)
 
     # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
     # `RecordViewSet.submit` and by nothing else -- neither field is writable
