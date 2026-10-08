@@ -377,6 +377,45 @@ inconclusive**, because each holds two questions. The combined figure is a
 demonstration that the OR rule works on ten questions, not a measurement of the
 detector. Labelling more questions in each category is what turns it into one.
 
+## Reporting the pilot (IR-467)
+
+```bash
+cd backend
+python manage.py report_evidence_pilot                      # exploratory, all curated runs in docs/evaluation/runs
+python manage.py report_evidence_pilot --plan ../docs/evaluation/evidence_pilot_plan.json --stage confirmatory
+```
+
+Writes `runs/<stamp>-evidence-pilot-<stage>.json` and `.md`. Calls no model and
+no vendor; reads `eval_evidence` result files and the shadow rows; reads no
+question text and no Turn id. Two sections, never blended:
+
+- **Curated (ground truth).** Per-lane over-fires and misses, per-rule for the
+  raw and Resolved lanes separately, categories (under `min_examples` is
+  INCONCLUSIVE and its accuracy is withheld), and, only if the run used
+  `--model-decision`, route accuracy, failure rate, union and detector/model
+  agreement. Each file is listed on its own; runs are never pooled.
+- **Shadow (no ground truth, no accuracy).** Eligible, completed and a missing
+  total broken into skipped, failed, unfinished and the two no-row tallies;
+  reclaimed, fenced and mismatched as overlays (not subtracted); decision-call
+  and created-to-finished latency; breaker and capacity skips; provider
+  failures. Eligible = rows + `record_failed` + `turn_deleted` tallies;
+  `enqueue_failed` is shown, not added. With `--since`/`--until` the tallies
+  (which carry no timestamp) are left out and the report says so.
+
+A field a run file did not record prints as `not recorded`. An unreachable
+database prints as **unavailable**, which is not the same as zero traffic. The
+body holds no wall-clock time, so the same inputs give the same bytes.
+
+**The sample plan** (`--plan`, JSON) is written by a person; nothing is
+defaulted. `{"stages": {"exploratory": {...}, "confirmatory": {...}}}`.
+Required: exploratory `declared_at`, `purpose`; confirmatory `declared_at`,
+`sample_rate`, `target_decisions`, `coverage_floor`,
+`min_examples_per_category`. `--stage confirmatory` refuses unless the
+confirmatory plan is complete, and excludes (and counts) shadow rows created
+before its `declared_at`, so a confirmatory figure cannot come from data seen
+before the plan. The 200 decisions that circulated during design is an
+exploratory planning estimate with no statistical basis and is not used.
+
 ## What blocks a real number today
 
 - **The corpus has no Voyage vectors.** Every vector observed so far came from

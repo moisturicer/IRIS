@@ -134,6 +134,15 @@ class Command(BaseCommand):
         decider = self._decider() if options["model_decision"] else None
 
         rule_set = active_rule_set()
+        model_provenance = {}
+        if decider:
+            from apps.ai.evidence.model_decision import prompt_digest
+            from apps.ai.evidence.shadow import generation_parameters
+
+            model_provenance = {
+                "prompt_digest": prompt_digest(),
+                "generation": generation_parameters(),
+            }
         report = run_curated(
             EvidenceDetector(rule_set),
             question_set,
@@ -150,6 +159,7 @@ class Command(BaseCommand):
                 # without a model run can still be compared with one that has.
                 "model_decision": bool(decider),
                 "model": "answer task" if decider else None,
+                **model_provenance,
             },
         )
 
