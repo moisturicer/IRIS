@@ -37,6 +37,7 @@ export type Capability =
   | "open_review"
   | "request_document"
   | "request_revision"
+  | "withdraw_revision"
   | "route"
   | "accept_route"
   | "office_review"
@@ -70,6 +71,7 @@ type CapabilityInputs = Pick<
   | "is_participant"
   | "routing"
   | "office_review"
+  | "revision"
   | "workflow_state"
   | "pipeline_status"
   | "abstract_file"
@@ -143,6 +145,11 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
     granted.add("add_reviewer");
   }
   if (record.can_request_document.length > 0) granted.add("request_document");
+  // Revision requests (ADR-032 §5, IR-272), from the server's flag. A party
+  // asks once: while its request is open, its reviewers are offered the
+  // withdrawal instead of a second request.
+  if (record.revision.withdrawable != null) granted.add("withdraw_revision");
+  else if (record.revision.party != null) granted.add("request_revision");
 
   if (isOwner(record, viewer)) {
     // Every author action keys off the server's derived state, never the
@@ -152,8 +159,11 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
       granted.add("edit_details");
     }
     if (record.workflow_state === "awaiting_resubmission") {
-      // Today's act is "Resubmit for review"; versions (IR-416) replace it.
-      granted.add("create_version");
+      // Today's act is the legacy "Resubmit for review", which answers a
+      // stored `declined` only. On the adviser-first model (stored
+      // `in_review`) the owner answers with a new version, which IR-273
+      // builds: offering the legacy act there would only be refused (IR-272).
+      if (record.pipeline_status !== "in_review") granted.add("create_version");
       // The edit becomes part of the next version (IR-273, invariant 4).
       granted.add("edit_details");
     }

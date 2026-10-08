@@ -97,6 +97,7 @@ const record: RecordDetail = {
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
   versions: null,
 };
 

@@ -879,6 +879,44 @@ export default function PaperViewPage() {
                   </div>
                 )}
 
+                {/* Revision requests on the adviser-first model (IR-272): what
+                    each party asked for, as plain text, and the version it
+                    asked about. The legacy banner above keeps its own
+                    Resubmit; the new model's *New version* is IR-273's. */}
+                {userIsOwner && !can.has("create_version") && record.revision.open.length > 0 && (
+                  <section
+                    aria-labelledby="revision-requested-heading"
+                    className="rounded-2xl border border-brand-200 bg-brand-50 p-4"
+                  >
+                    <h2
+                      id="revision-requested-heading"
+                      className="text-sm font-bold text-brand-dark flex items-center gap-2"
+                    >
+                      <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
+                      Revision requested
+                    </h2>
+                    <p className="text-sm text-brand leading-relaxed mt-1">
+                      Nothing can be decided on this record until you answer with a new version. Offices
+                      that already cleared it keep their clearance; only the reviewers who asked look again.
+                    </p>
+                    <ul className="mt-3 space-y-3">
+                      {record.revision.open.map((r) => (
+                        <li key={r.id} className="text-sm text-stone-900">
+                          <p className="font-semibold">
+                            {r.label} asked for changes
+                            {r.version != null && <span className="font-normal text-stone-600"> · on v{r.version}</span>}
+                          </p>
+                          {r.reason && (
+                            <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
+                              {r.reason}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
                 {userIsOwner && (
                   <ActionRequiredPanel
                     recordId={record.id}

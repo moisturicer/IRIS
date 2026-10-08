@@ -70,6 +70,7 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     is_participant: false,
     routing: { accept_and_route: false, route_as: null },
     office_review: { party: null, label: null, blocked: null, assignment: null },
+    revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [] },
     versions: null,
     ...overrides,
   };
@@ -300,6 +301,43 @@ const ROWS: Row[] = [
     }),
     viewer: itsoStaff,
     capabilities: ["cite", "open_review", "route", "office_review", "add_reviewer"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a seat holder may ask for a revision (IR-272)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "in_review",
+      my_seats: [seat("in_review")],
+      is_participant: true,
+      revision: { party: "itso", label: "ITSO", blocked: null, withdrawable: null, decision_blocked: null, open: [] },
+    }),
+    viewer: itsoStaff,
+    capabilities: ["cite", "open_review", "request_revision"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "a party that has asked is offered the withdrawal, not a second request (IR-272)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "awaiting_resubmission",
+      my_seats: [seat("in_review")],
+      is_participant: true,
+      revision: {
+        party: "itso", label: "ITSO", blocked: null, withdrawable: 5,
+        decision_blocked: "Waiting on the author: ITSO asked for a revision.",
+        open: [],
+      },
+    }),
+    viewer: itsoStaff,
+    capabilities: ["cite", "open_review", "withdraw_revision"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "on the adviser-first model the owner is not offered the legacy resubmit (IR-273 builds New version)",
+    record: record({ pipeline_status: "in_review", workflow_state: "awaiting_resubmission" }),
+    viewer: owner,
+    capabilities: ["cite", "edit_details"],
     sections: ["overview", "paper", "review", "files"],
   },
   {

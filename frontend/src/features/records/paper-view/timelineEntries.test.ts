@@ -51,6 +51,7 @@ const resubmission = (overrides: Partial<TrackerResubmission>): TrackerResubmiss
   state_label: "Open",
   reason: "Consent form is missing.",
   review: 2,
+  version: null,
   requested_by: "Leo Tan",
   created_at: "2026-09-06T08:00:00Z",
   resolved_at: null,

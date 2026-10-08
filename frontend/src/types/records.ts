@@ -168,6 +168,13 @@ export interface RecordDetail extends RecordListItem {
    */
   office_review:        OfficeReviewFlags;
   /**
+   * Revision requests (IR-272): whether the viewer may ask for one or
+   * withdraw their party's, why nothing can be decided now, and every open
+   * request for the owner's *Action required*. A rendering hint; the
+   * endpoints re-check it.
+   */
+  revision:             RevisionFlags;
+  /**
    * The record's versions, oldest first (ADR-032 §5, IR-416). Review
    * material: null to a viewer who may not read the review (IR-479), and
    * empty before the record is first submitted.
@@ -193,6 +200,32 @@ export interface OfficeReviewFlags {
   /** Why the act cannot be taken yet (an unopened seat, an open document request). */
   blocked:    string | null;
   assignment: number | null;
+}
+
+export interface RevisionFlags {
+  /** The party the viewer holds an open seat for, and may ask as; null otherwise. */
+  party:            Party | null;
+  label:            string | null;
+  /** Why the viewer cannot ask yet: their seat is not opened. */
+  blocked:          string | null;
+  /** Their party's open request, which they may withdraw instead: a party asks once. */
+  withdrawable:     number | null;
+  /** Why nobody may decide the record now: a revision request is open (ADR-032 §11). */
+  decision_blocked: string | null;
+  /** Every open request, oldest first. */
+  open:             OpenRevisionRequest[];
+}
+
+export interface OpenRevisionRequest {
+  id:           number;
+  party:        Party;
+  label:        string;
+  /** Plain text. Null, as `requested_by` is, to a viewer who may not read the review (IR-479). */
+  reason:       string | null;
+  requested_by: string | null;
+  /** The version it was made against; null for one made before versions were recorded. */
+  version:      number | null;
+  created_at:   string;
 }
 
 /** An office reviewer's two outcomes (ADR-032 §3): offices never reject or publish. */
@@ -350,6 +383,8 @@ export interface TrackerPartyRow {
   outcome_earlier: boolean;
   /** Active, with nobody there reviewing it yet: the office's pool (◌). */
   in_pool:         boolean;
+  /** This party has an open revision request: *Changes requested* (IR-272). */
+  changes_requested: boolean;
   /**
    * Who is reviewing for this party, per seat. Null when the viewer does not
    * take part in the review: not disclosed, which is not the same as none.
@@ -389,6 +424,8 @@ export interface TrackerResubmission {
   reason:       string | null;
   /** The `declined` review that made this request, one of `reviews` (IR-412). */
   review:       number;
+  /** The version it was made against; null for one made before versions were recorded (IR-272). */
+  version:      number | null;
   requested_by: string | null;
   created_at:   string | null;
   resolved_at:  string | null;

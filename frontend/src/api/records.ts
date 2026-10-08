@@ -66,6 +66,15 @@ export const recordsApi = {
    */
   officeReview: (id: number, body: { outcome: OfficeReviewOutcome; comment: string }) =>
     apiClient.post<RecordTracker>(`/records/${id}/office-review/`, body),
+  /**
+   * A holder of an opened seat asks the owners for a revision, with a reason
+   * (ADR-032 §5, IR-272). Nothing can be decided until the owner answers it.
+   */
+  requestRevision: (id: number, body: { reason: string }) =>
+    apiClient.post<RecordTracker>(`/records/${id}/request-revision/`, body),
+  /** A seat holder of the party that asked withdraws its open revision request (IR-272). */
+  withdrawRevisionRequest: (id: number, requestId: number) =>
+    apiClient.post<RecordTracker>(`/records/${id}/revision-requests/${requestId}/withdraw/`),
   /** The picklist: the record type's upload slots. */
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),

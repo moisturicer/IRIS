@@ -15,8 +15,9 @@
  * - **`dialog`** -- the action collects something first (who to route to, a
  *   finding, a revision's reasons). Its `Dialog` is mounted when the button is
  *   pressed and reports back through `onDone` with the outcome to announce.
- * - **`terminal`** -- the action ends the review (accept & publish, reject).
- *   The bar puts it last and asks through `ConfirmDialog` first, stating the
+ * - **`terminal`** -- the action ends the review (accept & publish, reject),
+ *   or takes something back (withdrawing a revision request, IR-272). The bar
+ *   puts it last and asks through `ConfirmDialog` first, stating the
  *   consequence (ui-ux/16 §4 copy), then calls `run`.
  *
  * `blockedReason` keeps a granted action on the bar but disabled, saying why
@@ -27,12 +28,14 @@
  */
 import type { ComponentType } from "react";
 
+import { recordsApi } from "@/api/records";
 import { RequestDocumentDialog } from "@/features/document-requests/RequestDocumentDialog";
 import type { Capability } from "@/features/records/capabilities";
 import type { RecordDetail } from "@/types/records";
 
 import { AddReviewerDialog } from "./AddReviewerDialog";
 import { OfficeReviewDialog } from "./OfficeReviewDialog";
+import { RequestRevisionDialog } from "./RequestRevisionDialog";
 import { RouteDialog } from "./RouteDialog";
 
 export interface ReviewActionDialogProps {
@@ -140,14 +143,28 @@ function AddReviewerAction({ record, onClose, onDone }: ReviewActionDialogProps)
   );
 }
 
+/** A seat holder asks the owner to revise the record (ADR-032 §5, IR-272). */
+function RequestRevisionAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return <RequestRevisionDialog record={record} onClose={onClose} onDone={onDone} />;
+}
+
+/** The viewer's party has asked already: its reviewers may withdraw the request (IR-272). */
+async function withdrawRevision(record: RecordDetail): Promise<string> {
+  const requestId = record.revision.withdrawable;
+  if (requestId == null) throw new Error("There is no revision request to withdraw.");
+  await recordsApi.withdrawRevisionRequest(record.id, requestId);
+  return "Revision request withdrawn. The owner has been told.";
+}
+
 /** Why the office reviewer cannot clear or record a finding yet, from the server. */
 const officeReviewBlocked = (record: RecordDetail) => record.office_review.blocked;
 
 /**
  * Order matters: the bar fills its first granted action. The Adviser's primary
  * is *Accept & route*; an office reviewer's is *Clear*, with *Record finding*
- * beside it (ui-ux/16's order), then *Request documents*, *Add reviewer* and
- * *Route to office*. *Clear* and *Record finding* share one capability,
+ * beside it (ui-ux/16's order), then *Request Revision*, *Request documents*,
+ * *Add reviewer* and *Route to office*. A reviewer whose party has already
+ * asked for a revision is offered *Withdraw revision request* instead, last. *Clear* and *Record finding* share one capability,
  * `office_review` (ADR-032 §10 Amendment, 2026-10-08).
  */
 export const REVIEW_ACTIONS: readonly ReviewAction[] = [
@@ -156,6 +173,8 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
     capability: "accept_route",
     label: "Accept & route…",
     icon: "fa-share-from-square",
+    // Accepting is a decision: refused while a revision request is open (IR-272).
+    blockedReason: (record) => record.revision.decision_blocked,
     Dialog: AcceptAndRouteAction,
   },
   {
@@ -173,6 +192,15 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
     icon: "fa-flag",
     blockedReason: officeReviewBlocked,
     Dialog: RecordFindingAction,
+  },
+  {
+    kind: "dialog",
+    capability: "request_revision",
+    // `EvaluationPage`'s words, kept verbatim (ui-ux/16 §4).
+    label: "Request Revision…",
+    icon: "fa-arrow-rotate-left",
+    blockedReason: (record) => record.revision.blocked,
+    Dialog: RequestRevisionAction,
   },
   {
     kind: "dialog",
@@ -194,5 +222,18 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
     label: "Route to office…",
     icon: "fa-route",
     Dialog: RouteAction,
+  },
+  {
+    kind: "terminal",
+    capability: "withdraw_revision",
+    label: "Withdraw revision request",
+    icon: "fa-rotate-left",
+    confirm: {
+      title: "Withdraw the revision request?",
+      consequence:
+        "The owner is told that your request for changes is withdrawn. The record can be decided again once no other revision request is open.",
+      confirmLabel: "Withdraw request",
+    },
+    run: withdrawRevision,
   },
 ];
