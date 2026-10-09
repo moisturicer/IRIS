@@ -175,6 +175,14 @@ export interface RecordDetail extends RecordListItem {
    */
   revision:             RevisionFlags;
   /**
+   * Decisions (IR-270): what the viewer may decide this record as -- the
+   * Adviser's *Accept & publish* or *Reject*, RDCO's three -- why not yet,
+   * what deciding would close, and the token `decide/` checks so a stale
+   * dialog never decides into a changed record. A rendering hint; the
+   * endpoint re-checks it.
+   */
+  decision:             DecisionFlags;
+  /**
    * The record's versions, oldest first (ADR-032 §5, IR-416). Review
    * material: null to a viewer who may not read the review (IR-479), and
    * empty before the record is first submitted.
@@ -197,6 +205,31 @@ export interface RecordVersion {
   created_by_name: string | null;
   /** Null when this version was submitted with no manuscript. */
   manuscript_url:  string | null;
+}
+
+/** What a Decision ends the review with (ADR-032 §3, IR-270). */
+export type DecisionOutcome = "publish" | "keep_unlisted" | "reject";
+
+export interface DecisionFlags {
+  /** The party the viewer decides as, `adviser` or `rdco`; null for anyone else. */
+  party:        Party | null;
+  /** The outcomes on offer, in the bar's order; empty for anyone who may not decide. */
+  outcomes:     DecisionOutcome[];
+  /** Why the decision cannot be taken yet: an unopened seat, an open revision request. */
+  blocked:      string | null;
+  /** What deciding now would close; null for anyone who may not decide. */
+  closes:       DecisionCloses | null;
+  /** Echoed to `decide/`: a record that moved since is refused with a 409. */
+  token:        string | null;
+  /** The author's flags, for the Adviser's *Publish without specialist review?* */
+  author_hints: string[];
+}
+
+export interface DecisionCloses {
+  /** Each review a decision would end, with whoever is reviewing there now. */
+  assignments:       { party: Party; label: string; holders: string[] }[];
+  /** How many open document requests it would withdraw. */
+  document_requests: number;
 }
 
 export interface OfficeReviewFlags {
@@ -408,6 +441,11 @@ export interface TrackerPartyRow {
   in_pool:         boolean;
   /** This party has an open revision request: *Changes requested* (IR-272). */
   changes_requested: boolean;
+  /**
+   * The Decision that withdrew this party's unfinished work, worded by the
+   * server ("RDCO published the record"); null otherwise (IR-270).
+   */
+  withdrawn_by_decision?: string | null;
   /**
    * Who is reviewing for this party, per seat. Null when the viewer does not
    * take part in the review: not disclosed, which is not the same as none.

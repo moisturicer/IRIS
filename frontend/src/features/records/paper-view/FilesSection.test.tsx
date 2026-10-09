@@ -98,6 +98,7 @@ const record = {
   current_holders: [],
   manuscript_unsubmitted: false,
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
 } as unknown as RecordDetail;
 
 /** A record on the new model with a revision asked for (IR-273): the owner is offered a new version. */

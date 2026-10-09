@@ -4,7 +4,7 @@ import type {
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest, RecordTracker,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
-  DocumentRequestSlot, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
+  DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -66,6 +66,14 @@ export const recordsApi = {
    */
   officeReview: (id: number, body: { outcome: OfficeReviewOutcome; comment: string }) =>
     apiClient.post<RecordTracker>(`/records/${id}/office-review/`, body),
+  /**
+   * The Adviser or RDCO decides the record (ADR-032 §3, IR-270). A reject
+   * needs a comment, its reason. `token` is record detail's `decision.token`;
+   * a record that changed since is refused with a 409 carrying the fresh
+   * `decision`. Answers with the tracker.
+   */
+  decide: (id: number, body: { outcome: DecisionOutcome; comment: string; token: string }) =>
+    apiClient.post<RecordTracker>(`/records/${id}/decide/`, body),
   /**
    * A holder of an opened seat asks the owners for a revision, with a reason
    * (ADR-032 §5, IR-272). Nothing can be decided until the owner answers it.
