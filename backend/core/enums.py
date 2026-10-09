@@ -361,6 +361,38 @@ class TrackerPartyState(models.TextChoices):
     NOT_REQUIRED = "not_required", "Not required"
 
 
+class MyReviewsTab(models.TextChoices):
+    """
+    The three tabs of My Reviews (ADR-032 §9). Not stored: a request
+    parameter and the wire format. `IN_REVIEW` shares its spelling with
+    `PipelineStatus` and `SeatState`, which is why the tab is named here
+    rather than typed by hand.
+    """
+
+    TO_REVIEW = "to_review", "To review"
+    IN_REVIEW = "in_review", "In review"
+    DONE = "done", "Done"
+
+
+class ReviewOutcome(models.TextChoices):
+    """
+    What one reviewer concluded, as a Done row on My Reviews states it.
+
+    Never stored: derived from the reviewer's own verdict `Review` (ADR-032
+    §9 Amendment, 2026-10-08). `REVISION_REQUESTED` is the old pipeline's
+    decline, which closed a reviewer's part; the new model never closes a
+    seat that way, so it has no filter of its own.
+    """
+
+    CLEARED = "cleared", "Cleared"
+    FINDING = "finding", "Finding recorded"
+    ACCEPTED = "accepted", "Accepted"
+    PUBLISHED = "published", "Published"
+    REJECTED = "rejected", "Rejected"
+    REVISION_REQUESTED = "revision_requested", "Revision requested"
+
+
+
 class RequestStatus(models.TextChoices):
     """
     The outcome of a request a person makes and staff rule on:

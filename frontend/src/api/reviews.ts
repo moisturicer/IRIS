@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 import type { AddReviewerOptions, ReviewerSeat } from "@/types/records";
-import type { Review, ReviewSubmitPayload, ReviewQueueRow } from "@/types/reviews";
+import type { MyReviewsPage, MyReviewsQuery, Review, ReviewSubmitPayload } from "@/types/reviews";
 
 /**
  * Reviewer seats (ADR-032 §4, IR-415). The server re-checks every act: a
@@ -14,6 +14,9 @@ export const seatsApi = {
   /** An office member takes an unclaimed record from their office's pool. */
   claim: (assignmentId: number) =>
     apiClient.post<ReviewerSeat>(`/assignments/${assignmentId}/claim/`),
+  /** Who a coordinator may assign: their office's members, marked when already seated (IR-268). */
+  assignOptions: (assignmentId: number) =>
+    apiClient.get<AddReviewerOptions>(`/assignments/${assignmentId}/assign/`),
   /** A coordinator seats a member of their own office. */
   assign: (assignmentId: number, reviewerId: number) =>
     apiClient.post<ReviewerSeat>(`/assignments/${assignmentId}/assign/`, { reviewer: reviewerId }),
@@ -32,16 +35,20 @@ export const seatsApi = {
   withdraw: (seatId: number) => apiClient.post<ReviewerSeat>(`/seats/${seatId}/withdraw/`),
 };
 
-/** The three queue filters. One screen, three server-side views (IR-143). */
-export type QueueFilter = "pending" | "approved" | "declined";
-
 export const reviewsApi = {
   /**
-   * One queue, three filters. Each is a distinct server-side question -- what
-   * awaits me, what I cleared, what I sent back -- so the filter is a request,
-   * not a client-side slice of one list. That also keeps the row count honest.
+   * One tab of My Reviews (IR-268), with every tab's count. Each tab is a
+   * server-side question, so the counts stay honest and Done can page.
    */
-  queue: (filter: QueueFilter) => apiClient.get<ReviewQueueRow[]>(`/reviews/${filter}/`),
+  mine: ({ tab, outcome, office, cursor }: MyReviewsQuery) =>
+    apiClient.get<MyReviewsPage>("/reviews/mine/", {
+      params: {
+        tab,
+        ...(outcome ? { outcome } : {}),
+        ...(office ? { office } : {}),
+        ...(cursor ? { cursor } : {}),
+      },
+    }),
   submit:     (data: ReviewSubmitPayload) => apiClient.post<Review>("/reviews/submit/", data),
   resubmit:   (recordId: number)         => apiClient.post("/reviews/resubmit/", { record_id: recordId }),
   /** Request a one-time PIN emailed to the current user's account email. */

@@ -229,22 +229,10 @@ def add_reviewer(assignment, holder, reviewer) -> ReviewerSeat:
     return _seat(assignment, reviewer, source=SeatSource.ADDED, by=holder)
 
 
-def add_reviewer_options(assignment, holder) -> dict:
-    """
-    Who `holder` may add to `assignment` (IR-269): every active member of the
-    office, marked `seated` when they already hold a live seat on it. Refused
-    as `add_reviewer` is: the office must be one, the holder seated on it.
-    """
+def _member_options(assignment) -> dict:
+    """Every active member of `assignment`'s office, marked `seated` when they hold a live seat."""
     from django.contrib.auth import get_user_model
 
-    if str(assignment.party) not in OFFICE_PARTIES:
-        raise SeatError(
-            f"{_label(assignment.party)} is not an office, so there is nobody to add."
-        )
-    if not holds_seat(holder, assignment.record, assignment.party):
-        raise SeatRefused(
-            f"Only a reviewer seated for {_label(assignment.party)} may add a colleague."
-        )
     roles = [role for role, party in OFFICE_PARTY_BY_ROLE.items() if str(party) == str(assignment.party)]
     seated = set(_live_seats(assignment).values_list("reviewer_id", flat=True))
     members = get_user_model().objects.filter(
@@ -259,6 +247,35 @@ def add_reviewer_options(assignment, holder) -> dict:
             for u in members
         ],
     }
+
+
+def add_reviewer_options(assignment, holder) -> dict:
+    """
+    Who `holder` may add to `assignment` (IR-269): every active member of the
+    office, marked `seated` when they already hold a live seat on it. Refused
+    as `add_reviewer` is: the office must be one, the holder seated on it.
+    """
+    if str(assignment.party) not in OFFICE_PARTIES:
+        raise SeatError(
+            f"{_label(assignment.party)} is not an office, so there is nobody to add."
+        )
+    if not holds_seat(holder, assignment.record, assignment.party):
+        raise SeatRefused(
+            f"Only a reviewer seated for {_label(assignment.party)} may add a colleague."
+        )
+    return _member_options(assignment)
+
+
+def assign_options(assignment, coordinator) -> dict:
+    """
+    Who a coordinator may assign to `assignment` (IR-268): the same list,
+    refused as `assign` is. Its own list, not *Add reviewer*'s, because that
+    one is served only to a seat holder and a coordinator assigning from the
+    pool holds no seat.
+    """
+    require_coordinator(coordinator, assignment.party)
+    _require_active(assignment)
+    return _member_options(assignment)
 
 
 @transaction.atomic

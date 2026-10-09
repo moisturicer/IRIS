@@ -19,7 +19,7 @@ import MyWorkspacePage      from "@/features/records/MyWorkspacePage";
 import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
-import ReviewQueuePage      from "@/features/review/ReviewQueuePage";
+import MyReviewsPage        from "@/features/review/MyReviewsPage";
 import EvaluationPage       from "@/features/review/EvaluationPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
@@ -71,7 +71,7 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
             children: [
-              { path: "review",              element: <ReviewQueuePage />,     handle: { crumb: "Review Queue" } },
+              { path: "review",              element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
               { path: "review/:id/evaluate", element: <EvaluationPage />,      handle: { crumb: "Evaluate" } },
             ],
           },

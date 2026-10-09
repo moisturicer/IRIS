@@ -65,9 +65,9 @@ GOVERNED_ENUMS = (
     RecordTypeName,
     RoleName,
     # IR-256: governed from the start, so IR-257 onward cannot write
-    # `"active"` by hand. `ResubmissionRequestState` is deliberately not here:
-    # its `"resubmitted"` is also the review-queue row's response key in
-    # `reviews/serializers.py`, and a key is wire format, not a stored value.
+    # `"active"` by hand. `ResubmissionRequestState` was left out because its
+    # `"resubmitted"` was also the review-queue row's response key; IR-268
+    # deleted that row, so governing it now is a change of its own.
     # Its `"withdrawn"` is still governed, through `AssignmentState`.
     AssignmentState,
     # IR-258: the derived tracker vocabulary. Never stored, but the frontend
@@ -102,10 +102,6 @@ ALLOWED = {
     # awaiting backfill, not a person's request awaiting a decision. Two
     # concepts, one string; pointing this file at core.enums would be wrong.
     "ai/models/embedding_space.py",
-    # "pending", "approved" and "declined" here are URL path segments and DRF
-    # action method names (`as_view({"get": "approved"})`), not stored values.
-    # They are the router's vocabulary, not the workflow's.
-    "reviews/urls.py",
     # (IR-406) Declares its own `SuggestionState` for the Publish dialog's
     # prefill (pending/ready/failed/unsupported, IR-374 spec §4.5): the
     # manuscript *extraction's* status restated for one client -- the same

@@ -14,7 +14,8 @@ them. Nothing here imports from those suites.
 
 **Seam: the API, end to end.** The Record is created and submitted through the
 records API as its owner would, accepted at intake and cleared through the
-reviews API, and ITSO's queue is read from `GET /reviews/pending/`. A Record
+reviews API, and ITSO's queue is read from My Reviews' To review tab
+(`GET /reviews/mine/`, IR-268; it was `/reviews/pending/` until then). A Record
 built straight into `rdco_intake` would skip the one step that proves the
 wizard's request reaches the router: that `requested_itso` survives the write
 serializer for a Thesis.
@@ -37,7 +38,7 @@ from core.enums import (
 
 RECORDS = "/api/v1/records/"
 REVIEW_SUBMIT = "/api/v1/reviews/submit/"
-PENDING = "/api/v1/reviews/pending/"
+MINE = "/api/v1/reviews/mine/"
 
 
 def _user(email, role_name):
@@ -108,9 +109,9 @@ class ItsoForThesisTests(APITestCase):
 
     def queue_ids(self, actor):
         self.client.force_authenticate(actor)
-        response = self.client.get(PENDING)
+        response = self.client.get(MINE, {"tab": "to_review"})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        return {row["id"] for row in response.data}
+        return {row["record"] for row in response.data["rows"]}
 
     # --- the rule ------------------------------------------------------------------
 
