@@ -29,6 +29,7 @@ from core.enums import ClearanceStatus, Office, PipelineStatus
 
 from .management.commands.seed_demo import (
     ADMIN_EMAIL,
+    AT_RDCO_TITLE,
     FLAGSHIP_TITLE,
     NEW_MODEL_TITLE,
     PASSWORD,
@@ -211,6 +212,30 @@ class SeedDemoRecordTests(TestCase):
         )
         seat = ReviewerSeat.objects.get(assignment__record=record)
         self.assertEqual((seat.reviewer_id, seat.source), (record.adviser_id, "entry"))
+
+    def test_one_specialist_path_thesis_waits_in_rdcos_pool(self):
+        """
+        IR-270: reached through the real acts -- the Adviser's accept & route,
+        ITSO's clearance and the hand-back -- so RDCO's decisions can be demoed.
+        """
+        from apps.reviews.models import RecordAssignment, Review
+
+        record = Record.objects.get(title=AT_RDCO_TITLE)
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        self.assertEqual(
+            set(RecordAssignment.objects.filter(record=record).values_list("party", "state")),
+            {("adviser", "completed"), ("itso", "completed"), ("rdco", "active")},
+        )
+        rdco = RecordAssignment.objects.get(record=record, party="rdco")
+        self.assertFalse(rdco.seats.exists(), "RDCO's pool should be unclaimed")
+        self.assertEqual(
+            RecordClearance.objects.get(record=record, office=Office.ITSO).status,
+            ClearanceStatus.CLEARED,
+        )
+        self.assertEqual(
+            set(Review.objects.filter(record=record).values_list("stage", "status")),
+            {("adviser", "approved"), ("itso", "approved")},
+        )
 
     def test_the_flagship_starts_declined_with_two_offices_cleared(self):
         record = Record.objects.get(title=FLAGSHIP_TITLE)

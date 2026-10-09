@@ -267,6 +267,13 @@ class DocumentRequest(models.Model):
     )
     created_at   = models.DateTimeField(default=timezone.now)
     closed_at    = models.DateTimeField(null=True, blank=True)
+    #: The Decision that withdrew this request, which is its reason (ADR-021
+    #: §12, ADR-022 §3; IR-270). Null for a request its party withdrew, which
+    #: records no reason (ADR-022 §4), or one that was fulfilled.
+    closed_by_decision = models.ForeignKey(
+        "reviews.Review", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="closed_document_requests",
+    )
 
     class Meta:
         ordering = ["record", "created_at", "pk"]

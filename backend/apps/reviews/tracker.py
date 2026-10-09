@@ -47,6 +47,7 @@ from core.enums import (
 from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 
 from .clearance_state import clearance_payload, resubmission_payload
+from .decisions import withdrawn_by_label
 from .models import (
     RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
 )
@@ -352,18 +353,19 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
     """
     Who is reviewing for `assignment`'s party, and how far each has got
     (ui-ux/16: *Maria Reyes -- reviewing · Juan Santos -- done*). Withdrawn
-    seats are left out; a finished seat carries its own verdict.
+    seats are left out, except on an assignment a Decision closed: its
+    withdrawn seats are the work that Decision cut short, and the tracker keeps
+    that history (IR-270). A finished seat carries its own verdict.
     """
     verdicts = {
         r.reviewed_by_id: r for r in reviews if r.assignment_id == assignment.pk
     }  # oldest first, so a later verdict by the same reviewer wins
     clearing = assignment.party in _CLEARING_OFFICES
+    shown = ReviewerSeat.objects.filter(assignment=assignment)
+    if assignment.closed_by_decision_id is None:
+        shown = shown.exclude(state=SeatState.WITHDRAWN)
     rows = []
-    for seat in (
-        ReviewerSeat.objects.filter(assignment=assignment)
-        .exclude(state=SeatState.WITHDRAWN)
-        .select_related("reviewer").order_by("assigned_at", "pk")
-    ):
+    for seat in shown.select_related("reviewer").order_by("assigned_at", "pk"):
         verdict = verdicts.get(seat.reviewer_id) if seat.state == SeatState.DONE else None
         verdict_label = verdict.get_status_display() if verdict else None
         if verdict and clearing and verdict.status == ReviewDecision.APPROVED:
@@ -384,12 +386,19 @@ def _party_rows(
     disclose_seats: bool = False,
 ) -> list[dict]:
     assignments: dict[str, RecordAssignment] = {}
-    for a in RecordAssignment.objects.filter(record=record).order_by("opened_at", "pk"):
+    for a in (
+        RecordAssignment.objects.filter(record=record)
+        .select_related("closed_by_decision__record").order_by("opened_at", "pk")
+    ):
         assignments[a.party] = a  # last one wins: the party's latest turn
     # The adviser-first model's rule for the RDCO row applies while a record
-    # is on it (stored `in_review`, IR-261). A decided record says nothing
-    # about which model reviewed it until IR-260 migrates the legacy ones.
-    new_model = record.pipeline_status == PipelineStatus.IN_REVIEW
+    # is on it (stored `in_review`, IR-261), and once a Decision on that model
+    # closed it (IR-270): an Adviser's publish never involved RDCO. Any other
+    # decided record says nothing about which model reviewed it until IR-260
+    # migrates the legacy ones.
+    new_model = record.pipeline_status == PipelineStatus.IN_REVIEW or any(
+        a.closed_by_decision_id is not None for a in assignments.values()
+    )
     specialist_ever = any(party in _CLEARING_OFFICES for party in assignments)
 
     latest_review: dict[str, Review] = {}
@@ -507,6 +516,14 @@ def _party_rows(
                 if disclose_seats and assignment is not None else None
             ),
             "at": _iso(at),
+            # The Decision that withdrew this party's unfinished work: "RDCO
+            # published the record" (ADR-021 §12, IR-270). An outcome, not
+            # review content, so every reader of the tracker gets it.
+            "withdrawn_by_decision": (
+                withdrawn_by_label(assignment.closed_by_decision)
+                if state is TrackerPartyState.WITHDRAWN
+                and assignment.closed_by_decision_id is not None else None
+            ),
             "preserved": (
                 clearance_payload(
                     clearance, last_resubmitted_at=record.last_resubmitted_at, readable=False,

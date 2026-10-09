@@ -713,6 +713,44 @@ class RecordViewSet(viewsets.ModelViewSet):
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
+    @action(detail=True, methods=["post"])
+    def decide(self, request, pk=None):
+        """
+        POST /records/<id>/decide/
+        `{"outcome": "publish" | "keep_unlisted" | "reject", "comment": str, "token": str}`
+
+        The record's Adviser, or RDCO's reviewer on the specialist path,
+        decides a Thesis/Research or Project (ADR-032 §3, IR-270). It closes
+        every other open assignment, seat and document request. A reject needs
+        a comment, its reason. `token` is record detail's `decision.token`.
+        Answers with the tracker. 404 for a record the caller cannot see, 403
+        for a caller who may not decide it, 400 for what cannot be done now,
+        409 for a record that changed since the token was read -- with the
+        fresh `decision` block, so the dialog can show what it would close now.
+        """
+        from apps.reviews import decisions
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            decisions.decide(
+                record, request.user,
+                outcome=request.data.get("outcome"),
+                comment=request.data.get("comment", ""),
+                token=request.data.get("token"),
+            )
+        except decisions.DecisionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except decisions.DecisionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except decisions.DecisionStale as exc:
+            return Response(
+                {"detail": str(exc), "decision": decisions.decision_flags(record, request.user)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
+
     @action(detail=True, methods=["get"], url_path="route-options")
     def route_options(self, request, pk=None):
         """
