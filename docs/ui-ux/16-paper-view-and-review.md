@@ -120,7 +120,7 @@ Each entry carries its version tag. The comment box is at the bottom, as on GitH
 | ITSO / IERC / KTTO | **Clear** · **Record finding** (both `office_review`; ADR-032 §10 *Amendment* 2026-10-08) · Request revision · Request document · **Add reviewer** (`add_reviewer`) · **Route to office…** (`route`) |
 | RDCO | Request revision · Reject (`reject`) · **Accept & publish** (`accept_publish`) · **Accept, keep unlisted** (`keep_unlisted`) · Route to office… · Request document |
 
-> **Amended 2026-10-09 (IR-270).** `final_decide` is renamed `keep_unlisted`, the act it grants, and Reject gets its own key, `reject`. The bar's order puts *Accept & publish* first (the primary) and *Reject* last. The three Decisions open one dialog each rather than `ConfirmDialog`, because each takes text (a reject's required reason, an accept's optional comment) and must keep it through a stale record. Each still states its consequence first.
+> **Amended 2026-10-09 (IR-270).** `final_decide` is renamed `keep_unlisted`, the act it grants, and Reject gets its own key, `reject`. The bar's order puts *Accept & publish* first (the primary) and *Reject* last; RDCO's *Route to office…* follows *Request document*, as it does for an office (ADR-032 §10, IR-270 deviation note). A rejected record reads **Archived**, and a Thesis or Project RDCO kept unlisted reads **Unlisted**. The three Decisions open one dialog each rather than `ConfirmDialog`, because each takes text (a reject's required reason, an accept's optional comment) and must keep it through a stale record. Each still states its consequence first.
 
 **Destructive or terminal actions** (Reject, both Accept & publish) open `ConfirmDialog` and state the consequence:
 

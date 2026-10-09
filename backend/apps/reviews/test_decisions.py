@@ -173,6 +173,11 @@ class AdviserRejectsTests(DecisionTestBase):
         self.assertFalse(self.listed(record, self.reader))
         self.assertFalse(self.readable(record, self.reader))
 
+    def test_readers_are_shown_it_as_archived(self):
+        record = self.at_adviser()
+        self.decided(record, self.adviser, "reject", REASON)
+        self.assertEqual(self.detail(record, self.owner)["workflow_state_label"], "Archived")
+
     def test_a_rejection_needs_a_reason(self):
         record = self.at_adviser()
 
@@ -225,6 +230,7 @@ class RdcoOutcomeTests(DecisionTestBase):
         self.decided(record, self.rdco, "keep_unlisted", "Patent filing pending.")
 
         self.assertEqual(record.pipeline_status, PipelineStatus.COMPLETED)
+        self.assertEqual(self.detail(record, self.owner)["workflow_state_label"], "Unlisted")
         self.assertFalse(self.listed(record, self.reader))
         self.assertFalse(self.readable(record, self.reader))
         self.assertNotIn(record, Record.objects.visible_to(self.reader))  # Ask IRIS too
@@ -330,6 +336,41 @@ class OpenWorkClosesTests(DecisionTestBase):
         reader_view = self.rows(self.tracker(record, self.reader))[Party.IERC]
         self.assertEqual(reader_view["withdrawn_by_decision"], "RDCO published the record")
         self.assertIsNone(reader_view["seats"])
+
+    def test_a_seat_a_coordinator_withdrew_earlier_stays_out_of_the_tracker(self):
+        """Code review: only the seats the Decision itself withdrew are its history."""
+        record, _ = self.busy_rdco()
+        earlier = ReviewerSeat.objects.create(
+            assignment=self.assignment(record, Party.IERC), reviewer=self.ierc2,
+            state=SeatState.WITHDRAWN,  # as `seats.withdraw` leaves it
+        )
+
+        self.decided(record, self.rdco, "publish")
+
+        earlier.refresh_from_db()
+        self.assertIsNone(earlier.closed_by_decision)
+        ierc_seats = self.rows(self.tracker(record, self.owner))[Party.IERC]["seats"]
+        self.assertEqual(len(ierc_seats), 1)
+        cut = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.ierc)
+        self.assertEqual(cut.closed_by_decision, Review.objects.get(record=record, stage=Party.RDCO))
+
+    def test_a_document_request_racing_the_decision_is_refused_after_it(self):
+        """
+        Code review: `create_request` re-checks, under the record lock a Decision
+        also takes, that its party still holds the record.
+        """
+        from apps.documents import requests as document_requests
+
+        record, _ = self.busy_rdco()
+        self.decided(record, self.rdco, "publish")
+
+        with self.assertRaises(document_requests.NotAHolder):
+            document_requests.create_request(
+                record, self.ierc, party=Party.IERC, message="One more form.", specs=[],
+            )
+        self.assertFalse(
+            DocumentRequest.objects.filter(record=record, state=DocumentRequestState.OPEN).exists()
+        )
 
     def test_the_owners_and_the_reviewers_cut_off_are_told(self):
         record, _ = self.busy_rdco()

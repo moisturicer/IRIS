@@ -72,16 +72,28 @@ def requesting_party(record, user, party=None) -> str:
 
 
 def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> DocumentRequest:
-    """Open a request as `party`, which `requesting_party` has already vetted."""
+    """
+    Open a request as `party`, which `requesting_party` has already vetted.
+
+    Under the record's row lock, re-checking that `party` still holds it: a
+    Decision (IR-270) takes the same lock and closes every assignment, so a
+    request racing it either lands before and is withdrawn by it, or after and
+    is refused here -- never left open on a decided record.
+    """
+    from apps.records.models import Record
     from apps.reviews.models import RecordAssignment
     from core.enums import AssignmentState
 
     with transaction.atomic():
+        Record.objects.select_for_update(of=("self",)).get(pk=record.pk)
+        assignment = RecordAssignment.objects.filter(
+            record=record, party=party, state=AssignmentState.ACTIVE
+        ).first()
+        if assignment is None:
+            raise NotAHolder("You no longer hold this record as that party.")
         request = DocumentRequest.objects.create(
             record=record,
-            assignment=RecordAssignment.objects.filter(
-                record=record, party=party, state=AssignmentState.ACTIVE
-            ).first(),
+            assignment=assignment,
             party=party,
             requested_by=user,
             message=message,

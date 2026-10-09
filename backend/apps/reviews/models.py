@@ -210,6 +210,12 @@ class ReviewerSeat(models.Model):
     #: Stamped by *Open review* (§4): the time-on-task start IR-144 measures from.
     opened_at   = models.DateTimeField(null=True, blank=True)
     done_at     = models.DateTimeField(null=True, blank=True)
+    #: The Decision that withdrew this seat while it was still open (IR-270),
+    #: which is how the tracker tells it from a seat a coordinator withdrew.
+    closed_by_decision = models.ForeignKey(
+        "reviews.Review", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="closed_seats",
+    )
 
     class Meta:
         ordering = ["assignment", "assigned_at", "pk"]

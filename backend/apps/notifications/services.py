@@ -707,8 +707,8 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
             headline = "Published"
         elif outcome == KEEP_UNLISTED:
             message = (
-                f'RDCO accepted "{title}" and kept it unlisted: it is not in Discover, '
-                f"and you can still open it."
+                f'{decided_by} accepted "{title}" and kept it unlisted: it is not in '
+                f"Discover, and you can still open it."
             )
             headline = "Accepted"
         else:

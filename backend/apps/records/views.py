@@ -515,11 +515,15 @@ class RecordViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": first_error(body.errors)}, status=status.HTTP_400_BAD_REQUEST
             )
-        created = document_requests.create_request(
-            record, request.user, party=party,
-            message=body.validated_data["message"],
-            specs=body.validated_data["items"],
-        )
+        try:
+            created = document_requests.create_request(
+                record, request.user, party=party,
+                message=body.validated_data["message"],
+                specs=body.validated_data["items"],
+            )
+        except document_requests.NotAHolder as exc:
+            # The party's turn closed after the check above -- a Decision (IR-270).
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
         notify_document_requested(
             created, party_label=party_label(created.party, staff_viewer=False)

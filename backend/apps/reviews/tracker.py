@@ -37,6 +37,7 @@ from core.enums import (
     Office,
     Party,
     PipelineStatus,
+    RecordTypeName,
     ResubmissionRequestState,
     ReviewDecision,
     RoleName,
@@ -185,7 +186,28 @@ def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
     )
 
 
+#: How readers are shown a terminal status where it differs from the stored
+#: one's name (ADR-032 §2-§3; `CONTEXT.md` *Archived*, *Unlisted*).
+_READER_LABELS = {
+    str(PipelineStatus.REJECTED): "Archived",
+}
+
+
+def record_state_label(record, state: str) -> str:
+    """
+    `workflow_state_label` for this record. A Thesis/Research or Project at
+    `completed` was accepted by RDCO and kept unlisted (IR-270); a Proposal at
+    `completed` is the retired *complete* act's, and keeps its name.
+    """
+    proposal = lifecycle.type_name_of(record) == RecordTypeName.PROPOSAL
+    if state == PipelineStatus.COMPLETED and not proposal:
+        return "Unlisted"
+    return workflow_state_label(state)
+
+
 def workflow_state_label(state: str) -> str:
+    if state in _READER_LABELS:
+        return _READER_LABELS[state]
     for enum in (WorkflowState, PipelineStatus):
         if state in enum.values:
             return str(enum(state).label)
@@ -338,7 +360,7 @@ def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[st
     state = workflow_state(record, active_assignments=active)
     return {
         "workflow_state": state,
-        "workflow_state_label": workflow_state_label(state),
+        "workflow_state_label": record_state_label(record, state),
         "current_holders": current_holders(
             record, user, active_assignments=active, readable=readable,
         ),
@@ -353,19 +375,20 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
     """
     Who is reviewing for `assignment`'s party, and how far each has got
     (ui-ux/16: *Maria Reyes -- reviewing · Juan Santos -- done*). Withdrawn
-    seats are left out, except on an assignment a Decision closed: its
-    withdrawn seats are the work that Decision cut short, and the tracker keeps
-    that history (IR-270). A finished seat carries its own verdict.
+    seats are left out, except those a Decision withdrew: they are the work it
+    cut short, and the tracker keeps that history (IR-270). A seat a
+    coordinator withdrew stays out. A finished seat carries its own verdict.
     """
     verdicts = {
         r.reviewed_by_id: r for r in reviews if r.assignment_id == assignment.pk
     }  # oldest first, so a later verdict by the same reviewer wins
     clearing = assignment.party in _CLEARING_OFFICES
-    shown = ReviewerSeat.objects.filter(assignment=assignment)
-    if assignment.closed_by_decision_id is None:
-        shown = shown.exclude(state=SeatState.WITHDRAWN)
     rows = []
-    for seat in shown.select_related("reviewer").order_by("assigned_at", "pk"):
+    for seat in (
+        ReviewerSeat.objects.filter(assignment=assignment)
+        .exclude(state=SeatState.WITHDRAWN, closed_by_decision__isnull=True)
+        .select_related("reviewer").order_by("assigned_at", "pk")
+    ):
         verdict = verdicts.get(seat.reviewer_id) if seat.state == SeatState.DONE else None
         verdict_label = verdict.get_status_display() if verdict else None
         if verdict and clearing and verdict.status == ReviewDecision.APPROVED:

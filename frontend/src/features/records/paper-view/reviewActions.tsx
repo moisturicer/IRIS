@@ -15,18 +15,19 @@
  * - **`dialog`** -- the action collects something first (who to route to, a
  *   finding, a revision's reasons, a decision's comment or reason -- the three
  *   Decisions are dialogs, not `ConfirmDialog`s, because each takes text and
- *   must survive a stale record, IR-270). Its `Dialog` is mounted when the button is
- *   pressed and reports back through `onDone` with the outcome to announce.
- * - **`terminal`** -- the action ends the review (accept & publish, reject),
- *   or takes something back (withdrawing a revision request, IR-272). The bar
- *   puts it last and asks through `ConfirmDialog` first, stating the
- *   consequence (ui-ux/16 §4 copy), then calls `run`.
+ *   must survive a stale record, IR-270). Its `Dialog` is mounted when the
+ *   button is pressed and reports back through `onDone` with the outcome to
+ *   announce.
+ * - **`terminal`** -- the action takes something back with nothing to type
+ *   (withdrawing a revision request, IR-272). The bar puts it last and asks
+ *   through `ConfirmDialog` first, stating the consequence (ui-ux/16 §4
+ *   copy), then calls `run`.
  *
  * `blockedReason` keeps a granted action on the bar but disabled, saying why
  * -- for a condition the server reports but the viewer cannot act past yet.
  *
- * Until IR-260 cuts over, decisions are still recorded on the current review
- * form; the Review section links to it beside the bar rather than porting it.
+ * Until IR-260 cuts over, a record still on the legacy pipeline is decided on
+ * the current review form; the Review section links to it beside the bar.
  */
 import type { ComponentType } from "react";
 

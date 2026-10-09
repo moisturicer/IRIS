@@ -24,8 +24,8 @@ is open (`revisions.decision_blocked_reason`).
    withdrawn;
 3. every other active assignment and its unfinished seats `withdrawn`, and
    every open `DocumentRequest` `withdrawn`, the decider's own included. Each
-   closed assignment and request names the decision in `closed_by_decision`,
-   which is the reason ADR-021 §12 asks for. A withdrawn office round leaves
+   closed assignment, withdrawn seat and request names the decision in
+   `closed_by_decision`, which is the reason ADR-021 §12 asks for. A withdrawn office round leaves
    its `RecordClearance` as it was: a clearance records completed rounds only
    (ADR-032 §4 Amendment);
 4. `pipeline_status` -- written here, not through `lifecycle.apply()`. The
@@ -77,7 +77,7 @@ from core.enums import (
     ReviewDecision,
     SeatState,
 )
-from core.permissions import holds_seat, is_office_member
+from core.permissions import is_office_member
 
 from . import revisions, routing, seats
 from .models import RecordAssignment, Review, ReviewerSeat
@@ -138,7 +138,7 @@ def _deciding_party(record, user) -> Optional[str]:
         return None
     if routing._seated_adviser(record, user):
         return str(Party.ADVISER)
-    if holds_seat(user, record, Party.RDCO):
+    if _decider_seat(record, user, Party.RDCO) is not None:
         return str(Party.RDCO)
     return None
 
@@ -289,7 +289,7 @@ def decision_flags(record, user) -> dict:
         "party": None, "outcomes": [], "blocked": None, "closes": None,
         "token": None, "author_hints": [],
     }
-    if not routing.is_new_model(record) or type_name_of(record) not in routing.ROUTABLE_TYPES:
+    if not routing._routable(record):
         return empty
     party = _deciding_party(record, user)
     if party is None:
@@ -323,6 +323,15 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
     (409), writing nothing.
     """
     record = routing._locked(record)
+    # And every active assignment: a claim or an *Add reviewer* locks only its
+    # assignment, not the record, so without this one could land between the
+    # token check and the closing below and leave an open seat behind on a
+    # withdrawn turn. Everything else that opens work here -- routing, a
+    # revision request, a document request -- locks the record.
+    list(
+        RecordAssignment.objects.select_for_update()
+        .filter(record=record, state=AssignmentState.ACTIVE)
+    )
     party = _deciding_party(record, actor)
     if party is None:
         raise DecisionRefused(_refusal(record, actor))
@@ -356,13 +365,17 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         comment=comment, assignment=seat.assignment, version=latest_version(record),
     )
 
+    # Seats are closed here rather than through `seats.complete_seat()` and
+    # `seats.withdraw()`: those run the office completion rule and its
+    # hand-back, which must not fire on a record the Decision is ending, and
+    # `withdraw()` is a coordinator's act with a coordinator's checks.
     now = timezone.now()
     cut_off = []  # reviewers whose open seat the decision withdrew
     for assignment, open_seats in _closing(record):
         own = assignment.pk == seat.assignment_id
         others = [s for s in open_seats if s.pk != seat.pk]
         ReviewerSeat.objects.filter(pk__in=[s.pk for s in others]).update(
-            state=SeatState.WITHDRAWN,
+            state=SeatState.WITHDRAWN, closed_by_decision=review,
         )
         cut_off.extend(s.reviewer for s in others)
         _close_assignment(
@@ -387,7 +400,12 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
 
 
 def withdrawn_by_label(review) -> str:
-    """How the tracker names the Decision that closed something: "RDCO published the record"."""
+    """
+    How the tracker names the Decision that closed something: "RDCO published
+    the record". *Published* is told from *kept unlisted* by the record's
+    status, the rule My Reviews uses (ADR-032 §9 Amendment), so the two always
+    agree; an act that later publishes an unlisted record would reword both.
+    """
     outcome = (
         REJECT if review.status == ReviewDecision.REJECTED
         else PUBLISH if review.record.pipeline_status == PipelineStatus.PUBLISHED
