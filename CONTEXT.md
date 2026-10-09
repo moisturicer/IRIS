@@ -114,6 +114,18 @@ _Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads
 One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and nobody can decide it; the party that asked cannot finish its own review either. Answered by the next Version, or withdrawn by the party that asked. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
 
+**Decision**:
+An act that ends a Record's review: accept & publish, keep [[Unlisted]] or reject, made by the Adviser or by RDCO, and a Proposal's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. It is refused while any [[Revision request]] is open. Accept & route is not a Decision: it is an acceptance that sends the Record on to [[Specialist office]]s, closes nothing, and is refused while a Revision request is open, as a Decision is.
+_Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
+
+**Unlisted**:
+A Thesis/Research or Project that RDCO accepted but kept out of Discover and Ask IRIS, for example ahead of a patent filing. Its owners and reviewers can still open it.
+_Avoid_: Completed (the code's status name), embargoed, hidden.
+
+**Archived**:
+How a rejected Record is shown to readers. It is terminal: the owner cannot answer it with a new [[Version]] and must submit a new Record.
+_Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision request).
+
 **Version**:
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).

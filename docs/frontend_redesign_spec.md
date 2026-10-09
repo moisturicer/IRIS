@@ -544,6 +544,8 @@ Versions and comments join the timeline when their backend lands (ADR-032 §5, �
 
 - `open_review` · `request_document` · `request_revision` · `route` · `decide` · `create_version` · `edit_details` · `continue_as` · `set_visibility` · `tag_ip` · `comment_review` · `comment_public` · `cite`.
 
+> **Amended 2026-10-09 (IR-270).** The three Decisions are their own keys: `accept_publish` (the Adviser and RDCO), `keep_unlisted` (RDCO; ui-ux/16 called it `final_decide`, renamed to the act it grants) and `reject`. The adapter grants them from record detail's `decision.outcomes`. `decide` stays the link to the current decision form for legacy records until IR-274.
+
 Every screen asks the adapter. No component reads a role name or `can_act` directly.
 
 **Phase 1 (no backend change).** The adapter derives from the server fields that exist: `can_act` non-empty → review actions; `can_request_document`; owner + `workflow_state` → author actions.

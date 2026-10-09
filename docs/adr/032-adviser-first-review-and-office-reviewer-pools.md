@@ -37,6 +37,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-08 (project lead, IR-268): §9.** What each My Reviews tab is made of. Current work splits by model until IR-260, and Done is history assembled from seats plus the old pipeline's unseated Reviews. It also settles how a Done row's outcome is derived, that the waiting badge is record-level, and the coordinator's office view. See the *Amendment* note under §9.
 
+**Amended 2026-10-09 (project lead, IR-270): §3, §10 and §11.** What a Decision is and what it closes, how the closures name it, the `decision` capabilities and the `final_decide` → `keep_unlisted` rename, the direct status write until IR-260, and the 409 for a stale dialog. See the *Amendment* notes under §3, §10 and §11.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -142,6 +144,24 @@ The ADR-018 office booleans on the submission form are shown to the Adviser as t
 *"Keep unlisted" is kept from ADR-021 and was not raised in the session. It is kept because the specialist path exists largely for IP concerns, and a record ITSO flagged as patentable may need to be accepted without being published before a filing. Confirmed at acceptance.*
 
 **Specialist offices never reject and never publish.** This is unchanged from ADR-021 §7.
+
+**Amendment, 2026-10-09 (project lead, IR-270): the Decision.** Settled in a design grilling; the project lead accepted every recommendation (Jira comment 10586). It also touches §10 and §11.
+
+- **A Decision ends a record's review**: the Adviser's *accept & publish* or *reject* while holding their own open seat, or RDCO's *accept & publish*, *keep unlisted* or *reject* on the specialist path. RDCO alone keeps a record unlisted. *Accept & route* is **not** a Decision: it is an acceptance that closes nothing, and shares only the rule that it is refused while a revision request is open. `CONTEXT.md` records the term.
+- **One act**, `POST /records/<id>/decide/` with `outcome ∈ publish | keep_unlisted | reject`, in `apps/reviews/decisions.py`. IR-271 extends it for Proposals.
+- **What each outcome writes.** The decider's own `Review` against the latest version: `approved` for both accepts, `rejected` for a reject. A reject needs a reason, shown to the owner as written; both accepts take an optional comment. No outcome is stored anywhere else: My Reviews tells *published* from *accepted* by the record's status and "this is its latest approval" (§9 Amendment).
+- **What it closes** (ADR-021 §12, kept):
+    - the decider's seat is `done` and their assignment `completed`; any other unfinished seat on that assignment (a second RDCO reviewer) is withdrawn;
+    - every other active assignment, with its unfinished seats, is `withdrawn`. That includes an office RDCO routed to that is still reviewing. Refusing would let RDCO's own routing block RDCO;
+    - every open `DocumentRequest` is `withdrawn`, the decider's own included. A Decision ends the record, so nothing is left waiting on the document. This differs on purpose from Clear, which waits on its office's own request (§4 Amendment);
+    - a withdrawn review round leaves the office's `RecordClearance` as it was: a clearance records completed rounds only (§4 Amendment).
+- **Why, recorded.** `RecordAssignment.closed_by_decision` and `DocumentRequest.closed_by_decision` (nullable FKs to the decider's `Review`, `reviews/0012` and `documents/0011`) are "the decision as the reason" ADR-021 §12 and ADR-022 §3 ask for. A request its own party withdrew still records no reason (ADR-022 §4).
+    - *Rejected:* a free-text reason on `DocumentRequest` only. It duplicates the `Review`, and seats and assignments would still have none.
+    - *Rejected:* matching closures to the decision by timestamp. Nothing here is tagged from timestamps (§5 Amendment).
+- **The tracker keeps the history.** A party row closed by a Decision carries `withdrawn_by_decision` ("RDCO published the record"), an outcome every reader sees. Its withdrawn seats are listed, to readers of the review only (`may_read_review`). A seat a coordinator withdrew elsewhere stays hidden, as before. The RDCO row reads *Not required* on a record an Adviser published, as it did while the record was `in_review`.
+- **Keep unlisted is terminal for now.** Publishing an unlisted record later would be its own act, and its own ticket, when RDCO first needs it. The dialog says so.
+- **Notifications.** The owners hear once; a reject carries its reason, and a withdrawn document request is mentioned there. Each reviewer whose open seat the Decision withdrew hears that their review is closed. Nobody else is told.
+- **Not audited** in IR-270: no `AuditEvent` type is a workflow event. IR-483 tracks the gap.
 
 ### 4. Office ≠ reviewer: assignments have seats
 
@@ -434,6 +454,8 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
     
     Aligning them would reopen ADR-022, so it was not done here.
 
+**Amendment, 2026-10-09 (project lead, IR-270): the Decision's capabilities.** Record detail carries a `decision` block, `{party, outcomes, blocked, closes, token, author_hints}`: the outcomes the viewer may take, why not yet (an unopened seat, an open revision request), what deciding would close (each assignment with its current holders, and the open document requests), the staleness token (§11 Amendment), and, for the Adviser, the author's ADR-018 hints. The frontend grants one capability per outcome: `accept_publish`, `keep_unlisted` and `reject`. **`final_decide` is renamed `keep_unlisted`**, the act it grants, as `record_finding` became `office_review` (above). `decide` stays the link to the current decision form for legacy records until IR-274.
+
 ### 11. Lifecycle
 
 `pipeline_status` stores:
@@ -457,6 +479,12 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 5. `in_review`
 
 A decision still closes the record's other open work (ADR-021 §12). A decision is still refused while any resubmission request is open.
+
+**Amendment, 2026-10-09 (project lead, IR-270): how a Decision moves the status, and a stale dialog.**
+
+- **The status is written by `decisions.decide()` directly**, as `routing.enter_at_adviser()` writes `in_review`: `published`, `completed` or `rejected`. The legacy transition table has no edge out of `in_review`, and `lifecycle.apply()` would run `shadow.sync()`, which closes assignments as *completed* where a Decision withdraws them. These are the only two `pipeline_status` writes outside `apply()`; IR-260's cutover folds them in.
+- **A Decision is never taken on a record that moved since the dialog read it.** Record detail's `decision.token` is a digest of the latest version, the active assignments, the open seats and the open document requests. `decide/` requires it, and a record whose token no longer matches is refused with **409** and the fresh `decision` block, so the dialog shows what deciding would close now and keeps the typed text. The decider decides again deliberately.
+    - *Rejected:* re-checking the rules at submit time only. A Decision would then withdraw whatever appeared meanwhile, unseen, which is what "never submits into a changed state" (IR-143) forbids.
 
 ### 12. Tests that pin the decisions
 
