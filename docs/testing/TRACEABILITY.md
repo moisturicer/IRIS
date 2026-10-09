@@ -8,6 +8,31 @@
 
 ---
 
+## IR-260 adviser-first cutover (FR-M5-01, 2026-10-10)
+
+**Design:** [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md)
+§§1, 5 and 13. **Implementation:** `RecordViewSet.submit` now calls
+`routing.enter_at_adviser` for every record type; it rejects absent or
+self-owned Advisers and no longer accepts `declined`. The entry service writes
+the Adviser assignment, entry seat, routing event and v1. `reviews.0014`
+withdraws in-flight intake assignments for records with an eligible Adviser,
+preserving historic reviews. `list_unassigned_intake` names records requiring
+a human assignment. The frontend already requires an Adviser for every type;
+retired intake history is labelled `Intake (retired)`. `seed_demo` drives the
+new services, including specialist hand-back and a clearance-aware v2.
+
+**Tests:** `apps.records.tests.SubmitOwnershipTests`,
+`apps.reviews.test_intake_retirement`, `apps.records.test_seed_demo`, and
+`apps.reviews.test_resubmission_regression`. The IR-233 strict xfail is
+removed: a metadata-only revision now submits v2 and preserves peer
+clearances. **Local evidence:** focused container tests for submission (7),
+intake retirement (2), demo states (1) and the metadata regression (1) passed
+against isolated PostgreSQL; frontend `tsc --noEmit` passed. Full-suite and
+CI evidence will be recorded on the PR. Operational backup and restoration
+steps are in [the cutover runbook](../engineering/IR-260-cutover.md).
+
+---
+
 ## IR-138 transaction integrity (2026-10-06)
 
 **IMPLEMENTED, awaiting PostgreSQL execution evidence.** In
@@ -165,6 +190,11 @@ Evidence, 2026-09-30, local: `python manage.py test apps.records apps.documents 
 ---
 
 ### IR-233: a resubmission refused by the upload guard looks like the Record went back to declined (FR-M5-01)
+
+**Superseded 2026-10-10 by IR-260:** the new-version endpoint accepts a
+metadata-only revision, the strict xfail marker is removed, and all three
+regression cases pass. The reproduction and xfail evidence below describe the
+pre-cutover system.
 
 **Reproduced 2026-09-15** against the report's own Record (seed_demo's `[DEMO] Declined by IERC, ITSO and KTTO preserved`, id 38 in the dev database). The backend log shows the owner's first `POST /api/v1/reviews/resubmit/` returning **400** with a 77-byte body. That is exactly `{"detail":"Please upload at least one updated document before resubmitting."}`. The Record stayed `declined`, and the paper view kept showing the IERC decline twice: once in the clearance track and once in the review history. After an upload, the second resubmission succeeded, leaving `parallel_review`, IERC `pending`, and ITSO and KTTO `cleared` with `preserved: true`. **The clearance-aware transition itself works.**
 

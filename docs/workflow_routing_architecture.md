@@ -5,7 +5,11 @@
 > **intake** party, Intake & Triage queues and UI, the Proposal "complete" act, and RDCO as a
 > mandatory decider for Thesis/Project is **superseded**. The code mapping, migration shape,
 > tracker derivation and test seams still hold. ADR-032 §14 lists how each unbuilt IR-255 slice
-> changes. The phrase "does not reopen it" below was true when written.
+> changes. The §4.1 symbol table is a historical migration plan: IR-260 cuts
+> new submissions over to the already-built new-model services, while IR-274
+> removes old code. Historical `rdco_intake` and `intake` rows stay readable as
+> `Intake (retired)`; ADR-032 §13 expressly forbids rewriting them. The phrase
+> "does not reopen it" below was true when written.
 
 **Status: the implementation companion to two Accepted ADRs.** The decisions are in
 [ADR-021](adr/021-reviewer-directed-routing.md) and
@@ -126,8 +130,8 @@ Each item is a defect relative to the settled MVP.
 
 | Current | Becomes | Slice |
 |---|---|---|
-| `core/enums.py` `PipelineStatus` | `IN_REVIEW` added; `ADVISER_REVIEW`, `RDCO_INTAKE`, `ITSO_REVIEW`, `PARALLEL_REVIEW`, `RDCO_REVIEW`, `DECLINED` removed | IR-256 adds `IN_REVIEW` beside the old values; IR-260 removes them |
-| `ReviewStage.RDCO_INTAKE = "rdco_intake"` | `ReviewStage.INTAKE = "intake"`; `Party = ReviewStage` alias | IR-256 adds `INTAKE` beside `RDCO_INTAKE`, plus the alias and `ASSIGNABLE_PARTIES` (the six parties without `rdco_intake`); IR-260 renames the stored rows and removes `RDCO_INTAKE` |
+| `core/enums.py` `PipelineStatus` | `IN_REVIEW` added; old stage statuses retained for historical records until IR-274 | IR-256 added `IN_REVIEW`; IR-260 sends all new submissions there |
+| `ReviewStage.RDCO_INTAKE = "rdco_intake"` | `ReviewStage.INTAKE = "intake"`; `Party = ReviewStage` alias | IR-256 added `INTAKE`; IR-260 retains both stored historical values and labels them `Intake (retired)` under ADR-032 §13 |
 | `ReviewDecision` | `NEGATIVE_FINDING` added; `DECLINED` relabelled "Resubmission requested" (stored value unchanged) | IR-256 |
 | `ClearanceStatus` | `NOT_CLEARED` added; `REJECTED` kept for history, no new writes | IR-256 adds `NOT_CLEARED` (and widens the column); IR-260 stops writing `REJECTED` |
 | `PUBLICLY_VISIBLE_STATUSES` | `(PUBLISHED,)` | IR-264 |

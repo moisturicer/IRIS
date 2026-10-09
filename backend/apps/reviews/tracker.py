@@ -225,13 +225,10 @@ def is_staff_viewer(user) -> bool:
 
 def party_label(party: Optional[str], *, staff_viewer: bool) -> Optional[str]:
     """
-    A party's display name. Intake reads "Intake & Triage" to staff and
-    "Intake" to students (ADR-021 §2); the staff label is the enum's.
+    Historical intake work remains readable as "Intake (retired)".
     """
     if not party:
         return None
-    if party == Party.INTAKE and not staff_viewer:
-        return "Intake"
     return str(Party(party).label)
 
 

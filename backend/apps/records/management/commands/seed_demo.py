@@ -63,14 +63,11 @@ from apps.records.models import (
     RecordOwner,
     RecordType,
 )
-from apps.records.versions import write_version
 from apps.reviews.services import (
     approve_record,
-    reject_record,
-    resubmit_record,
     submit_clearance,
 )
-from core.enums import IPType, Office, RecordTypeName, ReviewDecision, RoleName, VersionCause
+from core.enums import IPType, Office, RecordTypeName, ReviewDecision, RoleName
 
 #: The convention that already existed, kept deliberately (see module docstring).
 PASSWORD = "IrisDemo123!"
@@ -152,6 +149,7 @@ RESUBMITTED_TITLE = f"{_PREFIX} Resubmitted, ITSO and KTTO preserved"
 NEW_MODEL_TITLE = f"{_PREFIX} New model: Thesis at its Adviser, ready to accept and route"
 AT_RDCO_TITLE = f"{_PREFIX} New model: Thesis ITSO cleared, in RDCO's pool to decide"
 PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} New model: Proposal at its Adviser, ready to accept or reject"
+AWAITING_DOCUMENT_TITLE = f"{_PREFIX} Adviser requested a supporting document"
 
 
 class Command(BaseCommand):
@@ -261,14 +259,11 @@ class Command(BaseCommand):
     # -- phase 3: the Discover catalogue -----------------------------------
 
     def _seed_catalogue(self, users):
-        """Published records, reached by being published rather than by assignment.
+        """Published records reached through an Adviser's decision."""
+        from apps.reviews import seats
+        from apps.reviews.decisions import PUBLISH, decide, decision_token
 
-        `seed_demo_records.py` set `pipeline_status = "published"` directly. Two
-        RDCO approvals get there legitimately -- intake, then final review --
-        and a record that cannot make that journey is one Discover should not
-        have been showing.
-        """
-        rdco = users[RoleName.RDCO]
+        adviser = users[RoleName.ADVISER]
         for (title, classification_name, type_name, year, is_ip, ip_type,
              commercial, extension, college_code, author_names) in CATALOGUE:
 
@@ -290,16 +285,16 @@ class Command(BaseCommand):
                 for_commercialization=commercial,
                 community_extension=extension,
                 added_by=owner,
+                adviser=adviser,
                 pipeline_status=lifecycle.INITIAL_STATUS,
                 access_count=(year - 2020) * 7 + len(title) % 13,
             )
             RecordOwner.objects.create(record=record, user=owner, is_primary=True)
             Author.objects.bulk_create([Author(record=record, name=n) for n in author_names])
 
-            # No offices requested, so intake routes straight to final review.
-            self._submit(record, owner)
-            approve_record(record, rdco, "Intake complete; no office clearance required.")
-            approve_record(record, rdco, "Published to the catalogue.")
+            entry = self._submit(record, owner)
+            seats.open_review(entry.seats.get(), adviser)
+            decide(record, adviser, outcome=PUBLISH, token=decision_token(record))
             self._done(record)
 
     # -- phase 4: one record per pipeline state ----------------------------
@@ -307,17 +302,13 @@ class Command(BaseCommand):
     def _seed_workflow(self, users):
         for scenario in (
             self._scenario_draft,
-            self._scenario_adviser_review,
             self._scenario_approved,
             self._scenario_completed,
-            self._scenario_rdco_intake,
-            self._scenario_itso_review,
-            self._scenario_parallel_review,
-            self._scenario_rdco_review,
             self._scenario_rejected,
             self._scenario_declined_preserving_peers,
             self._scenario_resubmitted_with_preserved_clearances,
             self._scenario_new_model_at_adviser,
+            self._scenario_awaiting_document,
             self._scenario_new_model_at_rdco,
             self._scenario_new_model_proposal_at_adviser,
         ):
@@ -351,19 +342,13 @@ class Command(BaseCommand):
         return record
 
     def _submit(self, record: Record, owner: User):
-        """Submit as `RecordViewSet.submit` does, consent included.
+        """Submit through the same adviser-first service as the API."""
+        from apps.reviews.routing import enter_at_adviser
 
-        The view stamps DPA consent before transitioning (IR-226). Seeding
-        through the service layer skips the view, so the stamp is applied here
-        too -- a seeded record in a review queue with no consent behind it would
-        misrepresent the flow the demo exists to show.
-        """
         record.dpa_accepted_at = timezone.now()
         record.dpa_accepted_by = owner
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-        lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, owner)
-        # ...and writes v1, as the view does (IR-416).
-        write_version(record, owner, VersionCause.SUBMISSION)
+        return enter_at_adviser(record, owner)
 
     @transaction.atomic
     def _scenario_draft(self, users):
@@ -385,25 +370,49 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def _scenario_approved(self, users):
+        from apps.reviews import seats
+        from apps.reviews.decisions import ACCEPT, decide, decision_token
+
+        student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
         record = self._make(
-            "Proposal approved by adviser", RecordTypeName.PROPOSAL, users[RoleName.STUDENT],
-            adviser=users[RoleName.ADVISER],
+            "Proposal approved by adviser", RecordTypeName.PROPOSAL, student,
+            adviser=adviser,
         )
         if record:
-            self._submit(record, users[RoleName.STUDENT])
-            approve_record(record, users[RoleName.ADVISER], "Looks good. Proceed.")
+            entry = self._submit(record, student)
+            seats.open_review(entry.seats.get(), adviser)
+            decide(record, adviser, outcome=ACCEPT, token=decision_token(record))
             self._done(record)
 
     @transaction.atomic
     def _scenario_completed(self, users):
+        from apps.reviews import seats
+        from apps.reviews.decisions import KEEP_UNLISTED, decide, decision_token
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.office_review import CLEARED, record_office_review
+        from apps.reviews.routing import accept_and_route
+
+        student, adviser, ktto, rdco = (
+            users[RoleName.STUDENT], users[RoleName.ADVISER],
+            users[RoleName.KTTO], users[RoleName.RDCO],
+        )
         record = self._make(
-            "Proposal completed", RecordTypeName.PROPOSAL, users[RoleName.STUDENT],
-            adviser=users[RoleName.ADVISER],
+            "Project kept unlisted after KTTO", RecordTypeName.PROJECT, student,
+            adviser=adviser, requested_ktto=True,
         )
         if record:
-            self._submit(record, users[RoleName.STUDENT])
-            approve_record(record, users[RoleName.ADVISER], "Approved.")
-            lifecycle.apply(record, lifecycle.WorkflowEvent.MARK_COMPLETE, users[RoleName.RDCO])
+            entry = self._submit(record, student)
+            seats.open_review(entry.seats.get(), adviser)
+            accept_and_route(
+                record, adviser, to=[{"party": "ktto", "nominee": ktto.pk}],
+                reason="KTTO should assess commercialisation potential.",
+            )
+            assignment = RecordAssignment.objects.get(record=record, party="ktto", state="active")
+            seats.open_review(assignment.seats.get(reviewer=ktto), ktto)
+            record_office_review(record, ktto, outcome=CLEARED, comment="Assessment complete.")
+            rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+            seats.open_review(seats.claim(rdco_assignment, rdco), rdco)
+            decide(record, rdco, outcome=KEEP_UNLISTED, token=decision_token(record))
             self._done(record)
 
     @transaction.atomic
@@ -462,49 +471,65 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def _scenario_rejected(self, users):
-        """Rejected by RDCO at final review.
+        """A Proposal's Adviser rejects it after opening the review."""
+        from apps.reviews import seats
+        from apps.reviews.decisions import REJECT, decide, decision_token
 
-        This was "Rejected at intake" until IR-265: under ADR-021 intake
-        informs the decision and can no longer reject, so the demo rejects
-        where the decision is actually made. No office is requested, so intake
-        approval goes straight to final review.
-        """
+        student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
         record = self._make(
-            "Rejected at final review", RecordTypeName.THESIS_RESEARCH,
-            users[RoleName.STUDENT],
+            "Proposal rejected by adviser", RecordTypeName.PROPOSAL,
+            student, adviser=adviser,
         )
         if record:
-            self._submit(record, users[RoleName.STUDENT])
-            approve_record(record, users[RoleName.RDCO], "No office review requested.")
-            reject_record(
-                record, users[RoleName.RDCO],
-                "Out of scope for institutional disclosure.",
+            entry = self._submit(record, student)
+            seats.open_review(entry.seats.get(), adviser)
+            decide(
+                record, adviser, outcome=REJECT,
+                comment="Out of scope for institutional disclosure.",
+                token=decision_token(record),
             )
             self._done(record)
 
     def _drive_to_ierc_decline(self, title, users) -> Record | None:
-        """Two offices cleared, IERC declined. The shared setup for both demos."""
+        """Two offices clear; IERC asks for a revision on the new model."""
+        from apps.reviews import seats
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.office_review import CLEARED, record_office_review
+        from apps.reviews.revisions import request_revision
+        from apps.reviews.routing import accept_and_route
+
+        student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
         record = self._make(
-            title, RecordTypeName.PROJECT, users[RoleName.STUDENT],
+            title, RecordTypeName.PROJECT, student, adviser=adviser,
             requested_itso=True, requested_ierc=True, requested_ktto=True,
         )
         if not record:
             return None
 
-        self._submit(record, users[RoleName.STUDENT])
-        approve_record(record, users[RoleName.RDCO], "Routing to all three offices.")
-        submit_clearance(
-            record, users[RoleName.ITSO], Office.ITSO, ReviewDecision.APPROVED,
-            "Prior-art search complete; no conflict.",
+        entry = self._submit(record, student)
+        seats.open_review(entry.seats.get(), adviser)
+        accept_and_route(
+            record, adviser,
+            to=[{"party": str(party), "nominee": users[role].pk} for party, role in (
+                (Office.ITSO, RoleName.ITSO),
+                (Office.IERC, RoleName.IERC),
+                (Office.KTTO, RoleName.KTTO),
+            )],
+            reason="The project needs prior-art, ethics and commercialisation review.",
         )
-        submit_clearance(
-            record, users[RoleName.KTTO], Office.KTTO, ReviewDecision.APPROVED,
-            "Commercialisation potential noted.",
-        )
-        submit_clearance(
-            record, users[RoleName.IERC], Office.IERC, ReviewDecision.DECLINED,
-            "Consent form for human participants is missing. Please attach it "
-            "and resubmit.",
+        for office, role, comment in (
+            (Office.ITSO, RoleName.ITSO, "Prior-art search complete; no conflict."),
+            (Office.KTTO, RoleName.KTTO, "Commercialisation potential noted."),
+        ):
+            reviewer = users[role]
+            assignment = RecordAssignment.objects.get(record=record, party=office, state="active")
+            seats.open_review(assignment.seats.get(reviewer=reviewer), reviewer)
+            record_office_review(record, reviewer, outcome=CLEARED, comment=comment)
+        ierc = users[RoleName.IERC]
+        assignment = RecordAssignment.objects.get(record=record, party=Office.IERC, state="active")
+        seats.open_review(assignment.seats.get(reviewer=ierc), ierc)
+        request_revision(
+            record, ierc, reason="Consent form for human participants is missing. Please attach it.",
         )
         return record
 
@@ -512,7 +537,7 @@ class Command(BaseCommand):
     def _scenario_declined_preserving_peers(self, users):
         """**The demo you drive.** ADR-003's contribution, waiting to be triggered.
 
-        Sits in `declined`. Resubmit it and IERC alone resets while ITSO and
+        Sits in `awaiting_resubmission`. Submit a new version and IERC alone resets while ITSO and
         KTTO survive. Under the `RESTART_ALL` policy (IR-137/ADR-004) the same
         record resets all three, which is the comparison the evaluation makes.
         """
@@ -536,7 +561,7 @@ class Command(BaseCommand):
             return
 
         owner = users[RoleName.STUDENT]
-        # Resubmission requires a document uploaded since the decline (IR-139).
+        # A new version requires a document uploaded since the request.
         slot, _ = UploadSlot.objects.get_or_create(
             name="Revised ethics consent form", record_type=record.record_type
         )
@@ -544,8 +569,30 @@ class Command(BaseCommand):
             record=record, slot=slot, file="documents/demo-revised-consent.pdf",
             uploaded_by=owner,
         )
-        resubmit_record(record, owner)
+        from apps.reviews.new_version import submit_new_version
+
+        submit_new_version(record, owner)
         self._done(record)
+
+    @transaction.atomic
+    def _scenario_awaiting_document(self, users):
+        """An owner has an open document request from the assigned Adviser."""
+        from apps.documents.requests import ItemSpec, create_request, requesting_party
+
+        student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
+        record = self._make(
+            AWAITING_DOCUMENT_TITLE, RecordTypeName.THESIS_RESEARCH, student,
+            adviser=adviser,
+        )
+        if record:
+            self._submit(record, student)
+            party = requesting_party(record, adviser, "adviser")
+            create_request(
+                record, adviser, party=party,
+                message="Please attach the signed adviser endorsement.",
+                specs=[ItemSpec(slot=None, label="Signed adviser endorsement")],
+            )
+            self._done(record)
 
     @transaction.atomic
     def _scenario_new_model_at_adviser(self, users):

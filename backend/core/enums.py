@@ -118,10 +118,10 @@ class ReviewStage(models.TextChoices):
     """
 
     ADVISER = "adviser", "Adviser"
-    RDCO_INTAKE = "rdco_intake", "RDCO Intake"
+    RDCO_INTAKE = "rdco_intake", "Intake (retired)"
     #: Staff see "Intake & Triage", students see "Intake" (ADR-021 §2). The
     #: label here is the staff one; the student label is IR-258's to serve.
-    INTAKE = "intake", "Intake & Triage"
+    INTAKE = "intake", "Intake (retired)"
     ITSO = "itso", "ITSO"
     IERC = "ierc", "IERC"
     KTTO = "ktto", "KTTO"

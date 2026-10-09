@@ -55,57 +55,30 @@ def notify_new_record(record, submitted_by):
     try:
         rt_name = record.record_type.name if record.record_type else ""
 
-        if rt_name == RecordTypeName.PROPOSAL:
-            adviser = record.adviser
-            if not adviser:
-                return
-            Notification.objects.create(
-                sender=submitted_by,
-                recipient=adviser,
-                record=record,
-                notif_type=_record_notif_type(record),
-                message=(
-                    f"{submitted_by.get_full_name()} submitted a new Proposal for your review: "
-                    f'"{record.title}".'
-                ),
-            )
-            send_email_async(
-                subject=f"[IRIS] New Proposal awaiting your review: {record.title[:60]}",
-                message=(
-                    f"Hello {adviser.first_name},\n\n"
-                    f"{submitted_by.get_full_name()} has submitted a new Proposal for your review.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review it:\n{_record_url(record)}\n\n"
-                    f"-- The IRIS Team"
-                ),
-                recipient_list=[adviser.email],
-            )
-
-        else:
-            # Thesis/Research and Project go to RDCO intake
-            rdco_role = _role(RoleName.RDCO)
-            if not rdco_role:
-                return
-            Notification.objects.create(
-                sender=submitted_by,
-                broadcast_to_role=rdco_role,
-                record=record,
-                notif_type=_record_notif_type(record),
-                message=(
-                    f"{submitted_by.get_full_name()} submitted a new {rt_name} for RDCO intake review: "
-                    f'"{record.title}".'
-                ),
-            )
-            _email_role_users(
-                role=rdco_role,
-                subject=f"[IRIS] New {rt_name} submitted for intake review: {record.title[:60]}",
-                greeting="Hello RDCO Team",
-                body=(
-                    f"{submitted_by.get_full_name()} has submitted a new {rt_name} record.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review the submission:\n{_record_url(record)}"
-                ),
-            )
+        adviser = record.adviser
+        if not adviser:
+            return
+        Notification.objects.create(
+            sender=submitted_by,
+            recipient=adviser,
+            record=record,
+            notif_type=_record_notif_type(record),
+            message=(
+                f"{submitted_by.get_full_name()} submitted a new {rt_name} for your review: "
+                f'"{record.title}".'
+            ),
+        )
+        send_email_async(
+            subject=f"[IRIS] New {rt_name} awaiting your review: {record.title[:60]}",
+            message=(
+                f"Hello {adviser.first_name},\n\n"
+                f"{submitted_by.get_full_name()} has submitted a new {rt_name} for your review.\n\n"
+                f"Title: {record.title}\n\n"
+                f"Please log in to IRIS to review it:\n{_record_url(record)}\n\n"
+                f"-- The IRIS Team"
+            ),
+            recipient_list=[adviser.email],
+        )
     except Exception:
         pass
 
