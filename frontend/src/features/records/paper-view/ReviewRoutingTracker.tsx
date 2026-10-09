@@ -268,6 +268,9 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
           {row.awaiting_document && (
             <span className="font-semibold text-brand">· Awaiting document</span>
           )}
+          {row.withdrawn_by_decision && (
+            <span className="text-stone-600">· {row.withdrawn_by_decision}</span>
+          )}
           {row.preserved && (
             <span
               className="px-1.5 py-0.5 rounded bg-stone-100 text-stone-900 border border-stone-300 text-2xs font-bold flex items-center gap-1"

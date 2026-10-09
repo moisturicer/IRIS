@@ -24,7 +24,8 @@ const PIPELINE_LABELS: Record<PipelineStatus, string> = {
   rdco_review:     "RDCO Final Review",
   published:       "Published",
   declined:        "Revision Requested",
-  rejected:        "Rejected",
+  // ADR-032 §2-§3: a rejected record is shown as Archived (IR-270).
+  rejected:        "Archived",
   pending_delete:  "Pending Deletion",
 };
 

@@ -150,6 +150,7 @@ _PREFIX = "[DEMO]"
 FLAGSHIP_TITLE = f"{_PREFIX} Declined by IERC, ITSO and KTTO preserved"
 RESUBMITTED_TITLE = f"{_PREFIX} Resubmitted, ITSO and KTTO preserved"
 NEW_MODEL_TITLE = f"{_PREFIX} New model: Thesis at its Adviser, ready to accept and route"
+AT_RDCO_TITLE = f"{_PREFIX} New model: Thesis ITSO cleared, in RDCO's pool to decide"
 
 
 class Command(BaseCommand):
@@ -316,6 +317,7 @@ class Command(BaseCommand):
             self._scenario_declined_preserving_peers,
             self._scenario_resubmitted_with_preserved_clearances,
             self._scenario_new_model_at_adviser,
+            self._scenario_new_model_at_rdco,
         ):
             scenario(users)
 
@@ -564,6 +566,51 @@ class Command(BaseCommand):
             record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
             enter_at_adviser(record, users[RoleName.STUDENT])
             self._done(record)
+
+    @transaction.atomic
+    def _scenario_new_model_at_rdco(self, users):
+        """
+        A Thesis/Research on the specialist path, in RDCO's pool (IR-270).
+
+        Every step is the real act: it enters at its Adviser, who opens the
+        review and accepts & routes it to ITSO, nominating ITSO's account; ITSO
+        opens and clears it, and the hand-back opens RDCO's pool. Nobody at
+        RDCO is seated, so the demo starts with *Claim review* as rdco@cit.edu,
+        then *Accept & publish*, *Keep unlisted* or *Reject*.
+        """
+        from apps.reviews import seats
+        from apps.reviews.models import ReviewerSeat
+        from apps.reviews.office_review import CLEARED, record_office_review
+        from apps.reviews.routing import accept_and_route, enter_at_adviser
+
+        student, adviser, itso = (
+            users[RoleName.STUDENT], users[RoleName.ADVISER], users[RoleName.ITSO],
+        )
+        record = self._make(
+            AT_RDCO_TITLE, RecordTypeName.THESIS_RESEARCH, student,
+            adviser=adviser, requested_itso=True,
+        )
+        if not record:
+            return
+        record.dpa_accepted_at = timezone.now()
+        record.dpa_accepted_by = student
+        record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+        entry = enter_at_adviser(record, student)
+        seats.open_review(entry.seats.get(), adviser)
+        accept_and_route(
+            record, adviser,
+            to=[{"party": "itso", "nominee": itso.pk}],
+            reason="The prototype's sensor fusion method may be patentable.",
+        )
+        seat = ReviewerSeat.objects.get(
+            assignment__record=record, assignment__party="itso", reviewer=itso,
+        )
+        seats.open_review(seat, itso)
+        record_office_review(
+            record, itso, outcome=CLEARED,
+            comment="No prior art found; no filing needed before publication.",
+        )
+        self._done(record)
 
     # -- output ------------------------------------------------------------
 

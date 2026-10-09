@@ -93,6 +93,12 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # open request for the owner's *Action required*. A rendering hint;
     # `request-revision/` and the withdraw endpoint re-check it.
     revision             = serializers.SerializerMethodField()
+    # Decisions (IR-270): `{party, outcomes, blocked, closes, token,
+    # author_hints}` -- what the viewer may decide this record as, why not
+    # yet, what deciding would close, and the token `decide/` checks so a
+    # stale dialog never decides into a changed record. A rendering hint;
+    # `decide/` re-checks it.
+    decision             = serializers.SerializerMethodField()
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
@@ -172,6 +178,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         from apps.reviews.revisions import revision_flags
 
         return revision_flags(obj, self._viewer(), readable=self._readable(obj))
+
+    def get_decision(self, obj):
+        from apps.reviews.decisions import decision_flags
+
+        return decision_flags(obj, self._viewer())
 
     def get_reviews(self, obj):
         """
@@ -331,7 +342,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "your_office", "your_office_label",
             "workflow_state", "workflow_state_label", "current_holders", "can_act",
             "can_request_document", "my_seats", "is_participant", "routing",
-            "office_review", "revision",
+            "office_review", "revision", "decision",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

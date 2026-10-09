@@ -74,6 +74,7 @@ const base: RecordDetail = {
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
   versions: null,
   manuscript_unsubmitted: false,
 };
@@ -226,15 +227,16 @@ const CASES: Case[] = [
   {
     was: "rejected",
     record: { pipeline_status: "rejected", workflow_state: "rejected" },
-    current: "Current: Rejected",
+    current: "Current: Archived",
     office: "—",
   },
   {
     // A published record whose owner asked RDCO to delete it. Still readable
-    // to its owner; filed with Rejected, as the page always has.
+    // to its owner; filed with the rejected records, as the page always has,
+    // which read Archived since IR-270.
     was: "pending_delete",
     record: { pipeline_status: "pending_delete", workflow_state: "pending_delete" },
-    current: "Current: Rejected",
+    current: "Current: Archived",
     office: "—",
   },
 ];

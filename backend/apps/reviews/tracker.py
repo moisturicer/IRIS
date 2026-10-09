@@ -37,6 +37,7 @@ from core.enums import (
     Office,
     Party,
     PipelineStatus,
+    RecordTypeName,
     ResubmissionRequestState,
     ReviewDecision,
     RoleName,
@@ -47,6 +48,7 @@ from core.enums import (
 from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 
 from .clearance_state import clearance_payload, resubmission_payload
+from .decisions import withdrawn_by_label
 from .models import (
     RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
 )
@@ -184,7 +186,28 @@ def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
     )
 
 
+#: How readers are shown a terminal status where it differs from the stored
+#: one's name (ADR-032 §2-§3; `CONTEXT.md` *Archived*, *Unlisted*).
+_READER_LABELS = {
+    str(PipelineStatus.REJECTED): "Archived",
+}
+
+
+def record_state_label(record, state: str) -> str:
+    """
+    `workflow_state_label` for this record. A Thesis/Research or Project at
+    `completed` was accepted by RDCO and kept unlisted (IR-270); a Proposal at
+    `completed` is the retired *complete* act's, and keeps its name.
+    """
+    proposal = lifecycle.type_name_of(record) == RecordTypeName.PROPOSAL
+    if state == PipelineStatus.COMPLETED and not proposal:
+        return "Unlisted"
+    return workflow_state_label(state)
+
+
 def workflow_state_label(state: str) -> str:
+    if state in _READER_LABELS:
+        return _READER_LABELS[state]
     for enum in (WorkflowState, PipelineStatus):
         if state in enum.values:
             return str(enum(state).label)
@@ -337,7 +360,7 @@ def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[st
     state = workflow_state(record, active_assignments=active)
     return {
         "workflow_state": state,
-        "workflow_state_label": workflow_state_label(state),
+        "workflow_state_label": record_state_label(record, state),
         "current_holders": current_holders(
             record, user, active_assignments=active, readable=readable,
         ),
@@ -352,7 +375,9 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
     """
     Who is reviewing for `assignment`'s party, and how far each has got
     (ui-ux/16: *Maria Reyes -- reviewing · Juan Santos -- done*). Withdrawn
-    seats are left out; a finished seat carries its own verdict.
+    seats are left out, except those a Decision withdrew: they are the work it
+    cut short, and the tracker keeps that history (IR-270). A seat a
+    coordinator withdrew stays out. A finished seat carries its own verdict.
     """
     verdicts = {
         r.reviewed_by_id: r for r in reviews if r.assignment_id == assignment.pk
@@ -361,7 +386,7 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
     rows = []
     for seat in (
         ReviewerSeat.objects.filter(assignment=assignment)
-        .exclude(state=SeatState.WITHDRAWN)
+        .exclude(state=SeatState.WITHDRAWN, closed_by_decision__isnull=True)
         .select_related("reviewer").order_by("assigned_at", "pk")
     ):
         verdict = verdicts.get(seat.reviewer_id) if seat.state == SeatState.DONE else None
@@ -384,12 +409,19 @@ def _party_rows(
     disclose_seats: bool = False,
 ) -> list[dict]:
     assignments: dict[str, RecordAssignment] = {}
-    for a in RecordAssignment.objects.filter(record=record).order_by("opened_at", "pk"):
+    for a in (
+        RecordAssignment.objects.filter(record=record)
+        .select_related("closed_by_decision__record").order_by("opened_at", "pk")
+    ):
         assignments[a.party] = a  # last one wins: the party's latest turn
     # The adviser-first model's rule for the RDCO row applies while a record
-    # is on it (stored `in_review`, IR-261). A decided record says nothing
-    # about which model reviewed it until IR-260 migrates the legacy ones.
-    new_model = record.pipeline_status == PipelineStatus.IN_REVIEW
+    # is on it (stored `in_review`, IR-261), and once a Decision on that model
+    # closed it (IR-270): an Adviser's publish never involved RDCO. Any other
+    # decided record says nothing about which model reviewed it until IR-260
+    # migrates the legacy ones.
+    new_model = record.pipeline_status == PipelineStatus.IN_REVIEW or any(
+        a.closed_by_decision_id is not None for a in assignments.values()
+    )
     specialist_ever = any(party in _CLEARING_OFFICES for party in assignments)
 
     latest_review: dict[str, Review] = {}
@@ -507,6 +539,14 @@ def _party_rows(
                 if disclose_seats and assignment is not None else None
             ),
             "at": _iso(at),
+            # The Decision that withdrew this party's unfinished work: "RDCO
+            # published the record" (ADR-021 §12, IR-270). An outcome, not
+            # review content, so every reader of the tracker gets it.
+            "withdrawn_by_decision": (
+                withdrawn_by_label(assignment.closed_by_decision)
+                if state is TrackerPartyState.WITHDRAWN
+                and assignment.closed_by_decision_id is not None else None
+            ),
             "preserved": (
                 clearance_payload(
                     clearance, last_resubmitted_at=record.last_resubmitted_at, readable=False,

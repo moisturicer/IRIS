@@ -25,7 +25,12 @@
  * capability is only a decision about what to *offer*.
  */
 import { STAFF_ROLES, type RoleName } from "@/lib/constants";
-import { OPEN_SEAT_STATES, type RecordDetail, type ReviewerSeat } from "@/types/records";
+import {
+  OPEN_SEAT_STATES,
+  type DecisionOutcome,
+  type RecordDetail,
+  type ReviewerSeat,
+} from "@/types/records";
 
 /**
  * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
@@ -33,6 +38,8 @@ import { OPEN_SEAT_STATES, type RecordDetail, type ReviewerSeat } from "@/types/
  * draft in Publish, and `attach_file`, an office filing a supplementary file
  * on a record it takes part in. IR-273 adds `replace_manuscript`: the owner
  * uploading a revised manuscript for the next version (ADR-032 §5 Amendment).
+ * IR-270 adds the three Decisions: `accept_publish`, `keep_unlisted` (the
+ * spec's `final_decide`, renamed to the act it grants) and `reject`.
  */
 export type Capability =
   | "open_review"
@@ -41,6 +48,9 @@ export type Capability =
   | "withdraw_revision"
   | "route"
   | "accept_route"
+  | "accept_publish"
+  | "keep_unlisted"
+  | "reject"
   | "office_review"
   | "add_reviewer"
   | "decide"
@@ -55,6 +65,13 @@ export type Capability =
   | "comment_review"
   | "comment_public"
   | "cite";
+
+/** Which capability offers each Decision outcome (IR-270). */
+const DECISION_CAPABILITY: Record<DecisionOutcome, Capability> = {
+  publish: "accept_publish",
+  keep_unlisted: "keep_unlisted",
+  reject: "reject",
+};
 
 /** Paper View's sections, in tab order (spec §4.6). */
 export const PAPER_SECTIONS = ["overview", "paper", "review", "files"] as const;
@@ -74,6 +91,7 @@ type CapabilityInputs = Pick<
   | "routing"
   | "office_review"
   | "revision"
+  | "decision"
   | "workflow_state"
   | "pipeline_status"
   | "abstract_file"
@@ -139,6 +157,10 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
   // Routing (ADR-032 §4, IR-261): the server's own flags, never derived here.
   if (record.routing.accept_and_route) granted.add("accept_route");
   if (record.routing.route_as != null) granted.add("route");
+  // Decisions (ADR-032 §3, IR-270): the outcomes the server offers this
+  // viewer, each its own action. Read defensively: a payload from before
+  // IR-270 carries no `decision`, and offers no Decision.
+  for (const outcome of record.decision?.outcomes ?? []) granted.add(DECISION_CAPABILITY[outcome]);
   // An office reviewer (ADR-032 §3-§4, IR-269), from the server's flag: one
   // capability for *Clear* and *Record finding*, which share every rule
   // (ADR-032 §10 Amendment, 2026-10-08), and *Add reviewer* from the same seat.

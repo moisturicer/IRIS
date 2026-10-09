@@ -13,18 +13,21 @@
  * Two kinds:
  *
  * - **`dialog`** -- the action collects something first (who to route to, a
- *   finding, a revision's reasons). Its `Dialog` is mounted when the button is
- *   pressed and reports back through `onDone` with the outcome to announce.
- * - **`terminal`** -- the action ends the review (accept & publish, reject),
- *   or takes something back (withdrawing a revision request, IR-272). The bar
- *   puts it last and asks through `ConfirmDialog` first, stating the
- *   consequence (ui-ux/16 §4 copy), then calls `run`.
+ *   finding, a revision's reasons, a decision's comment or reason -- the three
+ *   Decisions are dialogs, not `ConfirmDialog`s, because each takes text and
+ *   must survive a stale record, IR-270). Its `Dialog` is mounted when the
+ *   button is pressed and reports back through `onDone` with the outcome to
+ *   announce.
+ * - **`terminal`** -- the action takes something back with nothing to type
+ *   (withdrawing a revision request, IR-272). The bar puts it last and asks
+ *   through `ConfirmDialog` first, stating the consequence (ui-ux/16 §4
+ *   copy), then calls `run`.
  *
  * `blockedReason` keeps a granted action on the bar but disabled, saying why
  * -- for a condition the server reports but the viewer cannot act past yet.
  *
- * Until IR-260 cuts over, decisions are still recorded on the current review
- * form; the Review section links to it beside the bar rather than porting it.
+ * Until IR-260 cuts over, a record still on the legacy pipeline is decided on
+ * the current review form; the Review section links to it beside the bar.
  */
 import type { ComponentType } from "react";
 
@@ -35,6 +38,7 @@ import type { Capability } from "@/features/records/capabilities";
 import type { RecordDetail } from "@/types/records";
 
 import { AddReviewerDialog } from "./AddReviewerDialog";
+import { DecisionDialog } from "./DecisionDialog";
 import { OfficeReviewDialog } from "./OfficeReviewDialog";
 import { RequestRevisionDialog } from "./RequestRevisionDialog";
 import { RouteDialog } from "./RouteDialog";
@@ -139,6 +143,24 @@ function AddReviewerAction({ record, onClose, onDone }: ReviewActionDialogProps)
   );
 }
 
+/** The Adviser, or RDCO, accepts and publishes the record (ADR-032 §3, IR-270). */
+function AcceptAndPublishAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return <DecisionDialog record={record} outcome="publish" onClose={onClose} onDone={onDone} />;
+}
+
+/** RDCO accepts the record without publishing it (ADR-032 §3, IR-270). */
+function KeepUnlistedAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return <DecisionDialog record={record} outcome="keep_unlisted" onClose={onClose} onDone={onDone} />;
+}
+
+/** The Adviser, or RDCO, rejects and archives the record, with a reason (IR-270). */
+function RejectAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return <DecisionDialog record={record} outcome="reject" onClose={onClose} onDone={onDone} />;
+}
+
+/** Why nobody may decide yet: an unopened seat, or an open revision request (IR-270). */
+const decisionBlocked = (record: RecordDetail) => record.decision?.blocked ?? null;
+
 /** A seat holder asks the owner to revise the record (ADR-032 §5, IR-272). */
 function RequestRevisionAction({ record, onClose, onDone }: ReviewActionDialogProps) {
   return <RequestRevisionDialog record={record} onClose={onClose} onDone={onDone} />;
@@ -156,14 +178,33 @@ async function withdrawRevision(record: RecordDetail): Promise<string> {
 const officeReviewBlocked = (record: RecordDetail) => record.office_review.blocked;
 
 /**
- * Order matters: the bar fills its first granted action. The Adviser's primary
- * is *Accept & route*; an office reviewer's is *Clear*, with *Record finding*
- * beside it (ui-ux/16's order), then *Request Revision*, *Request documents*,
- * *Add reviewer* and *Route to office*. A reviewer whose party has already
- * asked for a revision is offered *Withdraw revision request* instead, last. *Clear* and *Record finding* share one capability,
+ * Order matters: the bar fills its first granted action. The Adviser's and
+ * RDCO's primary is *Accept & publish* (IR-270: most theses need no office),
+ * then RDCO's *Keep unlisted* and the Adviser's *Accept & route*. An office
+ * reviewer's is *Clear*, with *Record finding* beside it (ui-ux/16's order),
+ * then *Request Revision*, *Request documents*, *Add reviewer* and *Route to
+ * office*. *Reject* is the last of the dialogs. A reviewer whose party has
+ * already asked for a revision is offered *Withdraw revision request* instead,
+ * last of all. *Clear* and *Record finding* share one capability,
  * `office_review` (ADR-032 §10 Amendment, 2026-10-08).
  */
 export const REVIEW_ACTIONS: readonly ReviewAction[] = [
+  {
+    kind: "dialog",
+    capability: "accept_publish",
+    label: "Accept & publish…",
+    icon: "fa-circle-check",
+    blockedReason: decisionBlocked,
+    Dialog: AcceptAndPublishAction,
+  },
+  {
+    kind: "dialog",
+    capability: "keep_unlisted",
+    label: "Keep unlisted…",
+    icon: "fa-eye-slash",
+    blockedReason: decisionBlocked,
+    Dialog: KeepUnlistedAction,
+  },
   {
     kind: "dialog",
     capability: "accept_route",
@@ -218,6 +259,14 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
     label: "Route to office…",
     icon: "fa-route",
     Dialog: RouteAction,
+  },
+  {
+    kind: "dialog",
+    capability: "reject",
+    label: "Reject…",
+    icon: "fa-ban",
+    blockedReason: decisionBlocked,
+    Dialog: RejectAction,
   },
   {
     kind: "terminal",

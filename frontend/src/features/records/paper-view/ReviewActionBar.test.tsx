@@ -40,6 +40,10 @@ const record = {
   can_request_document: ["ierc"],
   current_holders: [{ party: "ierc", label: "IERC", opened_at: null, opened_by: null }],
   revision: { party: "ierc", label: "IERC", blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: {
+    party: "rdco", outcomes: ["publish", "keep_unlisted", "reject"], blocked: null,
+    closes: { assignments: [], document_requests: 0 }, token: "t", author_hints: [],
+  },
   versions: [],
 } as unknown as RecordDetail;
 
@@ -315,6 +319,46 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     expect(recordsApi.withdrawRevisionRequest).toHaveBeenCalledWith(7, 5);
     expect(await screen.findByRole("status")).toHaveTextContent("Revision request withdrawn.");
     expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  // IR-270: a decider's primary is Accept & publish, and Reject is the last
+  // of the dialogs; an open revision request holds all three Decisions.
+  it("orders the Decisions so publishing is primary and rejecting comes last", async () => {
+    const { unmount } = renderBar(["reject", "request_document", "accept_route", "request_revision", "accept_publish"]);
+    expect(buttonNames()).toEqual([
+      "Accept & publish…", "Accept & route…", "Request Revision…", "Request documents", "Reject…",
+    ]);
+    unmount();
+
+    renderBar(["reject", "route", "keep_unlisted", "request_document", "accept_publish"]);
+    expect(buttonNames()).toEqual([
+      "Accept & publish…", "Keep unlisted…", "Request documents", "Route to office…", "Reject…",
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "Keep unlisted…" }));
+    expect(screen.getByRole("dialog", { name: "Accept and keep unlisted?" })).toBeInTheDocument();
+  });
+
+  it("holds every Decision while the server says it is blocked", () => {
+    const blocked = {
+      ...record,
+      decision: {
+        party: "adviser", outcomes: ["publish", "reject"], token: "t", closes: null, author_hints: [],
+        blocked: "Waiting on the author: IERC asked for a revision.",
+      },
+    } as unknown as RecordDetail;
+    renderScreen(
+      <ReviewActionBar
+        record={blocked}
+        can={new Set<Capability>(["accept_publish", "reject"])}
+        onChanged={() => {}}
+      />,
+    );
+
+    for (const name of ["Accept & publish…", "Reject…"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription("Waiting on the author: IERC asked for a revision.");
+    }
   });
 
   it("offers Request Revision under `request_revision`, through its own dialog", async () => {

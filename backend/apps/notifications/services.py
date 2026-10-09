@@ -688,6 +688,68 @@ def notify_office_completed(
         pass
 
 
+def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off):
+    """
+    A Decision ended the record's review (ADR-032 §3, IR-270).
+
+    - Every owner hears it once, in-app, and the primary owner by email. A
+      rejection carries its reason as written; a document request the
+      decision withdrew is mentioned here rather than separately.
+    - Each reviewer whose open seat the decision withdrew hears that their
+      review is closed, in-app only. Nobody else: no office pool is told.
+    """
+    from apps.reviews.decisions import KEEP_UNLISTED, OUTCOME_PHRASE, PUBLISH
+
+    try:
+        title = record.title
+        if outcome == PUBLISH:
+            message = f'{decided_by} accepted "{title}" and published it to Discover.'
+            headline = "Published"
+        elif outcome == KEEP_UNLISTED:
+            message = (
+                f'{decided_by} accepted "{title}" and kept it unlisted: it is not in '
+                f"Discover, and you can still open it."
+            )
+            headline = "Accepted"
+        else:
+            message = f'{decided_by} rejected "{title}". It is archived. Reason: {reason}'
+            headline = "Rejected"
+        if closed_requests:
+            message += (
+                " Its open document request is withdrawn, so nothing more is needed."
+                if closed_requests == 1 else
+                " Its open document requests are withdrawn, so nothing more is needed."
+            )
+
+        notif_type = NotificationType.objects.get_or_create(name="Record Decided")[0]
+        owners = list(record.owners.select_related("user").all())
+        for ownership in owners:
+            Notification.objects.create(
+                sender=actor, recipient=ownership.user, record=record,
+                notif_type=notif_type, message=message,
+            )
+
+        closed = f'{decided_by} {OUTCOME_PHRASE[outcome]}, so your review of "{title}" is closed.'
+        for reviewer in cut_off:
+            Notification.objects.create(
+                sender=actor, recipient=reviewer, record=record,
+                notif_type=notif_type, message=closed,
+            )
+
+        if owners:
+            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
+            send_email_async(
+                subject=f"[IRIS] {headline}: {title[:60]}",
+                message=(
+                    f"Hello {primary.first_name},\n\n{message}\n\n"
+                    f"{_record_url(record)}\n\n-- The IRIS Team"
+                ),
+                recipient_list=[primary.email],
+            )
+    except Exception:
+        pass
+
+
 def notify_revision_requested(revision_request, *, party_label: str):
     """
     Tell every owner that a party has asked for a revision (ADR-032 §5

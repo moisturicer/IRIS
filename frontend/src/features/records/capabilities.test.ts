@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { RecordDetail, ReviewerSeat, SeatState } from "@/types/records";
+import type { DecisionFlags, RecordDetail, ReviewerSeat, SeatState } from "@/types/records";
 
 import {
   capabilitiesFor,
@@ -22,6 +22,11 @@ import {
 const OWNER = 40;
 const ADVISER = 30;
 const STRANGER = 99;
+
+/** Record detail's `decision` for a viewer who may not decide (IR-270). */
+const NO_DECISION: DecisionFlags = {
+  party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [],
+};
 
 /** A published Thesis no viewer below takes part in, unless a row says so. */
 function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
@@ -71,6 +76,7 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     routing: { accept_and_route: false, route_as: null },
     office_review: { party: null, label: null, blocked: null, assignment: null },
     revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+    decision: NO_DECISION,
     versions: null,
     manuscript_unsubmitted: false,
     ...overrides,
@@ -333,6 +339,33 @@ const ROWS: Row[] = [
     }),
     viewer: itsoStaff,
     capabilities: ["cite", "open_review", "withdraw_revision"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "the record's Adviser may accept & publish or reject, beside accept & route (IR-270)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "in_review",
+      is_participant: true,
+      routing: { accept_and_route: true, route_as: null },
+      decision: { ...NO_DECISION, party: "adviser", outcomes: ["publish", "reject"], token: "t" },
+    }),
+    viewer: adviser,
+    capabilities: ["cite", "accept_route", "accept_publish", "reject"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
+    name: "RDCO's reviewer may also keep the record unlisted (IR-270)",
+    record: record({
+      pipeline_status: "in_review",
+      workflow_state: "final_review",
+      is_participant: true,
+      decision: {
+        ...NO_DECISION, party: "rdco", outcomes: ["publish", "keep_unlisted", "reject"], token: "t",
+      },
+    }),
+    viewer: { id: 61, role_name: "RDCO" },
+    capabilities: ["cite", "accept_publish", "keep_unlisted", "reject"],
     sections: ["overview", "paper", "review", "files"],
   },
   {
