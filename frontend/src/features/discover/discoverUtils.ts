@@ -148,12 +148,12 @@ export function ipTypeLabel(ipType: IpType): string {
  * Metadata badges for a card, in reading order. Derived only from fields the
  * list serializer actually returns — no invented citation or file counts.
  *
- * `progress` adds the "Research Ongoing" badge for an approved Proposal. Off by
- * default, because the catalogue views (Discover, My Library) must not show
- * it: since IR-264 (ADR-021 §13) an approved Proposal is not public, so the
- * catalogue presenting one as ongoing research would describe something it is
- * not supposed to contain. My Workspace, where an owner tracks their own
- * Proposal, opts in.
+ * `progress` adds the "Accepted" badge for an approved Proposal (IR-271; it
+ * read "Research Ongoing" before ADR-032 retired *complete*). Off by default,
+ * because the catalogue views (Discover, My Library) must not show it: since
+ * IR-264 (ADR-021 §13) an approved Proposal is not public, so the catalogue
+ * presenting one would describe something it is not supposed to contain. My
+ * Workspace, where an owner tracks their own Proposal, opts in.
  */
 export function metaBadges(
   record: RecordListItem,
@@ -169,12 +169,11 @@ export function metaBadges(
     badges.push({ label: record.record_type_name, tone: "type" });
   }
 
-  // A Proposal enters `approved` when its adviser signs off, while the research
-  // itself is still underway. Without this badge nothing on the owner's card
-  // distinguishes in-progress work from a finished one. Only the ongoing case
-  // is marked; no badge means the work is finished.
+  // A Proposal rests at `approved` once its Adviser accepts it (ADR-032 §2,
+  // IR-271): *Accepted*, not "research ongoing", since the retired *complete*
+  // act no longer follows. The owner's card says so, as its stage does.
   if (progress && record.pipeline_status === "approved") {
-    badges.push({ label: "Research Ongoing", tone: "ongoing" });
+    badges.push({ label: "Accepted", tone: "ongoing" });
   }
 
   if (record.is_ip) {

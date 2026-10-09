@@ -78,11 +78,17 @@ class AcceptTests(ProposalTestBase):
         accepted = self.client.get(MINE, {"tab": "done", "outcome": "accepted"}).data["rows"]
         self.assertEqual([r["record"] for r in accepted], [record.pk])
 
-    def test_the_owner_is_told(self):
+    def test_the_owner_is_told_and_nobody_else(self):
         record = self.proposal()
+        before = set(Notification.objects.values_list("pk", flat=True))
+
         with self.captureOnCommitCallbacks(execute=True):
             self.decided(record, self.adviser, "accept")
-        note = Notification.objects.get(record=record, recipient=self.owner)
+
+        new = Notification.objects.exclude(pk__in=before)
+        self.assertEqual({n.recipient for n in new}, {self.owner})
+        self.assertEqual({n.broadcast_to_role_id for n in new}, {None})
+        note = new.get()
         self.assertIn("accepted", note.message)
         self.assertIn(record.title, note.message)
 
@@ -111,8 +117,17 @@ class RejectTests(ProposalTestBase):
 
         self.assertEqual(record.pipeline_status, PipelineStatus.REJECTED)
         self.assertEqual(self.detail(record, self.owner)["workflow_state_label"], "Archived")
-        response = self.post(reverse("record-new-version", args=[record.pk]), self.owner, {})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Neither way back in reopens it: submitting again (the route a draft
+        # or a legacy `declined` record takes) and answering with a new version.
+        for name, body in (("record-submit", {"dpa_accepted": True}), ("record-new-version", {})):
+            with self.subTest(route=name):
+                response = self.post(reverse(name, args=[record.pk]), self.owner, body)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        submitted = self.post(
+            reverse("record-submit", args=[record.pk]), self.owner, {"dpa_accepted": True},
+        )
+        self.assertIn("rejected", submitted.data["detail"])
         record.refresh_from_db()
         self.assertEqual(record.pipeline_status, PipelineStatus.REJECTED)
 

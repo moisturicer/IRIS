@@ -556,6 +556,12 @@ class RecordsAppTransitionTests(WorkflowCharacterisationBase):
         self.assertEqual(self.status_of(record), PipelineStatus.APPROVED)
 
     def test_completion_is_refused_off_the_proposal_route(self):
+        """
+        Since IR-271 every record is refused, so this no longer tells the
+        old preconditions apart; it is kept as the pin that nothing off the
+        route moves. `test_completing_an_approved_proposal_is_retired` is the
+        one that would catch the act coming back.
+        """
         cases = [
             ("wrong status", RecordTypeName.PROPOSAL, PipelineStatus.PUBLISHED),
             ("wrong type", RecordTypeName.THESIS_RESEARCH, PipelineStatus.APPROVED),
@@ -706,7 +712,8 @@ class ProposalRouteEndToEndTests(WorkflowCharacterisationBase):
         self.assertEqual(self.status_of(record), PipelineStatus.APPROVED)
 
         self.client.force_authenticate(self.rdco)
-        self.client.post(reverse("record-complete", args=[record.pk]))
+        response = self.client.post(reverse("record-complete", args=[record.pk]))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertEqual(self.status_of(record), PipelineStatus.APPROVED)
 
     def test_a_thesis_walks_draft_to_published(self):

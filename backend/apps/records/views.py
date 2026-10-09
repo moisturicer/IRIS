@@ -721,10 +721,12 @@ class RecordViewSet(viewsets.ModelViewSet):
     def decide(self, request, pk=None):
         """
         POST /records/<id>/decide/
-        `{"outcome": "publish" | "keep_unlisted" | "reject", "comment": str, "token": str}`
+        `{"outcome": "accept" | "publish" | "keep_unlisted" | "reject",
+          "comment": str, "token": str}`
 
         The record's Adviser, or RDCO's reviewer on the specialist path,
-        decides a Thesis/Research or Project (ADR-032 §3, IR-270). It closes
+        decides a Thesis/Research or Project (ADR-032 §3, IR-270); a
+        Proposal's Adviser alone accepts or rejects it (§2, IR-271). It closes
         every other open assignment, seat and document request. A reject needs
         a comment, its reason. `token` is record detail's `decision.token`.
         Answers with the tracker. 404 for a record the caller cannot see, 403
@@ -856,7 +858,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         Marking an approved Proposal completed meant "research finished". That
         meaning now lives in the Thesis or Project it continues as (§6), so an
         accepted Proposal rests at `approved`, shown as *Accepted*, and nothing
-        new writes `completed`. Every Proposal is refused, legacy ones too;
+        new writes `completed`. Every record is refused -- every Proposal,
+        legacy ones too, and anything else, which never could be completed;
         IR-274 deletes the route with the rest of the old pipeline.
 
         IR-267's two refusal layers still answer first, so a caller learns no

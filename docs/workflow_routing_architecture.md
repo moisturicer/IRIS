@@ -155,7 +155,7 @@ Each item is a defect relative to the settled MVP.
 | `records/serializers.py:100, 109` (`clearances[]`, `resubmission{}`) | **Kept.** `workflow_state`, `current_holders`, `can_act` added | IR-258 |
 | `reviews/serializers.py:9 queue_rows` | Keyed on assignment instead of status; `peer_summary` kept | IR-260 |
 | `reviews/clearance_state.py` | **Kept.** `declining_office` generalises to `requesting_parties` | IR-260 |
-| `notifications/services.py` `notify_record_reviewed` (`:111`), `notify_clearance_result` (`:253`), `notify_resubmit` (`:378`), `notify_proposal_completed` (`:486`) | Plumbing kept; recipients come from assignments; labels come from party labels; new routed / document-requested / decided notices | IR-260, IR-262 |
+| `notifications/services.py` `notify_record_reviewed` (`:111`), `notify_clearance_result` (`:253`), `notify_resubmit` (`:378`); `notify_proposal_completed` was deleted by IR-271 (ADR-032 §2 retires *complete*) | Plumbing kept; recipients come from assignments; labels come from party labels; new routed / document-requested / decided notices | IR-260, IR-262 |
 | `records/management/commands/seed_demo.py` | Seeds every new `workflow_state` | IR-260 |
 
 ### 4.2 Frontend

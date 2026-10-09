@@ -126,12 +126,10 @@ OUTCOME_PHRASE = {
     REJECT: "rejected the record",
 }
 
-
-def outcomes_for(record, party) -> tuple:
-    """The outcomes `party` may decide `record` with, in the bar's order."""
-    if type_name_of(record) == RecordTypeName.PROPOSAL:
-        return PROPOSAL_OUTCOMES if party == Party.ADVISER else ()
-    return OUTCOMES_FOR.get(str(party), ())
+#: Each outcome as the decider would say it, for a refusal's message.
+OUTCOME_WORDS = {
+    ACCEPT: "accept", PUBLISH: "publish", KEEP_UNLISTED: "keep unlisted", REJECT: "reject",
+}
 
 #: Who decided, in prose: the owner's notification and the tracker's "RDCO
 #: published the record". Structured payloads keep the party's own label.
@@ -152,6 +150,19 @@ class DecisionStale(Exception):
     """The record changed since the caller's dialog read it. A 409."""
 
 
+# --- which outcomes, for which record ---------------------------------------------------
+
+def _is_proposal(record) -> bool:
+    return type_name_of(record) == RecordTypeName.PROPOSAL
+
+
+def outcomes_for(record, party) -> tuple:
+    """The outcomes `party` may decide `record` with, in the bar's order."""
+    if _is_proposal(record):
+        return PROPOSAL_OUTCOMES if party == Party.ADVISER else ()
+    return OUTCOMES_FOR.get(str(party), ())
+
+
 # --- who decides, as what ------------------------------------------------------------
 
 def _deciding_party(record, user) -> Optional[str]:
@@ -164,7 +175,7 @@ def _deciding_party(record, user) -> Optional[str]:
     if routing._seated_adviser(record, user):
         return str(Party.ADVISER)
     # RDCO has no Proposal role (ADR-032 §2), whatever seat it might hold.
-    proposal = type_name_of(record) == RecordTypeName.PROPOSAL
+    proposal = _is_proposal(record)
     if not proposal and _decider_seat(record, user, Party.RDCO) is not None:
         return str(Party.RDCO)
     return None
@@ -184,7 +195,7 @@ def _decider_seat(record, user, party) -> Optional[ReviewerSeat]:
 
 def _refusal(record, user) -> str:
     """Why `user`, holding no deciding seat, may not decide: said as usefully as we can."""
-    proposal = type_name_of(record) == RecordTypeName.PROPOSAL
+    proposal = _is_proposal(record)
     if user is not None and record.adviser_id == getattr(user, "pk", None):
         if record.owners.filter(user=user).exists():
             return "Nobody decides their own submission."
@@ -374,9 +385,10 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
 
     allowed = outcomes_for(record, party)
     if not isinstance(outcome, str) or outcome not in OUTCOMES:
-        raise DecisionError(f"Choose one of: {', '.join(allowed)}.")
+        choices = " or ".join(OUTCOME_WORDS[o] for o in allowed)
+        raise DecisionError(f"Choose to {choices}.")
     if outcome not in allowed:
-        if type_name_of(record) == RecordTypeName.PROPOSAL:
+        if _is_proposal(record):
             raise DecisionError(
                 "A Proposal is accepted or rejected, never published or kept unlisted "
                 "(ADR-032 §2)."
@@ -454,7 +466,7 @@ def withdrawn_by_label(review) -> str:
     """
     outcome = (
         REJECT if review.status == ReviewDecision.REJECTED
-        else ACCEPT if type_name_of(review.record) == RecordTypeName.PROPOSAL
+        else ACCEPT if _is_proposal(review.record)
         else PUBLISH if review.record.pipeline_status == PipelineStatus.PUBLISHED
         else KEEP_UNLISTED
     )

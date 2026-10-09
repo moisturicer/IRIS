@@ -26,7 +26,6 @@ const ADAPTER = "src/features/records/capabilities.ts";
  * names the ticket that deletes or converts it. Never add a file to it.
  */
 const NOT_YET_CONVERTED: readonly string[] = [
-  // Retired by ADR-032 (no Proposal completion); F1 deletes the screen.
 ];
 
 const SOURCES: Record<string, string> = Object.fromEntries(
