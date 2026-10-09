@@ -29,7 +29,6 @@ import SettingsPage         from "@/features/settings/SettingsPage";
 import HelpPage             from "@/features/help/HelpPage";
 import DownloadRequestsPage  from "@/features/admin/DownloadRequestsPage";
 import DeleteRequestsPage    from "@/features/admin/DeleteRequestsPage";
-import ApprovedProposalsPage from "@/features/review/ApprovedProposalsPage";
 
 export const router = createBrowserRouter([
   { path: "/login",  element: <LoginPage /> },
@@ -81,7 +80,6 @@ export const router = createBrowserRouter([
             // path -- which is why RDCO does not also get the submission wizard.
             element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
             children: [
-              { path: "review/approved-proposals", element: <ApprovedProposalsPage />, handle: { crumb: "Approved Proposals" } },
               { path: "records/import",            element: <ImportRecordsPage />,     handle: { crumb: "Import Records" } },
               { path: "admin/role-requests",       element: <RoleRequestsPage />,      handle: { crumb: "Role Requests" } },
               { path: "admin/download-requests",   element: <DownloadRequestsPage />,  handle: { crumb: "Download Requests" } },

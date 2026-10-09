@@ -39,7 +39,10 @@ import {
  * on a record it takes part in. IR-273 adds `replace_manuscript`: the owner
  * uploading a revised manuscript for the next version (ADR-032 §5 Amendment).
  * IR-270 adds the three Decisions: `accept_publish`, `keep_unlisted` (the
- * spec's `final_decide`, renamed to the act it grants) and `reject`.
+ * spec's `final_decide`, renamed to the act it grants) and `reject`. IR-271
+ * adds `accept_proposal`, a Proposal's Adviser accepting it (the spec's
+ * `decide_proposal`, which also named *Reject*; reject is `reject` on every
+ * record).
  */
 export type Capability =
   | "open_review"
@@ -49,6 +52,7 @@ export type Capability =
   | "route"
   | "accept_route"
   | "accept_publish"
+  | "accept_proposal"
   | "keep_unlisted"
   | "reject"
   | "office_review"
@@ -68,6 +72,7 @@ export type Capability =
 
 /** Which capability offers each Decision outcome (IR-270). */
 const DECISION_CAPABILITY: Record<DecisionOutcome, Capability> = {
+  accept: "accept_proposal",
   publish: "accept_publish",
   keep_unlisted: "keep_unlisted",
   reject: "reject",

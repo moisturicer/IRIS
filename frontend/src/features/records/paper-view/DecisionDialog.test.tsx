@@ -157,6 +157,31 @@ describe("DecisionDialog", () => {
     expect(decide).toHaveBeenLastCalledWith(7, { outcome: "reject", comment: "Out of scope.", token: "t2" });
   });
 
+  // IR-271: a Proposal's Adviser accepts or rejects it.
+  const PROPOSAL: DecisionFlags = { ...ADVISER, outcomes: ["accept", "reject"], author_hints: [] };
+
+  it("accepts a proposal with an optional comment, promising nothing about continuing it", async () => {
+    const { onDone } = open("accept", PROPOSAL, "Proposal");
+
+    const dialog = screen.getByRole("dialog", { name: "Accept this proposal?" });
+    expect(dialog).toHaveTextContent("It leaves review and is not published to Discover");
+    expect(dialog).not.toHaveTextContent(/thesis|project/i);
+    expect(screen.getByRole("textbox", { name: "Comment (optional)" })).not.toBeRequired();
+    await userEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("Accepted. The proposal leaves review."));
+    expect(decide).toHaveBeenCalledWith(7, { outcome: "accept", comment: "", token: "t1" });
+  });
+
+  it("rejects a proposal in the card's words, with its reason required", () => {
+    open("reject", PROPOSAL, "Proposal");
+
+    expect(screen.getByRole("dialog", { name: "Reject and archive?" })).toHaveTextContent(
+      "This archives the proposal. The student will need to submit a new one.",
+    );
+    expect(screen.getByRole("textbox", { name: "Why is it rejected?" })).toBeRequired();
+  });
+
   it("keeps the text when closed to read a document, per outcome, and forgets it once decided", async () => {
     const first = open("reject");
     await userEvent.type(screen.getByRole("textbox", { name: "Why is it rejected?" }), "Plagiarised section 3.");

@@ -86,7 +86,6 @@ test("RDCO alone holds the coordination screens", () => {
   only("roleRequests", [ROLES.RDCO]);
   only("downloadRequests", [ROLES.RDCO]);
   only("deleteRequests", [ROLES.RDCO]);
-  only("approvedProposals", [ROLES.RDCO]);
   only("importRecords", [ROLES.RDCO]);
 });
 

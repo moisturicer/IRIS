@@ -115,7 +115,7 @@ Each entry carries its version tag. The comment box is at the bottom, as on GitH
 
 | Seat | Buttons (capability) |
 |---|---|
-| Adviser on a **Proposal** | **Request revision** (`request_revision`) · **Reject** (`decide_proposal`) · **Accept** (`decide_proposal`) · Request document |
+| Adviser on a **Proposal** | **Request revision** (`request_revision`) · **Reject** (`reject`) · **Accept** (`accept_proposal`) · Request document |
 | Adviser on a **Thesis / Project** | Request revision · Reject (`reject`) · **Accept & publish** (`accept_publish`) · **Accept & route…** (`accept_route`) · Request document |
 | ITSO / IERC / KTTO | **Clear** · **Record finding** (both `office_review`; ADR-032 §10 *Amendment* 2026-10-08) · Request revision · Request document · **Add reviewer** (`add_reviewer`) · **Route to office…** (`route`) |
 | RDCO | Request revision · Reject (`reject`) · **Accept & publish** (`accept_publish`) · **Accept, keep unlisted** (`keep_unlisted`) · Route to office… · Request document |

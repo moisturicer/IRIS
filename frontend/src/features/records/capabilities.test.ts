@@ -355,6 +355,20 @@ const ROWS: Row[] = [
     sections: ["overview", "paper", "review", "files"],
   },
   {
+    name: "a Proposal's Adviser may accept or reject it (IR-271)",
+    record: record({
+      record_type_name: "Proposal",
+      record_type: "Proposal",
+      pipeline_status: "in_review",
+      workflow_state: "in_review",
+      is_participant: true,
+      decision: { ...NO_DECISION, party: "adviser", outcomes: ["accept", "reject"], token: "t" },
+    }),
+    viewer: adviser,
+    capabilities: ["cite", "accept_proposal", "reject"],
+    sections: ["overview", "paper", "review", "files"],
+  },
+  {
     name: "RDCO's reviewer may also keep the record unlisted (IR-270)",
     record: record({
       pipeline_status: "in_review",

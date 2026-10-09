@@ -487,51 +487,6 @@ def notify_resubmit(record, submitted_by, new_status: str):
         pass
 
 
-def notify_proposal_completed(record, marked_by):
-    """
-    Notify record owners when a Proposal is marked completed -- by RDCO or by
-    its assigned Adviser (ADR-021 §3, IR-267). The message names which; it
-    used to say "by RDCO" whoever had acted.
-    """
-    try:
-        notif_type = _get_type("Record Approved")
-        # Keyed on the assignment, not the role: "your Adviser" is only true of
-        # the Adviser this record names.
-        marked_by_label = (
-            "your Adviser"
-            if record.adviser_id is not None and marked_by.pk == record.adviser_id
-            else RoleName.RDCO.label
-        )
-        message = (
-            f'Your Proposal "{record.title}" has been marked as completed by {marked_by_label}. '
-            f"It remains visible in the repository as a completed research proposal."
-        )
-        owners = list(record.owners.select_related("user").all())
-        for ownership in owners:
-            Notification.objects.create(
-                sender=marked_by,
-                recipient=ownership.user,
-                record=record,
-                notif_type=notif_type,
-                message=message,
-            )
-        if owners:
-            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
-            send_email_async(
-                subject=f"[IRIS] Your proposal has been marked as completed: {record.title[:60]}",
-                message=(
-                    f"Hello {primary.first_name},\n\n"
-                    f'Your Proposal "{record.title}" has been marked as completed by {marked_by_label}.\n\n'
-                    f"It remains publicly visible in the IRIS repository as a completed research proposal.\n\n"
-                    f"You can view it here:\n{_record_url(record)}\n\n"
-                    f"-- The IRIS Team"
-                ),
-                recipient_list=[primary.email],
-            )
-    except Exception:
-        pass
-
-
 def _role_for_party(party: str):
     """
     The role that staffs an office party (ADR-021 §1), read from the tracker's
@@ -690,7 +645,7 @@ def notify_office_completed(
 
 def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off):
     """
-    A Decision ended the record's review (ADR-032 §3, IR-270).
+    A Decision ended the record's review (ADR-032 §2-§3; IR-270, IR-271).
 
     - Every owner hears it once, in-app, and the primary owner by email. A
       rejection carries its reason as written; a document request the
@@ -698,11 +653,14 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
     - Each reviewer whose open seat the decision withdrew hears that their
       review is closed, in-app only. Nobody else: no office pool is told.
     """
-    from apps.reviews.decisions import KEEP_UNLISTED, OUTCOME_PHRASE, PUBLISH
+    from apps.reviews.decisions import ACCEPT, KEEP_UNLISTED, OUTCOME_PHRASE, PUBLISH
 
     try:
         title = record.title
-        if outcome == PUBLISH:
+        if outcome == ACCEPT:
+            message = f'{decided_by} accepted your proposal "{title}".'
+            headline = "Accepted"
+        elif outcome == PUBLISH:
             message = f'{decided_by} accepted "{title}" and published it to Discover.'
             headline = "Published"
         elif outcome == KEEP_UNLISTED:

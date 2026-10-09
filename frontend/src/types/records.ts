@@ -207,8 +207,12 @@ export interface RecordVersion {
   manuscript_url:  string | null;
 }
 
-/** What a Decision ends the review with (ADR-032 §3, IR-270). */
-export type DecisionOutcome = "publish" | "keep_unlisted" | "reject";
+/**
+ * What a Decision ends the review with (ADR-032 §2-§3; IR-270, IR-271):
+ * `accept` on a Proposal only, `publish` / `keep_unlisted` on a Thesis or
+ * Project, `reject` on either.
+ */
+export type DecisionOutcome = "accept" | "publish" | "keep_unlisted" | "reject";
 
 export interface DecisionFlags {
   /** The party the viewer decides as, `adviser` or `rdco`; null for anyone else. */

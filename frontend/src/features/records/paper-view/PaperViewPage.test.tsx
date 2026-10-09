@@ -169,8 +169,6 @@ const approvedProposal: RecordDetail = {
  * since the two concerns below need different records shown. */
 let shownRecord: RecordDetail = record;
 
-const completeProposal = vi.fn((_id: number) => Promise.resolve({ data: { detail: "ok" } }));
-
 function page<T>(results: T[]) {
   return { data: { count: results.length, next: null, previous: null, results } };
 }
@@ -191,7 +189,6 @@ vi.mock("@/api/records", () => ({
     documentRequestSlots:  vi.fn(() => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] })),
     createDocumentRequest: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
     updateTags:       vi.fn(),
-    completeProposal: (id: number) => completeProposal(id),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
@@ -345,7 +342,8 @@ describe("arriving from a citation", () => {
 const MARK_COMPLETED = { name: /mark as completed/i };
 
 // ADR-032 retires the Proposal *complete* act and gives RDCO no Proposal
-// role, so nobody is offered it any more (spec §4.6, IR-411).
+// role, so nobody is offered it any more (spec §4.6, IR-411). Since IR-271
+// the client has no completion call at all, and the server refuses one.
 describe("Mark as completed is retired", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -363,7 +361,6 @@ describe("Mark as completed is retired", () => {
     // assertion would pass against the loading skeleton.
     await screen.findByRole("heading", { name: approvedProposal.title });
     expect(screen.queryByRole("button", MARK_COMPLETED)).not.toBeInTheDocument();
-    expect(completeProposal).not.toHaveBeenCalled();
   });
 });
 

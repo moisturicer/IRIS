@@ -1,13 +1,20 @@
 """
-The Adviser or RDCO decides a Thesis/Research or Project (ADR-032 §3, §11;
-ADR-021 §12; IR-270).
+The Adviser or RDCO decides a record (ADR-032 §2, §3, §11; ADR-021 §12;
+IR-270, IR-271).
 
-**A Decision ends a record's review.** Three outcomes, by who decides:
+**A Decision ends a record's review.** The outcomes depend on the record and
+on who decides:
 
-- **The Adviser**, while their own seat is open (no specialist path):
-  *publish* or *reject*. RDCO is never involved.
-- **RDCO**, on the specialist path, holding the hand-back's seat: *publish*,
-  *keep unlisted* (`completed`) or *reject*.
+- **A Proposal: its Adviser alone** (IR-271): *accept* (`approved`, shown as
+  *Accepted*, its resting state) or *reject*. RDCO has no Proposal role, and a
+  Proposal is never routed, so the Adviser's seat is the only one it has.
+- **A Thesis/Research or Project, by its Adviser**, while their own seat is
+  open (no specialist path): *publish* or *reject*. RDCO is never involved.
+- **A Thesis/Research or Project, by RDCO**, on the specialist path, holding
+  the hand-back's seat: *publish*, *keep unlisted* (`completed`) or *reject*.
+
+*Reject* is the same act on every record: `rejected`, shown as *Archived*,
+terminal.
 
 Accept & route (IR-261) is not a Decision. It is an acceptance that closes
 nothing; it shares only the rule that it is refused while a revision request
@@ -15,7 +22,7 @@ is open (`revisions.decision_blocked_reason`).
 
 **What a Decision writes, in one transaction:**
 
-1. the decider's own `Review` -- `approved` for both accepts, `rejected` for a
+1. the decider's own `Review` -- `approved` for every accept, `rejected` for a
    reject -- against the latest version. My Reviews tells *published* from
    *accepted* by the record's status and "this is its latest approval", so no
    outcome is stored twice (IR-268);
@@ -39,10 +46,10 @@ is open (`revisions.decision_blocked_reason`).
 - a caller holding no open Adviser or RDCO seat here (403). An Adviser who
   has already accepted & routed is told RDCO decides now; an RDCO member
   without a seat is told to claim it;
-- a Proposal (400: IR-271 builds its accept and reject), or a record still on
-  the legacy pipeline (400);
-- an unknown outcome, or one the decider may not take -- only RDCO keeps a
-  record unlisted (400);
+- a record still on the legacy pipeline (400);
+- an unknown outcome, or one that does not fit -- a Proposal is never
+  published or kept unlisted, a Thesis or Project is never merely accepted,
+  and only RDCO keeps a record unlisted (400);
 - a reject with no reason (400);
 - an unopened seat (400, "Open the review first", as Clear and Request
   revision refuse);
@@ -83,30 +90,45 @@ from core.permissions import is_office_member
 from . import revisions, routing, seats
 from .models import RecordAssignment, Review, ReviewerSeat
 
+ACCEPT = "accept"
 PUBLISH = "publish"
 KEEP_UNLISTED = "keep_unlisted"
 REJECT = "reject"
 
 #: Each outcome: the decider's verdict, and the status it leaves the record in.
 OUTCOMES = {
+    ACCEPT: (ReviewDecision.APPROVED, PipelineStatus.APPROVED),
     PUBLISH: (ReviewDecision.APPROVED, PipelineStatus.PUBLISHED),
     KEEP_UNLISTED: (ReviewDecision.APPROVED, PipelineStatus.COMPLETED),
     REJECT: (ReviewDecision.REJECTED, PipelineStatus.REJECTED),
 }
 
-#: Who may take which outcome, in the order the action bar offers them.
-#: RDCO alone keeps a record unlisted (ADR-032 §3).
+#: The record types a Decision is taken on: a Proposal (ADR-032 §2) and the
+#: two types the Adviser may route (§3).
+DECIDABLE_TYPES = (RecordTypeName.PROPOSAL, *routing.ROUTABLE_TYPES)
+
+#: Who may take which outcome on a Thesis/Research or Project, in the order
+#: the action bar offers them. RDCO alone keeps a record unlisted (§3).
 OUTCOMES_FOR = {
     str(Party.ADVISER): (PUBLISH, REJECT),
     str(Party.RDCO): (PUBLISH, KEEP_UNLISTED, REJECT),
 }
 
-#: How the tracker names a Decision on the work it closed ("RDCO published
-#: the record").
+#: A Proposal's outcomes: its Adviser alone accepts or rejects it (§2).
+PROPOSAL_OUTCOMES = (ACCEPT, REJECT)
+
+#: How the tracker and the notifications name a Decision ("RDCO published the
+#: record").
 OUTCOME_PHRASE = {
+    ACCEPT: "accepted the proposal",
     PUBLISH: "published the record",
     KEEP_UNLISTED: "accepted the record and kept it unlisted",
     REJECT: "rejected the record",
+}
+
+#: Each outcome as the decider would say it, for a refusal's message.
+OUTCOME_WORDS = {
+    ACCEPT: "accept", PUBLISH: "publish", KEEP_UNLISTED: "keep unlisted", REJECT: "reject",
 }
 
 #: Who decided, in prose: the owner's notification and the tracker's "RDCO
@@ -128,6 +150,19 @@ class DecisionStale(Exception):
     """The record changed since the caller's dialog read it. A 409."""
 
 
+# --- which outcomes, for which record ---------------------------------------------------
+
+def _is_proposal(record) -> bool:
+    return type_name_of(record) == RecordTypeName.PROPOSAL
+
+
+def outcomes_for(record, party) -> tuple:
+    """The outcomes `party` may decide `record` with, in the bar's order."""
+    if _is_proposal(record):
+        return PROPOSAL_OUTCOMES if party == Party.ADVISER else ()
+    return OUTCOMES_FOR.get(str(party), ())
+
+
 # --- who decides, as what ------------------------------------------------------------
 
 def _deciding_party(record, user) -> Optional[str]:
@@ -139,7 +174,9 @@ def _deciding_party(record, user) -> Optional[str]:
         return None
     if routing._seated_adviser(record, user):
         return str(Party.ADVISER)
-    if _decider_seat(record, user, Party.RDCO) is not None:
+    # RDCO has no Proposal role (ADR-032 §2), whatever seat it might hold.
+    proposal = _is_proposal(record)
+    if not proposal and _decider_seat(record, user, Party.RDCO) is not None:
         return str(Party.RDCO)
     return None
 
@@ -158,13 +195,18 @@ def _decider_seat(record, user, party) -> Optional[ReviewerSeat]:
 
 def _refusal(record, user) -> str:
     """Why `user`, holding no deciding seat, may not decide: said as usefully as we can."""
+    proposal = _is_proposal(record)
     if user is not None and record.adviser_id == getattr(user, "pk", None):
         if record.owners.filter(user=user).exists():
             return "Nobody decides their own submission."
+        if proposal:
+            return "This proposal is no longer in your review, so there is nothing to decide."
         return (
             "You have already accepted this record and sent it for specialist "
             "review, so RDCO decides it now."
         )
+    if proposal:
+        return "Only the proposal's Adviser decides it (ADR-032 §2)."
     if is_office_member(user, Party.RDCO):
         return (
             "Claim this review from RDCO's pool, or be assigned it, before you "
@@ -176,13 +218,13 @@ def _refusal(record, user) -> str:
     )
 
 
+def _decidable(record) -> bool:
+    """On the new model, and a type a Decision is taken on."""
+    return routing.is_new_model(record) and type_name_of(record) in DECIDABLE_TYPES
+
+
 def _require_decidable(record):
-    if type_name_of(record) == RecordTypeName.PROPOSAL:
-        raise DecisionError(
-            "A Proposal is accepted or rejected by its Adviser, never published, "
-            "and IRIS does not offer that decision yet."
-        )
-    if not routing.is_new_model(record):
+    if not _decidable(record):
         raise DecisionError(
             "This record is still on the current review pipeline. Use the "
             "current decision form."
@@ -290,19 +332,22 @@ def decision_flags(record, user) -> dict:
         "party": None, "outcomes": [], "blocked": None, "closes": None,
         "token": None, "author_hints": [],
     }
-    if not routing._routable(record):
+    if not _decidable(record):
         return empty
     party = _deciding_party(record, user)
     if party is None:
         return empty
     seat = _decider_seat(record, user, party)
+    # The hints say which offices the author thought were needed: a question
+    # for the Adviser deciding whether to route, which a Proposal never is.
+    routable = type_name_of(record) in routing.ROUTABLE_TYPES
     return {
         "party": party,
-        "outcomes": list(OUTCOMES_FOR[party]),
+        "outcomes": list(outcomes_for(record, party)),
         "blocked": _blocked_reason(record, seat),
         "closes": closes_payload(record, seat),
         "token": decision_token(record),
-        "author_hints": author_hints(record) if party == Party.ADVISER else [],
+        "author_hints": author_hints(record) if party == Party.ADVISER and routable else [],
     }
 
 
@@ -338,9 +383,21 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         raise DecisionRefused(_refusal(record, actor))
     _require_decidable(record)
 
+    allowed = outcomes_for(record, party)
     if not isinstance(outcome, str) or outcome not in OUTCOMES:
-        raise DecisionError("Choose to publish, keep unlisted or reject the record.")
-    if outcome not in OUTCOMES_FOR[party]:
+        choices = " or ".join(OUTCOME_WORDS[o] for o in allowed)
+        raise DecisionError(f"Choose to {choices}.")
+    if outcome not in allowed:
+        if _is_proposal(record):
+            raise DecisionError(
+                "A Proposal is accepted or rejected, never published or kept unlisted "
+                "(ADR-032 §2)."
+            )
+        if outcome == ACCEPT:
+            raise DecisionError(
+                "A Thesis or Project is accepted by publishing it, keeping it unlisted "
+                "or routing it, never left merely accepted."
+            )
         raise DecisionError(
             "Only RDCO may accept a record and keep it unlisted, after specialist review."
         )
@@ -409,6 +466,7 @@ def withdrawn_by_label(review) -> str:
     """
     outcome = (
         REJECT if review.status == ReviewDecision.REJECTED
+        else ACCEPT if _is_proposal(review.record)
         else PUBLISH if review.record.pipeline_status == PipelineStatus.PUBLISHED
         else KEEP_UNLISTED
     )

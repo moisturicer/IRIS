@@ -341,13 +341,13 @@ TRANSITIONS: dict[tuple, Edge] = {
         decision=ReviewDecision.APPROVED,
         resolver="first_status",
     ),
-    # RDCO -- or, since IR-267 (ADR-021 §3), the Proposal's assigned Adviser --
-    # marks an approved Proposal finished. `gate_role` holds one role and is
-    # documentation only; the view's permission and queryset decide who may
-    # act, as the module docstring explains. Only Proposals reach `approved`
-    # -- approve_record sends every other type to `published` -- so keying on
-    # the status is sufficient; the view keeps an explicit record-type check as
-    # a defensive precondition rather than as routing.
+    # **Retired: nothing reaches it from a request** (ADR-032 §2, IR-271). It
+    # was the Proposal *complete* act -- RDCO or, after IR-267, the assigned
+    # Adviser marking an approved Proposal finished. `/records/<id>/complete/`
+    # now refuses every record, so `approved -> completed` is unreachable in
+    # use. The edge stays declared only because `seed_demo` writes a legacy
+    # `completed` Proposal through it, the state existing records keep; IR-274
+    # deletes it with the rest of the old pipeline.
     (PipelineStatus.APPROVED, WorkflowEvent.MARK_COMPLETE): Edge(
         decision=ReviewDecision.APPROVED,
         gate_role=RoleName.RDCO,

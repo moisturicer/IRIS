@@ -115,7 +115,7 @@ Client-side gating is **UX only**; enforcement is server-side (`S-02`…`S-05`).
 | Documents | ◐ | ◐ | ✅ | ◐ | ◐ | ◐ |
 | **Review queue** *(+ Approved / Declined filters)* | — | ◐ | ✅ | ◐ | ◐ | ◐ |
 | **Decision screen** | — | ◐ | ✅ | ◐ | ◐ | ◐ |
-| Approved Proposals | — | — | ✅ | — | — | — |
+| ~~Approved Proposals~~ (removed by IR-271) | — | — | — | — | — | — |
 | Import Records *(file on behalf of)* | — | — | ✅ | — | — | — |
 | Download Requests | — | — | ✅ | — | — | — |
 | Delete Requests | — | — | ✅ | — | — | — |

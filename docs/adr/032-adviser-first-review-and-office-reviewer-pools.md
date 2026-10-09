@@ -37,6 +37,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-08 (project lead, IR-268): §9.** What each My Reviews tab is made of. Current work splits by model until IR-260, and Done is history assembled from seats plus the old pipeline's unseated Reviews. It also settles how a Done row's outcome is derived, that the waiting badge is record-level, and the coordinator's office view. See the *Amendment* note under §9.
 
+**Amended 2026-10-09 (project lead, IR-271): §2 and §10.** The Proposal decision on IR-270's act, *complete* retired for every Proposal, `approved` read as *Accepted*, and the `decide_proposal` → `accept_proposal` rename. See the *Amendment* notes under §2 and §10.
+
 **Amended 2026-10-09 (project lead, IR-270): §3, §10 and §11.** What a Decision is and what it closes, how the closures name it, the `decision` capabilities and the `final_decide` → `keep_unlisted` rename, the direct status write until IR-260, and the 409 for a stale dialog. See the *Amendment* notes under §3, §10 and §11.
 
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
@@ -115,6 +117,15 @@ Party = adviser | itso | ierc | ktto | rdco
 
 - **The Adviser alone decides a Proposal.** RDCO has no Proposal role, and specialist offices are not routed on Proposals.
 - **The "complete" act is retired.** Before, `approved → completed` meant "research finished". That meaning now lives in the child record (§6), so `approved` is a Proposal's resting state. Existing `completed` Proposals keep their value, and nothing new writes it.
+
+**Amendment, 2026-10-09 (project lead, IR-271): building the Proposal decision.** Settled in a design grilling; every recommendation was accepted (Jira comment 10589).
+
+- **The Adviser's *Accept* and *Reject* are Decisions on IR-270's act**, `POST /records/<id>/decide/`. `accept` (→ `approved`) is offered on a Proposal only; `reject` is the same act on every record (`rejected`, *Archived*). A Proposal is never published or kept unlisted, and a Thesis or Project is never merely accepted: each is refused with a 400 saying so. RDCO and the offices hold no Proposal decision, whatever seat they might hold.
+- **Everything IR-270 settled applies unchanged**: the Adviser's seat and assignment close, their own document requests are withdrawn with `closed_by_decision`, the staleness token and 409, a reason required to reject, and a refusal while any revision request is open (the IR-272 hand-off).
+- **Complete is retired for every Proposal**, legacy ones included, as this section says, rather than only for the new model as the ticket first read. `/complete/` answers 400; its permission and queryset layers still answer first (403 for a role that could never complete, 404 for an Adviser who does not advise the record). The route goes with the old pipeline in IR-274. The *Approved Proposals* page, whose only act was *Complete* and whose list had been empty since IR-153, is deleted with its route and navigation entry. IR-267's carried criterion, "Intake cannot complete", is dropped: intake (§1) and complete are both retired.
+- **`approved` reads *Accepted*** wherever a reader sees it: the server's `workflow_state_label`, the frontend's status label and My Workspace's stepper, legacy records included. A `completed` Proposal still reads *Completed*. `CONTEXT.md` records *Accepted*.
+- **The owners are told**, and nobody else: a Proposal decision cuts off no other reviewer.
+- *The accept dialog promises nothing about continuing the Proposal as a Thesis or Project.* That is §6, built by IR-417.
 
 ### 3. Thesis / Research and Project
 
@@ -457,6 +468,8 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
     Aligning them would reopen ADR-022, so it was not done here.
 
 **Amendment, 2026-10-09 (project lead, IR-270): the Decision's capabilities.** Record detail carries a `decision` block, `{party, outcomes, blocked, closes, token, author_hints}`: the outcomes the viewer may take, why not yet (an unopened seat, an open revision request), what deciding would close (each assignment with its current holders, and the open document requests), the staleness token (§11 Amendment), and, for the Adviser, the author's ADR-018 hints. The frontend grants one capability per outcome: `accept_publish`, `keep_unlisted` and `reject`. **`final_decide` is renamed `keep_unlisted`**, the act it grants, as `record_finding` became `office_review` (above). `decide` stays the link to the current decision form for legacy records until IR-274.
+
+**Amendment, 2026-10-09 (project lead, IR-271).** A Proposal's *Accept* is its own capability, **`accept_proposal`**, and its *Reject* is `reject`, as on every record. This replaces the single `decide_proposal` key, so each button names the act it grants.
 
 *Deviation from the grilled order, accepted by the project lead on 2026-10-09:* the RDCO bar was first settled as *Accept & publish · Keep unlisted · Route · Request Revision · Request documents · Reject*. The bar is one ordered list for every viewer, and IR-269 settled an office reviewer's order with *Route to office* after *Request documents*. So RDCO gets *Accept & publish · Keep unlisted · Request Revision · Request documents · Route to office · Reject*. The primary and the last button are as settled; moving *Route* for RDCO alone would need per-viewer ordering.
     - *Rejected:* moving *Route* up the shared list. It would reorder every office's bar against ui-ux/16 and IR-261's settled office primary.

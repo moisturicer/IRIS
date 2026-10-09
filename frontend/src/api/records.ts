@@ -148,9 +148,6 @@ export const recordsApi = {
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),
-  completeProposal: (id: number) =>
-    apiClient.post<{ detail: string }>(`/records/${id}/complete/`),
-
   importExcel:    (file: File) => {
     const fd = new FormData();
     fd.append("file", file);

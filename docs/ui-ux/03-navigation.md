@@ -51,7 +51,7 @@ REVIEW QUEUE                                          (reviewers)
   Pending Records         /review/pending
   Approved                /review/approved
   Declined                /review/declined
-  Approved Proposals      /review/approved-proposals  (RDCO)
+  (Approved Proposals: removed by IR-271; ADR-032 §2 retires complete)
 
 TOOLS                                                 (every role)
   Notifications           /notifications        · badge = unread
@@ -87,7 +87,7 @@ ADMINISTRATION                                        (RDCO)
 | My Workspace | ✅ | ✅ | — | — | — | — |
 | Import Records | — | — | ✅ | — | — | — |
 | Review Queue | — | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Approved Proposals | — | — | ✅ | — | — | — |
+| ~~Approved Proposals~~ (removed by IR-271) | — | — | — | — | — | — |
 | Tools | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Administration | — | — | ✅ | — | — | — |
 

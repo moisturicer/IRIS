@@ -52,9 +52,9 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "review_routing", label: "Review & Routing" },
   { id: "ip_assessment", label: "IP Assessment" },
   { id: "commercialization", label: "Commercialization" },
-  // "Past Review", not "Completed": it holds both an approved Proposal whose
-  // research is still ongoing and a genuinely finished one. Labelling it
-  // "Completed" would contradict the card's own "Research Ongoing" badge.
+  // "Past Review", not "Completed": it holds both an accepted Proposal and a
+  // genuinely finished record. Labelling it "Completed" would contradict the
+  // card's own "Accepted" stage (IR-271).
   { id: "past_review", label: "Past Review" },
 ];
 

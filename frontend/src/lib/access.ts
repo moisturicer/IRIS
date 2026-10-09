@@ -107,8 +107,6 @@ export const SCREEN_ACCESS = {
   evaluate:    { path: "/review/:id/evaluate", roles: REVIEWERS },
 
   // --- RDCO coordination -------------------------------------------------
-  approvedProposals: { path: "/review/approved-proposals", roles: COORDINATOR,
-                 nav: { label: "Approved Proposals", icon: "fa-flag-checkered", section: "Review Queue" } },
   importRecords: { path: "/records/import", roles: COORDINATOR,
                  nav: { label: "Import Records", icon: "fa-file-import", section: "IP Management" } },
   roleRequests:  { path: "/admin/role-requests", roles: COORDINATOR,

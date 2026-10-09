@@ -26,7 +26,9 @@ const STAGE_LABELS: Record<WorkspaceStage, string> = {
   review_routing: "Review & Routing",
   office_review: "Office Review",
   final_review: "Final Review",
-  ongoing: "Research Ongoing",
+  // ADR-032 §2 (IR-271): an accepted Proposal rests here; "ongoing research"
+  // was the retired *complete* act's idea.
+  ongoing: "Accepted",
   completed: "Completed",
   revision_requested: "Declined",
   // ADR-032 §2-§3: a rejected record is shown as Archived (IR-270).
@@ -55,11 +57,9 @@ export function currentStage(record: RecordDetail): WorkspaceStage {
       return "office_review";
     case "awaiting_resubmission":
       return "revision_requested";
-    // `approved` is NOT finished: the adviser signed off and the research is
-    // now actually being done. Only a manual /complete/ call -- by RDCO or the
-    // assigned Adviser (ADR-021 §3, IR-267) -- ends a Proposal. Collapsing the two
-    // told a student their proposal was "Completed" while they were still
-    // working on it.
+    // `approved` is an accepted Proposal's resting state (ADR-032 §2, IR-271):
+    // *Accepted*, its own stage. The *complete* act that once followed it is
+    // retired; only a legacy Proposal can still be at `completed`.
     case "approved":
       return "ongoing";
     case "completed":
@@ -81,11 +81,14 @@ function heldOnlyBy(record: RecordDetail, party: Party): boolean {
 /** The ordered stage list a *this specific record* actually passes through. */
 export function stageSequence(record: RecordDetail): WorkspaceStage[] {
   if (record.record_type_name === "Proposal") {
-    // Four stages, not three: adviser approval lands on `ongoing`, and only
-    // RDCO or the assigned Adviser marking it complete reaches `completed`. Only Proposals ever have
-    // an `ongoing` stage -- approve_record() sends every other type straight
-    // to `published` from its final review.
-    return ["validation", "review_routing", "ongoing", "completed"];
+    // Acceptance lands on `ongoing`, read *Accepted*, and that is where a
+    // Proposal rests (ADR-032 §2, IR-271): the *complete* act that once led on
+    // to `completed` is retired, so no step is promised after it. Only a
+    // legacy Proposal already stored at `completed` shows that step, as the
+    // one it reached. Only Proposals have an `ongoing` stage.
+    return record.pipeline_status === "completed"
+      ? ["validation", "review_routing", "ongoing", "completed"]
+      : ["validation", "review_routing", "ongoing"];
   }
   const officeStages: WorkspaceStage[] =
     record.clearances && record.clearances.length > 0 ? ["office_review"] : [];

@@ -342,7 +342,7 @@ these eight *plus* the sections below, because every role also submits and brows
 | Pending Records | `/review/pending` |
 | Approved | `/review/approved` |
 | Declined | `/review/declined` |
-| Approved Proposals *(RDCO only)* | `/review/approved-proposals` |
+| ~~Approved Proposals *(RDCO only)*~~ removed by IR-271: ADR-032 §2 retires the *complete* act | ~~`/review/approved-proposals`~~ |
 
 ### + Staff — 4, or 6 for a Django admin
 

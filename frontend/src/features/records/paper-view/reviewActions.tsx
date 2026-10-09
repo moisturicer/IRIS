@@ -5,8 +5,8 @@
  * **Adding an action is adding an entry to `REVIEW_ACTIONS`**, and nothing
  * else: the bar (`ReviewActionBar`) renders one button per entry whose
  * capability the adapter grants, so an entry the viewer was not granted is
- * never shown. Route (IR-261), clear and finding (IR-269), accept & publish (IR-270),
- * the Proposal decision (IR-271) and revision against a version (IR-272) each
+ * never shown. Route (IR-261), clear and finding (IR-269), the Decisions
+ * (IR-270, IR-271) and revision against a version (IR-272) each
  * add one here, with their own dialog; their held frontend criteria are met
  * in this bar, not on a separate screen.
  *
@@ -148,6 +148,11 @@ function AcceptAndPublishAction({ record, onClose, onDone }: ReviewActionDialogP
   return <DecisionDialog record={record} outcome="publish" onClose={onClose} onDone={onDone} />;
 }
 
+/** A Proposal's Adviser accepts it: its resting state (ADR-032 §2, IR-271). */
+function AcceptProposalAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+  return <DecisionDialog record={record} outcome="accept" onClose={onClose} onDone={onDone} />;
+}
+
 /** RDCO accepts the record without publishing it (ADR-032 §3, IR-270). */
 function KeepUnlistedAction({ record, onClose, onDone }: ReviewActionDialogProps) {
   return <DecisionDialog record={record} outcome="keep_unlisted" onClose={onClose} onDone={onDone} />;
@@ -178,8 +183,9 @@ async function withdrawRevision(record: RecordDetail): Promise<string> {
 const officeReviewBlocked = (record: RecordDetail) => record.office_review.blocked;
 
 /**
- * Order matters: the bar fills its first granted action. The Adviser's and
- * RDCO's primary is *Accept & publish* (IR-270: most theses need no office),
+ * Order matters: the bar fills its first granted action. A Proposal's Adviser
+ * has *Accept* as primary (IR-271). The Adviser's and RDCO's primary on a
+ * Thesis or Project is *Accept & publish* (IR-270: most theses need no office),
  * then RDCO's *Keep unlisted* and the Adviser's *Accept & route*. An office
  * reviewer's is *Clear*, with *Record finding* beside it (ui-ux/16's order),
  * then *Request Revision*, *Request documents*, *Add reviewer* and *Route to
@@ -189,6 +195,14 @@ const officeReviewBlocked = (record: RecordDetail) => record.office_review.block
  * `office_review` (ADR-032 §10 Amendment, 2026-10-08).
  */
 export const REVIEW_ACTIONS: readonly ReviewAction[] = [
+  {
+    kind: "dialog",
+    capability: "accept_proposal",
+    label: "Accept…",
+    icon: "fa-circle-check",
+    blockedReason: decisionBlocked,
+    Dialog: AcceptProposalAction,
+  },
   {
     kind: "dialog",
     capability: "accept_publish",

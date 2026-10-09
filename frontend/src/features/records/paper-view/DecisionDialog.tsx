@@ -18,6 +18,7 @@ interface DecisionDialogProps {
 
 /** What each outcome's confirm button says, and what the bar announces after. */
 const CONFIRM: Record<DecisionOutcome, { label: string; done: string }> = {
+  accept: { label: "Accept", done: "Accepted. The proposal leaves review." },
   publish: { label: "Publish", done: "Published. It is now in Discover." },
   keep_unlisted: { label: "Keep unlisted", done: "Accepted and kept unlisted." },
   reject: { label: "Reject and archive", done: "Rejected. The record is archived." },
@@ -28,6 +29,22 @@ const CONFIRM: Record<DecisionOutcome, { label: string; done: string }> = {
  * (ui-ux/16 §4; spec §7.3 item 1 for the Adviser's publish).
  */
 function wording(outcome: DecisionOutcome, adviser: boolean, kind: string) {
+  if (outcome === "accept") {
+    // IR-271: promises nothing about continuing it as a Thesis or Project,
+    // which IRIS does not offer yet (IR-417).
+    return {
+      title: "Accept this proposal?",
+      body:
+        "This accepts the proposal. It leaves review and is not published to Discover; " +
+        "its owners keep it as an accepted proposal.",
+    };
+  }
+  if (outcome === "reject" && kind === "proposal") {
+    return {
+      title: "Reject and archive?",
+      body: "This archives the proposal. The student will need to submit a new one.",
+    };
+  }
   if (outcome === "publish" && adviser) {
     return {
       title: "Publish without specialist review?",
@@ -75,7 +92,8 @@ function closingLines(closes: DecisionCloses | null): string[] {
 /**
  * *Accept & publish*, *Keep unlisted* or *Reject* (ADR-032 §3, IR-270): the
  * Adviser on a record no office was asked to review, or RDCO's reviewer on
- * the specialist path.
+ * the specialist path. On a Proposal, *Accept* or *Reject*, by its Adviser
+ * alone (ADR-032 §2, IR-271).
  *
  * It says what follows and what it closes -- every other review still open,
  * and every open document request -- before anyone commits. A rejection
@@ -99,7 +117,12 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
 
   const reject = outcome === "reject";
   const ready = !reject || text.trim() !== "";
-  const kind = record.record_type_name === "Project" ? "project" : "thesis";
+  const kind =
+    record.record_type_name === "Project"
+      ? "project"
+      : record.record_type_name === "Proposal"
+        ? "proposal"
+        : "thesis";
   const { title, body } = wording(outcome, flags.party === "adviser", kind);
   const closing = closingLines(flags.closes);
 
