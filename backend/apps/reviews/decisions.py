@@ -75,6 +75,7 @@ from core.enums import (
     PipelineStatus,
     RecordTypeName,
     ReviewDecision,
+    RoleName,
     SeatState,
 )
 from core.permissions import is_office_member
@@ -102,7 +103,7 @@ OUTCOMES_FOR = {
 
 #: How the tracker names a Decision on the work it closed ("RDCO published
 #: the record").
-_VERB = {
+OUTCOME_PHRASE = {
     PUBLISH: "published the record",
     KEEP_UNLISTED: "accepted the record and kept it unlisted",
     REJECT: "rejected the record",
@@ -110,7 +111,7 @@ _VERB = {
 
 #: Who decided, in prose: the owner's notification and the tracker's "RDCO
 #: published the record". Structured payloads keep the party's own label.
-DECIDER_NAME = {str(Party.ADVISER): "The Adviser", str(Party.RDCO): "RDCO"}
+DECIDER_NAME = {str(Party.ADVISER): "The Adviser", str(Party.RDCO): RoleName.RDCO.value}
 
 _label = seats._label
 
@@ -411,7 +412,7 @@ def withdrawn_by_label(review) -> str:
         else PUBLISH if review.record.pipeline_status == PipelineStatus.PUBLISHED
         else KEEP_UNLISTED
     )
-    return f"{DECIDER_NAME[str(review.stage)]} {_VERB[outcome]}"
+    return f"{DECIDER_NAME[str(review.stage)]} {OUTCOME_PHRASE[outcome]}"
 
 
 def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off):

@@ -7,9 +7,9 @@ exists -- and every other assignment left seatless, which is the office's
 pool. Nothing is guessed, and nothing that is not active gets a seat.
 
 Mechanics follow `test_shadow_backfill_migration.py`: rewind `reviews` only
-and write rows through the current models, which is safe because `0010`
-changes no schema. Rows are written directly so no dual-write can produce
-the seats under test.
+and write `reviews` rows through the models as of the rewound migration, as
+later migrations add columns to them. Rows are written directly so no
+dual-write can produce the seats under test.
 """
 
 from datetime import timedelta
@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordType
-from apps.reviews.models import RecordAssignment, RecordClearance, ReviewerSeat
+from apps.reviews.models import RecordClearance
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -45,20 +45,32 @@ def _migrate(target):
     executor.migrate(target)
 
 
-def _review_model(target):
+def _model(target, name):
     """
-    `Review` as of `target`. The live model carries `Review.version` (IR-416,
-    `reviews/0011`), a column the rewound table does not have yet, so a row
-    written through it would name a column that does not exist.
+    `reviews.<name>` as of `target`. The live models carry columns the rewound
+    tables do not have yet -- `Review.version` (IR-416, `reviews/0011`), and
+    `closed_by_decision` on assignments and seats (IR-270, `reviews/0012` and
+    `0013`) -- so a row written or read through them would name a column that
+    does not exist.
     """
     executor = MigrationExecutor(connection)
-    return executor.loader.project_state(target).apps.get_model("reviews", "Review")
+    return executor.loader.project_state(target).apps.get_model("reviews", name)
+
+
+def _review_model(target):
+    return _model(target, "Review")
+
+
+def _assignment(record, party, **extra):
+    return _model(_BEFORE, "RecordAssignment").objects.create(
+        record_id=record.pk, party=party, **extra,
+    )
 
 
 def _seats(assignment):
     return {
         (s.reviewer_id, s.state, s.source, s.opened_at)
-        for s in ReviewerSeat.objects.filter(assignment=assignment)
+        for s in _model(_AFTER, "ReviewerSeat").objects.filter(assignment_id=assignment.pk)
     }
 
 
@@ -93,16 +105,16 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
 
         # An Adviser who has not reviewed yet: an `assigned` entry seat.
         unread = record("unread", "adviser_review", proposal, adviser=adviser)
-        unread_a = RecordAssignment.objects.create(record=unread, party="adviser")
+        unread_a = _assignment(unread, party="adviser")
 
         # An Adviser who asked for changes: still holds it, `in_review`.
         declined = record("declined", "declined", proposal, adviser=adviser)
         declined_at = review(declined, "adviser", adviser, 1, decision="declined")
-        declined_a = RecordAssignment.objects.create(record=declined, party="adviser")
+        declined_a = _assignment(declined, party="adviser")
 
         # An Adviser assignment on a record that names no Adviser: unmappable.
         orphan = record("orphan", "adviser_review", proposal)
-        orphan_a = RecordAssignment.objects.create(record=orphan, party="adviser")
+        orphan_a = _assignment(orphan, party="adviser")
 
         # ITSO reviewed twice; the most recent reviewer is seated. Their
         # clearance signature is the latest act, so it wins over the reviews.
@@ -114,26 +126,24 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
         )
         signed_at = T0 + timedelta(minutes=4)
         RecordClearance.objects.filter(pk=clearance.pk).update(updated_at=signed_at)
-        itso_a = RecordAssignment.objects.create(record=reread, party="itso")
+        itso_a = _assignment(reread, party="itso")
         # IERC has not looked at it: the pool.
-        ierc_a = RecordAssignment.objects.create(record=reread, party="ierc")
+        ierc_a = _assignment(reread, party="ierc")
 
         # RDCO final review by someone who already reviewed it.
         final = record("final", "rdco_review")
         final_at = review(final, "rdco", rdco, 5)
-        rdco_a = RecordAssignment.objects.create(record=final, party="rdco")
+        rdco_a = _assignment(final, party="rdco")
 
         # Intake is retired: never seated, even with an intake review on record.
         intake = record("intake", "rdco_intake")
         review(intake, "rdco_intake", rdco, 6)
-        intake_a = RecordAssignment.objects.create(record=intake, party="intake")
+        intake_a = _assignment(intake, party="intake")
 
         # A finished turn is history: no seat.
         done = record("done", "published")
         review(done, "ierc", ierc, 7)
-        done_a = RecordAssignment.objects.create(
-            record=done, party="ierc", state="completed", closed_at=T0,
-        )
+        done_a = _assignment(done, "ierc", state="completed", closed_at=T0)
 
         _migrate(_AFTER)
 
@@ -149,6 +159,6 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
         # Re-running finds every mappable assignment already seated.
         _migrate(_BEFORE)
         _migrate(_AFTER)
-        assert ReviewerSeat.objects.filter(assignment=unread_a).count() == 1
+        assert _model(_AFTER, "ReviewerSeat").objects.filter(assignment_id=unread_a.pk).count() == 1
     finally:
         call_command("migrate", verbosity=0)

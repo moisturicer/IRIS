@@ -698,7 +698,7 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
     - Each reviewer whose open seat the decision withdrew hears that their
       review is closed, in-app only. Nobody else: no office pool is told.
     """
-    from apps.reviews.decisions import KEEP_UNLISTED, PUBLISH
+    from apps.reviews.decisions import KEEP_UNLISTED, OUTCOME_PHRASE, PUBLISH
 
     try:
         title = record.title
@@ -729,10 +729,7 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
                 notif_type=notif_type, message=message,
             )
 
-        verb = {PUBLISH: "published", KEEP_UNLISTED: "accepted and kept unlisted"}.get(
-            outcome, "rejected",
-        )
-        closed = f'{decided_by} {verb} "{title}", so your review of it is closed.'
+        closed = f'{decided_by} {OUTCOME_PHRASE[outcome]}, so your review of "{title}" is closed.'
         for reviewer in cut_off:
             Notification.objects.create(
                 sender=actor, recipient=reviewer, record=record,
