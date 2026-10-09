@@ -29,7 +29,8 @@ const STAGE_LABELS: Record<WorkspaceStage, string> = {
   ongoing: "Research Ongoing",
   completed: "Completed",
   revision_requested: "Declined",
-  rejected: "Rejected",
+  // ADR-032 §2-§3: a rejected record is shown as Archived (IR-270).
+  rejected: "Archived",
 };
 
 /**

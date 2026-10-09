@@ -227,15 +227,16 @@ const CASES: Case[] = [
   {
     was: "rejected",
     record: { pipeline_status: "rejected", workflow_state: "rejected" },
-    current: "Current: Rejected",
+    current: "Current: Archived",
     office: "—",
   },
   {
     // A published record whose owner asked RDCO to delete it. Still readable
-    // to its owner; filed with Rejected, as the page always has.
+    // to its owner; filed with the rejected records, as the page always has,
+    // which read Archived since IR-270.
     was: "pending_delete",
     record: { pipeline_status: "pending_delete", workflow_state: "pending_delete" },
-    current: "Current: Rejected",
+    current: "Current: Archived",
     office: "—",
   },
 ];
