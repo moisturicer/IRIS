@@ -209,7 +209,7 @@ const CASES: Case[] = [
   {
     was: "approved",
     record: { pipeline_status: "approved", workflow_state: "approved", record_type_name: "Proposal" },
-    current: "Current: Research Ongoing",
+    current: "Current: Accepted",
     office: "—",
   },
   {

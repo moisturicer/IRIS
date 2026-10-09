@@ -26,7 +26,9 @@ const STAGE_LABELS: Record<WorkspaceStage, string> = {
   review_routing: "Review & Routing",
   office_review: "Office Review",
   final_review: "Final Review",
-  ongoing: "Research Ongoing",
+  // ADR-032 §2 (IR-271): an accepted Proposal rests here; "ongoing research"
+  // was the retired *complete* act's idea.
+  ongoing: "Accepted",
   completed: "Completed",
   revision_requested: "Declined",
   // ADR-032 §2-§3: a rejected record is shown as Archived (IR-270).

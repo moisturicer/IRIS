@@ -338,6 +338,14 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     expect(screen.getByRole("dialog", { name: "Accept and keep unlisted?" })).toBeInTheDocument();
   });
 
+  // IR-271: a Proposal's Adviser has Accept as primary, Reject last.
+  it("orders a Proposal's Decisions so accepting is primary and rejecting comes last", () => {
+    renderBar(["reject", "request_document", "request_revision", "accept_proposal"]);
+    expect(buttonNames()).toEqual([
+      "Accept…", "Request Revision…", "Request documents", "Reject…",
+    ]);
+  });
+
   it("holds every Decision while the server says it is blocked", () => {
     const blocked = {
       ...record,

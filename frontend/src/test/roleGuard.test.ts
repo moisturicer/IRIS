@@ -27,7 +27,6 @@ const ADAPTER = "src/features/records/capabilities.ts";
  */
 const NOT_YET_CONVERTED: readonly string[] = [
   // Retired by ADR-032 (no Proposal completion); F1 deletes the screen.
-  "src/features/review/ApprovedProposalsPage.tsx",
 ];
 
 const SOURCES: Record<string, string> = Object.fromEntries(

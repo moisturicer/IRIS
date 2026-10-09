@@ -11,7 +11,7 @@
 import type { DecisionOutcome } from "@/types/records";
 
 const KEY_PREFIX = "iris_decision_draft:";
-const OUTCOMES: readonly DecisionOutcome[] = ["publish", "keep_unlisted", "reject"];
+const OUTCOMES: readonly DecisionOutcome[] = ["accept", "publish", "keep_unlisted", "reject"];
 
 function keyFor(recordId: number, outcome: DecisionOutcome): string {
   return `${KEY_PREFIX}${recordId}:${outcome}`;

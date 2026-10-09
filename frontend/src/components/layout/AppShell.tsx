@@ -51,9 +51,8 @@ export function AppShell() {
             main's height, so an `overflow-y-auto` here never scrolled; it only
             made main the nearest scroll container, which left every `sticky`
             descendant inert. No overflow value at all, not `overflow-x-clip`:
-            a wide table with no scroll wrapper of its own
-            (ApprovedProposalsPage) must stay reachable by scrolling the window
-            sideways, not be cut off. */}
+            a wide table with no scroll wrapper of its own must stay reachable
+            by scrolling the window sideways, not be cut off. */}
         <main
           className={cn(
             "flex-1",

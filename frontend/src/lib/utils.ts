@@ -16,7 +16,8 @@ const PIPELINE_LABELS: Record<PipelineStatus, string> = {
   draft:           "Draft",
   in_review:       "In Review",
   adviser_review:  "Adviser Review",
-  approved:        "Approved — Ongoing",
+  // ADR-032 §2: an accepted Proposal's resting state (IR-271).
+  approved:        "Accepted",
   completed:       "Completed",
   rdco_intake:     "RDCO Intake Review",
   itso_review:     "ITSO Review",
