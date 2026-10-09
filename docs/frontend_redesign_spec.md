@@ -545,6 +545,8 @@ Versions and comments join the timeline when their backend lands (ADR-032 §5, �
 - `open_review` · `request_document` · `request_revision` · `route` · `decide` · `create_version` · `edit_details` · `continue_as` · `set_visibility` · `tag_ip` · `comment_review` · `comment_public` · `cite`.
 
 > **Amended 2026-10-09 (IR-270).** The three Decisions are their own keys: `accept_publish` (the Adviser and RDCO), `keep_unlisted` (RDCO; ui-ux/16 called it `final_decide`, renamed to the act it grants) and `reject`. The adapter grants them from record detail's `decision.outcomes`. `decide` stays the link to the current decision form for legacy records until IR-274.
+>
+> **Amended 2026-10-09 (IR-271).** A Proposal's *Accept* is `accept_proposal` and its *Reject* is `reject`, replacing ui-ux/16's single `decide_proposal`. Both open `DecisionDialog`: Reject's reason is required, and its body is the ui-ux/16 copy *"This archives the proposal. The student will need to submit a new one."*
 
 Every screen asks the adapter. No component reads a role name or `can_act` directly.
 

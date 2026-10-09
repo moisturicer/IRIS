@@ -118,6 +118,10 @@ _Avoid_: Resubmission request (the code's name for it), decline or sent back (th
 An act that ends a Record's review: accept & publish, keep [[Unlisted]] or reject, made by the Adviser or by RDCO, and a Proposal's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. It is refused while any [[Revision request]] is open. Accept & route is not a Decision: it is an acceptance that sends the Record on to [[Specialist office]]s, closes nothing, and is refused while a Revision request is open, as a Decision is.
 _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
 
+**Accepted**:
+A Proposal its Adviser accepted: its resting state. It is not published, and nothing further is decided on it.
+_Avoid_: Approved (the stored name), ongoing, completed (the state of the retired *complete* act).
+
 **Unlisted**:
 A Thesis/Research or Project that RDCO accepted but kept out of Discover and Ask IRIS, for example ahead of a patent filing. Its owners and reviewers can still open it.
 _Avoid_: Completed (the code's status name), embargoed, hidden.
