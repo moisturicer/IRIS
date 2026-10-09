@@ -538,7 +538,13 @@ class RecordsAppTransitionTests(WorkflowCharacterisationBase):
             PipelineStatus.DRAFT,
         )
 
-    def test_rdco_can_complete_an_approved_proposal(self):
+    def test_completing_an_approved_proposal_is_retired(self):
+        """
+        **Deliberate behaviour change (IR-271, ADR-032 §2).** This pinned
+        `approved -> completed` by RDCO. The *complete* act is retired: an
+        accepted Proposal rests at `approved`, and nothing new writes
+        `completed`.
+        """
         record = self.make_record(
             RecordTypeName.PROPOSAL,
             pipeline_status=PipelineStatus.APPROVED,
@@ -546,8 +552,8 @@ class RecordsAppTransitionTests(WorkflowCharacterisationBase):
         )
         self.client.force_authenticate(self.rdco)
         response = self.client.post(reverse("record-complete", args=[record.pk]))
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(self.status_of(record), PipelineStatus.COMPLETED)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertEqual(self.status_of(record), PipelineStatus.APPROVED)
 
     def test_completion_is_refused_off_the_proposal_route(self):
         cases = [
@@ -684,7 +690,12 @@ class LegacyImportTests(WorkflowCharacterisationBase):
 class ProposalRouteEndToEndTests(WorkflowCharacterisationBase):
     """One walk of each route, so a break anywhere in the chain surfaces as a chain break."""
 
-    def test_a_proposal_walks_draft_to_completed(self):
+    def test_a_proposal_walks_draft_to_approved_and_rests_there(self):
+        """
+        **Deliberate behaviour change (IR-271, ADR-032 §2).** The walk used to
+        end at `completed`. `approved` is now a Proposal's resting state, and
+        the *complete* step is refused.
+        """
         record = self.make_record(RecordTypeName.PROPOSAL, adviser=self.adviser)
         self.assertEqual(self.status_of(record), PipelineStatus.DRAFT)
 
@@ -696,7 +707,7 @@ class ProposalRouteEndToEndTests(WorkflowCharacterisationBase):
 
         self.client.force_authenticate(self.rdco)
         self.client.post(reverse("record-complete", args=[record.pk]))
-        self.assertEqual(self.status_of(record), PipelineStatus.COMPLETED)
+        self.assertEqual(self.status_of(record), PipelineStatus.APPROVED)
 
     def test_a_thesis_walks_draft_to_published(self):
         record = self.make_record(

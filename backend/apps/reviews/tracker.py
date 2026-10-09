@@ -190,6 +190,9 @@ def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
 #: one's name (ADR-032 §2-§3; `CONTEXT.md` *Archived*, *Unlisted*).
 _READER_LABELS = {
     str(PipelineStatus.REJECTED): "Archived",
+    # A Proposal's resting state once its Adviser accepts it (ADR-032 §2;
+    # IR-271). Only a Proposal is ever stored at `approved`.
+    str(PipelineStatus.APPROVED): "Accepted",
 }
 
 

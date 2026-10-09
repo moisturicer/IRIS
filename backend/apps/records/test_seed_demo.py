@@ -33,6 +33,7 @@ from .management.commands.seed_demo import (
     FLAGSHIP_TITLE,
     NEW_MODEL_TITLE,
     PASSWORD,
+    PROPOSAL_AT_ADVISER_TITLE,
     RESUBMITTED_TITLE,
     ROLE_ACCOUNTS,
     _PREFIX,
@@ -212,6 +213,18 @@ class SeedDemoRecordTests(TestCase):
         )
         seat = ReviewerSeat.objects.get(assignment__record=record)
         self.assertEqual((seat.reviewer_id, seat.source), (record.adviser_id, "entry"))
+
+    def test_one_new_model_proposal_waits_at_its_adviser(self):
+        """IR-271: in_review at its Adviser, so Accept and Reject can be demoed."""
+        from apps.reviews.models import RecordAssignment
+
+        record = Record.objects.get(title=PROPOSAL_AT_ADVISER_TITLE)
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        self.assertEqual(record.record_type.name, "Proposal")
+        self.assertEqual(
+            set(RecordAssignment.objects.filter(record=record).values_list("party", "state")),
+            {("adviser", "active")},
+        )
 
     def test_one_specialist_path_thesis_waits_in_rdcos_pool(self):
         """

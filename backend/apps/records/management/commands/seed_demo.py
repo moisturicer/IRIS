@@ -151,6 +151,7 @@ FLAGSHIP_TITLE = f"{_PREFIX} Declined by IERC, ITSO and KTTO preserved"
 RESUBMITTED_TITLE = f"{_PREFIX} Resubmitted, ITSO and KTTO preserved"
 NEW_MODEL_TITLE = f"{_PREFIX} New model: Thesis at its Adviser, ready to accept and route"
 AT_RDCO_TITLE = f"{_PREFIX} New model: Thesis ITSO cleared, in RDCO's pool to decide"
+PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} New model: Proposal at its Adviser, ready to accept or reject"
 
 
 class Command(BaseCommand):
@@ -318,6 +319,7 @@ class Command(BaseCommand):
             self._scenario_resubmitted_with_preserved_clearances,
             self._scenario_new_model_at_adviser,
             self._scenario_new_model_at_rdco,
+            self._scenario_new_model_proposal_at_adviser,
         ):
             scenario(users)
 
@@ -565,6 +567,27 @@ class Command(BaseCommand):
             record.dpa_accepted_by = users[RoleName.STUDENT]
             record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
             enter_at_adviser(record, users[RoleName.STUDENT])
+            self._done(record)
+
+    @transaction.atomic
+    def _scenario_new_model_proposal_at_adviser(self, users):
+        """
+        A Proposal on the adviser-first model, at its Adviser (IR-271). Entered
+        through `routing.enter_at_adviser`; adviser@cit.edu opens the review and
+        demos *Accept* and *Reject*, which a Proposal's Adviser alone decides.
+        """
+        from apps.reviews.routing import enter_at_adviser
+
+        student = users[RoleName.STUDENT]
+        record = self._make(
+            PROPOSAL_AT_ADVISER_TITLE, RecordTypeName.PROPOSAL, student,
+            adviser=users[RoleName.ADVISER],
+        )
+        if record:
+            record.dpa_accepted_at = timezone.now()
+            record.dpa_accepted_by = student
+            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+            enter_at_adviser(record, student)
             self._done(record)
 
     @transaction.atomic

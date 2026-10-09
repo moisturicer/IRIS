@@ -851,34 +851,27 @@ class RecordViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         """
-        POST /records/<id>/complete/
-        RDCO or the Proposal's assigned Adviser marks an approved Proposal as
-        completed (research finished; ADR-021 §3). The record remains publicly
-        visible. Permission: get_permissions() admits RDCO and Advisers, and
-        get_queryset() narrows an Adviser to the records they advise.
+        POST /records/<id>/complete/ -- **retired** (ADR-032 §2, IR-271).
+
+        Marking an approved Proposal completed meant "research finished". That
+        meaning now lives in the Thesis or Project it continues as (§6), so an
+        accepted Proposal rests at `approved`, shown as *Accepted*, and nothing
+        new writes `completed`. Every Proposal is refused, legacy ones too;
+        IR-274 deletes the route with the rest of the old pipeline.
+
+        IR-267's two refusal layers still answer first, so a caller learns no
+        more than before: get_permissions() refuses a role that could never
+        complete (403), and get_queryset() narrows an Adviser to the records
+        they advise (404 for any other).
         """
-        from apps.notifications.services import notify_proposal_completed
-
-        record = self.get_object()
-
-        if record.pipeline_status != PipelineStatus.APPROVED:
-            return Response(
-                {"detail": f"Only approved proposals can be marked as completed (current status: '{record.pipeline_status}')."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        rt_name = record.record_type.name if record.record_type else ""
-        if rt_name != RecordTypeName.PROPOSAL:
-            return Response(
-                {"detail": "Only Proposal records can be marked as completed."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        lifecycle.apply(record, lifecycle.WorkflowEvent.MARK_COMPLETE, request.user)
-
-        notify_proposal_completed(record, marked_by=request.user)
-
-        return Response({"detail": "Proposal marked as completed."}, status=status.HTTP_200_OK)
+        self.get_object()
+        return Response(
+            {"detail": (
+                "Completing a Proposal is retired (ADR-032 §2). An accepted "
+                "Proposal stays Accepted."
+            )},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     @action(detail=False, methods=["get"])
     def mine(self, request):
