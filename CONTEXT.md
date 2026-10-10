@@ -56,6 +56,22 @@ _Avoid_: Thinking or chain of thought (the vendor's words, and both suggest the 
 The self-contained question IRIS actually searches with, worked out from what the reader typed plus the earlier Turns of the Conversation. "What about its limitations?" resolves to "What are the limitations of *[paper]*?". Distinct from what the reader typed, and shown to them — a Resolved question that gets the subject wrong changes what was asked, so it is never hidden.
 _Avoid_: Rewrite or rewritten query (names the mechanism, not the thing), expanded query (a different technique — expansion adds phrasings, resolution supplies a missing subject), the question (ambiguous once the two differ).
 
+**Evidence decision**:
+Working out, before retrieval and from the question alone, whether answering it needs the corpus. Its result is an [[Evidence route]]. It is never a function of what retrieval found or why nothing was kept (ADR-035 §7). Under ADR-035's proposed 2026-10-10 amendment, it runs as a fixed sequence: hard policy, then the detector, then the [[Decider]]s. A direct answer needs every signal that ran to permit it, and any doubt or failure routes to evidence. The detector is an additive floor and never a classifier: it may require evidence and may never permit a direct answer. Nothing a reader sees depends on it yet: the setting accepts only `off` and `shadow`.
+_Avoid_: Classifier (implies the decision sorts questions by kind; it only decides whether evidence is needed), router (choosing which model writes the reply is a separate decision), relevance (that is a property of retrieved passages, not of the question).
+
+**Evidence route**:
+The outcome of an [[Evidence decision]]: either *evidence*, so the question is answered from retrieved passages, or *direct*, so it gets an [[Ungrounded answer]] with no retrieval. A route only selects a path. It never widens scope, identity or visibility, and no model output can make it do so.
+_Avoid_: Mode (the wire field that says how an answer was produced), tool call (one mechanism that once produced a route, not the route itself).
+
+**Decider**:
+A model whose only job is to give one opinion toward an [[Evidence route]], and which writes no answer. Two are proposed (ADR-035, 2026-10-10 amendment, not accepted): Jev (TypeSafe's decision model, reached through OpenRouter's Decisions API), which returns a probability that the question needs the corpus, and an LLM route label, which returns `search` or `answer`. A Decider is advisory. It can never overrule hard policy or the detector, and a direct answer normally needs both Deciders to permit it. The one proposed exception: when Jev fails, the route label decides alone. A Decider receives the question, the Resolved question, earlier reader questions and a fixed corpus description, and never Passages or earlier answers.
+_Avoid_: Classifier, judge, router (see [[Evidence decision]]), detector (the deterministic word rules, which are not a model).
+
+**Ungrounded answer**:
+An answer written from the model's general knowledge with no Passage behind it. It is stored in its own `ungrounded` state, labelled as not from the repository, never cited, and kept out of the model's history (ADR-034). Accepted ADR-034 §2 reaches it when no passage clears the relevance cut-off. ADR-034's 2026-10-10 amendment (proposed, not accepted) would change that: only a *direct* [[Evidence route]] chosen before retrieval reaches it, and a question that searched and found nothing would be `no_sources`. Not built yet.
+_Avoid_: General answer or fallback answer (both blur whether it came from the corpus), fabrication (that is a grounded-looking answer that is not grounded; this one says plainly what it is).
+
 **Area**:
 A named subject grouping that Records belong to, and the unit a question about the collection aggregates over. Today an Area is a Classification or PSCED category — assigned by a person at submission, so it has a name someone chose and siblings to be compared against. An Area is always named: a grouping nobody can name is not yet an Area, which is what makes a claim about one checkable.
 _Avoid_: Topic, cluster, field, domain, category used alone (each is either vaguer than an Area or names one particular way of arriving at one).
