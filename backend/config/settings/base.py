@@ -418,7 +418,8 @@ LLM_REASONING_EFFORT = config("LLM_REASONING_EFFORT", default="")
 # provider slugs, sent as provider.only, so no unvetted (e.g. China-hosted,
 # IR-485 #6) provider serves the task. OpenRouter only; elsewhere it refuses
 # startup. OpenRouter answers require a nonempty pin; other tasks may leave
-# it empty for any provider that passes data_collection: deny.
+# it empty for any provider that passes data_collection: deny. A fallback
+# answer chain uses PROVIDER_PINS instead, one endpoint list per model.
 LLM_ANSWER_VENDOR   = config("LLM_ANSWER_VENDOR", default="")
 LLM_ANSWER_BASE_URL = config("LLM_ANSWER_BASE_URL", default="")
 LLM_ANSWER_API_KEY  = config("LLM_ANSWER_API_KEY", default="")
@@ -428,6 +429,7 @@ LLM_ANSWER_FALLBACK_MODELS = config("LLM_ANSWER_FALLBACK_MODELS", default="")
 # watching it work. The others cost less without it.
 LLM_ANSWER_REASONING = config("LLM_ANSWER_REASONING", default=True, cast=bool)
 LLM_ANSWER_PROVIDER_ONLY = config("LLM_ANSWER_PROVIDER_ONLY", default="")
+LLM_ANSWER_PROVIDER_PINS = config("LLM_ANSWER_PROVIDER_PINS", default="")
 
 # Question resolution runs here as of IR-383, and the old LLM_RESOLUTION_MODEL
 # namespace is gone -- the contradiction recorded here is resolved, not
@@ -443,6 +445,7 @@ LLM_RESOLVE_MODEL    = config("LLM_RESOLVE_MODEL", default="openai/gpt-oss-20b")
 LLM_RESOLVE_FALLBACK_MODELS = config("LLM_RESOLVE_FALLBACK_MODELS", default="")
 LLM_RESOLVE_REASONING = config("LLM_RESOLVE_REASONING", default=False, cast=bool)
 LLM_RESOLVE_PROVIDER_ONLY = config("LLM_RESOLVE_PROVIDER_ONLY", default="")
+LLM_RESOLVE_PROVIDER_PINS = config("LLM_RESOLVE_PROVIDER_PINS", default="")
 
 LLM_SUMMARY_VENDOR   = config("LLM_SUMMARY_VENDOR", default="")
 LLM_SUMMARY_BASE_URL = config("LLM_SUMMARY_BASE_URL", default="")
@@ -451,6 +454,7 @@ LLM_SUMMARY_MODEL    = config("LLM_SUMMARY_MODEL", default="")
 LLM_SUMMARY_FALLBACK_MODELS = config("LLM_SUMMARY_FALLBACK_MODELS", default="")
 LLM_SUMMARY_REASONING = config("LLM_SUMMARY_REASONING", default=False, cast=bool)
 LLM_SUMMARY_PROVIDER_ONLY = config("LLM_SUMMARY_PROVIDER_ONLY", default="")
+LLM_SUMMARY_PROVIDER_PINS = config("LLM_SUMMARY_PROVIDER_PINS", default="")
 
 # Declared but unused: describe_figure's implementation is its own spec, and
 # reserving the keys here keeps the task set closed rather than growing later.
@@ -465,6 +469,7 @@ LLM_DESCRIBE_FIGURE_REASONING = config(
     "LLM_DESCRIBE_FIGURE_REASONING", default=False, cast=bool
 )
 LLM_DESCRIBE_FIGURE_PROVIDER_ONLY = config("LLM_DESCRIBE_FIGURE_PROVIDER_ONLY", default="")
+LLM_DESCRIBE_FIGURE_PROVIDER_PINS = config("LLM_DESCRIBE_FIGURE_PROVIDER_PINS", default="")
 
 # ---- Question resolution (IR-296, ADR-026 Decisions 1 and 8) -------------
 #

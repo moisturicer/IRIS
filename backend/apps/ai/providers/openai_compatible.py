@@ -27,9 +27,6 @@ failure it hides.
 from __future__ import annotations
 
 from typing import Any, Iterator, Optional, Sequence
-from time import perf_counter
-
-from .measured import MeasuredCompletion
 
 from django.conf import settings
 
@@ -189,13 +186,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
     # -- the port -----------------------------------------------------------
 
     def generate(self, system: str, user: str) -> str:
-        completion = self.complete_measured(system, user)
-        if not completion.text.strip():
-            raise LLMUnavailable("the model returned an empty message")
-        return self.dialect.normalize_citation_markers(completion.text)
-
-    def complete_measured(self, system: str, user: str) -> MeasuredCompletion:
-        """Keep empty content, finish reason and usage observable for evaluation."""
         # An injected client is already configured -- it is how the request
         # shaping is tested without an account. Only the real one needs a key,
         # and `_build_client` is where that is demanded.
@@ -211,10 +201,13 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             self._resolved_reasoning_effort(), self.models
         )
         if self._max_tokens:
-            limit_field = "max_completion_tokens" if "gpt-6-luna" in self.model else "max_tokens"
+            limit_field = (
+                "max_completion_tokens"
+                if self.model == "openai/gpt-6-luna"
+                else "max_tokens"
+            )
             extra[limit_field] = self._max_tokens
 
-        started = perf_counter()
         try:
             response = client.chat.completions.create(
                 model=self.model,
@@ -237,22 +230,12 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         if not choices:
             raise LLMUnavailable("the model returned no choices")
 
-        choice = choices[0]
-        usage = getattr(response, "usage", None)
-        details = getattr(usage, "completion_tokens_details", None)
-        return MeasuredCompletion(
-            text=getattr(choice.message, "content", None) or "",
-            reasoning=self.dialect.read_reasoning(choice.message),
-            model=getattr(response, "model", None),
-            provider=getattr(response, "provider", None),
-            finish_reason=getattr(choice, "finish_reason", None),
-            input_tokens=getattr(usage, "prompt_tokens", None),
-            output_tokens=getattr(usage, "completion_tokens", None),
-            reasoning_tokens=getattr(details, "reasoning_tokens", None),
-            cost=getattr(usage, "cost", None),
-            latency_seconds=perf_counter() - started,
-            response_id=getattr(response, "id", None),
-        )
+        content = getattr(choices[0].message, "content", None)
+        if not content or not content.strip():
+            # An empty string would render as an answer with no content and no
+            # indication that anything went wrong.
+            raise LLMUnavailable("the model returned an empty message")
+        return self.dialect.normalize_citation_markers(content)
 
     def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
         """Genuine streaming (IR-325), for a model reachable behind this
@@ -273,6 +256,13 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
+        if self._max_tokens:
+            limit_field = (
+                "max_completion_tokens"
+                if self.model == "openai/gpt-6-luna"
+                else "max_tokens"
+            )
+            extra[limit_field] = self._max_tokens
 
         try:
             chunks = client.chat.completions.create(

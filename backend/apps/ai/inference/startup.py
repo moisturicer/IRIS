@@ -54,6 +54,7 @@ PROFILE_SUFFIXES = (
     "FALLBACK_MODELS",
     "REASONING",
     "PROVIDER_ONLY",
+    "PROVIDER_PINS",
 )
 
 #: Segments that no longer configure anything, and what to do instead. A
@@ -184,14 +185,39 @@ def provider_pin_problems(profiles: Iterable[Profile]) -> tuple[str, ...]:
     A pin only OpenRouter honours; elsewhere it would read as protection.
     """
     profiles = tuple(profiles)
-    missing = tuple(
-        "LLM_ANSWER_PROVIDER_ONLY is required for OpenRouter answers: choose "
-        "providers with verified US/EU hosting (IR-485 #6)."
-        for profile in profiles
-        if profile.task is InferenceTask.ANSWER and profile.is_configured
-        and profile.vendor is Vendor.OPENROUTER and not profile.provider_only
-    )
-    return missing + tuple(
+    problems = []
+    for profile in profiles:
+        pins = dict(profile.model_provider_pins)
+        if pins and profile.provider_only:
+            problems.append(
+                f"{profile.task.settings_prefix}_PROVIDER_PINS and "
+                "_PROVIDER_ONLY cannot both be set."
+            )
+        if pins and profile.vendor is not Vendor.OPENROUTER:
+            problems.append(f"{profile.task.settings_prefix}_PROVIDER_PINS requires OpenRouter.")
+        if pins and (set(pins) != set(profile.models)):
+            problems.append(
+                f"{profile.task.settings_prefix}_PROVIDER_PINS must name "
+                "every configured model, and no other model."
+            )
+        if (
+            profile.task is InferenceTask.ANSWER
+            and profile.is_configured
+            and profile.vendor is Vendor.OPENROUTER
+        ):
+            if profile.fallback_models and not pins:
+                problems.append(
+                    "LLM_ANSWER_PROVIDER_PINS must restrict each OpenRouter "
+                    "answer model and fallback to a verified US/EU endpoint "
+                    "(IR-485 #6)."
+                )
+            elif not pins and not profile.provider_only:
+                problems.append(
+                    "LLM_ANSWER_PROVIDER_ONLY is required for OpenRouter "
+                    "answers: choose providers with verified US/EU hosting "
+                    "(IR-485 #6)."
+                )
+    return tuple(problems) + tuple(
         f"{profile.task.settings_prefix}_PROVIDER_ONLY is set, but the "
         f"{profile.task.value!r} task is at {profile.vendor.value}, which has "
         "no provider routing. Move the task to openrouter or remove the pin."
