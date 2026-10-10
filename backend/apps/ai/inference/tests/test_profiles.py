@@ -436,4 +436,3 @@ class ProviderPinTests:
             "data_collection": "deny",
             "only": ["together"],
         }
-
