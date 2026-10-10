@@ -17,22 +17,43 @@ adapter passes that list through; Paper View sections retain their existing
 participation and paper-presence checks. Every action endpoint keeps its own
 authority check.
 
-**Tests:** `apps.records.test_capabilities` (role × state at the REST seam,
-including endpoint refusals), `features/records/capabilities.test.ts`
-(pass-through with conflicting client hints), and `test/roleGuard.test.ts`.
-**Evidence:** `test_capabilities` passed in a container against its own test
-database (2 tests, every subtest) after it caught a real drift: the server
-offered `attach_file` to an Adviser, whom `documents/files/upload/` refuses
-with 403 (`IsStaff`), so the offer is now staff-gated like the endpoint.
-`capabilities.test.ts`, `roleGuard.test.ts` and `PaperViewPage.test.tsx`
-passed under Vitest. Full suites: the IR-418 PR's CI.
+**Tests:** `apps.records.test_capabilities` is ADR-032 §12's one table-driven
+test: 9 states (draft, with the Adviser unopened and open, ITSO's pool, ITSO
+seated, a revision ITSO asked for, RDCO seated, published, a Proposal with its
+Adviser) × 6 viewers (owner, Adviser, ITSO, IERC, RDCO, a student stranger).
+Each row pins the exact offer, and calls every capability's own endpoint inside
+a rolled-back savepoint: offered => never 403/404; not offered => never 2xx.
+`features/records/capabilities.test.ts` (pass-through, and the sections table),
+`paper-view/reviewActions.test.ts` (Add reviewer's assignment), and
+`test/roleGuard.test.ts`.
 
-**Recorded contradiction:** ADR-032 §10 (IR-270 amendment) keeps `decide` "the
-link to the current decision form for legacy records until IR-274". IR-260
-removed that form and its link, so nothing reads `decide` and the server does
-not send it. Paper View's header now defers its primary to the Review action
-bar whenever any review action is granted, which is what `decide` stood for.
-The ADR line is left for the project lead to amend or retire with IR-274.
+**Evidence (2026-10-11):** the table passed in a container against its own
+test database, every subtest; the known-gap test below is a strict xfail that
+fails with an AssertionError, as pinned. The table caught two drifts, both
+fixed: `attach_file` offered to an Adviser, whom the upload endpoint refuses
+(`IsStaff`); and `add_reviewer` never offered to a seated RDCO, whom
+`add-reviewer/` accepts. Frontend tests and typecheck passed locally; full
+suites: the IR-418 PR's CI.
+
+**Decided by the project lead, 2026-10-11:** `tag_ip` is offered to office
+staff on every record they can see, matching `tags/`, rather than on published
+records alone; `add_reviewer` is offered on any open seat of an active office
+assignment, RDCO's included, and Paper View's dialog takes that seat's
+assignment.
+
+**Known gap, pinned (IR-507):** the record update and `submit/` are
+`IsOwnerOrStaff`, wider than any offer -- office staff edit and submit records
+that are not theirs, and owners edit in every state. The table waives rule 3
+for `edit_details` and `continue_draft` only, and
+`test_edit_and_submit_refuse_what_is_not_offered` (strict xfail) turns red
+when IR-507 narrows the endpoints.
+
+**`decide`, resolved:** ADR-032 §10 (IR-270 amendment) kept `decide` "the
+link to the current decision form for legacy records until IR-274". IR-274 has
+merged and removed it from the frontend, so the ADR and the code agree with no
+amendment: the server never sends it (the table asserts so), and Paper View's
+header defers its primary to the Review action bar whenever any review action
+is granted, which is what `decide` stood for.
 
 ---
 

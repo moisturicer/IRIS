@@ -106,7 +106,8 @@ function hasPaper(record: CapabilityInputs): boolean {
   return Boolean(record.abstract_file) || record.files.length > 0;
 }
 
-export function capabilitiesFor(record: Pick<RecordDetail, "capabilities">, _viewer: Viewer | null): ReadonlySet<Capability> {
+/** The server's action offers for this viewer, as a set (IR-418: a pass-through). */
+export function capabilitiesFor(record: Pick<RecordDetail, "capabilities">): ReadonlySet<Capability> {
   return new Set(record.capabilities);
 }
 

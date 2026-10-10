@@ -471,7 +471,7 @@ export default function PaperViewPage() {
   const arriving = loading || record.id !== Number(id);
 
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
-  const can = capabilitiesFor(record, viewer);
+  const can = capabilitiesFor(record);
   const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
   const participant = isParticipant(record, viewer);
