@@ -14,13 +14,15 @@ No database and no Django settings — it reads files.
 
 import pathlib
 
+from testing.source_files import python_sources
+
 APPS_AI = pathlib.Path(__file__).resolve().parents[1]
 
 
 def test_no_module_under_apps_ai_reads_the_gateway_url():
     offenders = [
         path.relative_to(APPS_AI).as_posix()
-        for path in APPS_AI.rglob("*.py")
+        for path in python_sources(APPS_AI)
         if path.name != pathlib.Path(__file__).name
         and "AI_GATEWAY_URL" in path.read_text(encoding="utf-8")
     ]

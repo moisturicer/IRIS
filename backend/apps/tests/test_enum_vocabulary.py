@@ -34,6 +34,8 @@ from pathlib import Path
 from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 
+from testing.source_files import python_sources
+
 from core.enums import (
     AssignmentState,
     ClearanceStatus,
@@ -207,7 +209,7 @@ def _bare_vocabulary_literals(path):
 
 
 def _scanned_files():
-    for path in sorted(APPS_DIR.rglob("*.py")):
+    for path in python_sources(APPS_DIR):
         rel = path.relative_to(APPS_DIR).as_posix()
         if "/migrations/" in f"/{rel}":
             continue
@@ -260,7 +262,7 @@ class VocabularyIsSingleSourcedTests(SimpleTestCase):
         self.assertNotIn("ktto_review", {str(s.value) for s in PipelineStatus})
 
         hits = []
-        for path in sorted(Path(settings.BASE_DIR).rglob("*.py")):
+        for path in python_sources(settings.BASE_DIR):
             rel = path.relative_to(settings.BASE_DIR).as_posix()
             if "/migrations/" in f"/{rel}":
                 continue
