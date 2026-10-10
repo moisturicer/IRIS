@@ -8,8 +8,6 @@ type SearchMode = "keyword" | "smart";
 interface DiscoverSearchComposerProps {
   value: string;
   onChange: (value: string) => void;
-  /** Opens the filter panel — the composer's "+" is a second entry point to it. */
-  onAddFilter: () => void;
 }
 
 /**
@@ -19,7 +17,6 @@ interface DiscoverSearchComposerProps {
 export function DiscoverSearchComposer({
   value,
   onChange,
-  onAddFilter,
 }: DiscoverSearchComposerProps) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<SearchMode>("keyword");
@@ -80,16 +77,6 @@ export function DiscoverSearchComposer({
       </div>
 
       <div className="flex items-center gap-2 mt-2.5">
-        <button
-          type="button"
-          onClick={onAddFilter}
-          aria-label="Add a filter"
-          title="Add a filter"
-          className="w-7 h-7 shrink-0 rounded-full border border-stone-200 text-stone-500 flex items-center justify-center hover:border-brand-200 hover:text-brand transition-colors"
-        >
-          <i className="fas fa-plus text-[12px]" aria-hidden />
-        </button>
-
         <div className="relative" ref={menuRef}>
           <button
             type="button"

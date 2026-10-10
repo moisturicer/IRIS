@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 import type { AddReviewerOptions, ReviewerSeat } from "@/types/records";
-import type { MyReviewsPage, MyReviewsQuery, Review, ReviewSubmitPayload } from "@/types/reviews";
+import type { MyReviewsPage, MyReviewsQuery } from "@/types/reviews";
 
 /**
  * Reviewer seats (ADR-032 §4, IR-415). The server re-checks every act: a

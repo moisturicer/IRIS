@@ -335,6 +335,15 @@ Administration (RDCO) — unchanged
 - **Error:** "We couldn't load research", with **Try again**.
 - **Rate-limited:** IR-368's message, when that lands.
 
+**Amended 2026-10-10 (IR-407, built).**
+
+- **The Submit Disclosure sidebar item is gone for Students now**, ahead of F1, at the project lead's request: a Student publishes from Discover's **Publish**. **An Adviser keeps it until F1**, because an Adviser's home is still the Dashboard, not Discover (`HomePage`), so the item is an Adviser's only menu route into Publish. The route itself is unchanged for both (`/records/add` → `/?publish=new`); the access map narrows only the sidebar item (`nav.onlyFor`). F1 removes it for everyone when it makes Discover everyone's home.
+- **Result cards show no college.** `RecordListItem` carries none, so the card names none rather than guessing (user story 6 is otherwise met: type, title, authors, year and IP tags).
+- **The card keeps Star, Save and Cite**; the old card's copy-link button and "Quick read" expander are dropped (story 7 names cite and save). Star stays because My Library reads it.
+- **IP & patents is one control for two params:** "Has IP" is `is_ip=true`, a single IP type is `ip_type=<code>`.
+- **The tab container draws no tab bar for a single tab**, so Research alone shows none and an empty Proposals tab is impossible; IR-421 adds the second tab to `DiscoverTabs`.
+- **The search composer's "+ Add a filter" is removed**: the filter row now sits directly beneath it.
+
 ### 4.4 Publish dialog
 
 **Pattern: one dialog, three steps, with a slim progress indicator.**

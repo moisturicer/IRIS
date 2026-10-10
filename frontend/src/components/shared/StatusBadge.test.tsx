@@ -2,8 +2,8 @@
  * The workflow state badge (IR-259).
  *
  * It shows the label the API wrote (`workflow_state_label`) and takes only its
- * colour from `workflow_state`. The `status` form survives for one caller --
- * the Evaluation screen, which IR-268 moves over -- and IR-274 deletes it.
+ * colour from `workflow_state`. Its stored-status form went with the
+ * Evaluation screen (IR-274), and with it the test that pinned it.
  */
 import { describe, expect, it } from "vitest";
 
@@ -16,11 +16,5 @@ describe("StatusBadge", () => {
     renderScreen(<StatusBadge state="final_review" label="Final review" />);
 
     expect(screen.getByText("Final review")).toBeInTheDocument();
-  });
-
-  it("still labels a raw pipeline status for the Evaluation screen until IR-268", () => {
-    renderScreen(<StatusBadge status="published" />);
-
-    expect(screen.getByText("Published")).toBeInTheDocument();
   });
 });
