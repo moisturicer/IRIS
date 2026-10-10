@@ -161,3 +161,34 @@ class IntakeRetirementTests(TestCase):
         self.assertIn(str(second.pk), str(caught.exception))
         self.assertEqual(RecordAssignment.objects.get(pk=first_intake.pk).state, "active")
         self.assertEqual(RecordAssignment.objects.get(pk=second_intake.pk).state, "active")
+
+
+restore_backup = import_module(
+    "apps.reviews.migrations.0014_retire_intake_assignments"
+).restore_backup
+
+
+class ReverseRefusesTests(TestCase):
+    """The card's consistency gate: reversing refuses, pointing at the backup."""
+
+    # The fixtures only; inheriting the class would run its tests twice.
+    setUpTestData = IntakeRetirementTests.__dict__["setUpTestData"]
+    intake_record = IntakeRetirementTests.intake_record
+
+    def test_reversing_after_a_cutover_refuses_and_names_the_backup(self):
+        self.intake_record("Migrated", adviser=self.adviser)
+        retire_intake(apps, None)
+
+        with self.assertRaisesMessage(RuntimeError, "restore the pre-migration database backup"):
+            restore_backup(apps, None)
+
+    def test_any_record_in_review_also_refuses_the_reverse(self):
+        record, _ = self.intake_record("Native", adviser=self.adviser)
+        record.pipeline_status = "in_review"
+        record.save(update_fields=["pipeline_status"])
+
+        with self.assertRaises(RuntimeError):
+            restore_backup(apps, None)
+
+    def test_a_database_with_nothing_to_put_back_reverses_as_a_no_op(self):
+        restore_backup(apps, None)  # no record in review, no retired intake

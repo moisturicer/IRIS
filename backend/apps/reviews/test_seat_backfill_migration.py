@@ -23,6 +23,7 @@ from django.utils import timezone
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordType
 from apps.reviews.models import RecordClearance
+from apps.reviews.workflow_test_helpers import purge_records_at_current_state
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -161,4 +162,5 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
         _migrate(_AFTER)
         assert _model(_AFTER, "ReviewerSeat").objects.filter(assignment_id=unread_a.pk).count() == 1
     finally:
+        purge_records_at_current_state()  # its own partial rows; IR-260
         call_command("migrate", verbosity=0)

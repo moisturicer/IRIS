@@ -24,6 +24,7 @@ from django.utils import timezone
 from apps.accounts.models import Role, User
 from apps.records.models import RecordType, RecordVersion
 from apps.reviews.models import Review
+from apps.reviews.workflow_test_helpers import purge_records_at_current_state
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -140,4 +141,5 @@ def test_the_backfill_records_one_knowable_version_per_submitted_record():
         assert RecordVersion.objects.filter(record_id=once.pk).count() == 1
         assert RecordVersion.objects.filter(record_id=twice.pk).count() == 1
     finally:
+        purge_records_at_current_state()  # its own partial rows; IR-260
         call_command("migrate", verbosity=0)

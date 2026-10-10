@@ -148,10 +148,23 @@ def retire_intake(apps, schema_editor):
 
 
 def restore_backup(apps, schema_editor):
-    raise RuntimeError(
-        "IR-260 intake retirement cannot be reversed safely; restore the "
-        "pre-migration database backup instead."
-    )
+    """
+    Refuse to reverse whenever there is anything the forward step may have
+    changed: a record at `in_review` (a converted legacy status is
+    indistinguishable from a native one) or an assignment it opened or
+    withdrew. Only a database holding neither -- an empty one, as a migration
+    test rewinds -- has nothing to put back, and reverses as a no-op.
+    """
+    Record = apps.get_model("records", "Record")
+    RecordAssignment = apps.get_model("reviews", "RecordAssignment")
+    if (
+        Record.objects.filter(pipeline_status="in_review").exists()
+        or RecordAssignment.objects.filter(reason=REASON).exists()
+    ):
+        raise RuntimeError(
+            "IR-260 intake retirement cannot be reversed safely; restore the "
+            "pre-migration database backup instead."
+        )
 
 
 class Migration(migrations.Migration):
