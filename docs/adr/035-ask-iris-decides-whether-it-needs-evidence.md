@@ -4,6 +4,8 @@
 
 **Accepted** — 2026-10-06 (IR-461). Drafted by an AI agent; reviewed and approved by **Jive Tyler Revalde**, approver of record.
 
+> **Amendment proposed — 2026-10-10 (IR-487). Not accepted.** Jev-first evidence routing: a decision sequence with two deciders (a Jev probability and an LLM route label), replacing §2's tool call as the production mechanism, and amending §1, §3, §5, §8, §9 and §11. Drafted by an AI agent; **awaiting approval by Jive Tyler Revalde**, approver of record. Until a person records that approval in this file, the text above stands unchanged. See §Amendment — 2026-10-10 below.
+
 **Still open after acceptance, and not resolved by it:** §9's landscape exception needs an accountable owner named by a person before any production `on`, and §11's vendor-retention verification gates shadowing real reader questions.
 
 **This was a governance gate, now cleared.** IR-464 (the deterministic detector) and IR-466 (the reader-invisible shadow pilot) were blocked on this ADR being *approved*, not merely drafted, because both contradict [ADR-028](028-no-tool-calling-in-the-answer-path.md) as it stood. An agent drafted this document; a person approved it.
@@ -197,6 +199,114 @@ Reading an accuracy number off the shadow pilot, or an operational number off th
 - **Page-precision measurement**, which has no instrument (§Context).
 
 **Gating condition, stated as a condition and not an intention: shadowing real reader questions requires that the provider's request- and response-data retention and handling have been verified and approved first.** The no-training terms ADR-015 secured cover training, not retention, and the discarded hypothetical answer exists in the vendor's response whatever this system does with it. Until that verification is recorded, shadow runs only against the curated set.
+
+## Amendment — 2026-10-10 (IR-487): Jev-first evidence routing
+
+**Status: Proposed, not accepted.** Drafted by an AI agent from [proposal 12](../architecture-review/12-jev-first-evidence-routing-proposal.md) and the owner decisions recorded on IR-485 (2026-10-10). **Approver: Jive Tyler Revalde.** The agent does not mark this accepted. Until it is accepted, §1–§11 above are the decision.
+
+**Evidence, and what is exploratory.** Every number here comes from the 113-question proxy set (`docs/evaluation/proxy_starter.json`): one labeller, arXiv papers rather than CIT-U research, and probability bands read off the same questions they describe. Run files: Jev `20261008-110112`, `-110304`, `-110450`, `-110632`; route label on Groq `gpt-oss-20b` `20261008-093000`, `-093521`, `-094042`, `-094603`; tool call on Groq `gpt-oss-120b` `20261008-051409`, `-053345`, `-054102`, `-054438`; detector `20261008-044833`. **None of it is a threshold or a validation.** It shows the shape of the design and justifies a held-out run (IR-488). It does not justify a cutoff.
+
+### A1. The decision sequence, replacing §2's mechanism
+
+The route is computed from the question alone, before retrieval, in this order. The first step that requires evidence ends the sequence.
+
+1. **Hard policy** (application code, no model input): widened scope, degraded retrieval and decision `off` route to evidence.
+2. **Detector** (§5): any rule that fires routes to evidence. It is an additive floor and nothing later can overrule it.
+3. **Jev**, TypeSafe's decision model reached through OpenRouter's Decisions API (`typesafe/jev-1.13`, ADR-036 §IR-482 amendment). It writes no text. It returns a probability that the question needs the corpus.
+   - `p ≥ T_search`: evidence.
+   - `T_direct ≤ p < T_search` (uncertain): **evidence** (owner decision, proposal 12 §1.1 #2). The LLM is not consulted.
+   - `p < T_direct`: a direct candidate, passed to step 4.
+4. **LLM route label** (`apps/ai/evidence/route_label.py`): one `generate(system, user)` call that answers `{"route":"search"}` or `{"route":"answer"}` and **writes no answer text**. On a direct candidate it confirms or vetoes Jev's opinion.
+5. **Policy**: direct only if every signal that ran permitted it (A2).
+
+**The deciders are Jev and the LLM route label.** §2's native tool call is **no longer the production mechanism**. `ToolCallingLLM` and `model_decision.py` stay as built (IR-465) as an evaluation arm. This amendment deletes nothing.
+
+**Why §2 is overturned.** §2 chose the tool call for option value at a measured latency cost. Two things changed. First, a route label writes no hypothetical answer, which removes §10's discarded-answer retention concern rather than managing it. Second, on the proxy set, a second model run only on Jev's direct candidates rescued 3 of 4 Jev misses at cutoff 0.2 and 7 of 9 at 0.3 (proposal 12 §4.2). That rescue only happens when the second model sees the questions Jev scored low, so the second model's place in the sequence matters more than its mechanism. **§2's option-value bet is recorded as not taken, not as lost.** The tool-calling port remains if bounded tool use is ever proposed under its own ADR.
+
+`T_direct` and `T_search` are parameters, not values. They are chosen **only on a tuning split** (IR-488) and never on the held-out split or the proxy set above. With `T_direct = T_search` the uncertain band is empty.
+
+### A2. "Every signal that ran", replacing §3's "both halves"
+
+> **A direct answer requires every signal that ran to permit it. Any signal may require evidence. Every failure, timeout, rate limit, malformed reply or uncertain result routes to evidence.**
+
+§3 said a direct answer needs *both* halves. With three signals, and steps that short-circuit, "both" no longer describes the rule. A model can only move a question toward retrieval. No model output is an input to step 1, and no model may overrule step 2.
+
+### A3. When Jev fails, the LLM decides alone, with its own bar (owner decision)
+
+On a Jev error, timeout, 429, malformed reply or unpinned build, **the LLM route label decides alone** (owner decision 2026-10-08, proposal 12 §1.1 #1). If it says `search`, fails or is malformed, the question routes to evidence. If it says `answer`, the question may go direct **on one opinion**.
+
+This contradicts §3's *"Neither can authorize a direct answer alone"*, and **it is a deliberate trade of safety for the availability of the direct path**. It is not an oversight. It is bounded by three things:
+
+- **Its own reason code**, so every LLM-alone direct answer can be counted separately from a two-opinion one.
+- **A stricter bar** than the confirmation path. *Not chosen.* Candidates are two agreeing samples, or a precision-tuned prompt. Chosen on the tuning split (IR-488).
+- **A monitored cap.** If LLM-alone direct answers exceed a share of decided traffic, or Jev's failure rate exceeds a share of calls, the path stops permitting direct answers and routes to evidence. *Values not chosen.*
+
+**Its cost, on the proxy set (exploratory):** about one in three of the route label's own direct answers needed the corpus (8–10 of 28–30), against 4 of 24 for Jev alone below 0.2 and about 1 of 20 when both agree (proposal 12 §5.3). The LLM-alone path is the weakest route to a direct answer, and it runs exactly when Jev is having trouble.
+
+**Recorded asymmetry, not resolved. Owner: Jive Tyler Revalde.** If the LLM fails, Jev alone may **not** permit direct. If Jev fails, the LLM alone may. On the proxy set, Jev alone was the better single opinion. Either both single-opinion paths are allowed or neither is (proposal 12 D4). This amendment records the owner's chosen design and leaves that question with the owner.
+
+### A4. Paper Chat's scope is an access limit, not an evidence requirement (owner's reading)
+
+§5 lists `scope_record` as a structural rule that forces retrieval, and §Alternatives calls *"Paper Chat always needs the paper"* a fact that should not be a model's opinion. **The owner reads it differently** (proposal 12 §1.1 #4): a Conversation bound to a Record limits **what a search may read**, namely that paper's chunks only. It does not decide **whether** a search is needed. A Paper Chat question passes through steps 2–5 like any other. If a search runs, it is scoped to the paper exactly as today.
+
+- §6's *"Scope is the Conversation's. … the model cannot unbind it"* is **unchanged**. The model still cannot widen scope. It can only route.
+- `scope_record` stops being an evidence requirement. Removing it from the detector is IR-490's work. Until then the code still fires it, and that is correct under the unamended text.
+- **Cost, recorded.** ADR-034 §4 argued that a general-knowledge answer in Paper Chat *"is a non-answer there, whatever it is labelled"*. Under this reading, *"what is a confusion matrix?"* asked in Paper Chat may be answered ungrounded and labelled as such. ADR-034's matching amendment records the same cost.
+- **Gate.** Before `on`, a held-out check must show that dropping `scope_record` adds no misses on Paper Chat questions (IR-488). The proxy set has no Paper Chat conversations (`scope_record` fired 0 times in `20261008-044833`), so **nothing has measured this yet**.
+- **Contradiction recorded.** Proposal 12 §5 and §10 still list Paper Chat as hard-policy grounded and "never" direct. That contradicts the owner decision recorded in its own §1.1. This amendment follows the owner decision. The proposal is a review document and is not corrected here.
+
+### A5. §1: what `on` requires
+
+`on` stays **rejected as an invalid value** until a person approves a go/no-go on all of the following. Each is a condition, not an intention:
+
+1. **Miss rate ≤ 5%** of evidence-required questions, applied to every question category, on a held-out split used once and labelled by someone other than the tuner (owner decision IR-485 #5). **There is no separate 0% gate for structural or institutional questions.** The owner chose this, and it drops the zero-miss gate in proposal 12 §15. **Over-searches are free** and do not count against the target. **Sizing.** With zero misses in *n* questions, the true miss rate is below roughly 3/*n* at 95% confidence (the "rule of three"), so 60 evidence-required questions with zero misses support a 5% claim over the whole set. Supporting the same claim for each category separately needs about 60 per category. **Open. Owner: Jive Tyler Revalde.** Is the target pooled over the whole set or per category, and how are ambiguous questions scored?
+2. **Fallbacks ≤ 5%** of decision calls in each of at least three runs (proposal 12 §15).
+3. **Every vendor on the decision path approved** under §11 as amended (A7).
+4. **The direct path exists with its label**: ADR-034 as amended, built behind a flag that is off (IR-491).
+5. **§9's interim limit holds** until the Lens exists (A6).
+6. **Shadow coverage and fallback within target** over a fixed window on real traffic (IR-490).
+7. **Cost under $1 per question** across decision and answer together (owner decision IR-485 #6).
+
+### A6. §9: the landscape owner is named
+
+**Named owner: Jive Tyler Revalde. Choice: option (a), build the Lens**, the unbuilt feature that computes whole-collection answers (IR-302 to IR-305, ADR-027). Recorded by that person on IR-485, 2026-10-10. This satisfies §9.3's naming requirement. It does **not** satisfy ADR-027 §4, which stays dormant until the Lens exists.
+
+**Interim limit, until the Lens exists:** a landscape-shaped question routes to evidence and **never** to a direct answer. No answer may claim a comprehensive landscape or a research-gap analysis from ordinary retrieval (§9.1 and §9.2, unchanged).
+
+**Open. Owner: Jive Tyler Revalde.** Does the reader-visible pilot (IR-492) wait for IR-305, or run under the interim limit? §9.4 says the exception expires at the `on` go/no-go and cannot be carried past it without re-approval, so the go/no-go must answer this explicitly.
+
+### A7. §11: the retention gate applies per vendor
+
+§11 gated shadowing real reader questions on one provider's retention terms. With two deciders and per-task vendors (ADR-036), **the gate now applies to each vendor separately**. A decision provider is constructed on a reader's path only when its own approval is on, and it **fails closed to evidence** otherwise (ADR-036 §Amendment — 2026-10-10). A deployment with no approvals records nothing and sends nothing.
+
+The owner's rule (IR-485 #2 and #3, 2026-10-10): **retention is acceptable provided no model trains on the data. Zero data retention is not required. Reader questions may be sent to a decision vendor under that condition.** Hosting: US or EU. China-origin models are acceptable provided no endpoint is hosted in China (IR-485 #6).
+
+The full policy facts, with their sources and dates, are in ADR-036's 2026-10-10 amendment. This table records only each vendor's status.
+
+| Vendor on the decision path | What is recorded | Status under the owner's rule |
+|---|---|---|
+| TypeSafe (Jev), via OpenRouter Decisions | Privacy policy (updated 2025-11-19, read 2026-10-08): no training or fine-tuning on input, no disclosure except to service providers, retention unspecified, US-hosted | **Accepted by the owner** (IR-485 #1) |
+| OpenRouter, as intermediary | Privacy policy (updated 2026-08-31, read 2026-10-10): OpenRouter does not train on inputs or outputs. Model providers behind it may, and OpenRouter cannot control that. Retention "as long as reasonably necessary". A data-processing agreement is available and **not requested** | No training by OpenRouter itself. Chat requests send `provider.data_collection: deny`. **The Decisions adapter sends no `provider` object, and whether that endpoint honours one is unverified.** Jev's only provider is TypeSafe, so the rule is met by TypeSafe's own policy |
+| LLM route label: OpenRouter chat | `data_collection: deny` excludes training providers | Meets the rule |
+| LLM route label: Groq | **No no-training terms recorded in the repo** | **Not approved.** Moot once IRIS migrates to OpenRouter (owner direction, IR-485) |
+
+**Follow-ups, not blockers (IR-485):** request OpenRouter's data-processing agreement; send `provider.data_collection: deny` on Decisions calls if that endpoint honours it.
+
+**§8's context rule extends to Jev unchanged.** Jev receives the question, the Resolved question (labelled untrusted), at most five prior reader questions and a fixed corpus description. It receives no Passage, no recalled Turn, no prior assistant answer and no identifier. **Recommended, not decided:** a total character cap on the decision input, because prior questions are capped only by count today (proposal 12 §7.1). IR-490 decides it.
+
+### What this amendment does not change
+
+§4 (nothing is executed), §6 (identity, scope, visibility and disclosure stay the application's), §7 (withheld evidence does not affect the route) and §10 (two instruments, never conflated). §7 becomes **easier** to hold, because the route is fixed before retrieval and ADR-034's amendment removes the post-retrieval branch that contradicted it.
+
+### Contradictions this amendment leaves open
+
+| Contradiction | Owner |
+|---|---|
+| The asymmetry between single-opinion paths (A3) | Jive Tyler Revalde |
+| Whether the IR-492 pilot waits for the Lens (A6) | Jive Tyler Revalde |
+| Proposal 12 §5 and §10 against the owner's Paper Chat reading (A4) | Recorded. The proposal is not corrected |
+| §2 said *"ADR-036 is not amended"*. ADR-036 is now amended for a production decision adapter | Resolved by ADR-036's 2026-10-10 amendment, if accepted |
+| SECURITY.md §8 and §11 risk 11 describe reader questions as ungated. The owner has now decided that they may go to decision vendors under the no-training rule | Not updated here. SECURITY.md needs its own change |
 
 ## Alternatives Considered
 
