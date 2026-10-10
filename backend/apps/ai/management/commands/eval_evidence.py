@@ -22,6 +22,16 @@ reason code. It spends vendor credits, so it is manual and never CI, like
 `Turn` or shadow row, and the model's hypothetical direct answers are measured
 for length and discarded (ADR-035 §10).
 
+**`--chain` (IR-486) scores the whole proposed decision chain** (IR-484):
+structural rules, the detector, Jev with two cutoffs, an LLM route-label
+confirmation of every direct candidate, and the Jev-failure path where the LLM
+decides alone, beside the single-decider arms. It replays stored
+`--model-decision` result files (`--from-run jev=PATH`, repeatable) or collects
+fresh runs (`--live jev,label,tool`, which spends credits). Stored replay costs
+nothing, reads no database and calls no vendor. It writes a `chain` result file,
+never an `evidence` one, so `report_evidence_pilot` does not read it, and it
+chooses no operating point: both cutoffs are required.
+
 **Nothing consumes a verdict.** Neither half is wired into the answer path:
 production routing is out of scope for ADR-035 (§11).
 """
@@ -36,7 +46,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.ai.evaluation import QuestionSetError, load_question_set
-from apps.ai.evaluation.evidence import MIN_EXAMPLES, run_curated
+from apps.ai.evaluation import chain as chained
+from apps.ai.evaluation.evidence import MIN_EXAMPLES, annotated, judge, run_curated
 from apps.ai.evidence import (
     SETTING_MODE,
     active_rule_set,
@@ -67,7 +78,14 @@ from apps.ai.providers.tool_calling import ToolCallingLLM
 DEFAULT_OUT = Path("docs") / "evaluation" / "runs"
 
 #: A run with more fallbacks than this is reported alone, never pooled.
-FALLBACK_POOLING_LIMIT = 0.05
+FALLBACK_POOLING_LIMIT = chained.FALLBACK_POOLING_LIMIT
+
+#: `--live` names to the `--decision-mode` that builds each decider.
+LIVE_MODES = {
+    chained.DECIDER_JEV: "jev-noul",
+    chained.DECIDER_LABEL: "route-label",
+    chained.DECIDER_TOOL: "tools",
+}
 
 #: Recorded in every Jev run file (IR-482, ADR-036 amendment).
 JEV_VENDOR_TERMS = (
@@ -186,6 +204,60 @@ class Command(BaseCommand):
             f"(default: {ROUTE_LABEL_MAX_TOKENS}).",
         )
         parser.add_argument(
+            "--chain",
+            action="store_true",
+            help="Score the full decision chain offline (IR-486) instead of "
+            "the detector report. Needs --search-cutoff and --direct-cutoff "
+            "and at least one decider run.",
+        )
+        parser.add_argument(
+            "--from-run",
+            action="append",
+            default=[],
+            metavar="DECIDER=PATH",
+            help="With --chain: a stored --model-decision result file for "
+            "jev, label or tool. Repeat it: each file is one replicate.",
+        )
+        parser.add_argument(
+            "--live",
+            default="",
+            help="With --chain: collect fresh runs for these deciders "
+            "(comma list of jev, label, tool). Spends credits; jev is the "
+            "public proxy set only.",
+        )
+        parser.add_argument(
+            "--repeats",
+            type=int,
+            default=1,
+            help="With --chain --live: replicates per live decider (default 1; "
+            "the held-out comparison asks for at least 3).",
+        )
+        parser.add_argument(
+            "--search-cutoff",
+            type=float,
+            help="With --chain: Jev probability from which a question searches.",
+        )
+        parser.add_argument(
+            "--direct-cutoff",
+            type=float,
+            help="With --chain: below this a question is a direct candidate; "
+            "between the two cutoffs is uncertain and searches. Equal "
+            "cutoffs leave no uncertain band.",
+        )
+        parser.add_argument(
+            "--ablate-resolved",
+            action="store_true",
+            help="With --chain --live: also collect each decider with the "
+            "Resolved question withheld, to compare raw-only input.",
+        )
+        parser.add_argument(
+            "--resolver-label",
+            default="",
+            help="With --chain: names the resolver that produced the set's "
+            "Resolved questions, recorded so two sets resolved by different "
+            "models compare by label.",
+        )
+        parser.add_argument(
             "--out",
             default=str(DEFAULT_OUT),
             help=f"Directory for the results file (default: {DEFAULT_OUT}).",
@@ -204,6 +276,9 @@ class Command(BaseCommand):
             )
         except QuestionSetError as exc:
             raise CommandError(str(exc))
+
+        if options["chain"]:
+            return self._handle_chain(options, question_set)
 
         mode = options["decision_mode"]
         label_mode = mode == "route-label"
@@ -301,6 +376,242 @@ class Command(BaseCommand):
         if path is not None:
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
+
+    def _handle_chain(self, options, question_set):
+        """Score the chain over stored and/or freshly collected decider runs."""
+        if options["search_cutoff"] is None or options["direct_cutoff"] is None:
+            raise CommandError(
+                "--chain needs both --search-cutoff and --direct-cutoff: the "
+                "tool draws the curve and chooses no operating point."
+            )
+        try:
+            bands = chained.Bands(options["search_cutoff"], options["direct_cutoff"])
+        except chained.ChainError as exc:
+            raise CommandError(str(exc))
+        live = [n.strip() for n in options["live"].split(",") if n.strip()]
+        unknown = [n for n in live if n not in LIVE_MODES]
+        if unknown:
+            raise CommandError(
+                f"--live names {unknown}; choose from {sorted(LIVE_MODES)}."
+            )
+        if options["repeats"] < 1:
+            raise CommandError("--repeats must be positive.")
+        if options["ablate_resolved"] and not live:
+            raise CommandError(
+                "--ablate-resolved needs --live: a stored run cannot be "
+                "re-asked without the Resolved question."
+            )
+        if chained.DECIDER_JEV in live and _declared_tier(question_set.source) != "proxy":
+            raise CommandError(
+                "--live jev is approved for the public proxy question set only "
+                '(IR-482), and the set must declare "tier": "proxy" itself.'
+            )
+
+        runs: dict[str, list] = {name: [] for name in chained.DECIDERS}
+        sources = []
+        for spec in options["from_run"]:
+            name, _, path = spec.partition("=")
+            if not path or name not in chained.DECIDERS:
+                raise CommandError(
+                    f"--from-run takes DECIDER=PATH with DECIDER one of "
+                    f"{chained.DECIDERS}, not {spec!r}."
+                )
+            try:
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+                runs[name].append(
+                    chained.run_from_result_file(name, data, Path(path).name)
+                )
+            except (OSError, ValueError, chained.ChainError) as exc:
+                raise CommandError(f"{path}: {exc}")
+            except (KeyError, TypeError, AttributeError) as exc:
+                raise CommandError(
+                    f"{path}: not an eval_evidence result file ({type(exc).__name__}: {exc})"
+                )
+            sources.append({"decider": name, "path": path, "sha256": _digest(path)})
+
+        questions = annotated(question_set)
+        if not questions:
+            raise CommandError(
+                "no question in this set carries an evidence_required annotation."
+            )
+        rule_set = active_rule_set()
+        detector = EvidenceDetector(rule_set)
+        judgements = tuple(judge(detector, q) for q in questions)
+
+        try:
+            facts = [chained.facts_from_judgement(j) for j in judgements]
+            chained.validate_runs(facts, runs)
+        except chained.ChainError as exc:
+            raise CommandError(str(exc))
+        if "label" in live and options["max_tokens"] < 1:
+            raise CommandError("--max-tokens must be positive.")
+
+        raw_only: dict[str, list] = {name: [] for name in chained.DECIDERS}
+        deciders_used = {}
+        try:
+            for name in live:
+                decider = self._decider(LIVE_MODES[name], options["max_tokens"])
+                deciders_used[name] = LIVE_MODES[name]
+                digest = self._live_digest(name, options)
+                for _ in range(options["repeats"]):
+                    runs[name].append(
+                        chained.collect_run(
+                            name,
+                            decider,
+                            questions,
+                            source=f"live {name}",
+                            prompt_digest=digest,
+                        )
+                    )
+                    if options["ablate_resolved"]:
+                        raw_only[name].append(
+                            chained.collect_run(
+                                name,
+                                decider,
+                                questions,
+                                use_resolved=False,
+                                source=f"live {name} raw-only",
+                                prompt_digest=digest,
+                            )
+                        )
+        except Exception as exc:
+            # Paid passes already finished are scored and kept rather than lost.
+            if not any(runs.values()):
+                raise
+            self.stderr.write(
+                self.style.ERROR(
+                    f"live collection stopped early ({type(exc).__name__}: {exc}); "
+                    "scoring the passes completed so far."
+                )
+            )
+            # A partly collected raw-only set would not be comparable.
+            raw_only = {name: [] for name in chained.DECIDERS}
+
+        runs = {name: tuple(rs) for name, rs in runs.items() if rs}
+        if not runs:
+            raise CommandError(
+                "--chain needs decider runs: pass --from-run DECIDER=PATH or --live."
+            )
+        raw_facts = [chained.facts_from_judgement(j, lane="raw") for j in judgements]
+
+        ablations = {"resolver_label": options["resolver_label"] or "not recorded"}
+        try:
+            chained.validate_runs(raw_facts, runs)
+            ablations["detector_input"] = {
+                "raw_only": [
+                    chained.evaluate_arm(arm, raw_facts, runs, bands).summary()
+                    for arm in chained.available_arms(runs)
+                ],
+                "note": "the detector on the raw question alone; the main "
+                "arms use raw and Resolved together",
+            }
+            raw_runs = {n: tuple(rs) for n, rs in raw_only.items() if rs}
+            if raw_runs:
+                merged = {**runs, **raw_runs}
+                ablations["decider_input"] = {
+                    "raw_only": [
+                        chained.evaluate_arm(arm, facts, merged, bands).summary()
+                        for arm in chained.available_arms(merged)
+                        if any(d in raw_runs for d in arm.needs)
+                    ],
+                    "note": "live deciders asked without the Resolved question",
+                }
+            unpaired = chained.unpaired_replicates(runs)
+            if unpaired:
+                self.stderr.write(
+                    self.style.WARNING(
+                        "decider replicate counts differ ("
+                        f"{', '.join(unpaired)}): an arm using several deciders scores "
+                        "only as many replicates as its smallest."
+                    )
+                )
+            report = chained.build_report(
+                question_set=question_set.as_dict(),
+                facts=facts,
+                runs=runs,
+                bands=bands,
+                ablations=ablations,
+                provenance={
+                    "git_commit": _git_commit(),
+                    "question_set_path": question_set.source,
+                    "question_set_sha256": _digest(question_set.source),
+                    "rule_set_digest": rule_set.digest,
+                    "stored_runs": sources,
+                    "live_deciders": deciders_used,
+                    "repeats": options["repeats"] if live else None,
+                    "model_builds": {
+                        name: sorted({m for r in rs for m in r.models})
+                        for name, rs in runs.items()
+                    },
+                    "prompt_digests": {
+                        name: sorted({r.prompt_digest for r in rs if r.prompt_digest})
+                        for name, rs in runs.items()
+                    },
+                    "cost_usd": round(
+                        sum(
+                            d.cost_usd or 0.0
+                            for rs in runs.values()
+                            for r in rs
+                            for d in r.decisions.values()
+                        ),
+                        6,
+                    ),
+                    "decisions_without_reported_cost": sum(
+                        1
+                        for rs in runs.values()
+                        for r in rs
+                        for d in r.decisions.values()
+                        if d.cost_usd is None
+                    ),
+                    "jev_vendor_terms": (
+                        JEV_VENDOR_TERMS if chained.DECIDER_JEV in runs else None
+                    ),
+                },
+            )
+        except chained.ChainError as exc:
+            raise CommandError(str(exc))
+
+        self.stdout.write("")
+        self.stdout.write(report.render())
+        path = None
+        if not options["no_write"]:
+            out_dir = Path(options["out"])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            safe = "".join(
+                c if c.isalnum() or c in "-_" else "-" for c in question_set.name
+            ).strip("-")
+            stamp = timezone.now().strftime("%Y%m%d-%H%M%S")
+            path = out_dir / f"{stamp}-chain-{safe or 'run'}.json"
+            path.write_text(json.dumps(report.as_dict(), indent=2), encoding="utf-8")
+        for result in report.arms:
+            if result.reported_alone:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"{result.arm.name}: replicate(s) {list(result.reported_alone)} "
+                        f"exceeded {FALLBACK_POOLING_LIMIT:.0%} fallbacks and are "
+                        "reported alone, not pooled."
+                    )
+                )
+        if report.skipped_arms:
+            self.stdout.write(
+                self.style.WARNING(
+                    "Skipped for want of a decider run: "
+                    f"{', '.join(report.skipped_arms)}."
+                )
+            )
+        if path is not None:
+            self.stdout.write("")
+            self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
+
+    @staticmethod
+    def _live_digest(name: str, options) -> str:
+        from apps.ai.evidence.model_decision import prompt_digest
+
+        return {
+            chained.DECIDER_JEV: lambda: jev_digest(PINNED_MODEL),
+            chained.DECIDER_LABEL: lambda: route_label_digest(options["max_tokens"]),
+            chained.DECIDER_TOOL: prompt_digest,
+        }[name]()
 
     def _decider(self, mode: str = "tools", max_tokens: int = 0):
         """The decision over the `answer` task, refused when nothing is
