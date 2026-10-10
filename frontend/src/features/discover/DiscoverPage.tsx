@@ -1,57 +1,75 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { recordsApi } from "@/api/records";
+
 import { accountsApi } from "@/api/accounts";
-import { useUIStore } from "@/store/ui.store";
-import { Spinner } from "@/components/ui/Spinner";
+import { recordsApi } from "@/api/records";
+import { NotificationBell } from "@/components/layout/NotificationBell";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { PILL_PRIMARY } from "@/components/ui/pillStyles";
+import { Spinner } from "@/components/ui/Spinner";
+import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
+import { useRole } from "@/hooks/useRole";
+import { canAccess } from "@/lib/access";
+import { cn } from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { RecordListItem } from "@/types/records";
-import { DiscoverRecordCard } from "./DiscoverRecordCard";
 import { ALL_VALUE, type FilterOption } from "./DiscoverFilterDropdown";
-import { DiscoverFilterPanel, EMPTY_FILTERS, type DiscoverFilters } from "./DiscoverFilterPanel";
+import {
+  activeFilterCount,
+  DiscoverFilterBar,
+  EMPTY_FILTERS,
+  HAS_IP,
+  type DiscoverFilters,
+  type DiscoverSort,
+} from "./DiscoverFilterBar";
+import { DiscoverResultCard } from "./DiscoverResultCard";
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
+import { DiscoverTabs } from "./DiscoverTabs";
 import { PaperCiteModal } from "./PaperCiteModal";
 import { buildYearOptions } from "./discoverUtils";
-import { NotificationBell } from "@/components/layout/NotificationBell";
-import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
 
+const ORDERING: Record<DiscoverSort, string> = {
+  newest: "-created_at",
+  viewed: "-access_count",
+};
+
 /**
- * Saved views. Each maps to a real query.
+ * Discover: find published research, and start a submission (IR-407, F2;
+ * spec §4.3).
  *
- * "For you" has no personalisation signal available — `User` carries no college
- * or interest data — so it is the default recency feed. Kept because the agreed
- * design shows it; revisit once the profile exposes something to rank on.
+ * Every control maps to a query param the list endpoint already understands,
+ * and filtering is server-side, so a match beyond the first page is never
+ * missed. The old saved views are gone: Latest and Most viewed are Sort, IP &
+ * Patents and Theses are filters, and "For you" -- which had no personalisation
+ * signal to rank on -- is removed rather than kept as a relabelled recency feed.
  */
-const VIEWS = [
-  { id: "for-you", label: "For you", params: { ordering: "-created_at" } },
-  { id: "latest", label: "Latest", params: { ordering: "-created_at" } },
-  { id: "viewed", label: "Most Viewed", params: { ordering: "-access_count" } },
-  { id: "ip", label: "IP & Patents", params: { ordering: "-created_at", is_ip: true } },
-] as const;
-
-type ViewId = (typeof VIEWS)[number]["id"] | "theses";
-
 export default function DiscoverPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const { roleName } = useRole();
+  // The access map is the one place that says who authors (Student, Adviser).
+  const canPublish = canAccess(roleName as never, "submit");
 
   const [records, setRecords] = useState<RecordListItem[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
   const [activeQuery, setActiveQuery] = useState(searchParams.get("q") ?? "");
 
-  const [view, setView] = useState<ViewId>("for-you");
   const [filters, setFilters] = useState<DiscoverFilters>(EMPTY_FILTERS);
-  const [filterSignal, setFilterSignal] = useState(0);
+  const [sort, setSort] = useState<DiscoverSort>("newest");
+  const [tab, setTab] = useState("research");
 
   const [classifications, setClassifications] = useState<FilterOption[]>([]);
   const [colleges, setColleges] = useState<FilterOption[]>([]);
@@ -65,11 +83,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.allSettled([
-      recordsApi.classifications(),
-      accountsApi.colleges(),
-      recordsApi.recordTypes(),
-    ])
+    Promise.allSettled([recordsApi.classifications(), accountsApi.colleges(), recordsApi.recordTypes()])
       .then(([classRes, collegeRes, typeRes]) => {
         if (cancelled) return;
         if (classRes.status === "fulfilled") {
@@ -96,52 +110,49 @@ export default function DiscoverPage() {
         if (!cancelled) setRefLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  /* "Theses" is a real record type, so the tab resolves to its id at runtime. */
-  const thesesTypeId = useMemo(
-    () => recordTypes.find((t) => /thesis|research/i.test(t.label))?.value ?? null,
-    [recordTypes],
-  );
 
   /* ── Debounce the search box into the query + the URL ───────────────── */
   useEffect(() => {
     const handle = setTimeout(() => {
       setActiveQuery(searchInput.trim());
-      const next = new URLSearchParams(searchParams);
-      if (searchInput.trim()) next.set("q", searchInput.trim());
-      else next.delete("q");
-      setSearchParams(next, { replace: true });
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (searchInput.trim()) next.set("q", searchInput.trim());
+          else next.delete("q");
+          return next;
+        },
+        { replace: true },
+      );
     }, 300);
 
     return () => clearTimeout(handle);
-    // `searchParams`/`setSearchParams` are intentionally excluded — including
-    // them would re-fire this effect on every URL write and loop.
+    // Re-running on a `setSearchParams` identity change would loop on every
+    // URL write; only the typed text should start the debounce.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
   /* ── The query the API actually understands ─────────────────────────── */
   const queryParams = useMemo(() => {
-    const preset =
-      view === "theses"
-        ? { ordering: "-created_at", ...(thesesTypeId ? { record_type: thesesTypeId } : {}) }
-        : VIEWS.find((v) => v.id === view)!.params;
-
-    const params: Record<string, unknown> = { page_size: PAGE_SIZE, ...preset };
+    const params: Record<string, unknown> = { page_size: PAGE_SIZE, ordering: ORDERING[sort] };
 
     if (activeQuery) params.search = activeQuery;
-    if (filters.topics.length > 0) params.classification = filters.topics.join(",");
+    if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;
     if (filters.colleges.length > 0) params.college = filters.colleges.join(",");
+    if (filters.classifications.length > 0) params.classification = filters.classifications.join(",");
     if (filters.year !== ALL_VALUE) {
       params.year_from = filters.year;
       params.year_to = filters.year;
     }
-    if (filters.ipType !== ALL_VALUE) params.ip_type = filters.ipType;
-    if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;
+    if (filters.ip === HAS_IP) params.is_ip = true;
+    else if (filters.ip !== ALL_VALUE) params.ip_type = filters.ip;
 
     return params;
-  }, [view, thesesTypeId, activeQuery, filters]);
+  }, [sort, activeQuery, filters]);
 
   /* Guard against a slow early request overwriting a newer one. */
   const requestSeq = useRef(0);
@@ -149,7 +160,8 @@ export default function DiscoverPage() {
   useEffect(() => {
     const seq = ++requestSeq.current;
     setLoading(true);
-    setError(null);
+    setFailed(false);
+    setLoadMoreFailed(false);
 
     recordsApi
       .list({ ...queryParams, page: 1 })
@@ -168,217 +180,220 @@ export default function DiscoverPage() {
       .catch(() => {
         if (seq !== requestSeq.current) return;
         setRecords([]);
-        setTotalCount(0);
-        setError("Could not load records. Is the backend running?");
+        setTotalCount(null);
+        setFailed(true);
       })
       .finally(() => {
         if (seq === requestSeq.current) setLoading(false);
       });
-  }, [queryParams]);
+  }, [queryParams, attempt]);
 
   const loadMore = useCallback(() => {
     const nextPage = page + 1;
     setLoadingMore(true);
+    setLoadMoreFailed(false);
     recordsApi
       .list({ ...queryParams, page: nextPage })
       .then(({ data }) => {
         setRecords((prev) => [...prev, ...(data.results ?? [])]);
         setPage(nextPage);
       })
-      .catch(() => setError("Could not load more records."))
+      .catch(() => setLoadMoreFailed(true))
       .finally(() => setLoadingMore(false));
   }, [page, queryParams]);
 
-  const yearOptions = useMemo<FilterOption[]>(
-    () => [
-      { value: ALL_VALUE, label: "Any year" },
-      ...buildYearOptions(yearPool).map((y) => ({ value: y, label: y })),
-    ],
-    [yearPool],
+  const filterOptions = useMemo(
+    () => ({
+      recordTypes: [{ value: ALL_VALUE, label: "Any type" }, ...recordTypes],
+      colleges,
+      classifications,
+      years: [
+        { value: ALL_VALUE, label: "Any year" },
+        ...buildYearOptions(yearPool).map((y) => ({ value: y, label: y })),
+      ],
+      ip: [
+        { value: ALL_VALUE, label: "Any" },
+        { value: HAS_IP, label: "Has IP" },
+        ...Object.entries(IP_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+      ],
+    }),
+    [recordTypes, colleges, classifications, yearPool],
   );
 
-  const ipTypeOptions = useMemo<FilterOption[]>(
-    () => [
-      { value: ALL_VALUE, label: "Any IP type" },
-      ...Object.entries(IP_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-    ],
-    [],
-  );
+  const openPublish = () =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set(PUBLISH_PARAM, "new");
+      return next;
+    });
 
-  const recordTypeOptions = useMemo<FilterOption[]>(
-    () => [{ value: ALL_VALUE, label: "Any record type" }, ...recordTypes],
-    [recordTypes],
-  );
+  const narrowed = activeFilterCount(filters) > 0 || Boolean(activeQuery);
 
-  const activeFilterCount =
-    filters.topics.length +
-    filters.colleges.length +
-    (filters.year !== ALL_VALUE ? 1 : 0) +
-    (filters.ipType !== ALL_VALUE ? 1 : 0) +
-    (filters.recordType !== ALL_VALUE ? 1 : 0);
-
-  const resetAll = () => {
+  const clearFilters = () => {
     setSearchInput("");
+    setActiveQuery("");
     setFilters(EMPTY_FILTERS);
-    setView("for-you");
   };
 
-  const tabs: { id: ViewId; label: string }[] = [
-    ...VIEWS.map((v) => ({ id: v.id as ViewId, label: v.label })),
-    { id: "theses", label: "Theses" },
-  ];
+  const remaining = totalCount === null ? 0 : totalCount - records.length;
 
-  const hasMore = records.length < totalCount;
+  const research = (
+    <>
+      <DiscoverFilterBar
+        filters={filters}
+        onChange={setFilters}
+        sort={sort}
+        onSort={setSort}
+        options={filterOptions}
+        loading={refLoading}
+        resultCount={loading ? null : totalCount}
+      />
 
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      {/* ── Top bar. Spans the full width, unlike the centred record column. ── */}
-      <header className="bg-white border-b border-stone-200 px-4 sm:px-7 py-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-stone-200 flex items-center justify-center text-stone-600"
-          aria-label="Toggle navigation"
-        >
-          <i className="fas fa-bars text-sm" aria-hidden />
-        </button>
+      <p aria-live="polite" className="mt-5 mb-3 min-h-[20px] text-small text-stone-600">
+        {loading || totalCount === null ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
+      </p>
 
-        <span className="w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
-          <i className="fas fa-compass text-[13px]" aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <h1 className="font-display text-[24px] font-semibold text-stone-900 leading-tight truncate">
-            IRIS Discovery
-          </h1>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 leading-tight">
-            Institutional Knowledge Base
-          </p>
-        </div>
-
-        {/* AppShell hides the shared Header on "/" and "/ai" (isFullBleed), so
-            this page carries its own -- and has to carry the bell with it,
-            or Discover is the one screen where new notifications are
-            invisible. Same NotificationBell component; it reads the shared
-            store, so its count stays in step with the sidebar badge. */}
-        <div className="ml-auto shrink-0">
-          <NotificationBell />
-        </div>
-      </header>
-
-      <div className="w-full max-w-5xl mx-auto px-4 sm:px-7 py-5 flex-1 flex flex-col">
-
-        <DiscoverSearchComposer
-          value={searchInput}
-          onChange={setSearchInput}
-          onAddFilter={() => setFilterSignal((n) => n + 1)}
+      {loading ? (
+        <ResultsSkeleton />
+      ) : failed ? (
+        <EmptyState
+          framed
+          tone="error"
+          icon="fa-triangle-exclamation"
+          title="We couldn't load research"
+          message="Check your connection, then try again."
+          action={
+            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={PILL_SECONDARY}>
+              Try again
+            </button>
+          }
         />
-
-        {/* ── Filter + saved views + result count ───────────────────────── */}
-        <div className="flex flex-wrap items-center gap-3 mt-5 mb-4">
-          <DiscoverFilterPanel
-            filters={filters}
-            onChange={setFilters}
-            onClear={() => setFilters(EMPTY_FILTERS)}
-            activeCount={activeFilterCount}
-            topicOptions={classifications}
-            collegeOptions={colleges}
-            yearOptions={yearOptions}
-            ipTypeOptions={ipTypeOptions}
-            recordTypeOptions={recordTypeOptions}
-            loading={refLoading}
-            openSignal={filterSignal}
-          />
-
-          <div
-            role="tablist"
-            aria-label="Saved views"
-            className="flex items-center gap-1 p-1 bg-stone-100/80 rounded-full overflow-x-auto"
-          >
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                role="tab"
-                aria-selected={view === tab.id}
-                type="button"
-                onClick={() => setView(tab.id)}
-                className={cn(
-                  "px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-colors",
-                  view === tab.id
-                    ? "bg-white text-stone-900 shadow-card"
-                    : "text-stone-500 hover:text-stone-900",
-                )}
-              >
-                {tab.label}
+      ) : records.length === 0 ? (
+        narrowed ? (
+          <EmptyState
+            framed
+            icon="fa-filter-circle-xmark"
+            title="No research matches these filters"
+            message="Try removing a filter or searching for something else."
+            action={
+              <button type="button" onClick={clearFilters} className={PILL_SECONDARY}>
+                Clear filters
               </button>
-            ))}
-          </div>
-
-          <span className="ml-auto text-[13px] text-stone-400 font-medium whitespace-nowrap">
-            {loading ? "Loading…" : `${totalCount} record${totalCount === 1 ? "" : "s"}`}
-          </span>
-        </div>
-
-        {/* ── Feed ──────────────────────────────────────────────────────── */}
-        {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-3">
-            <Spinner />
-            <span className="text-xs text-stone-400 font-medium">Searching the repository…</span>
-          </div>
-        ) : error ? (
-          <EmptyState framed icon="fa-triangle-exclamation" tone="error" title="Something went wrong" message={error} />
-        ) : records.length === 0 ? (
+            }
+          />
+        ) : (
           <EmptyState
             framed
             icon="fa-book-open"
-            title="No research papers found"
-            message={
-              activeFilterCount > 0 || activeQuery
-                ? "No records match your current search and filters."
-                : "Nothing has been published yet. Records appear here once they clear review."
-            }
+            title="Nothing has been published yet."
+            message="Research appears here once it has been reviewed and published."
             action={
-              activeFilterCount > 0 || activeQuery ? (
-                <button type="button" onClick={resetAll} className={PILL_PRIMARY}>
-                  Reset all filters
+              canPublish ? (
+                <button type="button" onClick={openPublish} className={PILL_PRIMARY}>
+                  Publish
                 </button>
               ) : undefined
             }
           />
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-4">
-              {records.map((record) => (
-                <DiscoverRecordCard
-                  key={record.id}
-                  record={record}
-                  searchHighlight={activeQuery}
-                  onCite={() => setCiteRecord(record)}
-                />
-              ))}
-            </div>
+        )
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {records.map((record) => (
+              <DiscoverResultCard
+                key={record.id}
+                record={record}
+                searchHighlight={activeQuery}
+                onCite={() => setCiteRecord(record)}
+              />
+            ))}
+          </div>
 
-            {hasMore && (
-              <div className="flex justify-center mt-6">
-                <button
-                  type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="px-5 py-2.5 rounded-full border border-stone-200 bg-white text-stone-700 hover:border-brand hover:text-brand text-xs font-bold transition disabled:opacity-60 flex items-center gap-2"
-                >
-                  {loadingMore ? <Spinner size="sm" /> : <i className="fas fa-arrow-down text-[11px]" aria-hidden />}
-                  <span>{loadingMore ? "Loading…" : `Load more (${totalCount - records.length} left)`}</span>
-                </button>
-              </div>
-            )}
-          </>
-        )}
+          {(remaining > 0 || loadMoreFailed) && (
+            <div className="flex flex-col items-center gap-2 mt-8">
+              {loadMoreFailed && (
+                <p role="alert" className="text-small text-stone-700">
+                  More results didn&apos;t load.
+                </p>
+              )}
+              <button type="button" onClick={loadMore} disabled={loadingMore} className={PILL_SECONDARY}>
+                {loadingMore && <Spinner size="sm" />}
+                {loadingMore ? "Loading…" : loadMoreFailed ? "Try again" : `Load more (${remaining} left)`}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-stone-50 flex flex-col">
+      {/* AppShell draws no shared header on "/" until F1 (IR-413) moves
+          Discover under it, so this bar carries the drawer toggle and the
+          notification bell -- without the bell, Discover would be the one
+          screen where new notifications are invisible. */}
+      <div className="flex items-center gap-3 px-4 sm:px-7 pt-4">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className={cn(
+            "md:hidden w-10 h-10 shrink-0 rounded-xl border border-stone-200 bg-white flex items-center justify-center text-stone-700",
+            FOCUS_RING,
+          )}
+          aria-label="Toggle navigation"
+        >
+          <i className="fas fa-bars text-[14px]" aria-hidden />
+        </button>
+        <div className="ml-auto shrink-0">
+          <NotificationBell />
+        </div>
       </div>
 
-      <PaperCiteModal
-        record={citeRecord}
-        isOpen={Boolean(citeRecord)}
-        onClose={() => setCiteRecord(null)}
-      />
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-7 pt-2 pb-12 flex-1">
+        <PageHeader
+          title="Discover"
+          description="Published theses, research and projects from across CIT-U."
+          actions={
+            canPublish ? (
+              <button type="button" onClick={openPublish} className={PILL_PRIMARY}>
+                <i className="fas fa-plus text-[12px]" aria-hidden />
+                Publish
+              </button>
+            ) : undefined
+          }
+        />
+
+        <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
+
+        <DiscoverTabs
+          tabs={[{ id: "research", label: "Research", content: research }]}
+          active={tab}
+          onSelect={setTab}
+        />
+      </div>
+
+      <PaperCiteModal record={citeRecord} isOpen={Boolean(citeRecord)} onClose={() => setCiteRecord(null)} />
+    </div>
+  );
+}
+
+/** Placeholder cards in the grid's own shape, announced once as loading. */
+function ResultsSkeleton() {
+  return (
+    <div role="status">
+      <span className="sr-only">Loading research…</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-hidden="true">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="bg-white rounded-xl border border-stone-200 p-card-compact md:p-card">
+            <div className="h-3 w-1/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+            <div className="mt-3 h-5 w-5/6 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+            <div className="mt-2 h-5 w-2/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+            <div className="mt-4 h-3 w-full rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+            <div className="mt-2 h-3 w-11/12 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
