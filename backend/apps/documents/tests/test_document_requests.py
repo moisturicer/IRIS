@@ -632,6 +632,23 @@ class ValidationTests(DocumentRequestTestBase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_an_upload_with_neither_slot_nor_item_names_both_alternatives(self):
+        # IR-347: the message said "record, slot, and file" since before
+        # IR-262, which told a caller sending `request_item` the wrong fix.
+        record = self.at_parallel_review()
+        self.client.force_authenticate(self.owner)
+
+        response = self.client.post(
+            SUBMIT_DOCUMENT, {"record": record.pk, "file": pdf()}, format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"],
+            "record, file, and one of slot or request_item are required.",
+        )
+        self.assertFalse(RecordUpload.objects.filter(record=record).exists())
+
 
 class PicklistTests(DocumentRequestTestBase):
 
