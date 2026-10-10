@@ -139,12 +139,15 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
           </>
         ) : (
           <>
-            <h1 className="mt-10 sm:mt-14 font-serif leading-[1.05]">
+            {/* A display line, not a heading: the panel is hidden below `lg`,
+                so a heading here vanishes on a phone. `AuthLayout` owns the
+                `<h1>` (IR-211). */}
+            <p className="mt-10 sm:mt-14 font-serif leading-[1.05]">
               <span className="block text-[40px] sm:text-[48px] font-bold text-brand-dark">The</span>
               <span className="block text-[40px] sm:text-[48px] font-bold text-brand">
                 Academic Curator.
               </span>
-            </h1>
+            </p>
             <p className="mt-5 text-[15px] sm:text-[16px] text-brand/90 leading-relaxed max-w-md">
               Welcome to the Digital Vault of CIT-U Intellectual Property. A prestigious archive
               for students and researchers to safeguard and manage their academic assets.
