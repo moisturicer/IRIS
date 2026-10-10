@@ -27,6 +27,7 @@ from core.permissions import (
     IsAuthor,
     IsOwnerOrStaff,
     IsRDCO,
+    IsRecordOwner,
     IsStaff,
 )
 from .download_service import file_response_for_record
@@ -131,7 +132,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         # later clear the record, could author one (IR-165).
         if self.action == "create":
             return [IsAuthenticated(), IsAuthor()]
-        if self.action in ("update", "partial_update", "destroy", "submit"):
+        # Editing details and submitting are an owner's alone (IR-507, ADR-032
+        # §10 Amendment): no office edits or submits a record that is not
+        # theirs, so submission's consent is always an owner's. When an owner
+        # may edit is the serializer's question (`versions.details_editable`).
+        if self.action in ("update", "partial_update", "submit"):
+            return [IsAuthenticated(), IsRecordOwner()]
+        # Still owner-or-staff: who may delete is IR-508's decision.
+        if self.action == "destroy":
             return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
@@ -217,7 +225,7 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         Revised work uses the dedicated resubmission action.
         """
-        record = self.get_object()  # enforces IsOwnerOrStaff object permission
+        record = self.get_object()  # enforces IsRecordOwner object permission
 
         if record.pipeline_status != PipelineStatus.DRAFT:
             return Response(

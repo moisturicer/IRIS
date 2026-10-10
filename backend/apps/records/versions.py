@@ -39,6 +39,25 @@ from .models import Record, RecordVersion
 #: The statuses in which a record's manuscript may be replaced (module note).
 MANUSCRIPT_REPLACEABLE_STATUSES = frozenset({PipelineStatus.DRAFT})
 
+#: What a record was submitted *for routing and IP judgement on*, fixed once it
+#: leaves `draft` (IR-507, ADR-032 §10 Amendment). Changing the Adviser would
+#: leave the Adviser seat with the old one while routing reads the new one, so
+#: neither could route it; the type picks the decision path; the IP flags are the
+#: offices' through `tags/` and `is_ip` feeds the AI disclosure gate; the hints
+#: were for the router, who has already read them. A revision answers a
+#: reviewer, so only the paper's own details stay open while one is asked for.
+SUBMISSION_FIXED_FIELDS = (
+    "adviser",
+    "record_type",
+    "is_ip",
+    "for_commercialization",
+    "community_extension",
+    "requested_itso",
+    "requested_ierc",
+    "requested_ktto",
+    "requires_ethics_review",
+)
+
 
 def _awaiting_resubmission(record) -> bool:
     """On the new model with a revision request open (ADR-032 §5)."""
@@ -48,6 +67,16 @@ def _awaiting_resubmission(record) -> bool:
         record.pipeline_status == PipelineStatus.IN_REVIEW
         and open_requests(record).exists()
     )
+
+
+def details_editable(record) -> bool:
+    """
+    May `record`'s owners edit its details now? A `draft`, or while a revision
+    is asked for: exactly where Record detail offers `edit_details` (IR-507).
+    Who may edit is the view's question (`IsRecordOwner`); which fields, the
+    serializer's (`SUBMISSION_FIXED_FIELDS`).
+    """
+    return record.pipeline_status == PipelineStatus.DRAFT or _awaiting_resubmission(record)
 
 
 def may_replace_manuscript(record, user=None) -> bool:

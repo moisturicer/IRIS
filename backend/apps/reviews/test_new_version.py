@@ -20,6 +20,7 @@ from apps.documents.models import RecordUpload, UploadSlot
 from apps.notifications.models import Notification
 from apps.records import lifecycle
 from apps.records.models import RecordVersion
+from apps.reviews import routing
 from apps.reviews.models import (
     RecordAssignment,
     RecordClearance,
@@ -200,12 +201,16 @@ class UploadVersionTests(NewVersionTestBase):
         self.assertEqual(self.upload_manuscript(record).status_code, status.HTTP_200_OK)
 
     def test_a_reviewer_may_not_replace_it_while_a_revision_is_asked_for(self):
-        """Staff are not exempt (ADR-032 §5 Amendment): the revision is the owner's."""
+        """
+        Staff are not exempt (ADR-032 §5 Amendment): the revision is the owner's.
+        A 403 since IR-507, where it was the manuscript lock's 400: no office
+        edits a record that is not theirs, so the refusal comes before the lock.
+        """
         record = self.itso_cleared_and_ierc_asked()
 
         response = self.upload_manuscript(record, as_user=self.ierc)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         record.refresh_from_db()
         self.assertEqual(record.abstract_file.name, self.versions(record)[0].manuscript.name)
 
@@ -328,8 +333,17 @@ class NothingChangedTests(NewVersionTestBase):
         self.assert_refused_as_unchanged(self.itso_cleared_and_ierc_asked())
 
     def test_an_edit_made_before_the_request_does_not_answer_it(self):
-        record = self.thesis(Party.IERC)
+        """
+        The edit is made while the record is still a draft. It used to be made
+        in review before the request was opened, which IR-507 now refuses: an
+        owner edits only a draft or a record awaiting their revision. A draft
+        edit stamps `details_edited_at` just the same, so the question this
+        asks -- does an earlier stamp answer a later request? -- is unchanged.
+        """
+        record = self.make_record(abstract_file=_pdf(b"%PDF-1.7 v1"))
         self.edit_title(record)
+        routing.enter_at_adviser(record, self.owner)
+        self.accepted_to(record, Party.IERC)
         self.opened_seat(record, Party.IERC, self.ierc)
         self.asked(record, self.ierc)
 
@@ -342,10 +356,18 @@ class NothingChangedTests(NewVersionTestBase):
         self.assert_refused_as_unchanged(record)
 
     def test_a_reviewer_editing_the_details_does_not_answer_the_request(self):
-        """Found in review: the revision is the owner's to make."""
+        """
+        Found in review: the revision is the owner's to make. Since IR-507 the
+        reviewer's edit is refused outright -- a 403, since IERC can see the
+        record -- where before it was saved and merely did not count.
+        """
         record = self.itso_cleared_and_ierc_asked()
-        self.edit_title(record, as_user=self.ierc)
+        self.client.force_authenticate(self.ierc)
+        response = self.client.patch(detail_url(record), {"title": "A revised title"}, format="json")
 
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        record.refresh_from_db()
+        self.assertNotEqual(record.title, "A revised title")
         self.assert_refused_as_unchanged(record)
 
     def test_a_supporting_document_uploaded_since_the_request_is_a_change(self):

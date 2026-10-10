@@ -20,16 +20,14 @@ the state the next one sees. `cite` and `replace_manuscript` have no endpoint
 of their own (`replace_manuscript` rides on the owner's record update and is
 offered exactly with `create_version`), so they are checked by set only.
 
-**One known gap is pinned, not hidden.** The record update and `submit/` are
-`IsOwnerOrStaff`, wider than any offer. Rule 3 is waived for those two in the
-table and asserted on its own as a strict xfail, which turns red the day the
-endpoints are narrowed, so the waiver cannot outlive the gap.
+**No capability is waived.** The record update and `submit/` were wider than
+any offer until IR-507 narrowed them to owners, and an owner's edit to where
+`edit_details` is offered; rule 3 was waived for those two until then.
 """
 
 import shutil
 import tempfile
 
-import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.test import override_settings
@@ -267,12 +265,6 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
     }
 
-    # The two endpoints whose authority is wider than any offer: owners edit in
-    # every state, and office staff edit and submit records that are not theirs
-    # (`IsOwnerOrStaff`). Rule 3 is pinned for them separately, as a known gap
-    # (IR-507), and this waiver goes when that ticket narrows the endpoints.
-    WIDER_ENDPOINTS = {"edit_details", "continue_draft"}
-
     def _offer(self, record, user):
         self.client.force_authenticate(user)
         response = self.client.get(reverse("record-detail", args=[record.pk]))
@@ -301,21 +293,23 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                         got = (capability, response.status_code)
                         if capability in offered:
                             self.assertNotIn(response.status_code, (403, 404), got)
-                        elif capability not in self.WIDER_ENDPOINTS:
+                        else:
                             self.assertGreaterEqual(response.status_code, 300, got)
 
-    @pytest.mark.xfail(strict=True, raises=AssertionError, reason=(
-        "Known gap, IR-507: the record update and submit/ are IsOwnerOrStaff, so office "
-        "staff edit and submit records that are not theirs, and owners edit in every "
-        "state. This xfail turns red when the endpoints refuse what is not offered."
-    ))
     def test_edit_and_submit_refuse_what_is_not_offered(self):
+        """
+        IR-507: the record update and `submit/` were `IsOwnerOrStaff`, so office
+        staff edited and submitted records that were not theirs, and owners
+        edited in every state. Pinned here as a strict xfail until the
+        endpoints were narrowed; the table above now holds them to rule 3 as
+        well, and this stays as the named regression.
+        """
         probes = self._probes()
         for state in ("draft", "itso_open", "published"):
             record = getattr(self, state)()
             for name, user in self.viewers().items():
                 _, detail = self._offer(record, user)
                 offered = set(detail["capabilities"]) if detail else set()
-                for capability in sorted(self.WIDER_ENDPOINTS - offered):
+                for capability in sorted({"edit_details", "continue_draft"} - offered):
                     status_code = probes[capability](record, user, detail).status_code
                     assert status_code >= 300, (state, name, capability, status_code)
