@@ -1,34 +1,15 @@
 /**
  * The capabilities adapter (IR-411; spec §4.8, ADR-032 §10).
  *
- * **The one place the frontend decides what a viewer may do with a record.**
- * Paper View, My Library, My Reviews and Publish ask this module; none of them
- * reads a role name itself. `test/roleGuard.test.ts` fails the
- * build if one does.
- *
- * **Phase 1 (now).** The Record detail payload carries no `capabilities` list
- * yet, so this derives one from the server fields that exist:
- *
- * - a seat still to work → `open_review`;
- * - the server's per-act flags (`routing`, `decision`, `office_review`,
- *   `revision`) → the review actions;
- * - `can_request_document` non-empty → `request_document`;
- * - ownership plus the server's `workflow_state` → the author actions.
- *
- * `tag_ip` and `attach_file` are the two capabilities still read from the
- * viewer's role, here and nowhere else, until the server says them (phase 2).
- *
- * **Phase 2 (IR-418, "Capabilities payload").** The serializer adds
- * `capabilities: string[]` from `core.permissions`; this module becomes a
- * pass-through and every caller is untouched.
+ * Paper View, My Library, My Reviews and Publish ask this module for the
+ * server's action offers; none compares a role name to decide an action.
+ * `test/roleGuard.test.ts` guards that boundary.
  *
  * Nothing here is a permission. The server re-checks every action, so a
  * capability is only a decision about what to *offer*.
  */
-import { STAFF_ROLES, type RoleName } from "@/lib/constants";
+import type { RoleName } from "@/lib/constants";
 import {
-  OPEN_SEAT_STATES,
-  type DecisionOutcome,
   type RecordDetail,
   type ReviewerSeat,
 } from "@/types/records";
@@ -70,14 +51,6 @@ export type Capability =
   | "comment_public"
   | "cite";
 
-/** Which capability offers each Decision outcome (IR-270). */
-const DECISION_CAPABILITY: Record<DecisionOutcome, Capability> = {
-  accept: "accept_proposal",
-  publish: "accept_publish",
-  keep_unlisted: "keep_unlisted",
-  reject: "reject",
-};
-
 /** Paper View's sections, in tab order (spec §4.6). */
 export const PAPER_SECTIONS = ["overview", "paper", "review", "files"] as const;
 export type PaperSection = (typeof PAPER_SECTIONS)[number];
@@ -90,14 +63,7 @@ type CapabilityInputs = Pick<
   RecordDetail,
   | "owners"
   | "can_request_document"
-  | "my_seats"
   | "is_participant"
-  | "routing"
-  | "office_review"
-  | "revision"
-  | "decision"
-  | "workflow_state"
-  | "pipeline_status"
   | "abstract_file"
   | "files"
 >;
@@ -135,71 +101,13 @@ export function seatToOpen(record: Pick<RecordDetail, "my_seats">): ReviewerSeat
   return record.my_seats.find((seat) => seat.state === "assigned") ?? null;
 }
 
-/** Whether the viewer holds a seat still to work: assigned, or in review. */
-function holdsOpenSeat(record: Pick<RecordDetail, "my_seats">): boolean {
-  return record.my_seats.some((seat) => OPEN_SEAT_STATES.includes(seat.state));
-}
-
 /** Whether there is a paper to read: the manuscript, else any attached file. */
 function hasPaper(record: CapabilityInputs): boolean {
   return Boolean(record.abstract_file) || record.files.length > 0;
 }
 
-export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null): ReadonlySet<Capability> {
-  const granted = new Set<Capability>(["cite"]);
-  if (viewer == null) return granted;
-
-  // A seat to work is a review to open.
-  if (holdsOpenSeat(record)) granted.add("open_review");
-  // Routing (ADR-032 §4, IR-261): the server's own flags, never derived here.
-  if (record.routing.accept_and_route) granted.add("accept_route");
-  if (record.routing.route_as != null) granted.add("route");
-  // Decisions (ADR-032 §3, IR-270): the outcomes the server offers this
-  // viewer, each its own action. Read defensively: a payload from before
-  // IR-270 carries no `decision`, and offers no Decision.
-  for (const outcome of record.decision?.outcomes ?? []) granted.add(DECISION_CAPABILITY[outcome]);
-  // An office reviewer (ADR-032 §3-§4, IR-269), from the server's flag: one
-  // capability for *Clear* and *Record finding*, which share every rule
-  // (ADR-032 §10 Amendment, 2026-10-08), and *Add reviewer* from the same seat.
-  if (record.office_review.party != null) {
-    granted.add("office_review");
-    granted.add("add_reviewer");
-  }
-  if (record.can_request_document.length > 0) granted.add("request_document");
-  // Revision requests (ADR-032 §5, IR-272), from the server's flag. A party
-  // asks once: while its request is open, its reviewers are offered the
-  // withdrawal instead of a second request.
-  if (record.revision.withdrawable != null) granted.add("withdraw_revision");
-  else if (record.revision.party != null) granted.add("request_revision");
-
-  if (isOwner(record, viewer)) {
-    // Every author action keys off the server's derived state, never the
-    // stored stage, so a rejected record (terminal) offers none of them.
-    if (record.workflow_state === "draft") {
-      granted.add("continue_draft");
-      granted.add("edit_details");
-    }
-    if (record.workflow_state === "awaiting_resubmission") {
-      // The owner answers a revision request with a new version, which the
-      // server offers through `revision.new_version` (IR-273).
-      if (record.revision.new_version != null) granted.add("create_version");
-      // A new version may carry a revised manuscript (IR-273). The server
-      // opens the manuscript lock to an owner only while a revision is asked
-      // for on the new model, which is what its offer says.
-      if (record.revision.new_version != null) granted.add("replace_manuscript");
-      // The edit becomes part of the next version (IR-273, invariant 4).
-      granted.add("edit_details");
-    }
-  }
-
-  // Phase 1 only: the two role-derived capabilities, mirroring the server's
-  // `IsStaff` (KTTO, RDCO, ITSO, IERC). Phase 2 reads them from the server.
-  const officeStaff = viewer.role_name != null && STAFF_ROLES.includes(viewer.role_name);
-  if (officeStaff && record.pipeline_status === "published") granted.add("tag_ip");
-  // Only where the office takes part, which is where the Files section is.
-  if (officeStaff && isReviewing(record, viewer)) granted.add("attach_file");
-
-  return granted;
+export function capabilitiesFor(record: Pick<RecordDetail, "capabilities">, _viewer: Viewer | null): ReadonlySet<Capability> {
+  return new Set(record.capabilities);
 }
 
 /** A `?section=` value Paper View knows, else null. */

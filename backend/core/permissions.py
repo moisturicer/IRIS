@@ -294,6 +294,63 @@ def may_read_review(user, record) -> bool:
     ).exists()
 
 
+def record_capabilities(record, user, *, workflow, my_seats, routing, office_review,
+                        revision, decision) -> list[str]:
+    """Action keys offered by Record detail (ADR-032 §10, IR-418).
+
+    These are rendering hints assembled from the same server predicates and
+    action flags the endpoints use. An action still checks authority and state
+    when called; a blocked action may be offered so its reason can be shown.
+    """
+    from apps.documents.attachments import filing_party
+    from core.enums import PipelineStatus, WorkflowState
+
+    offered = ["cite"]
+    if not user or not getattr(user, "is_authenticated", False):
+        return offered
+
+    if workflow["can_act"] or any(seat["state"] in OPEN_SEAT_STATES for seat in my_seats):
+        offered.append("open_review")
+    if routing["accept_and_route"]:
+        offered.append("accept_route")
+    if routing["route_as"] is not None:
+        offered.append("route")
+    for outcome in decision["outcomes"]:
+        offered.append({
+            "accept": "accept_proposal", "publish": "accept_publish",
+            "keep_unlisted": "keep_unlisted", "reject": "reject",
+        }[outcome])
+    if office_review["party"] is not None:
+        offered.append("office_review")
+        if office_review["assignment"] is not None:
+            offered.append("add_reviewer")
+    if workflow["can_request_document"]:
+        offered.append("request_document")
+    if revision["withdrawable"] is not None:
+        offered.append("withdraw_revision")
+    elif revision["party"] is not None:
+        offered.append("request_revision")
+
+    if is_record_owner(user, record):
+        if workflow["workflow_state"] == PipelineStatus.DRAFT:
+            offered.extend(["continue_draft", "edit_details"])
+        elif workflow["workflow_state"] == WorkflowState.AWAITING_RESUBMISSION:
+            if revision["new_version"] is not None:
+                offered.extend(["create_version", "replace_manuscript"])
+            offered.append("edit_details")
+
+    # Both role-gated endpoints refuse anyone who is not office staff
+    # (`IsStaff`) before any other check, so the offers do too.
+    office_staff = get_role_name(user) in STAFF_ROLES
+    if office_staff and record.pipeline_status == PipelineStatus.PUBLISHED:
+        offered.append("tag_ip")
+    # `documents/files/upload/`: office staff whose office takes part (IR-474).
+    # An Adviser takes part too, but is not staff, so is never offered it.
+    if office_staff and filing_party(record, user) is not None:
+        offered.append("attach_file")
+    return offered
+
+
 class IsOwnerOrStaff(BasePermission):
     """
     Object-level: the user owns the record OR is a staff member.

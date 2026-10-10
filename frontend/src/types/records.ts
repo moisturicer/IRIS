@@ -94,6 +94,8 @@ export interface RecordFileItem {
 }
 
 export interface RecordDetail extends RecordListItem {
+  /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
+  capabilities:   import("@/features/records/capabilities").Capability[];
   year_completed:  number | null;
   abstract:        string;
   abstract_file:   string | null;

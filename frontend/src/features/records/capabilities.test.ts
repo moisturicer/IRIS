@@ -67,6 +67,7 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     workflow_state: "published",
     workflow_state_label: "Published",
     current_holders: [],
+    capabilities: ["cite"],
     can_request_document: [],
     my_seats: [],
     is_participant: false,
@@ -407,8 +408,21 @@ const ROWS: Row[] = [
 ];
 
 describe("the capabilities adapter", () => {
+  it("returns the server's list even when client-side role and workflow fields suggest otherwise", () => {
+    const payload = Object.assign(record({
+      pipeline_status: "draft",
+      workflow_state: "draft",
+      routing: { accept_and_route: true, route_as: "itso" },
+      my_seats: [seat("assigned")],
+    }), { capabilities: ["cite", "attach_file"] as Capability[] });
+
+    expect([...capabilitiesFor(payload, stranger)]).toEqual(["cite", "attach_file"]);
+  });
+
   it.each(ROWS)("$name", ({ record: r, viewer, capabilities, sections }) => {
-    expect([...capabilitiesFor(r, viewer)].sort()).toEqual([...capabilities].sort());
+    // The server supplies the action list; these rows still exercise every
+    // section-access state and verify that the adapter preserves each list.
+    expect([...capabilitiesFor({ ...r, capabilities }, viewer)].sort()).toEqual([...capabilities].sort());
     expect(sectionsFor(r, viewer)).toEqual(sections);
   });
 
@@ -418,14 +432,4 @@ describe("the capabilities adapter", () => {
     expect(seatToOpen(record())).toBeNull();
   });
 
-  it("never grants an action whose backend does not exist yet", () => {
-    // `request_revision` left this list with IR-272, which built its endpoint.
-    const unbuilt: Capability[] = [
-      "continue_as", "set_visibility", "comment_review", "comment_public",
-    ];
-    for (const { record: r, viewer } of ROWS) {
-      const granted = capabilitiesFor(r, viewer);
-      for (const capability of unbuilt) expect(granted.has(capability)).toBe(false);
-    }
-  });
 });

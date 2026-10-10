@@ -96,6 +96,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # stale dialog never decides into a changed record. A rendering hint;
     # `decide/` re-checks it.
     decision             = serializers.SerializerMethodField()
+    # What the viewer may be offered (ADR-032 §10, IR-418): `core.permissions`
+    # assembles it from the blocks above. A rendering hint; every action
+    # endpoint re-checks its own predicate, so the server stays authoritative.
+    capabilities         = serializers.SerializerMethodField()
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
@@ -148,10 +152,22 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def _viewer(self):
         return getattr(self.context.get("request"), "user", None)
 
+    def _once(self, obj, name, compute):
+        """
+        A viewer-dependent block, computed once per record. `capabilities`
+        reads the same blocks the payload carries (IR-418), and each costs
+        queries, so neither field computes them a second time.
+        """
+        cache = self.__dict__.setdefault("_block_cache", {})
+        key = (obj.pk, name)
+        if key not in cache:
+            cache[key] = compute()
+        return cache[key]
+
     def get_my_seats(self, obj):
         from apps.reviews.seats import my_seats
 
-        return my_seats(obj, self._viewer())
+        return self._once(obj, "my_seats", lambda: my_seats(obj, self._viewer()))
 
     def get_is_participant(self, obj):
         from core.permissions import is_record_participant
@@ -161,22 +177,35 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_routing(self, obj):
         from apps.reviews.routing import routing_flags
 
-        return routing_flags(obj, self._viewer())
+        return self._once(obj, "routing", lambda: routing_flags(obj, self._viewer()))
 
     def get_office_review(self, obj):
         from apps.reviews.office_review import office_review_flags
 
-        return office_review_flags(obj, self._viewer())
+        return self._once(obj, "office_review", lambda: office_review_flags(obj, self._viewer()))
 
     def get_revision(self, obj):
         from apps.reviews.revisions import revision_flags
 
-        return revision_flags(obj, self._viewer(), readable=self._readable(obj))
+        return self._once(
+            obj, "revision",
+            lambda: revision_flags(obj, self._viewer(), readable=self._readable(obj)),
+        )
 
     def get_decision(self, obj):
         from apps.reviews.decisions import decision_flags
 
-        return decision_flags(obj, self._viewer())
+        return self._once(obj, "decision", lambda: decision_flags(obj, self._viewer()))
+
+    def get_capabilities(self, obj):
+        from core.permissions import record_capabilities
+
+        return record_capabilities(
+            obj, self._viewer(), workflow=self._workflow(obj),
+            my_seats=self.get_my_seats(obj), routing=self.get_routing(obj),
+            office_review=self.get_office_review(obj), revision=self.get_revision(obj),
+            decision=self.get_decision(obj),
+        )
 
     def get_reviews(self, obj):
         """
@@ -310,7 +339,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "is_participant", "routing",
-            "office_review", "revision", "decision",
+            "office_review", "revision", "decision", "capabilities",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

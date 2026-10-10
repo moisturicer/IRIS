@@ -680,7 +680,7 @@ FR-M5-01 · FR-M5-03 · FR-M4 · NFR-R3 · NFR-S4. These are stable labels only.
 - seats, pool and coordinator
 - record versions and the version picker
 - Proposal continuation and lineage
-- capabilities payload and Paper View modes
+- capabilities payload (IR-418; Paper View modes belong to F5 / IR-411)
 - review timeline and `ReviewComment`
 - public discussion
 - Discoverable Proposals and the Discover Proposals section

@@ -8,6 +8,34 @@
 
 ---
 
+## IR-418 capabilities payload (ADR-032 §10)
+
+**Design:** [ADR-032 §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md)
+and [frontend redesign spec §4.8](../frontend_redesign_spec.md). Record detail
+returns server-computed `capabilities` for the requesting user. The frontend
+adapter passes that list through; Paper View sections retain their existing
+participation and paper-presence checks. Every action endpoint keeps its own
+authority check.
+
+**Tests:** `apps.records.test_capabilities` (role × state at the REST seam,
+including endpoint refusals), `features/records/capabilities.test.ts`
+(pass-through with conflicting client hints), and `test/roleGuard.test.ts`.
+**Evidence:** `test_capabilities` passed in a container against its own test
+database (2 tests, every subtest) after it caught a real drift: the server
+offered `attach_file` to an Adviser, whom `documents/files/upload/` refuses
+with 403 (`IsStaff`), so the offer is now staff-gated like the endpoint.
+`capabilities.test.ts`, `roleGuard.test.ts` and `PaperViewPage.test.tsx`
+passed under Vitest. Full suites: the IR-418 PR's CI.
+
+**Recorded contradiction:** ADR-032 §10 (IR-270 amendment) keeps `decide` "the
+link to the current decision form for legacy records until IR-274". IR-260
+removed that form and its link, so nothing reads `decide` and the server does
+not send it. Paper View's header now defers its primary to the Review action
+bar whenever any review action is granted, which is what `decide` stood for.
+The ADR line is left for the project lead to amend or retire with IR-274.
+
+---
+
 ## IR-260 adviser-first cutover (FR-M5-01, 2026-10-10)
 
 **Design:** [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md)
