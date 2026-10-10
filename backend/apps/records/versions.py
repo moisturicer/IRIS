@@ -46,16 +46,21 @@ MANUSCRIPT_REPLACEABLE_STATUSES = frozenset({PipelineStatus.DRAFT})
 #: offices' through `tags/` and `is_ip` feeds the AI disclosure gate; the hints
 #: were for the router, who has already read them. A revision answers a
 #: reviewer, so only the paper's own details stay open while one is asked for.
-SUBMISSION_FIXED_FIELDS = (
-    "adviser",
-    "record_type",
-    "is_ip",
-    "for_commercialization",
-    "community_extension",
-    "requested_itso",
-    "requested_ierc",
-    "requested_ktto",
-    "requires_ethics_review",
+#: Named through the model's own fields, so a renamed field breaks here, at
+#: import, and `"adviser"` is never spelled where the Party vocabulary is.
+SUBMISSION_FIXED_FIELDS = tuple(
+    attribute.field.name
+    for attribute in (
+        Record.adviser,
+        Record.record_type,
+        Record.is_ip,
+        Record.for_commercialization,
+        Record.community_extension,
+        Record.requested_itso,
+        Record.requested_ierc,
+        Record.requested_ktto,
+        Record.requires_ethics_review,
+    )
 )
 
 

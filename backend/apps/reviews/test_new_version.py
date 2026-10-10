@@ -14,12 +14,13 @@ from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.notifications.models import Notification
 from apps.records import lifecycle
-from apps.records.models import RecordVersion
+from apps.records.models import Record, RecordVersion
 from apps.reviews import routing
 from apps.reviews.models import (
     RecordAssignment,
@@ -569,7 +570,10 @@ class WhoMaySubmitTests(NewVersionTestBase):
 
     def test_with_no_open_request_there_is_nothing_to_answer(self):
         record = self.thesis(Party.IERC)
-        self.edit_title(record)
+        # A change exists, so the refusal is about the missing request. It was
+        # made through the record update until IR-507 refused an owner's edit
+        # in review with no revision asked for; the stamp is what that wrote.
+        Record.objects.filter(pk=record.pk).update(details_edited_at=timezone.now())
 
         response = self.submit_version(record)
 
