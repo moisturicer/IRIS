@@ -37,6 +37,8 @@ from django.test import SimpleTestCase, TestCase
 from core.enums import (
     AssignmentState,
     ClearanceStatus,
+    DocumentRequestItemState,
+    DocumentRequestState,
     IPType,
     Office,
     PipelineStatus,
@@ -74,12 +76,11 @@ GOVERNED_ENUMS = (
     # branches on these values, so a hand-typed copy is the same drift risk.
     WorkflowState,
     TrackerPartyState,
-    # IR-262: `DocumentRequestState` and `DocumentRequestItemState` are
-    # deliberately not here. Their `"open"` and `"uploaded"` are also, as
-    # unrelated concepts, bare values in `ai/resilience/circuit.py` (a circuit
-    # breaker's state) and `ai/ingestion/lifecycle.py` (an ingestion job's),
-    # and `apps/ai` is outside this change's reach. Their `"withdrawn"` and
-    # `"rejected"` stay governed through `AssignmentState` and `PipelineStatus`.
+    # IR-262's document-request vocabulary, governed by IR-347. Its "open"
+    # and "uploaded" are also unrelated bare values in two `apps/ai` modules;
+    # those files are allowed one by one below rather than exempting a value.
+    DocumentRequestState,
+    DocumentRequestItemState,
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
@@ -122,6 +123,32 @@ ALLOWED = {
     # (IR-466) A Celery job's own lifecycle (pending/.../completed), not a
     # person's request or a Record's stage. Same shape as embedding_space.py.
     "ai/models/shadow.py",
+    # (IR-347) The entries below exist because `DocumentRequestState` and
+    # `DocumentRequestItemState` became governed. None of them is a document
+    # request or an item; each is another concept spelled the same way.
+    #
+    # `CircuitState.OPEN`: a circuit breaker that has tripped, not a request
+    # awaiting documents. Same shape as embedding_space.py.
+    "ai/resilience/circuit.py",
+    # `IngestionState.UPLOADED`: the first step of the ingestion pipeline, a
+    # file that has arrived but not been extracted -- not an owner's answer to
+    # a requested item. Same shape as embedding_space.py.
+    "ai/ingestion/lifecycle.py",
+    # "missing" is a report key: the count of shadow rows recorded but never
+    # decided. A number, not an item's state.
+    "ai/evidence/shadow.py",
+    # "missing" is a report key, twice over: the count of eligible rows with
+    # no completed result, and the list of fields a sample plan has not yet
+    # declared. Neither is an item's state.
+    "ai/evaluation/pilot_report.py",
+    # "missing" reads the sample plan's undeclared-fields list built by
+    # pilot_report.py above, to name them in the refusal.
+    "ai/management/commands/report_evidence_pilot.py",
+    # "open" is record detail's response key for the list of open *revision*
+    # requests (ADR-032 §5, IR-272), which Paper View reads by that name.
+    # Renaming a wire key is out of IR-347's scope; it is not a
+    # `DocumentRequestState`.
+    "reviews/revisions.py",
 }
 
 
