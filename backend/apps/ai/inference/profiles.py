@@ -86,6 +86,8 @@ class Profile:
     api_key: str
     reasoning_visible: bool
     data_policy: DataPolicy = DataPolicy.NO_TRAINING
+    #: OpenRouter providers this task may reach, or empty for any (IR-489).
+    provider_only: tuple[str, ...] = ()
 
     @property
     def is_configured(self) -> bool:
@@ -109,9 +111,13 @@ def _setting(name: str, default: str = "") -> str:
     return (value or "").strip() if isinstance(value, str) else default
 
 
+def _listed(name: str) -> tuple[str, ...]:
+    raw = _setting(name)
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
 def _fallback_models(prefix: str) -> tuple[str, ...]:
-    raw = _setting(f"{prefix}_FALLBACK_MODELS")
-    return tuple(model.strip() for model in raw.split(",") if model.strip())
+    return _listed(f"{prefix}_FALLBACK_MODELS")
 
 
 #: The setting *names* a task inherits when its own are unset. Keys, not
@@ -227,4 +233,6 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
         base_url=base_url or chosen.base_url,
         api_key=api_key,
         reasoning_visible=bool(getattr(settings, f"{prefix}_REASONING", False)),
+        # Never inherited: a pin is a choice about one task's model.
+        provider_only=_listed(f"{prefix}_PROVIDER_ONLY"),
     )

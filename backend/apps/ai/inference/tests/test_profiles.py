@@ -399,3 +399,41 @@ class ResolveProfileTests:
 
         adapter = provider._provider._provider  # noqa: SLF001
         assert adapter._reasoning_effort == ""  # noqa: SLF001
+
+
+class ProviderPinTests:
+    """IR-489: an allow-list of OpenRouter providers, per task."""
+
+    def test_a_task_reads_its_own_pin(self, settings):
+        settings.LLM_ANSWER_PROVIDER_ONLY = "together, fireworks"
+
+        assert profile_for(InferenceTask.ANSWER).provider_only == (
+            "together",
+            "fireworks",
+        )
+
+    def test_no_pin_is_an_empty_tuple(self, settings):
+        settings.LLM_SUMMARY_PROVIDER_ONLY = ""
+
+        assert profile_for(InferenceTask.SUMMARY).provider_only == ()
+
+    def test_a_pin_is_not_inherited_by_another_task(self, settings):
+        settings.LLM_ANSWER_PROVIDER_ONLY = "together"
+        settings.LLM_RESOLVE_PROVIDER_ONLY = ""
+
+        assert profile_for(InferenceTask.RESOLVE).provider_only == ()
+
+    def test_the_pin_reaches_the_adapter_a_task_is_built_with(self, settings):
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+        settings.LLM_ANSWER_MODEL = "answer-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_ANSWER_PROVIDER_ONLY = "together"
+
+        provider = build_profile_llm(profile_for(InferenceTask.ANSWER))
+
+        adapter = provider._provider._provider  # noqa: SLF001
+        assert adapter.dialect.request_extras("")["extra_body"]["provider"] == {
+            "data_collection": "deny",
+            "only": ["together"],
+        }
+

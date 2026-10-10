@@ -90,6 +90,56 @@ class TestOpenRouterRequestShaping:
         }
 
 
+class TestOpenRouterProviderPin:
+    """IR-489: the hosting rule (IR-485 #6) as an allow-list."""
+
+    def test_no_pin_sends_only_the_data_policy(self):
+        assert OPENROUTER.request_extras("")["extra_body"]["provider"] == {
+            "data_collection": "deny"
+        }
+
+    def test_a_pin_is_sent_as_provider_only_beside_the_data_policy(self):
+        dialect = OpenRouterDialect(provider_only=("together", "fireworks"))
+
+        assert dialect.request_extras("")["extra_body"]["provider"] == {
+            "data_collection": "deny",
+            "only": ["together", "fireworks"],
+        }
+
+    def test_zero_data_retention_is_not_requested(self):
+        """IR-485 #2: retention is acceptable when nothing trains on it."""
+        dialect = OpenRouterDialect(provider_only=("together",))
+
+        assert "zdr" not in dialect.request_extras("high")["extra_body"]["provider"]
+
+    def test_the_pin_rides_with_a_fallback_list(self):
+        dialect = OpenRouterDialect(provider_only=("together",))
+        extras = dialect.request_extras("", models=("a", "b"))["extra_body"]
+
+        assert extras["provider"]["only"] == ["together"]
+        assert extras["models"] == ["a", "b"]
+
+    def test_dialect_for_builds_a_pinned_openrouter_dialect(self):
+        dialect = dialect_for("openrouter", provider_only=("together",))
+
+        assert isinstance(dialect, OpenRouterDialect)
+        assert dialect.provider_only == ("together",)
+
+    def test_a_pin_on_a_vendor_without_provider_routing_is_refused(self):
+        """A pin that does nothing would read as protection."""
+        with pytest.raises(ValueError, match="provider"):
+            dialect_for("groq", provider_only=("together",))
+
+    def test_the_pin_reaches_the_wire(self):
+        client = _FakeClient()
+        OpenAICompatibleAdapter(
+            client=client,
+            dialect=OpenRouterDialect(provider_only=("together",)),
+        ).generate(system="s", user="u")
+
+        assert client.calls[0]["extra_body"]["provider"]["only"] == ["together"]
+
+
 class TestOpenRouterCitationMarkers:
     def test_no_marker_habit_is_assumed(self):
         """OpenRouter routes to whichever model a deployment names; nobody

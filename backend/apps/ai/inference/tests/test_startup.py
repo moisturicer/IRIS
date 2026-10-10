@@ -26,8 +26,10 @@ from apps.ai.inference.startup import (
     configured_environment,
     inference_configuration_problems,
     missing_key_problems,
+    provider_pin_problems,
     unknown_task_problems,
 )
+from apps.ai.inference.profiles import profile_for
 
 BACKEND = Path(__file__).resolve().parents[4]
 
@@ -209,6 +211,39 @@ class WhereATypoLivesTests:
         monkeypatch.setattr(config.config, "repository", FakeRepository())
 
         assert "LLM_ANWSER_MODEL" in configured_environment()
+
+
+class ProviderPinStartupTests:
+    """IR-489: a pin only OpenRouter can honour is refused elsewhere."""
+
+    def test_the_pin_variable_is_a_task_variable(self):
+        assert unknown_task_problems(["LLM_ANSWER_PROVIDER_ONLY"]) == ()
+
+    def test_a_mistyped_pin_variable_is_caught(self):
+        (problem,) = unknown_task_problems(["LLM_ANWSER_PROVIDER_ONLY"])
+
+        assert "LLM_ANWSER_PROVIDER_ONLY" in problem
+
+    def test_a_pin_on_groq_is_a_problem(self, settings):
+        settings.LLM_RESOLVE_VENDOR = "groq"
+        settings.LLM_RESOLVE_PROVIDER_ONLY = "together"
+
+        problems = provider_pin_problems([profile_for(InferenceTask.RESOLVE)])
+
+        assert len(problems) == 1
+        assert "LLM_RESOLVE_PROVIDER_ONLY" in problems[0]
+
+    def test_a_pin_on_openrouter_is_fine(self, settings):
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+        settings.LLM_ANSWER_PROVIDER_ONLY = "together"
+
+        assert provider_pin_problems([profile_for(InferenceTask.ANSWER)]) == ()
+
+    def test_no_pin_is_fine_anywhere(self, settings):
+        settings.LLM_RESOLVE_VENDOR = "groq"
+        settings.LLM_RESOLVE_PROVIDER_ONLY = ""
+
+        assert provider_pin_problems([profile_for(InferenceTask.RESOLVE)]) == ()
 
 
 class StartupTests:

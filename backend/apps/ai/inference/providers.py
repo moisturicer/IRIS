@@ -76,6 +76,7 @@ def build_profile_llm(
             vendor=profile.vendor.value,
             fallback_models=fallback_models,
             max_tokens=max_tokens,
+            provider_only=profile.provider_only,
         )
 
     if dialect_for(profile.vendor.value).resolves_fallback:

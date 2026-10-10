@@ -35,7 +35,9 @@ from typing import Iterable, Mapping, Optional
 from django.core.exceptions import ImproperlyConfigured
 
 from .profiles import (
+    Profile,
     UnknownVendor,
+    Vendor,
     api_key_variables,
     model_variables,
     profile_for,
@@ -51,6 +53,7 @@ PROFILE_SUFFIXES = (
     "MODEL",
     "FALLBACK_MODELS",
     "REASONING",
+    "PROVIDER_ONLY",
 )
 
 #: Segments that no longer configure anything, and what to do instead. A
@@ -175,6 +178,20 @@ def missing_key_problems(states: Iterable[TaskKeyState]) -> tuple[str, ...]:
     return tuple(problems)
 
 
+def provider_pin_problems(profiles: Iterable[Profile]) -> tuple[str, ...]:
+    """Tasks pinned to providers their vendor cannot route between (IR-489).
+
+    A pin only OpenRouter honours; elsewhere it would read as protection.
+    """
+    return tuple(
+        f"{profile.task.settings_prefix}_PROVIDER_ONLY is set, but the "
+        f"{profile.task.value!r} task is at {profile.vendor.value}, which has "
+        "no provider routing. Move the task to openrouter or remove the pin."
+        for profile in profiles
+        if profile.provider_only and profile.vendor is not Vendor.OPENROUTER
+    )
+
+
 def inference_configuration_problems(
     *, names: Iterable[str], keys: Iterable[TaskKeyState]
 ) -> tuple[str, ...]:
@@ -259,7 +276,7 @@ def verify_inference_configuration() -> None:
 
     problems = inference_configuration_problems(
         names=environment.keys(), keys=keys
-    )
+    ) + provider_pin_problems(profile_for(task) for task in InferenceTask)
     if problems:
         raise ImproperlyConfigured(
             "Inference configuration (IR-379):\n"

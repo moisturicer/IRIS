@@ -167,6 +167,11 @@ class OpenRouterDialect(VendorDialect):
 
     name = "openrouter"
 
+    def __init__(self, provider_only: tuple[str, ...] = ()) -> None:
+        # The hosting rule (IR-485 #6, IR-489): an allow-list of OpenRouter
+        # provider slugs, so a provider nobody vetted is never used.
+        self.provider_only = tuple(provider_only)
+
     #: OpenRouter tries `models` itself, in one request, in order -- see
     #: `request_extras`. IR-385 is what stops `apps/ai/inference/providers.py`
     #: looping a request per model once this is true.
@@ -192,8 +197,12 @@ class OpenRouterDialect(VendorDialect):
         model reasons only when told to, the way it is for Groq's own
         extension.
         """
+        # No `zdr`: retention is acceptable when nothing trains on it (IR-485 #2).
+        provider: dict[str, Any] = {"data_collection": "deny"}
+        if self.provider_only:
+            provider["only"] = list(self.provider_only)
         extra_body: dict[str, Any] = {
-            "provider": {"data_collection": "deny"},
+            "provider": provider,
             "reasoning": (
                 {"effort": reasoning_effort} if reasoning_effort else {"exclude": True}
             ),
@@ -217,7 +226,9 @@ DEFAULT_DIALECT: VendorDialect = GROQ
 _DIALECTS: dict[str, VendorDialect] = {GROQ.name: GROQ, OPENROUTER.name: OPENROUTER}
 
 
-def dialect_for(vendor: str | None) -> VendorDialect:
+def dialect_for(
+    vendor: str | None, provider_only: tuple[str, ...] = ()
+) -> VendorDialect:
     """The dialect for `vendor`, or the default when it has none yet.
 
     Non-raising, unlike `profiles.vendor()`: a base URL is also how a
@@ -226,6 +237,17 @@ def dialect_for(vendor: str | None) -> VendorDialect:
     one of them already receives -- refusing them here would break
     deployments this refactor promised not to touch.
     """
-    if not vendor:
-        return DEFAULT_DIALECT
-    return _DIALECTS.get(str(vendor).strip().lower(), DEFAULT_DIALECT)
+    dialect = (
+        _DIALECTS.get(str(vendor).strip().lower(), DEFAULT_DIALECT)
+        if vendor
+        else DEFAULT_DIALECT
+    )
+    if not provider_only:
+        return dialect
+    if dialect is not OPENROUTER:
+        # A pin that does nothing would read as protection.
+        raise ValueError(
+            f"a provider pin needs OpenRouter's provider routing; {vendor!r} "
+            "has none (IR-489)."
+        )
+    return OpenRouterDialect(provider_only=provider_only)

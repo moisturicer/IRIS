@@ -517,6 +517,8 @@ class LLMProviderConfig:
     fallback_models: tuple[str, ...] = ()
     #: Completion cap for `generate`, `None` for the vendor's own (IR-481).
     max_tokens: Optional[int] = None
+    #: OpenRouter providers this config may reach, or empty for any (IR-489).
+    provider_only: tuple[str, ...] = ()
 
     @property
     def key(self) -> str:
@@ -539,7 +541,7 @@ def _build_retrying(config: LLMProviderConfig) -> LLMProvider:
         api_key=config.api_key or None,
         model=config.model or None,
         reasoning_effort=config.reasoning_effort,
-        dialect=dialect_for(config.vendor),
+        dialect=dialect_for(config.vendor, config.provider_only),
         fallback_models=config.fallback_models,
         max_tokens=config.max_tokens,
     )
