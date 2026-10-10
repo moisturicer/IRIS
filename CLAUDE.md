@@ -210,6 +210,23 @@ python manage.py eval_evidence --questions <set.json>     # does the evidence de
                                    # examples each, so the combined figure demonstrates the OR
                                    # rule and measures nothing. NOTHING CONSUMES A VERDICT:
                                    # ADR-035 is Proposed, not accepted
+python manage.py eval_evidence --questions <set.json> --chain --from-run jev=<run.json> ... --search-cutoff N --direct-cutoff N
+                                   # score the whole proposed decision chain offline (IR-486,
+                                   # IR-484). Replays stored --model-decision files (repeat
+                                   # --from-run jev=/label=/tool=; one file per replicate) or
+                                   # collects fresh runs with --live jev,label,tool --repeats N
+                                   # (spends credits; jev is the proxy tier only). Eight arms:
+                                   # structural alone, detector, detector+label, +tool call,
+                                   # +Jev, +Jev+LLM confirmation, Jev forced to fail (LLM
+                                   # decides alone) and the no-Jev control. Missed searches
+                                   # first, ambiguous apart, stable vs flaky misses, a
+                                   # replicate over 5% fallbacks reported alone, Jev
+                                   # calibration (Brier), failure/latency/cost per decider.
+                                   # Both cutoffs are required: it chooses no operating point.
+                                   # Writes <stamp>-chain-<set>.json, never an `evidence` file.
+                                   # Verified 2026-10-10 on the stored IR-481/482 runs: the
+                                   # band and rescue tables of proposal 12 §4 reproduce, except
+                                   # that "missed by all" at cutoff 0.5 is 3, not the 4 printed
 python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)
                                    # The retrieval eval harness. --dry-run costs nothing and calls no
                                    # vendor: it checks that every label resolves against this database,

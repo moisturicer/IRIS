@@ -183,6 +183,9 @@ class ModelDecision:
     #: Jev Noul mode only: the returned probability that the corpus is needed.
     #: A number, not model text; `None` for every other mode and for a fallback.
     probability: Optional[float] = None
+    #: What the vendor reported for the call, when it reports one (Jev does).
+    #: `None` is "not reported", never zero.
+    cost_usd: Optional[float] = None
 
     @property
     def evidence_required(self) -> bool:
@@ -194,7 +197,7 @@ class ModelDecision:
         return self.reason in DECIDED_REASONS
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "route": self.route,
             "reason": self.reason,
             "anomalies": list(self.anomalies),
@@ -206,6 +209,10 @@ class ModelDecision:
             "model": self.model,
             "probability": self.probability,
         }
+        # Only when reported, so the dict a shadow row stores is unchanged.
+        if self.cost_usd is not None:
+            out["cost_usd"] = self.cost_usd
+        return out
 
 
 def build_user_message(

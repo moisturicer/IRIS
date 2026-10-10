@@ -1,0 +1,4576 @@
+{
+  "instrument": "curated-chain",
+  "scoring": {
+    "search_tolerated_kinds": [
+      "ambiguous"
+    ],
+    "fallback_pooling_limit": 0.05,
+    "tie_rule": "a tie between runs searches"
+  },
+  "question_set": {
+    "name": "proxy-starter",
+    "source": "..\\docs\\evaluation\\proxy_starter.json",
+    "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+    "tier": "proxy",
+    "questions": 113,
+    "without_passages": 40,
+    "with_resolved_question": 20,
+    "labels": 78,
+    "skipped_questions": []
+  },
+  "bands": {
+    "search_cutoff": 0.5,
+    "direct_cutoff": 0.2
+  },
+  "operating_point": null,
+  "arms": [
+    {
+      "arm": "structural_only",
+      "description": "structural rules alone",
+      "needs": [],
+      "simulated_jev_failure": false,
+      "bands": null,
+      "replicates": 1,
+      "pooled_replicates": 1,
+      "reported_alone": [],
+      "missed_searches": {
+        "stable": [
+          "q01",
+          "q02",
+          "q03",
+          "q04",
+          "q05",
+          "q06",
+          "q07",
+          "q08",
+          "q09",
+          "q10",
+          "q100",
+          "q101",
+          "q102",
+          "q103",
+          "q104",
+          "q105",
+          "q106",
+          "q107",
+          "q108",
+          "q109",
+          "q11",
+          "q110",
+          "q111",
+          "q112",
+          "q113",
+          "q12",
+          "q13",
+          "q14",
+          "q15",
+          "q16",
+          "q17",
+          "q18",
+          "q19",
+          "q20",
+          "q21",
+          "q22",
+          "q23",
+          "q24",
+          "q25",
+          "q26",
+          "q27",
+          "q28",
+          "q29",
+          "q30",
+          "q31",
+          "q32",
+          "q33",
+          "q34",
+          "q35",
+          "q36",
+          "q37",
+          "q38",
+          "q39",
+          "q40",
+          "q41",
+          "q42",
+          "q43",
+          "q44",
+          "q45",
+          "q46",
+          "q47",
+          "q48",
+          "q49",
+          "q50",
+          "q51",
+          "q52",
+          "q55",
+          "q56",
+          "q61",
+          "q62",
+          "q66",
+          "q67",
+          "q68",
+          "q75",
+          "q76",
+          "q77",
+          "q83",
+          "q84",
+          "q85",
+          "q86",
+          "q87",
+          "q98",
+          "q99"
+        ],
+        "flaky": []
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": []
+      },
+      "rescue": null,
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q01",
+            "q02",
+            "q03",
+            "q04",
+            "q05",
+            "q06",
+            "q07",
+            "q08",
+            "q09",
+            "q10",
+            "q11",
+            "q12",
+            "q13",
+            "q14",
+            "q15",
+            "q16",
+            "q17",
+            "q18",
+            "q19",
+            "q20",
+            "q21",
+            "q22",
+            "q23",
+            "q24",
+            "q25",
+            "q26",
+            "q27",
+            "q28",
+            "q29",
+            "q30",
+            "q31",
+            "q32",
+            "q33",
+            "q34",
+            "q35",
+            "q36",
+            "q37",
+            "q38",
+            "q39",
+            "q40",
+            "q41",
+            "q42",
+            "q43",
+            "q44",
+            "q45",
+            "q46",
+            "q47",
+            "q48",
+            "q49",
+            "q50",
+            "q51",
+            "q52",
+            "q55",
+            "q56",
+            "q61",
+            "q62",
+            "q66",
+            "q67",
+            "q68",
+            "q75",
+            "q76",
+            "q77",
+            "q83",
+            "q84",
+            "q85",
+            "q86",
+            "q87",
+            "q98",
+            "q99",
+            "q100",
+            "q101",
+            "q102",
+            "q103",
+            "q104",
+            "q105",
+            "q106",
+            "q107",
+            "q108",
+            "q109",
+            "q110",
+            "q111",
+            "q112",
+            "q113"
+          ],
+          "missed_by_kind": {
+            "cross-paper": 10,
+            "exact-term": 10,
+            "follow-up-after-grounded": 10,
+            "mechanism": 33,
+            "near-duplicate": 10,
+            "off-corpus-research": 10
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": []
+          },
+          "correct": 30,
+          "direct_answers": 113,
+          "reasons": {
+            "detector_silent": 113
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 0,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": null,
+            "p95": null
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 0
+          }
+        }
+      ]
+    },
+    {
+      "arm": "detector",
+      "description": "structural rules and the keyword detector",
+      "needs": [],
+      "simulated_jev_failure": false,
+      "bands": null,
+      "replicates": 1,
+      "pooled_replicates": 1,
+      "reported_alone": [],
+      "missed_searches": {
+        "stable": [
+          "q01",
+          "q02",
+          "q03",
+          "q04",
+          "q05",
+          "q06",
+          "q07",
+          "q08",
+          "q09",
+          "q10",
+          "q100",
+          "q105",
+          "q106",
+          "q108",
+          "q109",
+          "q11",
+          "q110",
+          "q111",
+          "q112",
+          "q12",
+          "q13",
+          "q14",
+          "q15",
+          "q16",
+          "q17",
+          "q18",
+          "q22",
+          "q24",
+          "q25",
+          "q26",
+          "q27",
+          "q28",
+          "q31",
+          "q32",
+          "q34",
+          "q35",
+          "q36",
+          "q37",
+          "q38",
+          "q40",
+          "q41",
+          "q42",
+          "q43",
+          "q44",
+          "q45",
+          "q46",
+          "q47",
+          "q48",
+          "q49",
+          "q50",
+          "q51",
+          "q66",
+          "q77",
+          "q83",
+          "q85",
+          "q87",
+          "q99"
+        ],
+        "flaky": []
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": []
+      },
+      "rescue": null,
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q01",
+            "q02",
+            "q03",
+            "q04",
+            "q05",
+            "q06",
+            "q07",
+            "q08",
+            "q09",
+            "q10",
+            "q11",
+            "q12",
+            "q13",
+            "q14",
+            "q15",
+            "q16",
+            "q17",
+            "q18",
+            "q22",
+            "q24",
+            "q25",
+            "q26",
+            "q27",
+            "q28",
+            "q31",
+            "q32",
+            "q34",
+            "q35",
+            "q36",
+            "q37",
+            "q38",
+            "q40",
+            "q41",
+            "q42",
+            "q43",
+            "q44",
+            "q45",
+            "q46",
+            "q47",
+            "q48",
+            "q49",
+            "q50",
+            "q51",
+            "q66",
+            "q77",
+            "q83",
+            "q85",
+            "q87",
+            "q99",
+            "q100",
+            "q105",
+            "q106",
+            "q108",
+            "q109",
+            "q110",
+            "q111",
+            "q112"
+          ],
+          "missed_by_kind": {
+            "cross-paper": 9,
+            "exact-term": 3,
+            "follow-up-after-grounded": 3,
+            "mechanism": 32,
+            "near-duplicate": 6,
+            "off-corpus-research": 4
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": []
+          },
+          "correct": 56,
+          "direct_answers": 87,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 87
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 0,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": null,
+            "p95": null
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 0
+          }
+        }
+      ]
+    },
+    {
+      "arm": "detector+label",
+      "description": "detector, then the Groq route label",
+      "needs": [
+        "label"
+      ],
+      "simulated_jev_failure": false,
+      "bands": null,
+      "replicates": 4,
+      "pooled_replicates": 4,
+      "reported_alone": [],
+      "missed_searches": {
+        "stable": [
+          "q02",
+          "q12",
+          "q16",
+          "q36",
+          "q40"
+        ],
+        "flaky": [
+          "q01",
+          "q06",
+          "q13",
+          "q25",
+          "q32",
+          "q35",
+          "q43",
+          "q49"
+        ]
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": []
+      },
+      "rescue": null,
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q02",
+            "q06",
+            "q12",
+            "q16",
+            "q25",
+            "q32",
+            "q36",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 8,
+            "near-duplicate": 1
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 104,
+          "direct_answers": 29,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 29,
+            "llm_search": 58
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 1710,
+            "p95": 2907
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 1,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q01",
+            "q02",
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q35",
+            "q36",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 10
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 103,
+          "direct_answers": 30,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 30,
+            "llm_search": 57
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 2136,
+            "p95": 3006
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 2,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q02",
+            "q12",
+            "q16",
+            "q32",
+            "q35",
+            "q36",
+            "q40"
+          ],
+          "missed_by_kind": {
+            "mechanism": 7
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 106,
+          "direct_answers": 27,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 27,
+            "llm_search": 60
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 2177,
+            "p95": 3151
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 3,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q01",
+            "q02",
+            "q12",
+            "q16",
+            "q36",
+            "q40",
+            "q49"
+          ],
+          "missed_by_kind": {
+            "mechanism": 7
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 106,
+          "direct_answers": 27,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 27,
+            "llm_search": 60
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 2172,
+            "p95": 3097
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        }
+      ]
+    },
+    {
+      "arm": "detector+tool_call",
+      "description": "detector, then the tool-call decider",
+      "needs": [
+        "tool"
+      ],
+      "simulated_jev_failure": false,
+      "bands": null,
+      "replicates": 4,
+      "pooled_replicates": 3,
+      "reported_alone": [
+        3
+      ],
+      "missed_searches": {
+        "stable": [
+          "q07",
+          "q12",
+          "q13",
+          "q16",
+          "q32",
+          "q40",
+          "q43"
+        ],
+        "flaky": [
+          "q03",
+          "q04",
+          "q06",
+          "q106",
+          "q35",
+          "q36"
+        ]
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": []
+      },
+      "rescue": null,
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q03",
+            "q06",
+            "q07",
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q36",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 10
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q88",
+              "q89",
+              "q92"
+            ]
+          },
+          "correct": 103,
+          "direct_answers": 33,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 33,
+            "llm_search": 54
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 2649,
+            "p95": 7262
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 1,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q04",
+            "q07",
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q40",
+            "q43",
+            "q106"
+          ],
+          "missed_by_kind": {
+            "mechanism": 8,
+            "near-duplicate": 1
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q58",
+              "q69",
+              "q70",
+              "q88",
+              "q89",
+              "q90",
+              "q91"
+            ]
+          },
+          "correct": 104,
+          "direct_answers": 32,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 32,
+            "llm_search": 55
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 2684,
+            "p95": 8532
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 2,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q04",
+            "q07",
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q35",
+            "q36",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 10
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 103,
+          "direct_answers": 31,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 31,
+            "llm_search": 56
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 2909,
+            "p95": 9157
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 3,
+          "pooled": false,
+          "judged": 113,
+          "missed_searches": [
+            "q06",
+            "q07",
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q40"
+          ],
+          "missed_by_kind": {
+            "mechanism": 7
+          },
+          "over_searches": [
+            "q63",
+            "q64",
+            "q65",
+            "q72",
+            "q73",
+            "q74",
+            "q78",
+            "q79",
+            "q80",
+            "q81",
+            "q82",
+            "q93",
+            "q94",
+            "q95",
+            "q96",
+            "q97"
+          ],
+          "over_by_kind": {
+            "follow-up-after-direct": 8,
+            "general-knowledge": 8
+          },
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 90,
+          "direct_answers": 11,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 11,
+            "llm_search": 76
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 1559,
+            "p95": 8979
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        }
+      ]
+    },
+    {
+      "arm": "detector+jev",
+      "description": "detector, then Jev at the bands; uncertain searches",
+      "needs": [
+        "jev"
+      ],
+      "simulated_jev_failure": false,
+      "bands": {
+        "search_cutoff": 0.5,
+        "direct_cutoff": 0.2
+      },
+      "replicates": 4,
+      "pooled_replicates": 4,
+      "reported_alone": [],
+      "missed_searches": {
+        "stable": [
+          "q105",
+          "q106",
+          "q16",
+          "q85"
+        ],
+        "flaky": []
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": [
+          "q60"
+        ]
+      },
+      "rescue": null,
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16",
+            "q85",
+            "q105",
+            "q106"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1,
+            "near-duplicate": 2,
+            "off-corpus-research": 1
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 109,
+          "direct_answers": 24,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 24,
+            "jev_search": 45,
+            "jev_uncertain": 18
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 709,
+            "p95": 1145
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 1,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16",
+            "q85",
+            "q105",
+            "q106"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1,
+            "near-duplicate": 2,
+            "off-corpus-research": 1
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 109,
+          "direct_answers": 24,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 24,
+            "jev_search": 46,
+            "jev_uncertain": 17
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 727,
+            "p95": 1206
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 2,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16",
+            "q85",
+            "q105",
+            "q106"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1,
+            "near-duplicate": 2,
+            "off-corpus-research": 1
+          },
+          "over_searches": [
+            "q60"
+          ],
+          "over_by_kind": {
+            "follow-up-after-direct": 1
+          },
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 108,
+          "direct_answers": 23,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 23,
+            "jev_search": 46,
+            "jev_uncertain": 18
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 720,
+            "p95": 1580
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 3,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16",
+            "q85",
+            "q105",
+            "q106"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1,
+            "near-duplicate": 2,
+            "off-corpus-research": 1
+          },
+          "over_searches": [
+            "q60"
+          ],
+          "over_by_kind": {
+            "follow-up-after-direct": 1
+          },
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 108,
+          "direct_answers": 23,
+          "reasons": {
+            "detector_rule": 26,
+            "detector_silent": 23,
+            "jev_search": 45,
+            "jev_uncertain": 19
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 0
+          },
+          "latency_ms": {
+            "mean": 681,
+            "p95": 976
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        }
+      ]
+    },
+    {
+      "arm": "detector+jev+llm",
+      "description": "detector, Jev, then the route label confirms every direct candidate",
+      "needs": [
+        "jev",
+        "label"
+      ],
+      "simulated_jev_failure": false,
+      "bands": {
+        "search_cutoff": 0.5,
+        "direct_cutoff": 0.2
+      },
+      "replicates": 4,
+      "pooled_replicates": 4,
+      "reported_alone": [],
+      "missed_searches": {
+        "stable": [
+          "q16"
+        ],
+        "flaky": []
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": [
+          "q60"
+        ]
+      },
+      "rescue": {
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "jev_misses_before_confirmation": [
+              "q16",
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "rescued_by_llm": [
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "missed_by_both": [
+              "q16"
+            ]
+          },
+          {
+            "replicate": 1,
+            "jev_misses_before_confirmation": [
+              "q16",
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "rescued_by_llm": [
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "missed_by_both": [
+              "q16"
+            ]
+          },
+          {
+            "replicate": 2,
+            "jev_misses_before_confirmation": [
+              "q16",
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "rescued_by_llm": [
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "missed_by_both": [
+              "q16"
+            ]
+          },
+          {
+            "replicate": 3,
+            "jev_misses_before_confirmation": [
+              "q16",
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "rescued_by_llm": [
+              "q85",
+              "q105",
+              "q106"
+            ],
+            "missed_by_both": [
+              "q16"
+            ]
+          }
+        ]
+      },
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 112,
+          "direct_answers": 21,
+          "reasons": {
+            "both_permit_direct": 21,
+            "detector_rule": 26,
+            "jev_search": 45,
+            "jev_uncertain": 18,
+            "llm_search": 3
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 24
+          },
+          "latency_ms": {
+            "mean": 1275,
+            "p95": 3734
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 111
+          }
+        },
+        {
+          "replicate": 1,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 112,
+          "direct_answers": 21,
+          "reasons": {
+            "both_permit_direct": 21,
+            "detector_rule": 26,
+            "jev_search": 46,
+            "jev_uncertain": 17,
+            "llm_search": 3
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 24
+          },
+          "latency_ms": {
+            "mean": 1318,
+            "p95": 3781
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 111
+          }
+        },
+        {
+          "replicate": 2,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1
+          },
+          "over_searches": [
+            "q60"
+          ],
+          "over_by_kind": {
+            "follow-up-after-direct": 1
+          },
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 111,
+          "direct_answers": 20,
+          "reasons": {
+            "both_permit_direct": 20,
+            "detector_rule": 26,
+            "jev_search": 46,
+            "jev_uncertain": 18,
+            "llm_failed": 1,
+            "llm_search": 2
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 23
+          },
+          "latency_ms": {
+            "mean": 1289,
+            "p95": 3786
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 110
+          }
+        },
+        {
+          "replicate": 3,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q16"
+          ],
+          "missed_by_kind": {
+            "mechanism": 1
+          },
+          "over_searches": [
+            "q60"
+          ],
+          "over_by_kind": {
+            "follow-up-after-direct": 1
+          },
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 111,
+          "direct_answers": 20,
+          "reasons": {
+            "both_permit_direct": 20,
+            "detector_rule": 26,
+            "jev_search": 45,
+            "jev_uncertain": 19,
+            "llm_search": 3
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 23
+          },
+          "latency_ms": {
+            "mean": 1252,
+            "p95": 3735
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 110
+          }
+        }
+      ]
+    },
+    {
+      "arm": "jev_failure_llm_alone",
+      "description": "Jev forced to fail on every question: the route label decides alone",
+      "needs": [
+        "label"
+      ],
+      "simulated_jev_failure": true,
+      "bands": {
+        "search_cutoff": 0.5,
+        "direct_cutoff": 0.2
+      },
+      "replicates": 4,
+      "pooled_replicates": 4,
+      "reported_alone": [],
+      "missed_searches": {
+        "stable": [
+          "q02",
+          "q12",
+          "q16",
+          "q36",
+          "q40"
+        ],
+        "flaky": [
+          "q01",
+          "q06",
+          "q13",
+          "q25",
+          "q32",
+          "q35",
+          "q43",
+          "q49"
+        ]
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": []
+      },
+      "rescue": null,
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q02",
+            "q06",
+            "q12",
+            "q16",
+            "q25",
+            "q32",
+            "q36",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 8,
+            "near-duplicate": 1
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 104,
+          "direct_answers": 29,
+          "reasons": {
+            "detector_rule": 26,
+            "jev_failed_llm_search": 58,
+            "llm_alone_after_jev_failure": 29
+          },
+          "llm_alone": {
+            "direct_answers": [
+              "q02",
+              "q06",
+              "q12",
+              "q16",
+              "q25",
+              "q32",
+              "q36",
+              "q40",
+              "q43",
+              "q53",
+              "q54",
+              "q59",
+              "q60",
+              "q63",
+              "q64",
+              "q65",
+              "q72",
+              "q73",
+              "q74",
+              "q78",
+              "q79",
+              "q80",
+              "q81",
+              "q82",
+              "q93",
+              "q94",
+              "q95",
+              "q96",
+              "q97"
+            ],
+            "needed_corpus": [
+              "q02",
+              "q06",
+              "q12",
+              "q16",
+              "q25",
+              "q32",
+              "q36",
+              "q40",
+              "q43"
+            ]
+          },
+          "calls": {
+            "first": 0,
+            "second": 87
+          },
+          "latency_ms": {
+            "mean": 1710,
+            "p95": 2907
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 1,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q01",
+            "q02",
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q35",
+            "q36",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 10
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 103,
+          "direct_answers": 30,
+          "reasons": {
+            "detector_rule": 26,
+            "jev_failed_llm_failed": 1,
+            "jev_failed_llm_search": 56,
+            "llm_alone_after_jev_failure": 30
+          },
+          "llm_alone": {
+            "direct_answers": [
+              "q01",
+              "q02",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q35",
+              "q36",
+              "q40",
+              "q43",
+              "q53",
+              "q54",
+              "q59",
+              "q60",
+              "q63",
+              "q64",
+              "q65",
+              "q72",
+              "q73",
+              "q74",
+              "q78",
+              "q79",
+              "q80",
+              "q81",
+              "q82",
+              "q93",
+              "q94",
+              "q95",
+              "q96",
+              "q97"
+            ],
+            "needed_corpus": [
+              "q01",
+              "q02",
+              "q12",
+              "q13",
+              "q16",
+              "q32",
+              "q35",
+              "q36",
+              "q40",
+              "q43"
+            ]
+          },
+          "calls": {
+            "first": 0,
+            "second": 87
+          },
+          "latency_ms": {
+            "mean": 2136,
+            "p95": 3006
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 2,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q02",
+            "q12",
+            "q16",
+            "q32",
+            "q35",
+            "q36",
+            "q40"
+          ],
+          "missed_by_kind": {
+            "mechanism": 7
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 106,
+          "direct_answers": 27,
+          "reasons": {
+            "detector_rule": 26,
+            "jev_failed_llm_failed": 2,
+            "jev_failed_llm_search": 58,
+            "llm_alone_after_jev_failure": 27
+          },
+          "llm_alone": {
+            "direct_answers": [
+              "q02",
+              "q12",
+              "q16",
+              "q32",
+              "q35",
+              "q36",
+              "q40",
+              "q53",
+              "q54",
+              "q59",
+              "q60",
+              "q63",
+              "q64",
+              "q65",
+              "q72",
+              "q73",
+              "q74",
+              "q78",
+              "q79",
+              "q80",
+              "q81",
+              "q82",
+              "q93",
+              "q94",
+              "q95",
+              "q96",
+              "q97"
+            ],
+            "needed_corpus": [
+              "q02",
+              "q12",
+              "q16",
+              "q32",
+              "q35",
+              "q36",
+              "q40"
+            ]
+          },
+          "calls": {
+            "first": 0,
+            "second": 87
+          },
+          "latency_ms": {
+            "mean": 2177,
+            "p95": 3151
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        },
+        {
+          "replicate": 3,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q01",
+            "q02",
+            "q12",
+            "q16",
+            "q36",
+            "q40",
+            "q49"
+          ],
+          "missed_by_kind": {
+            "mechanism": 7
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 106,
+          "direct_answers": 27,
+          "reasons": {
+            "detector_rule": 26,
+            "jev_failed_llm_search": 60,
+            "llm_alone_after_jev_failure": 27
+          },
+          "llm_alone": {
+            "direct_answers": [
+              "q01",
+              "q02",
+              "q12",
+              "q16",
+              "q36",
+              "q40",
+              "q49",
+              "q53",
+              "q54",
+              "q59",
+              "q60",
+              "q63",
+              "q64",
+              "q65",
+              "q72",
+              "q73",
+              "q74",
+              "q78",
+              "q79",
+              "q80",
+              "q81",
+              "q82",
+              "q93",
+              "q94",
+              "q95",
+              "q96",
+              "q97"
+            ],
+            "needed_corpus": [
+              "q01",
+              "q02",
+              "q12",
+              "q16",
+              "q36",
+              "q40",
+              "q49"
+            ]
+          },
+          "calls": {
+            "first": 0,
+            "second": 87
+          },
+          "latency_ms": {
+            "mean": 2172,
+            "p95": 3097
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 87
+          }
+        }
+      ]
+    },
+    {
+      "arm": "label+llm_confirm_no_jev",
+      "description": "no-new-vendor control: the route label, confirmed by the tool-call decider",
+      "needs": [
+        "label",
+        "tool"
+      ],
+      "simulated_jev_failure": false,
+      "bands": null,
+      "replicates": 4,
+      "pooled_replicates": 3,
+      "reported_alone": [
+        3
+      ],
+      "missed_searches": {
+        "stable": [
+          "q12",
+          "q16",
+          "q32",
+          "q40"
+        ],
+        "flaky": [
+          "q06",
+          "q13",
+          "q35",
+          "q36",
+          "q43"
+        ]
+      },
+      "over_searches": {
+        "stable": [],
+        "flaky": []
+      },
+      "rescue": null,
+      "per_replicate": [
+        {
+          "replicate": 0,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q06",
+            "q12",
+            "q16",
+            "q32",
+            "q36",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 7
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 106,
+          "direct_answers": 27,
+          "reasons": {
+            "both_permit_direct": 27,
+            "detector_rule": 26,
+            "first_decider_search": 58,
+            "llm_search": 2
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 29
+          },
+          "latency_ms": {
+            "mean": 2881,
+            "p95": 9678
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 116
+          }
+        },
+        {
+          "replicate": 1,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q40",
+            "q43"
+          ],
+          "missed_by_kind": {
+            "mechanism": 6
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 107,
+          "direct_answers": 26,
+          "reasons": {
+            "both_permit_direct": 26,
+            "detector_rule": 26,
+            "first_decider_search": 56,
+            "first_failed": 1,
+            "llm_search": 4
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 30
+          },
+          "latency_ms": {
+            "mean": 3348,
+            "p95": 11146
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 117
+          }
+        },
+        {
+          "replicate": 2,
+          "pooled": true,
+          "judged": 113,
+          "missed_searches": [
+            "q12",
+            "q16",
+            "q32",
+            "q35",
+            "q36",
+            "q40"
+          ],
+          "missed_by_kind": {
+            "mechanism": 6
+          },
+          "over_searches": [],
+          "over_by_kind": {},
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 107,
+          "direct_answers": 26,
+          "reasons": {
+            "both_permit_direct": 26,
+            "detector_rule": 26,
+            "first_decider_search": 58,
+            "first_failed": 2,
+            "llm_search": 1
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 27
+          },
+          "latency_ms": {
+            "mean": 3198,
+            "p95": 9347
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 114
+          }
+        },
+        {
+          "replicate": 3,
+          "pooled": false,
+          "judged": 113,
+          "missed_searches": [
+            "q12",
+            "q16",
+            "q40"
+          ],
+          "missed_by_kind": {
+            "mechanism": 3
+          },
+          "over_searches": [
+            "q63",
+            "q64",
+            "q65",
+            "q72",
+            "q73",
+            "q74",
+            "q78",
+            "q79",
+            "q80",
+            "q81",
+            "q82",
+            "q93",
+            "q94",
+            "q95",
+            "q96",
+            "q97"
+          ],
+          "over_by_kind": {
+            "follow-up-after-direct": 8,
+            "general-knowledge": 8
+          },
+          "ambiguous": {
+            "judged": 10,
+            "searched": [
+              "q57",
+              "q58",
+              "q69",
+              "q70",
+              "q71",
+              "q88",
+              "q89",
+              "q90",
+              "q91",
+              "q92"
+            ]
+          },
+          "correct": 94,
+          "direct_answers": 7,
+          "reasons": {
+            "both_permit_direct": 7,
+            "detector_rule": 26,
+            "first_decider_search": 60,
+            "llm_failed": 16,
+            "llm_search": 4
+          },
+          "llm_alone": {
+            "direct_answers": [],
+            "needed_corpus": []
+          },
+          "calls": {
+            "first": 87,
+            "second": 27
+          },
+          "latency_ms": {
+            "mean": 2649,
+            "p95": 8542
+          },
+          "cost_usd": {
+            "total": 0.0,
+            "per_decision": 0.0,
+            "calls_without_reported_cost": 114
+          }
+        }
+      ]
+    }
+  ],
+  "skipped_arms": [],
+  "curves": {
+    "detector+jev": [
+      {
+        "threshold": 0.05,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          },
+          {
+            "replicate": 1,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          },
+          {
+            "replicate": 2,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          },
+          {
+            "replicate": 3,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          }
+        ]
+      },
+      {
+        "threshold": 0.1,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 3,
+            "over_searches": 7,
+            "direct_answers": 16
+          },
+          {
+            "replicate": 1,
+            "missed": 3,
+            "over_searches": 6,
+            "direct_answers": 17
+          },
+          {
+            "replicate": 2,
+            "missed": 3,
+            "over_searches": 5,
+            "direct_answers": 18
+          },
+          {
+            "replicate": 3,
+            "missed": 3,
+            "over_searches": 6,
+            "direct_answers": 17
+          }
+        ]
+      },
+      {
+        "threshold": 0.15,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 4,
+            "over_searches": 1,
+            "direct_answers": 23
+          },
+          {
+            "replicate": 1,
+            "missed": 4,
+            "over_searches": 2,
+            "direct_answers": 22
+          },
+          {
+            "replicate": 2,
+            "missed": 3,
+            "over_searches": 1,
+            "direct_answers": 22
+          },
+          {
+            "replicate": 3,
+            "missed": 4,
+            "over_searches": 1,
+            "direct_answers": 23
+          }
+        ]
+      },
+      {
+        "threshold": 0.2,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 1,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 1,
+            "direct_answers": 23
+          },
+          {
+            "replicate": 3,
+            "missed": 4,
+            "over_searches": 1,
+            "direct_answers": 23
+          }
+        ]
+      },
+      {
+        "threshold": 0.25,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          },
+          {
+            "replicate": 1,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          },
+          {
+            "replicate": 2,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          },
+          {
+            "replicate": 3,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          }
+        ]
+      },
+      {
+        "threshold": 0.3,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 10,
+            "over_searches": 0,
+            "direct_answers": 30
+          },
+          {
+            "replicate": 1,
+            "missed": 8,
+            "over_searches": 0,
+            "direct_answers": 28
+          },
+          {
+            "replicate": 2,
+            "missed": 9,
+            "over_searches": 0,
+            "direct_answers": 29
+          },
+          {
+            "replicate": 3,
+            "missed": 8,
+            "over_searches": 0,
+            "direct_answers": 28
+          }
+        ]
+      },
+      {
+        "threshold": 0.35,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 11,
+            "over_searches": 0,
+            "direct_answers": 31
+          },
+          {
+            "replicate": 1,
+            "missed": 11,
+            "over_searches": 0,
+            "direct_answers": 32
+          },
+          {
+            "replicate": 2,
+            "missed": 10,
+            "over_searches": 0,
+            "direct_answers": 31
+          },
+          {
+            "replicate": 3,
+            "missed": 11,
+            "over_searches": 0,
+            "direct_answers": 32
+          }
+        ]
+      },
+      {
+        "threshold": 0.4,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 13,
+            "over_searches": 0,
+            "direct_answers": 34
+          },
+          {
+            "replicate": 1,
+            "missed": 13,
+            "over_searches": 0,
+            "direct_answers": 35
+          },
+          {
+            "replicate": 2,
+            "missed": 13,
+            "over_searches": 0,
+            "direct_answers": 34
+          },
+          {
+            "replicate": 3,
+            "missed": 12,
+            "over_searches": 0,
+            "direct_answers": 34
+          }
+        ]
+      },
+      {
+        "threshold": 0.45,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 13,
+            "over_searches": 0,
+            "direct_answers": 37
+          },
+          {
+            "replicate": 1,
+            "missed": 14,
+            "over_searches": 0,
+            "direct_answers": 38
+          },
+          {
+            "replicate": 2,
+            "missed": 14,
+            "over_searches": 0,
+            "direct_answers": 37
+          },
+          {
+            "replicate": 3,
+            "missed": 13,
+            "over_searches": 0,
+            "direct_answers": 36
+          }
+        ]
+      },
+      {
+        "threshold": 0.5,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 16,
+            "over_searches": 0,
+            "direct_answers": 42
+          },
+          {
+            "replicate": 1,
+            "missed": 15,
+            "over_searches": 0,
+            "direct_answers": 41
+          },
+          {
+            "replicate": 2,
+            "missed": 16,
+            "over_searches": 0,
+            "direct_answers": 41
+          },
+          {
+            "replicate": 3,
+            "missed": 16,
+            "over_searches": 0,
+            "direct_answers": 42
+          }
+        ]
+      },
+      {
+        "threshold": 0.55,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 17,
+            "over_searches": 0,
+            "direct_answers": 43
+          },
+          {
+            "replicate": 1,
+            "missed": 17,
+            "over_searches": 0,
+            "direct_answers": 43
+          },
+          {
+            "replicate": 2,
+            "missed": 19,
+            "over_searches": 0,
+            "direct_answers": 46
+          },
+          {
+            "replicate": 3,
+            "missed": 19,
+            "over_searches": 0,
+            "direct_answers": 46
+          }
+        ]
+      },
+      {
+        "threshold": 0.6,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 20,
+            "over_searches": 0,
+            "direct_answers": 48
+          },
+          {
+            "replicate": 1,
+            "missed": 19,
+            "over_searches": 0,
+            "direct_answers": 47
+          },
+          {
+            "replicate": 2,
+            "missed": 23,
+            "over_searches": 0,
+            "direct_answers": 51
+          },
+          {
+            "replicate": 3,
+            "missed": 20,
+            "over_searches": 0,
+            "direct_answers": 48
+          }
+        ]
+      },
+      {
+        "threshold": 0.65,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 24,
+            "over_searches": 0,
+            "direct_answers": 53
+          },
+          {
+            "replicate": 1,
+            "missed": 24,
+            "over_searches": 0,
+            "direct_answers": 53
+          },
+          {
+            "replicate": 2,
+            "missed": 25,
+            "over_searches": 0,
+            "direct_answers": 54
+          },
+          {
+            "replicate": 3,
+            "missed": 26,
+            "over_searches": 0,
+            "direct_answers": 56
+          }
+        ]
+      },
+      {
+        "threshold": 0.7,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 29,
+            "over_searches": 0,
+            "direct_answers": 59
+          },
+          {
+            "replicate": 1,
+            "missed": 30,
+            "over_searches": 0,
+            "direct_answers": 60
+          },
+          {
+            "replicate": 2,
+            "missed": 29,
+            "over_searches": 0,
+            "direct_answers": 59
+          },
+          {
+            "replicate": 3,
+            "missed": 27,
+            "over_searches": 0,
+            "direct_answers": 57
+          }
+        ]
+      },
+      {
+        "threshold": 0.75,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 35,
+            "over_searches": 0,
+            "direct_answers": 65
+          },
+          {
+            "replicate": 1,
+            "missed": 34,
+            "over_searches": 0,
+            "direct_answers": 64
+          },
+          {
+            "replicate": 2,
+            "missed": 34,
+            "over_searches": 0,
+            "direct_answers": 64
+          },
+          {
+            "replicate": 3,
+            "missed": 35,
+            "over_searches": 0,
+            "direct_answers": 65
+          }
+        ]
+      },
+      {
+        "threshold": 0.8,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 40,
+            "over_searches": 0,
+            "direct_answers": 70
+          },
+          {
+            "replicate": 1,
+            "missed": 40,
+            "over_searches": 0,
+            "direct_answers": 70
+          },
+          {
+            "replicate": 2,
+            "missed": 39,
+            "over_searches": 0,
+            "direct_answers": 69
+          },
+          {
+            "replicate": 3,
+            "missed": 40,
+            "over_searches": 0,
+            "direct_answers": 70
+          }
+        ]
+      },
+      {
+        "threshold": 0.85,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 44,
+            "over_searches": 0,
+            "direct_answers": 74
+          },
+          {
+            "replicate": 1,
+            "missed": 44,
+            "over_searches": 0,
+            "direct_answers": 74
+          },
+          {
+            "replicate": 2,
+            "missed": 43,
+            "over_searches": 0,
+            "direct_answers": 73
+          },
+          {
+            "replicate": 3,
+            "missed": 43,
+            "over_searches": 0,
+            "direct_answers": 73
+          }
+        ]
+      },
+      {
+        "threshold": 0.9,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 52,
+            "over_searches": 0,
+            "direct_answers": 82
+          },
+          {
+            "replicate": 1,
+            "missed": 52,
+            "over_searches": 0,
+            "direct_answers": 82
+          },
+          {
+            "replicate": 2,
+            "missed": 52,
+            "over_searches": 0,
+            "direct_answers": 82
+          },
+          {
+            "replicate": 3,
+            "missed": 52,
+            "over_searches": 0,
+            "direct_answers": 82
+          }
+        ]
+      },
+      {
+        "threshold": 0.95,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 57,
+            "over_searches": 0,
+            "direct_answers": 87
+          },
+          {
+            "replicate": 1,
+            "missed": 57,
+            "over_searches": 0,
+            "direct_answers": 87
+          },
+          {
+            "replicate": 2,
+            "missed": 57,
+            "over_searches": 0,
+            "direct_answers": 87
+          },
+          {
+            "replicate": 3,
+            "missed": 57,
+            "over_searches": 0,
+            "direct_answers": 87
+          }
+        ]
+      }
+    ],
+    "detector+jev+llm": [
+      {
+        "threshold": 0.05,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          },
+          {
+            "replicate": 1,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          },
+          {
+            "replicate": 2,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          },
+          {
+            "replicate": 3,
+            "missed": 0,
+            "over_searches": 19,
+            "direct_answers": 1
+          }
+        ]
+      },
+      {
+        "threshold": 0.1,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 1,
+            "over_searches": 7,
+            "direct_answers": 14
+          },
+          {
+            "replicate": 1,
+            "missed": 1,
+            "over_searches": 6,
+            "direct_answers": 15
+          },
+          {
+            "replicate": 2,
+            "missed": 1,
+            "over_searches": 5,
+            "direct_answers": 16
+          },
+          {
+            "replicate": 3,
+            "missed": 1,
+            "over_searches": 6,
+            "direct_answers": 15
+          }
+        ]
+      },
+      {
+        "threshold": 0.15,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 1,
+            "over_searches": 1,
+            "direct_answers": 20
+          },
+          {
+            "replicate": 1,
+            "missed": 1,
+            "over_searches": 2,
+            "direct_answers": 19
+          },
+          {
+            "replicate": 2,
+            "missed": 1,
+            "over_searches": 1,
+            "direct_answers": 20
+          },
+          {
+            "replicate": 3,
+            "missed": 1,
+            "over_searches": 1,
+            "direct_answers": 20
+          }
+        ]
+      },
+      {
+        "threshold": 0.2,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 1,
+            "over_searches": 0,
+            "direct_answers": 21
+          },
+          {
+            "replicate": 1,
+            "missed": 1,
+            "over_searches": 0,
+            "direct_answers": 21
+          },
+          {
+            "replicate": 2,
+            "missed": 1,
+            "over_searches": 1,
+            "direct_answers": 20
+          },
+          {
+            "replicate": 3,
+            "missed": 1,
+            "over_searches": 1,
+            "direct_answers": 20
+          }
+        ]
+      },
+      {
+        "threshold": 0.25,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 1,
+            "over_searches": 0,
+            "direct_answers": 21
+          },
+          {
+            "replicate": 1,
+            "missed": 1,
+            "over_searches": 0,
+            "direct_answers": 21
+          },
+          {
+            "replicate": 2,
+            "missed": 1,
+            "over_searches": 0,
+            "direct_answers": 21
+          },
+          {
+            "replicate": 3,
+            "missed": 1,
+            "over_searches": 0,
+            "direct_answers": 21
+          }
+        ]
+      },
+      {
+        "threshold": 0.3,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          },
+          {
+            "replicate": 1,
+            "missed": 2,
+            "over_searches": 0,
+            "direct_answers": 22
+          },
+          {
+            "replicate": 2,
+            "missed": 2,
+            "over_searches": 0,
+            "direct_answers": 22
+          },
+          {
+            "replicate": 3,
+            "missed": 1,
+            "over_searches": 0,
+            "direct_answers": 21
+          }
+        ]
+      },
+      {
+        "threshold": 0.35,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 1,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          },
+          {
+            "replicate": 2,
+            "missed": 3,
+            "over_searches": 0,
+            "direct_answers": 23
+          },
+          {
+            "replicate": 3,
+            "missed": 3,
+            "over_searches": 0,
+            "direct_answers": 23
+          }
+        ]
+      },
+      {
+        "threshold": 0.4,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 1,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 3,
+            "missed": 3,
+            "over_searches": 0,
+            "direct_answers": 23
+          }
+        ]
+      },
+      {
+        "threshold": 0.45,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 1,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 3,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          }
+        ]
+      },
+      {
+        "threshold": 0.5,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 1,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 3,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          }
+        ]
+      },
+      {
+        "threshold": 0.55,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 1,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 3,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          }
+        ]
+      },
+      {
+        "threshold": 0.6,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 1,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 3,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          }
+        ]
+      },
+      {
+        "threshold": 0.65,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 1,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 3,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          }
+        ]
+      },
+      {
+        "threshold": 0.7,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 1,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 2,
+            "missed": 4,
+            "over_searches": 0,
+            "direct_answers": 24
+          },
+          {
+            "replicate": 3,
+            "missed": 5,
+            "over_searches": 0,
+            "direct_answers": 25
+          }
+        ]
+      },
+      {
+        "threshold": 0.75,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 9,
+            "over_searches": 0,
+            "direct_answers": 29
+          },
+          {
+            "replicate": 1,
+            "missed": 8,
+            "over_searches": 0,
+            "direct_answers": 28
+          },
+          {
+            "replicate": 2,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          },
+          {
+            "replicate": 3,
+            "missed": 6,
+            "over_searches": 0,
+            "direct_answers": 26
+          }
+        ]
+      },
+      {
+        "threshold": 0.8,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 9,
+            "over_searches": 0,
+            "direct_answers": 29
+          },
+          {
+            "replicate": 1,
+            "missed": 10,
+            "over_searches": 0,
+            "direct_answers": 30
+          },
+          {
+            "replicate": 2,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 3,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          }
+        ]
+      },
+      {
+        "threshold": 0.85,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 9,
+            "over_searches": 0,
+            "direct_answers": 29
+          },
+          {
+            "replicate": 1,
+            "missed": 10,
+            "over_searches": 0,
+            "direct_answers": 30
+          },
+          {
+            "replicate": 2,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 3,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          }
+        ]
+      },
+      {
+        "threshold": 0.9,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 9,
+            "over_searches": 0,
+            "direct_answers": 29
+          },
+          {
+            "replicate": 1,
+            "missed": 10,
+            "over_searches": 0,
+            "direct_answers": 30
+          },
+          {
+            "replicate": 2,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 3,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          }
+        ]
+      },
+      {
+        "threshold": 0.95,
+        "per_replicate": [
+          {
+            "replicate": 0,
+            "missed": 9,
+            "over_searches": 0,
+            "direct_answers": 29
+          },
+          {
+            "replicate": 1,
+            "missed": 10,
+            "over_searches": 0,
+            "direct_answers": 30
+          },
+          {
+            "replicate": 2,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          },
+          {
+            "replicate": 3,
+            "missed": 7,
+            "over_searches": 0,
+            "direct_answers": 27
+          }
+        ]
+      }
+    ]
+  },
+  "deciders": [
+    {
+      "decider": "jev",
+      "source": "20261008-110112-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "typesafe/jev-1.13-20260917"
+      ],
+      "prompt_digest": "836128e51bba263a19fdac226621827a5cefc0031bdf998fc4242dc0cb8c6e12",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 914,
+        "p95": 1137
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 51992,
+        "output": 0
+      }
+    },
+    {
+      "decider": "jev",
+      "source": "20261008-110304-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "typesafe/jev-1.13-20260917"
+      ],
+      "prompt_digest": "836128e51bba263a19fdac226621827a5cefc0031bdf998fc4242dc0cb8c6e12",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 928,
+        "p95": 1073
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 51992,
+        "output": 0
+      }
+    },
+    {
+      "decider": "jev",
+      "source": "20261008-110450-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "typesafe/jev-1.13-20260917"
+      ],
+      "prompt_digest": "836128e51bba263a19fdac226621827a5cefc0031bdf998fc4242dc0cb8c6e12",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 923,
+        "p95": 1156
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 51992,
+        "output": 0
+      }
+    },
+    {
+      "decider": "jev",
+      "source": "20261008-110632-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "typesafe/jev-1.13-20260917"
+      ],
+      "prompt_digest": "836128e51bba263a19fdac226621827a5cefc0031bdf998fc4242dc0cb8c6e12",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 889,
+        "p95": 1011
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 51992,
+        "output": 0
+      }
+    },
+    {
+      "decider": "label",
+      "source": "20261008-093000-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-20b"
+      ],
+      "prompt_digest": "276d836106ed6a5e2926404eb8dbc275d83974c15ffeef6705cb1f888724a232",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 2248,
+        "p95": 2912
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 0,
+        "output": 0
+      }
+    },
+    {
+      "decider": "label",
+      "source": "20261008-093521-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-20b"
+      ],
+      "prompt_digest": "276d836106ed6a5e2926404eb8dbc275d83974c15ffeef6705cb1f888724a232",
+      "n": 113,
+      "fallbacks": 1,
+      "fallback_rate": 0.0088,
+      "failure_rate": 0.0088,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 2784,
+        "p95": 3006
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 0,
+        "output": 0
+      }
+    },
+    {
+      "decider": "label",
+      "source": "20261008-094042-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-20b"
+      ],
+      "prompt_digest": "276d836106ed6a5e2926404eb8dbc275d83974c15ffeef6705cb1f888724a232",
+      "n": 113,
+      "fallbacks": 2,
+      "fallback_rate": 0.0177,
+      "failure_rate": 0.0177,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 2823,
+        "p95": 3068
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 0,
+        "output": 0
+      }
+    },
+    {
+      "decider": "label",
+      "source": "20261008-094603-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-20b"
+      ],
+      "prompt_digest": "276d836106ed6a5e2926404eb8dbc275d83974c15ffeef6705cb1f888724a232",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 2822,
+        "p95": 3080
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 0,
+        "output": 0
+      }
+    },
+    {
+      "decider": "tool",
+      "source": "20261008-051409-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-120b"
+      ],
+      "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 3467,
+        "p95": 7262
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 30799,
+        "output": 28240
+      }
+    },
+    {
+      "decider": "tool",
+      "source": "20261008-053345-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-120b"
+      ],
+      "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+      "n": 113,
+      "fallbacks": 1,
+      "fallback_rate": 0.0088,
+      "failure_rate": 0.0088,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0088,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 3406,
+        "p95": 9528
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 31038,
+        "output": 28047
+      }
+    },
+    {
+      "decider": "tool",
+      "source": "20261008-054102-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-120b"
+      ],
+      "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+      "n": 113,
+      "fallbacks": 0,
+      "fallback_rate": 0.0,
+      "failure_rate": 0.0,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0,
+      "malformed_rate": 0.0,
+      "reported_alone": false,
+      "latency_ms": {
+        "mean": 3827,
+        "p95": 9107
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 32847,
+        "output": 28540
+      }
+    },
+    {
+      "decider": "tool",
+      "source": "20261008-054438-evidence-proxy-starter.json",
+      "input_variant": "as_recorded",
+      "models": [
+        "openai/gpt-oss-120b"
+      ],
+      "prompt_digest": "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754",
+      "n": 113,
+      "fallbacks": 53,
+      "fallback_rate": 0.469,
+      "failure_rate": 0.469,
+      "timeout_rate": 0.0,
+      "rate_limit_rate": 0.0442,
+      "malformed_rate": 0.0,
+      "reported_alone": true,
+      "latency_ms": {
+        "mean": 1876,
+        "p95": 8979
+      },
+      "cost_usd": {
+        "total": 0,
+        "per_decision": null,
+        "calls_without_reported_cost": 113
+      },
+      "tokens": {
+        "input": 18326,
+        "output": 14256
+      }
+    }
+  ],
+  "calibration": [
+    {
+      "n": 103,
+      "ambiguous_excluded": true,
+      "brier": 0.1229,
+      "reliability": [
+        {
+          "from": 0.0,
+          "to": 0.1,
+          "n": 16,
+          "mean_probability": 0.065,
+          "fraction_needing_corpus": 0.1875
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 8,
+          "mean_probability": 0.1237,
+          "fraction_needing_corpus": 0.125
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 6,
+          "mean_probability": 0.2733,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 3,
+          "mean_probability": 0.36,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 4,
+          "mean_probability": 0.48,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "n": 5,
+          "mean_probability": 0.552,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "n": 12,
+          "mean_probability": 0.65,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "n": 12,
+          "mean_probability": 0.7508,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "n": 19,
+          "mean_probability": 0.8547,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.9,
+          "to": 1.0,
+          "n": 18,
+          "mean_probability": 0.9328,
+          "fraction_needing_corpus": 1.0
+        }
+      ],
+      "source": "20261008-110112-evidence-proxy-starter.json"
+    },
+    {
+      "n": 103,
+      "ambiguous_excluded": true,
+      "brier": 0.1235,
+      "reliability": [
+        {
+          "from": 0.0,
+          "to": 0.1,
+          "n": 17,
+          "mean_probability": 0.0653,
+          "fraction_needing_corpus": 0.1765
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 7,
+          "mean_probability": 0.1329,
+          "fraction_needing_corpus": 0.1429
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 4,
+          "mean_probability": 0.2575,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 5,
+          "mean_probability": 0.336,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 3,
+          "mean_probability": 0.4667,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "n": 5,
+          "mean_probability": 0.534,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "n": 14,
+          "mean_probability": 0.6486,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "n": 11,
+          "mean_probability": 0.7473,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "n": 19,
+          "mean_probability": 0.8589,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.9,
+          "to": 1.0,
+          "n": 18,
+          "mean_probability": 0.9356,
+          "fraction_needing_corpus": 1.0
+        }
+      ],
+      "source": "20261008-110304-evidence-proxy-starter.json"
+    },
+    {
+      "n": 103,
+      "ambiguous_excluded": true,
+      "brier": 0.1248,
+      "reliability": [
+        {
+          "from": 0.0,
+          "to": 0.1,
+          "n": 18,
+          "mean_probability": 0.0656,
+          "fraction_needing_corpus": 0.1667
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 5,
+          "mean_probability": 0.124,
+          "fraction_needing_corpus": 0.2
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 6,
+          "mean_probability": 0.245,
+          "fraction_needing_corpus": 0.8333
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 4,
+          "mean_probability": 0.355,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 4,
+          "mean_probability": 0.4675,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "n": 8,
+          "mean_probability": 0.55,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "n": 7,
+          "mean_probability": 0.6571,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "n": 13,
+          "mean_probability": 0.7431,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "n": 20,
+          "mean_probability": 0.8555,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.9,
+          "to": 1.0,
+          "n": 18,
+          "mean_probability": 0.9339,
+          "fraction_needing_corpus": 1.0
+        }
+      ],
+      "source": "20261008-110450-evidence-proxy-starter.json"
+    },
+    {
+      "n": 103,
+      "ambiguous_excluded": true,
+      "brier": 0.1236,
+      "reliability": [
+        {
+          "from": 0.0,
+          "to": 0.1,
+          "n": 17,
+          "mean_probability": 0.0659,
+          "fraction_needing_corpus": 0.1765
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "n": 6,
+          "mean_probability": 0.1133,
+          "fraction_needing_corpus": 0.1667
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "n": 5,
+          "mean_probability": 0.248,
+          "fraction_needing_corpus": 0.8
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "n": 4,
+          "mean_probability": 0.33,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "n": 5,
+          "mean_probability": 0.458,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "n": 5,
+          "mean_probability": 0.54,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "n": 9,
+          "mean_probability": 0.6267,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "n": 15,
+          "mean_probability": 0.7387,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "n": 19,
+          "mean_probability": 0.86,
+          "fraction_needing_corpus": 1.0
+        },
+        {
+          "from": 0.9,
+          "to": 1.0,
+          "n": 18,
+          "mean_probability": 0.9333,
+          "fraction_needing_corpus": 1.0
+        }
+      ],
+      "source": "20261008-110632-evidence-proxy-starter.json"
+    }
+  ],
+  "proposal_12_rescore": {
+    "band_table": [
+      {
+        "from": 0.0,
+        "to": 0.1,
+        "needs_corpus": 3,
+        "does_not_need_corpus": 14,
+        "ambiguous": 0
+      },
+      {
+        "from": 0.1,
+        "to": 0.2,
+        "needs_corpus": 1,
+        "does_not_need_corpus": 6,
+        "ambiguous": 0
+      },
+      {
+        "from": 0.2,
+        "to": 0.3,
+        "needs_corpus": 5,
+        "does_not_need_corpus": 0,
+        "ambiguous": 0
+      },
+      {
+        "from": 0.3,
+        "to": 0.5,
+        "needs_corpus": 8,
+        "does_not_need_corpus": 0,
+        "ambiguous": 6
+      },
+      {
+        "from": 0.5,
+        "to": 0.8,
+        "needs_corpus": 29,
+        "does_not_need_corpus": 0,
+        "ambiguous": 4
+      },
+      {
+        "from": 0.8,
+        "to": 1.0,
+        "needs_corpus": 37,
+        "does_not_need_corpus": 0,
+        "ambiguous": 0
+      }
+    ],
+    "rescue_table": [
+      {
+        "cutoff": 0.2,
+        "jev_misses": 4,
+        "label_rescues": 3,
+        "tool_rescues": 3,
+        "detector_rescues": 0,
+        "missed_by_all": 1,
+        "missed_by_all_ids": [
+          "q16"
+        ]
+      },
+      {
+        "cutoff": 0.3,
+        "jev_misses": 9,
+        "label_rescues": 7,
+        "tool_rescues": 5,
+        "detector_rescues": 0,
+        "missed_by_all": 2,
+        "missed_by_all_ids": [
+          "q12",
+          "q16"
+        ]
+      },
+      {
+        "cutoff": 0.5,
+        "jev_misses": 17,
+        "label_rescues": 13,
+        "tool_rescues": 11,
+        "detector_rescues": 1,
+        "missed_by_all": 3,
+        "missed_by_all_ids": [
+          "q12",
+          "q16",
+          "q40"
+        ]
+      }
+    ],
+    "note": "Bands and rescue read off the same questions as the runs; they show a shape, not cutoffs."
+  },
+  "ablations": {
+    "resolver_label": "as recorded in proxy_starter.json",
+    "detector_input": {
+      "raw_only": [
+        {
+          "arm": "structural_only",
+          "pooled_replicates": 1,
+          "mean_missed": 83.0,
+          "mean_over_searches": 0.0,
+          "stable_missed": [
+            "q01",
+            "q02",
+            "q03",
+            "q04",
+            "q05",
+            "q06",
+            "q07",
+            "q08",
+            "q09",
+            "q10",
+            "q100",
+            "q101",
+            "q102",
+            "q103",
+            "q104",
+            "q105",
+            "q106",
+            "q107",
+            "q108",
+            "q109",
+            "q11",
+            "q110",
+            "q111",
+            "q112",
+            "q113",
+            "q12",
+            "q13",
+            "q14",
+            "q15",
+            "q16",
+            "q17",
+            "q18",
+            "q19",
+            "q20",
+            "q21",
+            "q22",
+            "q23",
+            "q24",
+            "q25",
+            "q26",
+            "q27",
+            "q28",
+            "q29",
+            "q30",
+            "q31",
+            "q32",
+            "q33",
+            "q34",
+            "q35",
+            "q36",
+            "q37",
+            "q38",
+            "q39",
+            "q40",
+            "q41",
+            "q42",
+            "q43",
+            "q44",
+            "q45",
+            "q46",
+            "q47",
+            "q48",
+            "q49",
+            "q50",
+            "q51",
+            "q52",
+            "q55",
+            "q56",
+            "q61",
+            "q62",
+            "q66",
+            "q67",
+            "q68",
+            "q75",
+            "q76",
+            "q77",
+            "q83",
+            "q84",
+            "q85",
+            "q86",
+            "q87",
+            "q98",
+            "q99"
+          ],
+          "flaky_missed": []
+        },
+        {
+          "arm": "detector",
+          "pooled_replicates": 1,
+          "mean_missed": 58.0,
+          "mean_over_searches": 0.0,
+          "stable_missed": [
+            "q01",
+            "q02",
+            "q03",
+            "q04",
+            "q05",
+            "q06",
+            "q07",
+            "q08",
+            "q09",
+            "q10",
+            "q100",
+            "q105",
+            "q106",
+            "q108",
+            "q109",
+            "q11",
+            "q110",
+            "q111",
+            "q112",
+            "q12",
+            "q13",
+            "q14",
+            "q15",
+            "q16",
+            "q17",
+            "q18",
+            "q22",
+            "q24",
+            "q25",
+            "q26",
+            "q27",
+            "q28",
+            "q31",
+            "q32",
+            "q34",
+            "q35",
+            "q36",
+            "q37",
+            "q38",
+            "q40",
+            "q41",
+            "q42",
+            "q43",
+            "q44",
+            "q45",
+            "q46",
+            "q47",
+            "q48",
+            "q49",
+            "q50",
+            "q51",
+            "q61",
+            "q66",
+            "q77",
+            "q83",
+            "q85",
+            "q87",
+            "q99"
+          ],
+          "flaky_missed": []
+        },
+        {
+          "arm": "detector+label",
+          "pooled_replicates": 4,
+          "mean_missed": 8.25,
+          "mean_over_searches": 0.0,
+          "stable_missed": [
+            "q02",
+            "q12",
+            "q16",
+            "q36",
+            "q40"
+          ],
+          "flaky_missed": [
+            "q01",
+            "q06",
+            "q13",
+            "q25",
+            "q32",
+            "q35",
+            "q43",
+            "q49"
+          ]
+        },
+        {
+          "arm": "detector+tool_call",
+          "pooled_replicates": 3,
+          "mean_missed": 9.67,
+          "mean_over_searches": 0.0,
+          "stable_missed": [
+            "q07",
+            "q12",
+            "q13",
+            "q16",
+            "q32",
+            "q40",
+            "q43"
+          ],
+          "flaky_missed": [
+            "q03",
+            "q04",
+            "q06",
+            "q106",
+            "q35",
+            "q36"
+          ]
+        },
+        {
+          "arm": "detector+jev",
+          "pooled_replicates": 4,
+          "mean_missed": 4.0,
+          "mean_over_searches": 0.5,
+          "stable_missed": [
+            "q105",
+            "q106",
+            "q16",
+            "q85"
+          ],
+          "flaky_missed": []
+        },
+        {
+          "arm": "detector+jev+llm",
+          "pooled_replicates": 4,
+          "mean_missed": 1.0,
+          "mean_over_searches": 0.5,
+          "stable_missed": [
+            "q16"
+          ],
+          "flaky_missed": []
+        },
+        {
+          "arm": "jev_failure_llm_alone",
+          "pooled_replicates": 4,
+          "mean_missed": 8.25,
+          "mean_over_searches": 0.0,
+          "stable_missed": [
+            "q02",
+            "q12",
+            "q16",
+            "q36",
+            "q40"
+          ],
+          "flaky_missed": [
+            "q01",
+            "q06",
+            "q13",
+            "q25",
+            "q32",
+            "q35",
+            "q43",
+            "q49"
+          ]
+        },
+        {
+          "arm": "label+llm_confirm_no_jev",
+          "pooled_replicates": 3,
+          "mean_missed": 6.33,
+          "mean_over_searches": 0.0,
+          "stable_missed": [
+            "q12",
+            "q16",
+            "q32",
+            "q40"
+          ],
+          "flaky_missed": [
+            "q06",
+            "q13",
+            "q35",
+            "q36",
+            "q43"
+          ]
+        }
+      ],
+      "note": "the detector on the raw question alone; the main arms use raw and Resolved together"
+    }
+  },
+  "provenance": {
+    "git_commit": "v0.1.0-675-gd9fd469-dirty",
+    "question_set_path": "..\\docs\\evaluation\\proxy_starter.json",
+    "question_set_sha256": "cafe5d976e0d1101a9d03ef13dcfeb932b82eb04c0c82cf401de87b0418dee93",
+    "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+    "stored_runs": [
+      {
+        "decider": "jev",
+        "path": "../docs/evaluation/runs/20261008-110112-evidence-proxy-starter.json",
+        "sha256": "5d0cb69342040c22bbe502632d555229dce2181dbe952151e606b9f583166b70"
+      },
+      {
+        "decider": "jev",
+        "path": "../docs/evaluation/runs/20261008-110304-evidence-proxy-starter.json",
+        "sha256": "a3c9875969e1f25d46e6bb3b8dabb5981e49c2cd380455d4402c2512134c1b04"
+      },
+      {
+        "decider": "jev",
+        "path": "../docs/evaluation/runs/20261008-110450-evidence-proxy-starter.json",
+        "sha256": "d95b63685250ee7883f150b42a37430d09e844a1e0c004671f5650ae7cea3f93"
+      },
+      {
+        "decider": "jev",
+        "path": "../docs/evaluation/runs/20261008-110632-evidence-proxy-starter.json",
+        "sha256": "b404cb2efe3da5c056bd3ea8c64ff6c60cbee15e1523d4898b0a4add6f516c23"
+      },
+      {
+        "decider": "label",
+        "path": "../docs/evaluation/runs/20261008-093000-evidence-proxy-starter.json",
+        "sha256": "f767e3250b8f0f8b4dca3711fdafbc07f5370a9ee99b64c46a0d0f002118627b"
+      },
+      {
+        "decider": "label",
+        "path": "../docs/evaluation/runs/20261008-093521-evidence-proxy-starter.json",
+        "sha256": "989e6a018bd0b74cd4b891f9b410654a7ebeb24dc7a9b2f2d9cc8894ac3744ed"
+      },
+      {
+        "decider": "label",
+        "path": "../docs/evaluation/runs/20261008-094042-evidence-proxy-starter.json",
+        "sha256": "22f3318d54100952a7b6aadf90d6cfeae72a7efca131ec96a69c154e15293b1a"
+      },
+      {
+        "decider": "label",
+        "path": "../docs/evaluation/runs/20261008-094603-evidence-proxy-starter.json",
+        "sha256": "e86cc73e1f12fb07148228b588227b067ce74ba5a39d617c0cb707af9b78376b"
+      },
+      {
+        "decider": "tool",
+        "path": "../docs/evaluation/runs/20261008-051409-evidence-proxy-starter.json",
+        "sha256": "9dfdc82cbf0402e55095b3c69917497fe901cd8af90b783d7f74fbdea229e69a"
+      },
+      {
+        "decider": "tool",
+        "path": "../docs/evaluation/runs/20261008-053345-evidence-proxy-starter.json",
+        "sha256": "041d58fe47d7a3593863c61cf0be068eefceaa29ed861c469ff802a8f65ae3de"
+      },
+      {
+        "decider": "tool",
+        "path": "../docs/evaluation/runs/20261008-054102-evidence-proxy-starter.json",
+        "sha256": "74152cc7ac573927d0255eee8cfb8d93831e4d737285210832912a7265a34b57"
+      },
+      {
+        "decider": "tool",
+        "path": "../docs/evaluation/runs/20261008-054438-evidence-proxy-starter.json",
+        "sha256": "95229efe343e1830a74a27fff7f5cba48f9b298d5b88752b307c7a2088a3fbdb"
+      }
+    ],
+    "live_deciders": {},
+    "repeats": null,
+    "model_builds": {
+      "jev": [
+        "typesafe/jev-1.13-20260917"
+      ],
+      "label": [
+        "openai/gpt-oss-20b"
+      ],
+      "tool": [
+        "openai/gpt-oss-120b"
+      ]
+    },
+    "prompt_digests": {
+      "jev": [
+        "836128e51bba263a19fdac226621827a5cefc0031bdf998fc4242dc0cb8c6e12"
+      ],
+      "label": [
+        "276d836106ed6a5e2926404eb8dbc275d83974c15ffeef6705cb1f888724a232"
+      ],
+      "tool": [
+        "1ffdd72ab6e91a532a825accb697ffa1990082cc4ba5a62b77a014e95a654754"
+      ]
+    },
+    "cost_usd": 0.0,
+    "jev_vendor_terms": "UNVERIFIED: OpenRouter's docs state no retention, training or rate-limit terms for the alpha Decisions API. Treat everything sent as retained."
+  }
+}
