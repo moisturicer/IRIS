@@ -1,5 +1,5 @@
 """
-IR-316: download and delete requests honour the visibility predicate.
+IR-316: download requests honour the visibility predicate; delete requests take no record id.
 
 `POST /records/download-requests/` and `POST /records/delete-requests/` took a
 `record` id resolved against **every** Record. A record the caller cannot read
@@ -12,16 +12,13 @@ field resolves through `Record.objects.visible_to(user)`, so an unreadable id
 fails the same field validation, with the same code and the same message, as an
 id no record has. A 403 here would be the oracle this ticket closes.
 
-**Delete requests had no ownership check at all.** The card expected one from
-IR-165, but IR-165 guarded only approve/decline. Filing a delete request now
-follows `DELETE /records/<id>/`: owner or office staff (`IsOwnerOrStaff`). A
-record the caller can read but does not own is a 403 -- the 404-vs-403 rule
-from IR-153: refusing to act on a visible record hides nothing.
-
-**And their PATCH was open to any account.** It could repoint a pending request
-at someone else's record before RDCO approved it, so it is RDCO's now, like
-the rest of the queue. `status` is read-only on both serializers: a request is
-created pending, and only the review actions move it.
+**Delete requests no longer take a record id at all (IR-496).** IR-316 gated
+`POST /records/delete-requests/` and its PATCH; IR-496 retired both, because a
+request filed that way skipped the `request_delete` transition. The tests that
+asserted IR-316's gate are replaced, **deliberately**, by
+`DeleteRequestWriteRouteTests` below: every role gets a 405 and nothing is
+written. A delete request is raised by `DELETE /records/<id>/`; see
+`test_delete_request_queue.py`.
 
 **Seam: the API.**
 """
@@ -159,58 +156,51 @@ class DownloadRequestVisibilityTests(RequestVisibilityFixtures):
         )
 
 
-class DeleteRequestVisibilityTests(RequestVisibilityFixtures):
+class DeleteRequestWriteRouteTests(RequestVisibilityFixtures):
+    """
+    The delete-request queue has no write routes (IR-496). Replaces IR-316's
+    create and PATCH tests on purpose: the routes they gated are gone.
+    """
 
-    def test_a_stranger_is_refused_a_private_proposal_as_if_it_did_not_exist(self):
-        self.assert_refused_as_missing(
-            DELETE_REQUESTS, self.stranger, self.approved_proposal, extra={"reason": "x"}
-        )
+    def every_role(self):
+        return {
+            "owner": self.owner,
+            "stranger": self.stranger,
+            "adviser": self.adviser,
+            "itso": _user("req-itso@cit.edu", RoleName.ITSO),
+            "rdco": self.rdco,
+        }
+
+    def test_post_is_not_allowed_for_any_role(self):
+        for name, user in self.every_role().items():
+            with self.subTest(role=name):
+                response = self.post_as(
+                    user, DELETE_REQUESTS, {"record": self.published_thesis.pk, "reason": "x"}
+                )
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED, response.data
+                )
         self.assertFalse(DeleteRequest.objects.exists())
 
-    def test_a_stranger_may_not_request_deletion_of_a_record_they_can_read(self):
-        response = self.post_as(
-            self.stranger, DELETE_REQUESTS, {"record": self.published_thesis.pk, "reason": "x"}
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
-        self.assertFalse(DeleteRequest.objects.exists())
-
-    def test_an_owner_may_request_deletion_of_their_own_record(self):
-        response = self.post_as(
-            self.owner, DELETE_REQUESTS, {"record": self.published_thesis.pk, "reason": "x"}
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        request = DeleteRequest.objects.get(record=self.published_thesis)
-        self.assertEqual(request.requested_by, self.owner)
-        self.assertEqual(request.status, RequestStatus.PENDING)
-
-    def test_a_request_is_created_pending_whatever_status_is_sent(self):
-        response = self.post_as(
-            self.owner,
-            DELETE_REQUESTS,
-            {"record": self.published_thesis.pk, "reason": "x", "status": RequestStatus.APPROVED},
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        self.assertEqual(
-            DeleteRequest.objects.get(record=self.published_thesis).status,
-            RequestStatus.PENDING,
-        )
-
-    def test_a_stranger_cannot_repoint_a_pending_request_at_another_record(self):
+    def test_patch_is_not_allowed_for_any_role_and_changes_nothing(self):
         pending = DeleteRequest.objects.create(
             record=self.approved_proposal, requested_by=self.owner, reason="mine"
         )
 
-        self.client.force_authenticate(self.stranger)
-        response = self.client.patch(
-            f"{DELETE_REQUESTS}{pending.pk}/",
-            {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED},
-            format="json",
-        )
+        for name, user in self.every_role().items():
+            with self.subTest(role=name):
+                self.client.force_authenticate(user)
+                response = self.client.patch(
+                    f"{DELETE_REQUESTS}{pending.pk}/",
+                    {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED},
+                    format="json",
+                )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+                self.assertEqual(
+                    response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED, response.data
+                )
+
         pending.refresh_from_db()
         self.assertEqual(pending.record, self.approved_proposal)
         self.assertEqual(pending.status, RequestStatus.PENDING)

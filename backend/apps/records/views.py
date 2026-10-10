@@ -2,7 +2,6 @@ from io import BytesIO
 
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -36,7 +35,6 @@ from core.permissions import (
     IsRDCO,
     IsStaff,
     get_role_name,
-    owns_or_staffs_record,
 )
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
@@ -1252,11 +1250,20 @@ class DownloadRedeemView(APIView):
         return response
 
 
-class DeleteRequestViewSet(viewsets.ModelViewSet):
+class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    GET    /delete-requests/                  -- staff: all requests
-    POST   /delete-requests/                  -- authenticated user requests deletion
-    POST   /delete-requests/<id>/approve/     -- admin: soft-delete record, notify owner
+    GET    /delete-requests/                  -- RDCO: all requests
+    GET    /delete-requests/<id>/             -- RDCO: one request
+    POST   /delete-requests/<id>/approve/     -- RDCO: soft-delete record, notify owner
+    POST   /delete-requests/<id>/decline/     -- RDCO: restore record, notify owner
+
+    Read and decided, never written to directly (IR-496). A request comes into
+    existence only through `DELETE /records/<id>/` (`RecordViewSet.perform_destroy`),
+    which also moves the record to `pending_delete` and records the status to
+    restore. The direct POST skipped both, so approve deleted records nobody had
+    put on hold and decline refused after already marking the request declined;
+    its PATCH could repoint a pending request at another record. Read-only by
+    construction, so neither can be wired back in by a URL alone.
     """
     serializer_class = DeleteRequestSerializer
     queryset         = DeleteRequest.objects.select_related("record", "requested_by")
@@ -1267,11 +1274,6 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
             # below. IsStaff would have shown the queue to all four offices
             # while only RDCO could act on it (IR-165).
             return [IsAuthenticated(), IsAdmin()]
-        if self.action == "partial_update":
-            # RDCO's, like the rest of the queue. It fell through to the bare
-            # IsAuthenticated default, so any account could repoint a pending
-            # request at someone else's record before RDCO approved it (IR-316).
-            return [IsAuthenticated(), IsRDCO()]
         if self.action in ("approve", "decline"):
             # Must be explicit here. These two are wired manually in urls.py as
             # as_view({"post": "approve"}) rather than through the router, and a
@@ -1283,15 +1285,6 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
             # someone else's record. See tests.py::DeadPermissionKwargSweepTests.
             return [IsAuthenticated(), IsRDCO()]
         return super().get_permissions()
-
-    def perform_create(self, serializer):
-        # The serializer has already refused a record the caller cannot read,
-        # exactly as a missing one (IR-316). Reading it is not enough to ask
-        # for its deletion: that takes what DELETE /records/<id>/ takes --
-        # owner or office staff -- and refusing on a visible record is a 403.
-        if not owns_or_staffs_record(self.request.user, serializer.validated_data["record"]):
-            raise PermissionDenied("Only the record's owner or office staff may request its deletion.")
-        serializer.save(requested_by=self.request.user)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsRDCO])
     def approve(self, request, pk=None):
