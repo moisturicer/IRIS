@@ -49,6 +49,12 @@ DECIDER_JEV = "jev"
 DECIDER_LABEL = "label"
 DECIDER_TOOL = "tool"
 DECIDERS = (DECIDER_JEV, DECIDER_LABEL, DECIDER_TOOL)
+#: The `--decision-mode` a stored result file records for each decider.
+DECISION_MODES = {
+    DECIDER_JEV: "jev-noul",
+    DECIDER_LABEL: "route-label",
+    DECIDER_TOOL: "tools",
+}
 
 #: Detector reason codes that are structural, not lexical. Only
 #: `scope_record` is one (ADR-035 §5).
@@ -140,7 +146,10 @@ def facts_from_judgement(judgement: Judgement, *, lane: str = "combined") -> Fac
     Resolved together."""
     verdict = judgement.verdict(lane)
     if verdict is None:
-        verdict = judgement.combined
+        raise ChainError(
+            f"question {judgement.question_id} has no {lane!r} detector verdict, "
+            "so it cannot be scored on that lane"
+        )
     return Facts(
         question_id=judgement.question_id,
         kind=judgement.kind,
@@ -226,17 +235,31 @@ def run_from_result_file(
     if decider not in DECIDERS:
         raise ChainError(f"decider must be one of {DECIDERS}, not {decider!r}")
     model = data.get("model") if isinstance(data, Mapping) else None
-    if not model or "per_question" not in model:
+    if not isinstance(model, Mapping) or "per_question" not in model:
         raise ChainError(f"{source} holds no model decisions (run it with --model-decision)")
+    provenance = data.get("provenance") or {}
+    recorded = provenance.get("decision_mode")
+    if recorded is not None and recorded != DECISION_MODES[decider]:
+        raise ChainError(
+            f"{source} was run with decision mode {recorded!r}, not "
+            f"{DECISION_MODES[decider]!r}, so it is not a {decider} run"
+        )
+    rows = model["per_question"]
     if decider == DECIDER_JEV and not any(
-        row.get("probability") is not None for row in model["per_question"]
+        isinstance(row, Mapping) and row.get("probability") is not None for row in rows
     ):
         raise ChainError(f"{source} has no probabilities, so it is not a jev-noul run")
+    try:
+        decisions = {row["id"]: decision_from_row(row) for row in rows}
+    except (KeyError, TypeError, AttributeError, ValueError) as exc:
+        raise ChainError(
+            f"{source} has a malformed decision row ({type(exc).__name__}: {exc})"
+        )
     return DeciderRun(
         decider=decider,
-        decisions={row["id"]: decision_from_row(row) for row in model["per_question"]},
+        decisions=decisions,
         source=source,
-        prompt_digest=(data.get("provenance") or {}).get("prompt_digest"),
+        prompt_digest=provenance.get("prompt_digest"),
     )
 
 
@@ -438,6 +461,17 @@ def available_arms(runs: Mapping[str, Sequence[DeciderRun]]) -> list[Arm]:
 
 def replicates_for(arm: Arm, runs: Mapping[str, Sequence[DeciderRun]]) -> int:
     return min((len(runs[d]) for d in arm.needs), default=1)
+
+
+def unpaired_replicates(
+    runs: Mapping[str, Sequence[DeciderRun]],
+) -> list[str]:
+    """Deciders whose replicate counts differ, so an arm built on several of
+    them scores only the first `min` replicates of each."""
+    counts = {d: len(rs) for d, rs in runs.items() if rs}
+    if len(set(counts.values())) <= 1:
+        return []
+    return [f"{d}={n}" for d, n in sorted(counts.items())]
 
 
 def route_arm(
@@ -719,9 +753,7 @@ def evaluate_arm(
     scores = []
     for r in range(replicates):
         outcomes = route_arm(arm, facts, runs, bands, r)
-        # A forced Jev failure is simulated, so only the real deciders gate pooling.
-        gating = [d for d in arm.needs if not (arm.simulated_jev_failure and d == DECIDER_JEV)]
-        pooled = not any(runs[d][r].reported_alone for d in gating)
+        pooled = not any(runs[d][r].reported_alone for d in arm.needs)
         scores.append(score_replicate(outcomes, facts, replicate=r, pooled=pooled))
     rescue = None
     if arm is ARM_CHAIN:
@@ -1032,12 +1064,21 @@ class ChainReport:
             "$/dec n/r = a call in the arm reported no cost)"
         )
         for result in self.arms:
+            alone = [
+                r for r in result.pooled if r.llm_alone_direct or r.llm_alone_needed_corpus
+            ]
             if result.arm.simulated_jev_failure:
                 lines.append(
                     f"  {result.arm.name}: Jev failure is SIMULATED; its rate here is "
                     "not the vendor's."
                 )
-                for r in result.pooled:
+            elif alone:
+                lines.append(
+                    f"  {result.arm.name}: answered on the LLM's single opinion after "
+                    "a Jev failure:"
+                )
+            if result.arm.simulated_jev_failure or alone:
+                for r in (result.pooled if result.arm.simulated_jev_failure else alone):
                     lines.append(
                         f"    replicate {r.replicate}: {len(r.llm_alone_direct)} LLM-alone "
                         f"direct answers, {len(r.llm_alone_needed_corpus)} needed the corpus"

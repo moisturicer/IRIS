@@ -423,6 +423,10 @@ class Command(BaseCommand):
                 )
             except (OSError, ValueError, chained.ChainError) as exc:
                 raise CommandError(f"{path}: {exc}")
+            except (KeyError, TypeError, AttributeError) as exc:
+                raise CommandError(
+                    f"{path}: not an eval_evidence result file ({type(exc).__name__}: {exc})"
+                )
             sources.append({"decider": name, "path": path, "sha256": _digest(path)})
 
         questions = annotated(question_set)
@@ -434,8 +438,8 @@ class Command(BaseCommand):
         detector = EvidenceDetector(rule_set)
         judgements = tuple(judge(detector, q) for q in questions)
 
-        facts = [chained.facts_from_judgement(j) for j in judgements]
         try:
+            facts = [chained.facts_from_judgement(j) for j in judgements]
             chained.validate_runs(facts, runs)
         except chained.ChainError as exc:
             raise CommandError(str(exc))
@@ -444,30 +448,44 @@ class Command(BaseCommand):
 
         raw_only: dict[str, list] = {name: [] for name in chained.DECIDERS}
         deciders_used = {}
-        for name in live:
-            decider = self._decider(LIVE_MODES[name], options["max_tokens"])
-            deciders_used[name] = LIVE_MODES[name]
-            for _ in range(options["repeats"]):
-                runs[name].append(
-                    chained.collect_run(
-                        name,
-                        decider,
-                        questions,
-                        source=f"live {name}",
-                        prompt_digest=self._live_digest(name, options),
-                    )
-                )
-                if options["ablate_resolved"]:
-                    raw_only[name].append(
+        try:
+            for name in live:
+                decider = self._decider(LIVE_MODES[name], options["max_tokens"])
+                deciders_used[name] = LIVE_MODES[name]
+                digest = self._live_digest(name, options)
+                for _ in range(options["repeats"]):
+                    runs[name].append(
                         chained.collect_run(
                             name,
                             decider,
                             questions,
-                            use_resolved=False,
-                            source=f"live {name} raw-only",
-                            prompt_digest=self._live_digest(name, options),
+                            source=f"live {name}",
+                            prompt_digest=digest,
                         )
                     )
+                    if options["ablate_resolved"]:
+                        raw_only[name].append(
+                            chained.collect_run(
+                                name,
+                                decider,
+                                questions,
+                                use_resolved=False,
+                                source=f"live {name} raw-only",
+                                prompt_digest=digest,
+                            )
+                        )
+        except Exception as exc:
+            # Paid passes already finished are scored and kept rather than lost.
+            if not any(runs.values()):
+                raise
+            self.stderr.write(
+                self.style.ERROR(
+                    f"live collection stopped early ({type(exc).__name__}: {exc}); "
+                    "scoring the passes completed so far."
+                )
+            )
+            # A partly collected raw-only set would not be comparable.
+            raw_only = {name: [] for name in chained.DECIDERS}
 
         runs = {name: tuple(rs) for name, rs in runs.items() if rs}
         if not runs:
@@ -478,11 +496,12 @@ class Command(BaseCommand):
 
         ablations = {"resolver_label": options["resolver_label"] or "not recorded"}
         try:
-            raw_detector = chained.build_report(
-                question_set={}, facts=raw_facts, runs=runs, bands=bands
-            )
+            chained.validate_runs(raw_facts, runs)
             ablations["detector_input"] = {
-                "raw_only": [a.summary() for a in raw_detector.arms],
+                "raw_only": [
+                    chained.evaluate_arm(arm, raw_facts, runs, bands).summary()
+                    for arm in chained.available_arms(runs)
+                ],
                 "note": "the detector on the raw question alone; the main "
                 "arms use raw and Resolved together",
             }
@@ -497,6 +516,15 @@ class Command(BaseCommand):
                     ],
                     "note": "live deciders asked without the Resolved question",
                 }
+            unpaired = chained.unpaired_replicates(runs)
+            if unpaired:
+                self.stderr.write(
+                    self.style.WARNING(
+                        "decider replicate counts differ ("
+                        f"{', '.join(unpaired)}): an arm using several deciders scores "
+                        "only as many replicates as its smallest."
+                    )
+                )
             report = chained.build_report(
                 question_set=question_set.as_dict(),
                 facts=facts,
@@ -574,7 +602,6 @@ class Command(BaseCommand):
         if path is not None:
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
-
 
     @staticmethod
     def _live_digest(name: str, options) -> str:

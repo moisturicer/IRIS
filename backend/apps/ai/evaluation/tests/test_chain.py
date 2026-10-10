@@ -377,6 +377,40 @@ def test_a_non_jev_file_is_refused_as_jev():
         c.run_from_result_file("jev", data, "x.json")
 
 
+def test_a_file_run_in_another_decision_mode_is_refused():
+    data = {
+        "provenance": {"decision_mode": "route-label"},
+        "model": {"per_question": [{"id": "q", "route": "direct", "reason": "x", "probability": 0.1}]},
+    }
+    with pytest.raises(ChainError, match="not a jev run"):
+        c.run_from_result_file("jev", data, "x.json")
+    with pytest.raises(ChainError, match="not a tool run"):
+        c.run_from_result_file("tool", data, "x.json")
+    assert c.run_from_result_file("label", data, "x.json").decider == "label"
+
+
+def test_a_malformed_decision_row_is_a_chain_error():
+    data = {"model": {"per_question": [{"id": "q", "route": "direct"}]}}
+    with pytest.raises(ChainError, match="malformed decision row"):
+        c.run_from_result_file("label", data, "x.json")
+    with pytest.raises(ChainError, match="no model decisions"):
+        c.run_from_result_file("label", {"model": "oops"}, "x.json")
+
+
+def test_a_missing_lane_verdict_is_refused_not_substituted():
+    from types import SimpleNamespace
+
+    j = SimpleNamespace(question_id="q", verdict=lambda lane: None, combined=object())
+    with pytest.raises(ChainError, match="no 'raw' detector verdict"):
+        c.facts_from_judgement(j, lane="raw")
+
+
+def test_unpaired_replicate_counts_are_named():
+    run = DeciderRun(decider="jev", decisions={}, source="s")
+    assert c.unpaired_replicates({"jev": (run, run), "label": (run,)}) == ["jev=2", "label=1"]
+    assert c.unpaired_replicates({"jev": (run,), "label": (run,)}) == []
+
+
 # -- collecting fresh runs ---------------------------------------------------
 
 
