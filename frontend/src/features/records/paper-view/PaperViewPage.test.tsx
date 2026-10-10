@@ -74,6 +74,7 @@ const record: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [{ id: 1, name: "R. Dela Cruz", role: null }],
   adviser: null,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,
@@ -131,6 +132,7 @@ const approvedProposal: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [{ id: 1, name: "Andrea Lim", role: null }],
   adviser: ASSIGNED_ADVISER_ID,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,
@@ -592,6 +594,28 @@ describe("the status the paper shows", () => {
     // Once as the badge, once as the governance ledger's status row.
     expect(screen.getAllByText("Final review")).toHaveLength(2);
     expect(screen.queryByText("RDCO Final Review")).not.toBeInTheDocument();
+  });
+});
+
+describe("the byline credits the adviser (IR-472)", () => {
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  it("names the adviser on a record that has one", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos" };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
+  });
+
+  it("shows no adviser line on a record without one", async () => {
+    shownRecord = { ...record, adviser: null, adviser_name: null };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.queryByText(/^Adviser:/)).not.toBeInTheDocument();
   });
 });
 

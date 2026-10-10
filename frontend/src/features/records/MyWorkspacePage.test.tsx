@@ -50,6 +50,7 @@ const base: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [],
   adviser: null,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,

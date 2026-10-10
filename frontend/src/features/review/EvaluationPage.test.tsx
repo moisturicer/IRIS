@@ -69,6 +69,7 @@ const record: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [{ id: 1, name: "Mateo Villanueva", role: null }],
   adviser: null,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: true,
   requested_itso: true,
