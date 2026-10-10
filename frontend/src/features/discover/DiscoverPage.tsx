@@ -250,7 +250,8 @@ export default function DiscoverPage() {
       />
 
       <p aria-live="polite" className="mt-5 mb-3 min-h-[20px] text-small text-stone-600">
-        {loading || totalCount === null ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
+        {/* No count over an empty state: its own message already says so. */}
+        {loading || !totalCount ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
       </p>
 
       {loading ? (
