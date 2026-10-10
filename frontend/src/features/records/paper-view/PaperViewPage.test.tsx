@@ -90,13 +90,10 @@ const record: RecordDetail = {
     offices_preserved: [],
   },
   stage_label: "Published",
-  your_office: null,
-  your_office_label: null,
   files: [],
   workflow_state: "published",
   workflow_state_label: "Published",
   current_holders: [],
-  can_act: [],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
@@ -147,13 +144,10 @@ const approvedProposal: RecordDetail = {
     offices_preserved: [],
   },
   stage_label: "Approved",
-  your_office: null,
-  your_office_label: null,
   files: [],
   workflow_state: "approved",
   workflow_state_label: "Approved",
   current_holders: [],
-  can_act: [],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
@@ -379,7 +373,6 @@ const inReview: RecordDetail = {
   current_holders: [
     { party: "itso", label: "ITSO", opened_at: "2026-09-02T08:00:00Z", opened_by: null },
   ],
-  can_act: [],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
@@ -452,9 +445,9 @@ describe("the review control follows can_act", () => {
   });
 
   it("is not offered to a same-role viewer the API does not name, whatever the stage", async () => {
-    // `parallel_review` is a stage an ITSO reviewer used to be shown the
-    // control at by role alone. The API says this one cannot act.
-    shownRecord = { ...inReview, pipeline_status: "parallel_review", can_act: [] };
+    // An ITSO reviewer was once shown the control by role alone, at the
+    // retired `parallel_review` stage. The API gives this one no seat.
+    shownRecord = { ...inReview };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -543,7 +536,7 @@ describe("the new-version control follows revision requests", () => {
 
 describe("the status the paper shows", () => {
   it("is the API's workflow_state_label, on the badge and in governance", async () => {
-    shownRecord = { ...inReview, pipeline_status: "rdco_review", workflow_state_label: "Final review", workflow_state: "final_review" };
+    shownRecord = { ...inReview, pipeline_status: "in_review", workflow_state_label: "Final review", workflow_state: "final_review" };
     signInAs(99, "Student");
     renderPaperView();
 
@@ -1426,7 +1419,6 @@ describe("the Review section (IR-412)", () => {
     workflow_state: "in_review",
     workflow_state_label: "In review",
     current_holders: [],
-    can_act: [],
     parties: [],
     routing_history: [
       {

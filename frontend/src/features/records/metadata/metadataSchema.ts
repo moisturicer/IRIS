@@ -103,9 +103,7 @@ export const HINTS: ReadonlyArray<{
  *
  * The hints are sent as hints and nothing more: `requested_itso/ierc/ktto`
  * are never written here. Under ADR-032 the author picks no office; the
- * Adviser routes. Decided with the project lead on 2026-10-06 (IR-408),
- * knowing the legacy pipeline still routes on those flags after intake, so
- * until IR-260 cuts over a Publish submission reaches no specialist office.
+ * Adviser routes. Decided with the project lead on 2026-10-06 (IR-408).
  */
 export function metadataPayload(
   values: MetadataValues,

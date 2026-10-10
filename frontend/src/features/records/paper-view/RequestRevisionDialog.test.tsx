@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 
 describe("RequestRevisionDialog", () => {
-  it("keeps EvaluationPage's words and names the version being reviewed", async () => {
+  it("keeps the retired review form's words and names the version being reviewed", async () => {
     const { view } = open();
 
     const dialog = screen.getByRole("dialog", { name: "Request Revision" });

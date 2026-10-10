@@ -25,9 +25,6 @@
  *
  * `blockedReason` keeps a granted action on the bar but disabled, saying why
  * -- for a condition the server reports but the viewer cannot act past yet.
- *
- * Until IR-260 cuts over, a record still on the legacy pipeline is decided on
- * the current review form; the Review section links to it beside the bar.
  */
 import type { ComponentType } from "react";
 
@@ -247,7 +244,7 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   {
     kind: "dialog",
     capability: "request_revision",
-    // `EvaluationPage`'s words, kept verbatim (ui-ux/16 §4).
+    // The retired review form's words, kept verbatim (ui-ux/16 §4).
     label: "Request Revision…",
     icon: "fa-arrow-rotate-left",
     blockedReason: (record) => record.revision.blocked,

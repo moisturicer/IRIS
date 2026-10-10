@@ -7,7 +7,7 @@
  * kept here rather than in component state. One draft per record and outcome:
  * a half-written finding never turns up pre-filled as a clearance's note.
  *
- * `sessionStorage`, as `lib/reviewDraft.ts` argues: a half-written finding is
+ * `sessionStorage`, as the retired review form's draft did: a half-written finding is
  * somebody's opinion of somebody else's work, and should not outlive the tab
  * on a shared machine. Every access is guarded; losing a draft is a shame,
  * losing the dialog would be a defect.

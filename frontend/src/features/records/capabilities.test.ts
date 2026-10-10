@@ -63,13 +63,10 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     clearances: [],
     resubmission: { count: 0, last_resubmitted_at: null, declining_office: null, offices_preserved: [] },
     stage_label: "Published",
-    your_office: null,
-    your_office_label: null,
     files: [],
     workflow_state: "published",
     workflow_state_label: "Published",
     current_holders: [],
-    can_act: [],
     can_request_document: [],
     my_seats: [],
     is_participant: false,
@@ -143,7 +140,7 @@ const ROWS: Row[] = [
   },
   {
     name: "nobody signed in is nobody's participant",
-    record: record({ can_act: ["adviser"] }),
+    record: record({ can_request_document: ["adviser"] }),
     viewer: null,
     capabilities: ["cite"],
     sections: ["overview", "paper"],
@@ -163,17 +160,13 @@ const ROWS: Row[] = [
     sections: ["overview", "paper"],
   },
   {
-    name: "the owner asked for a revision may resubmit and edit details",
-    record: record({ pipeline_status: "declined", workflow_state: "awaiting_resubmission" }),
+    // IR-274: this asked it of a stored `declined`, the retired pipeline's
+    // revision, where "Resubmit for review" needed no server offer. Every
+    // revision is a new version now, offered by the server.
+    name: "the owner asked for a revision is offered no new version the server did not offer",
+    record: record({ pipeline_status: "in_review", workflow_state: "awaiting_resubmission" }),
     viewer: owner,
-    capabilities: ["cite", "create_version", "edit_details"],
-    sections: ["overview", "paper", "review", "files"],
-  },
-  {
-    name: "a stored 'declined' that the server says is still in review gives the owner nothing to do",
-    record: record({ pipeline_status: "declined", workflow_state: "in_review" }),
-    viewer: owner,
-    capabilities: ["cite"],
+    capabilities: ["cite", "edit_details"],
     sections: ["overview", "paper", "review", "files"],
   },
   {
@@ -188,13 +181,6 @@ const ROWS: Row[] = [
     record: record(),
     viewer: owner,
     capabilities: ["cite"],
-    sections: ["overview", "paper", "review", "files"],
-  },
-  {
-    name: "the party the server names in can_act may open the review and decide",
-    record: record({ pipeline_status: "in_review", workflow_state: "in_review", can_act: ["adviser"] }),
-    viewer: adviser,
-    capabilities: ["cite", "open_review", "decide"],
     sections: ["overview", "paper", "review", "files"],
   },
   {
@@ -240,9 +226,9 @@ const ROWS: Row[] = [
     sections: ["overview", "paper"],
   },
   {
-    name: "a seat to work is a review to open, even where the legacy pipeline lets its holder do nothing yet",
+    name: "a seat to work is a review to open",
     record: record({
-      pipeline_status: "itso_review",
+      pipeline_status: "in_review",
       workflow_state: "in_review",
       my_seats: [seat("assigned")],
       is_participant: true,

@@ -350,7 +350,6 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
   const status = (
     <>
       <span className="font-semibold text-stone-800">{holderLine(row)}</span>
-      {row.kind === "legacy" && row.stage_label && <Badge>{row.stage_label}</Badge>}
       {row.waiting_on && tab !== "done" && <Badge variant="warning">{WAITING_ON_LABEL[row.waiting_on]}</Badge>}
       {tab === "done" && (
         <Badge variant={row.outcome == null ? "default" : "success"}>

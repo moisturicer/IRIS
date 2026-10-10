@@ -3,14 +3,15 @@
  *
  * **The one place the frontend decides what a viewer may do with a record.**
  * Paper View, My Library, My Reviews and Publish ask this module; none of them
- * reads a role name or `can_act` itself. `test/roleGuard.test.ts` fails the
+ * reads a role name itself. `test/roleGuard.test.ts` fails the
  * build if one does.
  *
  * **Phase 1 (now).** The Record detail payload carries no `capabilities` list
  * yet, so this derives one from the server fields that exist:
  *
- * - `can_act` non-empty → the review actions (`open_review`, and `decide`
- *   through the current decision form until ADR-032's actions land);
+ * - a seat still to work → `open_review`;
+ * - the server's per-act flags (`routing`, `decision`, `office_review`,
+ *   `revision`) → the review actions;
  * - `can_request_document` non-empty → `request_document`;
  * - ownership plus the server's `workflow_state` → the author actions.
  *
@@ -57,7 +58,6 @@ export type Capability =
   | "reject"
   | "office_review"
   | "add_reviewer"
-  | "decide"
   | "create_version"
   | "replace_manuscript"
   | "edit_details"
@@ -89,7 +89,6 @@ export type Viewer = { id: number; role_name: RoleName | null };
 type CapabilityInputs = Pick<
   RecordDetail,
   | "owners"
-  | "can_act"
   | "can_request_document"
   | "my_seats"
   | "is_participant"
@@ -109,19 +108,19 @@ export function isOwner(record: Pick<RecordDetail, "owners">, viewer: Viewer | n
 }
 
 /**
- * Whether the viewer takes part in the review: the server lets them act on the
- * record, or ask its owner for documents.
+ * Whether the viewer takes part in the review now: they hold a party's active
+ * assignment, which is what lets them ask the owner for documents.
  */
 export function isReviewing(record: CapabilityInputs, viewer: Viewer | null): boolean {
-  return viewer != null && (record.can_act.length > 0 || record.can_request_document.length > 0);
+  return viewer != null && record.can_request_document.length > 0;
 }
 
 /**
  * An owner, or someone taking part in the review. The server's
  * `is_participant` is ADR-032's `is_record_participant`, which also counts
  * anyone who *has* held a seat (IR-415): a reviewer whose part is done keeps
- * the Review and Files sections. The two client-side grounds stay for a
- * reviewer on the legacy pipeline who acts without holding a seat.
+ * the Review and Files sections. The two client-side grounds cover the owner
+ * and a pool member who is about to claim.
  */
 export function isParticipant(record: CapabilityInputs, viewer: Viewer | null): boolean {
   return viewer != null && (record.is_participant || isOwner(record, viewer) || isReviewing(record, viewer));
@@ -150,14 +149,7 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
   const granted = new Set<Capability>(["cite"]);
   if (viewer == null) return granted;
 
-  // Reading `can_act` belongs here alone; see the module comment.
-  if (record.can_act.length > 0) {
-    granted.add("open_review");
-    // Through the current decision form, until IR-260 retires it.
-    granted.add("decide");
-  }
-  // A seat to work is a review to open, even where the legacy pipeline does
-  // not let its holder act yet (IERC waiting on ITSO, say).
+  // A seat to work is a review to open.
   if (holdsOpenSeat(record)) granted.add("open_review");
   // Routing (ADR-032 §4, IR-261): the server's own flags, never derived here.
   if (record.routing.accept_and_route) granted.add("accept_route");
@@ -188,14 +180,9 @@ export function capabilitiesFor(record: CapabilityInputs, viewer: Viewer | null)
       granted.add("edit_details");
     }
     if (record.workflow_state === "awaiting_resubmission") {
-      // Two acts answer a revision request. A stored `declined` (the legacy
-      // pipeline) takes "Resubmit for review". On the adviser-first model
-      // (stored `in_review`) the owner submits a new version, which the
-      // server offers through `revision.new_version` (IR-273); without it,
-      // the legacy act would only be refused (IR-272).
-      if (record.pipeline_status !== "in_review" || record.revision.new_version != null) {
-        granted.add("create_version");
-      }
+      // The owner answers a revision request with a new version, which the
+      // server offers through `revision.new_version` (IR-273).
+      if (record.revision.new_version != null) granted.add("create_version");
       // A new version may carry a revised manuscript (IR-273). The server
       // opens the manuscript lock to an owner only while a revision is asked
       // for on the new model, which is what its offer says.

@@ -9,7 +9,6 @@
  * tests show by handing it actions it has never seen, and by the real
  * *Request documents* entry. Every query goes through the accessible tree.
  */
-import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -72,7 +71,7 @@ const publish = vi.fn(() => Promise.resolve("Published."));
 
 const acceptAndPublish: ReviewAction = {
   kind: "terminal",
-  capability: "decide",
+  capability: "accept_publish",
   label: "Accept & publish",
   icon: "fa-check",
   confirm: {
@@ -95,14 +94,13 @@ const reviseBlocked: ReviewAction = {
 function renderBar(
   granted: Capability[],
   actions?: ReviewAction[],
-  extra: { secondary?: ReactNode; onChanged?: () => void } = {},
+  extra: { onChanged?: () => void } = {},
 ) {
   return renderScreen(
     <ReviewActionBar
       record={record}
       can={new Set(granted)}
       actions={actions}
-      secondary={extra.secondary}
       onChanged={extra.onChanged ?? (() => {})}
     />,
   );
@@ -126,7 +124,7 @@ describe("ReviewActionBar", () => {
   });
 
   it("puts an action that ends the review last, whatever order it was given in", () => {
-    renderBar(["route", "decide"], [acceptAndPublish, route]);
+    renderBar(["route", "accept_publish"], [acceptAndPublish, route]);
 
     expect(buttonNames()).toEqual(["Route", "Accept & publish"]);
   });
@@ -189,7 +187,7 @@ describe("ReviewActionBar", () => {
 
   it("asks before an action that ends the review, stating the consequence", async () => {
     const onChanged = vi.fn();
-    renderBar(["decide"], [acceptAndPublish], { onChanged });
+    renderBar(["accept_publish"], [acceptAndPublish], { onChanged });
 
     await userEvent.click(screen.getByRole("button", { name: "Accept & publish" }));
     const confirm = screen.getByRole("dialog", { name: "Accept and publish this record?" });
@@ -213,7 +211,7 @@ describe("ReviewActionBar", () => {
 
   it("keeps the confirmation open and says what went wrong when the action fails", async () => {
     publish.mockRejectedValueOnce({ response: { data: { detail: "This record is no longer yours to decide." } } });
-    renderBar(["decide"], [acceptAndPublish]);
+    renderBar(["accept_publish"], [acceptAndPublish]);
 
     await userEvent.click(screen.getByRole("button", { name: "Accept & publish" }));
     const confirm = screen.getByRole("dialog", { name: "Accept and publish this record?" });
@@ -224,15 +222,8 @@ describe("ReviewActionBar", () => {
     );
   });
 
-  it("carries a secondary link in the same toolbar", () => {
-    renderBar(["route"], [route], { secondary: <a href="/review/7/evaluate">Record a decision (current form)</a> });
-
-    const bar = screen.getByRole("toolbar", { name: "Review actions" });
-    expect(within(bar).getByRole("link", { name: "Record a decision (current form)" })).toBeInTheDocument();
-  });
-
   it("moves between its controls with the arrow keys", async () => {
-    renderBar(["route", "decide"], [route, acceptAndPublish]);
+    renderBar(["route", "accept_publish"], [route, acceptAndPublish]);
 
     screen.getByRole("button", { name: "Route" }).focus();
     await userEvent.keyboard("{ArrowRight}");

@@ -49,8 +49,6 @@ export const reviewsApi = {
         ...(cursor ? { cursor } : {}),
       },
     }),
-  submit:     (data: ReviewSubmitPayload) => apiClient.post<Review>("/reviews/submit/", data),
-  resubmit:   (recordId: number)         => apiClient.post("/reviews/resubmit/", { record_id: recordId }),
   /** Request a one-time PIN emailed to the current user's account email. */
   generatePin:(recordId: number) => apiClient.post("/reviews/pin/generate/", { record_id: recordId }),
   /** Verify a PIN and confirm access. Returns { verified: true, record_id }. */
