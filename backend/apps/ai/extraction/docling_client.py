@@ -39,18 +39,25 @@ EXTRACTOR_NAME = "docling"
 
 _CONVERT_PATH = "/v1/convert/file"
 
-# do_ocr, table_mode and do_formula_enrichment are IR-367/DOCLING_* settings,
+# do_ocr and do_formula_enrichment are IR-367/DOCLING_* settings,
 # not constants here — a CPU-only deployment bulk-loading born-digital PDFs
 # (an exact text layer already) pays for RapidOCR and accurate table/formula
 # passes it gets no benefit from. Defaults below match what this dict used to
 # hardcode, so an unconfigured deployment behaves exactly as before. Images
 # stay off unconditionally: the citation overlay draws regions over the real
 # PDF, so a rendered picture would be megabytes of derived asset nothing reads.
-_DEFAULT_DO_OCR = True
-_DEFAULT_TABLE_MODE = "accurate"
+_DEFAULT_DO_OCR = False
 _DEFAULT_DO_FORMULA_ENRICHMENT = True
+_DEFAULT_DO_CODE_ENRICHMENT = True
+_DEFAULT_DO_PICTURE_CLASSIFICATION = True
 
-TABLE_MODES = ("accurate", "fast")
+# docling-serve 1.36 no longer defaults the CodeFormula preset: "default" is
+# not one, and omitting it fails every conversion before it starts.
+_CODE_FORMULA_PRESET = "codeformulav2"
+
+# Always accurate: a table read in fast mode retrieves as prose, and it is not
+# a setting any deployment gets to trade away.
+_TABLE_MODE = "accurate"
 
 
 def _bool_str(value: bool) -> str:
@@ -90,12 +97,10 @@ class DoclingExtractor:
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         client: Optional[httpx.Client] = None,
         do_ocr: bool = _DEFAULT_DO_OCR,
-        table_mode: str = _DEFAULT_TABLE_MODE,
         do_formula_enrichment: bool = _DEFAULT_DO_FORMULA_ENRICHMENT,
+        do_code_enrichment: bool = _DEFAULT_DO_CODE_ENRICHMENT,
+        do_picture_classification: bool = _DEFAULT_DO_PICTURE_CLASSIFICATION,
     ):
-        if table_mode not in TABLE_MODES:
-            raise ValueError(f"table_mode must be one of {TABLE_MODES!r}, got {table_mode!r}")
-
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._client = client
@@ -103,10 +108,18 @@ class DoclingExtractor:
             "to_formats": ["json"],
             "do_ocr": _bool_str(do_ocr),
             "do_table_structure": "true",
-            "table_mode": table_mode,
+            "table_mode": _TABLE_MODE,
             "do_formula_enrichment": _bool_str(do_formula_enrichment),
+            "do_code_enrichment": _bool_str(do_code_enrichment),
+            "do_picture_classification": _bool_str(do_picture_classification),
+            # Generated descriptions and chart data are not extraction: the
+            # models are heavy and the mapper has nowhere to put the output.
+            "do_picture_description": "false",
+            "do_chart_extraction": "false",
             "include_images": "false",
         }
+        if do_formula_enrichment or do_code_enrichment:
+            self._convert_options["code_formula_preset"] = _CODE_FORMULA_PRESET
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument:
         payload = self._convert(pdf_bytes, filename=filename)
