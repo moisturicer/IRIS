@@ -490,7 +490,7 @@ class DownloadRequestSerializer(serializers.ModelSerializer):
 
 
 class DeleteRequestSerializer(serializers.ModelSerializer):
-    record               = VisibleRecordField()
+    """Output only: the queue is read and decided, never written to (IR-496)."""
     record_title         = serializers.CharField(source="record.title",                    read_only=True)
     requested_by_name    = serializers.SerializerMethodField()
     requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
@@ -502,8 +502,7 @@ class DeleteRequestSerializer(serializers.ModelSerializer):
             "requested_by", "requested_by_name", "requested_by_email",
             "reason", "status", "reviewed_by", "reviewed_at", "created_at",
         ]
-        # A request is created pending; only the review actions move it.
-        read_only_fields = ["requested_by", "status", "reviewed_by", "reviewed_at"]
+        read_only_fields = fields
 
     def get_requested_by_name(self, obj):
         if obj.requested_by:

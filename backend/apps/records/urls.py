@@ -16,8 +16,9 @@ urlpatterns = [
         path("<int:pk>/decline/", DownloadRequestViewSet.as_view({"post": "decline"}), name="download-request-decline"),
     ])),
     path("delete-requests/", include([
-        path("", DeleteRequestViewSet.as_view({"get": "list", "post": "create"}), name="delete-requests"),
-        path("<int:pk>/", DeleteRequestViewSet.as_view({"get": "retrieve", "patch": "partial_update"}), name="delete-request-detail"),
+        # Read and decided only: a request is raised by DELETE /records/<id>/ (IR-496).
+        path("", DeleteRequestViewSet.as_view({"get": "list"}), name="delete-requests"),
+        path("<int:pk>/", DeleteRequestViewSet.as_view({"get": "retrieve"}), name="delete-request-detail"),
         path("<int:pk>/approve/", DeleteRequestViewSet.as_view({"post": "approve"}), name="delete-request-approve"),
         path("<int:pk>/decline/", DeleteRequestViewSet.as_view({"post": "decline"}), name="delete-request-decline"),
     ])),
