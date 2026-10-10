@@ -679,7 +679,21 @@ Both repositories are read at their local `HEAD`: `Controllable-RAG-Agent` `929b
 
 ## 12. Ticket candidates
 
-**Not created in Jira.** Labels below are placeholders (`C-n`), not issue keys. Existing keys are named with their titles.
+**Not created in Jira as listed.** Labels below are placeholders (`C-n`), not issue keys. Existing keys are named with their titles.
+
+> **Update, 2026-10-10 — owner decision.** Option B is being built as six consolidated tickets, with evaluation deferred until the architecture exists:
+>
+> | Ticket | Covers |
+> |---|---|
+> | IR-499 — ADR: bounded research lane | C-1, C-2, and the ADR-036 and ADR-026 §13 amendments |
+> | IR-500 — Tool layer | C-3–C-7, C-17 |
+> | IR-501 — Screening and topic counts | C-13, part of C-14 |
+> | IR-502 — Planner, answer validation, run audit | C-8, C-9, C-16, C-18 |
+> | IR-503 — Routing | C-12, C-14, C-15 |
+> | IR-504 — Production rollout | C-20, phase 3 |
+> | IR-505 — Deferred: evaluation and shadow mode | C-10, C-11, C-19, the ADR-023 amendment |
+>
+> This moves evaluation after the build, so the phase 2 gate in §9 (planner beats workflows, no page-precision loss) is no longer a precondition for building phase 3. IR-499 must record that. C-21 (Lens) and phase 4b (web search) are not included.
 
 | # | Candidate | Depends on | Kind |
 |---|---|---|---|
