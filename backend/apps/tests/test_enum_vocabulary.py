@@ -76,9 +76,11 @@ GOVERNED_ENUMS = (
     # branches on these values, so a hand-typed copy is the same drift risk.
     WorkflowState,
     TrackerPartyState,
-    # IR-262's document-request vocabulary, governed by IR-347. Its "open"
-    # and "uploaded" are also unrelated bare values in two `apps/ai` modules;
-    # those files are allowed one by one below rather than exempting a value.
+    # IR-262's document-request vocabulary, governed by IR-347. Its "open",
+    # "uploaded" and "missing" also mean unrelated things in six modules.
+    # Those files are allowed one by one below, rather than exempting a value
+    # everywhere -- but an allowed file is exempt from *every* governed value,
+    # so each entry's reason has to hold for the whole file.
     DocumentRequestState,
     DocumentRequestItemState,
 )
@@ -145,9 +147,11 @@ ALLOWED = {
     # pilot_report.py above, to name them in the refusal.
     "ai/management/commands/report_evidence_pilot.py",
     # "open" is record detail's response key for the list of open *revision*
-    # requests (ADR-032 §5, IR-272), which Paper View reads by that name.
-    # Renaming a wire key is out of IR-347's scope; it is not a
-    # `DocumentRequestState`.
+    # requests (ADR-032 §5, IR-272), which Paper View reads by that name. It
+    # names a list, not a stored state: neither `DocumentRequestState.OPEN`
+    # nor `ResubmissionRequestState.OPEN`. Renaming a wire key is out of
+    # IR-347's scope. This is a workflow module, so the cost is real: a bare
+    # governed value added here later goes unseen. Renaming the key is the fix.
     "reviews/revisions.py",
 }
 
