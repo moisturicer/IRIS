@@ -9,6 +9,8 @@
  * The page offers this only under the `edit_details` capability: the owner's
  * draft, or the owner's record awaiting a revision, where the change goes back
  * to the reviewers with the resubmission (invariant 4). The server re-checks.
+ * Once submitted, the Adviser and the hints are fixed (IR-507): the form shows
+ * them read-only and the PATCH leaves them out.
  */
 import { useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -58,6 +60,8 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
   const [moreOpen, setMoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
+  // Past draft, the Adviser and the hints are fixed (IR-507): shown, not sent.
+  const submitted = record.pipeline_status !== "draft";
 
   // The lists name the record's classification and PSCED, which the detail
   // payload gives by name; the form needs their ids, so it is reset once
@@ -96,7 +100,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
     setSaving(true);
     setFailure(null);
     try {
-      await recordsApi.update(record.id, metadataPayload(values, failed));
+      await recordsApi.update(record.id, metadataPayload(values, failed, { submitted }));
       const { data } = await recordsApi.detail(record.id);
       onSaved(data);
     } catch (err) {
@@ -164,6 +168,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
             loadError={failed.advisers || failed.classification || failed.psced}
             moreOpen={moreOpen}
             onMoreOpenChange={setMoreOpen}
+            submitted={submitted}
           />
         </FormProvider>
       </form>

@@ -99,6 +99,13 @@ export const HINTS: ReadonlyArray<{
 ];
 
 /**
+ * The form fields that are fixed once a record is submitted (IR-507, ADR-032
+ * §10 Amendment): the server keeps the Adviser and the hints as they were
+ * submitted, so the form shows them read-only and does not send them.
+ */
+export const FIXED_ONCE_SUBMITTED = ["adviser", "is_ip", "requires_ethics_review", "for_commercialization"] as const;
+
+/**
  * The PATCH body for these values.
  *
  * The hints are sent as hints and nothing more: `requested_itso/ierc/ktto`
@@ -110,6 +117,8 @@ export function metadataPayload(
   // A list that failed to load shows its field as "Not set"; sending that
   // would erase a value the draft already holds, so such a field is left out.
   unloaded: { classification?: boolean; psced?: boolean } = {},
+  // A submitted record's revision: its fixed fields are left out (IR-507).
+  { submitted = false }: { submitted?: boolean } = {},
 ): Partial<RecordFormData> {
   const payload: Partial<RecordFormData> = {
     title:                  values.title.trim(),
@@ -126,5 +135,6 @@ export function metadataPayload(
   };
   if (unloaded.classification) delete payload.classification;
   if (unloaded.psced) delete payload.psced;
+  if (submitted) for (const field of FIXED_ONCE_SUBMITTED) delete payload[field];
   return payload;
 }
