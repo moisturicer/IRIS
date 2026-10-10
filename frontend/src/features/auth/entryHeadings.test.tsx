@@ -17,7 +17,6 @@
  * check at the three widths is a browser check, recorded on the PR.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReactElement } from "react";
 import { Route, Routes } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
@@ -36,15 +35,6 @@ interface EntryScreen {
   render: () => void;
   /** The per-screen title, which sits one level below the layout's `<h1>`. */
   title: string;
-}
-
-function routed(element: ReactElement, path: string, route: string) {
-  renderScreen(
-    <Routes>
-      <Route path={path} element={element} />
-    </Routes>,
-    { route },
-  );
 }
 
 const SCREENS: EntryScreen[] = [
@@ -67,30 +57,45 @@ const SCREENS: EntryScreen[] = [
     name: "email verification",
     render: () => {
       vi.spyOn(authApi, "activate").mockResolvedValue({ data: {} } as never);
-      routed(<EmailVerifyPage />, "/verify-email/:uidb64/:token", "/verify-email/abc/def");
+      // The screen reads its token from the route, so it is mounted on the real one.
+      renderScreen(
+        <Routes>
+          <Route path="/activate/:uidb64/:token" element={<EmailVerifyPage />} />
+        </Routes>,
+        { route: "/activate/abc/def" },
+      );
     },
     title: "Email Verified",
   },
 ];
 
-/** A Tailwind utility that sets `display:none` at some width, or `visibility:hidden`. */
-const HIDING_UTILITY = /^(?:[a-z0-9]+:)*(?:hidden|invisible)$/;
+/**
+ * A Tailwind utility that sets `display:none` or `visibility:hidden`, under any
+ * variant prefix -- `lg:hidden`, `max-lg:hidden`, `min-[900px]:hidden` alike.
+ */
+const HIDING_UTILITY = /^(?:[^:\s]+:)*(?:hidden|invisible)$/;
 
-/** The utilities and attributes on `element` or any ancestor that could hide it. */
+/** Inline styles that would take an element out of the accessibility tree. */
+const HIDING_STYLE = /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)/;
+
+/** The utilities, styles and attributes on `element` or any ancestor that could hide it. */
 function hidersOf(element: Element): string[] {
   const found: string[] = [];
   for (let node: Element | null = element; node; node = node.parentElement) {
-    if (node.getAttribute("aria-hidden") === "true") found.push(`aria-hidden on <${node.tagName.toLowerCase()}>`);
-    if (node.hasAttribute("hidden")) found.push(`hidden attribute on <${node.tagName.toLowerCase()}>`);
+    const tag = `<${node.tagName.toLowerCase()}>`;
+    if (node.getAttribute("aria-hidden") === "true") found.push(`aria-hidden on ${tag}`);
+    if (node.hasAttribute("hidden")) found.push(`hidden attribute on ${tag}`);
+    if (HIDING_STYLE.test(node.getAttribute("style") ?? "")) found.push(`inline style on ${tag}`);
     for (const cls of Array.from(node.classList)) {
-      if (HIDING_UTILITY.test(cls)) found.push(`${cls} on <${node.tagName.toLowerCase()}>`);
+      if (HIDING_UTILITY.test(cls)) found.push(`${cls} on ${tag}`);
     }
   }
   return found;
 }
 
+/** The level an assistive technology reads: `aria-level` wins over the tag. */
 function headingLevel(heading: HTMLElement): number {
-  return Number(heading.tagName.slice(1)) || Number(heading.getAttribute("aria-level"));
+  return Number(heading.getAttribute("aria-level")) || Number(heading.tagName.slice(1));
 }
 
 afterEach(() => {

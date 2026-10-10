@@ -9,7 +9,8 @@ interface AuthLayoutProps {
 }
 
 /**
- * The shared frame of the entry screens.
+ * The shared frame of the login and signup screens. Email verification still
+ * draws its own and carries its own `<h1>` until it joins this one (IR-213).
  *
  * It owns the one `<h1>` (IR-211); each screen's own title ("Welcome Back",
  * "Create an Account") is the `<h2>` beneath it. The heading is `sr-only`
