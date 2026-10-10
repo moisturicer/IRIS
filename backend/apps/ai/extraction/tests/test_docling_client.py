@@ -75,13 +75,11 @@ def test_it_posts_the_pdf_to_the_convert_endpoint():
     assert b'filename="thesis.pdf"' in seen["body"]
 
 
-def test_it_asks_for_ocr_tables_and_structured_output_by_default():
-    """Each of these is a decision, not a hardcoded default: OCR is why
-    scanned theses work at all, accurate tables are why a table does not
-    retrieve as prose, and json is the only format this pipeline reads.
-    IR-367 made do_ocr and table_mode configurable — this asserts the
-    unconfigured (default-constructed) client still behaves exactly as
-    before."""
+def test_it_asks_for_tables_and_structured_output_and_no_ocr_by_default():
+    """Accurate tables are why a table does not retrieve as prose, and json
+    is the only format this pipeline reads. OCR defaults off (the corpus is
+    born-digital); a deployment that takes scans turns it on, which
+    test_do_ocr_is_configurable covers."""
     seen = {}
 
     def handler(request):
@@ -91,7 +89,7 @@ def test_it_asks_for_ocr_tables_and_structured_output_by_default():
     _extractor(handler).extract(b"pdf", filename="thesis.pdf")
 
     body = seen["body"]
-    assert 'name="do_ocr"' in body and "true" in body
+    assert re.search(r'name="do_ocr"\r?\n\r?\nfalse', body)
     assert "do_table_structure" in body
     assert 'name="table_mode"' in body and "accurate" in body
     assert "json" in body
@@ -112,24 +110,21 @@ def test_do_ocr_is_configurable():
     assert re.search(r'name="do_ocr"\r?\n\r?\nfalse', seen["body"])
 
 
-def test_table_mode_is_configurable():
+def test_tables_are_always_read_in_accurate_mode():
+    """Table mode used to be a setting; it is now fixed, so a deployment cannot
+    trade table accuracy away. The old configurability tests were deleted with
+    the setting, on purpose."""
     seen = {}
 
     def handler(request):
         seen["body"] = request.content.decode("utf-8", "replace")
         return httpx.Response(200, json={"document": {"json_content": _DOCUMENT}})
 
-    _extractor(handler, table_mode="fast").extract(b"pdf", filename="thesis.pdf")
+    _extractor(handler).extract(b"pdf", filename="thesis.pdf")
 
-    assert re.search(r'name="table_mode"\r?\n\r?\nfast', seen["body"])
-
-
-def test_an_unrecognised_table_mode_is_rejected():
-    """The two docling-serve accepts are "accurate" and "fast" — anything
-    else would be silently forwarded and rejected by the service instead of
-    caught at construction."""
-    with pytest.raises(ValueError, match="table_mode"):
-        DoclingExtractor(BASE_URL, table_mode="thorough")
+    assert re.search(r'name="table_mode"\r?\n\r?\naccurate', seen["body"])
+    with pytest.raises(TypeError):
+        DoclingExtractor(BASE_URL, table_mode="fast")
 
 
 def test_do_formula_enrichment_is_configurable():
@@ -160,6 +155,52 @@ def test_it_asks_for_formula_enrichment():
 
     assert 'name="do_formula_enrichment"' in seen["body"]
     assert "true" in seen["body"]
+
+
+def _sent_fields(extractor_kwargs) -> str:
+    seen = {}
+
+    def handler(request):
+        seen["body"] = request.content.decode("utf-8", "replace")
+        return httpx.Response(200, json={"document": {"json_content": _DOCUMENT}})
+
+    _extractor(handler, **extractor_kwargs).extract(b"pdf", filename="thesis.pdf")
+    return seen["body"]
+
+
+def _field(body: str, name: str) -> str:
+    match = re.search(rf'name="{name}"\r?\n\r?\n([^\r\n]*)', body)
+    assert match, f"{name} was not sent"
+    return match.group(1)
+
+
+def test_it_names_the_code_formula_preset():
+    """docling-serve 1.36 has no "default" preset; omitting this fails every
+    conversion before it starts."""
+    assert _field(_sent_fields({}), "code_formula_preset") == "codeformulav2"
+
+
+def test_code_enrichment_and_picture_classification_are_on_by_default():
+    body = _sent_fields({})
+    assert _field(body, "do_code_enrichment") == "true"
+    assert _field(body, "do_picture_classification") == "true"
+
+
+def test_picture_description_and_chart_extraction_are_always_off():
+    body = _sent_fields({})
+    assert _field(body, "do_picture_description") == "false"
+    assert _field(body, "do_chart_extraction") == "false"
+
+
+def test_code_enrichment_and_picture_classification_are_configurable():
+    body = _sent_fields({"do_code_enrichment": False, "do_picture_classification": False})
+    assert _field(body, "do_code_enrichment") == "false"
+    assert _field(body, "do_picture_classification") == "false"
+
+
+def test_no_preset_is_sent_when_both_code_model_stages_are_off():
+    body = _sent_fields({"do_formula_enrichment": False, "do_code_enrichment": False})
+    assert "code_formula_preset" not in body
 
 
 def test_a_trailing_slash_on_the_base_url_does_not_double_up():

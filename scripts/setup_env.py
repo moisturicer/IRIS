@@ -1,6 +1,6 @@
 """Create the environment files this repository needs, without clobbering.
 
-Run from anywhere:  python scripts/setup_env.py
+Run from anywhere:  python scripts/setup_env.py  (add --refresh-gpu to re-detect the GPU)
 
 IR-154 made the database credential a required, un-defaulted value and gave
 Docker Compose its own repo-root `.env` to interpolate from. That is the right
@@ -24,7 +24,10 @@ Never overwrites a file that exists. Safe to run repeatedly.
 
 from __future__ import annotations
 
+import re
 import secrets
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -75,6 +78,50 @@ def write_root_env(values: dict[str, str], derived_from_backend: bool) -> None:
         + "".join(f"{key}={values[key]}\n" for key in DB_KEYS),
         encoding="utf-8",
     )
+
+
+def detect_gpu() -> bool:
+    """True when the host has an NVIDIA GPU the driver can see.
+
+    Compose cannot make a GPU reservation conditional: on a host without the
+    NVIDIA runtime it stops the container from being created. So the choice is
+    made here, once, and written to .env as DOCLING_VARIANT.
+    """
+    if shutil.which("nvidia-smi") is None:
+        return False
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "-L"], capture_output=True, text=True, timeout=15, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return out.returncode == 0 and "GPU" in out.stdout
+
+
+def set_docling_variant(refresh: bool) -> str | None:
+    """Write DOCLING_VARIANT to the repo-root .env. Returns a message, or None.
+
+    Adds the key when it is missing. With ``refresh`` it replaces an existing
+    value, for a host whose GPU was added or removed. Never touches anything else.
+    """
+    text = ROOT_ENV.read_text(encoding="utf-8") if ROOT_ENV.exists() else ""
+    has_key = re.search(r"^DOCLING_VARIANT=", text, re.MULTILINE) is not None
+    if has_key and not refresh:
+        return None
+    variant = "docling-gpu" if detect_gpu() else "docling-cpu"
+    line = f"DOCLING_VARIANT={variant}"
+    if has_key:
+        text = re.sub(r"^DOCLING_VARIANT=.*$", line, text, flags=re.MULTILINE)
+    else:
+        text = (
+            text.rstrip("\n")
+            + "\n\n# Docling runs on the GPU when the host has one, else on CPU (docling/compose.yml).\n"
+            + "# Re-detect with: python scripts/setup_env.py --refresh-gpu\n"
+            + line
+            + "\n"
+        )
+    ROOT_ENV.write_text(text, encoding="utf-8")
+    return f"docling  {variant}  ({'NVIDIA GPU detected' if variant == 'docling-gpu' else 'no NVIDIA GPU found, CPU fallback'})"
 
 
 def main() -> int:
@@ -128,6 +175,12 @@ def main() -> int:
         did_something = True
         source = "copied from backend/.env" if from_backend else "generated"
         print(f"created  {ROOT_ENV.relative_to(REPO_ROOT)}  ({source})")
+
+    # --- docling variant (GPU or CPU) -------------------------------------
+    message = set_docling_variant(refresh="--refresh-gpu" in sys.argv[1:])
+    if message:
+        did_something = True
+        print(message)
 
     # --- warn about anything burned ---------------------------------------
     root = read_env(ROOT_ENV)

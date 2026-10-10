@@ -97,39 +97,17 @@ services:
 
   # AI services
   docling:
-    build:
-      context: ./docling
-      dockerfile: Dockerfile
-    restart: unless-stopped
+    # Variant (GPU or CPU) is chosen once by scripts/setup_env.py, which writes
+    # DOCLING_VARIANT to the repo-root .env. Sizing, workers, the VRAM cap and
+    # the reasoning are in docling/compose.yml and
+    # docs/engineering/DOCLING_RESOURCES.md.
+    extends:
+      file: docling/compose.yml
+      service: ${DOCLING_VARIANT:-docling-gpu}
     ports:
       - "5001:5001"
     environment:
       - DOCLING_SERVE_ENABLE_UI=1
-      - DOCLING_SERVE_CONCURRENCY=4
-      - DOCLING_SERVE_MAX_NUM_PAGES=200
-      - DOCLING_SERVE_MAX_FILE_SIZE=52428800 # 50MB
-      # Docling-serve's own ceiling on a synchronous conversion, and the
-      # binding one: IRIS waits DOCLING_TIMEOUT_SECONDS (900, on the worker
-      # below), but the server abandons the request at its own default of 120
-      # and returns 504, so no client-side value can extend it. Left unset,
-      # two large PDFs converting concurrently each slow past 120s and both
-      # fail -- which is why single-document runs looked fine and bulk
-      # ingestion did not work at all (IR-249). Keep this equal to
-      # DOCLING_TIMEOUT_SECONDS; raising one without the other is the bug.
-      - DOCLING_SERVE_MAX_SYNC_WAIT=900
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -sf http://localhost:5001/health || exit 1" ]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          # 4g was sized before CodeFormula (IR-290): a single formula
-          # enrichment pass alone peaked at 95% of that cap, and
-          # DOCLING_SERVE_CONCURRENCY allows four such passes at once.
-          memory: 8g
 
   ai-gateway:
     build:

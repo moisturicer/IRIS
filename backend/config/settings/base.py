@@ -4,7 +4,6 @@ from datetime import timedelta
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
-from apps.ai.extraction.docling_client import TABLE_MODES as _DOCLING_TABLE_MODES
 from .validation import missing_required, non_blank
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -791,15 +790,16 @@ DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int
 # DOCLING_SERVE_CONCURRENCY, not to these flags). OCR stays on because a
 # meaningful share of the corpus is scanned submissions with no text layer at
 # all, and ADR-016 dropped the fallback extractor that used to cover that case.
-DOCLING_DO_OCR = config("DOCLING_DO_OCR", default=True, cast=bool)
-# TABLE_MODES lives on the extractor, not here, so there is one definition of
-# what docling-serve accepts rather than two that can silently disagree.
-DOCLING_TABLE_MODE = config("DOCLING_TABLE_MODE", default="accurate")
-if DOCLING_TABLE_MODE not in _DOCLING_TABLE_MODES:
-    raise ImproperlyConfigured(
-        f"DOCLING_TABLE_MODE must be one of {_DOCLING_TABLE_MODES!r}, got {DOCLING_TABLE_MODE!r}."
-    )
+# **Superseded:** OCR now defaults off. The corpus is born-digital (an exact
+# text layer), and OCR costs time and memory for nothing there. Turn it on for a
+# deployment that accepts scanned submissions -- nothing else extracts them.
+DOCLING_DO_OCR = config("DOCLING_DO_OCR", default=False, cast=bool)
+# Table mode is not a setting: the extractor always asks for "accurate".
 DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=True, cast=bool)
+# Code blocks use the same CodeFormula model as formulas, so this adds little.
+DOCLING_DO_CODE_ENRICHMENT = config("DOCLING_DO_CODE_ENRICHMENT", default=True, cast=bool)
+# A 4M-parameter classifier; the mapper does not store its output yet.
+DOCLING_DO_PICTURE_CLASSIFICATION = config("DOCLING_DO_PICTURE_CLASSIFICATION", default=True, cast=bool)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process
