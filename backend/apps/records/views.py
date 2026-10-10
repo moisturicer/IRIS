@@ -20,17 +20,14 @@ from core.enums import (
     IPType,
     PipelineStatus,
     RequestStatus,
-    RoleName,
 )
 from . import lifecycle
 from core.permissions import (
     IsAdmin,
-    IsAdviser,
     IsAuthor,
     IsOwnerOrStaff,
     IsRDCO,
     IsStaff,
-    get_role_name,
 )
 from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
@@ -90,20 +87,6 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser"
         ).prefetch_related("owners__user", "authors")
 
-        if (
-            self.action == "complete"
-            and get_role_name(self.request.user) == RoleName.ADVISER
-        ):
-            # An Adviser completes only the Proposal they advise (ADR-021 §3,
-            # IR-267). The role gate in get_permissions() admits every Adviser;
-            # narrowing here, rather than refusing in a permission class, makes
-            # an unassigned Adviser's refusal the same 404 as a missing record.
-            # Since IR-264 visible_to() already hides an approved Proposal from
-            # most unassigned Advisers; this narrowing still matters for one who
-            # can read it on other grounds -- an Adviser can author records, so
-            # may *own* a Proposal someone else advises.
-            qs = qs.filter(adviser=self.request.user)
-
         if self.action == "metadata_suggestions":
             # The Publish dialog's prefill is the manuscript's own text, offered
             # to the person publishing it (IR-406; IR-374 spec Appendix D:
@@ -150,11 +133,6 @@ class RecordViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), IsAuthor()]
         if self.action in ("update", "partial_update", "destroy", "submit"):
             return [IsAuthenticated(), IsOwnerOrStaff()]
-        if self.action == "complete":
-            # RDCO or the *assigned* Adviser (IR-267). The assignment is
-            # per-record, so get_queryset() narrows an Adviser to their own
-            # records; this gate only turns away roles that can never complete.
-            return [IsAuthenticated(), (IsRDCO | IsAdviser)()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -833,32 +811,6 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
 
         return Response(RecordDetailSerializer(record, context={"request": request}).data)
-
-    @action(detail=True, methods=["post"])
-    def complete(self, request, pk=None):
-        """
-        POST /records/<id>/complete/ -- **retired** (ADR-032 §2, IR-271).
-
-        Marking an approved Proposal completed meant "research finished". That
-        meaning now lives in the Thesis or Project it continues as (§6), so an
-        accepted Proposal rests at `approved`, shown as *Accepted*, and nothing
-        new writes `completed`. Every record is refused -- every Proposal,
-        legacy ones too, and anything else, which never could be completed;
-        IR-274 deletes the route with the rest of the old pipeline.
-
-        IR-267's two refusal layers still answer first, so a caller learns no
-        more than before: get_permissions() refuses a role that could never
-        complete (403), and get_queryset() narrows an Adviser to the records
-        they advise (404 for any other).
-        """
-        self.get_object()
-        return Response(
-            {"detail": (
-                "Completing a Proposal is retired (ADR-032 §2). An accepted "
-                "Proposal stays Accepted."
-            )},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
 
     @action(detail=False, methods=["get"])
     def mine(self, request):

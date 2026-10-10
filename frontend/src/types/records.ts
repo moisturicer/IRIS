@@ -122,13 +122,6 @@ export interface RecordDetail extends RecordListItem {
   resubmission:    RecordResubmission;
   /** Server-worded stage. Never map a pipeline key to English on the client. */
   stage_label:     string;
-  /**
-   * The office whose clearance the *requesting user* would be recording, or
-   * null for Adviser and RDCO, who decide the record at a sequential stage.
-   * Server-derived so the client needs no role->office table of its own.
-   */
-  your_office:       "itso" | "ierc" | "ktto" | null;
-  your_office_label: string | null;
   files:           RecordFileItem[];
   /**
    * Derived by the server from the routing tables, never stored (ADR-021 §4,
@@ -137,12 +130,9 @@ export interface RecordDetail extends RecordListItem {
   workflow_state:       WorkflowState;
   workflow_state_label: string;
   current_holders:      TrackerHolder[];
-  /** The parties this viewer may act as. Empty for almost everyone. */
-  can_act:              Party[];
   /**
    * The parties this viewer may ask the owner for documents as (ADR-022,
-   * IR-262): a party they hold. Wider than `can_act`, which the legacy
-   * pipeline still narrows.
+   * IR-262): a party they hold.
    */
   can_request_document: Party[];
   /**
@@ -363,7 +353,11 @@ export interface ReviewerSeat {
 // Review & Routing Tracker (IR-258, ADR-021 §14)
 // ---------------------------------------------------------------------------
 
-/** ADR-021 §1. `intake` is its own party, even though RDCO staffs it. */
+/**
+ * ADR-021 §1. `intake` is retired (ADR-032 §13): it survives only on history
+ * the server sends -- an old assignment, review or request -- and is never
+ * assigned, routed to or staffed.
+ */
 export type Party = "intake" | "adviser" | "itso" | "ierc" | "ktto" | "rdco";
 
 export type WorkflowState =
@@ -504,7 +498,6 @@ export interface RecordTracker {
   workflow_state:        WorkflowState;
   workflow_state_label:  string;
   current_holders:       TrackerHolder[];
-  can_act:               Party[];
   parties:               TrackerPartyRow[];
   routing_history:       TrackerRoutingGroup[];
   /** Routing was not recorded before this date (IR-257's backfill wrote none). */

@@ -130,8 +130,8 @@ Each item is a defect relative to the settled MVP.
 
 | Current | Becomes | Slice |
 |---|---|---|
-| `core/enums.py` `PipelineStatus` | `IN_REVIEW` added; old stage statuses retained for historical records until IR-274 | IR-256 added `IN_REVIEW`; IR-260 sends all new submissions there |
-| `ReviewStage.RDCO_INTAKE = "rdco_intake"` | `ReviewStage.INTAKE = "intake"`; `Party = ReviewStage` alias | IR-256 added `INTAKE`; IR-260 retains both stored historical values and labels them `Intake (retired)` under ADR-032 §13 |
+| `core/enums.py` `PipelineStatus` | `IN_REVIEW` added; the old stage statuses and `declined` removed | IR-256 added `IN_REVIEW`; IR-260 sends all new submissions there and migrates in-flight records; IR-274 removes the old values (`records/0017`) |
+| `ReviewStage.RDCO_INTAKE = "rdco_intake"` | `ReviewStage.INTAKE = "intake"`; `Party = ReviewStage` alias | IR-256 added `INTAKE`; IR-260 labels both stored values `Intake (retired)` under ADR-032 §13; IR-274 rewrites `rdco_intake` rows to `intake`, removes `rdco_intake`, and forbids an active intake assignment (`reviews/0016`) |
 | `ReviewDecision` | `NEGATIVE_FINDING` added; `DECLINED` relabelled "Resubmission requested" (stored value unchanged) | IR-256 |
 | `ClearanceStatus` | `NOT_CLEARED` added; `REJECTED` kept for history, no new writes | IR-256 adds `NOT_CLEARED` (and widens the column); IR-260 stops writing `REJECTED` |
 | `PUBLICLY_VISIBLE_STATUSES` | `(PUBLISHED,)` | IR-264 |
@@ -478,6 +478,16 @@ is retired deliberately, in the same PR that makes it obsolete, and the PR says 
 | `reviews/tests.py` | 150 | **Rewritten** (service-level pipeline assertions) | IR-260 |
 | `reviews/test_clearance_state.py` (13 tests, pure) | 107 | **Kept**; `declining_office` → `requesting_parties` | IR-260 |
 | `apps/tests/test_enum_vocabulary.py` | — | **Changed deliberately.** IR-256 extends `GOVERNED_ENUMS` with `AssignmentState`, so the new tables' states cannot be hand-written as literals (`ResubmissionRequestState` stays out: its `resubmitted` is also a queue-row response key). Its `:8` docstring names the `rdco_intake` rename; `:299` asserts `len(PUBLICLY_VISIBLE_STATUSES) == 3` | IR-256, then IR-260, IR-264 |
+
+**Done (IR-260, IR-274, 2026-10-10).** IR-260 retired the matrix, the characterisation suite,
+`test_resubmission_policy.py` and the shadow suites with the cutover. IR-274 rewrote the three
+suites this table listed for IR-260 -- `records/test_lifecycle.py` (the record-level edges, the
+ADR-005 seam, ADR-004's policy), `reviews/tests.py` (the requested-office flags route nothing; an
+owner never reviews their own record) and `apps/tests/test_authorization_matrix.py` (the review
+gates asked of the adviser-first acts) -- and changed `test_enum_vocabulary.py` deliberately: the
+retired values left the enums, so a separate scan now bans them in app source. §4's symbols marked
+"deleted" are deleted, along with `reviews/services.py`, `reviews/shadow.py` and
+`/records/<id>/complete/`.
 
 ### 10.2 IR-233 — keeping the failure visible
 

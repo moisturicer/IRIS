@@ -555,12 +555,14 @@ class WhoMaySubmitTests(NewVersionTestBase):
         self.assertIn("No reviewer has asked for a revision", response.data["detail"])
         self.assertEqual(len(self.versions(record)), 1)
 
-    def test_a_legacy_record_is_pointed_at_the_current_resubmission(self):
+    def test_a_record_not_in_review_is_refused(self):
+        """IR-274: this was asked of a record still holding a fixed-pipeline status. Those statuses are gone; the refusal they exercised -- a record not in review -- is asked of a published record instead. It used to point the owner at
+        the legacy Resubmit, which no longer exists."""
         record = self.make_record()
-        record.pipeline_status = PipelineStatus.DECLINED
+        record.pipeline_status = PipelineStatus.PUBLISHED
         record.save(update_fields=["pipeline_status"])
 
         response = self.submit_version(record)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("current review pipeline", response.data["detail"])
+        self.assertIn("not in review", response.data["detail"])

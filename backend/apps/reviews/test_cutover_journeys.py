@@ -13,6 +13,7 @@ from apps.reviews.models import RecordAssignment, RecordClearance, Review, Revie
 from core.enums import RecordTypeName, VersionCause
 
 from .test_decisions import DecisionTestBase
+from .workflow_test_helpers import at_the_cutover_schema
 
 
 retire_intake = import_module(
@@ -21,6 +22,11 @@ retire_intake = import_module(
 
 
 class MigratedApiJourneys(DecisionTestBase):
+    def setUp(self):
+        super().setUp()
+        # Active intake assignments are what 0014 retires; IR-274 forbids them.
+        at_the_cutover_schema()
+
     def migrated(self, type_name):
         record = self.make_record(type_name)
         if type_name == RecordTypeName.PROPOSAL:

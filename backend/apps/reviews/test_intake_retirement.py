@@ -13,6 +13,7 @@ from apps.records.models import Record, RecordOwner, RecordType
 from apps.reviews.models import (
     RecordAssignment, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
 )
+from apps.reviews.workflow_test_helpers import at_the_cutover_schema
 
 
 retire_intake = import_module(
@@ -31,6 +32,10 @@ class IntakeRetirementTests(TestCase):
         cls.adviser = user("ir260-adviser@cit.edu", "Adviser")
         cls.rdco = user("ir260-rdco@cit.edu", "RDCO")
         cls.record_type, _ = RecordType.objects.get_or_create(name="Thesis / Research")
+
+    def setUp(self):
+        # Active intake assignments are what 0014 retires; IR-274 forbids them.
+        at_the_cutover_schema()
 
     def intake_record(self, title, adviser=None):
         record = Record.objects.create(
@@ -173,6 +178,7 @@ class ReverseRefusesTests(TestCase):
 
     # The fixtures only; inheriting the class would run its tests twice.
     setUpTestData = IntakeRetirementTests.__dict__["setUpTestData"]
+    setUp = IntakeRetirementTests.setUp
     intake_record = IntakeRetirementTests.intake_record
 
     def test_reversing_after_a_cutover_refuses_and_names_the_backup(self):

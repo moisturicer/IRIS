@@ -289,8 +289,8 @@ const SECTION_LABELS: Record<PaperSection, string> = {
  * Four sections, kept in the URL as `?section=`: **Overview**, **Paper**,
  * **Review** and **Files**. Which ones a viewer sees, and which actions the
  * header offers, come from the capabilities adapter
- * (`features/records/capabilities.ts`); this page reads no role name and no
- * `can_act` of its own. A section the viewer may not open falls back to
+ * (`features/records/capabilities.ts`); this page reads no role name of its
+ * own. A section the viewer may not open falls back to
  * Overview, so an old or shared link never shows a broken page.
  *
  * Switching sections *replaces* the history entry rather than adding one, and
@@ -593,17 +593,15 @@ export default function PaperViewPage() {
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else Save. When
-  // the pending action has its own region -- the revision banner, the
-  // Review section's decision -- the header fills nothing.
+  // the pending action has its own region -- the revision banner -- the
+  // header fills nothing.
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
       ? "elsewhere"
       : can.has("open_review") && section !== "review"
         ? "open_review"
-        : section === "review" && can.has("decide")
-          ? "elsewhere"
-          : "save";
+        : "save";
 
   // *Open review* (ADR-032 §4) records when this reviewer started -- the
   // seat moves to `in_review` and the server stamps `opened_at` -- then moves

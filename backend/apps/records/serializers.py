@@ -61,8 +61,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     clearances     = serializers.SerializerMethodField()
     resubmission   = serializers.SerializerMethodField()
     stage_label    = serializers.CharField(source="get_pipeline_status_display", read_only=True)
-    your_office    = serializers.SerializerMethodField()
-    your_office_label = serializers.SerializerMethodField()
     files          = serializers.SerializerMethodField()
     # Read as the manuscript endpoint, not the stored `/media/` path (IR-334).
     abstract_file  = serializers.SerializerMethodField()
@@ -70,7 +68,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     workflow_state       = serializers.SerializerMethodField()
     workflow_state_label = serializers.SerializerMethodField()
     current_holders      = serializers.SerializerMethodField()
-    can_act              = serializers.SerializerMethodField()
     # The parties this viewer may ask the owner for documents as (IR-262).
     can_request_document = serializers.SerializerMethodField()
     # The viewer's own reviewer seats here, and whether they take part in the
@@ -109,8 +106,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
     def _workflow(self, obj):
         """
-        The three workflow fields, computed once per record. `can_act` depends
-        on the viewer, so it comes from the request like `your_office` does.
+        The workflow fields, computed once per record. `can_request_document`
+        depends on the viewer, so it comes from the request.
         """
         cache = self.__dict__.setdefault("_workflow_cache", {})
         if obj.pk not in cache:
@@ -144,9 +141,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
     def get_current_holders(self, obj):
         return self._workflow(obj)["current_holders"]
-
-    def get_can_act(self, obj):
-        return self._workflow(obj)["can_act"]
 
     def get_can_request_document(self, obj):
         return self._workflow(obj)["can_request_document"]
@@ -261,31 +255,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             latest_decline_stage=latest_decline.stage if latest_decline else None,
         )
 
-    def _viewer_office(self, obj):
-        """Which office's clearance the requesting user would be recording.
-
-        Server-derived for the same reason `preserved` is (IR-139): the client
-        would otherwise need its own role->office table, and a second table is a
-        second thing to get wrong. None for Adviser and RDCO, who decide the
-        record at a sequential stage rather than clearing for an office.
-        """
-        from apps.reviews.services import ROLE_TO_OFFICE
-
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
-        role = getattr(getattr(user, "role", None), "name", "")
-        return ROLE_TO_OFFICE.get(role) or None
-
-    def get_your_office(self, obj):
-        return self._viewer_office(obj)
-
-    def get_your_office_label(self, obj):
-        office = self._viewer_office(obj)
-        if not office:
-            return None
-        match = next((c for c in self._ordered_clearances(obj) if c.office == office), None)
-        return match.get_office_display() if match else office.upper()
-
     def get_file_count(self, obj):
         return obj.files.count()
 
@@ -339,8 +308,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",
-            "your_office", "your_office_label",
-            "workflow_state", "workflow_state_label", "current_holders", "can_act",
+            "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "is_participant", "routing",
             "office_review", "revision", "decision",
             "dpa_accepted", "dpa_accepted_at",

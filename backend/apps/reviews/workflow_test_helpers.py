@@ -31,3 +31,31 @@ def purge_records_at_current_state():
     loader = MigrationExecutor(connection).loader
     state = loader.project_state(list(loader.applied_migrations))
     state.apps.get_model("records", "Record").objects.all().delete()
+
+
+#: The last reviews migration before IR-274 retired Intake. 0015 changed only
+#: `choices`, so the tables are exactly those `reviews/0014` ran against.
+CUTOVER_SCHEMA = ("reviews", "0015_alter_recordassignment_party_and_more")
+
+
+def at_the_cutover_schema():
+    """
+    Rewind `reviews` to just before IR-274 (`CUTOVER_SCHEMA`) -- tables
+    identical to those IR-260's cutover migration (`reviews/0014`) ran
+    against -- for the rest of this test only.
+
+    IR-274's `reviews/0016` forbids an active Intake assignment. A test of
+    0014 must build exactly that row -- it is what 0014 retires -- so it
+    rewinds 0016, which drops only that constraint. Call it from a `TestCase`:
+    PostgreSQL's DDL is transactional, so the test's own rollback restores the
+    constraint and the migration record. Pending deferred FK checks would
+    block the DDL, so they are run first.
+    """
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("at_the_cutover_schema() needs a TestCase's transaction to undo it")
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+    MigrationExecutor(connection).migrate([CUTOVER_SCHEMA])

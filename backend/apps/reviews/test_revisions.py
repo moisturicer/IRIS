@@ -414,16 +414,17 @@ class WhoMayAskTests(RevisionTestBase):
 
         self.assertEqual(self.ask(record, self.itso).status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_a_legacy_record_uses_the_current_form(self):
+    def test_a_record_not_in_review_is_refused(self):
+        """IR-274: this was asked of a record still holding a fixed-pipeline status. Those statuses are gone; the refusal they exercised -- a record not in review -- is asked of a published record instead."""
         record = self.new_model()
         self.adviser_seat(record)
-        record.pipeline_status = PipelineStatus.ADVISER_REVIEW
+        record.pipeline_status = PipelineStatus.PUBLISHED
         record.save(update_fields=["pipeline_status"])
 
         response = self.ask(record, self.adviser)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("current review pipeline", response.data["detail"])
+        self.assertIn("not in review", response.data["detail"])
         self.assertIsNone(self.detail(record, self.adviser)["revision"]["party"])
 
 

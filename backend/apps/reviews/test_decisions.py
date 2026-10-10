@@ -469,16 +469,16 @@ class RefusalTests(DecisionTestBase):
         record.refresh_from_db()
         self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
 
-    def test_a_legacy_record_is_refused(self):
+    def test_a_record_not_in_review_is_refused(self):
+        """IR-274: this was asked of a record still holding a fixed-pipeline status. Those statuses are gone; the refusal they exercised -- a record not in review -- is asked of a draft record instead."""
         record = self.make_record()
-        record.pipeline_status = PipelineStatus.ADVISER_REVIEW
-        record.save(update_fields=["pipeline_status"])
+        self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
         response = self.decide(record, self.adviser, "publish", token="x")
         self.assertIn(
             response.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN),
         )
         record.refresh_from_db()
-        self.assertEqual(record.pipeline_status, PipelineStatus.ADVISER_REVIEW)
+        self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
 
     def test_a_decided_record_cannot_be_decided_again(self):
         record = self.at_adviser()

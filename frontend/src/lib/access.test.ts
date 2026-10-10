@@ -86,7 +86,6 @@ test("a Student publishes from Discover, so the sidebar offers no Submit Disclos
 
 test("the review queue is every reviewer, and excludes Student", () => {
   only("reviewQueue", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
-  only("evaluate", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
 });
 
 // --- RDCO coordination -----------------------------------------------------

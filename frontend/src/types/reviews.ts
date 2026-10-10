@@ -1,23 +1,3 @@
-export type ReviewStage  = "adviser" | "rdco_intake" | "itso" | "ierc" | "ktto" | "rdco";
-export type ReviewStatus = "approved" | "declined" | "rejected";
-
-export interface Review {
-  id:               number;
-  record:           number;
-  reviewed_by:      number;
-  reviewed_by_name: string;
-  stage:            ReviewStage;
-  status:           ReviewStatus;
-  comment:          string;
-  created_at:       string;
-}
-
-export interface ReviewSubmitPayload {
-  record_id: number;
-  status:    ReviewStatus;
-  comment?:  string;
-}
-
 /** The three tabs of My Reviews (ADR-032 §9). */
 export type MyReviewsTab = "to_review" | "in_review" | "done";
 
@@ -31,8 +11,7 @@ export type ReviewOutcome =
 
 /**
  * The parties a My Reviews row names. No `intake`: it is retired, and the
- * server shows an intake decision as RDCO's. The stored `Party` and
- * `ReviewStage` are narrowed by IR-260 and IR-274.
+ * server shows a historical intake decision as RDCO's.
  */
 export type MyReviewsParty = "adviser" | "itso" | "ierc" | "ktto" | "rdco";
 
@@ -42,21 +21,18 @@ export type MyReviewsParty = "adviser" | "itso" | "ierc" | "ktto" | "rdco";
  * - `seat`: a reviewer's part, theirs or (in a coordinator's office view) a colleague's;
  * - `pool`: an office's unclaimed record, which carries the `assignment` that
  *   *Claim* and *Assign* address;
- * - `legacy`: a record still on the old pipeline, listed as its old queue listed it;
  * - `review`: a Done decision with no seat behind it, from before seats existed.
  *
  * Every label is server-worded.
  */
 export interface MyReviewsRow {
   key:              string;
-  kind:             "seat" | "pool" | "legacy" | "review";
+  kind:             "seat" | "pool" | "review";
   record:           number;
   title:            string;
   record_type_name: string | null;
   party:            MyReviewsParty;
   party_label:      string;
-  /** The old pipeline's stage, on a `legacy` row only. */
-  stage_label:      string | null;
   seat:             number | null;
   assignment:       number | null;
   holder:           number | null;

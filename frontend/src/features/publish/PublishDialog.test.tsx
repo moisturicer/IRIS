@@ -537,7 +537,7 @@ describe("a network failure", () => {
       .mockRejectedValueOnce(new Error("Network Error"))
       .mockResolvedValueOnce({ data: { detail: "Submitted." } } as never);
     vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ pipeline_status: "rdco_intake", current_holders: [] }),
+      data: draftDetail({ pipeline_status: "in_review", current_holders: [] }),
     } as never);
     openNew();
     await completeManuscript(user);
@@ -558,7 +558,7 @@ describe("success", () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
-        pipeline_status: "rdco_intake",
+        pipeline_status: "in_review",
         current_holders: [{ party: "intake", label: "Intake", opened_at: null, opened_by: null }],
       }),
     } as never);
@@ -578,7 +578,7 @@ describe("success", () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
-        pipeline_status: "rdco_intake",
+        pipeline_status: "in_review",
         current_holders: [{ party: "intake", label: "Intake", opened_at: null, opened_by: null }],
       }),
     } as never);
@@ -603,7 +603,7 @@ describe("success", () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
-        pipeline_status: "adviser_review",
+        pipeline_status: "in_review",
         adviser: 21,
         current_holders: [{ party: "adviser", label: "Adviser", opened_at: null, opened_by: null }],
       }),
@@ -620,7 +620,7 @@ describe("success", () => {
   it("starts over on Publish another", async () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ pipeline_status: "rdco_intake", current_holders: [] }),
+      data: draftDetail({ pipeline_status: "in_review", current_holders: [] }),
     } as never);
     openNew();
     await completeManuscript(user);
@@ -679,7 +679,7 @@ describe("resuming a draft from /?publish=<id>", () => {
 
   it("says so when the record has already been submitted", async () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ pipeline_status: "adviser_review" }),
+      data: draftDetail({ pipeline_status: "in_review" }),
     } as never);
     renderScreen(<PublishDialog />, { route: "/?publish=42" });
 

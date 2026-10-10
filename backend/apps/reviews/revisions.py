@@ -157,7 +157,7 @@ def revision_flags(record, user, *, readable: bool) -> dict:
     """
     from .new_version import new_version_hint
 
-    new_model = routing.is_new_model(record)
+    new_model = routing.is_in_review(record)
     requests = list(
         open_requests(record).select_related("requested_by", "review__version")
     ) if new_model else []
@@ -212,11 +212,8 @@ def request_revision(record, actor, *, reason) -> ResubmissionRequest:
         raise RevisionRefused(
             "Only a reviewer holding this record's review may ask for a revision."
         )
-    if not routing.is_new_model(record):
-        raise RevisionError(
-            "This record is still on the current review pipeline. Use the "
-            "current decision form."
-        )
+    if not routing.is_in_review(record):
+        raise RevisionError("This record is not in review.")
     reason = reason.strip() if isinstance(reason, str) else ""
     if not reason:
         raise RevisionError("Say what needs revising, so the author can act on it.")
@@ -259,11 +256,8 @@ def withdraw_revision_request(record, actor, request_id) -> ResubmissionRequest:
         raise RevisionRefused(
             f"Only a reviewer for {_label(party)} may withdraw its revision request."
         )
-    if not routing.is_new_model(record):
-        raise RevisionError(
-            "This record is still on the current review pipeline. Use the "
-            "current decision form."
-        )
+    if not routing.is_in_review(record):
+        raise RevisionError("This record is not in review.")
     if request.state != ResubmissionRequestState.OPEN:
         raise RevisionError("Only an open revision request can be withdrawn.")
 

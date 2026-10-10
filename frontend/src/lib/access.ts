@@ -117,7 +117,6 @@ export const SCREEN_ACCESS = {
   // for one job.
   reviewQueue: { path: "/review",  roles: REVIEWERS,
                  nav: { label: "Review Queue", icon: "fa-hourglass-half", section: "Review Queue" } },
-  evaluate:    { path: "/review/:id/evaluate", roles: REVIEWERS },
 
   // --- RDCO coordination -------------------------------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
