@@ -36,7 +36,7 @@ class ClearancePayloadTests(APITestCase):
             title="Clearance payload record",
             record_type=RecordType.objects.first(),
             added_by=self.owner,
-            pipeline_status="parallel_review",
+            pipeline_status="in_review",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
 
@@ -97,61 +97,48 @@ class ClearancePayloadTests(APITestCase):
         self.assertEqual(data["resubmission"]["offices_preserved"], ["itso"])
         self.assertIsNotNone(itso.updated_at)
 
-    def test_a_sequential_decline_names_no_declining_office(self):
-        """RDCO declining restarts everything -- there is no office whose
-        clearance was spared, and naming one would imply otherwise."""
-        Review.objects.create(
-            record=self.record, reviewed_by=self.itso, stage="rdco_intake", status="declined",
-        )
+    def test_a_revision_asked_by_a_party_that_clears_nothing_names_no_office(self):
+        """The Adviser, RDCO and the retired intake hold no clearance row, so a
+        revision they asked for spares no office's clearance, and naming one
+        would imply otherwise. (IR-274 replaced `rdco_intake` here with the
+        one surviving spelling, `intake`, and added the other two.)"""
         self.record.resubmission_count = 1
         self.record.last_resubmitted_at = timezone.now()
         self.record.save(update_fields=["resubmission_count", "last_resubmitted_at"])
+        for stage in ("adviser", "rdco", "intake"):
+            with self.subTest(stage=stage):
+                Review.objects.create(
+                    record=self.record, reviewed_by=self.itso, stage=stage, status="declined",
+                )
+                self.assertIsNone(self._detail()["resubmission"]["declining_office"])
 
-        self.assertIsNone(self._detail()["resubmission"]["declining_office"])
 
+class StageLabelTests(APITestCase):
+    """
+    The status label comes from the server (IR-143).
 
-class ViewerOfficeTests(APITestCase):
-    """Who the record detail says *you* are (IR-139/IR-143).
-
-    The decision screen must state which office's clearance it records. That
-    label is server-derived for the same reason `preserved` is: a client-side
-    role->office table would be a second definition to keep in step with
-    `ROLE_TO_OFFICE`, and it would drift.
+    **Retired here by IR-274: `ViewerOfficeTests`.** They pinned `your_office`
+    and `your_office_label`, which told the fixed pipeline's reviewer form
+    (`EvaluationPage`) which office's clearance it would record. The form and
+    both fields were deleted with the pipeline; an office reviewer now acts
+    from a seat, and record detail's `office_review` says as which party
+    (`test_office_review.py`).
     """
 
     def setUp(self):
         self.owner = make_user("owner-vo@cit.edu", "Student")
-        self.itso = make_user("itso-vo@cit.edu", "ITSO")
-        self.rdco = make_user("rdco-vo@cit.edu", "RDCO")
         self.record = Record.objects.create(
             title="Viewer office record",
             record_type=RecordType.objects.first(),
             added_by=self.owner,
-            pipeline_status="parallel_review",
+            pipeline_status="in_review",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
-        RecordClearance.objects.create(record=self.record, office="itso", status="pending")
-
-    def _detail_as(self, user):
-        self.client.force_authenticate(user)
-        return self.client.get(f"/api/v1/records/{self.record.id}/").data
-
-    def test_a_clearance_officer_is_told_which_office_they_clear_for(self):
-        data = self._detail_as(self.itso)
-        self.assertEqual(data["your_office"], "itso")
-        self.assertEqual(data["your_office_label"], "ITSO")
-
-    def test_a_sequential_reviewer_clears_for_no_office(self):
-        """RDCO decides the record at its own stages; it holds no clearance row,
-        so claiming an office would be false."""
-        data = self._detail_as(self.rdco)
-        self.assertIsNone(data["your_office"])
-        self.assertIsNone(data["your_office_label"])
-
-    def test_an_author_clears_for_no_office(self):
-        data = self._detail_as(self.owner)
-        self.assertIsNone(data["your_office"])
 
     def test_the_stage_label_comes_from_the_server(self):
         """AC: no client-side pipeline-key -> English mapping."""
-        self.assertEqual(self._detail_as(self.owner)["stage_label"], "Parallel Office Review")
+        self.client.force_authenticate(self.owner)
+        data = self.client.get(f"/api/v1/records/{self.record.id}/").data
+        self.assertEqual(data["stage_label"], "In Review")
+        self.assertNotIn("your_office", data)
+        self.assertNotIn("your_office_label", data)

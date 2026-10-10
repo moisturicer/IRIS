@@ -2,17 +2,16 @@
 Record versions: the one writer, and the questions everything else asks
 (ADR-032 §5, as amended 2026-10-08; IR-416).
 
-**One function writes every version.** `write_version()` is called by the
-legacy `POST /records/<id>/submit/` and `routing.enter_at_adviser()` (v1,
-`submission`) and by the legacy `resubmit_record()` (the next version,
-`revision`). IR-273's resubmission calls it too. Nothing else creates a
-`RecordVersion`, so the numbering has one author.
+**One function writes every version.** `write_version()` is called by
+`routing.enter_at_adviser()` (v1, `submission`) and by IR-273's new version
+(the next version, `revision`). Nothing else creates a `RecordVersion`, so the
+numbering has one author.
 
 **The manuscript lock lives here too.** Once a record is submitted, its
 manuscript changes only through a new version, so `may_replace_manuscript()`
-allows a replacement only while the owner is preparing one: a `draft`, a
-legacy `declined` until IR-274, or a record on the new model with a revision
-request open (`awaiting_resubmission`, IR-273). Staff are not exempt, and in
+allows a replacement only while the owner is preparing one: a `draft`, or a
+record in review with a revision request open (`awaiting_resubmission`,
+IR-273). Staff are not exempt, and in
 that last case only an owner may: the revision is theirs to make.
 
 **Which manuscript a reader is shown** (IR-273, settled in IR-416). Between
@@ -38,10 +37,7 @@ from core.permissions import is_record_owner
 from .models import Record, RecordVersion
 
 #: The statuses in which a record's manuscript may be replaced (module note).
-MANUSCRIPT_REPLACEABLE_STATUSES = frozenset({
-    PipelineStatus.DRAFT,
-    PipelineStatus.DECLINED,
-})
+MANUSCRIPT_REPLACEABLE_STATUSES = frozenset({PipelineStatus.DRAFT})
 
 
 def _awaiting_resubmission(record) -> bool:

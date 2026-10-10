@@ -22,9 +22,8 @@ ADMIN_ROLES    = {ROLE_RDCO}
 # and M2-2.2 (Submit Record for Review) both name the actor "Record Owner
 # (Student or Adviser)". Deliberately excludes the clearing offices -- ITSO,
 # IERC and KTTO must not author records they may later clear -- and RDCO, which
-# performs both intake and final review, so authoring would mean reviewing its
-# own record at two of the three gates. RDCO files on behalf of others through
-# the bulk import path instead.
+# decides the specialist path, so authoring would mean deciding its own record.
+# RDCO files on behalf of others through the bulk import path instead.
 AUTHOR_ROLES   = {ROLE_STUDENT, ROLE_ADVISER}
 # Who may publish a Calls & Conferences opportunity (IR-121). Deliberately not
 # STAFF_ROLES: that set includes ITSO/IERC, who review clearances and have no
@@ -275,9 +274,8 @@ def may_read_review(user, record) -> bool:
 
     - `is_record_participant`: an owner, or anyone who has ever held a seat;
     - or a member of a party holding an **active** assignment on the record
-      right now, its pool included -- someone about to claim, or a reviewer on
-      the legacy pipeline deciding straight from the pool, needs the history
-      before acting. The server twin of the frontend's `isParticipant`.
+      right now, its pool included -- someone about to claim needs the
+      history before acting. The server twin of the frontend's `isParticipant`.
 
     No role reads it everywhere, RDCO included; an audit is Django admin's.
     Document requests keep their own, party-wide rule (`may_read_requests`,

@@ -85,7 +85,7 @@ class SeatTestBase(APITestCase):
         cls.rdco = make_user("seat-rdco@cit.edu", RoleName.RDCO)
 
     def make_record(self, type_name=RecordTypeName.THESIS_RESEARCH,
-                    pipeline_status=PipelineStatus.ITSO_REVIEW, **extra):
+                    pipeline_status=PipelineStatus.IN_REVIEW, **extra):
         record = Record.objects.create(
             title=f"Seats {type_name}",
             abstract="A" * 40,
@@ -360,7 +360,7 @@ class AddReviewerTests(SeatTestBase):
 
     def test_the_adviser_has_no_office_to_add_from(self):
         record = self.make_record(
-            RecordTypeName.PROPOSAL, PipelineStatus.ADVISER_REVIEW, adviser=self.adviser,
+            RecordTypeName.PROPOSAL, PipelineStatus.IN_REVIEW, adviser=self.adviser,
         )
         adviser = self.assignment(record, Party.ADVISER)
         self.seat(adviser, self.adviser, source=SeatSource.ENTRY)
@@ -435,9 +435,13 @@ class OfficeCompletionTests(SeatTestBase):
         pool = self.assignment(self.record, Party.KTTO)
         self.assertFalse(seats.office_complete(pool))
 
-    def test_on_the_legacy_pipeline_the_pipeline_still_decides(self):
-        """Until IR-260, `shadow.sync()` owns a legacy record's assignments."""
-        self.record.pipeline_status = PipelineStatus.PARALLEL_REVIEW
+    def test_a_record_not_in_review_is_never_completed_by_a_seat(self):
+        """
+        IR-274: this asked it of a record on the fixed pipeline, whose
+        assignments `shadow.sync()` owned. Both are gone; the guard remains for
+        any record not in review, asked here of a published one.
+        """
+        self.record.pipeline_status = PipelineStatus.PUBLISHED
         self.record.save(update_fields=["pipeline_status"])
 
         seats.complete_seat(self.first, self.ierc)
@@ -465,7 +469,7 @@ class ReviewAccessTests(SeatTestBase):
 
     def test_an_adviser_with_an_entry_seat_on_a_submitted_record_has_reviews(self):
         record = self.make_record(
-            RecordTypeName.PROPOSAL, PipelineStatus.ADVISER_REVIEW, adviser=self.adviser,
+            RecordTypeName.PROPOSAL, PipelineStatus.IN_REVIEW, adviser=self.adviser,
         )
         self.seat(self.assignment(record, Party.ADVISER), self.adviser, source=SeatSource.ENTRY)
 
@@ -579,7 +583,8 @@ class ParticipationTests(SeatTestBase):
 
         self.assertTrue(data["is_participant"])
         # Nothing left to act on, which is exactly the case IR-411 lost.
-        self.assertEqual(data["can_act"], [])
+        # (`can_act`, the retired review form's flag, was deleted by IR-274.)
+        self.assertNotIn("can_act", data)
         self.assertEqual(data["can_request_document"], [])
         self.assertEqual(
             [(s["party"], s["state"]) for s in data["my_seats"]], [(Party.ITSO, SeatState.DONE)],

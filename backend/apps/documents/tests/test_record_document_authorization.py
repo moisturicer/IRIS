@@ -263,7 +263,7 @@ class RecordFileUploadAuthorizationTests(APITestCase):
         self.record = Record.objects.create(
             title="Disclosure Under Review", abstract="D" * 40,
             record_type=record_type, added_by=self.owner,
-            pipeline_status="itso_review",
+            pipeline_status="in_review",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
         # ITSO holds the record; KTTO has no part in it.
@@ -375,7 +375,7 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
 
         self.record_type = RecordType.objects.first()
         self.assertIsNotNone(self.record_type, "no seeded RecordType -- migrations incomplete")
-        self.record = self._record("parallel_review")
+        self.record = self._record("in_review")
         # ITSO and IERC both hold the record; KTTO has no part in it.
         RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
         RecordAssignment.objects.create(record=self.record, party=Party.IERC)
@@ -456,17 +456,20 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
                 self.client.force_authenticate(user)
                 self.assertSurvives(orphan, self._remove(orphan))
 
-    def test_rdco_can_remove_its_own_file_at_either_rdco_stage(self):
+    def test_rdco_can_remove_its_own_file_while_it_holds_the_record(self):
+        """
+        IR-274: this asked the same of RDCO at intake as well, while RDCO
+        staffed the retired intake party. Nobody staffs intake now, so only the
+        RDCO assignment is left to ask about.
+        """
         from apps.reviews.models import RecordAssignment
         from core.enums import Party
 
-        for pipeline_status, party in (("rdco_intake", Party.INTAKE), ("rdco_review", Party.RDCO)):
-            with self.subTest(stage=pipeline_status):
-                record = self._record(pipeline_status)
-                RecordAssignment.objects.create(record=record, party=party)
-                record_file = self._file(record, "rdco", self.rdco)
-                self.client.force_authenticate(self.rdco)
-                self.assertRemoved(record_file, self._remove(record_file))
+        record = self._record("in_review")
+        RecordAssignment.objects.create(record=record, party=Party.RDCO)
+        record_file = self._file(record, "rdco", self.rdco)
+        self.client.force_authenticate(self.rdco)
+        self.assertRemoved(record_file, self._remove(record_file))
 
     # --- refusals ------------------------------------------------------------
 
@@ -501,17 +504,22 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
         self.assertEqual(RecordFile.objects.get(pk=response.data["id"]).party, "ierc")
         self.assertTrue(response.data["can_remove"])
 
-    def test_rdco_attaching_at_intake_stores_rdco_never_intake(self):
+    def test_rdco_attaching_stores_rdco(self):
+        """
+        IR-274: this asked it of RDCO at intake, where RDCO staffed a second
+        party and had to be told to file as `rdco`. Intake is retired and
+        nobody staffs it, so RDCO holds only `rdco`.
+        """
         from apps.reviews.models import RecordAssignment
         from core.enums import Party
 
-        record = self._record("rdco_intake")
-        RecordAssignment.objects.create(record=record, party=Party.INTAKE)
+        record = self._record("in_review")
+        RecordAssignment.objects.create(record=record, party=Party.RDCO)
         self.client.force_authenticate(self.rdco)
         response = self._attach(record)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(RecordFile.objects.get(pk=response.data["id"]).party, "rdco")
-        self.assertTrue(response.data["can_remove"], "RDCO could not remove what it just filed at intake")
+        self.assertTrue(response.data["can_remove"], "RDCO could not remove what it just filed")
 
     # --- the screen follows the server ---------------------------------------
 

@@ -27,10 +27,10 @@ real routing changes.
 
 **The two records that matter are the last two.**
 
-`[DEMO] Declined by IERC, ITSO and KTTO preserved` sits in `declined` with ITSO
-and KTTO cleared, waiting for the student to resubmit. That is the demo you
-*drive*: upload a document, resubmit, and watch one office reset while two
-survive.
+`[DEMO] Declined by IERC, ITSO and KTTO preserved` is awaiting resubmission:
+IERC has asked for a revision, ITSO and KTTO have cleared. That is the demo you
+*drive*: edit or upload, submit a new version, and watch one office reset while
+two survive.
 
 `[DEMO] Resubmitted, ITSO and KTTO preserved` has already been through it, so
 the paper view's "Preserved" badges render on arrival. This is what
@@ -292,7 +292,7 @@ class Command(BaseCommand):
             decide(record, adviser, outcome=PUBLISH, token=decision_token(record))
             self._done(record)
 
-    # -- phase 4: one record per pipeline state ----------------------------
+    # -- phase 4: one record per workflow state ----------------------------
 
     def _seed_workflow(self, users):
         for scenario in (
@@ -530,9 +530,8 @@ class Command(BaseCommand):
         """
         A Thesis/Research on the adviser-first model, at its Adviser (IR-261).
 
-        Entered through `routing.enter_at_adviser`, not the legacy submit: until
-        IR-260 the seed is how a record reaches the new model, and this one is
-        where *Accept & route…* is demoed (as adviser@cit.edu).
+        Entered through `routing.enter_at_adviser`, as every submission is.
+        This one is where *Accept & route…* is demoed (as adviser@cit.edu).
         """
         from apps.reviews.routing import enter_at_adviser
 
