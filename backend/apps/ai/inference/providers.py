@@ -11,10 +11,9 @@ one account, which is the only kind of fallback ADR-008 §Amendment permits:
   config per model, wrapped in `FallbackLLMProvider`, which moves to the next
   model only on a failure another model could fix (`network`, `timeout`,
   `rate_limit`);
-* a vendor that resolves the list itself -- OpenRouter, which declares
-  `VendorDialect.resolves_fallback` -- gets **one** config carrying the whole
-  list, sent as the native `models` field. Looping there would send a second
-  request for a fallback the vendor already performed.
+* OpenRouter's native `models` field is used only when the list has no
+  per-model provider pins. A pinned list is tried one model per request, so
+  each model receives its own endpoint restriction.
 
 **Cross-vendor failover is gone, not switched off** (IR-385). The
 `LLM_FALLBACK_*` second vendor IR-321 shipped -- a second key, a second
@@ -67,18 +66,26 @@ def build_profile_llm(
     # either way. `None` keeps the inherited setting for the tasks that do.
     reasoning_effort = None if profile.reasoning_visible else ""
 
+    pins = dict(profile.model_provider_pins)
+
     def config(model: str, fallback_models: tuple[str, ...] = ()) -> LLMProviderConfig:
+        # GLM 5.3 Flash always reasons and accepts low/high/max. The shared
+        # setting may be empty or "medium", so use its supported high setting.
+        model_effort = "high" if model == "z-ai/glm-5.3-flash" else reasoning_effort
         return LLMProviderConfig(
             base_url=profile.base_url,
             api_key=profile.api_key,
             model=model,
-            reasoning_effort=reasoning_effort,
+            reasoning_effort=model_effort,
             vendor=profile.vendor.value,
             fallback_models=fallback_models,
             max_tokens=max_tokens,
+            provider_only=pins.get(model, profile.provider_only),
         )
 
-    if dialect_for(profile.vendor.value).resolves_fallback:
+    if pins:
+        configs = [config(model) for model in profile.models]
+    elif dialect_for(profile.vendor.value).resolves_fallback:
         configs = [config(profile.model, profile.fallback_models)]
     else:
         configs = [config(model) for model in profile.models]

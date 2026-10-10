@@ -20,11 +20,13 @@ none of the per-task variables behaves exactly as it does now.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Union
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 from .tasks import InferenceTask, inference_task
 
@@ -86,6 +88,10 @@ class Profile:
     api_key: str
     reasoning_visible: bool
     data_policy: DataPolicy = DataPolicy.NO_TRAINING
+    #: OpenRouter providers this task may reach, or empty for any (IR-489).
+    provider_only: tuple[str, ...] = ()
+    #: Per-model OpenRouter endpoints, preserving each model's routing policy.
+    model_provider_pins: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def is_configured(self) -> bool:
@@ -109,9 +115,41 @@ def _setting(name: str, default: str = "") -> str:
     return (value or "").strip() if isinstance(value, str) else default
 
 
+def _listed(name: str) -> tuple[str, ...]:
+    raw = _setting(name)
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
 def _fallback_models(prefix: str) -> tuple[str, ...]:
-    raw = _setting(f"{prefix}_FALLBACK_MODELS")
-    return tuple(model.strip() for model in raw.split(",") if model.strip())
+    return _listed(f"{prefix}_FALLBACK_MODELS")
+
+
+def _model_provider_pins(prefix: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    name = f"{prefix}_PROVIDER_PINS"
+    raw = _setting(name)
+    if not raw:
+        return ()
+    try:
+        pins = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ImproperlyConfigured(
+            f"{name} must be a JSON object of model to provider endpoint lists"
+        ) from exc
+    if not isinstance(pins, dict) or not all(
+        isinstance(model, str)
+        and model.strip()
+        and isinstance(endpoints, list)
+        and bool(endpoints)
+        and all(
+            isinstance(endpoint, str) and endpoint.strip()
+            for endpoint in endpoints
+        )
+        for model, endpoints in pins.items()
+    ):
+        raise ImproperlyConfigured(
+            f"{name} must map model names to nonempty provider endpoint lists"
+        )
+    return tuple((model, tuple(endpoints)) for model, endpoints in pins.items())
 
 
 #: The setting *names* a task inherits when its own are unset. Keys, not
@@ -227,4 +265,7 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
         base_url=base_url or chosen.base_url,
         api_key=api_key,
         reasoning_visible=bool(getattr(settings, f"{prefix}_REASONING", False)),
+        # Never inherited: a pin is a choice about one task's model.
+        provider_only=_listed(f"{prefix}_PROVIDER_ONLY"),
+        model_provider_pins=_model_provider_pins(prefix),
     )

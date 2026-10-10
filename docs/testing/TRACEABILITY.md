@@ -198,3 +198,7 @@ This is the one unrecoverable item in the plan. Events not written during the We
 - Never move a row to VERIFIED without a link to actual evidence
 - If a requirement is descoped, set DEFERRED and cite the ADR or SRS amendment — do not delete the row
 - Review the whole table before the technical defence; an unverified requirement reported as unverified is defensible, a false VERIFIED is not
+
+## IR-489 — selected answer models and request data controls
+
+The owner selected `openai/gpt-oss-120b`, followed by `openai/gpt-6-luna`, `deepseek/deepseek-v4.1-flash`, and `z-ai/glm-5.3-flash`. The answer task can configure this ordered chain through OpenRouter. A pinned chain sends one request per model, each with its own `provider.only` list beside `data_collection: deny`; startup refuses missing or incomplete pins and pins on Groq. The deployment operator must verify the endpoint locations before setting `LLM_ANSWER_PROVIDER_PINS`. No paid quality comparison is part of IR-489, and no model quality claim follows from this change.
