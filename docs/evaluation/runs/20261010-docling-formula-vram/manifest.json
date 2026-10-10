@@ -1,0 +1,124 @@
+{
+  "concurrency": 2,
+  "corpus": {
+    "formula": {
+      "bytes": 13662703,
+      "pages": 35,
+      "relative_path": "formula.pdf",
+      "sha256": "7628fa3c0aedd848941d189b6b917520563b72f9c1502679d9ace324326b0bb0"
+    }
+  },
+  "created_at": "2026-10-10T05:04:37.173103+00:00",
+  "host": {
+    "docker_ram_gib": 15.07,
+    "docker_version": "29.8.1",
+    "gpu": {
+      "free_mib": 14126,
+      "name": "NVIDIA GeForce RTX 5070 Ti",
+      "total_mib": 16303,
+      "used_mib": 1870,
+      "utilization_pct": 1
+    },
+    "logical_cpus": 16,
+    "ram_gib": 30.88
+  },
+  "images": {
+    "cpu": "iris-docling:cpu",
+    "gpu": "iris-docling:gpu"
+  },
+  "profiles": {
+    "baseline-end": {
+      "container": "iris-bench-e0837e47f8f7",
+      "effective_limits": {
+        "device_requests": [
+          {
+            "Capabilities": [
+              [
+                "gpu"
+              ]
+            ],
+            "Count": -1,
+            "DeviceIDs": null,
+            "Driver": "",
+            "Options": {}
+          }
+        ],
+        "memory_bytes": 8589934592,
+        "nano_cpus": 4000000000
+      },
+      "image_id": "sha256:10fa43972c3f9a6c2d36e9d5b9e01b7237e157aff7bcabe2382ef5880c080560",
+      "limits": {
+        "cpus": 4,
+        "name": "baseline-end",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "baseline-start": {
+      "container": "iris-bench-5ec218678f31",
+      "effective_limits": {
+        "device_requests": [
+          {
+            "Capabilities": [
+              [
+                "gpu"
+              ]
+            ],
+            "Count": -1,
+            "DeviceIDs": null,
+            "Driver": "",
+            "Options": {}
+          }
+        ],
+        "memory_bytes": 8589934592,
+        "nano_cpus": 4000000000
+      },
+      "image_id": "sha256:10fa43972c3f9a6c2d36e9d5b9e01b7237e157aff7bcabe2382ef5880c080560",
+      "limits": {
+        "cpus": 4,
+        "name": "baseline-start",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "vram-13": {
+      "container": "iris-bench-24a6f8f44dcf",
+      "effective_limits": {
+        "device_requests": [
+          {
+            "Capabilities": [
+              [
+                "gpu"
+              ]
+            ],
+            "Count": -1,
+            "DeviceIDs": null,
+            "Driver": "",
+            "Options": {}
+          }
+        ],
+        "memory_bytes": 8589934592,
+        "nano_cpus": 4000000000
+      },
+      "image_id": "sha256:10fa43972c3f9a6c2d36e9d5b9e01b7237e157aff7bcabe2382ef5880c080560",
+      "limits": {
+        "cpus": 4,
+        "name": "vram-13",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 13
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    }
+  },
+  "repeats": 1,
+  "sample_interval_seconds": 1.0,
+  "timeout_seconds": 3600
+}

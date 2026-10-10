@@ -1,0 +1,430 @@
+{"at": "2026-10-10T05:30:27.470154+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 84.71, "gpu_delta_mib": 794, "gpu_pct": 1, "gpu_used_mib": 2884, "profile": "baseline-start", "ram_mib": 867.5}
+{"at": "2026-10-10T05:30:29.876160+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 97.1, "gpu_delta_mib": 1639, "gpu_pct": 1, "gpu_used_mib": 3729, "profile": "baseline-start", "ram_mib": 968.6}
+{"at": "2026-10-10T05:30:33.209248+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 104.71, "gpu_delta_mib": 1696, "gpu_pct": 1, "gpu_used_mib": 3786, "profile": "baseline-start", "ram_mib": 1156.1}
+{"at": "2026-10-10T05:30:35.600112+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.99, "gpu_delta_mib": 1694, "gpu_pct": 5, "gpu_used_mib": 3784, "profile": "baseline-start", "ram_mib": 1250.3}
+{"at": "2026-10-10T05:30:37.967392+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.99, "gpu_delta_mib": 1693, "gpu_pct": 2, "gpu_used_mib": 3783, "profile": "baseline-start", "ram_mib": 1313.79}
+{"at": "2026-10-10T05:30:40.481521+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.63, "gpu_delta_mib": 1753, "gpu_pct": 1, "gpu_used_mib": 3843, "profile": "baseline-start", "ram_mib": 1412.1}
+{"at": "2026-10-10T05:30:43.412950+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.63, "gpu_delta_mib": 1745, "gpu_pct": 1, "gpu_used_mib": 3835, "profile": "baseline-start", "ram_mib": 1498.11}
+{"at": "2026-10-10T05:30:45.728163+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.63, "gpu_delta_mib": 1789, "gpu_pct": 2, "gpu_used_mib": 3879, "profile": "baseline-start", "ram_mib": 1675.26}
+{"at": "2026-10-10T05:30:48.051709+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 100.09, "gpu_delta_mib": 2223, "gpu_pct": 22, "gpu_used_mib": 4313, "profile": "baseline-start", "ram_mib": 2228.22}
+{"at": "2026-10-10T05:30:50.376981+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.32, "gpu_delta_mib": 2964, "gpu_pct": 22, "gpu_used_mib": 5054, "profile": "baseline-start", "ram_mib": 2496.51}
+{"at": "2026-10-10T05:30:53.419005+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.67, "gpu_delta_mib": 2966, "gpu_pct": 20, "gpu_used_mib": 5056, "profile": "baseline-start", "ram_mib": 2496.51}
+{"at": "2026-10-10T05:30:55.766128+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.11, "gpu_delta_mib": 2966, "gpu_pct": 20, "gpu_used_mib": 5056, "profile": "baseline-start", "ram_mib": 2495.49}
+{"at": "2026-10-10T05:30:58.169020+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.21, "gpu_delta_mib": 2964, "gpu_pct": 23, "gpu_used_mib": 5054, "profile": "baseline-start", "ram_mib": 2496.51}
+{"at": "2026-10-10T05:31:00.513899+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.81, "gpu_delta_mib": 2966, "gpu_pct": 22, "gpu_used_mib": 5056, "profile": "baseline-start", "ram_mib": 2495.49}
+{"at": "2026-10-10T05:31:03.558136+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.05, "gpu_delta_mib": 2964, "gpu_pct": 23, "gpu_used_mib": 5054, "profile": "baseline-start", "ram_mib": 2495.49}
+{"at": "2026-10-10T05:31:05.882383+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.46, "gpu_delta_mib": 2965, "gpu_pct": 24, "gpu_used_mib": 5055, "profile": "baseline-start", "ram_mib": 2495.49}
+{"at": "2026-10-10T05:31:08.248332+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.75, "gpu_delta_mib": 2965, "gpu_pct": 15, "gpu_used_mib": 5055, "profile": "baseline-start", "ram_mib": 2495.49}
+{"at": "2026-10-10T05:31:10.607180+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 35.29, "gpu_delta_mib": 2970, "gpu_pct": 1, "gpu_used_mib": 5060, "profile": "baseline-start", "ram_mib": 2603.01}
+{"at": "2026-10-10T05:31:13.617841+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.25, "gpu_delta_mib": 2977, "gpu_pct": 15, "gpu_used_mib": 5067, "profile": "baseline-start", "ram_mib": 3069.95}
+{"at": "2026-10-10T05:31:15.953800+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.55, "gpu_delta_mib": 2977, "gpu_pct": 25, "gpu_used_mib": 5067, "profile": "baseline-start", "ram_mib": 2550.78}
+{"at": "2026-10-10T05:31:18.316894+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.15, "gpu_delta_mib": 2976, "gpu_pct": 23, "gpu_used_mib": 5066, "profile": "baseline-start", "ram_mib": 2550.78}
+{"at": "2026-10-10T05:31:20.711974+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 97.74, "gpu_delta_mib": 3134, "gpu_pct": 16, "gpu_used_mib": 5224, "profile": "baseline-start", "ram_mib": 2549.76}
+{"at": "2026-10-10T05:31:23.689237+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.47, "gpu_delta_mib": 3135, "gpu_pct": 11, "gpu_used_mib": 5225, "profile": "baseline-start", "ram_mib": 2549.76}
+{"at": "2026-10-10T05:31:26.041050+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.1, "gpu_delta_mib": 3135, "gpu_pct": 21, "gpu_used_mib": 5225, "profile": "baseline-start", "ram_mib": 2549.76}
+{"at": "2026-10-10T05:31:28.372779+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.48, "gpu_delta_mib": 3136, "gpu_pct": 21, "gpu_used_mib": 5226, "profile": "baseline-start", "ram_mib": 2549.76}
+{"at": "2026-10-10T05:31:30.760134+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.11, "gpu_delta_mib": 3165, "gpu_pct": 25, "gpu_used_mib": 5255, "profile": "baseline-start", "ram_mib": 2549.76}
+{"at": "2026-10-10T05:31:33.797921+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 58.97, "gpu_delta_mib": 2977, "gpu_pct": 55, "gpu_used_mib": 5067, "profile": "baseline-start", "ram_mib": 2652.16}
+{"at": "2026-10-10T05:31:36.139872+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.74, "gpu_delta_mib": 2967, "gpu_pct": 15, "gpu_used_mib": 5057, "profile": "baseline-start", "ram_mib": 2580.48}
+{"at": "2026-10-10T05:31:38.537653+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.41, "gpu_delta_mib": 2950, "gpu_pct": 18, "gpu_used_mib": 5040, "profile": "baseline-start", "ram_mib": 2579.46}
+{"at": "2026-10-10T05:31:40.883468+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.98, "gpu_delta_mib": 2944, "gpu_pct": 15, "gpu_used_mib": 5034, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:31:43.895133+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 97.99, "gpu_delta_mib": 2951, "gpu_pct": 23, "gpu_used_mib": 5041, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:31:46.255439+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.96, "gpu_delta_mib": 2951, "gpu_pct": 26, "gpu_used_mib": 5041, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:31:48.584933+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.44, "gpu_delta_mib": 2950, "gpu_pct": 24, "gpu_used_mib": 5040, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:31:51.029243+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.4, "gpu_delta_mib": 2951, "gpu_pct": 24, "gpu_used_mib": 5041, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:31:53.967093+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.49, "gpu_delta_mib": 2949, "gpu_pct": 24, "gpu_used_mib": 5039, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:31:56.324936+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 87.42, "gpu_delta_mib": 2951, "gpu_pct": 49, "gpu_used_mib": 5041, "profile": "baseline-start", "ram_mib": 2663.42}
+{"at": "2026-10-10T05:31:58.636824+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.55, "gpu_delta_mib": 2943, "gpu_pct": 17, "gpu_used_mib": 5033, "profile": "baseline-start", "ram_mib": 2581.5}
+{"at": "2026-10-10T05:32:01.054646+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.88, "gpu_delta_mib": 2881, "gpu_pct": 20, "gpu_used_mib": 4971, "profile": "baseline-start", "ram_mib": 2579.46}
+{"at": "2026-10-10T05:32:04.002144+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 97.81, "gpu_delta_mib": 2882, "gpu_pct": 22, "gpu_used_mib": 4972, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:32:06.338457+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.35, "gpu_delta_mib": 2881, "gpu_pct": 22, "gpu_used_mib": 4971, "profile": "baseline-start", "ram_mib": 2578.43}
+{"at": "2026-10-10T05:32:08.877149+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.49, "gpu_delta_mib": 2880, "gpu_pct": 19, "gpu_used_mib": 4970, "profile": "baseline-start", "ram_mib": 2577.41}
+{"at": "2026-10-10T05:32:11.222599+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 98.44, "gpu_delta_mib": 2880, "gpu_pct": 15, "gpu_used_mib": 4970, "profile": "baseline-start", "ram_mib": 2577.41}
+{"at": "2026-10-10T05:32:14.277298+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 97.83, "gpu_delta_mib": 2880, "gpu_pct": 21, "gpu_used_mib": 4970, "profile": "baseline-start", "ram_mib": 2577.41}
+{"at": "2026-10-10T05:32:16.607416+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 99.62, "gpu_delta_mib": 2880, "gpu_pct": 13, "gpu_used_mib": 4970, "profile": "baseline-start", "ram_mib": 2577.41}
+{"at": "2026-10-10T05:32:18.991411+00:00", "container": "iris-bench-9565f13eefad", "cpu_pct": 61.55, "gpu_delta_mib": 2873, "gpu_pct": 18, "gpu_used_mib": 4963, "profile": "baseline-start", "ram_mib": 2598.91}
+{"at": "2026-10-10T05:32:39.968830+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 122.49, "gpu_pct": 2, "gpu_used_mib": 1993, "profile": "cpu-only-4", "ram_mib": 1501.18}
+{"at": "2026-10-10T05:32:43.148624+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 403.38, "gpu_pct": 1, "gpu_used_mib": 1986, "profile": "cpu-only-4", "ram_mib": 2243.58}
+{"at": "2026-10-10T05:32:45.502024+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.64, "gpu_pct": 2, "gpu_used_mib": 2028, "profile": "cpu-only-4", "ram_mib": 2062.34}
+{"at": "2026-10-10T05:32:47.847047+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 389.95, "gpu_pct": 2, "gpu_used_mib": 2003, "profile": "cpu-only-4", "ram_mib": 1678.34}
+{"at": "2026-10-10T05:32:50.241953+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 386.03, "gpu_pct": 1, "gpu_used_mib": 2001, "profile": "cpu-only-4", "ram_mib": 1670.14}
+{"at": "2026-10-10T05:32:53.271926+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 376.84, "gpu_pct": 1, "gpu_used_mib": 1982, "profile": "cpu-only-4", "ram_mib": 3034.11}
+{"at": "2026-10-10T05:32:55.613183+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 374.09, "gpu_pct": 2, "gpu_used_mib": 1993, "profile": "cpu-only-4", "ram_mib": 2504.7}
+{"at": "2026-10-10T05:32:58.017003+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 388.31, "gpu_pct": 2, "gpu_used_mib": 2006, "profile": "cpu-only-4", "ram_mib": 2908.16}
+{"at": "2026-10-10T05:33:00.397032+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 385.05, "gpu_pct": 1, "gpu_used_mib": 2008, "profile": "cpu-only-4", "ram_mib": 2908.16}
+{"at": "2026-10-10T05:33:03.406172+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 387.48, "gpu_pct": 3, "gpu_used_mib": 2065, "profile": "cpu-only-4", "ram_mib": 2908.16}
+{"at": "2026-10-10T05:33:05.797588+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.37, "gpu_pct": 3, "gpu_used_mib": 2062, "profile": "cpu-only-4", "ram_mib": 2908.16}
+{"at": "2026-10-10T05:33:08.244516+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 389.71, "gpu_pct": 1, "gpu_used_mib": 2049, "profile": "cpu-only-4", "ram_mib": 2908.16}
+{"at": "2026-10-10T05:33:10.614109+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 385.37, "gpu_pct": 1, "gpu_used_mib": 2094, "profile": "cpu-only-4", "ram_mib": 2915.33}
+{"at": "2026-10-10T05:33:13.639880+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 398.8, "gpu_pct": 17, "gpu_used_mib": 2067, "profile": "cpu-only-4", "ram_mib": 2922.5}
+{"at": "2026-10-10T05:33:16.005938+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 316.69, "gpu_pct": 1, "gpu_used_mib": 2144, "profile": "cpu-only-4", "ram_mib": 2942.98}
+{"at": "2026-10-10T05:33:18.416772+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 387.96, "gpu_pct": 1, "gpu_used_mib": 2028, "profile": "cpu-only-4", "ram_mib": 2946.05}
+{"at": "2026-10-10T05:33:21.001057+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.66, "gpu_pct": 1, "gpu_used_mib": 2028, "profile": "cpu-only-4", "ram_mib": 2945.02}
+{"at": "2026-10-10T05:33:23.981399+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.22, "gpu_pct": 6, "gpu_used_mib": 2100, "profile": "cpu-only-4", "ram_mib": 2946.05}
+{"at": "2026-10-10T05:33:26.358809+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.16, "gpu_pct": 1, "gpu_used_mib": 2030, "profile": "cpu-only-4", "ram_mib": 2948.1}
+{"at": "2026-10-10T05:33:28.932763+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 398.49, "gpu_pct": 8, "gpu_used_mib": 2029, "profile": "cpu-only-4", "ram_mib": 2948.1}
+{"at": "2026-10-10T05:33:31.353904+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.98, "gpu_pct": 2, "gpu_used_mib": 2029, "profile": "cpu-only-4", "ram_mib": 2948.1}
+{"at": "2026-10-10T05:33:34.449917+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.45, "gpu_pct": 4, "gpu_used_mib": 2045, "profile": "cpu-only-4", "ram_mib": 2947.07}
+{"at": "2026-10-10T05:33:37.001694+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.21, "gpu_pct": 10, "gpu_used_mib": 2003, "profile": "cpu-only-4", "ram_mib": 2947.07}
+{"at": "2026-10-10T05:33:39.902700+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.46, "gpu_pct": 21, "gpu_used_mib": 2006, "profile": "cpu-only-4", "ram_mib": 2947.07}
+{"at": "2026-10-10T05:33:43.479922+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.26, "gpu_pct": 17, "gpu_used_mib": 2006, "profile": "cpu-only-4", "ram_mib": 2947.07}
+{"at": "2026-10-10T05:33:45.885892+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.73, "gpu_pct": 22, "gpu_used_mib": 2012, "profile": "cpu-only-4", "ram_mib": 2947.07}
+{"at": "2026-10-10T05:33:48.358013+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.17, "gpu_pct": 1, "gpu_used_mib": 2011, "profile": "cpu-only-4", "ram_mib": 2948.1}
+{"at": "2026-10-10T05:33:50.763972+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.2, "gpu_pct": 2, "gpu_used_mib": 2052, "profile": "cpu-only-4", "ram_mib": 2954.24}
+{"at": "2026-10-10T05:33:53.832939+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.29, "gpu_pct": 1, "gpu_used_mib": 2093, "profile": "cpu-only-4", "ram_mib": 2954.24}
+{"at": "2026-10-10T05:33:56.206117+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.11, "gpu_pct": 2, "gpu_used_mib": 2077, "profile": "cpu-only-4", "ram_mib": 2954.24}
+{"at": "2026-10-10T05:33:58.582095+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.94, "gpu_pct": 1, "gpu_used_mib": 2089, "profile": "cpu-only-4", "ram_mib": 2967.55}
+{"at": "2026-10-10T05:34:00.998535+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.31, "gpu_pct": 2, "gpu_used_mib": 2045, "profile": "cpu-only-4", "ram_mib": 2967.55}
+{"at": "2026-10-10T05:34:04.045387+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.41, "gpu_pct": 1, "gpu_used_mib": 2039, "profile": "cpu-only-4", "ram_mib": 2967.55}
+{"at": "2026-10-10T05:34:06.398734+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.5, "gpu_pct": 31, "gpu_used_mib": 1882, "profile": "cpu-only-4", "ram_mib": 2974.72}
+{"at": "2026-10-10T05:34:08.801790+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.02, "gpu_pct": 1, "gpu_used_mib": 1976, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:11.203561+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.81, "gpu_pct": 2, "gpu_used_mib": 1976, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:14.230592+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.61, "gpu_pct": 1, "gpu_used_mib": 1976, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:16.620833+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.98, "gpu_pct": 8, "gpu_used_mib": 1976, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:19.053177+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.47, "gpu_pct": 4, "gpu_used_mib": 1977, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:21.509867+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.99, "gpu_pct": 14, "gpu_used_mib": 1946, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:24.542123+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.79, "gpu_pct": 0, "gpu_used_mib": 1880, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:26.920163+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.02, "gpu_pct": 0, "gpu_used_mib": 1878, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:29.340508+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.46, "gpu_pct": 0, "gpu_used_mib": 1881, "profile": "cpu-only-4", "ram_mib": 2975.74}
+{"at": "2026-10-10T05:34:31.721328+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.72, "gpu_pct": 1, "gpu_used_mib": 1887, "profile": "cpu-only-4", "ram_mib": 2990.08}
+{"at": "2026-10-10T05:34:34.746657+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.37, "gpu_pct": 1, "gpu_used_mib": 1906, "profile": "cpu-only-4", "ram_mib": 2990.08}
+{"at": "2026-10-10T05:34:37.152040+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.54, "gpu_pct": 7, "gpu_used_mib": 1917, "profile": "cpu-only-4", "ram_mib": 2990.08}
+{"at": "2026-10-10T05:34:39.547994+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 75.22, "gpu_pct": 34, "gpu_used_mib": 1921, "profile": "cpu-only-4", "ram_mib": 2287.62}
+{"at": "2026-10-10T05:34:41.936663+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.04, "gpu_pct": 2, "gpu_used_mib": 1930, "profile": "cpu-only-4", "ram_mib": 2268.16}
+{"at": "2026-10-10T05:34:44.939868+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 398.74, "gpu_pct": 1, "gpu_used_mib": 1922, "profile": "cpu-only-4", "ram_mib": 2370.56}
+{"at": "2026-10-10T05:34:47.323513+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 383.59, "gpu_pct": 44, "gpu_used_mib": 1912, "profile": "cpu-only-4", "ram_mib": 1798.14}
+{"at": "2026-10-10T05:34:49.720314+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 342.33, "gpu_pct": 1, "gpu_used_mib": 1910, "profile": "cpu-only-4", "ram_mib": 2593.79}
+{"at": "2026-10-10T05:34:52.175049+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 387.02, "gpu_pct": 2, "gpu_used_mib": 1923, "profile": "cpu-only-4", "ram_mib": 2987.01}
+{"at": "2026-10-10T05:34:55.249517+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 381.36, "gpu_pct": 1, "gpu_used_mib": 1924, "profile": "cpu-only-4", "ram_mib": 2988.03}
+{"at": "2026-10-10T05:34:57.778195+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 388.2, "gpu_pct": 12, "gpu_used_mib": 1932, "profile": "cpu-only-4", "ram_mib": 2988.03}
+{"at": "2026-10-10T05:35:00.784486+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 385.2, "gpu_pct": 1, "gpu_used_mib": 1932, "profile": "cpu-only-4", "ram_mib": 2988.03}
+{"at": "2026-10-10T05:35:03.816606+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 385.81, "gpu_pct": 53, "gpu_used_mib": 1912, "profile": "cpu-only-4", "ram_mib": 2988.03}
+{"at": "2026-10-10T05:35:06.168580+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 384.24, "gpu_pct": 0, "gpu_used_mib": 1935, "profile": "cpu-only-4", "ram_mib": 2988.03}
+{"at": "2026-10-10T05:35:08.582586+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 387.36, "gpu_pct": 1, "gpu_used_mib": 1931, "profile": "cpu-only-4", "ram_mib": 3047.42}
+{"at": "2026-10-10T05:35:11.032727+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.18, "gpu_pct": 0, "gpu_used_mib": 1928, "profile": "cpu-only-4", "ram_mib": 3048.45}
+{"at": "2026-10-10T05:35:13.991899+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.11, "gpu_pct": 18, "gpu_used_mib": 1928, "profile": "cpu-only-4", "ram_mib": 3048.45}
+{"at": "2026-10-10T05:35:16.369924+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 398.13, "gpu_pct": 23, "gpu_used_mib": 1933, "profile": "cpu-only-4", "ram_mib": 3050.5}
+{"at": "2026-10-10T05:35:18.753726+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.75, "gpu_pct": 8, "gpu_used_mib": 1947, "profile": "cpu-only-4", "ram_mib": 3051.52}
+{"at": "2026-10-10T05:35:21.166974+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.8, "gpu_pct": 5, "gpu_used_mib": 1942, "profile": "cpu-only-4", "ram_mib": 3051.52}
+{"at": "2026-10-10T05:35:24.162394+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.24, "gpu_pct": 1, "gpu_used_mib": 1940, "profile": "cpu-only-4", "ram_mib": 3052.54}
+{"at": "2026-10-10T05:35:26.531500+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.33, "gpu_pct": 1, "gpu_used_mib": 1908, "profile": "cpu-only-4", "ram_mib": 3066.88}
+{"at": "2026-10-10T05:35:28.903222+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.43, "gpu_pct": 1, "gpu_used_mib": 1908, "profile": "cpu-only-4", "ram_mib": 3066.88}
+{"at": "2026-10-10T05:35:31.270033+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 390.84, "gpu_pct": 35, "gpu_used_mib": 1959, "profile": "cpu-only-4", "ram_mib": 3066.88}
+{"at": "2026-10-10T05:35:34.296452+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.41, "gpu_pct": 1, "gpu_used_mib": 1998, "profile": "cpu-only-4", "ram_mib": 3066.88}
+{"at": "2026-10-10T05:35:36.760623+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.7, "gpu_pct": 1, "gpu_used_mib": 2073, "profile": "cpu-only-4", "ram_mib": 3066.88}
+{"at": "2026-10-10T05:35:39.196299+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.99, "gpu_pct": 1, "gpu_used_mib": 2100, "profile": "cpu-only-4", "ram_mib": 3066.88}
+{"at": "2026-10-10T05:35:41.612606+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.01, "gpu_pct": 1, "gpu_used_mib": 1993, "profile": "cpu-only-4", "ram_mib": 3066.88}
+{"at": "2026-10-10T05:35:44.658609+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.89, "gpu_pct": 1, "gpu_used_mib": 1955, "profile": "cpu-only-4", "ram_mib": 3065.86}
+{"at": "2026-10-10T05:36:07.642114+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.46, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-4", "ram_mib": 3065.86}
+{"at": "2026-10-10T05:36:10.016506+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.6, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-4", "ram_mib": 3065.86}
+{"at": "2026-10-10T05:36:12.473859+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.11, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-4", "ram_mib": 3065.86}
+{"at": "2026-10-10T05:36:15.506871+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.7, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-4", "ram_mib": 3065.86}
+{"at": "2026-10-10T05:36:17.862934+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.28, "gpu_pct": 4, "gpu_used_mib": 2015, "profile": "cpu-only-4", "ram_mib": 3092.48}
+{"at": "2026-10-10T05:36:20.247460+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.0, "gpu_pct": 4, "gpu_used_mib": 1986, "profile": "cpu-only-4", "ram_mib": 3092.48}
+{"at": "2026-10-10T05:36:22.745635+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.83, "gpu_pct": 1, "gpu_used_mib": 2059, "profile": "cpu-only-4", "ram_mib": 3092.48}
+{"at": "2026-10-10T05:36:25.816471+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.86, "gpu_pct": 9, "gpu_used_mib": 1986, "profile": "cpu-only-4", "ram_mib": 3092.48}
+{"at": "2026-10-10T05:36:28.217697+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.68, "gpu_pct": 1, "gpu_used_mib": 1976, "profile": "cpu-only-4", "ram_mib": 3094.53}
+{"at": "2026-10-10T05:36:30.636703+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.49, "gpu_pct": 3, "gpu_used_mib": 1967, "profile": "cpu-only-4", "ram_mib": 3094.53}
+{"at": "2026-10-10T05:36:33.993640+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.65, "gpu_pct": 4, "gpu_used_mib": 1984, "profile": "cpu-only-4", "ram_mib": 3094.53}
+{"at": "2026-10-10T05:36:36.425195+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.86, "gpu_pct": 9, "gpu_used_mib": 2036, "profile": "cpu-only-4", "ram_mib": 3094.53}
+{"at": "2026-10-10T05:36:38.813766+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.06, "gpu_pct": 1, "gpu_used_mib": 2037, "profile": "cpu-only-4", "ram_mib": 3115.01}
+{"at": "2026-10-10T05:36:41.244063+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.26, "gpu_pct": 2, "gpu_used_mib": 2002, "profile": "cpu-only-4", "ram_mib": 3115.01}
+{"at": "2026-10-10T05:36:44.257952+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 222.27, "gpu_pct": 1, "gpu_used_mib": 2002, "profile": "cpu-only-4", "ram_mib": 2170.88}
+{"at": "2026-10-10T05:36:46.659167+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 382.31, "gpu_pct": 0, "gpu_used_mib": 2001, "profile": "cpu-only-4", "ram_mib": 2259.97}
+{"at": "2026-10-10T05:36:49.075711+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.23, "gpu_pct": 1, "gpu_used_mib": 1981, "profile": "cpu-only-4", "ram_mib": 1865.73}
+{"at": "2026-10-10T05:36:51.550607+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.34, "gpu_pct": 2, "gpu_used_mib": 1992, "profile": "cpu-only-4", "ram_mib": 1913.86}
+{"at": "2026-10-10T05:36:54.542325+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 369.3, "gpu_pct": 1, "gpu_used_mib": 1992, "profile": "cpu-only-4", "ram_mib": 3032.06}
+{"at": "2026-10-10T05:36:57.014966+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 383.2, "gpu_pct": 2, "gpu_used_mib": 1992, "profile": "cpu-only-4", "ram_mib": 3100.67}
+{"at": "2026-10-10T05:36:59.472427+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 383.15, "gpu_pct": 42, "gpu_used_mib": 2002, "profile": "cpu-only-4", "ram_mib": 3101.7}
+{"at": "2026-10-10T05:37:02.058896+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 381.14, "gpu_pct": 1, "gpu_used_mib": 2013, "profile": "cpu-only-4", "ram_mib": 3102.72}
+{"at": "2026-10-10T05:37:05.003487+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 385.26, "gpu_pct": 1, "gpu_used_mib": 1969, "profile": "cpu-only-4", "ram_mib": 3101.7}
+{"at": "2026-10-10T05:37:07.515500+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 380.13, "gpu_pct": 13, "gpu_used_mib": 1946, "profile": "cpu-only-4", "ram_mib": 3102.72}
+{"at": "2026-10-10T05:37:09.858986+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 385.74, "gpu_pct": 4, "gpu_used_mib": 1946, "profile": "cpu-only-4", "ram_mib": 3099.65}
+{"at": "2026-10-10T05:37:12.223070+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.11, "gpu_pct": 25, "gpu_used_mib": 1946, "profile": "cpu-only-4", "ram_mib": 2203.65}
+{"at": "2026-10-10T05:37:15.312811+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.91, "gpu_pct": 6, "gpu_used_mib": 2007, "profile": "cpu-only-4", "ram_mib": 2209.79}
+{"at": "2026-10-10T05:37:17.718309+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.23, "gpu_pct": 1, "gpu_used_mib": 2047, "profile": "cpu-only-4", "ram_mib": 2217.98}
+{"at": "2026-10-10T05:37:20.062403+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.3, "gpu_pct": 0, "gpu_used_mib": 2049, "profile": "cpu-only-4", "ram_mib": 2216.96}
+{"at": "2026-10-10T05:37:22.432810+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.67, "gpu_pct": 2, "gpu_used_mib": 1999, "profile": "cpu-only-4", "ram_mib": 2233.34}
+{"at": "2026-10-10T05:37:25.473363+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.35, "gpu_pct": 0, "gpu_used_mib": 1997, "profile": "cpu-only-4", "ram_mib": 2233.34}
+{"at": "2026-10-10T05:37:27.850307+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.0, "gpu_pct": 0, "gpu_used_mib": 1969, "profile": "cpu-only-4", "ram_mib": 2245.63}
+{"at": "2026-10-10T05:37:30.200160+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.4, "gpu_pct": 0, "gpu_used_mib": 1952, "profile": "cpu-only-4", "ram_mib": 2280.45}
+{"at": "2026-10-10T05:37:32.585652+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.61, "gpu_pct": 12, "gpu_used_mib": 1966, "profile": "cpu-only-4", "ram_mib": 2282.5}
+{"at": "2026-10-10T05:37:35.616678+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.88, "gpu_pct": 15, "gpu_used_mib": 1967, "profile": "cpu-only-4", "ram_mib": 2282.5}
+{"at": "2026-10-10T05:37:37.982709+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.67, "gpu_pct": 4, "gpu_used_mib": 1967, "profile": "cpu-only-4", "ram_mib": 2300.93}
+{"at": "2026-10-10T05:37:40.424340+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 389.34, "gpu_pct": 6, "gpu_used_mib": 2085, "profile": "cpu-only-4", "ram_mib": 2301.95}
+{"at": "2026-10-10T05:37:42.867719+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.03, "gpu_pct": 1, "gpu_used_mib": 2023, "profile": "cpu-only-4", "ram_mib": 2302.98}
+{"at": "2026-10-10T05:37:45.908775+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 398.27, "gpu_pct": 3, "gpu_used_mib": 2003, "profile": "cpu-only-4", "ram_mib": 2313.22}
+{"at": "2026-10-10T05:37:48.251986+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.53, "gpu_pct": 1, "gpu_used_mib": 1995, "profile": "cpu-only-4", "ram_mib": 2314.24}
+{"at": "2026-10-10T05:37:50.608082+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 399.22, "gpu_pct": 2, "gpu_used_mib": 2045, "profile": "cpu-only-4", "ram_mib": 2334.72}
+{"at": "2026-10-10T05:37:54.009012+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.62, "gpu_pct": 2, "gpu_used_mib": 2043, "profile": "cpu-only-4", "ram_mib": 2338.82}
+{"at": "2026-10-10T05:37:56.373517+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.42, "gpu_pct": 2, "gpu_used_mib": 2035, "profile": "cpu-only-4", "ram_mib": 2339.84}
+{"at": "2026-10-10T05:37:58.743249+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 389.28, "gpu_pct": 2, "gpu_used_mib": 2012, "profile": "cpu-only-4", "ram_mib": 2340.86}
+{"at": "2026-10-10T05:38:01.103341+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.87, "gpu_pct": 2, "gpu_used_mib": 2004, "profile": "cpu-only-4", "ram_mib": 2361.34}
+{"at": "2026-10-10T05:38:04.164094+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.08, "gpu_pct": 4, "gpu_used_mib": 2002, "profile": "cpu-only-4", "ram_mib": 2361.34}
+{"at": "2026-10-10T05:38:06.516302+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.23, "gpu_pct": 1, "gpu_used_mib": 2081, "profile": "cpu-only-4", "ram_mib": 2361.34}
+{"at": "2026-10-10T05:38:08.986996+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.6, "gpu_pct": 1, "gpu_used_mib": 2014, "profile": "cpu-only-4", "ram_mib": 2375.68}
+{"at": "2026-10-10T05:38:11.413149+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.53, "gpu_pct": 4, "gpu_used_mib": 2001, "profile": "cpu-only-4", "ram_mib": 2375.68}
+{"at": "2026-10-10T05:38:14.407859+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 391.54, "gpu_pct": 1, "gpu_used_mib": 2001, "profile": "cpu-only-4", "ram_mib": 2375.68}
+{"at": "2026-10-10T05:38:16.778687+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.13, "gpu_pct": 1, "gpu_used_mib": 2001, "profile": "cpu-only-4", "ram_mib": 2390.02}
+{"at": "2026-10-10T05:38:19.153545+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.58, "gpu_pct": 2, "gpu_used_mib": 2046, "profile": "cpu-only-4", "ram_mib": 2390.02}
+{"at": "2026-10-10T05:38:21.627529+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 371.9, "gpu_pct": 2, "gpu_used_mib": 2047, "profile": "cpu-only-4", "ram_mib": 2394.11}
+{"at": "2026-10-10T05:38:24.567462+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.93, "gpu_pct": 1, "gpu_used_mib": 2036, "profile": "cpu-only-4", "ram_mib": 2699.26}
+{"at": "2026-10-10T05:38:26.997800+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.97, "gpu_pct": 1, "gpu_used_mib": 1997, "profile": "cpu-only-4", "ram_mib": 2703.36}
+{"at": "2026-10-10T05:38:29.422887+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.1, "gpu_pct": 2, "gpu_used_mib": 2010, "profile": "cpu-only-4", "ram_mib": 1908.74}
+{"at": "2026-10-10T05:38:31.785268+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 343.38, "gpu_pct": 1, "gpu_used_mib": 2004, "profile": "cpu-only-4", "ram_mib": 2881.54}
+{"at": "2026-10-10T05:38:34.819042+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 372.14, "gpu_pct": 4, "gpu_used_mib": 2007, "profile": "cpu-only-4", "ram_mib": 3113.98}
+{"at": "2026-10-10T05:38:37.183901+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 386.38, "gpu_pct": 5, "gpu_used_mib": 2002, "profile": "cpu-only-4", "ram_mib": 3082.24}
+{"at": "2026-10-10T05:38:39.560375+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 390.52, "gpu_pct": 1, "gpu_used_mib": 1994, "profile": "cpu-only-4", "ram_mib": 3115.01}
+{"at": "2026-10-10T05:38:42.080806+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 383.55, "gpu_pct": 2, "gpu_used_mib": 2001, "profile": "cpu-only-4", "ram_mib": 2711.55}
+{"at": "2026-10-10T05:38:44.953200+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 380.53, "gpu_pct": 1, "gpu_used_mib": 1994, "profile": "cpu-only-4", "ram_mib": 3115.01}
+{"at": "2026-10-10T05:38:47.319575+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 381.46, "gpu_pct": 1, "gpu_used_mib": 2007, "profile": "cpu-only-4", "ram_mib": 3116.03}
+{"at": "2026-10-10T05:38:49.711920+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 383.65, "gpu_pct": 1, "gpu_used_mib": 2002, "profile": "cpu-only-4", "ram_mib": 2639.87}
+{"at": "2026-10-10T05:38:52.116938+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.03, "gpu_pct": 1, "gpu_used_mib": 1998, "profile": "cpu-only-4", "ram_mib": 2220.03}
+{"at": "2026-10-10T05:38:55.145704+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.44, "gpu_pct": 4, "gpu_used_mib": 2010, "profile": "cpu-only-4", "ram_mib": 2229.25}
+{"at": "2026-10-10T05:38:57.535751+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.14, "gpu_pct": 1, "gpu_used_mib": 2030, "profile": "cpu-only-4", "ram_mib": 2238.46}
+{"at": "2026-10-10T05:38:59.902288+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 399.48, "gpu_pct": 9, "gpu_used_mib": 2044, "profile": "cpu-only-4", "ram_mib": 2246.66}
+{"at": "2026-10-10T05:39:02.393288+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 388.1, "gpu_pct": 3, "gpu_used_mib": 2008, "profile": "cpu-only-4", "ram_mib": 2273.28}
+{"at": "2026-10-10T05:39:05.365302+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.22, "gpu_pct": 1, "gpu_used_mib": 1983, "profile": "cpu-only-4", "ram_mib": 2273.28}
+{"at": "2026-10-10T05:39:07.804317+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 393.18, "gpu_pct": 1, "gpu_used_mib": 1982, "profile": "cpu-only-4", "ram_mib": 2274.3}
+{"at": "2026-10-10T05:39:10.178130+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 398.81, "gpu_pct": 2, "gpu_used_mib": 1990, "profile": "cpu-only-4", "ram_mib": 2302.98}
+{"at": "2026-10-10T05:39:12.568424+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.89, "gpu_pct": 13, "gpu_used_mib": 2040, "profile": "cpu-only-4", "ram_mib": 2302.98}
+{"at": "2026-10-10T05:39:15.592935+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.76, "gpu_pct": 1, "gpu_used_mib": 2036, "profile": "cpu-only-4", "ram_mib": 2302.98}
+{"at": "2026-10-10T05:39:17.960992+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.64, "gpu_pct": 5, "gpu_used_mib": 1995, "profile": "cpu-only-4", "ram_mib": 2304.0}
+{"at": "2026-10-10T05:39:20.343344+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.85, "gpu_pct": 1, "gpu_used_mib": 1995, "profile": "cpu-only-4", "ram_mib": 2304.0}
+{"at": "2026-10-10T05:39:22.750579+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.18, "gpu_pct": 1, "gpu_used_mib": 2004, "profile": "cpu-only-4", "ram_mib": 2329.6}
+{"at": "2026-10-10T05:39:25.778570+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.2, "gpu_pct": 9, "gpu_used_mib": 2084, "profile": "cpu-only-4", "ram_mib": 2330.62}
+{"at": "2026-10-10T05:39:28.245390+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.98, "gpu_pct": 1, "gpu_used_mib": 2001, "profile": "cpu-only-4", "ram_mib": 2331.65}
+{"at": "2026-10-10T05:39:30.652919+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.74, "gpu_pct": 7, "gpu_used_mib": 2006, "profile": "cpu-only-4", "ram_mib": 2331.65}
+{"at": "2026-10-10T05:39:33.088422+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.22, "gpu_pct": 2, "gpu_used_mib": 1990, "profile": "cpu-only-4", "ram_mib": 2360.32}
+{"at": "2026-10-10T05:39:36.105011+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.6, "gpu_pct": 0, "gpu_used_mib": 1991, "profile": "cpu-only-4", "ram_mib": 2361.34}
+{"at": "2026-10-10T05:39:38.511004+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.55, "gpu_pct": 0, "gpu_used_mib": 1990, "profile": "cpu-only-4", "ram_mib": 2361.34}
+{"at": "2026-10-10T05:39:40.888332+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.41, "gpu_pct": 1, "gpu_used_mib": 1988, "profile": "cpu-only-4", "ram_mib": 2363.39}
+{"at": "2026-10-10T05:39:43.318801+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.79, "gpu_pct": 2, "gpu_used_mib": 1979, "profile": "cpu-only-4", "ram_mib": 2363.39}
+{"at": "2026-10-10T05:39:45.689091+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.27, "gpu_pct": 1, "gpu_used_mib": 1970, "profile": "cpu-only-4", "ram_mib": 2363.39}
+{"at": "2026-10-10T05:39:48.080770+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 394.96, "gpu_pct": 1, "gpu_used_mib": 1970, "profile": "cpu-only-4", "ram_mib": 2390.02}
+{"at": "2026-10-10T05:39:50.462227+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 399.81, "gpu_pct": 2, "gpu_used_mib": 1979, "profile": "cpu-only-4", "ram_mib": 2391.04}
+{"at": "2026-10-10T05:39:52.892945+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.88, "gpu_pct": 2, "gpu_used_mib": 1981, "profile": "cpu-only-4", "ram_mib": 2391.04}
+{"at": "2026-10-10T05:39:55.403811+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 395.1, "gpu_pct": 2, "gpu_used_mib": 1980, "profile": "cpu-only-4", "ram_mib": 2392.06}
+{"at": "2026-10-10T05:39:57.850118+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 397.6, "gpu_pct": 1, "gpu_used_mib": 1976, "profile": "cpu-only-4", "ram_mib": 2412.54}
+{"at": "2026-10-10T05:40:00.424134+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 392.42, "gpu_pct": 1, "gpu_used_mib": 2023, "profile": "cpu-only-4", "ram_mib": 2416.64}
+{"at": "2026-10-10T05:40:02.892501+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 396.68, "gpu_pct": 3, "gpu_used_mib": 2032, "profile": "cpu-only-4", "ram_mib": 2416.64}
+{"at": "2026-10-10T05:40:05.310159+00:00", "container": "iris-bench-50284b8056af", "cpu_pct": 121.66, "gpu_pct": 1, "gpu_used_mib": 1986, "profile": "cpu-only-4", "ram_mib": 2417.66}
+{"at": "2026-10-10T05:40:28.821645+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 112.48, "gpu_pct": 1, "gpu_used_mib": 1996, "profile": "cpu-only-8", "ram_mib": 857.7}
+{"at": "2026-10-10T05:40:31.161203+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 484.03, "gpu_pct": 1, "gpu_used_mib": 1996, "profile": "cpu-only-8", "ram_mib": 1637.38}
+{"at": "2026-10-10T05:40:33.578733+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 756.83, "gpu_pct": 2, "gpu_used_mib": 2053, "profile": "cpu-only-8", "ram_mib": 1759.23}
+{"at": "2026-10-10T05:40:36.025296+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 385.67, "gpu_pct": 1, "gpu_used_mib": 2039, "profile": "cpu-only-8", "ram_mib": 1268.74}
+{"at": "2026-10-10T05:40:38.387093+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 375.79, "gpu_pct": 2, "gpu_used_mib": 2004, "profile": "cpu-only-8", "ram_mib": 2342.91}
+{"at": "2026-10-10T05:40:40.765370+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 386.36, "gpu_pct": 14, "gpu_used_mib": 1978, "profile": "cpu-only-8", "ram_mib": 2507.78}
+{"at": "2026-10-10T05:40:43.169757+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.05, "gpu_pct": 10, "gpu_used_mib": 2005, "profile": "cpu-only-8", "ram_mib": 2507.78}
+{"at": "2026-10-10T05:40:45.591539+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 374.32, "gpu_pct": 7, "gpu_used_mib": 2002, "profile": "cpu-only-8", "ram_mib": 2507.78}
+{"at": "2026-10-10T05:40:47.949943+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 382.99, "gpu_pct": 1, "gpu_used_mib": 2003, "profile": "cpu-only-8", "ram_mib": 2508.8}
+{"at": "2026-10-10T05:40:50.336097+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 382.11, "gpu_pct": 2, "gpu_used_mib": 2002, "profile": "cpu-only-8", "ram_mib": 2508.8}
+{"at": "2026-10-10T05:40:52.689437+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 383.07, "gpu_pct": 1, "gpu_used_mib": 1998, "profile": "cpu-only-8", "ram_mib": 2508.8}
+{"at": "2026-10-10T05:40:55.021878+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.43, "gpu_pct": 15, "gpu_used_mib": 1998, "profile": "cpu-only-8", "ram_mib": 2562.05}
+{"at": "2026-10-10T05:40:57.395985+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.69, "gpu_pct": 1, "gpu_used_mib": 1995, "profile": "cpu-only-8", "ram_mib": 2562.05}
+{"at": "2026-10-10T05:40:59.780841+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.96, "gpu_pct": 1, "gpu_used_mib": 1969, "profile": "cpu-only-8", "ram_mib": 2561.02}
+{"at": "2026-10-10T05:41:02.158537+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.26, "gpu_pct": 1, "gpu_used_mib": 1968, "profile": "cpu-only-8", "ram_mib": 2562.05}
+{"at": "2026-10-10T05:41:04.537836+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.67, "gpu_pct": 1, "gpu_used_mib": 1968, "profile": "cpu-only-8", "ram_mib": 2562.05}
+{"at": "2026-10-10T05:41:06.917424+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 399.18, "gpu_pct": 1, "gpu_used_mib": 1968, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:09.309854+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.45, "gpu_pct": 1, "gpu_used_mib": 1974, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:11.735465+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.99, "gpu_pct": 5, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:14.141412+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.17, "gpu_pct": 6, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:16.531725+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.28, "gpu_pct": 0, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:18.917760+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.7, "gpu_pct": 8, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:21.400394+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.9, "gpu_pct": 3, "gpu_used_mib": 2055, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:23.787878+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.39, "gpu_pct": 3, "gpu_used_mib": 1996, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:26.180358+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.68, "gpu_pct": 1, "gpu_used_mib": 1956, "profile": "cpu-only-8", "ram_mib": 2563.07}
+{"at": "2026-10-10T05:41:28.646845+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.79, "gpu_pct": 9, "gpu_used_mib": 1950, "profile": "cpu-only-8", "ram_mib": 2576.38}
+{"at": "2026-10-10T05:41:31.023116+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.45, "gpu_pct": 2, "gpu_used_mib": 1949, "profile": "cpu-only-8", "ram_mib": 2576.38}
+{"at": "2026-10-10T05:41:33.457472+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 399.64, "gpu_pct": 1, "gpu_used_mib": 1948, "profile": "cpu-only-8", "ram_mib": 2576.38}
+{"at": "2026-10-10T05:41:35.896731+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.28, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 2589.7}
+{"at": "2026-10-10T05:41:38.282811+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.65, "gpu_pct": 1, "gpu_used_mib": 1980, "profile": "cpu-only-8", "ram_mib": 2589.7}
+{"at": "2026-10-10T05:41:40.673790+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.78, "gpu_pct": 1, "gpu_used_mib": 1988, "profile": "cpu-only-8", "ram_mib": 2589.7}
+{"at": "2026-10-10T05:41:43.097260+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.59, "gpu_pct": 1, "gpu_used_mib": 1983, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:41:45.488844+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.17, "gpu_pct": 2, "gpu_used_mib": 1949, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:41:47.855065+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.72, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:41:50.282240+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.97, "gpu_pct": 3, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:41:52.679798+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.51, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:41:55.105702+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.91, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:41:57.508729+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.69, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:41:59.934806+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.77, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:42:02.355948+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.94, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:42:04.716438+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 391.23, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:42:07.088167+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 347.35, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1828.86}
+{"at": "2026-10-10T05:42:09.509326+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 361.95, "gpu_pct": 2, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 1867.78}
+{"at": "2026-10-10T05:42:11.880754+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 389.19, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 1870.85}
+{"at": "2026-10-10T05:42:14.257770+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 353.78, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1490.94}
+{"at": "2026-10-10T05:42:16.662658+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 383.11, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2515.97}
+{"at": "2026-10-10T05:42:19.031752+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 378.12, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2408.45}
+{"at": "2026-10-10T05:42:21.398109+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 373.0, "gpu_pct": 3, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2321.41}
+{"at": "2026-10-10T05:42:23.769964+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 380.15, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2523.14}
+{"at": "2026-10-10T05:42:26.166627+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 386.51, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2530.3}
+{"at": "2026-10-10T05:42:28.552583+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 368.29, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2412.54}
+{"at": "2026-10-10T05:42:30.920908+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 385.34, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2320.38}
+{"at": "2026-10-10T05:42:33.278711+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.19, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1743.87}
+{"at": "2026-10-10T05:42:35.692716+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.75, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1744.9}
+{"at": "2026-10-10T05:42:38.118699+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.58, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1745.92}
+{"at": "2026-10-10T05:42:40.523814+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.71, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1746.94}
+{"at": "2026-10-10T05:42:42.878410+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.82, "gpu_pct": 3, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 1746.94}
+{"at": "2026-10-10T05:42:45.273511+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.52, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 1747.97}
+{"at": "2026-10-10T05:42:47.756968+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.2, "gpu_pct": 2, "gpu_used_mib": 1951, "profile": "cpu-only-8", "ram_mib": 1766.4}
+{"at": "2026-10-10T05:42:50.284893+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.18, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 1771.52}
+{"at": "2026-10-10T05:42:52.693430+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.3, "gpu_pct": 1, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 1799.17}
+{"at": "2026-10-10T05:42:55.167640+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.73, "gpu_pct": 3, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1800.19}
+{"at": "2026-10-10T05:42:57.604486+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 399.43, "gpu_pct": 1, "gpu_used_mib": 1937, "profile": "cpu-only-8", "ram_mib": 1800.19}
+{"at": "2026-10-10T05:43:00.105774+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.76, "gpu_pct": 1, "gpu_used_mib": 1947, "profile": "cpu-only-8", "ram_mib": 1803.26}
+{"at": "2026-10-10T05:43:02.624060+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.26, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 1803.26}
+{"at": "2026-10-10T05:43:05.066467+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.08, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1803.26}
+{"at": "2026-10-10T05:43:07.596301+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.18, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1803.26}
+{"at": "2026-10-10T05:43:10.061755+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.2, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 1803.26}
+{"at": "2026-10-10T05:43:12.499481+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.45, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1803.26}
+{"at": "2026-10-10T05:43:14.892613+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.69, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 1831.94}
+{"at": "2026-10-10T05:43:17.260788+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.55, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1831.94}
+{"at": "2026-10-10T05:43:19.638178+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.21, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1832.96}
+{"at": "2026-10-10T05:43:22.110837+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.4, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1833.98}
+{"at": "2026-10-10T05:43:24.477264+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.38, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1864.7}
+{"at": "2026-10-10T05:43:26.879530+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 401.16, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1864.7}
+{"at": "2026-10-10T05:43:29.884829+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.59, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1864.7}
+{"at": "2026-10-10T05:43:32.278149+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.46, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 1864.7}
+{"at": "2026-10-10T05:43:34.669513+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.13, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 1864.7}
+{"at": "2026-10-10T05:43:37.082373+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 391.97, "gpu_pct": 4, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1864.7}
+{"at": "2026-10-10T05:43:39.472632+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.58, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 1905.66}
+{"at": "2026-10-10T05:43:41.844552+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.14, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1906.69}
+{"at": "2026-10-10T05:43:44.247591+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.62, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 1906.69}
+{"at": "2026-10-10T05:43:46.657100+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 69.39, "gpu_pct": 1, "gpu_used_mib": 1937, "profile": "cpu-only-8", "ram_mib": 1509.38}
+{"at": "2026-10-10T05:43:49.014155+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 735.42, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1817.6}
+{"at": "2026-10-10T05:43:51.517848+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 383.72, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 1469.44}
+{"at": "2026-10-10T05:43:53.907312+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 344.44, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2275.33}
+{"at": "2026-10-10T05:43:56.286284+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 369.08, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2030.59}
+{"at": "2026-10-10T05:43:58.728070+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 384.28, "gpu_pct": 1, "gpu_used_mib": 1937, "profile": "cpu-only-8", "ram_mib": 2637.82}
+{"at": "2026-10-10T05:44:01.136785+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 382.26, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2639.87}
+{"at": "2026-10-10T05:44:03.494972+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 382.99, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2639.87}
+{"at": "2026-10-10T05:44:05.860808+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 377.85, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2639.87}
+{"at": "2026-10-10T05:44:08.248334+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 379.21, "gpu_pct": 1, "gpu_used_mib": 1937, "profile": "cpu-only-8", "ram_mib": 2638.85}
+{"at": "2026-10-10T05:44:10.622643+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.39, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2701.31}
+{"at": "2026-10-10T05:44:13.062618+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 391.24, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2701.31}
+{"at": "2026-10-10T05:44:15.460440+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.95, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2703.36}
+{"at": "2026-10-10T05:44:17.886242+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.48, "gpu_pct": 2, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2706.43}
+{"at": "2026-10-10T05:44:20.309798+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.97, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2706.43}
+{"at": "2026-10-10T05:44:22.713221+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.05, "gpu_pct": 1, "gpu_used_mib": 1940, "profile": "cpu-only-8", "ram_mib": 2706.43}
+{"at": "2026-10-10T05:44:25.129954+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.19, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2712.58}
+{"at": "2026-10-10T05:44:27.542631+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.21, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2718.72}
+{"at": "2026-10-10T05:44:29.914665+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.09, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2729.98}
+{"at": "2026-10-10T05:44:32.369411+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.49, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2729.98}
+{"at": "2026-10-10T05:44:34.945648+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 403.46, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2731.01}
+{"at": "2026-10-10T05:44:37.535662+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 401.17, "gpu_pct": 1, "gpu_used_mib": 1935, "profile": "cpu-only-8", "ram_mib": 2757.63}
+{"at": "2026-10-10T05:44:40.039770+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.55, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2760.7}
+{"at": "2026-10-10T05:44:42.574534+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.97, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2761.73}
+{"at": "2026-10-10T05:44:44.970788+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.53, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2762.75}
+{"at": "2026-10-10T05:44:47.419920+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.71, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2762.75}
+{"at": "2026-10-10T05:44:49.855532+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.76, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2762.75}
+{"at": "2026-10-10T05:44:52.249849+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.18, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2790.4}
+{"at": "2026-10-10T05:44:54.666626+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.14, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2791.42}
+{"at": "2026-10-10T05:44:57.111826+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.96, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2792.45}
+{"at": "2026-10-10T05:44:59.549444+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.29, "gpu_pct": 1, "gpu_used_mib": 1947, "profile": "cpu-only-8", "ram_mib": 2792.45}
+{"at": "2026-10-10T05:45:01.929563+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 400.4, "gpu_pct": 2, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 2794.5}
+{"at": "2026-10-10T05:45:04.326920+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 391.27, "gpu_pct": 1, "gpu_used_mib": 1934, "profile": "cpu-only-8", "ram_mib": 2794.5}
+{"at": "2026-10-10T05:45:06.711551+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.83, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2794.5}
+{"at": "2026-10-10T05:45:09.114787+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.19, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2802.69}
+{"at": "2026-10-10T05:45:11.502606+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.96, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2802.69}
+{"at": "2026-10-10T05:45:13.878758+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.85, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2802.69}
+{"at": "2026-10-10T05:45:16.258375+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 389.82, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2802.69}
+{"at": "2026-10-10T05:45:18.662116+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.93, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2832.38}
+{"at": "2026-10-10T05:45:21.066476+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.35, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2833.41}
+{"at": "2026-10-10T05:45:23.461864+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 17.32, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2834.43}
+{"at": "2026-10-10T05:45:25.851316+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 365.45, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1670.14}
+{"at": "2026-10-10T05:45:28.242248+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 762.34, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2025.47}
+{"at": "2026-10-10T05:45:30.731048+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 376.52, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 1575.94}
+{"at": "2026-10-10T05:45:33.072347+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 362.56, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2292.74}
+{"at": "2026-10-10T05:45:35.467428+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 354.58, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2154.5}
+{"at": "2026-10-10T05:45:37.845662+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 370.02, "gpu_pct": 2, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2626.56}
+{"at": "2026-10-10T05:45:40.225674+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 375.07, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2360.32}
+{"at": "2026-10-10T05:45:42.649081+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 384.38, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2629.63}
+{"at": "2026-10-10T05:45:45.040231+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 387.13, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2630.66}
+{"at": "2026-10-10T05:45:47.457006+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 383.51, "gpu_pct": 4, "gpu_used_mib": 1945, "profile": "cpu-only-8", "ram_mib": 2629.63}
+{"at": "2026-10-10T05:45:49.869177+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.64, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2675.71}
+{"at": "2026-10-10T05:45:52.266124+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.52, "gpu_pct": 1, "gpu_used_mib": 1949, "profile": "cpu-only-8", "ram_mib": 2685.95}
+{"at": "2026-10-10T05:45:54.693525+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.2, "gpu_pct": 1, "gpu_used_mib": 1949, "profile": "cpu-only-8", "ram_mib": 2686.98}
+{"at": "2026-10-10T05:45:57.105545+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.9, "gpu_pct": 4, "gpu_used_mib": 1949, "profile": "cpu-only-8", "ram_mib": 2689.02}
+{"at": "2026-10-10T05:45:59.548969+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.25, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2689.02}
+{"at": "2026-10-10T05:46:01.992351+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.16, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2689.02}
+{"at": "2026-10-10T05:46:04.606225+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.17, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2689.02}
+{"at": "2026-10-10T05:46:07.237101+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.72, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2709.5}
+{"at": "2026-10-10T05:46:09.709840+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.94, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2709.5}
+{"at": "2026-10-10T05:46:12.284665+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.94, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2709.5}
+{"at": "2026-10-10T05:46:14.842444+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.46, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2736.13}
+{"at": "2026-10-10T05:46:17.233152+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.89, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2740.22}
+{"at": "2026-10-10T05:46:19.637176+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.37, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2741.25}
+{"at": "2026-10-10T05:46:22.066322+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 391.76, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2741.25}
+{"at": "2026-10-10T05:46:24.473678+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 398.91, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2741.25}
+{"at": "2026-10-10T05:46:26.878236+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.67, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2767.87}
+{"at": "2026-10-10T05:46:29.249355+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.64, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2767.87}
+{"at": "2026-10-10T05:46:31.685530+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.19, "gpu_pct": 1, "gpu_used_mib": 1933, "profile": "cpu-only-8", "ram_mib": 2767.87}
+{"at": "2026-10-10T05:46:34.110799+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.27, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2771.97}
+{"at": "2026-10-10T05:46:36.533114+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.7, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2771.97}
+{"at": "2026-10-10T05:46:38.931307+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.76, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2771.97}
+{"at": "2026-10-10T05:46:41.306805+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 394.11, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2777.09}
+{"at": "2026-10-10T05:46:43.657123+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 393.68, "gpu_pct": 1, "gpu_used_mib": 1937, "profile": "cpu-only-8", "ram_mib": 2777.09}
+{"at": "2026-10-10T05:46:46.046002+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.01, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2777.09}
+{"at": "2026-10-10T05:46:48.426363+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.58, "gpu_pct": 1, "gpu_used_mib": 1946, "profile": "cpu-only-8", "ram_mib": 2777.09}
+{"at": "2026-10-10T05:46:50.818932+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 397.2, "gpu_pct": 1, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2806.78}
+{"at": "2026-10-10T05:46:53.224417+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 392.84, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2806.78}
+{"at": "2026-10-10T05:46:55.615503+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 399.42, "gpu_pct": 1, "gpu_used_mib": 1938, "profile": "cpu-only-8", "ram_mib": 2806.78}
+{"at": "2026-10-10T05:46:58.010441+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 390.81, "gpu_pct": 10, "gpu_used_mib": 1947, "profile": "cpu-only-8", "ram_mib": 2821.12}
+{"at": "2026-10-10T05:47:00.430035+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 395.92, "gpu_pct": 1, "gpu_used_mib": 1949, "profile": "cpu-only-8", "ram_mib": 2825.22}
+{"at": "2026-10-10T05:47:02.822603+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 396.19, "gpu_pct": 1, "gpu_used_mib": 1941, "profile": "cpu-only-8", "ram_mib": 2825.22}
+{"at": "2026-10-10T05:47:05.213157+00:00", "container": "iris-bench-93e4262824ea", "cpu_pct": 1.05, "gpu_pct": 2, "gpu_used_mib": 1944, "profile": "cpu-only-8", "ram_mib": 2829.31}
+{"at": "2026-10-10T05:47:29.066181+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.08, "gpu_delta_mib": 802, "gpu_pct": 1, "gpu_used_mib": 2740, "profile": "baseline-end", "ram_mib": 866.8}
+{"at": "2026-10-10T05:47:31.403875+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 103.23, "gpu_delta_mib": 1301, "gpu_pct": 1, "gpu_used_mib": 3239, "profile": "baseline-end", "ram_mib": 933.1}
+{"at": "2026-10-10T05:47:33.755962+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 117.56, "gpu_delta_mib": 1523, "gpu_pct": 5, "gpu_used_mib": 3461, "profile": "baseline-end", "ram_mib": 931.4}
+{"at": "2026-10-10T05:47:36.119171+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 97.46, "gpu_delta_mib": 1698, "gpu_pct": 5, "gpu_used_mib": 3636, "profile": "baseline-end", "ram_mib": 1002.0}
+{"at": "2026-10-10T05:47:38.474063+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.18, "gpu_delta_mib": 1689, "gpu_pct": 1, "gpu_used_mib": 3627, "profile": "baseline-end", "ram_mib": 1204.22}
+{"at": "2026-10-10T05:47:40.804745+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.55, "gpu_delta_mib": 1700, "gpu_pct": 4, "gpu_used_mib": 3638, "profile": "baseline-end", "ram_mib": 1307.65}
+{"at": "2026-10-10T05:47:43.147776+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.97, "gpu_delta_mib": 1753, "gpu_pct": 2, "gpu_used_mib": 3691, "profile": "baseline-end", "ram_mib": 1415.17}
+{"at": "2026-10-10T05:47:45.530057+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 100.4, "gpu_delta_mib": 1759, "gpu_pct": 1, "gpu_used_mib": 3697, "profile": "baseline-end", "ram_mib": 1454.08}
+{"at": "2026-10-10T05:47:47.949423+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.54, "gpu_delta_mib": 1784, "gpu_pct": 5, "gpu_used_mib": 3722, "profile": "baseline-end", "ram_mib": 1523.71}
+{"at": "2026-10-10T05:47:50.421020+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.28, "gpu_delta_mib": 1783, "gpu_pct": 2, "gpu_used_mib": 3721, "profile": "baseline-end", "ram_mib": 1697.79}
+{"at": "2026-10-10T05:47:52.856795+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 104.74, "gpu_delta_mib": 2211, "gpu_pct": 30, "gpu_used_mib": 4149, "profile": "baseline-end", "ram_mib": 2195.46}
+{"at": "2026-10-10T05:47:55.370013+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 96.14, "gpu_delta_mib": 2290, "gpu_pct": 6, "gpu_used_mib": 4228, "profile": "baseline-end", "ram_mib": 2700.29}
+{"at": "2026-10-10T05:47:58.339044+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.55, "gpu_delta_mib": 2961, "gpu_pct": 18, "gpu_used_mib": 4899, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:01.044435+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.39, "gpu_delta_mib": 2975, "gpu_pct": 17, "gpu_used_mib": 4913, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:03.432346+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.43, "gpu_delta_mib": 2960, "gpu_pct": 22, "gpu_used_mib": 4898, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:05.835128+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.18, "gpu_delta_mib": 2965, "gpu_pct": 23, "gpu_used_mib": 4903, "profile": "baseline-end", "ram_mib": 2788.35}
+{"at": "2026-10-10T05:48:08.205268+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.88, "gpu_delta_mib": 2972, "gpu_pct": 25, "gpu_used_mib": 4910, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:10.577922+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.77, "gpu_delta_mib": 2965, "gpu_pct": 14, "gpu_used_mib": 4903, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:13.054305+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.3, "gpu_delta_mib": 2972, "gpu_pct": 18, "gpu_used_mib": 4910, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:15.493299+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.55, "gpu_delta_mib": 2965, "gpu_pct": 12, "gpu_used_mib": 4903, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:17.886916+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.14, "gpu_delta_mib": 2965, "gpu_pct": 16, "gpu_used_mib": 4903, "profile": "baseline-end", "ram_mib": 2787.33}
+{"at": "2026-10-10T05:48:20.290334+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 1.59, "gpu_delta_mib": 2974, "gpu_pct": 2, "gpu_used_mib": 4912, "profile": "baseline-end", "ram_mib": 2788.35}
+{"at": "2026-10-10T05:48:22.695668+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.66, "gpu_delta_mib": 2977, "gpu_pct": 1, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 3151.87}
+{"at": "2026-10-10T05:48:25.072280+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.63, "gpu_delta_mib": 2984, "gpu_pct": 17, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:27.498362+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 100.01, "gpu_delta_mib": 2977, "gpu_pct": 17, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:29.879084+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.96, "gpu_delta_mib": 2984, "gpu_pct": 9, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:32.278530+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.26, "gpu_delta_mib": 2984, "gpu_pct": 23, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:34.675758+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.77, "gpu_delta_mib": 2977, "gpu_pct": 16, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:37.046417+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.26, "gpu_delta_mib": 2984, "gpu_pct": 19, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:39.449335+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.3, "gpu_delta_mib": 2973, "gpu_pct": 15, "gpu_used_mib": 4911, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:41.820863+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.7, "gpu_delta_mib": 2989, "gpu_pct": 24, "gpu_used_mib": 4927, "profile": "baseline-end", "ram_mib": 2547.71}
+{"at": "2026-10-10T05:48:44.296610+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 0.2, "gpu_delta_mib": 2978, "gpu_pct": 1, "gpu_used_mib": 4916, "profile": "baseline-end", "ram_mib": 2568.19}
+{"at": "2026-10-10T05:48:46.653746+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 100.53, "gpu_delta_mib": 2985, "gpu_pct": 1, "gpu_used_mib": 4923, "profile": "baseline-end", "ram_mib": 2814.98}
+{"at": "2026-10-10T05:48:49.112363+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.14, "gpu_delta_mib": 2984, "gpu_pct": 18, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 3036.16}
+{"at": "2026-10-10T05:48:51.581802+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 100.14, "gpu_delta_mib": 2977, "gpu_pct": 18, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:48:53.987837+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.87, "gpu_delta_mib": 2984, "gpu_pct": 23, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:48:56.366231+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.39, "gpu_delta_mib": 2977, "gpu_pct": 13, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:48:58.775513+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.23, "gpu_delta_mib": 2973, "gpu_pct": 17, "gpu_used_mib": 4911, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:49:01.169080+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.56, "gpu_delta_mib": 2984, "gpu_pct": 19, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:49:03.566716+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 100.08, "gpu_delta_mib": 2977, "gpu_pct": 17, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:49:06.034770+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.83, "gpu_delta_mib": 2984, "gpu_pct": 18, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:49:08.768879+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.8, "gpu_delta_mib": 2984, "gpu_pct": 19, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 3035.14}
+{"at": "2026-10-10T05:49:11.309481+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 54.68, "gpu_delta_mib": 2977, "gpu_pct": 57, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 2636.8}
+{"at": "2026-10-10T05:49:13.823788+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 100.26, "gpu_delta_mib": 2984, "gpu_pct": 1, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 3056.64}
+{"at": "2026-10-10T05:49:16.269843+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 100.12, "gpu_delta_mib": 2978, "gpu_pct": 21, "gpu_used_mib": 4916, "profile": "baseline-end", "ram_mib": 2725.89}
+{"at": "2026-10-10T05:49:18.760823+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.33, "gpu_delta_mib": 2977, "gpu_pct": 22, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:49:21.200122+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.81, "gpu_delta_mib": 2984, "gpu_pct": 25, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:49:23.595653+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.31, "gpu_delta_mib": 2977, "gpu_pct": 15, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 2590.72}
+{"at": "2026-10-10T05:49:25.998548+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 99.41, "gpu_delta_mib": 2984, "gpu_pct": 20, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2589.7}
+{"at": "2026-10-10T05:49:28.404715+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.67, "gpu_delta_mib": 2985, "gpu_pct": 18, "gpu_used_mib": 4923, "profile": "baseline-end", "ram_mib": 2589.7}
+{"at": "2026-10-10T05:49:30.802521+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 97.66, "gpu_delta_mib": 2977, "gpu_pct": 17, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 2589.7}
+{"at": "2026-10-10T05:49:33.191749+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 98.59, "gpu_delta_mib": 2984, "gpu_pct": 20, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2589.7}
+{"at": "2026-10-10T05:49:35.592248+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 69.21, "gpu_delta_mib": 2977, "gpu_pct": 1, "gpu_used_mib": 4915, "profile": "baseline-end", "ram_mib": 2613.25}
+{"at": "2026-10-10T05:49:37.974976+00:00", "container": "iris-bench-bd98396c9b0c", "cpu_pct": 3.12, "gpu_delta_mib": 2984, "gpu_pct": 1, "gpu_used_mib": 4922, "profile": "baseline-end", "ram_mib": 2614.27}
