@@ -31,7 +31,7 @@ from core.enums import (
 from core.permissions import may_read_review
 
 from .test_office_review import OfficeReviewTestBase
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 
 class ReviewPrivacyTestBase(OfficeReviewTestBase):

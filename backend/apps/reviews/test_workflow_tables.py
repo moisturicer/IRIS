@@ -1,17 +1,12 @@
 """
-IR-256: the reviewer-directed routing tables, added beside the current pipeline.
+IR-256: reviewer-directed routing table constraints retained after IR-260.
 
-This is the expand step of ADR-021's expand–contract sequence
-(`docs/workflow_routing_architecture.md` §7). `RecordAssignment`, `RoutingEvent`
-and `ResubmissionRequest` exist, and `Review` can point at the assignment it
-was made under. **Nothing writes to them yet**: IR-257 dual-writes, and IR-260
-makes them authoritative. So these tests pin two things only:
+These tests pin the schema invariants carried through the cutover:
 
 - **the constraints the tables carry.** At most one *active* assignment per
   Record and party, enforced by the database rather than by whichever service
   remembers to check;
-- **that nothing behaves differently yet.** The new vocabulary values exist,
-  but no endpoint accepts them.
+- **the vocabulary fits its columns.**
 
 The migration itself, applied over existing rows, is tested separately in
 `test_workflow_tables_migration.py`.
@@ -22,7 +17,6 @@ import uuid
 from django.db import IntegrityError, transaction
 from django.db.models import RestrictedError
 from django.test import TestCase
-from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
@@ -258,33 +252,3 @@ class VocabularyIsAddedBesideTheOldTests(TestCase):
             len(ClearanceStatus.NOT_CLEARED),
             RecordClearance._meta.get_field("status").max_length,
         )
-
-
-class NoEndpointAcceptsTheNewValuesYetTests(APITestCase):
-    """
-    Expand means nothing behaves differently. `ReviewWriteSerializer` validated
-    `status` against every `ReviewDecision` value, so adding `negative_finding`
-    to the enum would have made `/reviews/submit/` accept it and route it down
-    the decline branch.
-    """
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.owner = _user("ir256-api-owner@cit.edu", RoleName.STUDENT)
-        cls.rdco = _user("ir256-api-rdco@cit.edu")
-
-    def test_a_negative_finding_cannot_be_submitted_before_its_behaviour_exists(self):
-        record = _record(self.owner)
-        self.client.force_authenticate(self.rdco)
-
-        response = self.client.post(
-            "/api/v1/reviews/submit/",
-            {"record_id": record.pk, "status": "negative_finding", "comment": "x"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("status", response.data)
-        record.refresh_from_db()
-        self.assertEqual(record.pipeline_status, "rdco_intake")
-        self.assertFalse(Review.objects.filter(record=record).exists())

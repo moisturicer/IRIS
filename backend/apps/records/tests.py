@@ -15,7 +15,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
-from apps.reviews.models import RecordClearance
+from apps.notifications.models import Notification
+from apps.reviews.models import RecordAssignment, RecordClearance, ReviewerSeat
+from apps.records.models import RecordVersion
 from .models import DeleteRequest, Record, RecordOwner, RecordType
 
 
@@ -43,10 +45,11 @@ class SubmitOwnershipTests(APITestCase):
         self.owner   = make_user("owner@cit.edu", "Student")
         self.other   = make_user("other@cit.edu", "Student")
         self.rdco    = make_user("rdco@cit.edu", "RDCO")
+        self.adviser = make_user("adviser@cit.edu", "Adviser")
 
         self.record = Record.objects.create(
             title="A" * 10, abstract="B" * 40, record_type=self.record_type,
-            added_by=self.owner, pipeline_status="draft",
+            added_by=self.owner, adviser=self.adviser, pipeline_status="draft",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
 
@@ -69,12 +72,59 @@ class SubmitOwnershipTests(APITestCase):
         response = self._submit()
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()
-        self.assertEqual(self.record.pipeline_status, "rdco_intake")
+        self.assertEqual(self.record.pipeline_status, "in_review")
+        assignment = RecordAssignment.objects.get(record=self.record, state="active")
+        self.assertEqual(assignment.party, "adviser")
+        self.assertTrue(ReviewerSeat.objects.filter(
+            assignment=assignment, reviewer=self.adviser, source="entry"
+        ).exists())
+        self.assertEqual(RecordVersion.objects.filter(record=self.record).count(), 1)
+        self.assertFalse(RecordAssignment.objects.filter(record=self.record, party="intake").exists())
+        notice = Notification.objects.get(record=self.record)
+        self.assertEqual(notice.recipient, self.adviser)
+        self.assertIsNone(notice.broadcast_to_role)
+        self.assertNotIn("intake", notice.message.lower())
 
     def test_staff_can_submit_someone_elses_draft(self):
         self.client.force_authenticate(self.rdco)
         response = self._submit()
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_missing_adviser_is_refused_without_consent_or_workflow_writes(self):
+        self.record.adviser = None
+        self.record.save(update_fields=["adviser"])
+        self.client.force_authenticate(self.owner)
+        response = self._submit()
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, "draft")
+        self.assertIsNone(self.record.dpa_accepted_at)
+        self.assertFalse(RecordAssignment.objects.filter(record=self.record).exists())
+
+    def test_owner_cannot_be_the_adviser(self):
+        self.record.adviser = self.owner
+        self.record.save(update_fields=["adviser"])
+        self.client.force_authenticate(self.owner)
+        response = self._submit()
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(RecordAssignment.objects.filter(record=self.record).exists())
+
+    def test_submit_cannot_resubmit_a_declined_record(self):
+        self.record.pipeline_status = "declined"
+        self.record.save(update_fields=["pipeline_status"])
+        self.client.force_authenticate(self.owner)
+        response = self._submit()
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_submitting_twice_creates_only_one_entry_and_version(self):
+        self.client.force_authenticate(self.owner)
+        self.assertEqual(self._submit().status_code, status.HTTP_200_OK)
+
+        response = self._submit()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(RecordAssignment.objects.filter(record=self.record).count(), 1)
+        self.assertEqual(RecordVersion.objects.filter(record=self.record).count(), 1)
 
     def test_non_owner_non_staff_cannot_submit_someone_elses_draft(self):
         """
@@ -614,9 +664,10 @@ class DpaConsentAtSubmitTests(APITestCase):
     def setUp(self):
         self.record_type = RecordType.objects.get_or_create(name="Thesis / Research")[0]
         self.owner = make_user("dpa-owner@cit.edu", "Student")
+        self.adviser = make_user("dpa-adviser@cit.edu", "Adviser")
         self.record = Record.objects.create(
             title="C" * 10, abstract="D" * 40, record_type=self.record_type,
-            added_by=self.owner, pipeline_status="draft",
+            added_by=self.owner, adviser=self.adviser, pipeline_status="draft",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
         self.url = reverse("record-submit", args=[self.record.id])
@@ -658,7 +709,7 @@ class DpaConsentAtSubmitTests(APITestCase):
         response = self._post({"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()
-        self.assertEqual(self.record.pipeline_status, "rdco_intake")
+        self.assertEqual(self.record.pipeline_status, "in_review")
         self.assertIsNotNone(self.record.dpa_accepted_at)
         self.assertEqual(self.record.dpa_accepted_by, self.owner)
         self.assertTrue(self.record.dpa_accepted)

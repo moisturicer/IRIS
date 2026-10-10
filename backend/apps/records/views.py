@@ -19,14 +19,10 @@ from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
     IPType,
     PipelineStatus,
-    RecordTypeName,
     RequestStatus,
-    ReviewStage,
     RoleName,
-    VersionCause,
 )
 from . import lifecycle
-from .versions import write_version
 from core.permissions import (
     IsAdmin,
     IsAdviser,
@@ -60,6 +56,7 @@ from apps.notifications.services import (
     notify_delete_declined,
 )
 from apps.audit.services import create_audit_event
+from apps.reviews.routing import RoutingError, enter_at_adviser
 
 
 class RecordViewSet(viewsets.ModelViewSet):
@@ -233,22 +230,18 @@ class RecordViewSet(viewsets.ModelViewSet):
         POST /records/<id>/submit/
 
         Transition a new draft record into the pipeline.
-        Routing depends on record type:
-          Proposal        -> adviser_review   (adviser notified)
-          Thesis/Research -> rdco_intake      (RDCO notified)
-          Project         -> rdco_intake      (RDCO notified)
+        Every record type enters review at its assigned Adviser.
 
         Rules:
           - Record must be in 'draft' status.
-          - Proposal: adviser must be assigned.
+          - An Adviser must be assigned and cannot own the record.
           - record_type must be set.
 
-        Also handles resubmission after revision ('declined' → owner fixes and resubmits).
-        'rejected' is the terminal state — rejected records cannot be resubmitted.
+        Revised work uses the dedicated resubmission action.
         """
         record = self.get_object()  # enforces IsOwnerOrStaff object permission
 
-        if record.pipeline_status not in (PipelineStatus.DRAFT, PipelineStatus.DECLINED):
+        if record.pipeline_status != PipelineStatus.DRAFT:
             return Response(
                 {"detail": f"Record is in '{record.pipeline_status}' status and cannot be submitted."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -260,17 +253,14 @@ class RecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        rt_name = record.record_type.name  # "Proposal" | "Thesis/Research" | "Project"
-
-        # A Proposal's first gate is its adviser, so it cannot enter the pipeline
-        # without one. This is a **precondition on submitting**, not routing --
-        # the destination is the table's (IR-136 stage 2), which is why the
-        # if/else that used to compute `first_status` here is gone rather than
-        # kept alongside it. Two places deciding where a submission lands is
-        # exactly the drift the table removes.
-        if rt_name == RecordTypeName.PROPOSAL and not record.adviser:
+        if not record.adviser_id:
             return Response(
-                {"detail": "An adviser must be assigned before a Proposal can be submitted."},
+                {"detail": "An adviser must be assigned before a record can be submitted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if record.owners.filter(user_id=record.adviser_id).exists():
+            return Response(
+                {"detail": "A record's adviser cannot also be one of its owners."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -295,28 +285,22 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = request.user
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-
-        # The move and the record's v1 are one write (ADR-032 §5, IR-416): a
-        # submitted record never lacks the version reviewers are handed.
-        with transaction.atomic():
-            lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, request.user)
-            write_version(record, request.user, VersionCause.SUBMISSION)
+        try:
+            # Consent, assignment, entry seat and v1 commit together.
+            with transaction.atomic():
+                if not record.dpa_accepted:
+                    record.dpa_accepted_at = timezone.now()
+                    record.dpa_accepted_by = request.user
+                    record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+                enter_at_adviser(record, actor=request.user)
+        except RoutingError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
 
-        # `.label` so the prose below stays single-sourced; lower() keeps the
-        # sentence reading "the adviser has been notified" exactly as before.
-        stage_label = (
-            ReviewStage.ADVISER.label.lower()
-            if rt_name == RecordTypeName.PROPOSAL
-            else RoleName.RDCO.label
-        )
         return Response(
-            {"detail": f"Record submitted successfully. The {stage_label} has been notified."},
+            {"detail": "Record submitted successfully. The adviser has been notified."},
             status=status.HTTP_200_OK,
         )
 

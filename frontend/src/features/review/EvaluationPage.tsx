@@ -63,7 +63,7 @@ const REJECTING_STAGES: ReadonlySet<PipelineStatus> = new Set<PipelineStatus>([
 function stageLabel(pipelineStatus: string): string {
   const map: Record<string, string> = {
     adviser_review:  "Adviser Review",
-    rdco_intake:     "RDCO Intake Review",
+    rdco_intake:     "Intake (retired)",
     itso_review:     "ITSO Technical Review",
     parallel_review: "Parallel Office Review",
     rdco_review:     "RDCO Final Review",

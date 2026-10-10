@@ -31,7 +31,7 @@ from core.enums import (
 
 from .test_my_reviews import MINE
 from .test_revisions import RevisionTestBase
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 COMMENT = "Sound method; nothing here needs an office."
 REASON = "The study duplicates a thesis already published in 2023."

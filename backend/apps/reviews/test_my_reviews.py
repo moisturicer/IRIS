@@ -28,7 +28,7 @@ from core.enums import (
 )
 
 from .test_routing import RoutingTestBase
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 MINE = "/api/v1/reviews/mine/"
 
@@ -293,7 +293,9 @@ class DoneTests(MyReviewsTestBase):
         record = self.legacy(PipelineStatus.ITSO_REVIEW)
         self.legacy_review(record, self.rdco, "rdco_intake", "approved")
         row = self.rows(self.rdco, tab="done")[0]
-        self.assertEqual((row["party"], row["party_label"], row["outcome"]), ("rdco", "RDCO Intake", "accepted"))
+        # Deliberately changed by IR-260: a historical intake review is labelled
+        # "Intake (retired)" (ADR-032 §13; the card's "Intake history" criterion).
+        self.assertEqual((row["party"], row["party_label"], row["outcome"]), ("rdco", "Intake (retired)", "accepted"))
 
     def test_a_seat_done_without_a_verdict_of_its_own_has_no_outcome(self):
         record = self.routed(Party.ITSO)

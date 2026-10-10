@@ -24,6 +24,7 @@ from django.utils import timezone
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordType
+from apps.reviews.workflow_test_helpers import purge_records_at_current_state
 from apps.reviews.models import (
     RecordClearance,
     ResubmissionRequest,
@@ -228,6 +229,7 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
         assert list(_assignments(_BEFORE).values_list("pk", flat=True)) == [existing.pk]
         assert ResubmissionRequest.objects.count() == 0
     finally:
+        purge_records_at_current_state()  # its own partial rows; IR-260
         call_command("migrate", verbosity=0)
 
 

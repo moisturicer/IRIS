@@ -33,7 +33,7 @@ from core.enums import (
     SeatState,
 )
 
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 
 def accept_url(record):

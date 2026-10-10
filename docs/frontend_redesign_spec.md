@@ -39,7 +39,7 @@ These restate [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.m
 15. **Clearance-aware resubmission is visible, not reimplemented.** The UI shows which clearances were preserved from server fields; it never computes them.
 16. **Every action is offered only when the server grants it** (capabilities, §4.8), and every endpoint re-checks.
 
-**During the transition** — until IR-260 cuts over — the live backend still runs the legacy pipeline, including RDCO intake for Thesis/Research and Project. The frontend therefore **reads current holders and labels from the server rather than asserting the ADR-032 flow in copy.** For example, Publish's success screen names whoever the server says now holds the record (§4.4); it does not hard-code "Sent to your adviser".
+**After IR-260's cutover**, new submissions of every record type enter at the assigned Adviser. The frontend still reads current holders and labels from the server because migrated history can include `Intake (retired)`.
 
 Sections 1–6 follow the project's `to-spec` template. The appendices hold what the request asked for beyond it:
 
@@ -362,7 +362,7 @@ At `md` and above it is a centred dialog up to 720 px wide. Below `md` it is a f
 **Step 2 — "Details".**
 
 - **Essential fields:** title, abstract, adviser (searchable, from the existing advisers endpoint), co-authors, year.
-- **More details** (a disclosure, closed by default): classification, PSCED, and "Flag for your adviser" hints (possible IP · human subjects · commercialisation). These are the existing `is_ip`, `requires_ethics_review` and `for_commercialization` fields. Under ADR-032 they are hints the Adviser sees, not routes, and the copy says so. **Publish never writes `requested_*`:** the author picks no office. *(Amended 2026-10-06, IR-408, lead decision: the legacy pipeline still routes on `requested_*` after intake, so until IR-260 cuts over a Publish-submitted Thesis or Project reaches no specialist office. Accepted rather than letting authors choose offices.)*
+- **More details** (a disclosure, closed by default): classification, PSCED, and "Flag for your adviser" hints (possible IP · human subjects · commercialisation). These are the existing `is_ip`, `requires_ethics_review` and `for_commercialization` fields. Under ADR-032 they are hints the Adviser sees, not routes, and the copy says so. **Publish never writes `requested_*`:** the author picks no office; the Adviser may route a Thesis or Project to specialists after reviewing it.
 - **Prefill** (§4.5): a field the server found text for shows a "Found in your PDF" chip with **Use** and **Dismiss**. A suggestion **never overwrites** a field the user has typed in.
 - **While extraction runs:** the title and abstract fields show a quiet inline "Reading your PDF…" line. They are **never** disabled, so the user may type over them at any time.
 - **Adviser ≠ owner.** The client disables choosing oneself, with an explanation. The server refuses it as well (IR-260 owns the server rule).

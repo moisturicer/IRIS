@@ -410,9 +410,7 @@ describe("the review control follows can_act", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  // Until IR-260 retires it, the Review section's action bar reaches the
-  // decision through the current form, which is left as it is (spec §4.7).
-  it("opens the Review section, whose action bar reaches the current decision form", async () => {
+  it("opens the Review section without the retired fixed-stage decision form", async () => {
     shownRecord = { ...inReview, can_act: ["itso"] };
     signInAs(2, "ITSO");
     renderPaperView();
@@ -420,11 +418,7 @@ describe("the review control follows can_act", () => {
     await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
 
     expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
-    const bar = screen.getByRole("toolbar", { name: "Review actions" });
-    expect(within(bar).getByRole("link", { name: "Record a decision (current form)" })).toHaveAttribute(
-      "href",
-      `/review/${RECORD_ID}/evaluate`,
-    );
+    expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
   });
 
@@ -478,44 +472,9 @@ describe("the review control follows can_act", () => {
   });
 });
 
-describe("the resubmit control follows workflow_state", () => {
+describe("the new-version control follows revision requests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  // The legacy pipeline's revision: stored `declined`, which is what its
-  // Resubmit answers. The adviser-first model's is the last case (IR-272).
-  const awaiting: RecordDetail = {
-    ...inReview,
-    pipeline_status: "declined",
-    workflow_state: "awaiting_resubmission",
-    workflow_state_label: "Awaiting resubmission",
-  };
-
-  it("is offered to the owner of a record awaiting resubmission", async () => {
-    shownRecord = awaiting;
-    signInAs(OWNER_ID, "Student");
-    renderPaperView();
-
-    expect(await screen.findByRole("button", RESUBMIT)).toBeInTheDocument();
-  });
-
-  it("is not offered to someone who does not own it", async () => {
-    shownRecord = awaiting;
-    signInAs(99, "Student");
-    renderPaperView();
-
-    await waitForRecord(inReview.title);
-    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
-  });
-
-  it("is not offered while the record is still in review, even if stored as declined", async () => {
-    shownRecord = { ...inReview, pipeline_status: "declined" };
-    signInAs(OWNER_ID, "Student");
-    renderPaperView();
-
-    await waitForRecord(inReview.title);
-    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
   });
 
   it("on the adviser-first model, shows the owner what was asked instead of the legacy Resubmit (IR-272)", async () => {
@@ -1508,7 +1467,7 @@ describe("the Review section (IR-412)", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("offers a reviewer who may request documents exactly that, and the current form", async () => {
+  it("offers a reviewer who may request documents exactly that action", async () => {
     shownRecord = { ...inReview, can_act: ["ierc"], can_request_document: ["ierc"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
@@ -1517,7 +1476,7 @@ describe("the Review section (IR-412)", () => {
     expect(within(bar()).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
       "Request documents",
     ]);
-    expect(within(bar()).getByRole("link", { name: "Record a decision (current form)" })).toBeInTheDocument();
+    expect(within(bar()).queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
   });
 
   it("offers Request documents alone to a party that may ask but not decide", async () => {

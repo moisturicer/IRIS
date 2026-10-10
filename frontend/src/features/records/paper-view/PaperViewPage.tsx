@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
-import { reviewsApi, seatsApi } from "@/api/reviews";
+import { seatsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button, Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -313,8 +313,6 @@ export default function PaperViewPage() {
   const [attempt, setAttempt] = useState(0);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
-  const [resubmitting, setResubmitting] = useState(false);
-  const [resubmitError, setResubmitError] = useState<string | null>(null);
   /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
@@ -398,24 +396,6 @@ export default function PaperViewPage() {
     // `attempt` is Try again; a retry is not a second visit to count.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, attempt]);
-
-  const handleResubmit = async () => {
-    if (!id) return;
-    setResubmitting(true);
-    setResubmitError(null);
-    try {
-      await reviewsApi.resubmit(Number(id));
-      const { data } = await recordsApi.detail(Number(id));
-      setRecord(data);
-    } catch (err: unknown) {
-      setResubmitError(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-          "Resubmission failed. Please try again.",
-      );
-    } finally {
-      setResubmitting(false);
-    }
-  };
 
   // Share copies the paper's permanent link (IR-356), the address a reader
   // would paste to a colleague. A blocked clipboard claims nothing.
@@ -884,34 +864,7 @@ export default function PaperViewPage() {
               <>
                 {/* Action required (spec §4.10): what is waiting on the
                     owner comes first. */}
-                {can.has("create_version") && record.revision.new_version == null && (
-                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                    <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
-                      <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
-                      Revision requested
-                    </p>
-                    <p className="text-sm text-brand leading-relaxed mt-1">
-                      Address the reviewer comments in the Review section, then resubmit. Offices that
-                      already cleared this record keep their clearance — only the office that asked for
-                      changes reviews it again.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleResubmit}
-                      disabled={resubmitting}
-                      className={cn(PILL_PRIMARY, "mt-3")}
-                    >
-                      <i className="fas fa-paper-plane text-2xs" aria-hidden />
-                      {resubmitting ? "Resubmitting…" : "Resubmit for review"}
-                    </button>
-                    {resubmitError && <p className="text-xs text-brand mt-2">{resubmitError}</p>}
-                  </div>
-                )}
-
-                {/* Revision requests on the adviser-first model (IR-272): what
-                    each party asked for, as plain text, and the version it
-                    asked about, answered with *Submit new version* (IR-273).
-                    The legacy banner above keeps its own Resubmit. */}
+                {/* Revision requests are answered through Submit new version. */}
                 {userIsOwner && record.revision.open.length > 0 && (
                   <section
                     aria-labelledby="revision-requested-heading"

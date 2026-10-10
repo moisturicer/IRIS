@@ -1,12 +1,10 @@
 """
 Adviser-first entry and routing into office pools (ADR-032 §1, §3, §4; IR-261).
 
-**A new-model slice, beside the legacy pipeline.** A record is on the new
-model when its stored `pipeline_status` is `in_review`; the legacy lifecycle
-table has no edge from that status, so the two never act on the same record.
-Until IR-260's cutover, only `enter_at_adviser()` puts a record there -- the
-demo seed and the tests call it, and `POST /records/<id>/submit/` stays on the
-legacy pipeline (decided 2026-10-07). IR-260 makes submission call it.
+**The submission path after IR-260.** A record is on the new model when its
+stored `pipeline_status` is `in_review`; the legacy lifecycle table has no edge
+from that status, so the two never act on the same record. The public submit
+endpoint, demo seed and tests all call `enter_at_adviser()`.
 
 **Two acts, one core.**
 
@@ -123,6 +121,8 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
     Adviser is not also an owner (ADR-032 §1); a record with no Adviser is
     refused, since nobody could review it.
     """
+    original_record = record
+    record = _locked(record)
     if record.adviser_id is None:
         raise RoutingError("A record enters at its Adviser, and this one names none.")
     if record.owners.filter(user_id=record.adviser_id).exists():
@@ -147,6 +147,7 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
     )
     # What the Adviser is handed is v1 (ADR-032 §5, IR-416).
     versions.write_version(record, actor, VersionCause.SUBMISSION)
+    original_record.pipeline_status = record.pipeline_status
     return assignment
 
 

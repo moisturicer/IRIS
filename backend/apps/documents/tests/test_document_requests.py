@@ -146,21 +146,21 @@ class RequestReachesTheOwnerTests(DocumentRequestTestBase):
         self.assertEqual(self.listed(record)[0]["message"], message)
 
 
-class IntakeCanRequestTests(DocumentRequestTestBase):
+class AdviserCanRequestTests(DocumentRequestTestBase):
 
-    def test_intake_creates_a_request_on_a_new_submission(self):
+    def test_adviser_creates_a_request_on_a_new_submission(self):
         record = self.submitted(RecordTypeName.THESIS_RESEARCH, requested_itso=True)
 
-        data = self.requested(record, self.rdco, [{"label": "Endorsement sheet"}])
+        data = self.requested(record, self.adviser, [{"label": "Endorsement sheet"}])
 
-        self.assertEqual(data["party"], "intake")
+        self.assertEqual(data["party"], "adviser")
 
-    def test_intake_reads_intake_to_the_owner(self):
+    def test_the_request_names_the_adviser_to_the_owner(self):
         record = self.submitted(RecordTypeName.THESIS_RESEARCH, requested_itso=True)
-        self.requested(record, self.rdco, [{"label": "Endorsement sheet"}])
+        self.requested(record, self.adviser, [{"label": "Endorsement sheet"}])
 
-        self.assertEqual(self.listed(record, self.owner)[0]["label"], "Intake")
-        self.assertEqual(self.listed(record, self.rdco)[0]["label"], "Intake & Triage")
+        self.assertEqual(self.listed(record, self.owner)[0]["label"], "Adviser")
+        self.assertEqual(self.listed(record, self.adviser)[0]["label"], "Adviser")
 
 
 class UploadsFulfilTheRequestTests(DocumentRequestTestBase):

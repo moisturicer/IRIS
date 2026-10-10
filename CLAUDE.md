@@ -101,22 +101,16 @@ python manage.py migrate
 python manage.py runserver
 python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db_required
                                           # tests skip cleanly with no Postgres reachable
-python manage.py seed_demo                # accounts + Discover catalogue + every pipeline state
+python manage.py seed_demo                # accounts + Discover catalogue + every workflow_state
                                           # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
                                           # plus admin@cit.edu (Django superuser, no app role).
                                           # Replaced scripts/seed_demo_{users,records,clearances}.py
                                           # and seed_test_users, all deleted. Idempotent for records;
                                           # re-running resets passwords. Refuses with DEBUG off
                                           # unless --force. --accounts-only for logins alone.
-                                          # Also seeds one new-model Thesis waiting at
-                                          # adviser@cit.edu, for Accept & route (IR-261)
-python manage.py enter_new_model <record_id>  # DEVELOPMENT ONLY (IR-261): puts one of your drafts on
-                                          # the adviser-first model through routing.enter_at_adviser
-                                          # -- in_review, an Adviser entry seat -- so routing can be
-                                          # demoed before IR-260 makes submission do it. Same rules:
-                                          # a draft, an Adviser who is not an owner. Refuses with
-                                          # DEBUG off and has NO --force. IR-260 deletes it.
-                                          # Verified on the dev database 2026-10-08
+                                          # Submissions enter adviser-first review through the
+                                          # Record API. The Adviser must be named and cannot own
+                                          # the record (IR-260).
 python manage.py load_corpus <dir> --dry-run             # bulk-load PDFs as Records (IR-313).
                                    # One subfolder per category; each becomes a Classification.
                                    # Defaults: record type "Thesis / Research", status "published"

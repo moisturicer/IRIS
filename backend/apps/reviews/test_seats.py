@@ -7,11 +7,9 @@ a seat -- clearing, or recording a finding -- is IR-269's endpoint, so the rule
 is pinned here through `seats.complete_seat()`, the one function that endpoint
 will call, and IR-269 adds its own HTTP test on top.
 
-Records are built in the state each case needs, with their assignments written
-directly, rather than walked there through the legacy pipeline: what is under
-test is the seat model, and a walk would test the pipeline as well. The two
-cases that are *about* the pipeline -- the entry seat at submission and a
-seat settling when the legacy pipeline closes an assignment -- use HTTP.
+Records are built with the assignments each seat case needs. The entry-seat
+case uses the public submission API; routing and office completion have their
+own adviser-first API suites.
 """
 
 from django.urls import reverse
@@ -23,14 +21,12 @@ from apps.records.models import Record, RecordOwner, RecordType
 from apps.reviews import seats
 from apps.reviews.models import (
     RecordAssignment,
-    RecordClearance,
     ResubmissionRequest,
     Review,
     ReviewerSeat,
 )
 from core.enums import (
     AssignmentState,
-    Office,
     Party,
     PipelineStatus,
     RecordTypeName,
@@ -41,7 +37,7 @@ from core.enums import (
     SeatState,
 )
 
-from .test_workflow_characterisation import SUBMIT_REVIEW, make_user
+from .workflow_test_helpers import make_user
 
 
 def claim_url(assignment):
@@ -142,71 +138,6 @@ class EntrySeatAndPoolTests(SeatTestBase):
             self.live_seats(assignment),
             {(self.adviser.pk, SeatState.ASSIGNED, SeatSource.ENTRY)},
         )
-
-    def test_an_office_the_record_is_routed_to_is_a_pool(self):
-        """RDCO's legacy intake approval routes to ITSO: ITSO holds it, nobody is seated."""
-        record = self.make_record(
-            pipeline_status=PipelineStatus.RDCO_INTAKE, requested_itso=True,
-        )
-        self.assignment(record, Party.INTAKE)
-        self.client.force_authenticate(self.rdco)
-        response = self.client.post(
-            SUBMIT_REVIEW,
-            {"record_id": record.pk, "status": ReviewDecision.APPROVED, "comment": ""},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-
-        itso = RecordAssignment.objects.get(
-            record=record, party=Party.ITSO, state=AssignmentState.ACTIVE,
-        )
-        self.assertFalse(itso.seats.exists())
-
-    def test_the_legacy_pipeline_closing_the_advisers_turn_finishes_the_entry_seat(self):
-        """The Adviser approves through today's form: their seat is done, not left open."""
-        record = self.make_record(
-            RecordTypeName.PROPOSAL, PipelineStatus.DRAFT, adviser=self.adviser,
-        )
-        self.client.force_authenticate(self.owner)
-        self.client.post(
-            reverse("record-submit", args=[record.pk]), {"dpa_accepted": True}, format="json",
-        )
-        self.client.force_authenticate(self.adviser)
-        response = self.client.post(
-            SUBMIT_REVIEW,
-            {"record_id": record.pk, "status": ReviewDecision.APPROVED, "comment": "Fine."},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-
-        seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.adviser)
-        self.assertEqual(seat.state, SeatState.DONE)
-        self.assertIsNotNone(seat.done_at)
-
-    def test_an_office_member_who_decides_straight_from_the_pool_is_left_a_done_seat(self):
-        """
-        The legacy pipeline lets ITSO clear without claiming. That reviewer
-        still took part, so they keep Review and Files afterwards (AC9).
-        """
-        record = self.make_record(pipeline_status=PipelineStatus.ITSO_REVIEW, requested_itso=True)
-        RecordClearance.objects.create(record=record, office=Office.ITSO)
-        self.assignment(record, Party.ITSO)
-        self.client.force_authenticate(self.itso)
-        response = self.client.post(
-            SUBMIT_REVIEW,
-            {"record_id": record.pk, "status": ReviewDecision.APPROVED, "comment": "Clear."},
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-
-        seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.itso)
-        self.assertEqual((seat.state, seat.source), (SeatState.DONE, SeatSource.CLAIMED))
-        detail = self.client.get(reverse("record-detail", args=[record.pk])).data
-        self.assertTrue(detail["is_participant"])
-        # Nobody else at ITSO is made a participant by it.
-        self.client.force_authenticate(self.itso2)
-        self.assertFalse(self.client.get(reverse("record-detail", args=[record.pk])).data["is_participant"])
-
 
 # --- claim -----------------------------------------------------------------------
 
