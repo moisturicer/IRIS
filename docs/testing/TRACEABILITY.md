@@ -8,6 +8,31 @@
 
 ---
 
+## IR-507 who edits and submits a record (ADR-032 §10, FR-M6-02)
+
+**Design:** [ADR-032 §10, Amendment of 2026-10-11](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
+The record update and `submit/` are `IsRecordOwner` (any owner; no office, no
+Adviser). An owner edits only a `draft` or a record awaiting their revision
+(`versions.details_editable`), matching the `edit_details` offer. Once a
+record leaves `draft`, `versions.SUBMISSION_FIXED_FIELDS` (Adviser, type, IP
+flags, routing hints) stay as submitted: unchanged values pass, a change is one
+400 naming every field. Edit details shows those fields read-only and leaves
+them out of the PATCH. Consent (FR-M6-02, IR-226) is therefore always given by
+an owner. `destroy` is unchanged and is IR-508's.
+
+**Tests:** `apps.records.test_edit_policy` (who edits, who submits and whose
+consent is recorded, when an owner edits, the fixed fields one by one and all
+at once, an office's IP tag surviving the owner's save, and what a changed
+Adviser would strand); `apps.records.test_capabilities` with no waiver;
+`apps.records.tests.SubmitOwnershipTests.test_staff_cannot_submit_someone_elses_draft`
+(reversed deliberately from `test_staff_can_...`); three tests in
+`apps.reviews.test_new_version` updated for the refusals (see the PR);
+`paper-view/EditDetailsDialog.test.tsx` (the revision state).
+
+**Evidence:** the IR-507 PR's CI.
+
+---
+
 ## IR-418 capabilities payload (ADR-032 §10)
 
 **Design:** [ADR-032 §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md)
@@ -41,12 +66,10 @@ records alone; `add_reviewer` is offered on any open seat of an active office
 assignment, RDCO's included, and Paper View's dialog takes that seat's
 assignment.
 
-**Known gap, pinned (IR-507):** the record update and `submit/` are
-`IsOwnerOrStaff`, wider than any offer -- office staff edit and submit records
-that are not theirs, and owners edit in every state. The table waives rule 3
-for `edit_details` and `continue_draft` only, and
-`test_edit_and_submit_refuse_what_is_not_offered` (strict xfail) turns red
-when IR-507 narrows the endpoints.
+**Known gap, closed by IR-507 (below):** the record update and `submit/` were
+`IsOwnerOrStaff`, wider than any offer. The table's waiver of rule 3 for
+`edit_details` and `continue_draft` is removed, and
+`test_edit_and_submit_refuse_what_is_not_offered` lost its strict xfail.
 
 **`decide`, resolved:** ADR-032 §10 (IR-270 amendment) kept `decide` "the
 link to the current decision form for legacy records until IR-274". IR-274 has
