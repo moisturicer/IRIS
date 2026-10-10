@@ -1,6 +1,8 @@
 # Docling resources
 
 What the Docling container runs, what it needs, and what was measured.
+For repeatable CPU/RAM/VRAM sweeps and raw timing data, see
+[DOCLING_BENCHMARK.md](DOCLING_BENCHMARK.md).
 docling-serve 1.36.0; formula, code and figure-classification stages on; OCR,
 picture description and chart extraction off; tables always `accurate`.
 
@@ -83,9 +85,9 @@ workers.
   tries it, but multiple server processes in one container were not reliable here.
 - The extraction worker runs two tasks at once (`--concurrency=2`). That is
   enough to keep the one docling worker fed while the other task parses.
-- `docker-compose.override.yml` (local, gitignored) forces extraction concurrency
-  to 1 and a 3600 s timeout. Delete it once the corpus is loaded, or it caps
-  throughput.
+- A local, gitignored `docker-compose.override.yml` may change extraction
+  concurrency and timeout. Check the effective Compose configuration before
+  comparing runs; the benchmark uses isolated containers with recorded limits.
 
 ## What the image patches (and why)
 
