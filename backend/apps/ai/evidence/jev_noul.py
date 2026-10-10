@@ -162,4 +162,5 @@ class JevNoulDecision:
             input_tokens=answer.input_tokens,
             model=answer.model,
             probability=answer.probability,
+            cost_usd=answer.cost_usd,
         )
