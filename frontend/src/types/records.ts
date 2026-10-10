@@ -93,9 +93,46 @@ export interface RecordFileItem {
   can_remove: boolean;
 }
 
+/**
+ * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
+ * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
+ * draft in Publish, and `attach_file`, an office filing a supplementary file
+ * on a record it takes part in. IR-273 adds `replace_manuscript`: the owner
+ * uploading a revised manuscript for the next version (ADR-032 §5 Amendment).
+ * IR-270 adds the three Decisions: `accept_publish`, `keep_unlisted` (the
+ * spec's `final_decide`, renamed to the act it grants) and `reject`. IR-271
+ * adds `accept_proposal`, a Proposal's Adviser accepting it (the spec's
+ * `decide_proposal`, which also named *Reject*; reject is `reject` on every
+ * record).
+ */
+export type Capability =
+  | "open_review"
+  | "request_document"
+  | "request_revision"
+  | "withdraw_revision"
+  | "route"
+  | "accept_route"
+  | "accept_publish"
+  | "accept_proposal"
+  | "keep_unlisted"
+  | "reject"
+  | "office_review"
+  | "add_reviewer"
+  | "create_version"
+  | "replace_manuscript"
+  | "edit_details"
+  | "continue_draft"
+  | "continue_as"
+  | "set_visibility"
+  | "tag_ip"
+  | "attach_file"
+  | "comment_review"
+  | "comment_public"
+  | "cite";
+
 export interface RecordDetail extends RecordListItem {
   /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
-  capabilities:   import("@/features/records/capabilities").Capability[];
+  capabilities:   Capability[];
   year_completed:  number | null;
   abstract:        string;
   abstract_file:   string | null;

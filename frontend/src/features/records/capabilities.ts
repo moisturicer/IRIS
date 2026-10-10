@@ -9,47 +9,10 @@
  * capability is only a decision about what to *offer*.
  */
 import type { RoleName } from "@/lib/constants";
-import {
-  type RecordDetail,
-  type ReviewerSeat,
-} from "@/types/records";
+import type { Capability, RecordDetail, ReviewerSeat } from "@/types/records";
 
-/**
- * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
- * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
- * draft in Publish, and `attach_file`, an office filing a supplementary file
- * on a record it takes part in. IR-273 adds `replace_manuscript`: the owner
- * uploading a revised manuscript for the next version (ADR-032 §5 Amendment).
- * IR-270 adds the three Decisions: `accept_publish`, `keep_unlisted` (the
- * spec's `final_decide`, renamed to the act it grants) and `reject`. IR-271
- * adds `accept_proposal`, a Proposal's Adviser accepting it (the spec's
- * `decide_proposal`, which also named *Reject*; reject is `reject` on every
- * record).
- */
-export type Capability =
-  | "open_review"
-  | "request_document"
-  | "request_revision"
-  | "withdraw_revision"
-  | "route"
-  | "accept_route"
-  | "accept_publish"
-  | "accept_proposal"
-  | "keep_unlisted"
-  | "reject"
-  | "office_review"
-  | "add_reviewer"
-  | "create_version"
-  | "replace_manuscript"
-  | "edit_details"
-  | "continue_draft"
-  | "continue_as"
-  | "set_visibility"
-  | "tag_ip"
-  | "attach_file"
-  | "comment_review"
-  | "comment_public"
-  | "cite";
+/** ADR-032 §10's action keys; the union lives with the payload that carries it. */
+export type { Capability } from "@/types/records";
 
 /** Paper View's sections, in tab order (spec §4.6). */
 export const PAPER_SECTIONS = ["overview", "paper", "review", "files"] as const;
