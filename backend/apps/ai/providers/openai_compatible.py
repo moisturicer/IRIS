@@ -158,6 +158,18 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             return self._reasoning_effort
         return getattr(settings, "LLM_REASONING_EFFORT", "") or ""
 
+    def _temperature_kwargs(self) -> dict[str, float]:
+        # Luna does not list temperature among its chat completion parameters.
+        if self.model == "openai/gpt-6-luna":
+            return {}
+        return {
+            "temperature": (
+                self._temperature
+                if self._temperature is not None
+                else getattr(settings, "LLM_TEMPERATURE", 0.1)
+            )
+        }
+
     def _resolved_key(self) -> str:
         key = self._api_key or getattr(settings, "LLM_API_KEY", "")
         if not key:
@@ -191,12 +203,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         # and `_build_client` is where that is demanded.
         client = self._client or self._build_client()
 
-        temperature = (
-            self._temperature
-            if self._temperature is not None
-            else getattr(settings, "LLM_TEMPERATURE", 0.1)
-        )
-
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
@@ -215,7 +221,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                temperature=temperature,
+                **self._temperature_kwargs(),
                 **extra,
             )
         except LLMUnavailable:
@@ -248,11 +254,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         """
         client = self._client or self._build_client()
 
-        temperature = (
-            self._temperature
-            if self._temperature is not None
-            else getattr(settings, "LLM_TEMPERATURE", 0.1)
-        )
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
@@ -271,7 +272,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                temperature=temperature,
+                **self._temperature_kwargs(),
                 stream=True,
                 **extra,
             )
@@ -326,11 +327,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         """
         client = self._client or self._build_client()
 
-        temperature = (
-            self._temperature
-            if self._temperature is not None
-            else getattr(settings, "LLM_TEMPERATURE", 0.1)
-        )
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
@@ -344,7 +340,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                temperature=temperature,
+                **self._temperature_kwargs(),
                 tools=[
                     {
                         "type": "function",

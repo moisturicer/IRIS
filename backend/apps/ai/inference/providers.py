@@ -69,11 +69,14 @@ def build_profile_llm(
     pins = dict(profile.model_provider_pins)
 
     def config(model: str, fallback_models: tuple[str, ...] = ()) -> LLMProviderConfig:
+        # GLM 5.3 Flash always reasons and accepts low/high/max. The shared
+        # setting may be empty or "medium", so use its supported high setting.
+        model_effort = "high" if model == "z-ai/glm-5.3-flash" else reasoning_effort
         return LLMProviderConfig(
             base_url=profile.base_url,
             api_key=profile.api_key,
             model=model,
-            reasoning_effort=reasoning_effort,
+            reasoning_effort=model_effort,
             vendor=profile.vendor.value,
             fallback_models=fallback_models,
             max_tokens=max_tokens,
