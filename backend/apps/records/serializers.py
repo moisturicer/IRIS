@@ -455,7 +455,20 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         return sent != list(instance.authors.order_by("pk").values_list("name", flat=True))
 
 
+class VisibleRecordField(serializers.PrimaryKeyRelatedField):
+    """
+    A record id, resolved only among the records the requester may read
+    (`Record.objects.visible_to`, IR-153). An id outside that set fails exactly
+    as an id no record has -- same code, same message -- so a request endpoint
+    cannot be used to learn that a private record exists (IR-316).
+    """
+    def get_queryset(self):
+        request = self.context.get("request")
+        return Record.objects.visible_to(getattr(request, "user", None))
+
+
 class DownloadRequestSerializer(serializers.ModelSerializer):
+    record               = VisibleRecordField()
     record_title         = serializers.CharField(source="record.title",                    read_only=True)
     requested_by_name    = serializers.SerializerMethodField()
     requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
@@ -467,7 +480,8 @@ class DownloadRequestSerializer(serializers.ModelSerializer):
             "requested_by", "requested_by_name", "requested_by_email",
             "status", "reviewed_by", "reviewed_at", "created_at",
         ]
-        read_only_fields = ["requested_by", "reviewed_by", "reviewed_at"]
+        # A request is created pending; only the review actions move it.
+        read_only_fields = ["requested_by", "status", "reviewed_by", "reviewed_at"]
 
     def get_requested_by_name(self, obj):
         if obj.requested_by:
@@ -476,6 +490,7 @@ class DownloadRequestSerializer(serializers.ModelSerializer):
 
 
 class DeleteRequestSerializer(serializers.ModelSerializer):
+    record               = VisibleRecordField()
     record_title         = serializers.CharField(source="record.title",                    read_only=True)
     requested_by_name    = serializers.SerializerMethodField()
     requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
@@ -487,7 +502,8 @@ class DeleteRequestSerializer(serializers.ModelSerializer):
             "requested_by", "requested_by_name", "requested_by_email",
             "reason", "status", "reviewed_by", "reviewed_at", "created_at",
         ]
-        read_only_fields = ["requested_by", "reviewed_by", "reviewed_at"]
+        # A request is created pending; only the review actions move it.
+        read_only_fields = ["requested_by", "status", "reviewed_by", "reviewed_at"]
 
     def get_requested_by_name(self, obj):
         if obj.requested_by:
