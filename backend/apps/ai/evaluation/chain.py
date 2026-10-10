@@ -10,8 +10,8 @@ collected, and scores every arm on the same facts.
 **Nothing here chooses an operating point.** Bands are two parameters the
 caller passes in; the report draws the curve and sets none.
 
-Pure: no database, no vendor, no file I/O. Deciders are handed in as
-`ModelDecision` values, so a deterministic fake exercises every arm.
+Pure: no database, no file I/O, and no vendor of its own. Deciders are
+handed in, so a deterministic fake exercises every arm.
 
 Reporting rules, each stopping a misreading:
 
@@ -50,8 +50,8 @@ DECIDER_LABEL = "label"
 DECIDER_TOOL = "tool"
 DECIDERS = (DECIDER_JEV, DECIDER_LABEL, DECIDER_TOOL)
 
-#: Reason codes on the codes a detector verdict can carry that are structural,
-#: not lexical. Only `scope_record` is one (ADR-035 §5).
+#: Detector reason codes that are structural, not lexical. Only
+#: `scope_record` is one (ADR-035 §5).
 STRUCTURAL_CODES = (SCOPE_RECORD,)
 
 SEARCH = "search"
@@ -62,6 +62,8 @@ DIRECT = "direct"
 R_STRUCTURAL = "structural_rule"
 R_DETECTOR = "detector_rule"
 R_DETECTOR_SILENT = "detector_silent"
+#: A model, not the detector, permitted the direct answer (no confirmer).
+R_MODEL_PERMIT = "model_permit_direct"
 R_JEV_SEARCH = "jev_search"
 R_FIRST_SEARCH = "first_decider_search"
 R_JEV_UNCERTAIN = "jev_uncertain"
@@ -348,7 +350,7 @@ def _union(facts: Facts, decision: Optional[ModelDecision]) -> Outcome:
         return _outcome(facts, SEARCH, R_NO_SIGNAL)
     if decision.evidence_required:
         return _outcome(facts, SEARCH, R_LLM_SEARCH, decision)
-    return _outcome(facts, DIRECT, R_DETECTOR_SILENT, decision)
+    return _outcome(facts, DIRECT, R_MODEL_PERMIT, decision)
 
 
 def _detector_only(facts: Facts) -> Outcome:
@@ -370,7 +372,7 @@ def _jev_only(facts: Facts, first: Optional[ModelDecision], bands: Bands) -> Out
     searches, reason = _first_searches(first, bands)
     if searches:
         return _outcome(facts, SEARCH, reason, first)
-    return _outcome(facts, DIRECT, R_DETECTOR_SILENT, first)
+    return _outcome(facts, DIRECT, R_MODEL_PERMIT, first)
 
 
 # -- arms -------------------------------------------------------------------
@@ -534,6 +536,7 @@ class ReplicateScore:
 
     def as_dict(self) -> dict[str, Any]:
         n = self.judged or 1
+        calls = len(self.latencies_ms) or 1
         return {
             "replicate": self.replicate,
             "pooled": self.pooled,
@@ -555,7 +558,7 @@ class ReplicateScore:
             },
             "calls": {"first": self.first_calls, "second": self.second_calls},
             "latency_ms": {
-                "mean": round(sum(self.latencies_ms) / n) if self.latencies_ms else None,
+                "mean": round(sum(self.latencies_ms) / calls) if self.latencies_ms else None,
                 "p95": _percentile(self.latencies_ms, 0.95),
             },
             "cost_usd": {
@@ -748,6 +751,7 @@ def jev_curve(
                 "per_replicate": [
                     {
                         "replicate": r.replicate,
+                        "pooled": r.pooled,
                         "missed": len(r.missed),
                         "over_searches": len(r.over_searches),
                         "direct_answers": r.direct_answers,
@@ -1112,13 +1116,21 @@ def build_report(
         {**calibration(facts, run), "source": run.source} for run in runs.get(DECIDER_JEV, ())
     )
     rescore = None
-    if runs.get(DECIDER_JEV):
+    clean = {
+        name: [r for r in rs if not r.reported_alone] for name, rs in runs.items()
+    }
+    if clean.get(DECIDER_JEV):
         rescore = {
-            "band_table": band_table(facts, runs[DECIDER_JEV]),
+            "band_table": band_table(facts, clean[DECIDER_JEV]),
             "rescue_table": (
-                rescue_table(facts, runs[DECIDER_JEV], runs[DECIDER_LABEL], runs[DECIDER_TOOL])
-                if runs.get(DECIDER_LABEL) and runs.get(DECIDER_TOOL)
+                rescue_table(
+                    facts, clean[DECIDER_JEV], clean[DECIDER_LABEL], clean[DECIDER_TOOL]
+                )
+                if clean.get(DECIDER_LABEL) and clean.get(DECIDER_TOOL)
                 else None
+            ),
+            "runs_left_out": sorted(
+                r.source for rs in runs.values() for r in rs if r.reported_alone
             ),
             "note": (
                 "Bands and rescue read off the same questions as the runs; they "

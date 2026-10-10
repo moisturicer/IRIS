@@ -434,6 +434,14 @@ class Command(BaseCommand):
         detector = EvidenceDetector(rule_set)
         judgements = tuple(judge(detector, q) for q in questions)
 
+        facts = [chained.facts_from_judgement(j) for j in judgements]
+        try:
+            chained.validate_runs(facts, runs)
+        except chained.ChainError as exc:
+            raise CommandError(str(exc))
+        if "label" in live and options["max_tokens"] < 1:
+            raise CommandError("--max-tokens must be positive.")
+
         raw_only: dict[str, list] = {name: [] for name in chained.DECIDERS}
         deciders_used = {}
         for name in live:
@@ -441,7 +449,13 @@ class Command(BaseCommand):
             deciders_used[name] = LIVE_MODES[name]
             for _ in range(options["repeats"]):
                 runs[name].append(
-                    chained.collect_run(name, decider, questions, source=f"live {name}")
+                    chained.collect_run(
+                        name,
+                        decider,
+                        questions,
+                        source=f"live {name}",
+                        prompt_digest=self._live_digest(name, options),
+                    )
                 )
                 if options["ablate_resolved"]:
                     raw_only[name].append(
@@ -451,6 +465,7 @@ class Command(BaseCommand):
                             questions,
                             use_resolved=False,
                             source=f"live {name} raw-only",
+                            prompt_digest=self._live_digest(name, options),
                         )
                     )
 
@@ -459,7 +474,6 @@ class Command(BaseCommand):
             raise CommandError(
                 "--chain needs decider runs: pass --from-run DECIDER=PATH or --live."
             )
-        facts = [chained.facts_from_judgement(j) for j in judgements]
         raw_facts = [chained.facts_from_judgement(j, lane="raw") for j in judgements]
 
         ablations = {"resolver_label": options["resolver_label"] or "not recorded"}
@@ -514,6 +528,13 @@ class Command(BaseCommand):
                         ),
                         6,
                     ),
+                    "decisions_without_reported_cost": sum(
+                        1
+                        for rs in runs.values()
+                        for r in rs
+                        for d in r.decisions.values()
+                        if d.cost_usd is None
+                    ),
                     "jev_vendor_terms": (
                         JEV_VENDOR_TERMS if chained.DECIDER_JEV in runs else None
                     ),
@@ -554,6 +575,16 @@ class Command(BaseCommand):
             self.stdout.write("")
             self.stdout.write(self.style.SUCCESS(f"Results written to {path}"))
 
+
+    @staticmethod
+    def _live_digest(name: str, options) -> str:
+        from apps.ai.evidence.model_decision import prompt_digest
+
+        return {
+            chained.DECIDER_JEV: lambda: jev_digest(PINNED_MODEL),
+            chained.DECIDER_LABEL: lambda: route_label_digest(options["max_tokens"]),
+            chained.DECIDER_TOOL: prompt_digest,
+        }[name]()
 
     def _decider(self, mode: str = "tools", max_tokens: int = 0):
         """The decision over the `answer` task, refused when nothing is

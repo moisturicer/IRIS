@@ -489,3 +489,35 @@ def test_the_full_chain_runs_over_the_stored_runs(stored_runs):
     # confirming Jev's direct candidates can only remove misses, never add
     assert len(chain_arm["missed_searches"]["stable"]) <= len(jev_arm["missed_searches"]["stable"])
     assert report.render()
+
+
+# -- review fixes -----------------------------------------------------------
+
+
+def test_a_model_permitted_direct_answer_is_not_called_detector_silent(runs):
+    r = result(ARM_JEV, runs).replicates[0]
+    assert r.reasons[c.R_MODEL_PERMIT] >= 1
+    assert r.reasons[c.R_DETECTOR_SILENT] == 0
+
+
+def test_mean_latency_is_over_the_calls_made_in_json_and_console(runs):
+    r = result(ARM_CHAIN, runs).replicates[0]
+    assert r.as_dict()["latency_ms"]["mean"] == round(sum(r.latencies_ms) / len(r.latencies_ms))
+
+
+def test_the_proposal_tables_leave_out_a_replicate_over_five_percent_fallbacks():
+    qs = [facts(f"x{i}", needs=True) for i in range(20)]
+    good = run("jev", {f.question_id: jev(0.9) for f in qs}, "good")
+    flaky = run(
+        "jev",
+        {f.question_id: (jev_down() if i < 3 else jev(0.05)) for i, f in enumerate(qs)},
+        "flaky",
+    )
+    data = c.build_report(
+        question_set={}, facts=qs, runs={"jev": [good, flaky]}, bands=BANDS
+    ).as_dict()
+    assert data["proposal_12_rescore"]["runs_left_out"] == ["flaky"]
+    top = data["proposal_12_rescore"]["band_table"][-1]
+    assert top["needs_corpus"] == 20  # only the clean run, all at 0.9
+    rows = data["curves"]["detector+jev"][0]["per_replicate"]
+    assert [r["pooled"] for r in rows] == [True, False]

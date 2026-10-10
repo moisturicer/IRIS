@@ -236,6 +236,18 @@ class TheLiveTests:
         with pytest.raises(CommandError, match="public proxy question set only"):
             chain(str(path), "--live", "jev", *CUTOFFS, "--no-write")
 
+    def test_a_mismatched_stored_run_is_refused_before_any_live_call(self, fakes, questions, tmp_path):
+        other = result_file(tmp_path, "other", [row("x1", True, 0.9)])
+        with pytest.raises(CommandError, match="answers 1 questions"):
+            chain(questions, "--from-run", f"jev={other}", "--live", "label", *CUTOFFS, "--no-write")
+        assert "route-label" not in fakes or fakes["route-label"].seen == []
+
+    def test_live_runs_record_their_prompt_digest(self, fakes, questions, tmp_path):
+        out = tmp_path / "runs"
+        chain(questions, "--live", "label", *CUTOFFS, "--out", str(out))
+        _, data = written(out)
+        assert data["provenance"]["prompt_digests"]["label"]
+
     def test_an_unknown_live_decider_is_refused(self, questions):
         with pytest.raises(CommandError, match="--live names"):
             chain(questions, "--live", "gpt", *CUTOFFS, "--no-write")
