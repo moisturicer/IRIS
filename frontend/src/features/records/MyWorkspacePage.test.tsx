@@ -65,6 +65,7 @@ const base: RecordDetail = {
   workflow_state: "in_review",
   workflow_state_label: "In review",
   current_holders: [],
+  capabilities: ["cite"],
   can_request_document: [],
   my_seats: [],
   is_participant: false,

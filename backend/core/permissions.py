@@ -1,6 +1,8 @@
 from rest_framework.permissions import BasePermission
 
-from core.enums import OPEN_SEAT_STATES, AssignmentState, Party, RoleName
+from core.enums import (
+    OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus, RoleName, WorkflowState,
+)
 
 # Role name constants -- match the Role.name values in the DB exactly.
 # Aliases onto `RoleName` since IR-135: the names are kept because the sets
@@ -107,10 +109,15 @@ class IsReviewer(BasePermission):
         return get_role_name(request.user) in REVIEWER_ROLES
 
 
+def is_office_staff(user) -> bool:
+    """KTTO, RDCO, ITSO or IERC. Role only -- see the module note on is_staff."""
+    return get_role_name(user) in STAFF_ROLES
+
+
 class IsStaff(BasePermission):
     """KTTO, RDCO, ITSO or IERC. Role only -- see the module note on is_staff."""
     def has_permission(self, request, view):
-        return get_role_name(request.user) in STAFF_ROLES
+        return is_office_staff(request.user)
 
 
 class IsAdmin(BasePermission):
@@ -292,6 +299,73 @@ def may_read_review(user, record) -> bool:
     return bool(staffable) and RecordAssignment.objects.filter(
         record=record, party__in=staffable, state=AssignmentState.ACTIVE,
     ).exists()
+
+
+# Which capability offers each Decision outcome (IR-270, IR-271).
+DECISION_CAPABILITY = {
+    "accept": "accept_proposal",
+    "publish": "accept_publish",
+    "keep_unlisted": "keep_unlisted",
+    "reject": "reject",
+}
+
+
+def record_capabilities(record, user, *, workflow, my_seats, routing, office_review,
+                        revision, decision) -> list[str]:
+    """Action keys offered by Record detail (ADR-032 §10, IR-418).
+
+    These are rendering hints assembled from the same server predicates and
+    action flags the endpoints use. An action still checks authority and state
+    when called; a blocked action may be offered so its reason can be shown.
+    `apps.records.test_capabilities` pairs every key with its endpoint.
+    """
+    from apps.documents.attachments import filing_party
+    from apps.reviews.seats import add_reviewer_assignment
+
+    offered = ["cite"]
+    if not user or not getattr(user, "is_authenticated", False):
+        return offered
+
+    # A seat still to work is a review to open (IR-274 retired `can_act`).
+    if any(seat["state"] in OPEN_SEAT_STATES for seat in my_seats):
+        offered.append("open_review")
+    if routing["accept_and_route"]:
+        offered.append("accept_route")
+    if routing["route_as"] is not None:
+        offered.append("route")
+    offered.extend(DECISION_CAPABILITY[outcome] for outcome in decision["outcomes"])
+    if office_review["party"] is not None:
+        offered.append("office_review")
+    # `add-reviewer/`: an open seat on an active office assignment, RDCO's too.
+    if add_reviewer_assignment(record, user) is not None:
+        offered.append("add_reviewer")
+    if workflow["can_request_document"]:
+        offered.append("request_document")
+    if revision["withdrawable"] is not None:
+        offered.append("withdraw_revision")
+    elif revision["party"] is not None:
+        offered.append("request_revision")
+
+    if is_record_owner(user, record):
+        if workflow["workflow_state"] == PipelineStatus.DRAFT:
+            offered.extend(["continue_draft", "edit_details"])
+        elif workflow["workflow_state"] == WorkflowState.AWAITING_RESUBMISSION:
+            if revision["new_version"] is not None:
+                offered.extend(["create_version", "replace_manuscript"])
+            offered.append("edit_details")
+
+    # Both role-gated endpoints refuse anyone who is not office staff
+    # (`IsStaff`) before any other check, so the offers do too.
+    office_staff = is_office_staff(user)
+    # `tags/`: office staff, on any record they can see (decided 2026-10-11:
+    # the offer follows the endpoint, no longer published records alone).
+    if office_staff:
+        offered.append("tag_ip")
+    # `documents/files/upload/`: office staff whose office takes part (IR-474).
+    # An Adviser takes part too, but is not staff, so is never offered it.
+    if office_staff and filing_party(record, user) is not None:
+        offered.append("attach_file")
+    return offered
 
 
 class IsOwnerOrStaff(BasePermission):

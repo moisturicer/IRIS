@@ -46,6 +46,7 @@ import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
+import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
 import { SectionHeading } from "./headings";
@@ -470,7 +471,7 @@ export default function PaperViewPage() {
   const arriving = loading || record.id !== Number(id);
 
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
-  const can = capabilitiesFor(record, viewer);
+  const can = capabilitiesFor(record);
   const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
   const participant = isParticipant(record, viewer);
@@ -593,15 +594,19 @@ export default function PaperViewPage() {
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else Save. When
-  // the pending action has its own region -- the revision banner -- the
-  // header fills nothing.
+  // the pending action has its own region -- the revision banner, the
+  // Review section's action bar -- the header fills nothing. The bar fills
+  // its first granted action, so any granted review action puts the primary
+  // there.
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
       ? "elsewhere"
       : can.has("open_review") && section !== "review"
         ? "open_review"
-        : "save";
+        : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
+          ? "elsewhere"
+          : "save";
 
   // *Open review* (ADR-032 §4) records when this reviewer started -- the
   // seat moves to `in_review` and the server stamps `opened_at` -- then moves

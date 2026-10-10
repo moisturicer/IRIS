@@ -245,6 +245,30 @@ def _member_options(assignment) -> dict:
     }
 
 
+def add_reviewer_assignment(record, user):
+    """
+    The assignment `user` may add a colleague to on `record` (IR-418), or None.
+
+    The active office assignment -- RDCO's included -- on which they hold an
+    open seat: what `add_reviewer` accepts. The oldest seat first, the order
+    `my_seats` lists them in, so Paper View's dialog picks the same one.
+    """
+    if not user or not user.is_authenticated:
+        return None
+    return (
+        ReviewerSeat.objects.filter(
+            assignment__record=record,
+            assignment__party__in=OFFICE_PARTIES,
+            assignment__state=AssignmentState.ACTIVE,
+            reviewer=user,
+            state__in=OPEN_SEAT_STATES,
+        )
+        .order_by("assigned_at", "pk")
+        .values_list("assignment_id", flat=True)
+        .first()
+    )
+
+
 def add_reviewer_options(assignment, holder) -> dict:
     """
     Who `holder` may add to `assignment` (IR-269): every active member of the

@@ -8,6 +8,55 @@
 
 ---
 
+## IR-418 capabilities payload (ADR-032 §10)
+
+**Design:** [ADR-032 §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md)
+and [frontend redesign spec §4.8](../frontend_redesign_spec.md). Record detail
+returns server-computed `capabilities` for the requesting user. The frontend
+adapter passes that list through; Paper View sections retain their existing
+participation and paper-presence checks. Every action endpoint keeps its own
+authority check.
+
+**Tests:** `apps.records.test_capabilities` is ADR-032 §12's one table-driven
+test: 9 states (draft, with the Adviser unopened and open, ITSO's pool, ITSO
+seated, a revision ITSO asked for, RDCO seated, published, a Proposal with its
+Adviser) × 6 viewers (owner, Adviser, ITSO, IERC, RDCO, a student stranger).
+Each row pins the exact offer, and calls every capability's own endpoint inside
+a rolled-back savepoint: offered => never 403/404; not offered => never 2xx.
+`features/records/capabilities.test.ts` (pass-through, and the sections table),
+`paper-view/reviewActions.test.ts` (Add reviewer's assignment), and
+`test/roleGuard.test.ts`.
+
+**Evidence (2026-10-11):** the table passed in a container against its own
+test database, every subtest; the known-gap test below is a strict xfail that
+fails with an AssertionError, as pinned. The table caught two drifts, both
+fixed: `attach_file` offered to an Adviser, whom the upload endpoint refuses
+(`IsStaff`); and `add_reviewer` never offered to a seated RDCO, whom
+`add-reviewer/` accepts. Frontend tests and typecheck passed locally; full
+suites: the IR-418 PR's CI.
+
+**Decided by the project lead, 2026-10-11:** `tag_ip` is offered to office
+staff on every record they can see, matching `tags/`, rather than on published
+records alone; `add_reviewer` is offered on any open seat of an active office
+assignment, RDCO's included, and Paper View's dialog takes that seat's
+assignment.
+
+**Known gap, pinned (IR-507):** the record update and `submit/` are
+`IsOwnerOrStaff`, wider than any offer -- office staff edit and submit records
+that are not theirs, and owners edit in every state. The table waives rule 3
+for `edit_details` and `continue_draft` only, and
+`test_edit_and_submit_refuse_what_is_not_offered` (strict xfail) turns red
+when IR-507 narrows the endpoints.
+
+**`decide`, resolved:** ADR-032 §10 (IR-270 amendment) kept `decide` "the
+link to the current decision form for legacy records until IR-274". IR-274 has
+merged and removed it from the frontend, so the ADR and the code agree with no
+amendment: the server never sends it (the table asserts so), and Paper View's
+header defers its primary to the Review action bar whenever any review action
+is granted, which is what `decide` stood for.
+
+---
+
 ## IR-260 adviser-first cutover (FR-M5-01, 2026-10-10)
 
 **Design:** [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md)
