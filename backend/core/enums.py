@@ -48,9 +48,8 @@ class PipelineStatus(models.TextChoices):
     **`IN_REVIEW` is added beside the stage values, not instead of them**
     (IR-256, ADR-021 §4). Under reviewer-directed routing a record's place in
     review is its active assignments, so one stored value replaces the five
-    stage values and `declined`. Nothing stores it until IR-260 migrates those
-    six away, and until then no review edge in `lifecycle.TRANSITIONS` leads to
-    it.
+    stage values and `declined`. IR-260 migrates those six away; the old values
+    remain readable for historical code until IR-274 removes the pipeline.
     """
 
     DRAFT = "draft", "Draft"
@@ -66,7 +65,7 @@ class PipelineStatus(models.TextChoices):
     PARALLEL_REVIEW = "parallel_review", "Parallel Office Review"
     RDCO_REVIEW = "rdco_review", "RDCO Final Review"
 
-    # Reviewer-directed routing (ADR-021 §4). Unused until IR-260.
+    # Reviewer-directed routing (ADR-021 §4), authoritative since IR-260.
     IN_REVIEW = "in_review", "In Review"
 
     # Terminal / visible states
@@ -110,17 +109,14 @@ class ReviewStage(models.TextChoices):
     the state the record is in (`itso_review`).
 
     **This is also the party vocabulary** (ADR-021 §1), aliased as `Party`
-    below. The six parties are these six values with `rdco_intake` renamed to
-    `intake`. IR-256 adds `INTAKE` beside `RDCO_INTAKE` rather than renaming it:
-    `rdco_intake` is a stored `Review.stage`, and IR-260's migration rewrites
-    those rows and removes the old value in the same step. Until then, nothing
-    new may name a party `rdco_intake`; see `RecordAssignment.party`.
+    below. `rdco_intake` and `intake` survive only as historical Review stages,
+    labelled "Intake (retired)" (ADR-032 §13). Nothing new may assign or route
+    to either party; see `RecordAssignment.party`.
     """
 
     ADVISER = "adviser", "Adviser"
     RDCO_INTAKE = "rdco_intake", "Intake (retired)"
-    #: Staff see "Intake & Triage", students see "Intake" (ADR-021 §2). The
-    #: label here is the staff one; the student label is IR-258's to serve.
+    #: Historical stage value retained for old Review rows (ADR-032 §13).
     INTAKE = "intake", "Intake (retired)"
     ITSO = "itso", "ITSO"
     IERC = "ierc", "IERC"
@@ -132,10 +128,9 @@ class ReviewStage(models.TextChoices):
 #: what it means at the call site.
 Party = ReviewStage
 
-#: The six parties of ADR-021 §1: `Party` without `RDCO_INTAKE`. That value is
-#: a stored stage's history until IR-260 renames the rows, never a party's
-#: identity (§2), so nothing new may be assigned to, routed to, or asked for
-#: changes by it. When IR-260 deletes `RDCO_INTAKE`, this is simply `tuple(Party)`.
+#: Stored review-stage vocabulary includes `RDCO_INTAKE`; it is never an
+#: assignable party. `INTAKE` is retained for historical assignment rows, but
+#: IR-260 retires all new intake writes (ADR-032 §13).
 ASSIGNABLE_PARTIES = tuple(p for p in Party if p is not Party.RDCO_INTAKE)
 
 

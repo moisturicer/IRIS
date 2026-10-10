@@ -15,8 +15,7 @@ hand through `manage.py shell <`:
 The account convention here is the one that already existed -- `<role>@cit.edu`
 at `IrisDemo123!`. Nothing about the credentials people already use has changed.
 
-**Everything goes through the real services.** `lifecycle.apply`,
-`approve_record`, `submit_clearance`, `reject_record`, `resubmit_record` --
+**Everything goes through the real adviser-first services.**
 never an assignment to `pipeline_status`. That is the point rather than a
 style preference, and it is what the deleted scripts got wrong:
 `seed_demo_records.py` wrote `record.pipeline_status = "published"` directly,
@@ -63,11 +62,7 @@ from apps.records.models import (
     RecordOwner,
     RecordType,
 )
-from apps.reviews.services import (
-    approve_record,
-    submit_clearance,
-)
-from core.enums import IPType, Office, RecordTypeName, ReviewDecision, RoleName
+from core.enums import IPType, Office, RecordTypeName, RoleName
 
 #: The convention that already existed, kept deliberately (see module docstring).
 PASSWORD = "IrisDemo123!"
@@ -359,16 +354,6 @@ class Command(BaseCommand):
             self._done(record)
 
     @transaction.atomic
-    def _scenario_adviser_review(self, users):
-        record = self._make(
-            "Awaiting adviser review", RecordTypeName.PROPOSAL, users[RoleName.STUDENT],
-            adviser=users[RoleName.ADVISER],
-        )
-        if record:
-            self._submit(record, users[RoleName.STUDENT])
-            self._done(record)
-
-    @transaction.atomic
     def _scenario_approved(self, users):
         from apps.reviews import seats
         from apps.reviews.decisions import ACCEPT, decide, decision_token
@@ -413,60 +398,6 @@ class Command(BaseCommand):
             rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
             seats.open_review(seats.claim(rdco_assignment, rdco), rdco)
             decide(record, rdco, outcome=KEEP_UNLISTED, token=decision_token(record))
-            self._done(record)
-
-    @transaction.atomic
-    def _scenario_rdco_intake(self, users):
-        record = self._make(
-            "Awaiting RDCO intake", RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT],
-            requested_ierc=True,
-        )
-        if record:
-            self._submit(record, users[RoleName.STUDENT])
-            self._done(record)
-
-    @transaction.atomic
-    def _scenario_itso_review(self, users):
-        """ITSO and KTTO both act at `itso_review`; IERC only joins once ITSO clears."""
-        record = self._make(
-            "At ITSO clearance", RecordTypeName.PROJECT, users[RoleName.STUDENT],
-            requested_itso=True, requested_ktto=True,
-        )
-        if record:
-            self._submit(record, users[RoleName.STUDENT])
-            approve_record(record, users[RoleName.RDCO], "Routing for clearance.")
-            self._done(record)
-
-    @transaction.atomic
-    def _scenario_parallel_review(self, users):
-        record = self._make(
-            "At parallel clearance, ITSO cleared", RecordTypeName.PROJECT,
-            users[RoleName.STUDENT],
-            requested_itso=True, requested_ierc=True, requested_ktto=True,
-        )
-        if record:
-            self._submit(record, users[RoleName.STUDENT])
-            approve_record(record, users[RoleName.RDCO], "Routing for clearance.")
-            submit_clearance(
-                record, users[RoleName.ITSO], Office.ITSO, ReviewDecision.APPROVED,
-                "No prior art conflict found.",
-            )
-            self._done(record)
-
-    @transaction.atomic
-    def _scenario_rdco_review(self, users):
-        """Every requested office has cleared, so it waits on RDCO's final review."""
-        record = self._make(
-            "All offices cleared, awaiting RDCO", RecordTypeName.THESIS_RESEARCH,
-            users[RoleName.STUDENT], requested_ierc=True,
-        )
-        if record:
-            self._submit(record, users[RoleName.STUDENT])
-            approve_record(record, users[RoleName.RDCO], "Routing to IERC.")
-            submit_clearance(
-                record, users[RoleName.IERC], Office.IERC, ReviewDecision.APPROVED,
-                "Ethics clearance granted.",
-            )
             self._done(record)
 
     @transaction.atomic

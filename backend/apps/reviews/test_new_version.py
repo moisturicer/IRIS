@@ -5,8 +5,8 @@ requesting parties' clearances and seats reset (IR-273).
 ADR-032 §5 and its 2026-10-08 Amendments, at the REST seam IR-255 confirmed:
 ADR-003's clearance-aware resubmission on the new model. One class per
 acceptance criterion, then the IR-416 hand-off (the manuscript lock and which
-manuscript a non-owner reads). Both resubmission policies are run the way
-`test_resubmission_policy.py` runs them, through `WORKFLOW_TABLE`.
+manuscript a non-owner reads). Both resubmission policies run through
+`WORKFLOW_TABLE` here; the old fixed-pipeline policy suite was retired.
 """
 
 from unittest.mock import patch

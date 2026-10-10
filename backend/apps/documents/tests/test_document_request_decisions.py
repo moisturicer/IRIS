@@ -342,24 +342,29 @@ class RefusalTests(DecisionTestBase):
         record = self.submitted(
             RecordTypeName.THESIS_RESEARCH, requested_itso=True, requested_ierc=True,
         )
-        self.review(record, self.rdco, "approved", "Needs ITSO and IERC.")
+        self.route_requested(record)
         self.review(record, self.itso, "approved", "No patent concerns.")
         _, request_id, item_id = self.one_item_uploaded(record)
 
         self.assert_refused(self.ktto, request_id, item_id, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.item_state(item_id), "uploaded")
 
-    def test_the_decision_routes_agree_with_the_list_endpoint(self):
-        # One rule for every route: where the list is 404 or 403, so are these.
+    def test_read_access_does_not_grant_decision_authority(self):
+        # Public readers cannot see requests; the Adviser participated and
+        # may read them, but only the requesting office may decide or withdraw.
         record, request_id, item_id = self.one_item_uploaded()
         Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
 
-        for viewer in (self.stranger, self.adviser, self.other_adviser):
+        for viewer in (self.stranger, self.other_adviser):
             with self.subTest(viewer=viewer.email):
                 self.client.force_authenticate(viewer)
                 listed = self.client.get(self.requests_url(record)).status_code
                 self.assertEqual(listed, status.HTTP_403_FORBIDDEN)
                 self.assert_refused(viewer, request_id, item_id, listed)
+
+        self.client.force_authenticate(self.adviser)
+        self.assertEqual(self.client.get(self.requests_url(record)).status_code, 200)
+        self.assert_refused(self.adviser, request_id, item_id, status.HTTP_403_FORBIDDEN)
 
 
 class DecisionDataIsInternalTests(DecisionTestBase):

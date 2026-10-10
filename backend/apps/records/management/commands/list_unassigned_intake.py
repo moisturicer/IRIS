@@ -3,6 +3,7 @@
 from django.core.management.base import BaseCommand
 
 from apps.records.models import Record
+from apps.reviews.models import RecordAssignment
 
 
 class Command(BaseCommand):
@@ -10,7 +11,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         count = 0
-        for record in Record.objects.filter(pipeline_status="rdco_intake").order_by("pk"):
+        intake_ids = set(RecordAssignment.objects.filter(
+            party="intake", state="active"
+        ).values_list("record_id", flat=True))
+        intake_ids.update(Record.objects.filter(
+            pipeline_status="rdco_intake"
+        ).values_list("pk", flat=True))
+        for record in Record.objects.filter(pk__in=intake_ids).order_by("pk"):
             if record.adviser_id is None:
                 reason = "no adviser"
             elif record.owners.filter(user_id=record.adviser_id).exists():

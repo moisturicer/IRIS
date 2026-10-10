@@ -28,7 +28,7 @@ from core.enums import (
 )
 
 from .test_routing import RoutingTestBase
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 MINE = "/api/v1/reviews/mine/"
 

@@ -8,8 +8,11 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from apps.accounts.models import Role, User
+from apps.documents.models import DocumentRequest
 from apps.records.models import Record, RecordOwner, RecordType
-from apps.reviews.models import RecordAssignment, Review, ReviewerSeat, RoutingEvent
+from apps.reviews.models import (
+    RecordAssignment, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
+)
 
 
 retire_intake = import_module(
@@ -58,11 +61,12 @@ class IntakeRetirementTests(TestCase):
         self.assertEqual(ReviewerSeat.objects.get(assignment=adviser).reviewer, self.adviser)
         self.assertEqual(RoutingEvent.objects.filter(record=record, to_party="adviser").count(), 1)
 
-    def test_missing_or_self_adviser_remains_visible_for_manual_resolution(self):
+    def test_missing_or_self_adviser_blocks_cutover_and_is_listed(self):
         missing, missing_intake = self.intake_record("No adviser")
         self_owned, self_intake = self.intake_record("Own adviser", self.owner)
 
-        retire_intake(apps, None)
+        with self.assertRaisesRegex(RuntimeError, "Record ids:.*" + str(missing.pk)):
+            retire_intake(apps, None)
 
         missing.refresh_from_db()
         self_owned.refresh_from_db()
@@ -79,7 +83,7 @@ class IntakeRetirementTests(TestCase):
         record, intake = self.intake_record("Conflicting holder", self.adviser)
         RecordAssignment.objects.create(record=record, party="itso")
 
-        with self.assertRaisesRegex(RuntimeError, "also held by"):
+        with self.assertRaisesRegex(RuntimeError, f"Record ids: {record.pk}"):
             retire_intake(apps, None)
 
         record.refresh_from_db()
@@ -87,3 +91,73 @@ class IntakeRetirementTests(TestCase):
         self.assertEqual(record.pipeline_status, "rdco_intake")
         self.assertEqual(intake.state, "active")
         self.assertFalse(RecordAssignment.objects.filter(record=record, party="adviser").exists())
+
+    def test_declined_intake_work_and_its_requests_are_retired_as_history(self):
+        record, intake = self.intake_record("Intake asked for changes", self.adviser)
+        record.pipeline_status = "declined"
+        record.save(update_fields=["pipeline_status"])
+        review = Review.objects.create(
+            record=record, reviewed_by=self.rdco, stage="rdco_intake",
+            status="declined", comment="Revise the manuscript.", assignment=intake,
+        )
+        revision = ResubmissionRequest.objects.create(
+            record=record, party="intake", assignment=intake, review=review,
+            requested_by=self.rdco, reason=review.comment,
+        )
+        document = DocumentRequest.objects.create(
+            record=record, party="intake", assignment=intake,
+            requested_by=self.rdco, message="Attach the evidence.",
+        )
+
+        retire_intake(apps, None)
+
+        record.refresh_from_db()
+        revision.refresh_from_db()
+        document.refresh_from_db()
+        review.refresh_from_db()
+        self.assertEqual(record.pipeline_status, "in_review")
+        self.assertEqual(revision.state, "withdrawn")
+        self.assertEqual(document.state, "withdrawn")
+        self.assertIsNotNone(revision.resolved_at)
+        self.assertIsNotNone(document.closed_at)
+        self.assertEqual((review.stage, review.status), ("rdco_intake", "declined"))
+
+    def test_all_legacy_in_flight_statuses_move_after_preflight(self):
+        statuses = ("adviser_review", "itso_review", "parallel_review", "rdco_review")
+        for status in statuses:
+            with self.subTest(status=status):
+                record = Record.objects.create(
+                    title=status, record_type=self.record_type, added_by=self.owner,
+                    adviser=self.adviser, pipeline_status=status,
+                )
+                RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
+                if status == "adviser_review":
+                    RecordAssignment.objects.create(record=record, party="adviser")
+                elif status == "rdco_review":
+                    RecordAssignment.objects.create(record=record, party="rdco")
+                    RecordAssignment.objects.create(
+                        record=record, party="intake", state="completed",
+                    )
+                else:
+                    from apps.reviews.models import RecordClearance
+                    RecordClearance.objects.create(record=record, office="itso", status="pending")
+                    RecordAssignment.objects.create(record=record, party="itso")
+                    RecordAssignment.objects.create(
+                        record=record, party="intake", state="completed",
+                    )
+        retire_intake(apps, None)
+        self.assertFalse(Record.objects.filter(pipeline_status__in=statuses).exists())
+        self.assertEqual(Record.objects.filter(pipeline_status="in_review").count(), 4)
+
+    def test_preflight_lists_every_bad_id_before_any_write(self):
+        first, first_intake = self.intake_record("Missing adviser")
+        second, second_intake = self.intake_record("Wrong holders", self.adviser)
+        RecordAssignment.objects.create(record=second, party="itso")
+
+        with self.assertRaises(RuntimeError) as caught:
+            retire_intake(apps, None)
+
+        self.assertIn(str(first.pk), str(caught.exception))
+        self.assertIn(str(second.pk), str(caught.exception))
+        self.assertEqual(RecordAssignment.objects.get(pk=first_intake.pk).state, "active")
+        self.assertEqual(RecordAssignment.objects.get(pk=second_intake.pk).state, "active")

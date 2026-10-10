@@ -8,16 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from core.permissions import IsReviewer, IsStaff
-from core.exceptions import InvalidPipelineTransition
-from apps.records import lifecycle
-from core.enums import ReviewDecision
 from .models import Review, RecordAuthPin
-from .serializers import ReviewSerializer, ReviewWriteSerializer
-from .services import (
-    approve_record, decline_record, reject_record,
-    resubmit_record, submit_clearance,
-    ROLE_TO_OFFICE,
-)
 from apps.records.models import Record
 from apps.audit.services import create_audit_event
 
@@ -26,8 +17,8 @@ PIN_EXPIRY_HOURS = 24
 
 class ReviewViewSet(viewsets.GenericViewSet):
     """
-    POST /reviews/submit/     -- submit a review or clearance decision
-    POST /reviews/resubmit/   -- owner resubmits a declined record
+    POST /reviews/submit/     -- retired fixed-stage action (410)
+    POST /reviews/resubmit/   -- retired fixed-stage resubmission (410)
     GET  /reviews/analytics/  -- per-stage average processing time (TODO stub, 501)
     """
     permission_classes = [IsAuthenticated, IsReviewer]
@@ -60,94 +51,17 @@ class ReviewViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["post"])
     def submit(self, request):
-        """
-        POST /reviews/submit/
-
-        Body: { "record_id": <int>, "status": "approved"|"declined"|"rejected", "comment": "<str>" }
-
-        Routing:
-          • Sequential stages (adviser_review, rdco_intake, rdco_review):
-              approved  → advance to next stage (rdco_intake also creates office clearances)
-              declined  → record enters 'declined'; the owner may resubmit
-              rejected  → terminal; record enters 'rejected'. adviser_review and
-                          rdco_review only -- refused with 400 at rdco_intake (IR-265)
-          • Clearance stages (itso_review, parallel_review):
-              Routes to submit_clearance; office determined from user's role.
-              approved  → clears office; advances pipeline when all offices are cleared.
-              declined  → record enters 'declined' (same as above).
-              rejected  → refused with 400; an office cannot reject (IR-265).
-        """
-        serializer = ReviewWriteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        try:
-            record = Record.objects.select_related("record_type", "adviser").get(
-                pk=data["record_id"]
-            )
-        except Record.DoesNotExist:
-            return Response({"detail": "Record not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        decision = data["status"]
-        comment  = data.get("comment", "")
-
-        try:
-            if lifecycle.is_clearance_stage(record.pipeline_status):
-                # Clearance stage — office is inferred from the reviewer's role
-                role_name = request.user.role.name if request.user.role else ""
-                office    = ROLE_TO_OFFICE.get(role_name, "")
-                review = submit_clearance(
-                    record, reviewed_by=request.user,
-                    office=office, decision=decision, comment=comment,
-                )
-            else:
-                # Sequential stage
-                if decision == ReviewDecision.APPROVED:
-                    review = approve_record(record, reviewed_by=request.user, comment=comment)
-                elif decision == ReviewDecision.REJECTED:
-                    review = reject_record(record, reviewed_by=request.user, comment=comment)
-                else:
-                    review = decline_record(record, reviewed_by=request.user, comment=comment)
-
-        except InvalidPipelineTransition as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
+        return Response(
+            {"detail": "The fixed-stage review form is retired. Use the record's review actions."},
+            status=status.HTTP_410_GONE,
+        )
 
     @action(detail=False, methods=["post"])
     def resubmit(self, request):
-        """
-        POST /reviews/resubmit/
-
-        Body: { "record_id": <int> }
-
-        Owner resubmits a declined record. Clears all office clearances and routes
-        to the correct first stage based on record type.
-        Only the record owner or staff may call this.
-        """
-        record_id = request.data.get("record_id")
-        if not record_id:
-            return Response({"detail": "record_id is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            record = Record.objects.select_related("record_type", "adviser").get(pk=record_id)
-        except Record.DoesNotExist:
-            return Response({"detail": "Record not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        from core.permissions import owns_or_staffs_record
-        if not owns_or_staffs_record(request.user, record):
-            return Response(
-                {"detail": "Only the record owner may resubmit."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        try:
-            resubmit_record(record, submitted_by=request.user)
-        except InvalidPipelineTransition as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response({"detail": "Record resubmitted successfully."})
-
+        return Response(
+            {"detail": "Use the record's Submit new version action for a requested revision."},
+            status=status.HTTP_410_GONE,
+        )
 
 class MyReviewsView(APIView):
     """
