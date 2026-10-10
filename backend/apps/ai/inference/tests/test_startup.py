@@ -245,6 +245,12 @@ class ProviderPinStartupTests:
 
         assert provider_pin_problems([profile_for(InferenceTask.RESOLVE)]) == ()
 
+    def test_openrouter_answer_without_a_pin_refuses_startup(self, settings):
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+        settings.LLM_ANSWER_MODEL = "model"
+        settings.LLM_ANSWER_PROVIDER_ONLY = ""
+        assert "LLM_ANSWER_PROVIDER_ONLY" in provider_pin_problems([profile_for(InferenceTask.ANSWER)])[0]
+
 
 class StartupTests:
     """The check runs when Django starts, not when a reader asks something."""

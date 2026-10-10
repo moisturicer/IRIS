@@ -197,3 +197,7 @@ This is the one unrecoverable item in the plan. Events not written during the We
 - Never move a row to VERIFIED without a link to actual evidence
 - If a requirement is descoped, set DEFERRED and cite the ADR or SRS amendment — do not delete the row
 - Review the whole table before the technical defence; an unverified requirement reported as unverified is defensible, a false VERIFIED is not
+
+## IR-489 — answer-model evaluation and request data controls
+
+The answer evaluation instrument freezes disclosable prompts, requires >=2 repeats and a judge from a different model maker, records raw citation/leakage/empty/finish diagnostics and usage including reasoning tokens, and skips history arms beyond the candidate context. Evidence: `backend/apps/ai/evaluation/tests/test_answer_models.py`, `providers/tests/test_dialects.py`, `inference/tests/test_profiles.py` and `inference/tests/test_startup.py`. The offline comparison is `docs/evaluation/runs/ir489-offline-answers.json`; it is synthetic instrument evidence, not a real model quality finding. Per-task OpenRouter pins send `provider.only` beside `data_collection: deny`; startup refuses missing OpenRouter answer pins and pins on Groq. Paid comparison and endpoint hosting verification remain pending. No requirement status is promoted to VERIFIED by synthetic quality scores.

@@ -183,7 +183,15 @@ def provider_pin_problems(profiles: Iterable[Profile]) -> tuple[str, ...]:
 
     A pin only OpenRouter honours; elsewhere it would read as protection.
     """
-    return tuple(
+    profiles = tuple(profiles)
+    missing = tuple(
+        "LLM_ANSWER_PROVIDER_ONLY is required for OpenRouter answers: choose "
+        "providers with verified US/EU hosting (IR-485 #6)."
+        for profile in profiles
+        if profile.task is InferenceTask.ANSWER and profile.is_configured
+        and profile.vendor is Vendor.OPENROUTER and not profile.provider_only
+    )
+    return missing + tuple(
         f"{profile.task.settings_prefix}_PROVIDER_ONLY is set, but the "
         f"{profile.task.value!r} task is at {profile.vendor.value}, which has "
         "no provider routing. Move the task to openrouter or remove the pin."

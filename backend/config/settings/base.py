@@ -417,7 +417,8 @@ LLM_REASONING_EFFORT = config("LLM_REASONING_EFFORT", default="")
 # PROVIDER_ONLY (IR-489) is a comma-separated allow-list of OpenRouter
 # provider slugs, sent as provider.only, so no unvetted (e.g. China-hosted,
 # IR-485 #6) provider serves the task. OpenRouter only; elsewhere it refuses
-# startup. Empty means any provider that passes data_collection: deny.
+# startup. OpenRouter answers require a nonempty pin; other tasks may leave
+# it empty for any provider that passes data_collection: deny.
 LLM_ANSWER_VENDOR   = config("LLM_ANSWER_VENDOR", default="")
 LLM_ANSWER_BASE_URL = config("LLM_ANSWER_BASE_URL", default="")
 LLM_ANSWER_API_KEY  = config("LLM_ANSWER_API_KEY", default="")

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "tier": "proxy",
+  "notes": "Invented offline instrument. These are frozen fake retrieval results, not evidence about any real corpus.",
+  "cases": [
+    {
+      "id": "supported",
+      "question": "What accuracy did the rainfall model achieve?",
+      "reference": "The supplied passage reports 82% accuracy. Cite source 1.",
+      "prompt": "Question: What accuracy did the rainfall model achieve?\n\nSources:\n[1] Rainfall experiment > Results\nThe model achieved 82% accuracy on the held-out rainfall data.",
+      "source_count": 1
+    },
+    {
+      "id": "unsupported",
+      "question": "What accuracy did the earthquake model achieve?",
+      "reference": "Decline to provide an accuracy number: the supplied source only discusses rainfall.",
+      "prompt": "Question: What accuracy did the earthquake model achieve?\n\nSources:\n[1] Rainfall experiment > Results\nThe rainfall model achieved 82% accuracy.",
+      "source_count": 1
+    }
+  ]
+}
