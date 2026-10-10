@@ -6,6 +6,15 @@
 
 > **Amendment to §4 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** §4's obligation binds a question *routed as corpus-level or landscape*, and §5's router does not exist (verified 2026-10-06: no routing module, no Lens, IR-302–305 unbuilt), so **§4 is dormant, not satisfied**. ADR-035 §9 records a bounded landscape exception: ordinary retrieval **does not** satisfy Lens-or-refuse, no answer may claim a comprehensive landscape or research-gap analysis from it, an accountable owner must be **named by a person** before any production `on`, and the exception **expires at that go/no-go**. It is not a blanket postponement.
 
+> **Where this stands — reviewed 2026-10-10. Status only; no Decision below changes.**
+>
+> - **Nothing in this ADR is built.** Checked in the tree: `backend/apps/ai` has no Lens, no Area source and no routing module. `frontend/src/features/discover` has no Research landscape panel. Listing (§9, IR-400) is unbuilt too.
+> - **Owner named.** Jive Tyler Revalde was named landscape owner and chose ADR-035 §9's **option (a), build the Lens**. This was recorded on IR-485 on 2026-10-10. It is written into ADR-035 §Amendment A6, which is part of the IR-487 amendment and is **proposed, not accepted**. Until the Lens exists, §4 stays dormant. The interim limit holds: a landscape-shaped question routes to evidence and never to a direct answer, and no answer may claim a landscape or gap analysis from ordinary retrieval.
+> - **Contradiction recorded, not resolved.** The owner chose to build the Lens. Its Jira epic, IR-301, is still **Deferred Until Validation**, and its five children, IR-302 to IR-306, are **To Do**. ADR-035 cites the Lens as "IR-302–305", but IR-306 (§7's dated snapshot) belongs to it too. The planning state and the owner's choice need reconciling by a person.
+> - **The evidence detector recognises these questions; it does not answer them.** IR-464's `aggregate_shape` rule (`apps/ai/evidence/rules.py`) matches landscape and listing phrasings such as "landscape" and "list every". It can only add retrieval. It is not §5's router and it does not reach a Lens.
+> - **Jira holds a §5 amendment this file does not.** IR-301's 2026-09-28 resolution log says the routing call may answer several *shape* facets (route, listing, multi-part), with accuracy reported per facet by IR-394's harness, and says "this amends ADR-027 §5". ADR-026 §14 covers the multi-part flag. The per-facet measurement rule is in neither ADR. Under the source-of-truth hierarchy this ADR stands until a person amends it. The gap is recorded here and not reconciled.
+> - IR-301 also names [ADR-028](028-no-tool-calling-in-the-answer-path.md) as governing "what this must not become". ADR-028 is now `Superseded by ADR-035`. ADR-035's tool call is a route signal that is never executed, so it does not let the model choose a Lens call. The prohibition still holds in substance, but the citation is stale.
+
 **Extends [ADR-013](013-chunk-level-rag-pipeline.md)** rather than amending it. ADR-013 made the chunk the retrievable unit, which is right for questions about a Record's contents. This ADR covers questions about the corpus itself, which retrieval cannot answer at all.
 
 **Depends on [ADR-023](023-retrieval-quality-evaluation.md)** for its evaluation structure, and on [IR-153](https://citiris.atlassian.net)'s visibility guarantee for its security posture.
@@ -36,6 +45,8 @@ Retrieval finds passages resembling a question. Ask it for trends and it returns
 Two corrections to earlier internal analysis are worth recording, because both were used to argue this capability was further away than it is. The architecture review claimed engagement tracking "needs a new event stream" — it does not; `ACCESS` events exist and are timestamped. And `Record.access_count` was read as an engagement signal — it is a lifetime cumulative counter with no timestamps, so it can only answer "most accessed ever", never "trending this month". The `AuditEvent` rows are the ones with dates.
 
 **The consequence: this capability needs no vectors.** It is not blocked on the chunk-embedding chain.
+
+> **Re-audited 2026-10-10. The table still holds.** `AuditEvent` still has 14 types, and `ACCESS` is still written by `increment_access` (`apps/records/views.py`). `Classification` and `PSCEDClassification` are still flat tables holding only a unique `name`. Both `Record` foreign keys are still nullable. **One addition:** `manage.py load_corpus` (IR-313) creates one `Classification` per category folder and sets no PSCED. So the proxy corpus has Classification Areas but no PSCED Areas. That is enough for §8's engineering-gate fixture. It says nothing about §1a's question of whether real PSCED names carry codes.
 
 ## Decision
 
@@ -79,7 +90,7 @@ Ranking Areas and reporting the bottom N was rejected: it guarantees a finding w
 
 **Landscape answers do not run below a configured minimum number of visible Records**, and above it the sample size is shown.
 
-With a dozen Records every Area is sparse and every trend is noise. This matters immediately rather than theoretically: IR-278 has not started, so the *first* run of this capability will be against a near-empty catalogue. It must say "not enough records to describe a landscape" rather than invent one.
+With a dozen Records every Area is sparse and every trend is noise. This matters immediately rather than theoretically: IR-278 has not started (as of 2026-10-10 it is **Deferred Until Validation**, and the only loaded corpus is the 40-paper arXiv proxy tier), so the *first* run of this capability will be against a near-empty catalogue. It must say "not enough records to describe a landscape" rather than invent one.
 
 Showing the sample size above the floor is not sufficient on its own — a reader takes the claim and skips the caveat, which is what caveats are for.
 
@@ -244,4 +255,4 @@ FR-M4 — stable label only, per the frozen-SRS rule.
 
 ## Related Tasks
 
-IR-278 (corpus — gates the interpretive evaluation tier), ADR-023 (evaluation structure), IR-296 (question resolution, deliberately kept separate from routing). **IR-392** adds §9; **IR-400** builds the listing outcome, under IR-390.
+**IR-301** (the epic that builds this ADR, Deferred Until Validation as of 2026-10-10): **IR-302** (a landscape you can look at), **IR-303** (Areas that have gone quiet), **IR-304** (submission and access velocity), **IR-305** (landscape questions in Ask IRIS, i.e. §5's router, which IR-400 waits on), **IR-306** (§7's dated snapshot). **IR-485** names the landscape owner (ADR-035 §9, and A6 in its proposed amendment). IR-464 (the `aggregate_shape` detector rule, which recognises but does not answer). IR-278 (corpus — gates the interpretive evaluation tier, Deferred Until Validation), ADR-023 (evaluation structure), IR-296 (question resolution, deliberately kept separate from routing). **IR-392** adds §9; **IR-400** builds the listing outcome, under IR-390.
