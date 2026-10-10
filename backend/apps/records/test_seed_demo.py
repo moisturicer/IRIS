@@ -230,6 +230,19 @@ class SeedDemoRecordTests(TestCase):
             {("adviser", "active")},
         )
 
+    def test_every_my_reviews_tab_has_a_seat(self):
+        """
+        IR-260: a rehearsal can open each My Reviews tab on real rows. To review
+        is an `assigned` seat, In review an `in_review` one, Done a `done` one
+        (ADR-032 §9).
+        """
+        from apps.reviews.models import ReviewerSeat
+
+        states = set(ReviewerSeat.objects.values_list("state", flat=True))
+        for state in ("assigned", "in_review", "done"):
+            with self.subTest(state=state):
+                self.assertIn(state, states, f"no seeded seat is {state}")
+
     def test_one_specialist_path_thesis_waits_in_rdcos_pool(self):
         """
         IR-270: reached through the real acts -- the Adviser's accept & route,
