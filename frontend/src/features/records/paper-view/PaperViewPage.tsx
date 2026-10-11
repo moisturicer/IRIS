@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent,
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
+import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button, Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -638,15 +639,12 @@ export default function PaperViewPage() {
   };
 
   return (
-    // Centred, not stretched edge to edge (IR-335) -- alphaxiv's reading
-    // layout. `AppShell`'s own `<main>` sets no max-width, deliberately: it
-    // is shared by every screen, and this constraint belongs to the one that
-    // reads like a paper. The right rail stays inside this same container,
-    // centred with the main column as a pair, rather than moving elsewhere.
-    // The Paper section is the exception (IR-372): the reader and Ask IRIS
-    // use the whole width, so a wide screen gives the paper more room
-    // instead of margins.
-    <div className={cn(!onPaperTab && !onReviewTab && "max-w-6xl mx-auto")}>
+    // Centred at the app's standard width (IR-335, IR-521), with the right
+    // rail inside the same container so the two centre as a pair. The route
+    // asks AppShell for the full width because the Paper and Review sections
+    // use all of it (IR-372): the reader and the review pane get the room
+    // rather than margins. The other sections take the standard width here.
+    <div className={cn(!onPaperTab && !onReviewTab && PAGE_WIDTH.standard)}>
       <div
         className={cn(
           "lg:flex lg:gap-6 lg:items-start",
@@ -654,7 +652,7 @@ export default function PaperViewPage() {
         )}
       >
         <div className="min-w-0 lg:flex-1">
-          {/* The section switch floats just under the app header, so every
+          {/* The section switch floats at the top of the window, so every
               section is one click away at any depth (IR-356). */}
           <div className={cn("sticky z-30 flex justify-center mb-4 pointer-events-none", VIEW_SWITCH_TOP)}>
             <div
@@ -688,7 +686,9 @@ export default function PaperViewPage() {
           <div
             className={cn(
               "grid gap-6 items-start",
-              showRail && "lg:grid-cols-[minmax(0,1fr)_20rem]",
+              // The rail takes some of a wide screen's extra width (IR-521);
+              // the Abstract keeps its reading measure either way.
+              showRail && "lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]",
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -1043,7 +1043,7 @@ export default function PaperViewPage() {
           {/* Overview only (IR-372 keeps it off the Paper tab). Not shown
               while chat is docked (IR-351): a docked chat beside the rail
               squeezed the paper under it. Floating or closing the chat brings
-              it back. Sticky below the fixed 58px header, capped to the
+              it back. Sticky under the section switch, capped to the
               viewport and scrollable, because a sticky rail taller than the
               window would hide its lower cards until the paper ended. The
               party status strip is for participants only (spec §4.6). */}

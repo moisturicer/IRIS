@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { opportunitiesApi } from "@/api/opportunities";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   getSavedOpportunityIds,
   toggleSavedOpportunity,
@@ -95,27 +96,14 @@ export function CallsAndConferencesPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-[1400px] mx-auto space-y-4">
+    // Width and padding come from AppShell's PageContainer (IR-522).
+    <div className="space-y-4">
       {/* ---- Orientation ------------------------------------------------- */}
-      <header className="bg-white rounded-xl border border-stone-200 p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
-                <i className="fas fa-bullhorn text-[11px]" aria-hidden />
-              </span>
-              <span className="text-[12px] font-bold uppercase tracking-wider text-brand">
-                Institutional &amp; External Announcements
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold text-stone-900">Calls &amp; Conferences</h1>
-            <p className="text-[14px] text-stone-600 mt-1 max-w-2xl">
-              Internal research calls, upcoming conference deadlines, and competitive funding
-              windows published by CIT-U offices and partner institutions.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 text-[13px] font-semibold rounded-lg border border-stone-200 px-3 py-2 shrink-0">
+      <PageHeader
+        title="Calls & Conferences"
+        description="Internal research calls, upcoming conference deadlines, and competitive funding windows published by CIT-U offices and partner institutions."
+        actions={
+          <div className="flex items-center gap-3 text-[13px] font-semibold rounded-lg border border-stone-200 bg-white px-3 py-2">
             <span className="flex items-center gap-1.5 text-stone-700">
               <i className="fas fa-calendar-check text-brand text-[12px]" aria-hidden />
               {activeCount} Active {activeCount === 1 ? "Call" : "Calls"}
@@ -127,10 +115,12 @@ export function CallsAndConferencesPage() {
               {savedIds.length} Saved
             </span>
           </div>
-        </div>
+        }
+      />
 
-        {/* ---- Filters --------------------------------------------------- */}
-        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-stone-100 flex-wrap">
+      {/* ---- Filters --------------------------------------------------- */}
+      <div className="bg-white rounded-xl border border-stone-200 p-4">
+        <div className="flex items-center gap-3 flex-wrap">
           <div
             className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin -mb-1 pb-1"
             role="tablist"
@@ -174,7 +164,7 @@ export function CallsAndConferencesPage() {
             />
           </div>
         </div>
-      </header>
+      </div>
 
       {/* ---- Board ------------------------------------------------------- */}
       {loading ? (

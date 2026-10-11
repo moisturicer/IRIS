@@ -75,10 +75,12 @@ export function ChatToolbar({
         <span className="hidden sm:inline">Sources</span>
       </button>
 
-      {/* Ask IRIS is the other page AppShell treats as full-bleed (isFullBleed
-          covers "/" and "/ai"), so the shared Header -- and its bell -- never
-          renders here. Same component, same shared store. */}
-      <NotificationBell />
+      {/* Phones only: Ask IRIS fills the window, so AppShell draws no phone bar
+          here, and this is where the bell goes instead. On a desktop the bell
+          is at the top of the sidebar (IR-519). Same component, same store. */}
+      <div className="md:hidden">
+        <NotificationBell />
+      </div>
     </header>
   );
 }

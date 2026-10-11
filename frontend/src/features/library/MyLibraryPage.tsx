@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { recordsApi } from "@/api/records";
+import { PageHeader } from "@/components/layout/PageHeader";
 import type { RecordListItem } from "@/types/records";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import {
@@ -210,23 +211,17 @@ export default function MyLibraryPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-[20px] font-bold text-stone-900 flex items-center gap-2">
-            <i className="fas fa-bookmark text-[16px] text-brand" aria-hidden />
-            My Library
-          </h1>
-          <p className="text-[14px] text-stone-500 mt-1">
-            Saved research, likes and folders — stored in this browser only.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="My Library"
+        description="Saved research, likes and folders — stored in this browser only."
+      />
 
       <div className="lg:flex lg:gap-5 lg:items-start">
-        {/* The rail sticks below the fixed 58px Header (IR-351: sticky only
-            started working once AppShell stopped being a scroll container). */}
+        {/* The rail sticks 24px from the top of the window -- there is no app
+            header above it since IR-519 (IR-351: sticky only started working
+            once AppShell stopped being a scroll container). */}
         {railOpen ? (
-          <div className="mb-4 lg:mb-0 lg:w-64 lg:shrink-0 lg:sticky lg:top-[82px] lg:h-[calc(100vh-8rem)]">
+          <div className="mb-4 lg:mb-0 lg:w-64 lg:shrink-0 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
             <LibraryFolderRail
               collections={collections}
               view={view}

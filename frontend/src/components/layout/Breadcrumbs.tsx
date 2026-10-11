@@ -1,7 +1,11 @@
 import { Link, useMatches } from "react-router-dom";
 
+import type { PageWidth } from "./PageContainer";
+
 export type RouteHandle = {
   crumb?: string;
+  /** How wide the page may grow; `AppShell` reads it (IR-521). Standard when absent. */
+  width?: PageWidth;
 };
 
 export function Breadcrumbs() {

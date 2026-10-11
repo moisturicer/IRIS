@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { authApi } from "@/api/auth";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
@@ -41,17 +42,16 @@ export default function SettingsPage() {
   if (!user) return null;
 
   return (
-    <div className="p-4 sm:p-6 max-w-[1200px] mx-auto space-y-4">
-      <header className="bg-white rounded-xl border border-stone-200 px-5 sm:px-6 py-5">
-        <h1 className="text-2xl font-bold text-stone-900">Settings &amp; Profile</h1>
-        <p className="text-[14px] text-stone-600 mt-1">
-          {[user.first_name && `${user.first_name} ${user.last_name}`.trim(),
-            user.role_name,
-            user.college_name]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      </header>
+    // Width and padding come from AppShell's PageContainer (IR-522).
+    <div className="space-y-4">
+      <PageHeader
+        title="Settings & Profile"
+        description={[user.first_name && `${user.first_name} ${user.last_name}`.trim(),
+          user.role_name,
+          user.college_name]
+          .filter(Boolean)
+          .join(" · ")}
+      />
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <nav

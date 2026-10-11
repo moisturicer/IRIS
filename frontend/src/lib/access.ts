@@ -86,8 +86,9 @@ export const SCREEN_ACCESS = {
                    nav: { label: "My Library", icon: "fa-bookmark", section: "Research Exploration" } },
   opportunities: { path: "/opportunities", roles: EVERYONE,
                    nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Research Exploration" } },
-  notifications: { path: "/notifications", roles: EVERYONE,
-                   nav: { label: "Notifications", icon: "fa-bell", section: "Tools" } },
+  // The bell at the top of the sidebar is the entry; its "View all" opens the
+  // page, so a sidebar link would say the same thing twice (IR-519).
+  notifications: { path: "/notifications", roles: EVERYONE },
   settings:      { path: "/settings",      roles: EVERYONE,
                    nav: { label: "Settings & Profile", icon: "fa-cog", section: "Tools" } },
   help:          { path: "/help",          roles: EVERYONE },
