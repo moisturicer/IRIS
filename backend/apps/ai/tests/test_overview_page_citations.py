@@ -143,7 +143,7 @@ class OverviewPageCitationTests:
         llm = ScriptedLLM(reply="The gauge network is sparse [p. 9].")
 
         with use_composition_root(_overview_root(llm)):
-            result = overview_for(paper)
+            result = whole_paper._generate_overview(paper)
 
         [citation] = result["overview"]["citations"]
         assert citation["page"] == 9
@@ -154,7 +154,7 @@ class OverviewPageCitationTests:
         llm = ScriptedLLM(reply="An account [p. 1].")
 
         with use_composition_root(_overview_root(llm)):
-            overview_for(paper)
+            whole_paper._generate_overview(paper)
 
         [(system, user)] = llm.calls
         assert "[p. 3]" in system

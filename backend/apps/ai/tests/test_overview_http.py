@@ -12,6 +12,7 @@ from django.urls import reverse
 
 from apps.ai.composition import use_composition_root
 from apps.ai.models import ChunkSet, RecordOverview
+from apps.ai.overview.service import PROMPT_VERSION
 from apps.ai.tasks import generate_record_overview
 from apps.ai.providers.fakes import ScriptedLLM
 from core.enums import PipelineStatus
@@ -83,7 +84,7 @@ class GeneratedOnceAndCachedTests:
             record=record,
             text="A cached overview.",
             content_hash=chunk_set.content_hash,
-            prompt_version=2,
+            prompt_version=PROMPT_VERSION,
         )
 
         response = _overview(client, record.pk)
@@ -165,7 +166,7 @@ class UnavailableIsNeverCachedTests:
         chunk_set = ChunkSet.objects.get(record=record, is_active=True)
         RecordOverview.objects.create(
             record=record, state="unavailable", text="",
-            content_hash=chunk_set.content_hash, prompt_version=2,
+            content_hash=chunk_set.content_hash, prompt_version=PROMPT_VERSION,
         )
         queued = []
         monkeypatch.setattr(

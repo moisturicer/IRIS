@@ -201,7 +201,7 @@ class ComprehensiveSkeletonTests:
     def _sent(self, paper):
         llm = ScriptedLLM(reply="An account [1].")
         with use_composition_root(_root(llm)):
-            overview_for(paper)
+            _generate_overview(paper)
         [(system, user)] = llm.calls
         return system, user
 
@@ -245,7 +245,7 @@ class ComprehensiveSkeletonTests:
         llm = ScriptedLLM(reply="## Objectives\n\nForecasting [1].")
 
         with use_composition_root(_root(llm)):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         assert len(llm.calls) == 1
         assert result["overview"]["text"] == "## Objectives\n\nForecasting [1]."
