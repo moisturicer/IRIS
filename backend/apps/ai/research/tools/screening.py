@@ -1,6 +1,7 @@
 """Title-and-abstract screening of an application-supplied candidate set (IR-501)."""
 
 import json
+import hashlib
 from collections import Counter
 
 from django.conf import settings
@@ -51,12 +52,22 @@ def _validated_decisions(reply, batch):
     return decisions
 
 
-def screen_records(run: ToolRun, args: dict) -> ToolResult:
+def _candidates(run):
     candidates = (
         run.screen_candidate_ids if run.screen_candidate_ids is not None
         else tuple(e.record_id for e in run.ledger.records())
     )
-    records = list(readable_records(run.ctx).filter(pk__in=candidates).order_by("pk"))
+    return readable_records(run.ctx).filter(pk__in=candidates).order_by("pk")
+
+
+def _cache_context(run):
+    # A repeat is a duplicate only while identity, gate and content still match.
+    return [(r.pk, hashlib.sha256((r.title + "\0" + r.abstract).encode()).hexdigest()
+             if run.ctx.permits(r) else None) for r in _candidates(run)]
+
+
+def screen_records(run: ToolRun, args: dict) -> ToolResult:
+    records = list(_candidates(run))
     maximum = max(1, settings.AI_SCREEN_MAX_RECORDS)
     truncated = len(records) > maximum
     records = records[:maximum]
@@ -93,15 +104,22 @@ def screen_records(run: ToolRun, args: dict) -> ToolResult:
         except Exception:
             # A vendor can echo input in its exception. Keep no message/reason.
             decisions.extend(fallback)
+    # Another batch or an in-flight call can outlive a visibility/gate change.
+    current_ids = set(readable_records(run.ctx).filter(pk__in=[r.pk for r in records])
+                      .values_list("pk", flat=True))
+    allowed = disclosable(run.ctx, current_ids)
+    evidence = [e for e in evidence if e.record_id in allowed]
+    handles = {e.handle for e in evidence}
+    decisions = [row for row in decisions if row["record"] in handles]
     checked = sum(row["decision"] != "unassessed" for row in decisions)
     return ToolResult(
-        status_for(len(records), checked < len(records)),
+        status_for(len(current_ids), checked < len(current_ids)),
         Coverage(Completeness.MATCHES_FOUND if truncated else Completeness.SCREENED,
-                 returned=len(records), truncated=truncated),
+                 returned=len(current_ids), truncated=truncated),
         tuple(evidence),
         detail={"criterion": args["criterion"], "method": "title_and_abstract",
                 "rows": decisions, "checked": checked,
-                "unassessed": len(records) - checked,
+                "unassessed": len(current_ids) - checked,
                 "possible_duplicates": possible_duplicates(run, evidence)},
     )
 
@@ -117,4 +135,5 @@ SCREEN_RECORDS = Tool(
     parameters={"type": "object", "properties": {"criterion": QUERY},
                 "required": ["criterion"], "additionalProperties": False},
     execute=screen_records,
+    cache_context=_cache_context,
 )

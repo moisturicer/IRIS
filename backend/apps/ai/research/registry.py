@@ -47,6 +47,8 @@ class Tool:
     description: str
     parameters: Mapping[str, Any]
     execute: Callable[[ToolRun, dict[str, Any]], ToolResult]
+    # Stateful inputs owned by the application, absent from vendor schemas.
+    cache_context: Callable[[ToolRun], Any] | None = None
 
     def __post_init__(self) -> None:
         check_schema(self.parameters)
@@ -85,11 +87,8 @@ class ToolRegistry:
         try:
             args = validate(arguments, tool.parameters)
             identity = args
-            if name == "screen_records":
-                candidates = run.screen_candidate_ids
-                if candidates is None:
-                    candidates = tuple(e.record_id for e in run.ledger.records())
-                identity = {"arguments": args, "candidates": sorted(set(candidates))}
+            if tool.cache_context is not None:
+                identity = {"arguments": args, "context": tool.cache_context(run)}
             key = (name, json.dumps(identity, sort_keys=True))
             cached = run.cache.get(key)
             if cached is not None:

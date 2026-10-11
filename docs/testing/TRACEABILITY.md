@@ -426,7 +426,7 @@ disclosure and scope, batch/vendor failures, malformed responses, quote
 provenance, budgets, candidate-set caching, screening beyond retrieval's top
 ten, duplicate flags, include/exclude counts and author/version multiplicity.
 The focused research/inference suite and unchanged-answer/retrieval guards
-passed **261 tests** on 2026-10-11. Django configuration and migration drift
+passed **266 tests** on 2026-10-11. Django configuration and migration drift
 checks passed, with the existing Axes deprecation warning. Full-suite and
 independent review evidence is recorded after final verification.
 

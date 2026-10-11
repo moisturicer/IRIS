@@ -3,7 +3,7 @@ import pytest
 from apps.ai.research.results import Completeness
 from apps.ai.models.conversation import Conversation
 from apps.records.models import RecordOwner, RecordVersion
-from core.enums import VersionCause
+from core.enums import VersionCause, PipelineStatus
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.tests.corpus import make_record
 from apps.ai.providers.fakes import ScriptedLLM
@@ -158,3 +158,31 @@ def test_vectors_from_different_models_never_flag_duplicates(corpus, embedder):
         embedding=seed.embedding, model_name="different-model")
     result = topic_count(screening_run(corpus, embedder, ScreeningModel()), "Is about aquaponics")
     assert result.detail["possible_duplicates"] == []
+
+
+def test_a_visibility_change_during_screening_removes_the_record_from_all_results(corpus, embedder):
+    from apps.ai.research.workflows import topic_count
+
+    class VisibilityChanges(ScreeningModel):
+        def generate(self, system, user):
+            reply = super().generate(system, user)
+            corpus["public"].pipeline_status = PipelineStatus.DRAFT
+            corpus["public"].save()
+            return reply
+
+    result = topic_count(screening_run(corpus, embedder, VisibilityChanges()), "Is about aquaponics")
+    assert result.detail["total"] == result.detail["checked"] == 1
+    assert result.detail["unassessed"] == 0
+    assert "Flood" not in result.planner_message()
+
+
+def test_a_cached_result_does_not_reveal_a_paper_that_becomes_invisible(corpus, embedder):
+    from apps.ai.research.workflows import topic_count
+
+    run = screening_run(corpus, embedder, ScreeningModel())
+    assert topic_count(run, "Is about aquaponics").detail["total"] == 2
+    corpus["public"].pipeline_status = PipelineStatus.DRAFT
+    corpus["public"].save()
+    result = topic_count(run, "Is about aquaponics")
+    assert result.detail["total"] == result.detail["checked"] == 1
+    assert "Flood" not in result.planner_message()

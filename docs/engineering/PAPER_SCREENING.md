@@ -41,6 +41,11 @@ performs no paid quality measurement and enables no reader-facing route.
 collected in the run or from the application workflow; a model cannot supply
 IDs, scope, identity, batch size or limits. Visibility and Paper Chat scope
 are re-read, and the disclosure gate is applied before each batch.
+Cache reuse rechecks visible candidates, disclosure and title/abstract content
+identity. Unchanged duplicate calls return the cached result and spend a call;
+changed permissions or text require fresh screening. Returned evidence and
+decisions are checked again after all batches. A newly invisible paper is
+removed from every result/count; a newly gated visible paper is unassessed.
 
 `topic_count(run, criterion, filters=...)` screens all visible filtered
 records at or below the ceiling (default 500). Above it, the existing fused

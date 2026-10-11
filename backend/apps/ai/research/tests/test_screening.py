@@ -160,3 +160,48 @@ def test_a_late_response_is_unassessed_and_no_next_batch_is_sent(corpus, embedde
     assert len(model.requests) == 1
     assert result.detail["checked"] == 0
     assert result.detail["unassessed"] == 2
+
+
+def test_a_cached_screening_result_is_withheld_when_the_gate_changes(corpus, embedder):
+    allowed = [True]
+    model = ScreeningModel()
+    run = screening_run(corpus, embedder, model, lambda r: allowed[0])
+    first = call(run, "screen_records", criterion="Is about aquaponics")
+    repeated = call(run, "screen_records", criterion="Is about aquaponics")
+    assert first.detail == repeated.detail and repeated.duplicate
+    allowed[0] = False
+    refused = call(run, "screen_records", criterion="Is about aquaponics")
+    assert refused.detail["unassessed"] == 2
+    assert "Flood" not in refused.planner_message()
+    assert "Tilapia" not in refused.planner_message()
+    assert len(model.requests) == 1
+
+
+def test_a_paper_changed_after_discovery_is_screened_from_its_current_text(corpus, embedder):
+    model = ScreeningModel()
+    run = screening_run(corpus, embedder, model)
+    first = call(run, "screen_records", criterion="Is about aquaponics")
+    assert first.detail["rows"][0]["quote"] == "Flood forecasting"
+    corpus["public"].title = "Flood methods updated"
+    corpus["public"].save()
+    refreshed = call(run, "screen_records", criterion="Is about aquaponics")
+    assert refreshed.detail["rows"][0]["quote"] == "Flood methods updated"
+    assert model.requests[-1]["records"][0]["title"] == "Flood methods updated"
+
+
+def test_restrictions_applied_during_a_screening_call_sanitize_its_result(corpus, embedder):
+    allowed = [True]
+
+    class GateClosesDuringCall(ScreeningModel):
+        def generate(self, system, user):
+            reply = super().generate(system, user)
+            allowed[0] = False
+            return reply
+
+    run = screening_run(corpus, embedder, GateClosesDuringCall(), lambda r: allowed[0])
+    result = call(run, "screen_records", criterion="Is about aquaponics")
+    assert result.evidence == ()
+    assert result.detail["rows"] == result.detail["possible_duplicates"] == []
+    assert result.detail["checked"] == 0
+    assert result.detail["unassessed"] == 2
+    assert "Flood" not in result.planner_message()
