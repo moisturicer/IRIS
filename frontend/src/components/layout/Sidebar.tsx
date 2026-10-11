@@ -118,7 +118,6 @@ export function Sidebar({ className }: SidebarProps) {
     await authApi.logout(refreshToken ?? "").catch(() => {});
     logout();
   };
-  const [workspaceBadge, setWorkspaceBadge] = useState<number | undefined>();
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
 
   // Every nav decision comes from lib/access.ts, the same map the router gates
@@ -127,14 +126,6 @@ export function Sidebar({ className }: SidebarProps) {
   // sidebar came to offer ITSO and IERC screens the router then refused. There
   // is nothing to keep in sync now because there is only one definition.
   const nav = navFor(roleName as Parameters<typeof navFor>[0]);
-
-  useEffect(() => {
-    if (!canAccess(roleName as never, "workspace")) return;
-    apiClient
-      .get<{ pending_mine: number }>("/dashboard/stats/")
-      .then(({ data }) => setWorkspaceBadge(data.pending_mine ?? 0))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!canAccess(roleName as never, "roleRequests")) return;
@@ -150,7 +141,6 @@ export function Sidebar({ className }: SidebarProps) {
   // attached here rather than baked into lib/access.ts -- the map answers "may
   // this role open it", never "how many are waiting".
   const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
-    workspace:     workspaceBadge,
     notifications: unreadCount,
     roleRequests:  roleRequestBadge,
   };

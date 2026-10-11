@@ -42,6 +42,29 @@ export interface RecordListItem {
   authors:               Author[];
 }
 
+/**
+ * One row of `/records/mine/`: what a *My research* card shows, and nothing
+ * else (IR-410, spec §4.9). Not Record detail -- the per-viewer review blocks
+ * stay on Paper View, so the list costs the same queries for any length.
+ */
+export interface MyResearchItem {
+  id:                   number;
+  title:                string;
+  record_type_name:     string | null;
+  authors:              Author[];
+  adviser_name:         string | null;
+  pipeline_status:      PipelineStatus;
+  /** Derived by the server, as on Record detail; the client derives no stage. */
+  workflow_state:       WorkflowState;
+  workflow_state_label: string;
+  /** Who has the record now, in tracker order; empty when nobody does. */
+  holders:              { party: Party; label: string }[];
+  /** Offices that have cleared it; `preserved` when kept through a resubmission (ADR-003). */
+  cleared_offices:      { office: "itso" | "ierc" | "ktto"; label: string; preserved: boolean }[];
+  created_at:           string;
+  updated_at:           string;
+}
+
 export interface RecordReview {
   id:               number;
   stage:            string;
