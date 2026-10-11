@@ -33,3 +33,44 @@ The model is independently configured through `LLM_SCREEN_*`; no model or
 account is inherited from the answer task. Deployment operators select an
 approved model and endpoint under ADR-036's no-training policy. This change
 performs no paid quality measurement and enables no reader-facing route.
+
+## Current implementation
+
+`research_tools()` offers `screen_records` with one model argument:
+`criterion` (1–300 characters). Candidates come from record handles already
+collected in the run or from the application workflow; a model cannot supply
+IDs, scope, identity, batch size or limits. Visibility and Paper Chat scope
+are re-read, and the disclosure gate is applied before each batch.
+
+`topic_count(run, criterion, filters=...)` screens all visible filtered
+records at or below the ceiling (default 500). Above it, the existing fused
+paper ranking supplies at most ten candidates, bounded by the ceiling.
+Ranking keeps candidate IDs inside the application so refused candidates
+remain unassessed. Only approved content reaches screening. Every included
+record is counted in SQL with `COUNT(DISTINCT pk)` against current visibility.
+Metadata counts through `count_records` retain their existing exact contract.
+
+Screening uses title and abstract in batches of 20, within the run's prompt
+budget and a 20-second per-call limit capped by remaining time. Missing,
+duplicate, invalid or unsupported judgments become unassessed; the deciding
+quote for an include/exclude must be a nonempty verbatim substring of that
+paper's title or abstract. An outage affects its batch, preserving completed
+batches. Unassessed quote text is discarded. These checks verify provenance,
+not the screening model's judgment accuracy.
+
+Results carry `criterion`, `method`, checked/unassessed totals, decision rows,
+included matches, possible-duplicate flags and code-produced wording:
+"N matched out of M checked; K could not be assessed." A sampled count adds
+"These are matches found; other visible papers were not checked." The label
+is `screened` or `matches_found`, never exact. Gated candidates appear only
+in the unassessed total, with no individual identity or reason.
+
+Normalized-title equality and same-model record-vector cosine similarity
+at or above 0.98 produce possible-duplicate flags. They never merge records
+or reduce the count. Versions, owners and chunks belong to a record and
+never increase its count. The duplicate threshold and screening limits are
+configurable starting values, not empirically calibrated quality claims.
+
+The owner accepted the scope in IR-499's Jira comment, but the ADR document
+still says Proposed. That tracking/document contradiction is recorded here
+and remains a human approval prerequisite for merge and rollout.

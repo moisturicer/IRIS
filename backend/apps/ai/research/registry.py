@@ -30,6 +30,8 @@ class ToolRun:
     root: "CompositionRoot"
     spend: Spend
     cache: dict[tuple[str, str], ToolResult] = field(default_factory=dict)
+    # Workflow-owned candidate IDs; never a tool argument or vendor payload.
+    screen_candidate_ids: tuple[int, ...] | None = None
 
     @classmethod
     def start(cls, ctx: RunContext, root: "CompositionRoot") -> "ToolRun":
@@ -82,7 +84,13 @@ class ToolRegistry:
             return self._reject(run, name, "unknown_tool")
         try:
             args = validate(arguments, tool.parameters)
-            key = (name, json.dumps(args, sort_keys=True))
+            identity = args
+            if name == "screen_records":
+                candidates = run.screen_candidate_ids
+                if candidates is None:
+                    candidates = tuple(e.record_id for e in run.ledger.records())
+                identity = {"arguments": args, "candidates": sorted(set(candidates))}
+            key = (name, json.dumps(identity, sort_keys=True))
             cached = run.cache.get(key)
             if cached is not None:
                 return replace(cached, duplicate=True)
@@ -109,7 +117,7 @@ class ToolRegistry:
 
 
 def research_tools() -> ToolRegistry:
-    """The five corpus tools. `screen_records` joins in IR-501."""
+    """The six corpus tools (ADR-038 §2)."""
     from .tools import TOOLS
 
     return ToolRegistry(TOOLS)
