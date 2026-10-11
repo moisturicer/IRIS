@@ -45,6 +45,10 @@ def scoped_ids(ctx: RunContext, requested: Optional[Iterable[int]]) -> Optional[
     return scope & wanted if wanted is not None else scope
 
 
+def visible_record_ids(ctx: RunContext) -> frozenset[int]:
+    return frozenset(readable_records(ctx).values_list("pk", flat=True))
+
+
 def apply_filters(records: QuerySet, args: dict) -> QuerySet:
     for name, model in _TAXONOMIES.items():
         value = args.get(name)

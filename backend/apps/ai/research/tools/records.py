@@ -26,8 +26,13 @@ SIGNAL_DEPTH = 40
 BY_VECTOR, BY_KEYWORD, BY_PASSAGE = "vector", "keyword", "passage"
 
 
-def find_records(run: ToolRun, args: dict) -> ToolResult:
-    topic, k = args["topic"], args.get("k", 10)
+def rank_record_candidates(run: ToolRun, args: dict):
+    """Rank visible scoped IDs locally, before disclosure (also used by screening).
+
+    The embedding request carries only the topic; retrieved passage text is
+    gated by the retrieval stack. No record content is returned to a model here.
+    """
+    topic = args["topic"]
     candidates = apply_filters(readable_records(run.ctx), args)
     degraded = False
 
@@ -63,6 +68,12 @@ def find_records(run: ToolRun, args: dict) -> ToolResult:
 
     signals = {BY_VECTOR: by_vector, BY_KEYWORD: by_keyword, BY_PASSAGE: by_passage}
     fused = fuse_by_rank(signals.values(), key=lambda pk: pk)
+    return fused, degraded, signals
+
+
+def find_records(run: ToolRun, args: dict) -> ToolResult:
+    fused, degraded, signals = rank_record_candidates(run, args)
+    k = args.get("k", 10)
     # Gated before the trim to `k`, so a withheld record leaves no gap.
     allowed = disclosable(run.ctx, fused)
     chosen = [pk for pk in fused if pk in allowed][:k]

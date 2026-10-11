@@ -58,6 +58,8 @@ class ToolResult:
     reason: Optional[str] = None
     #: The same call again: the cached result, still counted (ADR-038 §5).
     duplicate: bool = False
+    # Private provenance for metadata aggregates, never rendered for a vendor.
+    visible_record_ids: frozenset[int] | None = None
 
     @classmethod
     def rejected(cls, reason: str) -> "ToolResult":

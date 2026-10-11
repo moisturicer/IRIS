@@ -35,4 +35,4 @@ class RecordOverviewView(APIView):
 
     def get(self, request, pk: int):
         record = get_object_or_404(Record.objects.visible_to(request.user), pk=pk)
-        return Response(overview_for(record, request.user))
+        return Response(overview_for(record))

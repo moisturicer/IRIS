@@ -30,6 +30,8 @@ class ToolRun:
     root: "CompositionRoot"
     spend: Spend
     cache: dict[tuple[str, str], ToolResult] = field(default_factory=dict)
+    # Workflow-owned candidate IDs; never a tool argument or vendor payload.
+    screen_candidate_ids: tuple[int, ...] | None = None
 
     @classmethod
     def start(cls, ctx: RunContext, root: "CompositionRoot") -> "ToolRun":
@@ -45,6 +47,8 @@ class Tool:
     description: str
     parameters: Mapping[str, Any]
     execute: Callable[[ToolRun, dict[str, Any]], ToolResult]
+    # Stateful inputs owned by the application, absent from vendor schemas.
+    cache_context: Callable[[ToolRun], Any] | None = None
 
     def __post_init__(self) -> None:
         check_schema(self.parameters)
@@ -82,7 +86,10 @@ class ToolRegistry:
             return self._reject(run, name, "unknown_tool")
         try:
             args = validate(arguments, tool.parameters)
-            key = (name, json.dumps(args, sort_keys=True))
+            identity = args
+            if tool.cache_context is not None:
+                identity = {"arguments": args, "context": tool.cache_context(run)}
+            key = (name, json.dumps(identity, sort_keys=True))
             cached = run.cache.get(key)
             if cached is not None:
                 return replace(cached, duplicate=True)
@@ -109,7 +116,7 @@ class ToolRegistry:
 
 
 def research_tools() -> ToolRegistry:
-    """The five corpus tools. `screen_records` joins in IR-501."""
+    """The six corpus tools (ADR-038 §2)."""
     from .tools import TOOLS
 
     return ToolRegistry(TOOLS)

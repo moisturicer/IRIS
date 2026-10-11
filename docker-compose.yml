@@ -44,6 +44,28 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: development.txt
+    restart: "no"
+    command: python manage.py migrate --noinput
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
+      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
+    depends_on:
+      db:
+        condition: service_healthy
+
   backend:
     build:
       context: ./backend
@@ -77,6 +99,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     image: node:20-alpine
@@ -183,6 +207,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   celery-extraction:
     build:
@@ -229,6 +255,8 @@ services:
         condition: service_healthy
       docling:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   celery-embedding:
     build:
@@ -266,6 +294,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   # IR-466: the evidence-decision shadow pilot. Concurrency 1 bounds how
   # much shadow traffic competes with readers at the vendor, which has no
@@ -306,6 +336,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   celery-beat:
     build:
@@ -331,6 +363,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

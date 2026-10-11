@@ -28,10 +28,10 @@ def _handle(run, record):
     return next(e.handle for e in found.evidence if e.record_id == record.pk)
 
 
-def test_the_closed_set_is_the_five_corpus_tools():
+def test_the_closed_set_is_the_six_corpus_tools():
     assert set(TOOLS.names) == {
         "search_passages", "find_records", "read_record_sections",
-        "count_records", "corpus_facets",
+        "count_records", "corpus_facets", "screen_records",
     }
 
 

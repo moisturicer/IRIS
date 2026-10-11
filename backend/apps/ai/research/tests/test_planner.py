@@ -15,6 +15,15 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 
 def planning(*calls):
+    # IR-513 requires an explicit plan before corpus calls and an outer
+    # sufficiency check after a sub-task; preserve the original scenarios.
+    if any(name != "finish" for name, _ in calls):
+        expanded = [("plan_research", {"subtasks": ["Gather evidence"]})]
+        for name, args in calls:
+            if name == "finish":
+                expanded.append(("subtask_done", {}))
+            expanded.append((name, args))
+        calls = expanded
     return ScriptedToolCallingLLM([
         ScriptedToolCallingLLM.calling(name, json.dumps(args), f"call-{i}")
         for i, (name, args) in enumerate(calls)
@@ -41,9 +50,9 @@ def test_a_search_then_finish_returns_a_cited_answer(corpus, embedder):
 
 
 def test_duplicate_is_fed_back_and_spends_the_inner_budget(corpus, embedder):
-    model = planning(*[("search_passages", {"query": TOPIC})] * 3)
-    result = run(corpus, embedder, model, max_calls_per_subtask=2)
-    assert result.stop_reason == "max_calls_per_subtask"
+    model = planning(*[("search_passages", {"query": TOPIC})] * 2)
+    result = run(corpus, embedder, model, max_calls_per_subtask=2, max_tool_calls=3)
+    assert result.stop_reason == "max_tool_calls"
     assert "stopped" in result.answer.text
     assert [step for step in result.steps if step.kind == "tool"][-1].duplicate is True
 
@@ -54,13 +63,12 @@ def test_two_malformed_calls_end_planning_and_use_the_pipeline(corpus, embedder)
     assert result.stop_reason == "malformed_call"
     assert result.fallback is True
     assert result.answer.state in ("generated", "no_sources", "unavailable")
-    messages = model.conversation_requests[1].messages
+    messages = model.conversation_requests[2].messages
     assert any(isinstance(m, ToolResultMessage) and "correct" in m.content for m in messages)
 
 
 @pytest.mark.parametrize("limit, value, reason", [
     ("max_tool_calls", 1, "max_tool_calls"),
-    ("max_calls_per_subtask", 1, "max_calls_per_subtask"),
     ("max_outer_rounds", 0, "max_outer_rounds"),
     ("max_prompt_tokens", 0, "max_prompt_tokens"),
     ("wall_clock_seconds", 0, "wall_clock_seconds"),
@@ -74,6 +82,7 @@ def test_each_planning_budget_stops_the_run(corpus, embedder, limit, value, reas
 
 def test_provider_failure_with_evidence_synthesizes_without_another_search(corpus, embedder):
     model = ScriptedToolCallingLLM([
+        ScriptedToolCallingLLM.calling("plan_research", json.dumps({"subtasks": ["Find evidence"]}), "plan"),
         ScriptedToolCallingLLM.calling("search_passages", json.dumps({"query": TOPIC}), "a"),
         LLMUnavailable("a timeout whose body must not reach telemetry"),
     ])
@@ -137,6 +146,8 @@ def test_a_late_planner_response_cannot_start_an_answer_call(corpus, embedder):
     ctx = RunContext.for_request(user=corpus["student"], root=stack, lane="research")
     def late(request):
         if len(model.conversation_requests) == 1:
+            return ScriptedToolCallingLLM.calling("plan_research", json.dumps({"subtasks": ["Find evidence"]}), "plan")
+        if len(model.conversation_requests) == 2:
             return ScriptedToolCallingLLM.calling("search_passages", json.dumps({"query": TOPIC}), "search")
         clock.now = 100
         return ScriptedToolCallingLLM.calling("finish", "{}", "stop")

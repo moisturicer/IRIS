@@ -45,6 +45,10 @@ def validate_answer(text, *, sources, ledger, results):
     if re.search(r"\[(?:ref|source|E|R)[:\s]?[^\]]+\]", text, re.I):
         failures.add("unknown_citation")
     body = MARKER.sub("", text)
+    # Research references have exactly one namespace: the numbered sources
+    # backed by ledger passages. Notes and arbitrary bracket labels have none.
+    if re.search(r"\[[^\]\n]+\]", body):
+        failures.add("unknown_citation")
     computed = set()
     successful = [r for r in results if r.status in (ToolStatus.OK, ToolStatus.EMPTY, ToolStatus.DEGRADED)]
     for result in successful:

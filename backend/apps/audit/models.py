@@ -27,6 +27,32 @@ class AuditEvent(models.Model):
     SESSION_REVOKE   = "SESSION_REVOKE"
     QUESTION_INJECTION = "QUESTION_INJECTION"
 
+    # Workflow events (IR-144): one type per act, written by the workflow
+    # services inside the act's own transaction (`apps.audit.workflow`). Their
+    # metadata keys are documented in docs/evaluation/AUDIT_EXPORT.md.
+    SUBMITTED                  = "SUBMITTED"
+    ROUTED                     = "ROUTED"
+    ASSIGNMENT_CLOSED          = "ASSIGNMENT_CLOSED"
+    DECISION_RECORDED          = "DECISION_RECORDED"
+    PUBLISHED                  = "PUBLISHED"
+    RESUBMISSION_REQUESTED     = "RESUBMISSION_REQUESTED"
+    REVISION_REQUEST_WITHDRAWN = "REVISION_REQUEST_WITHDRAWN"
+    RESUBMITTED                = "RESUBMITTED"
+    CLEARANCE_PRESERVED        = "CLEARANCE_PRESERVED"
+    SEAT_CLAIMED               = "SEAT_CLAIMED"
+    SEAT_ASSIGNED              = "SEAT_ASSIGNED"
+    SEAT_NOMINATED             = "SEAT_NOMINATED"
+    SEAT_REASSIGNED            = "SEAT_REASSIGNED"
+    SEAT_WITHDRAWN             = "SEAT_WITHDRAWN"
+    REVIEWER_ADDED             = "REVIEWER_ADDED"
+    SEAT_OPENED                = "SEAT_OPENED"
+    RECORD_WITHDRAWN           = "RECORD_WITHDRAWN"
+    DOCUMENT_REQUESTED         = "DOCUMENT_REQUESTED"
+    DOCUMENT_REQUEST_FULFILLED = "DOCUMENT_REQUEST_FULFILLED"
+    DOCUMENT_REQUEST_ACCEPTED  = "DOCUMENT_REQUEST_ACCEPTED"
+    DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
+    DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
+
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
         (LOGOUT,           "Logout"),
@@ -43,9 +69,31 @@ class AuditEvent(models.Model):
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
         (SESSION_REVOKE,   "Session Revoked"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
+        (SUBMITTED,                  "Submitted"),
+        (ROUTED,                     "Routed"),
+        (ASSIGNMENT_CLOSED,          "Assignment Closed"),
+        (DECISION_RECORDED,          "Decision Recorded"),
+        (PUBLISHED,                  "Published"),
+        (RESUBMISSION_REQUESTED,     "Revision Requested"),
+        (REVISION_REQUEST_WITHDRAWN, "Revision Request Withdrawn"),
+        (RESUBMITTED,                "New Version Submitted"),
+        (CLEARANCE_PRESERVED,        "Clearance Preserved"),
+        (SEAT_CLAIMED,               "Seat Claimed"),
+        (SEAT_ASSIGNED,              "Seat Assigned"),
+        (SEAT_NOMINATED,             "Seat Nominated"),
+        (SEAT_REASSIGNED,            "Seat Reassigned"),
+        (SEAT_WITHDRAWN,             "Seat Withdrawn"),
+        (REVIEWER_ADDED,             "Reviewer Added"),
+        (SEAT_OPENED,                "Seat Opened"),
+        (RECORD_WITHDRAWN,           "Record Withdrawn"),
+        (DOCUMENT_REQUESTED,         "Documents Requested"),
+        (DOCUMENT_REQUEST_FULFILLED, "Document Request Fulfilled"),
+        (DOCUMENT_REQUEST_ACCEPTED,  "Requested Document Accepted"),
+        (DOCUMENT_REQUEST_REJECTED,  "Requested Document Rejected"),
+        (DOCUMENT_REQUEST_WITHDRAWN, "Document Request Withdrawn"),
     ]
 
-    event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, db_index=True)
+    event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)
     user       = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="audit_events"
     )

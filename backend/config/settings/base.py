@@ -461,6 +461,20 @@ LLM_PLAN_PROVIDER_ONLY = config("LLM_PLAN_PROVIDER_ONLY", default="")
 LLM_PLAN_PROVIDER_PINS = config("LLM_PLAN_PROVIDER_PINS", default="")
 AI_RESEARCH_PLAN_TIMEOUT_SECONDS = config("AI_RESEARCH_PLAN_TIMEOUT_SECONDS", default=30.0, cast=float)
 
+# IR-501: independent, off until a screening model/account is configured.
+LLM_SCREEN_VENDOR = config("LLM_SCREEN_VENDOR", default="")
+LLM_SCREEN_BASE_URL = config("LLM_SCREEN_BASE_URL", default="")
+LLM_SCREEN_API_KEY = config("LLM_SCREEN_API_KEY", default="")
+LLM_SCREEN_MODEL = config("LLM_SCREEN_MODEL", default="")
+LLM_SCREEN_FALLBACK_MODELS = config("LLM_SCREEN_FALLBACK_MODELS", default="")
+LLM_SCREEN_REASONING = config("LLM_SCREEN_REASONING", default=False, cast=bool)
+LLM_SCREEN_PROVIDER_ONLY = config("LLM_SCREEN_PROVIDER_ONLY", default="")
+LLM_SCREEN_PROVIDER_PINS = config("LLM_SCREEN_PROVIDER_PINS", default="")
+AI_SCREEN_MAX_RECORDS = config("AI_SCREEN_MAX_RECORDS", default=500, cast=int)
+AI_SCREEN_BATCH_SIZE = config("AI_SCREEN_BATCH_SIZE", default=20, cast=int)
+AI_SCREEN_TIMEOUT_SECONDS = config("AI_SCREEN_TIMEOUT_SECONDS", default=20.0, cast=float)
+AI_SCREEN_DUPLICATE_MIN_SIMILARITY = config("AI_SCREEN_DUPLICATE_MIN_SIMILARITY", default=0.98, cast=float)
+
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
 LLM_ROUTE_API_KEY = config("LLM_ROUTE_API_KEY", default="")
@@ -698,6 +712,11 @@ AI_RESEARCH_WALL_CLOCK_SECONDS = config(
 AI_RESEARCH_MAX_PROMPT_TOKENS = config(
     "AI_RESEARCH_MAX_PROMPT_TOKENS", default=120_000, cast=int
 )
+# A single planner/synthesis request, including schemas. The run-wide
+# cumulative ceiling above still applies to all calls (IR-513).
+AI_RESEARCH_CONTEXT_TOKEN_BUDGET = config(
+    "AI_RESEARCH_CONTEXT_TOKEN_BUDGET", default=16_000, cast=int
+)
 AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
     "AI_RESEARCH_MAX_LEDGER_PASSAGES", default=30, cast=int
 )
@@ -817,6 +836,13 @@ AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
 # deliberate act by whoever is paying. 0 disables the guard.
 AI_EMBEDDING_TOKEN_CEILING = config(
     "AI_EMBEDDING_TOKEN_CEILING", default=2_000_000, cast=int
+)
+# A paper whose active chunks sum past this gets no AI Overview (IR-432): the
+# state is `unavailable` with reason `too_large`, nothing is stored and no model
+# is called. Default ~7x the 14,600-token mean of the proxy corpus, which clears
+# papers past voyage-context-4's 32k window (IR-423). 0 disables.
+AI_OVERVIEW_TOKEN_CEILING = config(
+    "AI_OVERVIEW_TOKEN_CEILING", default=100_000, cast=int
 )
 # Approximate, and printed as approximate. Vendor pricing is not in this
 # repository's control, so this is a figure for deciding whether a run is

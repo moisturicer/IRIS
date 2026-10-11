@@ -81,3 +81,9 @@ FR-M3-01, FR-M3-02 — stable labels only, per the frozen-SRS rule.
 ## Related Tasks
 
 IR-334 (this ADR) · IR-335 (the PDF.js reader and overlay this ADR's regions feed, not yet started) · IR-152 (the `/media/` removal this corrects the missed edge of) · IR-107, IR-113 (the extraction and chunking work whose rectangles this finally exposes) · IR-321 (the resilience decorators this extends with `stream()`) · IR-325, IR-326, IR-329 (the streaming path this closes the last gap in) · ADR-025 (the citation-overlay question this answers the data half of).
+
+## Amendment — 2026-10-11: an overview citation names a page (IR-434)
+
+**An AI Overview citation resolves to a page, and to the chunk or chunks on it** — not to a chunk number. Since IR-431 the overview reads the whole paper, so a chunk number is meaningless to a reader and the page is what a paper is cited by. `apps/ai/overview/pages.py` labels the prompt by page (`[p. 3]`) under its own system prompt and resolves page markers itself: the citation carries that page, the first chunk on it as `chunk_id`, and the text and regions of every chunk on it. A page no chunk sits on is dropped, as an out-of-range chunk marker already was. A bare `[3]` in an overview is read as page 3, because the prompt offers no other number to cite. The stored text keeps the canonical `[n]`, with `marker` equal to the page, so the reader's chips and `?page=` links are unchanged. `PROMPT_VERSION` 3 regenerates rows written under chunk numbers.
+
+**Ask IRIS's chat citations are untouched.** They stay chunk-level and carry the quoted Passage (IR-284). The page form is a separate pattern, `PAGE_MARKER` in `apps/ai/citation_markers.py`; `MARKER` neither matches it nor was narrowed.

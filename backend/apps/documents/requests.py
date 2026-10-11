@@ -23,6 +23,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from core.enums import DocumentRequestItemState, DocumentRequestState
 
 from .models import DocumentRequest, DocumentRequestItem, UploadSlot
@@ -102,6 +103,7 @@ def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> Do
             DocumentRequestItem(request=request, slot=s.slot, label=s.label, sort_order=i)
             for i, s in enumerate(specs)
         )
+        audit.document_requested(request, user)
     return request
 
 
@@ -169,6 +171,7 @@ def fulfil_item(item: DocumentRequestItem, upload, *, uploaded_by) -> DocumentRe
         request.state = DocumentRequestState.FULFILLED
         request.closed_at = timezone.now()
         request.save(update_fields=["state", "closed_at"])
+        audit.document_request_fulfilled(request, uploaded_by)
 
         from apps.notifications.services import notify_document_request_fulfilled
 
@@ -303,17 +306,18 @@ def _lock_decidable(item: DocumentRequestItem) -> tuple[DocumentRequestItem, Doc
     return item, request
 
 
-def accept_item(item: DocumentRequestItem) -> DocumentRequest:
+def accept_item(item: DocumentRequestItem, user) -> DocumentRequest:
     """
     The upload satisfies the request (ADR-022 §3.4). A request whose items
     were all uploaded is already fulfilled, so it stays closed. The caller has
-    checked `is_requester`.
+    checked `is_requester`; `user` is who accepted, for the audit log.
     """
     with transaction.atomic():
         item, request = _lock_decidable(item)
         item.state = DocumentRequestItemState.ACCEPTED
         item.decided_at = timezone.now()
         item.save(update_fields=["state", "decided_at"])
+        audit.document_accepted(request, item, user)
     return request
 
 
@@ -335,6 +339,7 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
             request.state = DocumentRequestState.OPEN
             request.closed_at = None
             request.save(update_fields=["state", "closed_at"])
+        audit.document_rejected(request, item, user, reason=reason)
 
         from apps.notifications.services import notify_document_rejected
 
@@ -344,14 +349,15 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
     return request
 
 
-def withdraw_request(request: DocumentRequest) -> DocumentRequest:
+def withdraw_request(request: DocumentRequest, user) -> DocumentRequest:
     """
     The requesting party no longer needs it (ADR-022 §4). Only an open
     request: a fulfilled one is already closed, and its uploads are decided
     item by item. It stays in the history; the owner's panel drops it.
 
     No reason is recorded: IR-263 adds none, and IR-270 defines any a
-    decision needs when it closes requests.
+    decision needs when it closes requests. `user` is who withdrew it, for
+    the audit log.
     """
     with transaction.atomic():
         request = DocumentRequest.objects.select_for_update().get(pk=request.pk)
@@ -360,6 +366,7 @@ def withdraw_request(request: DocumentRequest) -> DocumentRequest:
         request.state = DocumentRequestState.WITHDRAWN
         request.closed_at = timezone.now()
         request.save(update_fields=["state", "closed_at"])
+        audit.document_request_withdrawn(request, user)
     return request
 
 

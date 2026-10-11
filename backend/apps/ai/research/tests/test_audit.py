@@ -27,7 +27,7 @@ def test_audit_has_only_telemetry_and_is_private_to_the_owner(corpus, embedder):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "generated"
-    assert len(data["steps"]) == 5
+    assert len(data["steps"]) == 9
     assert len(data["steps"][1]["argument_digest"]) == 64
     serialized = json.dumps(data)
     assert TOPIC not in serialized
