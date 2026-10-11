@@ -67,7 +67,6 @@ test("only Student and Adviser may author a disclosure", () => {
   // Adviser)". The clearing offices must not author what they later clear, and
   // RDCO performs both intake and final review.
   only("submit", [ROLES.STUDENT, ROLES.ADVISER]);
-  only("workspace", [ROLES.STUDENT, ROLES.ADVISER]);
 });
 
 test("a Student publishes from Discover, so the sidebar offers no Submit Disclosure (IR-407)", () => {

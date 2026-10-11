@@ -16,7 +16,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.notifications.models import Notification
-from apps.reviews.models import RecordAssignment, RecordClearance, ReviewerSeat
+from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.records.models import RecordVersion
 from .models import DeleteRequest, Record, RecordOwner, RecordType
 from apps.reviews.test_decisions import DecisionTestBase
@@ -219,39 +219,6 @@ class TagsPermissionTests(APITestCase):
     def test_anonymous_cannot_set_tags(self):
         response = self._patch_tags(is_ip=True)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-
-class MineEndpointTests(APITestCase):
-    """
-    GET /records/mine/ is RecordViewSet.mine() -- MyRecordsViewSet also exists
-    in this file with serializer_class = RecordDetailSerializer, but is never
-    registered in urls.py, so it serves nothing. mine() hardcoded
-    RecordListSerializer directly, which has no `clearances` field. Found
-    while building My Workspace: the frontend read record.clearances
-    everywhere and always got undefined, because the real endpoint was never
-    returning it -- MyRecordsViewSet's richer serializer was a red herring
-    that looked live but wasn't reachable.
-    """
-
-    def setUp(self):
-        self.thesis = RecordType.objects.get_or_create(name="Thesis / Research")[0]
-        self.owner = make_user("mine_owner@cit.edu", "Student")
-        self.record = Record.objects.create(
-            title="A" * 10, abstract="B" * 40, record_type=self.thesis,
-            added_by=self.owner, pipeline_status="in_review",
-            requested_ierc=True,
-        )
-        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
-        RecordClearance.objects.create(record=self.record, office="ierc", status="pending")
-
-    def test_mine_includes_clearances(self):
-        self.client.force_authenticate(self.owner)
-        response = self.client.get(reverse("record-mine"))
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        mine = next(r for r in response.data if r["id"] == self.record.id)
-        self.assertIn("clearances", mine, "My Workspace needs this to show office status")
-        self.assertEqual(mine["clearances"][0]["office"], "ierc")
-        self.assertEqual(mine["clearances"][0]["status"], "pending")
 
 
 class DeadPermissionKwargSweepTests(APITestCase):

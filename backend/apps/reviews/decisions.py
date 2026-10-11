@@ -71,10 +71,12 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records.lifecycle import type_name_of
 from apps.records.versions import latest_version
 from core.enums import (
     OPEN_SEAT_STATES,
+    PUBLICLY_VISIBLE_STATUSES,
     AssignmentState,
     DocumentRequestState,
     Party,
@@ -418,6 +420,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         record=record, reviewed_by=actor, stage=party, status=verdict,
         comment=comment, assignment=seat.assignment, version=latest_version(record),
     )
+    audit.decision_recorded(record, actor, party=party, outcome=outcome, final=True, review=review)
 
     # Seats are closed here rather than through `seats.complete_seat()` and
     # `seats.withdraw()`: those run the office completion rule and its
@@ -436,6 +439,10 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
             assignment, actor, now, review,
             AssignmentState.COMPLETED if own else AssignmentState.WITHDRAWN,
         )
+        audit.assignment_closed(
+            assignment, actor, how=audit.COMPLETED if own else audit.CLOSED_BY_DECISION,
+            decision=review, withdrawn_seats=[s.pk for s in others],
+        )
     ReviewerSeat.objects.filter(pk=seat.pk).update(state=SeatState.DONE, done_at=now)
 
     requests = list(_open_document_requests(record).select_for_update())
@@ -444,10 +451,13 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         request.closed_at = now
         request.closed_by_decision = review
         request.save(update_fields=["state", "closed_at", "closed_by_decision"])
+        audit.document_request_withdrawn(request, actor, closed_by=audit.BY_DECISION)
 
     # The one status write of a Decision (module note, point 4).
     record.pipeline_status = new_status
     record.save(update_fields=["pipeline_status", "updated_at"])
+    if new_status in PUBLICLY_VISIBLE_STATUSES:
+        audit.published(record, actor, party=party)
 
     _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off)
     return review

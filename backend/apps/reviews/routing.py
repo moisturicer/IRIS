@@ -37,6 +37,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records import versions
 from apps.records.lifecycle import type_name_of
 
@@ -89,6 +90,11 @@ _HINT_TEXT = {
 _CLEARING_OFFICES = frozenset(str(o) for o in Office)
 #: The role that staffs each office party: `core.permissions`' map, inverted.
 _ROLE_FOR_PARTY = {str(party): role for role, party in OFFICE_PARTY_BY_ROLE.items()}
+
+
+#: The Adviser's verdict when they accept & route, as the audit log names it.
+#: Not a Decision (`decisions` module note): the record stays in review.
+ACCEPTED_AND_ROUTED = "accepted_and_routed"
 
 
 class RoutingError(Exception):
@@ -145,6 +151,7 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
     )
     # What the Adviser is handed is v1 (ADR-032 §5, IR-416).
     versions.write_version(record, actor, VersionCause.SUBMISSION)
+    audit.submitted(record, actor, to_party=Party.ADVISER)
     original_record.pipeline_status = record.pipeline_status
     return assignment
 
@@ -340,7 +347,8 @@ def _apply(record, actor, plan: _Plan) -> list[_Target]:
     group = uuid.uuid4()
     opened = []
     for target in plan.targets:
-        if target.assignment is None:
+        opens = target.assignment is None
+        if opens:
             target.assignment = RecordAssignment.objects.create(
                 record=record, party=target.party, opened_by=actor, opened_at=now,
                 reason=plan.reason,
@@ -357,6 +365,10 @@ def _apply(record, actor, plan: _Plan) -> list[_Target]:
         RoutingEvent.objects.create(
             record=record, actor=actor, from_party=plan.from_party,
             to_party=target.party, reason=plan.reason, group_id=group, created_at=now,
+        )
+        audit.routed(
+            record, actor, from_party=plan.from_party, to_party=target.party,
+            opened=opens, group=group, nominee=target.nominee,
         )
     return opened
 
@@ -430,10 +442,14 @@ def accept_and_route(record, actor, *, to, reason):
         .filter(state__in=OPEN_SEAT_STATES)
         .first()
     )
-    Review.objects.create(
+    review = Review.objects.create(
         record=record, reviewed_by=actor, stage=Party.ADVISER,
         status=ReviewDecision.APPROVED, comment=plan.reason,
         assignment=adviser_seat.assignment, version=versions.latest_version(record),
+    )
+    audit.decision_recorded(
+        record, actor, party=Party.ADVISER, outcome=ACCEPTED_AND_ROUTED, final=False,
+        review=review,
     )
     def accept_then_route():
         seats.complete_seat(adviser_seat, actor)

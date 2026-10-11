@@ -44,6 +44,61 @@ class RecordListSerializer(serializers.ModelSerializer):
         ]
 
 
+class MyResearchSerializer(serializers.ModelSerializer):
+    """
+    `/records/mine/`: what a *My research* card shows, and nothing else
+    (IR-410; spec §4.9 as amended 2026-10-11). The status line is
+    `workflow_state_label`, the next step comes from `workflow_state`, and My
+    Library groups the list by `holders`, so the client derives no stage.
+
+    `context["workflow_facts"]` holds every listed record's facts, worked out
+    in one pass by `tracker.workflow_facts`, so the list's query count does
+    not grow with its length. Record detail's viewer-dependent blocks stay
+    on detail.
+    """
+    record_type_name     = serializers.CharField(source="record_type.name", read_only=True)
+    authors              = AuthorSerializer(many=True, read_only=True)
+    adviser_name         = serializers.SerializerMethodField()
+    workflow_state       = serializers.SerializerMethodField()
+    workflow_state_label = serializers.SerializerMethodField()
+    # Who has the record now: `[{party, label}]`, in tracker order.
+    holders              = serializers.SerializerMethodField()
+    # `[{office, label, preserved}]`: each office that has cleared it, and
+    # whether that clearance was kept through a resubmission (ADR-003).
+    cleared_offices      = serializers.SerializerMethodField()
+
+    def _facts(self, obj):
+        return self.context["workflow_facts"][obj.pk]
+
+    def get_adviser_name(self, obj):
+        if obj.adviser:
+            return obj.adviser.get_full_name() or obj.adviser.email
+        return None
+
+    def get_workflow_state(self, obj):
+        return self._facts(obj)["workflow_state"]
+
+    def get_workflow_state_label(self, obj):
+        from apps.reviews.tracker import record_state_label
+
+        return record_state_label(obj, self.get_workflow_state(obj))
+
+    def get_holders(self, obj):
+        return self._facts(obj)["holders"]
+
+    def get_cleared_offices(self, obj):
+        return self._facts(obj)["cleared_offices"]
+
+    class Meta:
+        model  = Record
+        fields = [
+            "id", "title", "record_type_name", "authors", "adviser_name",
+            "pipeline_status", "workflow_state", "workflow_state_label",
+            "holders", "cleared_offices", "created_at", "updated_at",
+        ]
+        read_only_fields = fields
+
+
 class RecordDetailSerializer(serializers.ModelSerializer):
     """Full record detail including all related objects."""
     owners         = RecordOwnerSerializer(many=True, read_only=True)

@@ -13,7 +13,6 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from apps.ai.answers.citations import build_prompt
 from apps.ai.answers.service import generate_cited, model_that_answered
 from apps.ai.composition import composition_root
 from apps.ai.inference import InferenceTask
@@ -23,16 +22,32 @@ from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.records.models import Record
 
 from .assembly import whole_paper
+from .pages import SYSTEM_PROMPT, build_page_prompt, parse_page_citations
 
 logger = logging.getLogger(__name__)
 
 #: 2: grounded in the whole paper, not six retrieved passages (IR-431).
-PROMPT_VERSION = 2
+#: 3: cites pages, not chunk numbers (IR-434).
+#: 4: the comprehensive skeleton replaces two paragraphs of prose (IR-433).
+PROMPT_VERSION = 4
 
+# Formatting rules come from SYSTEM_PROMPT (IR-424); only structure lives here.
+# The omission rule matters most: a filled-in Limitations section the paper
+# never wrote is fabrication (ADR-025).
 _QUESTION = (
-    "Summarise this work for a reader deciding whether to read it: its "
-    "research objectives, the methodology it used, and its key findings. "
-    "Write it as flowing prose in two or three short paragraphs."
+    "Write a comprehensive overview of this work for a reader deciding "
+    "whether to read it.\n"
+    "Open with one paragraph: the problem, what the authors did, and what "
+    "they found.\n"
+    "Then use these '## ' sections, in this order: '## Objectives', "
+    "'## Methodology', '## Key findings', '## Limitations and scope'.\n"
+    "Omit any section the paper does not support. Never write a heading you "
+    "cannot fill from the document, and never infer a limitation the authors "
+    "do not state.\n"
+    "Where a figure or table carries a finding, name it in the sentence and "
+    "cite it.\n"
+    "Close with one paragraph separating what the work demonstrates from what "
+    "it only suggests."
 )
 
 
@@ -219,8 +234,10 @@ def _generate(chunk_set: ChunkSet):
         logger.info("overview not generated: LLM_SUMMARY_MODEL is not set")
         return None
 
-    prompt = build_prompt(f"{record.title}. {_QUESTION}", sources)
-    generated = generate_cited(llm, prompt, sources)
+    prompt = build_page_prompt(f"{record.title}. {_QUESTION}", sources)
+    generated = generate_cited(
+        llm, prompt, sources, system=SYSTEM_PROMPT, parse=parse_page_citations
+    )
     if generated is None:
         return None
     text, citations = generated
