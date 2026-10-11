@@ -45,6 +45,7 @@ class ClosedTaskSetTests:
             "answer",
             "resolve",
             "route",
+            "plan",
             "summary",
             "describe_figure",
         ]

@@ -352,3 +352,41 @@ Evidence: `apps/ai/tests/test_question_routing.py`, `test_route_question_command
 ## IR-489 — selected answer models and request data controls
 
 The owner selected `openai/gpt-oss-120b`, followed by `openai/gpt-6-luna`, `deepseek/deepseek-v4.1-flash`, and `z-ai/glm-5.3-flash`. The answer task can configure this ordered chain through OpenRouter. A pinned chain sends one request per model, each with its own `provider.only` list beside `data_collection: deny`; startup refuses missing or incomplete pins and pins on Groq. The deployment operator must verify the endpoint locations before setting `LLM_ANSWER_PROVIDER_PINS`. No paid quality comparison is part of IR-489, and no model quality claim follows from this change.
+
+## IR-512 — bounded single-loop planner, answer checks and private run audit
+
+**Implemented, offline only; ADR-038 remains Proposed.** The inner loop in
+`apps/ai/research/planner.py` offers the existing corpus tools plus an
+argument-free `finish`. Identity, scope, disclosure and limits are supplied
+by the application. Duplicate calls reuse the registry cache and spend a
+call; malformed calls get one correction and the second stops planning.
+The `plan` inference profile inherits the answer model/account by default
+and has its own breaker. Tool results are fed back; IR-513 owns recent
+history, notes, aggregate context and the outer loop.
+
+`synthesis.py` supplies the ledger to `GroundedAnswerService`, preserving
+numbered-source prompts and `parse_citations`. Validation checks raw markers
+before parsing, literal numbers, marked titles and completeness phrases.
+Failures withhold the answer, retaining sources and reason codes. This is
+the conservative implementation proposed for D4, not recorded human policy
+approval. See [RESEARCH_PLANNER.md](../engineering/RESEARCH_PLANNER.md) for
+the literal validator's limits and wall-clock exhaustion behavior.
+
+Evidence: `research/tests/test_planner.py` covers successful citation,
+duplicates, every planning budget, corrections, provider failure, empty
+sources, late responses, argument rejection and validation withholding.
+`test_validation.py` covers invented markers, numbers, titles and
+completeness; `test_audit.py` exercises owner-only HTTP access and the
+`ask_agent` command; `test_plan_profile.py` covers profile/account inheritance.
+`test_tool_deadline.py` demonstrates that Voyage retrieval calls receive
+the remaining run deadline. The pre-change answer-request snapshots in
+`tests/test_shadow_off_snapshot.py` pass unchanged on both Ask IRIS endpoints,
+and `test_one_retrieval_stack.py` passes without widening its one-predicate
+rule. Tests use scripted models and deterministic embeddings/reranking.
+
+Migration `0019_research_run_audit` was rolled back and reapplied on a
+development database copy on 2026-10-11, retaining **60 records and 2,145
+chunks**. Audit tables store only identifiers, digests, statuses and
+measurements; deletion cascades with the owner/Conversation. Django checks
+and migration drift checks pass (the existing Axes deprecation warning
+remains). No paid planner measurement or reader rollout is claimed.

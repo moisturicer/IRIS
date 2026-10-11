@@ -32,6 +32,18 @@ class Spend:
         self.rounds += 1
         self.subtask_calls = 0
 
+    def check(self) -> None:
+        """Admission check before a model call, including one proposing finish."""
+        self._check_clock()
+        if self.tool_calls >= self._budget.max_tool_calls:
+            raise BudgetExhausted("max_tool_calls")
+        if self.subtask_calls >= self._budget.max_calls_per_subtask:
+            raise BudgetExhausted("max_calls_per_subtask")
+
+    @property
+    def remaining_seconds(self) -> float:
+        return max(0.0, self._budget.wall_clock_seconds - (self._clock() - self._started))
+
     def begin_subtask(self) -> None:
         self._check_clock()
         self.subtask_calls = 0

@@ -1,4 +1,5 @@
 from django.urls import path
+from .views.research import ResearchRunDetailView
 
 from .views import (
     AIStatusView,
@@ -17,6 +18,7 @@ from .views import (
 # stays out until its service exists — a 404 is more honest than a 500 from a
 # `pass` body.
 urlpatterns = [
+    path("research/runs/<uuid:pk>/", ResearchRunDetailView.as_view(), name="ai-research-run"),
     path("ask/",        ChatQueryView.as_view(),  name="ai-ask"),
     path("ask/stream/", ChatStreamView.as_view(), name="ai-ask-stream"),
     path("search/", SemanticSearchView.as_view(), name="ai-search"),
