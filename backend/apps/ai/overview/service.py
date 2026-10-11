@@ -141,9 +141,20 @@ def _claim_generation(
 def _enqueue_overview(record_id: int, chunk_set_id: int, content_hash: str) -> None:
     from apps.ai.tasks import generate_record_overview
 
-    generate_record_overview.delay(
-        record_id, chunk_set_id, content_hash, PROMPT_VERSION
-    )
+    try:
+        generate_record_overview.delay(
+            record_id, chunk_set_id, content_hash, PROMPT_VERSION
+        )
+    except Exception:
+        # The claim is already committed when this callback runs. Mark it
+        # unavailable so a broker outage cannot leave readers polling forever.
+        logger.exception("could not queue overview generation for record %s", record_id)
+        RecordOverview.objects.filter(
+            record_id=record_id,
+            state="generating",
+            content_hash=content_hash,
+            prompt_version=PROMPT_VERSION,
+        ).update(state="unavailable", updated_at=timezone.now())
 
 
 def generate_overview(record_id: int, chunk_set_id: int, content_hash: str, prompt_version: int) -> None:

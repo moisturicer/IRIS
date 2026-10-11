@@ -134,6 +134,26 @@ class InvalidationTests:
 
 
 class UnavailableIsNeverCachedTests:
+    def test_a_broker_failure_does_not_leave_the_claim_generating(
+        self, embedder, space, client_for, monkeypatch
+    ):
+        reader = make_user("reader@cit.edu")
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+
+        def fail_to_publish(*args):
+            raise RuntimeError("broker unavailable")
+
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay", fail_to_publish
+        )
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            response = _overview(client_for(reader), record.pk)
+
+        assert response.json()["state"] == "generating"
+        assert RecordOverview.objects.get(record=record).state == "unavailable"
+
     def test_an_unavailable_generation_is_reported_and_can_be_retried(
         self, embedder, space, client_for, monkeypatch
     ):
