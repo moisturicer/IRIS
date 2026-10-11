@@ -93,3 +93,8 @@ skills-lock.json
 screenshots/
 .firecrawl/
 docker-compose.override.yml
+
+# impeccable design-skill working files (decision pages, mocks); config.json is shared
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/config.local.json

@@ -107,8 +107,6 @@ export const SCREEN_ACCESS = {
   submit:     { path: "/records/add",       roles: AUTHORS,
                 nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "IP Management",
                        onlyFor: [ROLES.ADVISER] } },
-  workspace:  { path: "/workspace",         roles: AUTHORS,
-                nav: { label: "My Workspace", icon: "fa-briefcase", section: "IP Management" } },
 
   // --- review ------------------------------------------------------------
   // One queue, three filters (IR-143). Approved and Declined were separate nav
