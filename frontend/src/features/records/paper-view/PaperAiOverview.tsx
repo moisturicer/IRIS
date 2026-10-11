@@ -15,14 +15,12 @@ import { RailHeading } from "./headings";
  * used to fire `/ai/ask/` from this component's own `useEffect`, a corpus-
  * wide question on every mount — a paid vendor call on every page view for an
  * answer that is a pure function of the record's own extracted text.
- * `GET /ai/records/<id>/overview/` now generates once, scoped to the record,
- * and returns the cached row on every read after; the vendor is called again
- * only when a re-chunk changes what there is to summarise.
+ * `GET /ai/records/<id>/overview/` reads a per-record cache. Generation runs
+ * in a worker after chunking; this panel polls only while that work is pending.
  *
- * This runs the same retrieval and visibility predicate as Ask IRIS, so it
- * can only ever draw on the record being viewed. Nothing here is invented
- * locally: whatever the pipeline could not produce is reported as
- * unavailable rather than filled in (ADR-008).
+ * The backend reads only the record's active chunk set and applies the same
+ * record visibility rule as other reads. Nothing is invented locally:
+ * unavailable generation is reported rather than filled in (ADR-008).
  *
  * Rendered as markdown through `CitationText` (IR-335) rather than plain
  * text — the same renderer chat uses, so headings, lists and emphasis in the
@@ -34,11 +32,11 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (retry = false) => {
     setLoading(true);
     setFailed(false);
     try {
-      const { data } = await aiApi.overview(record.id);
+      const { data } = await (retry ? aiApi.overview(record.id, true) : aiApi.overview(record.id));
       setResponse(data);
     } catch {
       setFailed(true);
@@ -50,6 +48,19 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (response?.state !== "generating" || failed) return;
+
+    const timeout = window.setTimeout(() => {
+      void aiApi.overview(record.id).then(
+        ({ data }) => setResponse(data),
+        () => setFailed(true),
+      );
+    }, 2500);
+
+    return () => window.clearTimeout(timeout);
+  }, [failed, record.id, response]);
 
   const state = response?.state;
   const overview = response?.overview ?? null;
@@ -91,7 +102,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
             </p>
             <button
               type="button"
-              onClick={() => void load()}
+              onClick={() => void load(true)}
               className="mt-2 text-xs font-semibold text-brand hover:underline"
             >
               Try again
@@ -111,6 +122,25 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
               The answering model could not be reached, so IRIS is not summarising this paper.
               Retrieval still works — see Related Institutional Works below, or ask a question in
               Paper Chat.
+            </p>
+            <button
+              type="button"
+              onClick={() => void load(true)}
+              className="mt-2 text-xs font-semibold text-brand hover:underline"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!loading && !failed && state === "generating" && (
+        <div role="status" className="flex items-start gap-3">
+          <SynthesisIcon className="w-4 h-4 text-brand" spinning />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-stone-700">AI overview is being prepared</p>
+            <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
+              IRIS is reading the indexed paper. This panel will update when the overview is ready.
             </p>
           </div>
         </div>

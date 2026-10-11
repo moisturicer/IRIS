@@ -128,7 +128,7 @@ export interface AIStatus {
  * "no overview" as one undifferentiated blank.
  */
 export interface RecordOverviewResponse {
-  state:    "ready" | "not_indexed" | "unavailable";
+  state:    "ready" | "generating" | "not_indexed" | "unavailable";
   overview: RecordOverview | null;
   /** Present only on `ready` — whether this read hit the cache. */
   cached?:  boolean;

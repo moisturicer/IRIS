@@ -81,8 +81,10 @@ export const aiApi = {
    * A record's AI Overview, generated once and cached server-side (IR-334).
    * Replaces firing `ask()` from the paper view on every mount.
    */
-  overview: (recordId: number) =>
-    apiClient.get<RecordOverviewResponse>(`/ai/records/${recordId}/overview/`),
+  overview: (recordId: number, retry = false) =>
+    apiClient.get<RecordOverviewResponse>(`/ai/records/${recordId}/overview/`, {
+      params: retry ? { retry: true } : undefined,
+    }),
 
   /** Ranked retrieval over the readable corpus, without synthesis. */
   search: (query: string, topK = 10) =>

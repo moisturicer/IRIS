@@ -16,7 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, waitFor } from "@/test/render";
+import { act, renderScreen, screen, waitFor } from "@/test/render";
 import type { Citation, RecordOverviewResponse } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 
@@ -69,6 +69,26 @@ describe("the AI overview on a paper", () => {
     renderScreen(<PaperAiOverview record={record} />);
 
     await waitFor(() => expect(overview).toHaveBeenCalledWith(7));
+  });
+
+  it("explains that generation is pending and polls until the overview is ready", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    overview
+      .mockResolvedValueOnce({ data: { state: "generating", overview: null } })
+      .mockResolvedValueOnce({ data: response() });
+    try {
+      renderScreen(<PaperAiOverview record={record} />);
+
+      expect(await screen.findByRole("status")).toHaveTextContent(/being prepared/i);
+      await act(async () => {
+        vi.advanceTimersByTime(2500);
+      });
+
+      expect(await screen.findByRole("heading", { level: 2, name: "Methodology" })).toBeTruthy();
+      expect(overview).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("renders the summary as markdown", async () => {

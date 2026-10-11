@@ -6,7 +6,8 @@ import pytest
 from django.urls import reverse
 
 from apps.ai.composition import CompositionRoot, use_composition_root
-from apps.ai.models import RecordOverview
+from apps.ai.models import ChunkSet, RecordOverview
+from apps.ai.overview.service import PROMPT_VERSION, generate_overview
 from apps.ai.providers.fakes import ScriptedLLM, ScriptedReranker
 from core.enums import PipelineStatus
 
@@ -15,8 +16,22 @@ from .corpus import FLOOD_TEXT, make_record, make_user
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 
+@pytest.fixture(autouse=True)
+def suppress_task_publish(monkeypatch):
+    monkeypatch.setattr("apps.ai.overview.service._enqueue_overview", lambda *args: None)
+
+
 def _get(client, record_id):
     return client.get(reverse("ai-record-overview", args=[record_id]))
+
+
+def _read_after_generation(client, record):
+    """First read claims the work; the worker body then runs; the next read serves it."""
+    claimed = _get(client, record.pk)
+    assert claimed.json()["state"] == "generating"
+    chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+    generate_overview(record.pk, chunk_set.pk, chunk_set.content_hash, PROMPT_VERSION)
+    return _get(client, record.pk)
 
 
 def _root(embedder, llm, permits):
@@ -35,7 +50,7 @@ def test_draft_owner_can_read_overview(embedder, space, client_for):
     llm = ScriptedLLM(reply="The study uses rainfall gauges [p. 4].")
 
     with use_composition_root(_root(embedder, llm, lambda record: True)):
-        response = _get(client_for(owner), record.pk)
+        response = _read_after_generation(client_for(owner), record)
 
     assert response.status_code == 200
     assert response.json()["state"] == "ready"
@@ -53,7 +68,7 @@ def test_invisible_cached_record_is_identical_to_missing_and_calls_no_model(
     )
     llm = ScriptedLLM(reply="The study uses rainfall gauges [p. 4].")
     with use_composition_root(_root(embedder, llm, lambda record: True)):
-        assert _get(client_for(owner), record.pk).json()["state"] == "ready"
+        assert _read_after_generation(client_for(owner), record).json()["state"] == "ready"
     assert RecordOverview.objects.filter(record=record).exists()
     llm.calls.clear()
 
@@ -101,7 +116,7 @@ def test_disclosure_refusal_hides_cached_overview(
     llm = ScriptedLLM(reply="The study uses rainfall gauges [p. 4].")
     client = client_for(reader)
     with use_composition_root(_root(embedder, llm, lambda record: True)):
-        assert _get(client, record.pk).json()["state"] == "ready"
+        assert _read_after_generation(client, record).json()["state"] == "ready"
     stored = RecordOverview.objects.get(record=record)
     llm.calls.clear()
 
@@ -125,14 +140,13 @@ def test_two_readers_share_one_stored_row_and_one_model_call(
     llm = ScriptedLLM(reply="The study uses rainfall gauges [p. 4].")
 
     with use_composition_root(_root(embedder, llm, lambda record: True)):
-        first = _get(client_for(first_reader), record.pk)
+        first = _read_after_generation(client_for(first_reader), record)
         stored = RecordOverview.objects.get(record=record)
         row_id, generated_at = stored.pk, stored.updated_at
         second = _get(client_for(second_reader), record.pk)
 
     assert first.status_code == second.status_code == 200
     assert first.json()["overview"] == second.json()["overview"]
-    assert first.json()["cached"] is False
     assert second.json()["cached"] is True
     assert len(llm.calls) == 1
     assert RecordOverview.objects.filter(record=record).count() == 1

@@ -25,12 +25,11 @@ class RecordOverviewView(APIView):
     a 403 that would confirm it exists.
 
     Disclosure is checked explicitly before reading a cached overview or
-    assembling the whole paper. A refusal returns no overview and calls no model.
+    queueing generation. A refusal returns no overview and calls no model.
 
-    Three states, and the client renders each differently: `ready` carries an
-    overview, `not_indexed` means nothing has been extracted from this record
-    yet, and `unavailable` means disclosure was refused or no model could be
-    reached; this state is not cached, so the next view tries again.
+    `generating` is a persisted claim, so concurrent readers share one queued
+    task. `unavailable` means disclosure was refused or generation failed, and
+    can be retried explicitly with `?retry=true`.
     """
 
     permission_classes = [IsAuthenticated]
@@ -38,4 +37,5 @@ class RecordOverviewView(APIView):
 
     def get(self, request, pk: int):
         record = get_object_or_404(Record.objects.visible_to(request.user), pk=pk)
-        return Response(overview_for(record))
+        retry = request.query_params.get("retry", "").lower() == "true"
+        return Response(overview_for(record, retry=retry))
