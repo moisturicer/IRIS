@@ -1,3 +1,4 @@
+import { routingFixture } from "@/test/routingFixture";
 /**
  * Ask IRIS on persisted Conversations (IR-298).
  *
@@ -198,4 +199,18 @@ describe("the retired browser storage", () => {
     expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
     expect(screen.queryByText(/your previous chats are gone/i)).toBeNull();
   });
+});
+
+it("reruns a replayed answer's original question in its conversation and scope", async () => {
+  list.mockResolvedValue({ data: [summary({ id: 9 })] });
+  get.mockResolvedValue({ data: detail({ id: 9, turns: [{
+    id: 1, question: "Find flooding papers", resolved_question: "A resolved question",
+    answer: "Prior answer", message: null, state: "generative", degraded: false,
+    widened: true, created_at: "2026-10-11", citations: [], routing: routingFixture,
+  }] }) });
+  renderScreen(<RAGChatPage />);
+  await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
+  await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
+    conversationId: 9, routeOverride: "listing", widen: true,
+  }));
 });

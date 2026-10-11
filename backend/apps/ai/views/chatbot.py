@@ -150,6 +150,11 @@ def _prepare_ask_request(request):
     happens identically whether the answer that follows is one JSON body or
     a stream of events.
     """
+    from apps.ai.routing.router import LANES
+
+    route_override = request.data.get("route_override")
+    if route_override is not None and (not isinstance(route_override, str) or route_override not in LANES):
+        return None, Response({"detail": "route_override must name a supported lane."}, status=400)
     conversation = _conversation_for(request)
     question = (request.data.get("question") or "").strip()
     if not question:
@@ -188,6 +193,7 @@ def _prepare_ask_request(request):
             history=history,
             widened=widened,
             scope_record=scope_record,
+            route_override=route_override,
         ),
         None,
     )
@@ -248,7 +254,8 @@ class ChatQueryView(APIView):
 
         return Response(
             {
-                **answer_body(mode, answer.text),
+                **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
+                **orchestrator.metadata,
                 "conversation_id": (
                     None if prepared.conversation is None else prepared.conversation.pk
                 ),
@@ -349,8 +356,12 @@ class ChatStreamView(APIView):
         def event_source():
             # The orchestrator records the Turn before `Done` reaches here,
             # and as `partial` on interruption (IR-328).
+            from apps.ai.routing.chat import RoutingDecided
+
             for event in orchestrator.answer_stream(request.user):
-                if isinstance(event, RetrievalFinished):
+                if isinstance(event, RoutingDecided):
+                    yield _sse(event.name, {"routing": event.routing})
+                elif isinstance(event, RetrievalFinished):
                     yield _sse(
                         event.name,
                         {
@@ -369,7 +380,8 @@ class ChatStreamView(APIView):
                     yield _sse(
                         event.name,
                         {
-                            **answer_body(mode, answer.text),
+                            **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
+                            **orchestrator.metadata,
                             "conversation_id": (
                                 None
                                 if prepared.conversation is None

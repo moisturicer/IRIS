@@ -10,7 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator, Optional
 
-from apps.ai.answers.events import Done
+from apps.ai.answers.events import Done, RetrievalStarted
+from apps.ai.routing.chat import RoutedChat, RoutingDecided
 from apps.ai.composition import composition_root
 from apps.ai.conversations import record_turn
 from apps.ai.evidence.shadow import shadow_turn
@@ -28,18 +29,29 @@ class ChatQuestion:
     history: list
     widened: bool
     scope_record: object
+    route_override: Optional[str] = None
 
 
 class ChatOrchestrator:
     def __init__(self, asked: ChatQuestion, *, max_sources: int) -> None:
         self._asked = asked
-        self._service = composition_root().answer_service(
-            max_sources=max_sources, record=asked.scope_record
+        self._routing = RoutedChat(asked, max_sources=max_sources)
+        self._max_sources = max_sources
+
+    @property
+    def _service(self):
+        return composition_root().answer_service(
+            max_sources=self._max_sources, record=self._asked.scope_record
         )
+
+    @property
+    def metadata(self):
+        return self._routing.metadata
 
     def answer(self, user):
         asked = self._asked
-        answer = self._service.answer(
+        routed = self._routing.answer(user)
+        answer = routed if routed is not None else self._service.answer(
             asked.effective_question,
             user,
             conversation=asked.conversation,
@@ -52,6 +64,18 @@ class ChatOrchestrator:
         """The service's events; the Turn is recorded before `Done` passes
         on, and shadowed only after the reader has it."""
         asked = self._asked
+        self._routing.decide(user)
+        if self._routing.decision is not None:
+            yield RoutingDecided(self._routing.decision)
+        if self._routing.nonpassage:
+            yield RetrievalStarted()
+            answer = self._routing.answer(user)
+            turn = self._record(answer)
+            try:
+                yield Done(answer)
+            finally:
+                self._shadow(turn)
+            return
         for event in self._service.answer_stream(
             asked.effective_question,
             user,
@@ -82,6 +106,8 @@ class ChatOrchestrator:
             answer,
             asked.resolved_question,
             asked.widened,
+            routing=self._routing.decision,
+            listing=self._routing.listing,
         )
 
     def _shadow(self, turn) -> None:

@@ -205,6 +205,8 @@ class Turn(models.Model):
     widened = models.BooleanField(default=False)
     had_reasoning = models.BooleanField(default=False)
     reasoning = models.TextField(blank=True)
+    routing = models.JSONField(default=dict, blank=True)
+    listing = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = TurnQuerySet.as_manager()

@@ -216,7 +216,7 @@ def answer_mode(state: str) -> str:
     return _WIRE_MODE.get(state, UNAVAILABLE_MODE)
 
 
-def answer_body(mode: str, text: str) -> dict:
+def answer_body(mode: str, text: str, *, preserve_no_results: bool = False) -> dict:
     """The ``answer``/``message`` pair for one answer state.
 
     ``answer`` is a written answer or it is null. The non-answers -- nothing
@@ -232,5 +232,5 @@ def answer_body(mode: str, text: str) -> dict:
     if mode == GENERATIVE_MODE:
         return {"answer": text, "message": None}
     if mode == NO_RESULTS_MODE:
-        return {"answer": None, "message": NO_RESULTS_MESSAGE}
+        return {"answer": None, "message": text if preserve_no_results else NO_RESULTS_MESSAGE}
     return {"answer": None, "message": text}

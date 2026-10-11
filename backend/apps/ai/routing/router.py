@@ -74,14 +74,14 @@ def _fixed_lane(question: str, *, paper_chat: bool, widened: bool) -> Optional[s
     if paper_chat and not widened:
         return "passage"
     text = question.lower()
+    if re.search(r"\b(research gaps?|literature landscape|state of the field)\b", text):
+        return "landscape"
     if re.search(r"\b(how many|number of|count of)\b", text):
         return "count"
     if re.search(r"\b(which papers|list (?:the )?papers|what papers)\b", text):
         return "listing"
     if re.search(r"\b(compare|comparison|contrast)\b", text):
         return "comparison"
-    if re.search(r"\b(research gaps?|literature landscape|state of the field)\b", text):
-        return "landscape"
     return None
 
 
@@ -175,7 +175,7 @@ def route_question(
             probabilities, reason, paper_chat, widened, audit_user,
         )
     except (LLMUnavailable, CircuitOpen, DecisionMalformed):
-        suggested = "passage"
+        suggested = "landscape" if fixed == "landscape" else "passage"
         # An uncertain route does not undo a successful Jev screen.
         flagged = not jev_safe
         return _finish(
