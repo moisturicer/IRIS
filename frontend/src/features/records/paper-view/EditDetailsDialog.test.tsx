@@ -203,6 +203,22 @@ describe("Edit details while a revision is asked for", () => {
     }
   });
 
+  it("saves a legacy record that has no Adviser recorded", async () => {
+    // Found in the browser check: the hidden Adviser was still validated, so
+    // Save sent nothing and said nothing.
+    const user = userEvent.setup();
+    const legacy = { ...revising, adviser: null } as unknown as RecordDetail;
+    renderScreen(<EditDetailsDialog record={legacy} selfId={OWNER_ID} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+    await within(dialog).findByRole("textbox", { name: /Title/ });
+
+    expect(within(dialog).getByText("None recorded")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save details" }));
+
+    await waitFor(() => expect(recordsApi.update).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(recordsApi.update).mock.calls[0][1]).not.toHaveProperty("adviser");
+  });
+
   it("has no serious or critical accessibility violations", async () => {
     renderRevising();
     const dialog = await screen.findByRole("dialog", { name: "Edit details" });

@@ -47,7 +47,9 @@ interface EditDetailsDialogProps {
 }
 
 export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDetailsDialogProps) {
-  const schema = useMemo(() => metadataSchema(selfId), [selfId]);
+  // Past draft, the Adviser and the hints are fixed (IR-507): shown, not sent.
+  const submitted = record.pipeline_status !== "draft";
+  const schema = useMemo(() => metadataSchema(selfId, { submitted }), [selfId, submitted]);
   const form = useForm<MetadataValues>({
     resolver: zodResolver(schema),
     defaultValues: stateFromDraft(record, { recordTypes: [], classifications: [], psceds: [] }).values,
@@ -60,8 +62,6 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
   const [moreOpen, setMoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
-  // Past draft, the Adviser and the hints are fixed (IR-507): shown, not sent.
-  const submitted = record.pipeline_status !== "draft";
 
   // The lists name the record's classification and PSCED, which the detail
   // payload gives by name; the form needs their ids, so it is reset once

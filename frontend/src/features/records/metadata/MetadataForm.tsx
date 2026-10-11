@@ -179,7 +179,7 @@ export function MetadataForm({
           <div>
             <p className={LABEL}>Adviser</p>
             <p id={ids.adviser} tabIndex={-1} aria-describedby={`${ids.adviser}-hint`} className="py-2 text-body text-stone-800">
-              {adviser ? personName(adviser) : "Your adviser"}
+              {adviser ? personName(adviser) : adviserId ? "Your adviser" : "None recorded"}
             </p>
             <p id={`${ids.adviser}-hint`} className="mt-1 text-small text-stone-600">
               Your adviser can't be changed once the record is submitted.
