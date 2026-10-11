@@ -229,17 +229,46 @@ class RecordViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
-        # Accepted work goes through the delete request flow (RDCO review);
-        # DELETE_REVIEW_STATUSES, not the public set -- see core.enums (IR-264).
-        if instance.pipeline_status in DELETE_REVIEW_STATUSES:
-            DeleteRequest.objects.create(
-                record=instance,
-                requested_by=self.request.user,
-                previous_pipeline_status=instance.pipeline_status,
-            )
-            lifecycle.apply(instance, lifecycle.WorkflowEvent.REQUEST_DELETE, self.request.user)
-        else:
-            soft_delete_record(instance, deleted_by=self.request.user)
+        """
+        The owner's delete, by status (IR-508), and who is told (IR-517).
+
+        Accepted work goes through the delete request flow (RDCO review);
+        DELETE_REVIEW_STATUSES, not the public set -- see core.enums (IR-264).
+        Anything else is soft-deleted now, which withdraws a record in review
+        (`reviews.withdrawal`). The notices go after commit and never raise.
+        """
+        from apps.notifications.services import (
+            notify_delete_requested,
+            notify_record_deleted,
+            notify_record_withdrawn,
+        )
+        from apps.reviews.withdrawal import open_review_work
+
+        actor = self.request.user
+        with transaction.atomic():
+            if instance.pipeline_status in DELETE_REVIEW_STATUSES:
+                delete_request = DeleteRequest.objects.create(
+                    record=instance,
+                    requested_by=actor,
+                    previous_pipeline_status=instance.pipeline_status,
+                )
+                lifecycle.apply(instance, lifecycle.WorkflowEvent.REQUEST_DELETE, actor)
+                transaction.on_commit(
+                    lambda: notify_delete_requested(delete_request, requested_by=actor)
+                )
+                return
+
+            in_review = instance.pipeline_status == PipelineStatus.IN_REVIEW
+            # Read before the withdrawal closes it: whose work is ending.
+            work = open_review_work(instance) if in_review else None
+            soft_delete_record(instance, deleted_by=actor)
+            if in_review:
+                transaction.on_commit(lambda: notify_record_withdrawn(
+                    instance, withdrawn_by=actor,
+                    seats=work.seats, requesting_parties=work.requesting_parties,
+                ))
+            else:
+                transaction.on_commit(lambda: notify_record_deleted(instance, deleted_by=actor))
 
     # get_permissions() below is a full override with no super() fallback, so a
     # permission_classes kwarg here would never actually run -- that's exactly
