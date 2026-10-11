@@ -19,6 +19,7 @@ from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
+from apps.ai.retrieval.degraded import FullTextRetriever
 from apps.ai.retrieval.two_stage import TwoStageRetriever
 from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
@@ -173,3 +174,32 @@ class VisibilityTests:
             for p in retriever.retrieve("sampling", stranger).passages
         ]
         assert titles == ["Public One"]
+
+
+class RecordSetScopeTests:
+    """A set-valued scope (IR-500) narrows within `visible_to`, never past it."""
+
+    def _corpus(self, embedder, space):
+        author = make_user("author@cit.edu", ROLE_STUDENT)
+        public = make_record(title="Public", status=PipelineStatus.PUBLISHED,
+                             embedder=embedder, space=space)
+        other = make_record(title="Other", status=PipelineStatus.PUBLISHED,
+                            embedder=embedder, space=space)
+        draft = make_record(title="Draft", status=PipelineStatus.DRAFT, owner=author,
+                            embedder=embedder, space=space)
+        return public, other, draft
+
+    @pytest.mark.parametrize("make", [
+        lambda embedder, records: TwoStageRetriever(embedder, records=records),
+        lambda embedder, records: FullTextRetriever(records=records),
+    ])
+    def test_the_set_is_intersected_with_visibility(self, make, embedder, space):
+        public, other, draft = self._corpus(embedder, space)
+        stranger = make_user("stranger@cit.edu", ROLE_STUDENT)
+
+        scoped = make(embedder, {public.pk, draft.pk})
+        found = {p.record_id for p in scoped.retrieve("tilapia ponds", stranger).passages}
+        assert found == {public.pk}
+
+        empty = make(embedder, frozenset())
+        assert empty.retrieve("tilapia ponds", stranger).passages == ()

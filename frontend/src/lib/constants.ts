@@ -37,26 +37,24 @@ export const AUDIT_LOG_ROLES: RoleName[] = [
   ROLES.RDCO,
 ];
 
-/** Record pipeline statuses — match `Record.PIPELINE_STATUS` in Django. */
+/**
+ * Record pipeline statuses — match `PipelineStatus` in Django (`core/enums.py`).
+ *
+ * One value for a record in review, whoever holds it (ADR-021 §4). The fixed
+ * pipeline's five stage values and the stored `declined` were migrated away by
+ * IR-260 and removed by IR-274; a revision request is `workflow_state`
+ * `awaiting_resubmission`, never a status. `lib/pipelineVocabulary.test.ts`
+ * fails the build if one is read again.
+ */
 export const PIPELINE_STATUS = {
   DRAFT:          "draft",
-  // The one in-review status IR-260 stores in place of the stage values below
-  // (ADR-021 §4). Mirrors `PipelineStatus.IN_REVIEW`, added by IR-256.
   IN_REVIEW:      "in_review",
-  // Proposal pipeline
-  ADVISER_REVIEW: "adviser_review",
-  APPROVED:       "approved",       // Proposal accepted by its Adviser: its resting state, shown as Accepted (ADR-032 §2); not public (IR-264)
-  // Thesis/Research and Project pipeline
-  RDCO_INTAKE:      "rdco_intake",
-  ITSO_REVIEW:      "itso_review",
-  PARALLEL_REVIEW:  "parallel_review",
-  RDCO_REVIEW:      "rdco_review",
-  // Terminal / visible states
+  // A Decision's outcomes (ADR-032 §2-§3)
+  APPROVED:       "approved",       // a Proposal accepted by its Adviser, shown as Accepted; not public (IR-264)
   PUBLISHED:      "published",
-  DECLINED:       "declined",       // sent back for revision; owner may resubmit
-  REJECTED:       "rejected",       // outright rejection; no resubmission
+  COMPLETED:      "completed",      // kept unlisted by RDCO, or a legacy Proposal the retired complete act finished
+  REJECTED:       "rejected",       // terminal, shown as Archived
   PENDING_DELETE: "pending_delete",
-  COMPLETED:      "completed",      // Proposal research finished — marked by RDCO or the assigned Adviser
 } as const;
 
 export type PipelineStatus = (typeof PIPELINE_STATUS)[keyof typeof PIPELINE_STATUS];

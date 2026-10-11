@@ -21,13 +21,10 @@ a seat holder clears or records a finding. When an assignment completes,
 `office_review.office_completed()` settles a specialist office's clearance and
 hands back to RDCO.
 
-**Two pipelines, one table.** Until IR-260, the legacy pipeline is still
-authoritative and `shadow.sync()` decides when an assignment opens and closes.
-So seats follow it there: `seat_entry()` and `settle_closed()` are its two
-calls in. A seat can close an assignment only on a record already on the new
-model (`pipeline_status == in_review`), where nothing reconciles the
-assignments back from a legacy status. Without that guard, a seat finishing on
-a legacy record would close an assignment the next `sync()` reopens.
+**What closes an assignment.** Only three things: this module's completion
+rule (`_close_if_complete`), a Decision (`decisions`, which withdraws), and a
+soft delete (`withdrawal`). The legacy `shadow.sync()` reconciliation is
+retired (IR-274).
 
 **Who may do what is not decided here.** Each act names the predicate from
 `core.permissions` it needs and raises `SeatRefused` (a 403) when it fails;
@@ -56,7 +53,7 @@ from core.permissions import (
     office_parties_of,
 )
 
-from .models import RecordAssignment, ResubmissionRequest, Review, ReviewerSeat
+from .models import RecordAssignment, ResubmissionRequest, ReviewerSeat
 
 #: The parties that are offices, and so have members, a pool and coordinators.
 OFFICE_PARTIES = frozenset(str(p) for p in OFFICE_PARTY_BY_ROLE.values())
@@ -148,8 +145,7 @@ def office_complete(assignment) -> bool:
 
 def _close_if_complete(assignment, actor) -> bool:
     """
-    Complete `assignment` when the rule holds. New-model records only: on a
-    legacy record `shadow.sync()` owns the assignment's lifecycle (module note).
+    Complete `assignment` when the rule holds, on a record still in review.
     """
     if assignment.record.pipeline_status != PipelineStatus.IN_REVIEW:
         return False
@@ -247,6 +243,30 @@ def _member_options(assignment) -> dict:
             for u in members
         ],
     }
+
+
+def add_reviewer_assignment(record, user):
+    """
+    The assignment `user` may add a colleague to on `record` (IR-418), or None.
+
+    The active office assignment -- RDCO's included -- on which they hold an
+    open seat: what `add_reviewer` accepts. The oldest seat first, the order
+    `my_seats` lists them in, so Paper View's dialog picks the same one.
+    """
+    if not user or not user.is_authenticated:
+        return None
+    return (
+        ReviewerSeat.objects.filter(
+            assignment__record=record,
+            assignment__party__in=OFFICE_PARTIES,
+            assignment__state=AssignmentState.ACTIVE,
+            reviewer=user,
+            state__in=OPEN_SEAT_STATES,
+        )
+        .order_by("assigned_at", "pk")
+        .values_list("assignment_id", flat=True)
+        .first()
+    )
 
 
 def add_reviewer_options(assignment, holder) -> dict:
@@ -370,7 +390,7 @@ def complete_seat(seat, actor=None) -> bool:
     return _close_if_complete(assignment, actor)
 
 
-# --- the legacy pipeline's two calls in (shadow.sync) -----------------------
+# --- the Adviser's entry seat --------------------------------------------------
 
 def seat_entry(assignment) -> ReviewerSeat | None:
     """
@@ -387,46 +407,6 @@ def seat_entry(assignment) -> ReviewerSeat | None:
         assignment=assignment, reviewer_id=adviser_id, source=SeatSource.ENTRY,
         assigned_at=assignment.opened_at,
     )
-
-
-def settle_closed(assignment, actor, closing_state, *, acted=False):
-    """
-    The legacy pipeline closed `assignment`; settle its seats.
-
-    Completed: whoever reviewed the record as this party *during this
-    assignment* -- the acting reviewer, or anyone with a `Review` at its stage
-    since it opened -- finished their part, so their seat is `done`. Everyone
-    else seated was never needed: withdrawn. The legacy pipeline lets one
-    person decide for an office, so this is the nearest true reading of a
-    closure it made. A withdrawn assignment (a deletion) withdraws every seat.
-
-    `acted` says `actor` closed it by acting *as this party*. The legacy
-    pipeline lets an office member decide straight from the pool, without
-    claiming; that reviewer is given the `done` seat they never took, so they
-    stay a participant (ADR-032 §10: "anyone who has ever held a seat") and
-    keep the Review and Files sections once their part is over.
-    """
-    from .shadow import party_for_stage
-
-    now = timezone.now()
-    open_seats = assignment.seats.filter(state__in=OPEN_SEAT_STATES)
-    if closing_state == AssignmentState.COMPLETED:
-        reviewed = {
-            reviewer_id
-            for stage, reviewer_id in Review.objects.filter(
-                record_id=assignment.record_id, created_at__gte=assignment.opened_at,
-            ).values_list("stage", "reviewed_by_id")
-            if str(party_for_stage(stage) or "") == str(assignment.party)
-        }
-        if acted and actor is not None:
-            reviewed.add(actor.pk)
-            if not _live_seats(assignment).filter(reviewer=actor).exists():
-                ReviewerSeat.objects.create(
-                    assignment=assignment, reviewer=actor, source=SeatSource.CLAIMED,
-                    state=SeatState.DONE, assigned_by=actor, assigned_at=now, done_at=now,
-                )
-        open_seats.filter(reviewer_id__in=reviewed).update(state=SeatState.DONE, done_at=now)
-    open_seats.filter(state__in=OPEN_SEAT_STATES).update(state=SeatState.WITHDRAWN)
 
 
 # --- what the API reads -------------------------------------------------------

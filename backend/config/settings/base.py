@@ -384,6 +384,9 @@ LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
 # Grounded answering is extraction from supplied sources, not composition. A
 # higher temperature buys variety nobody asked for and invites invention.
 LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
+# Seconds before one model call is abandoned when no run deadline is shorter
+# (IR-511). A timeout is a transient failure: retry and the breaker apply.
+LLM_TIMEOUT_SECONDS = config("LLM_TIMEOUT_SECONDS", default=120.0, cast=float)
 # Unset by default -- a Groq/openai/gpt-oss-120b extension ("low"/"medium"/
 # "high") the openai SDK does not type, sent only when configured (IR-325).
 # Requesting it also requests include_reasoning, so a reasoning model's
@@ -446,6 +449,24 @@ LLM_RESOLVE_FALLBACK_MODELS = config("LLM_RESOLVE_FALLBACK_MODELS", default="")
 LLM_RESOLVE_REASONING = config("LLM_RESOLVE_REASONING", default=False, cast=bool)
 LLM_RESOLVE_PROVIDER_ONLY = config("LLM_RESOLVE_PROVIDER_ONLY", default="")
 LLM_RESOLVE_PROVIDER_PINS = config("LLM_RESOLVE_PROVIDER_PINS", default="")
+
+# IR-514: route inherits resolve's model/account until explicitly configured.
+LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
+LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
+LLM_ROUTE_API_KEY = config("LLM_ROUTE_API_KEY", default="")
+LLM_ROUTE_MODEL = config("LLM_ROUTE_MODEL", default="")
+LLM_ROUTE_FALLBACK_MODELS = config("LLM_ROUTE_FALLBACK_MODELS", default="")
+LLM_ROUTE_REASONING = config("LLM_ROUTE_REASONING", default=False, cast=bool)
+LLM_ROUTE_PROVIDER_ONLY = config("LLM_ROUTE_PROVIDER_ONLY", default="")
+LLM_ROUTE_PROVIDER_PINS = config("LLM_ROUTE_PROVIDER_PINS", default="")
+AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
+AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
+AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)
+AI_ROUTE_UNCERTAIN_MIN = config("AI_ROUTE_UNCERTAIN_MIN", default=0.4, cast=float)
+AI_ROUTE_UNCERTAIN_MAX = config("AI_ROUTE_UNCERTAIN_MAX", default=0.6, cast=float)
+AI_ROUTE_INJECTION_THRESHOLD = config(
+    "AI_ROUTE_INJECTION_THRESHOLD", default=0.5, cast=float
+)
 
 LLM_SUMMARY_VENDOR   = config("LLM_SUMMARY_VENDOR", default="")
 LLM_SUMMARY_BASE_URL = config("LLM_SUMMARY_BASE_URL", default="")
@@ -653,6 +674,33 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
 # ---- Vector scan depth (IR-440) ---------------------------------------
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
 AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
+
+# ---- Research lane limits (ADR-038 §5, IR-500) ---------------------------
+# Carried on every run's Budget and enforced by its Spend.
+AI_RESEARCH_MAX_OUTER_ROUNDS = config("AI_RESEARCH_MAX_OUTER_ROUNDS", default=3, cast=int)
+AI_RESEARCH_MAX_CALLS_PER_SUBTASK = config(
+    "AI_RESEARCH_MAX_CALLS_PER_SUBTASK", default=4, cast=int
+)
+AI_RESEARCH_MAX_TOOL_CALLS = config("AI_RESEARCH_MAX_TOOL_CALLS", default=10, cast=int)
+AI_RESEARCH_WALL_CLOCK_SECONDS = config(
+    "AI_RESEARCH_WALL_CLOCK_SECONDS", default=90.0, cast=float
+)
+AI_RESEARCH_MAX_PROMPT_TOKENS = config(
+    "AI_RESEARCH_MAX_PROMPT_TOKENS", default=120_000, cast=int
+)
+AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
+    "AI_RESEARCH_MAX_LEDGER_PASSAGES", default=30, cast=int
+)
+# Tokens one read_record_sections call may return (ADR-038 §2).
+AI_RESEARCH_READ_TOKEN_CAP = config("AI_RESEARCH_READ_TOKEN_CAP", default=3000, cast=int)
+# ADR-027 §1d: corpus_facets refuses below this many visible records. The
+# ADR sets no value; this default is a placeholder until a corpus exists.
+AI_LANDSCAPE_MIN_RECORDS = config("AI_LANDSCAPE_MIN_RECORDS", default=20, cast=int)
+# ADR-027 §1b: corpus_facets refuses above this unclassified share. Also a
+# placeholder; the ADR sets no value.
+AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE = config(
+    "AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE", default=0.5, cast=float
+)
 
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #

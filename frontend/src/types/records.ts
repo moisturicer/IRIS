@@ -93,7 +93,53 @@ export interface RecordFileItem {
   can_remove: boolean;
 }
 
+/**
+ * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
+ * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
+ * draft in Publish, and `attach_file`, an office filing a supplementary file
+ * on a record it takes part in. IR-273 adds `replace_manuscript`: the owner
+ * uploading a revised manuscript for the next version (ADR-032 §5 Amendment).
+ * IR-270 adds the three Decisions: `accept_publish`, `keep_unlisted` (the
+ * spec's `final_decide`, renamed to the act it grants) and `reject`. IR-271
+ * adds `accept_proposal`, a Proposal's Adviser accepting it (the spec's
+ * `decide_proposal`, which also named *Reject*; reject is `reject` on every
+ * record). IR-508 adds the owner's three deletes, one per act, all served by
+ * `DELETE /records/<id>/`: `delete_record` (a draft or rejected record, gone
+ * now), `withdraw_submission` (in review, ending every open turn) and
+ * `request_deletion` (accepted work, for RDCO to decide). Nothing renders them
+ * yet.
+ */
+export type Capability =
+  | "open_review"
+  | "request_document"
+  | "request_revision"
+  | "withdraw_revision"
+  | "route"
+  | "accept_route"
+  | "accept_publish"
+  | "accept_proposal"
+  | "keep_unlisted"
+  | "reject"
+  | "office_review"
+  | "add_reviewer"
+  | "create_version"
+  | "replace_manuscript"
+  | "edit_details"
+  | "continue_draft"
+  | "delete_record"
+  | "withdraw_submission"
+  | "request_deletion"
+  | "continue_as"
+  | "set_visibility"
+  | "tag_ip"
+  | "attach_file"
+  | "comment_review"
+  | "comment_public"
+  | "cite";
+
 export interface RecordDetail extends RecordListItem {
+  /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
+  capabilities:   Capability[];
   year_completed:  number | null;
   abstract:        string;
   abstract_file:   string | null;
@@ -124,13 +170,6 @@ export interface RecordDetail extends RecordListItem {
   resubmission:    RecordResubmission;
   /** Server-worded stage. Never map a pipeline key to English on the client. */
   stage_label:     string;
-  /**
-   * The office whose clearance the *requesting user* would be recording, or
-   * null for Adviser and RDCO, who decide the record at a sequential stage.
-   * Server-derived so the client needs no role->office table of its own.
-   */
-  your_office:       "itso" | "ierc" | "ktto" | null;
-  your_office_label: string | null;
   files:           RecordFileItem[];
   /**
    * Derived by the server from the routing tables, never stored (ADR-021 §4,
@@ -139,12 +178,9 @@ export interface RecordDetail extends RecordListItem {
   workflow_state:       WorkflowState;
   workflow_state_label: string;
   current_holders:      TrackerHolder[];
-  /** The parties this viewer may act as. Empty for almost everyone. */
-  can_act:              Party[];
   /**
    * The parties this viewer may ask the owner for documents as (ADR-022,
-   * IR-262): a party they hold. Wider than `can_act`, which the legacy
-   * pipeline still narrows.
+   * IR-262): a party they hold.
    */
   can_request_document: Party[];
   /**
@@ -365,7 +401,11 @@ export interface ReviewerSeat {
 // Review & Routing Tracker (IR-258, ADR-021 §14)
 // ---------------------------------------------------------------------------
 
-/** ADR-021 §1. `intake` is its own party, even though RDCO staffs it. */
+/**
+ * ADR-021 §1. `intake` is retired (ADR-032 §13): it survives only on history
+ * the server sends -- an old assignment, review or request -- and is never
+ * assigned, routed to or staffed.
+ */
 export type Party = "intake" | "adviser" | "itso" | "ierc" | "ktto" | "rdco";
 
 export type WorkflowState =
@@ -506,7 +546,6 @@ export interface RecordTracker {
   workflow_state:        WorkflowState;
   workflow_state_label:  string;
   current_holders:       TrackerHolder[];
-  can_act:               Party[];
   parties:               TrackerPartyRow[];
   routing_history:       TrackerRoutingGroup[];
   /** Routing was not recorded before this date (IR-257's backfill wrote none). */

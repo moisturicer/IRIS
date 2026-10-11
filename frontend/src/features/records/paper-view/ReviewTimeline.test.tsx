@@ -25,7 +25,6 @@ const payload: RecordTracker = {
   workflow_state_label: "In review",
   // The legacy pipeline can still hold a record at Intake until IR-260.
   current_holders: [{ party: "intake", label: "Intake (retired)", opened_at: null, opened_by: null }],
-  can_act: [],
   parties: [
     {
       party: "intake", label: "Intake (retired)", state: "active", state_label: "Reviewing",

@@ -23,8 +23,6 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from core.enums import Party
-
 logger = logging.getLogger(__name__)
 
 
@@ -32,18 +30,13 @@ def filing_party(record, user) -> Optional[str]:
     """
     The office `user` files as on `record`, or None when they take no part.
 
-    RDCO staffs both `intake` and `rdco`, and always files as `rdco`, so no row
-    carries the `intake` value IR-260 would have to migrate. Every other office
-    staffs exactly one party.
+    Every office staffs exactly one party, so the one it holds here is the one
+    it files as. RDCO files as `rdco`; the retired `intake` is never staffed.
     """
     from apps.reviews.tracker import requestable_parties
 
     parties = requestable_parties(record, user)
-    if not parties:
-        return None
-    if str(Party.INTAKE) in parties:
-        return str(Party.RDCO)
-    return parties[0]
+    return parties[0] if parties else None
 
 
 def removable_parties(record, user) -> frozenset:
@@ -58,7 +51,6 @@ def removable_parties(record, user) -> frozenset:
 
     if not requestable_parties(record, user):
         return frozenset()
-    # RDCO staffs `rdco` too, so it may remove its own files at intake.
     return staffable_parties(record, user)
 
 

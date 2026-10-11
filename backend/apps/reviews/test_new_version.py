@@ -5,8 +5,8 @@ requesting parties' clearances and seats reset (IR-273).
 ADR-032 §5 and its 2026-10-08 Amendments, at the REST seam IR-255 confirmed:
 ADR-003's clearance-aware resubmission on the new model. One class per
 acceptance criterion, then the IR-416 hand-off (the manuscript lock and which
-manuscript a non-owner reads). Both resubmission policies are run the way
-`test_resubmission_policy.py` runs them, through `WORKFLOW_TABLE`.
+manuscript a non-owner reads). Both resubmission policies run through
+`WORKFLOW_TABLE` here; the old fixed-pipeline policy suite was retired.
 """
 
 from unittest.mock import patch
@@ -14,12 +14,14 @@ from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.notifications.models import Notification
 from apps.records import lifecycle
-from apps.records.models import RecordVersion
+from apps.records.models import Record, RecordVersion
+from apps.reviews import routing
 from apps.reviews.models import (
     RecordAssignment,
     RecordClearance,
@@ -189,23 +191,35 @@ class UploadVersionTests(NewVersionTestBase):
         self.assertEqual(v1.manuscript.read(), b"%PDF-1.7 v1")
 
     def test_the_owner_may_replace_the_manuscript_only_while_a_revision_is_asked_for(self):
+        """
+        Still a 400, but since IR-507 it is the record update's own "not now"
+        (`detail`, naming the status), answered before the body is read --
+        not the manuscript lock's `abstract_file` error. An owner may edit
+        nothing in review until a revision is asked for, the file included.
+        """
         record = self.thesis(Party.IERC)
 
         refused = self.upload_manuscript(record)
         self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("abstract_file", refused.data)
+        self.assertIn("in_review", refused.data["detail"])
+        record.refresh_from_db()
+        self.assertEqual(record.abstract_file.name, self.versions(record)[0].manuscript.name)
 
         self.opened_seat(record, Party.IERC, self.ierc)
         self.asked(record, self.ierc)
         self.assertEqual(self.upload_manuscript(record).status_code, status.HTTP_200_OK)
 
     def test_a_reviewer_may_not_replace_it_while_a_revision_is_asked_for(self):
-        """Staff are not exempt (ADR-032 §5 Amendment): the revision is the owner's."""
+        """
+        Staff are not exempt (ADR-032 §5 Amendment): the revision is the owner's.
+        A 403 since IR-507, where it was the manuscript lock's 400: no office
+        edits a record that is not theirs, so the refusal comes before the lock.
+        """
         record = self.itso_cleared_and_ierc_asked()
 
         response = self.upload_manuscript(record, as_user=self.ierc)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         record.refresh_from_db()
         self.assertEqual(record.abstract_file.name, self.versions(record)[0].manuscript.name)
 
@@ -328,8 +342,17 @@ class NothingChangedTests(NewVersionTestBase):
         self.assert_refused_as_unchanged(self.itso_cleared_and_ierc_asked())
 
     def test_an_edit_made_before_the_request_does_not_answer_it(self):
-        record = self.thesis(Party.IERC)
+        """
+        The edit is made while the record is still a draft. It used to be made
+        in review before the request was opened, which IR-507 now refuses: an
+        owner edits only a draft or a record awaiting their revision. A draft
+        edit stamps `details_edited_at` just the same, so the question this
+        asks -- does an earlier stamp answer a later request? -- is unchanged.
+        """
+        record = self.make_record(abstract_file=_pdf(b"%PDF-1.7 v1"))
         self.edit_title(record)
+        routing.enter_at_adviser(record, self.owner)
+        self.accepted_to(record, Party.IERC)
         self.opened_seat(record, Party.IERC, self.ierc)
         self.asked(record, self.ierc)
 
@@ -342,10 +365,18 @@ class NothingChangedTests(NewVersionTestBase):
         self.assert_refused_as_unchanged(record)
 
     def test_a_reviewer_editing_the_details_does_not_answer_the_request(self):
-        """Found in review: the revision is the owner's to make."""
+        """
+        Found in review: the revision is the owner's to make. Since IR-507 the
+        reviewer's edit is refused outright -- a 403, since IERC can see the
+        record -- where before it was saved and merely did not count.
+        """
         record = self.itso_cleared_and_ierc_asked()
-        self.edit_title(record, as_user=self.ierc)
+        self.client.force_authenticate(self.ierc)
+        response = self.client.patch(detail_url(record), {"title": "A revised title"}, format="json")
 
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        record.refresh_from_db()
+        self.assertNotEqual(record.title, "A revised title")
         self.assert_refused_as_unchanged(record)
 
     def test_a_supporting_document_uploaded_since_the_request_is_a_change(self):
@@ -547,7 +578,10 @@ class WhoMaySubmitTests(NewVersionTestBase):
 
     def test_with_no_open_request_there_is_nothing_to_answer(self):
         record = self.thesis(Party.IERC)
-        self.edit_title(record)
+        # A change exists, so the refusal is about the missing request. It was
+        # made through the record update until IR-507 refused an owner's edit
+        # in review with no revision asked for; the stamp is what that wrote.
+        Record.objects.filter(pk=record.pk).update(details_edited_at=timezone.now())
 
         response = self.submit_version(record)
 
@@ -555,12 +589,14 @@ class WhoMaySubmitTests(NewVersionTestBase):
         self.assertIn("No reviewer has asked for a revision", response.data["detail"])
         self.assertEqual(len(self.versions(record)), 1)
 
-    def test_a_legacy_record_is_pointed_at_the_current_resubmission(self):
+    def test_a_record_not_in_review_is_refused(self):
+        """IR-274: this was asked of a record still holding a fixed-pipeline status. Those statuses are gone; the refusal they exercised -- a record not in review -- is asked of a published record instead. It used to point the owner at
+        the legacy Resubmit, which no longer exists."""
         record = self.make_record()
-        record.pipeline_status = PipelineStatus.DECLINED
+        record.pipeline_status = PipelineStatus.PUBLISHED
         record.save(update_fields=["pipeline_status"])
 
         response = self.submit_version(record)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("current review pipeline", response.data["detail"])
+        self.assertIn("not in review", response.data["detail"])

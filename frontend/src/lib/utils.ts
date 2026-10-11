@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
 import { format, parseISO, isValid } from "date-fns";
-import type { PipelineStatus } from "./constants";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -10,28 +9,6 @@ export function formatDate(value: string | Date | null | undefined, pattern = "M
   if (!value) return "—";
   const date = typeof value === "string" ? parseISO(value) : value;
   return isValid(date) ? format(date, pattern) : "—";
-}
-
-const PIPELINE_LABELS: Record<PipelineStatus, string> = {
-  draft:           "Draft",
-  in_review:       "In Review",
-  adviser_review:  "Adviser Review",
-  // ADR-032 §2: an accepted Proposal's resting state (IR-271).
-  approved:        "Accepted",
-  completed:       "Completed",
-  rdco_intake:     "RDCO Intake Review",
-  itso_review:     "ITSO Review",
-  parallel_review: "Parallel Office Review",
-  rdco_review:     "RDCO Final Review",
-  published:       "Published",
-  declined:        "Revision Requested",
-  // ADR-032 §2-§3: a rejected record is shown as Archived (IR-270).
-  rejected:        "Archived",
-  pending_delete:  "Pending Deletion",
-};
-
-export function pipelineLabel(status: PipelineStatus | string): string {
-  return PIPELINE_LABELS[status as PipelineStatus] ?? status;
 }
 
 export function downloadBlob(data: Blob, filename: string) {

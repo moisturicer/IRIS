@@ -13,16 +13,17 @@ method would be bypassed by all of them and the feature would silently never run
 in a real configuration. An abstract method makes forgetting a decorator a
 `TypeError` at construction, not a missing feature in production.
 
-**One request, one completion.** There is no message list and no tool-result
-turn, because nothing executes a tool in this phase (ADR-035 §4): a tool call is
-read back as a route signal and the exchange ends.
+**Two forms, both abstract.** `complete_with_tools` is one request and one
+completion, which is all the evidence decision needs (ADR-035 §4).
+`converse_with_tools` takes a message list carrying the model's earlier tool
+calls and their results, for the research planner (IR-511, ADR-038 §4).
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Union
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,8 @@ class ToolCall:
 
     name: str
     arguments: str = ""
+    #: The vendor's id for this call; a tool result answers it by this id.
+    id: str = ""
 
 
 @dataclass(frozen=True)
@@ -66,6 +69,39 @@ class ToolCompletion:
     #: Vendor-reported token counts, or `None` when the vendor said nothing.
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class SystemMessage:
+    content: str
+
+
+@dataclass(frozen=True)
+class UserMessage:
+    content: str
+
+
+@dataclass(frozen=True)
+class AssistantMessage:
+    """An earlier model turn, fed back. Reasoning is never sent back."""
+
+    text: str = ""
+    tool_calls: tuple[ToolCall, ...] = ()
+
+    @classmethod
+    def from_completion(cls, completion: ToolCompletion) -> "AssistantMessage":
+        return cls(text=completion.text, tool_calls=completion.tool_calls)
+
+
+@dataclass(frozen=True)
+class ToolResultMessage:
+    """The result of one tool call, answering it by its id."""
+
+    tool_call_id: str
+    content: str
+
+
+Message = Union[SystemMessage, UserMessage, AssistantMessage, ToolResultMessage]
 
 
 class ToolCallingLLM(ABC):
@@ -90,4 +126,18 @@ class ToolCallingLLM(ABC):
         An empty or malformed completion is **returned, not raised**: whether
         it is an error is the caller's reading, and the evidence decision
         routes each shape to its own reason code.
+        """
+
+    @abstractmethod
+    def converse_with_tools(
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        """Continue `messages`, with `tools` on offer (IR-511).
+
+        Same failure contract as `complete_with_tools`. Executing a returned
+        call and appending its result is the caller's job.
         """

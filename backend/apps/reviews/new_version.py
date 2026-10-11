@@ -18,7 +18,7 @@ changed since the newest request:
    reviewers review the new version. Every other party's seats, and the
    Adviser's and RDCO's, are untouched, so if RDCO asked only RDCO looks
    again, and if the Adviser asked only the Adviser does;
-5. records the resubmission on the record, as the legacy path does, so
+5. records the resubmission on the record (IR-139), so
    `clearance_state.is_preserved` tells a surviving clearance from a reset
    one.
 
@@ -32,8 +32,7 @@ nothing.
 
 **What counts as a change** (`unchanged_reason`): a manuscript other than the
 latest version's, a supporting document an owner uploaded since the newest
-request, or a detail edited since then (`Record.details_edited_at`). The
-legacy `resubmit_record()` counts only supporting uploads.
+request, or a detail edited since then (`Record.details_edited_at`).
 
 The requesting parties' reviewers are told, after commit.
 """
@@ -124,7 +123,7 @@ def new_version_hint(record, user) -> Optional[dict]:
     - `kept`: the offices whose `cleared` clearance it keeps;
     - `blocked`: why it cannot be submitted yet.
     """
-    if not routing.is_new_model(record) or not is_record_owner(user, record):
+    if not routing.is_in_review(record) or not is_record_owner(user, record):
         return None
     requests = list(revisions.open_requests(record))
     if not requests:
@@ -156,11 +155,8 @@ def submit_new_version(record, actor):
     record = routing._locked(record)
     if not is_record_owner(actor, record):
         raise NewVersionRefused("Only an owner of this record may submit a new version of it.")
-    if not routing.is_new_model(record):
-        raise NewVersionError(
-            "This record is still on the current review pipeline. Use Resubmit "
-            "for review instead."
-        )
+    if not routing.is_in_review(record):
+        raise NewVersionError("This record is not in review.")
     # Read before anything is written, so a misconfigured policy refuses this
     # version cleanly instead of halfway through it (IR-137).
     lifecycle.resubmission_policy()
@@ -203,7 +199,7 @@ def submit_new_version(record, actor):
     )
     requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
 
-    # Which policy was active, per resubmission, as the legacy path logs it
+    # Which policy was active, per resubmission
     # (IR-137, ADR-004's documentation requirement).
     logger.info(
         "record %s: v%s submitted under %s policy; %s review again",

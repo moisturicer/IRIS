@@ -16,7 +16,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from apps.records.models import Record, RecordOwner, RecordType
-from apps.reviews.models import RecordAssignment, RecordClearance, Review, ReviewerSeat
+from apps.reviews.models import RecordAssignment, Review, ReviewerSeat
 from core.enums import (
     AssignmentState,
     Party,
@@ -28,7 +28,7 @@ from core.enums import (
 )
 
 from .test_routing import RoutingTestBase
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 MINE = "/api/v1/reviews/mine/"
 
@@ -84,7 +84,12 @@ class MyReviewsTestBase(RoutingTestBase):
         )
 
     def legacy(self, pipeline_status, **extra):
-        """An old-pipeline record parked at `pipeline_status`."""
+        """
+        A record with no assignment behind it, parked at `pipeline_status`: the
+        shape history from before the seat backfill (IR-415) has. Since IR-274
+        `pipeline_status` is one of today's values -- IR-260 migrated every
+        in-flight fixed-pipeline record to `in_review`.
+        """
         record = Record.objects.create(
             title=f"Legacy at {pipeline_status}",
             abstract="A" * 40,
@@ -265,7 +270,7 @@ class DoneTests(MyReviewsTestBase):
 
     def test_old_pipeline_history_without_a_seat_is_done(self):
         """Settled 2026-10-08 (Q10): the seat backfill never seated these."""
-        record = self.legacy(PipelineStatus.PARALLEL_REVIEW)
+        record = self.legacy(PipelineStatus.IN_REVIEW)
         self.legacy_review(record, self.itso, "itso", "approved")
 
         rows = self.rows(self.itso, tab="done")
@@ -273,7 +278,7 @@ class DoneTests(MyReviewsTestBase):
                          [(record.pk, "review", "cleared")])
 
     def test_an_old_decline_is_revision_requested_and_only_under_all(self):
-        record = self.legacy(PipelineStatus.DECLINED)
+        record = self.legacy(PipelineStatus.IN_REVIEW)
         self.legacy_review(record, self.itso, "itso", "declined")
 
         rows = self.rows(self.itso, tab="done")
@@ -290,10 +295,14 @@ class DoneTests(MyReviewsTestBase):
         self.assertEqual(self.rows(self.rdco, tab="done", outcome="accepted"), [])
 
     def test_an_intake_decision_is_rdcos(self):
-        record = self.legacy(PipelineStatus.ITSO_REVIEW)
-        self.legacy_review(record, self.rdco, "rdco_intake", "approved")
+        record = self.legacy(PipelineStatus.IN_REVIEW)
+        # `intake`, not `rdco_intake`: IR-274's `reviews.0016` rewrote the old
+        # spelling, which no longer exists, to this one.
+        self.legacy_review(record, self.rdco, "intake", "approved")
         row = self.rows(self.rdco, tab="done")[0]
-        self.assertEqual((row["party"], row["party_label"], row["outcome"]), ("rdco", "RDCO Intake", "accepted"))
+        # Deliberately changed by IR-260: a historical intake review is labelled
+        # "Intake (retired)" (ADR-032 §13; the card's "Intake history" criterion).
+        self.assertEqual((row["party"], row["party_label"], row["outcome"]), ("rdco", "Intake (retired)", "accepted"))
 
     def test_a_seat_done_without_a_verdict_of_its_own_has_no_outcome(self):
         record = self.routed(Party.ITSO)
@@ -396,47 +405,31 @@ class CoordinatorTests(MyReviewsTestBase):
                 response = self.mine(self.itso_coordinator, office=office)
                 self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_an_old_pipeline_row_in_the_office_view_offers_no_assign(self):
-        record = self.legacy(PipelineStatus.ITSO_REVIEW)
-        RecordClearance.objects.create(record=record, office="itso", status="pending")
 
-        rows = self.rows(self.itso_coordinator, office="itso")
-        self.assertEqual([(r["record"], r["kind"], r["can_assign"]) for r in rows],
-                         [(record.pk, "legacy", False)])
+# --- Retired by IR-274: the old pipeline's queue -----------------------------------------
+#
+# `OldPipelineTests` pinned that a record still on the fixed pipeline appeared in
+# To review where the retired `/reviews/pending/` had put it, as a `legacy` row
+# naming its stage (ADR-032 §9 Amendment). IR-260 migrated every such record to
+# `in_review`, and IR-274 deleted the branch. What remains true is asserted here.
 
+class NoOldPipelineQueueTests(MyReviewsTestBase):
 
-# --- AC: Old pipeline -----------------------------------------------------------------------
+    def test_a_record_with_no_assignment_is_in_nobodys_to_review(self):
+        self.legacy(PipelineStatus.IN_REVIEW)
+        for user in (self.itso, self.ktto, self.ierc, self.rdco, self.adviser):
+            with self.subTest(user=user.email):
+                self.assertEqual(self.rows(user, tab="to_review"), [])
 
-class OldPipelineTests(MyReviewsTestBase):
-
-    def test_old_pipeline_records_appear_where_the_old_queue_put_them(self):
-        itso_stage = self.legacy(PipelineStatus.ITSO_REVIEW)
-        for office in ("itso", "ierc", "ktto"):
-            RecordClearance.objects.create(record=itso_stage, office=office, status="pending")
-        intake = self.legacy(PipelineStatus.RDCO_INTAKE)
-        proposal = self.legacy(PipelineStatus.ADVISER_REVIEW)
-
-        def legacy_rows(user):
-            return {r["record"] for r in self.rows(user, tab="to_review") if r["kind"] == "legacy"}
-
-        self.assertEqual(legacy_rows(self.itso), {itso_stage.pk})
-        self.assertEqual(legacy_rows(self.ktto), {itso_stage.pk})
-        # IERC holds a pending clearance at itso_review, and may not act there yet.
-        self.assertEqual(legacy_rows(self.ierc), set())
-        self.assertEqual(legacy_rows(self.rdco), {intake.pk})
-        self.assertEqual(legacy_rows(self.adviser), {proposal.pk})
-        self.assertEqual(legacy_rows(self.adviser2), set())
-
-    def test_a_legacy_row_names_its_stage_and_is_never_in_review(self):
-        self.legacy(PipelineStatus.RDCO_INTAKE)
-        row = self.rows(self.rdco, tab="to_review")[0]
-        self.assertEqual(row["stage_label"], "RDCO Intake Review")
-        self.assertEqual(row["party_label"], "RDCO")
-        self.assertFalse(row["can_claim"])
-        self.assertEqual(self.rows(self.rdco, tab="in_review"), [])
+    def test_no_row_names_a_stage(self):
+        record = self.routed(Party.ITSO)
+        self.seat(record, Party.ITSO, self.itso)
+        for row in self.rows(self.itso, tab="to_review"):
+            self.assertIn(row["kind"], ("seat", "pool"))
+            self.assertNotIn("stage_label", row)
 
     def test_a_student_has_empty_tabs(self):
-        self.legacy(PipelineStatus.RDCO_INTAKE)
+        self.legacy(PipelineStatus.IN_REVIEW)
         page = self.page(self.owner)
         self.assertEqual(page["rows"], [])
         self.assertEqual(page["counts"], {"to_review": 0, "in_review": 0, "done": 0})
@@ -475,8 +468,6 @@ class ContractTests(MyReviewsTestBase):
             for _ in range(n):
                 self.seat(self.routed(Party.ITSO), Party.ITSO, self.itso)
                 self.routed(Party.ITSO)
-                legacy = self.legacy(PipelineStatus.ITSO_REVIEW)
-                RecordClearance.objects.create(record=legacy, office="itso", status="pending")
                 done = self.legacy(PipelineStatus.PUBLISHED)
                 Review.objects.create(record=done, reviewed_by=self.itso, stage="itso", status="approved")
                 self.done_seat(self.legacy(PipelineStatus.PUBLISHED), timezone.now())

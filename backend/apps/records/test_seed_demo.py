@@ -24,7 +24,8 @@ from django.test import TestCase
 from apps.accounts.models import User
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.reviews.models import RecordClearance
-from apps.reviews.services import resubmit_record
+from apps.reviews.new_version import submit_new_version
+from apps.reviews.tracker import workflow_state
 from core.enums import ClearanceStatus, Office, PipelineStatus
 
 from .management.commands.seed_demo import (
@@ -134,16 +135,11 @@ class SeedDemoRecordTests(TestCase):
     #: which is not part of the disclosure workflow this seed demonstrates.
     EXPECTED_STATUSES = [
         PipelineStatus.DRAFT,
-        PipelineStatus.ADVISER_REVIEW,
+        PipelineStatus.IN_REVIEW,
         PipelineStatus.APPROVED,
         PipelineStatus.COMPLETED,
-        PipelineStatus.RDCO_INTAKE,
-        PipelineStatus.ITSO_REVIEW,
-        PipelineStatus.PARALLEL_REVIEW,
-        PipelineStatus.RDCO_REVIEW,
         PipelineStatus.PUBLISHED,
         PipelineStatus.REJECTED,
-        PipelineStatus.DECLINED,
     ]
 
     def setUp(self):
@@ -156,14 +152,21 @@ class SeedDemoRecordTests(TestCase):
             missing,
             f"no seeded record sits at {missing} -- a rehearsal cannot start there",
         )
+        states = {workflow_state(r) for r in Record.objects.all()}
+        self.assertTrue(
+            {"submitted", "in_review", "final_review", "awaiting_document", "awaiting_resubmission"} <= states,
+            states,
+        )
+        self.assertFalse(Record.objects.filter(pipeline_status__in=[
+            "adviser_review", "rdco_intake", "itso_review", "parallel_review",
+            "rdco_review", "declined",
+        ]).exists())
 
     def test_the_catalogue_reaches_published_through_the_workflow(self):
         """Discover's records are published, not assigned to `published`.
 
-        `seed_demo_records.py` set the status directly, so a record Discover
-        showed might never have been able to make the journey. Two RDCO
-        approvals is the journey; a `Review` row for each is the evidence it
-        happened.
+        A record in Discover passed an Adviser's decision, which is the
+        new model's direct path when no specialist office is required.
         """
         published = Record.objects.filter(
             pipeline_status=PipelineStatus.PUBLISHED
@@ -171,9 +174,10 @@ class SeedDemoRecordTests(TestCase):
         self.assertTrue(published.exists(), "the Discover catalogue is empty")
         for record in published:
             self.assertGreaterEqual(
-                record.reviews.count(), 2,
+                record.reviews.count(), 1,
                 f"{record.title} is published with no review history behind it",
             )
+            self.assertEqual(record.reviews.first().stage, "adviser")
 
     def test_submitted_records_carry_dpa_consent(self):
         """The seed must not manufacture records that skipped the consent gate.
@@ -226,6 +230,19 @@ class SeedDemoRecordTests(TestCase):
             {("adviser", "active")},
         )
 
+    def test_every_my_reviews_tab_has_a_seat(self):
+        """
+        IR-260: a rehearsal can open each My Reviews tab on real rows. To review
+        is an `assigned` seat, In review an `in_review` one, Done a `done` one
+        (ADR-032 §9).
+        """
+        from apps.reviews.models import ReviewerSeat
+
+        states = set(ReviewerSeat.objects.values_list("state", flat=True))
+        for state in ("assigned", "in_review", "done"):
+            with self.subTest(state=state):
+                self.assertIn(state, states, f"no seeded seat is {state}")
+
     def test_one_specialist_path_thesis_waits_in_rdcos_pool(self):
         """
         IR-270: reached through the real acts -- the Adviser's accept & route,
@@ -250,22 +267,21 @@ class SeedDemoRecordTests(TestCase):
             {("adviser", "approved"), ("itso", "approved")},
         )
 
-    def test_the_flagship_starts_declined_with_two_offices_cleared(self):
+    def test_the_flagship_awaits_revision_with_two_offices_cleared(self):
         record = Record.objects.get(title=FLAGSHIP_TITLE)
-        self.assertEqual(record.pipeline_status, PipelineStatus.DECLINED)
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        self.assertEqual(workflow_state(record), "awaiting_resubmission")
         self.assertEqual(self._clearances(record), {
             Office.ITSO: ClearanceStatus.CLEARED,
             Office.KTTO: ClearanceStatus.CLEARED,
-            Office.IERC: ClearanceStatus.DECLINED,
+            Office.IERC: ClearanceStatus.PENDING,
         })
 
     def test_the_flagship_record_actually_preserves_its_peer_clearances(self):
         """**The demo, executed.** ADR-003's contribution, on the seeded record.
 
-        Resubmitting runs the real `resubmit_record`, which reads the declining
-        stage off the last `Review` row -- so if the seed had reached `declined`
-        by assigning the status rather than by having IERC decline, there would
-        be no such row and this would route as a full restart instead.
+        Submitting a new version runs the real clearance-aware path and
+        preserves offices that already cleared.
         """
         record = Record.objects.get(title=FLAGSHIP_TITLE)
         owner = record.owners.get(is_primary=True).user
@@ -280,7 +296,7 @@ class SeedDemoRecordTests(TestCase):
             uploaded_by=owner,
         )
 
-        resubmit_record(record, owner)
+        submit_new_version(record, owner)
 
         record.refresh_from_db()
         self.assertEqual(self._clearances(record), {
@@ -289,8 +305,8 @@ class SeedDemoRecordTests(TestCase):
             Office.IERC: ClearanceStatus.PENDING,
         }, "only the declining office is reset")
         self.assertEqual(
-            record.pipeline_status, PipelineStatus.PARALLEL_REVIEW,
-            "the record returns to the stage IERC reviews at, not to the top",
+            record.pipeline_status, PipelineStatus.IN_REVIEW,
+            "the record stays with the assigned reviewers",
         )
 
     def test_the_resubmitted_record_shows_preserved_clearances(self):
@@ -305,7 +321,7 @@ class SeedDemoRecordTests(TestCase):
         """
         record = Record.objects.get(title=RESUBMITTED_TITLE)
 
-        self.assertEqual(record.pipeline_status, PipelineStatus.PARALLEL_REVIEW)
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
         self.assertEqual(record.resubmission_count, 1)
         self.assertIsNotNone(
             record.last_resubmitted_at,

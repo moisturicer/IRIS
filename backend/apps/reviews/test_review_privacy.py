@@ -23,15 +23,13 @@ from core.enums import (
     ClearanceStatus,
     Party,
     PipelineStatus,
-    RecordTypeName,
     ResubmissionRequestState,
     ReviewDecision,
     RoleName,
 )
-from core.permissions import may_read_review
 
 from .test_office_review import OfficeReviewTestBase
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 
 class ReviewPrivacyTestBase(OfficeReviewTestBase):
@@ -196,17 +194,6 @@ class ParticipantsReadItTests(ReviewPrivacyTestBase):
     def test_a_pool_member_of_an_office_taking_part_reads_it_without_a_seat(self):
         record = self.reviewed()  # IERC is active, and nobody there is seated
         self.assertEverythingDisclosed(record, self.ierc2)
-
-    def test_a_legacy_pipeline_reviewer_who_can_act_reads_it(self):
-        """Intake decides straight from the pool on the legacy pipeline."""
-        record = self.make_record(RecordTypeName.THESIS_RESEARCH)
-        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.RDCO_INTAKE)
-        record.refresh_from_db()
-        RecordAssignment.objects.create(record=record, party=Party.INTAKE, opened_at=timezone.now())
-
-        self.assertTrue(may_read_review(self.rdco, record))
-        self.assertEqual(self.tracker(record, self.rdco)["reviews"], [])
-        self.assertFalse(may_read_review(self.ktto_member, record))
 
 
 # --- AC: IR-269's per-seat detail follows the same rule ------------------------------------

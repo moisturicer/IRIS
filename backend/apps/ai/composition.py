@@ -56,7 +56,7 @@ resilient path.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, AbstractSet, Callable, Optional
 
 from apps.ai.answers.selection import SourceSelection
 from apps.ai.answers.service import GroundedAnswerService
@@ -168,7 +168,7 @@ class CompositionRoot:
 
         The only way to reach a model -- ``llm()``, the untasked accessor
         every caller used before Inference tasks existed, is deleted
-        (IR-388). A task name that is not one of the four raises rather than
+        (IR-388). A task name outside the closed set raises rather than
         resolving to a default, and an injected ``self._llm`` bypasses
         Profile resolution entirely -- the property every fake-driven test in
         ``test_ask_http.py`` depends on.
@@ -181,6 +181,7 @@ class CompositionRoot:
         """
         from apps.ai.inference import (
             CompletionLoggingLLMProvider,
+            InferenceTask,
             build_profile_llm,
             inference_task,
             profile_for,
@@ -198,7 +199,13 @@ class CompositionRoot:
             # `FallbackLLMProvider`), and this is the one seam every
             # production caller reaches a task's model through anyway
             # (IR-387).
-            provider = CompletionLoggingLLMProvider(build_profile_llm(profile), profile)
+            provider = CompletionLoggingLLMProvider(
+                build_profile_llm(
+                    profile,
+                    max_tokens=256 if resolved is InferenceTask.ROUTE else None,
+                ),
+                profile,
+            )
             self._task_llms[resolved] = provider
         return provider
 
@@ -323,7 +330,11 @@ class CompositionRoot:
 
     # -- the stack ----------------------------------------------------------
 
-    def retriever(self, record: Optional[Record] = None) -> Retriever:
+    def retriever(
+        self,
+        record: Optional[Record] = None,
+        records: Optional[AbstractSet[int]] = None,
+    ) -> Retriever:
         """The stack, optionally narrowed to one Record for this call (IR-298).
 
         ``record`` is a call-time argument, not a root-level setting: two
@@ -331,19 +342,39 @@ class CompositionRoot:
         retriever, which is what lets Paper Chat stay scoped by default and
         Ask IRIS stay unscoped, from one root. The `Retriever` port itself
         carries no such parameter -- see `TwoStageRetriever`'s docstring.
+
+        ``records`` narrows to a set of Record ids (IR-500), on every path
+        including the outage fallback, intersected with ``visible_to``.
         """
         return DegradableRetriever(
             RerankingRetriever(
-                self._candidates(record),
+                self._candidates(record, records),
                 reranker=self.reranker(),
                 policy_enabled=self._policy_enabled,
                 permits=self._permits,
             ),
-            fallback=FullTextRetriever(record=record),
+            fallback=FullTextRetriever(record=record, records=records),
             degrade_on=_vendor_failures(),
         )
 
-    def _candidates(self, record: Optional[Record]) -> Retriever:
+    def vendor_permits(self) -> Callable[[Record], bool]:
+        """The gate for content bound to the research planner (ADR-038 §2.3).
+
+        Unlike reranking's, it does not depend on whether the reranker
+        transmits. ``policy_enabled=False`` turns it off, as it does for
+        ``SourceSelection``.
+        """
+        if not self._policy_enabled:
+            return lambda record: True
+        return self._permits
+
+    def vendor_unavailable(self, exc: BaseException) -> bool:
+        """Whether ``exc`` is an outage to degrade past, not a bug to raise."""
+        return _vendor_failures()(exc)
+
+    def _candidates(
+        self, record: Optional[Record], records: Optional[AbstractSet[int]] = None
+    ) -> Retriever:
         """What reranking is handed: the vector list, or the fused list.
 
         Fusion goes *inside* `RerankingRetriever` (ADR-033 §1, IR-395), so the
@@ -355,7 +386,7 @@ class CompositionRoot:
         """
         from django.conf import settings
 
-        vector = TwoStageRetriever(self.embedder(), record=record)
+        vector = TwoStageRetriever(self.embedder(), record=record, records=records)
         if not (
             getattr(settings, "AI_KEYWORD_RETRIEVAL_ENABLED", False)
             and getattr(settings, "AI_RETRIEVAL_FUSION_ENABLED", False)
@@ -366,7 +397,9 @@ class CompositionRoot:
 
         # The same `FullTextRetriever` the outage path uses, scoped the same
         # way, so `visible_to(user)` is one predicate on both paths.
-        return KeywordFusionRetriever(vector, keyword=FullTextRetriever(record=record))
+        return KeywordFusionRetriever(
+            vector, keyword=FullTextRetriever(record=record, records=records)
+        )
 
     def without_reranking(self) -> "CompositionRoot":
         """The same root with reranking switched off (IR-133).

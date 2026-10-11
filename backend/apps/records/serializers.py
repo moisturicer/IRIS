@@ -1,6 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
-from core.enums import ReviewDecision
+from core.enums import PipelineStatus, ReviewDecision
 
 from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, resubmission_payload
@@ -64,8 +64,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     clearances     = serializers.SerializerMethodField()
     resubmission   = serializers.SerializerMethodField()
     stage_label    = serializers.CharField(source="get_pipeline_status_display", read_only=True)
-    your_office    = serializers.SerializerMethodField()
-    your_office_label = serializers.SerializerMethodField()
     files          = serializers.SerializerMethodField()
     # Read as the manuscript endpoint, not the stored `/media/` path (IR-334).
     abstract_file  = serializers.SerializerMethodField()
@@ -73,7 +71,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     workflow_state       = serializers.SerializerMethodField()
     workflow_state_label = serializers.SerializerMethodField()
     current_holders      = serializers.SerializerMethodField()
-    can_act              = serializers.SerializerMethodField()
     # The parties this viewer may ask the owner for documents as (IR-262).
     can_request_document = serializers.SerializerMethodField()
     # The viewer's own reviewer seats here, and whether they take part in the
@@ -102,6 +99,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # stale dialog never decides into a changed record. A rendering hint;
     # `decide/` re-checks it.
     decision             = serializers.SerializerMethodField()
+    # What the viewer may be offered (ADR-032 §10, IR-418): `core.permissions`
+    # assembles it from the blocks above. A rendering hint; every action
+    # endpoint re-checks its own predicate, so the server stays authoritative.
+    capabilities         = serializers.SerializerMethodField()
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
@@ -112,8 +113,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
     def _workflow(self, obj):
         """
-        The three workflow fields, computed once per record. `can_act` depends
-        on the viewer, so it comes from the request like `your_office` does.
+        The workflow fields, computed once per record. `can_request_document`
+        depends on the viewer, so it comes from the request.
         """
         cache = self.__dict__.setdefault("_workflow_cache", {})
         if obj.pk not in cache:
@@ -148,19 +149,28 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_current_holders(self, obj):
         return self._workflow(obj)["current_holders"]
 
-    def get_can_act(self, obj):
-        return self._workflow(obj)["can_act"]
-
     def get_can_request_document(self, obj):
         return self._workflow(obj)["can_request_document"]
 
     def _viewer(self):
         return getattr(self.context.get("request"), "user", None)
 
+    def _once(self, obj, name, compute):
+        """
+        A viewer-dependent block, computed once per record. `capabilities`
+        reads the same blocks the payload carries (IR-418), and each costs
+        queries, so neither field computes them a second time.
+        """
+        cache = self.__dict__.setdefault("_block_cache", {})
+        key = (obj.pk, name)
+        if key not in cache:
+            cache[key] = compute()
+        return cache[key]
+
     def get_my_seats(self, obj):
         from apps.reviews.seats import my_seats
 
-        return my_seats(obj, self._viewer())
+        return self._once(obj, "my_seats", lambda: my_seats(obj, self._viewer()))
 
     def get_is_participant(self, obj):
         from core.permissions import is_record_participant
@@ -170,22 +180,35 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_routing(self, obj):
         from apps.reviews.routing import routing_flags
 
-        return routing_flags(obj, self._viewer())
+        return self._once(obj, "routing", lambda: routing_flags(obj, self._viewer()))
 
     def get_office_review(self, obj):
         from apps.reviews.office_review import office_review_flags
 
-        return office_review_flags(obj, self._viewer())
+        return self._once(obj, "office_review", lambda: office_review_flags(obj, self._viewer()))
 
     def get_revision(self, obj):
         from apps.reviews.revisions import revision_flags
 
-        return revision_flags(obj, self._viewer(), readable=self._readable(obj))
+        return self._once(
+            obj, "revision",
+            lambda: revision_flags(obj, self._viewer(), readable=self._readable(obj)),
+        )
 
     def get_decision(self, obj):
         from apps.reviews.decisions import decision_flags
 
-        return decision_flags(obj, self._viewer())
+        return self._once(obj, "decision", lambda: decision_flags(obj, self._viewer()))
+
+    def get_capabilities(self, obj):
+        from core.permissions import record_capabilities
+
+        return record_capabilities(
+            obj, self._viewer(), workflow=self._workflow(obj),
+            my_seats=self.get_my_seats(obj), routing=self.get_routing(obj),
+            office_review=self.get_office_review(obj), revision=self.get_revision(obj),
+            decision=self.get_decision(obj),
+        )
 
     def get_reviews(self, obj):
         """
@@ -264,31 +287,6 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             latest_decline_stage=latest_decline.stage if latest_decline else None,
         )
 
-    def _viewer_office(self, obj):
-        """Which office's clearance the requesting user would be recording.
-
-        Server-derived for the same reason `preserved` is (IR-139): the client
-        would otherwise need its own role->office table, and a second table is a
-        second thing to get wrong. None for Adviser and RDCO, who decide the
-        record at a sequential stage rather than clearing for an office.
-        """
-        from apps.reviews.services import ROLE_TO_OFFICE
-
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
-        role = getattr(getattr(user, "role", None), "name", "")
-        return ROLE_TO_OFFICE.get(role) or None
-
-    def get_your_office(self, obj):
-        return self._viewer_office(obj)
-
-    def get_your_office_label(self, obj):
-        office = self._viewer_office(obj)
-        if not office:
-            return None
-        match = next((c for c in self._ordered_clearances(obj) if c.office == office), None)
-        return match.get_office_display() if match else office.upper()
-
     def get_file_count(self, obj):
         return obj.files.count()
 
@@ -347,10 +345,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",
-            "your_office", "your_office_label",
-            "workflow_state", "workflow_state_label", "current_holders", "can_act",
+            "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "is_participant", "routing",
-            "office_review", "revision", "decision",
+            "office_review", "revision", "decision", "capabilities",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
@@ -419,6 +416,34 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(problem)
         return file
 
+    def validate(self, attrs):
+        """
+        What an owner may change (IR-507, ADR-032 §10 Amendment).
+
+        Only an owner reaches an update (`IsRecordOwner`), and only while the
+        record is a `draft` or awaits their revision (`RecordViewSet.update`).
+        Once submitted, the fields in `versions.SUBMISSION_FIXED_FIELDS` stay
+        as they were submitted. Sending one unchanged is not a change, so a
+        form that re-sends every field still saves; changing any is one
+        refusal naming each field, so a single correction clears them all.
+        """
+        if self.instance is None:
+            return attrs
+        from .versions import SUBMISSION_FIXED_FIELDS
+
+        record = self.instance
+        if record.pipeline_status != PipelineStatus.DRAFT:
+            changed = [
+                field for field in SUBMISSION_FIXED_FIELDS
+                if field in attrs and attrs[field] != getattr(record, field)
+            ]
+            if changed:
+                raise serializers.ValidationError({
+                    field: "This was fixed when the record was submitted and cannot be changed now."
+                    for field in changed
+                })
+        return attrs
+
     def _sync_authors(self, record, authors_data: list[str]):
         """Replace all Author rows for a record with the provided name list."""
         from .models import Author
@@ -436,13 +461,11 @@ class RecordWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         authors_data = validated_data.pop("authors", None)
-        from core.permissions import is_record_owner
-
-        editor = getattr(self.context.get("request"), "user", None)
-        if is_record_owner(editor, instance) and self._details_changed(instance, validated_data, authors_data):
+        if self._details_changed(instance, validated_data, authors_data):
             # What a new version answers a revision request with, when no file
-            # changed (IR-273). Only an owner's real change: the revision is
-            # theirs, and saving the same details again answers nothing.
+            # changed (IR-273). Only a real change: saving the same details
+            # again answers nothing. Only an owner edits at all (IR-507), so
+            # every change stamped here is the owner's own revision.
             validated_data["details_edited_at"] = timezone.now()
         record = super().update(instance, validated_data)
         if authors_data is not None:           # only replace when field was explicitly sent
@@ -498,7 +521,7 @@ class DownloadRequestSerializer(serializers.ModelSerializer):
 
 
 class DeleteRequestSerializer(serializers.ModelSerializer):
-    record               = VisibleRecordField()
+    """Output only: the queue is read and decided, never written to (IR-496)."""
     record_title         = serializers.CharField(source="record.title",                    read_only=True)
     requested_by_name    = serializers.SerializerMethodField()
     requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
@@ -510,8 +533,7 @@ class DeleteRequestSerializer(serializers.ModelSerializer):
             "requested_by", "requested_by_name", "requested_by_email",
             "reason", "status", "reviewed_by", "reviewed_at", "created_at",
         ]
-        # A request is created pending; only the review actions move it.
-        read_only_fields = ["requested_by", "status", "reviewed_by", "reviewed_at"]
+        read_only_fields = fields
 
     def get_requested_by_name(self, obj):
         if obj.requested_by:

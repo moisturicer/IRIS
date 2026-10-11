@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
-import { reviewsApi, seatsApi } from "@/api/reviews";
+import { seatsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button, Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -46,6 +46,7 @@ import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
+import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
 import { SectionHeading } from "./headings";
@@ -289,8 +290,8 @@ const SECTION_LABELS: Record<PaperSection, string> = {
  * Four sections, kept in the URL as `?section=`: **Overview**, **Paper**,
  * **Review** and **Files**. Which ones a viewer sees, and which actions the
  * header offers, come from the capabilities adapter
- * (`features/records/capabilities.ts`); this page reads no role name and no
- * `can_act` of its own. A section the viewer may not open falls back to
+ * (`features/records/capabilities.ts`); this page reads no role name of its
+ * own. A section the viewer may not open falls back to
  * Overview, so an old or shared link never shows a broken page.
  *
  * Switching sections *replaces* the history entry rather than adding one, and
@@ -313,8 +314,6 @@ export default function PaperViewPage() {
   const [attempt, setAttempt] = useState(0);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
-  const [resubmitting, setResubmitting] = useState(false);
-  const [resubmitError, setResubmitError] = useState<string | null>(null);
   /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
@@ -399,24 +398,6 @@ export default function PaperViewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, attempt]);
 
-  const handleResubmit = async () => {
-    if (!id) return;
-    setResubmitting(true);
-    setResubmitError(null);
-    try {
-      await reviewsApi.resubmit(Number(id));
-      const { data } = await recordsApi.detail(Number(id));
-      setRecord(data);
-    } catch (err: unknown) {
-      setResubmitError(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-          "Resubmission failed. Please try again.",
-      );
-    } finally {
-      setResubmitting(false);
-    }
-  };
-
   // Share copies the paper's permanent link (IR-356), the address a reader
   // would paste to a colleague. A blocked clipboard claims nothing.
   const handleShare = async () => {
@@ -490,7 +471,7 @@ export default function PaperViewPage() {
   const arriving = loading || record.id !== Number(id);
 
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
-  const can = capabilitiesFor(record, viewer);
+  const can = capabilitiesFor(record);
   const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
   const participant = isParticipant(record, viewer);
@@ -614,14 +595,16 @@ export default function PaperViewPage() {
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else Save. When
   // the pending action has its own region -- the revision banner, the
-  // Review section's decision -- the header fills nothing.
+  // Review section's action bar -- the header fills nothing. The bar fills
+  // its first granted action, so any granted review action puts the primary
+  // there.
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
       ? "elsewhere"
       : can.has("open_review") && section !== "review"
         ? "open_review"
-        : section === "review" && can.has("decide")
+        : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
           ? "elsewhere"
           : "save";
 
@@ -884,34 +867,7 @@ export default function PaperViewPage() {
               <>
                 {/* Action required (spec §4.10): what is waiting on the
                     owner comes first. */}
-                {can.has("create_version") && record.revision.new_version == null && (
-                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                    <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
-                      <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
-                      Revision requested
-                    </p>
-                    <p className="text-sm text-brand leading-relaxed mt-1">
-                      Address the reviewer comments in the Review section, then resubmit. Offices that
-                      already cleared this record keep their clearance — only the office that asked for
-                      changes reviews it again.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleResubmit}
-                      disabled={resubmitting}
-                      className={cn(PILL_PRIMARY, "mt-3")}
-                    >
-                      <i className="fas fa-paper-plane text-2xs" aria-hidden />
-                      {resubmitting ? "Resubmitting…" : "Resubmit for review"}
-                    </button>
-                    {resubmitError && <p className="text-xs text-brand mt-2">{resubmitError}</p>}
-                  </div>
-                )}
-
-                {/* Revision requests on the adviser-first model (IR-272): what
-                    each party asked for, as plain text, and the version it
-                    asked about, answered with *Submit new version* (IR-273).
-                    The legacy banner above keeps its own Resubmit. */}
+                {/* Revision requests are answered through Submit new version. */}
                 {userIsOwner && record.revision.open.length > 0 && (
                   <section
                     aria-labelledby="revision-requested-heading"

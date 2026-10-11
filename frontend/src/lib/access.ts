@@ -64,7 +64,16 @@ interface ScreenDef {
   path: string;
   roles: RoleName[];
   /** Present only for screens that appear in the sidebar. */
-  nav?: { label: string; icon: string; section: NavSectionName };
+  nav?: {
+    label: string;
+    icon: string;
+    section: NavSectionName;
+    /**
+     * Narrows who sees the sidebar item, never who may open the route: a
+     * role outside it can still reach the screen by link or redirect.
+     */
+    onlyFor?: readonly RoleName[];
+  };
 }
 
 export const SCREEN_ACCESS = {
@@ -92,8 +101,12 @@ export const SCREEN_ACCESS = {
   // --- authoring ---------------------------------------------------------
   // `/records/add` now redirects to the Publish dialog (IR-408); F1 replaces
   // this entry with a `publish` capability and drops it from the sidebar.
+  // A Student publishes from Discover's Publish button (IR-407), so only an
+  // Adviser keeps the shortcut: an Adviser's home is the Dashboard, not
+  // Discover, until F1 (IR-413) makes Discover everyone's home.
   submit:     { path: "/records/add",       roles: AUTHORS,
-                nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "IP Management" } },
+                nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "IP Management",
+                       onlyFor: [ROLES.ADVISER] } },
   workspace:  { path: "/workspace",         roles: AUTHORS,
                 nav: { label: "My Workspace", icon: "fa-briefcase", section: "IP Management" } },
 
@@ -104,7 +117,6 @@ export const SCREEN_ACCESS = {
   // for one job.
   reviewQueue: { path: "/review",  roles: REVIEWERS,
                  nav: { label: "Review Queue", icon: "fa-hourglass-half", section: "Review Queue" } },
-  evaluate:    { path: "/review/:id/evaluate", roles: REVIEWERS },
 
   // --- RDCO coordination -------------------------------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
@@ -168,7 +180,9 @@ export function navFor(role: RoleName | null | undefined): NavEntry[] {
     const def = SCREEN_ACCESS[key];
     if (!("nav" in def) || !def.nav) return [];
     if (!canAccess(role, key)) return [];
-    return [{ key, to: def.path, ...def.nav }];
+    const { onlyFor, ...item } = def.nav as NonNullable<ScreenDef["nav"]>;
+    if (onlyFor && !onlyFor.includes(role)) return [];
+    return [{ key, to: def.path, ...item }];
   });
 }
 

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, redirect } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
@@ -20,7 +20,6 @@ import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConfer
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
 import MyReviewsPage        from "@/features/review/MyReviewsPage";
-import EvaluationPage       from "@/features/review/EvaluationPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
@@ -71,7 +70,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
             children: [
               { path: "review",              element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
-              { path: "review/:id/evaluate", element: <EvaluationPage />,      handle: { crumb: "Evaluate" } },
+              { path: "review/:id/evaluate", loader: ({ params }) => redirect(`/records/${params.id}?section=review`) },
             ],
           },
 

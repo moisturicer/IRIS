@@ -1,11 +1,8 @@
 """
 IR-233: clearance-aware resubmission, pinned at the API so it survives IR-255.
 
-**Why this module stands alone.** IR-260 retires `test_workflow_characterisation.py`
-and the suites built on it, because they describe the fixed pipeline that
-ADR-021 replaces. A regression test inside any of them would be deleted along
-with them, and the refactor could hide the defect. So nothing here imports from
-those suites.
+**Why this module stands alone.** It tests the clearance-aware revision path
+independently of the retired fixed-pipeline characterisation suite.
 
 **What reproducing the report found (2026-09-15).** The Record in the report is
 seed_demo's `[DEMO] Declined by IERC, ITSO and KTTO preserved`. The backend log
@@ -22,31 +19,21 @@ view made the refusal look like a second decline.**
 That is why this module has three tests, not one:
 
 - **No revision.** The resubmission is refused and the Record still awaits
-  resubmission. That is the reported click path, and it stays correct under
-  ADR-021 §11. It also stops IR-260 from making the expected failure below
-  pass just by deleting the guard.
-- **After an upload.** Resubmission already behaves correctly. This test
-  passes today and must keep passing through the cutover. Under a strict xfail
-  it would pass unexpectedly and fail the build.
-- **After a metadata-only revision.** The guard still refuses, because it
-  accepts only an upload. ADR-021 §11 settles that "a new upload or an edit to
-  the record's metadata" both count, and IR-260 implements that. This test
-  carries the strict expected-failure marker, and IR-260 removes it.
+  resubmission. That is the reported click path under ADR-021 §11.
+- **After an upload.** Only the requesting office's clearance resets.
+- **After a metadata-only revision.** The same clearance-aware behavior now
+  passes through the new-version endpoint (IR-260).
 
 What no test here covers is the display half: that the paper view shows a
 refusal as a refusal. That is IR-259's Action required panel.
 
-**The rules for editing this module at the cutover.** Only the setup helpers,
-marked below, may change when IR-260 replaces the decline action with a
-resubmission request. The observation helpers and the assertions describe
-behaviour and name no pipeline stage. Do not edit either to make a test pass.
+The assertions describe behavior and name no pipeline stage.
 """
 
 import shutil
 import tempfile
 from unittest import mock
 
-import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APITestCase
@@ -54,10 +41,8 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import Role, User
 from apps.documents.models import UploadSlot
 from apps.records.models import Record, RecordOwner, RecordType
-from core.enums import PipelineStatus, RecordTypeName, ReviewDecision, RoleName
+from core.enums import PipelineStatus, RecordTypeName, RoleName
 
-REVIEW_SUBMIT = "/api/v1/reviews/submit/"
-RESUBMIT = "/api/v1/reviews/resubmit/"
 DOCUMENT_SUBMIT = "/api/v1/documents/submit/"
 
 #: The office that asks for changes in the reported case, and its two peers.
@@ -114,23 +99,12 @@ class ResubmissionRegressionTests(APITestCase):
 
         cls.owner = user("ir233-owner@cit.edu", RoleName.STUDENT)
         cls.rdco = user("ir233-rdco@cit.edu", RoleName.RDCO)
+        cls.adviser = user("ir233-adviser@cit.edu", RoleName.ADVISER)
         cls.itso = user("ir233-itso@cit.edu", RoleName.ITSO)
         cls.ierc = user("ir233-ierc@cit.edu", RoleName.IERC)
         cls.ktto = user("ir233-ktto@cit.edu", RoleName.KTTO)
 
     # -- setup: may change at the IR-260 cutover ---------------------------
-
-    def _decide(self, record, as_user, decision, comment=""):
-        self.client.force_authenticate(as_user)
-        return _require_status(
-            self.client.post(
-                REVIEW_SUBMIT,
-                {"record_id": record.pk, "status": decision, "comment": comment},
-                format="json",
-            ),
-            201,
-            f"{as_user.email} records {decision!r}",
-        )
 
     def _project_where_one_office_asked_for_changes(self):
         """
@@ -140,25 +114,44 @@ class ResubmissionRegressionTests(APITestCase):
         record_type = RecordType.objects.filter(name=RecordTypeName.PROJECT).first()
         if record_type is None:
             raise SetupFailed("RecordType 'Project' is not seeded; migrations incomplete")
+        from apps.reviews import seats
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.office_review import CLEARED, record_office_review
+        from apps.reviews.revisions import request_revision
+        from apps.reviews.routing import accept_and_route, enter_at_adviser
+
         record = Record.objects.create(
             title="IR-233 regression",
             abstract="A" * 40,
             record_type=record_type,
             added_by=self.owner,
-            pipeline_status=PipelineStatus.RDCO_INTAKE,
+            pipeline_status=PipelineStatus.DRAFT,
+            adviser=self.adviser,
             requested_itso=True,
             requested_ierc=True,
             requested_ktto=True,
         )
         RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
 
-        self._decide(record, self.rdco, ReviewDecision.APPROVED, "Routing to all three offices.")
-        self._decide(record, self.itso, ReviewDecision.APPROVED, "Prior-art search complete.")
-        self._decide(record, self.ktto, ReviewDecision.APPROVED, "Commercialisation potential noted.")
-        self._decide(
-            record, self.ierc, ReviewDecision.DECLINED,
-            "Consent form for human participants is missing.",
+        entry = enter_at_adviser(record, self.owner)
+        seats.open_review(entry.seats.get(), self.adviser)
+        accept_and_route(
+            record, self.adviser,
+            to=[{"party": party, "nominee": reviewer.pk} for party, reviewer in (
+                ("itso", self.itso), ("ierc", self.ierc), ("ktto", self.ktto),
+            )],
+            reason="Specialist review is needed.",
         )
+        for party, reviewer, comment in (
+            ("itso", self.itso, "Prior-art search complete."),
+            ("ktto", self.ktto, "Commercialisation potential noted."),
+        ):
+            assignment = RecordAssignment.objects.get(record=record, party=party, state="active")
+            seats.open_review(assignment.seats.get(reviewer=reviewer), reviewer)
+            record_office_review(record, reviewer, outcome=CLEARED, comment=comment)
+        ierc = RecordAssignment.objects.get(record=record, party="ierc", state="active")
+        seats.open_review(ierc.seats.get(reviewer=self.ierc), self.ierc)
+        request_revision(record, self.ierc, reason="Consent form for human participants is missing.")
 
         if not self._awaits_resubmission(self._detail(record)):
             raise SetupFailed(
@@ -205,7 +198,7 @@ class ResubmissionRegressionTests(APITestCase):
 
     def _resubmit(self, record):
         self.client.force_authenticate(self.owner)
-        return self.client.post(RESUBMIT, {"record_id": record.pk}, format="json")
+        return self.client.post(f"/api/v1/records/{record.pk}/new-version/", {}, format="json")
 
     def _detail(self, record):
         self.client.force_authenticate(self.owner)
@@ -308,16 +301,6 @@ class ResubmissionRegressionTests(APITestCase):
 
         self._assert_clearance_aware_resubmission(record, response)
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=AssertionError,
-        reason=(
-            "IR-233: resubmit_record accepts only a new upload as a revision, so a "
-            "metadata-only revision is refused and the Record stays awaiting "
-            "resubmission. ADR-021 §11 accepts an upload or a metadata edit; "
-            "IR-260 implements that and removes this marker."
-        ),
-    )
     def test_resubmission_after_a_metadata_revision_resets_only_the_requesting_office(self):
         record = self._project_where_one_office_asked_for_changes()
         self._revise_metadata_only(record)

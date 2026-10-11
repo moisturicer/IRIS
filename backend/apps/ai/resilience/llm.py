@@ -83,8 +83,10 @@ from typing import Callable, Dict, Iterator, Optional, Sequence, Tuple
 
 from apps.ai.providers.dialects import DEFAULT_DIALECT, VendorDialect
 from apps.ai.providers.errors import ErrorKind
+from apps.ai.providers.openai_compatible import DeadlineExceeded
 from apps.ai.providers.ports import LLMProvider, StreamDelta
 from apps.ai.providers.tool_calling import (
+    Message,
     ToolCallingLLM,
     ToolCompletion,
     ToolDefinition,
@@ -110,6 +112,9 @@ _GIVE_UP_ON_RETRY = (
     ErrorKind.UNKNOWN,
 )
 
+#: A spent run deadline cannot be fixed by trying again.
+_GIVE_UP_ON = (DeadlineExceeded,)
+
 #: Worth trying the next model in the list for -- the same three kinds
 #: `composition._vendor_failures` degrades retrieval on, for the same reason:
 #: each means *this vendor*, not *the question*, is the problem. `auth` and
@@ -129,6 +134,8 @@ def is_switchable_failure(exc: BaseException) -> bool:
     """
     if isinstance(exc, CircuitOpen):
         return True
+    if getattr(exc, "counts_against_circuit", True) is False:
+        return False
     return getattr(exc, "kind", None) in _SWITCH_KINDS
 
 
@@ -212,6 +219,7 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
         return retry_with_backoff(
             lambda: self._provider.generate(system, user),
             attempts=self._attempts,
+            give_up_on=_GIVE_UP_ON,
             give_up_on_kind=_GIVE_UP_ON_RETRY,
             **kwargs,
         )
@@ -228,6 +236,7 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
             retry_with_backoff(
                 lambda: _open_stream(lambda: self._provider.stream(system, user)),
                 attempts=self._attempts,
+                give_up_on=_GIVE_UP_ON,
                 give_up_on_kind=_GIVE_UP_ON_RETRY,
                 **kwargs,
             )
@@ -247,6 +256,25 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
                 system, user, tools, timeout_seconds=timeout_seconds
             ),
             attempts=self._attempts,
+            give_up_on=_GIVE_UP_ON,
+            give_up_on_kind=_GIVE_UP_ON_RETRY,
+            **kwargs,
+        )
+
+    def converse_with_tools(
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        kwargs = {} if self._sleep is None else {"sleep": self._sleep}
+        return retry_with_backoff(
+            lambda: require_tool_calling(self._provider).converse_with_tools(
+                messages, tools, timeout_seconds=timeout_seconds
+            ),
+            attempts=self._attempts,
+            give_up_on=_GIVE_UP_ON,
             give_up_on_kind=_GIVE_UP_ON_RETRY,
             **kwargs,
         )
@@ -325,6 +353,19 @@ class CircuitBreakingLLMProvider(LLMProvider, ToolCallingLLM):
         return self._breaker.call(
             lambda: require_tool_calling(self._provider).complete_with_tools(
                 system, user, tools, timeout_seconds=timeout_seconds
+            )
+        )
+
+    def converse_with_tools(
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        return self._breaker.call(
+            lambda: require_tool_calling(self._provider).converse_with_tools(
+                messages, tools, timeout_seconds=timeout_seconds
             )
         )
 
@@ -442,6 +483,32 @@ class FallbackLLMProvider(LLMProvider, ToolCallingLLM):
             try:
                 completion = require_tool_calling(provider).complete_with_tools(
                     system, user, tools, timeout_seconds=timeout_seconds
+                )
+            except Exception as exc:
+                if not self._switch_on(exc):
+                    raise
+                failure = exc
+                self._log_switch(provider, exc)
+                continue
+            self.last_model_used = self.last_attempted_model
+            return completion
+        assert failure is not None
+        raise failure
+
+    def converse_with_tools(
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        """The same walk as `complete_with_tools`, over a message list."""
+        failure: Optional[BaseException] = None
+        for provider in self._providers:
+            self.last_attempted_model = getattr(provider, "model", None)
+            try:
+                completion = require_tool_calling(provider).converse_with_tools(
+                    messages, tools, timeout_seconds=timeout_seconds
                 )
             except Exception as exc:
                 if not self._switch_on(exc):

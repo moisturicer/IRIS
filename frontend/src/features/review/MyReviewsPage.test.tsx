@@ -32,7 +32,7 @@ function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
   return {
     key: "seat:1", kind: "seat", record: 7, title: "Smart Campus Energy Monitor",
     record_type_name: "Thesis / Research", party: "itso", party_label: "ITSO",
-    stage_label: null, seat: 1, assignment: 3, holder: 5, holder_name: "Ana Reyes",
+    seat: 1, assignment: 3, holder: 5, holder_name: "Ana Reyes",
     is_mine: true, routed_by: "Prof. Santos", routed_reason: "Potential IP concern",
     submitted_by: null, waiting_since: "2026-10-01T00:00:00Z", waiting_days: 2,
     waiting_on: null, outcome: null, outcome_label: null, decided_at: null,

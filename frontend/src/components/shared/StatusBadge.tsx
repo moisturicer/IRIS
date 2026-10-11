@@ -1,6 +1,5 @@
 import { TONES } from "@/components/ui/statusTones";
-import { cn, pipelineLabel } from "@/lib/utils";
-import type { PipelineStatus } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import type { WorkflowState } from "@/types/records";
 
 /**
@@ -38,46 +37,20 @@ const WORKFLOW_ICONS: Record<string, string> = {
   rejected:              "fa-ban",         // terminal
   pending_delete:        "fa-trash-can",
 };
-const LEGACY_ICONS: Record<string, string> = {
-  declined:       "fa-rotate-left",
-  rejected:       "fa-ban",
-  pending_delete: "fa-trash-can",
-};
+type StatusBadgeProps = { state: WorkflowState; label: string };
 
-type StatusBadgeProps =
-  | { state: WorkflowState; label: string; status?: never }
-  /** Evaluation screen only, until IR-268 passes it a workflow state. */
-  | { status: PipelineStatus; state?: never; label?: never };
-
-export function StatusBadge(props: StatusBadgeProps) {
-  const [text, color, icon] =
-    props.state !== undefined
-      ? [props.label, WORKFLOW_COLORS[props.state] ?? NEUTRAL, WORKFLOW_ICONS[props.state]]
-      : [pipelineLabel(props.status), LEGACY_COLORS[props.status] ?? NEUTRAL, LEGACY_ICONS[props.status]];
+/**
+ * The stored-status fallback the Evaluation screen used is gone with that
+ * screen (IR-274): every caller passes the server's state and its label.
+ */
+export function StatusBadge({ state, label }: StatusBadgeProps) {
+  const color = WORKFLOW_COLORS[state] ?? NEUTRAL;
+  const icon = WORKFLOW_ICONS[state];
 
   return (
     <span className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold", color)}>
       {icon && <i className={cn("fas", icon)} aria-hidden />}
-      {text}
+      {label}
     </span>
   );
 }
-
-// IR-274: delete from here. The stored-stage colours below serve only the
-// `status` form above, which the Evaluation screen uses until IR-268 moves it
-// onto `workflow_state`. Nothing else may add a caller.
-const LEGACY_COLORS: Record<string, string> = {
-  draft:           QUIET,
-  adviser_review:  ACTIVE,
-  approved:        ACTIVE,
-  completed:       SETTLED,
-  rdco_intake:     QUIET,
-  itso_review:     ACTIVE,
-  ktto_review:     ACTIVE,
-  parallel_review: ACTIVE,
-  rdco_review:     ACTIVE,
-  published:       SETTLED,
-  declined:        ACTIVE,
-  rejected:        ATTENTION,
-  pending_delete:  ATTENTION,
-};
