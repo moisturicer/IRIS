@@ -21,7 +21,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.composition import composition_root
 from apps.ai.models.conversation import Conversation
-from apps.ai.research.context import Lane, RunContext
+from apps.ai.research.context import RunContext
 from apps.ai.research.registry import ToolRun, research_tools
 
 
@@ -55,7 +55,7 @@ class Command(BaseCommand):
         calls = [_parse(call) for call in options["call"]]
         root = composition_root()
         ctx = RunContext.for_request(
-            user=user, root=root, lane=Lane.RESEARCH, conversation=conversation
+            user=user, root=root, lane="research", conversation=conversation
         )
         run = ToolRun.start(ctx, root)
         registry = research_tools()

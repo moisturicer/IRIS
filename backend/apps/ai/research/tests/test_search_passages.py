@@ -126,6 +126,13 @@ def test_a_raw_database_id_is_rejected(corpus, embedder):
         is ToolStatus.REJECTED
 
 
+def test_a_run_context_names_one_of_the_routers_lanes(corpus, embedder):
+    from apps.ai.research.context import RunContext
+
+    with pytest.raises(ValueError):
+        RunContext.for_request(user=corpus["student"], root=root(embedder), lane="agent")
+
+
 def test_context_fields_cannot_be_set_by_an_argument(corpus, embedder):
     run = start_run(corpus["student"], root(embedder))
     for extra in ({"user": 1}, {"scope_record_id": 1}, {"permits": True}, {"record_id": 1}):

@@ -58,11 +58,9 @@ def test_total_calls_stop_across_subtasks():
 def test_wall_clock_stops_the_run():
     clock = Clock()
     spend = Spend(_budget(wall_clock_seconds=90), clock=clock)
-    clock.now = 60
-    assert spend.time_left() == 30
+    clock.now = 89
     spend.charge_call()
     clock.now = 90
-    assert spend.time_left() == 0
     with pytest.raises(BudgetExhausted, match="wall_clock_seconds"):
         spend.charge_call()
     with pytest.raises(BudgetExhausted, match="wall_clock_seconds"):

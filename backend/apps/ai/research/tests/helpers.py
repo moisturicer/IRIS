@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from apps.ai.composition import CompositionRoot
 from apps.ai.providers.fakes import ScriptedReranker, ScriptedToolCallingLLM
-from apps.ai.research.context import Budget, Lane, RunContext
+from apps.ai.research.context import Budget, RunContext
 from apps.ai.research.registry import ToolRun, research_tools
 
 TOPIC = "rainfall flooding neural network"
@@ -20,7 +20,7 @@ def start_run(user, root, conversation=None, **limits):
     # Roomy limits, so tests exercise tools rather than the budget.
     limits = {"max_calls_per_subtask": 100, "max_tool_calls": 100, **limits}
     ctx = RunContext.for_request(
-        user=user, root=root, lane=Lane.RESEARCH, conversation=conversation,
+        user=user, root=root, lane="research", conversation=conversation,
         budget=replace(Budget.from_settings(), **limits),
     )
     return ToolRun.start(ctx, root)

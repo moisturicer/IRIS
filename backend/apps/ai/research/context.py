@@ -4,26 +4,16 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import TYPE_CHECKING, Callable, Optional
 
 from django.conf import settings
+
+from apps.ai.routing.router import LANES
 
 if TYPE_CHECKING:
     from apps.ai.composition import CompositionRoot
     from apps.ai.models.conversation import Conversation
     from apps.records.models import Record
-
-
-class Lane(str, Enum):
-    """The route outcomes of ADR-038 §3.2."""
-
-    PASSAGE = "passage"
-    LISTING = "listing"
-    COUNT = "count"
-    COMPARISON = "comparison"
-    RESEARCH = "research"
-    LANDSCAPE = "landscape"
 
 
 @dataclass(frozen=True)
@@ -61,7 +51,8 @@ class RunContext:
     scope_record_id: Optional[int]
     #: Whether a record's content may go to a vendor: the gate in force.
     permits: Callable[["Record"], bool]
-    lane: Lane
+    #: One of the router's lanes (IR-514).
+    lane: str
     budget: Budget
     run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
@@ -71,15 +62,17 @@ class RunContext:
         *,
         user,
         root: "CompositionRoot",
-        lane: Lane,
+        lane: str,
         conversation: Optional["Conversation"] = None,
         budget: Optional[Budget] = None,
     ) -> "RunContext":
+        if lane not in LANES:
+            raise ValueError(f"unknown lane {lane!r}")
         return cls(
             user=user,
             conversation_id=conversation.pk if conversation else None,
             scope_record_id=conversation.record_id if conversation else None,
             permits=root.vendor_permits(),
-            lane=Lane(lane),
+            lane=lane,
             budget=budget or Budget.from_settings(),
         )

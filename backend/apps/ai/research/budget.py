@@ -1,4 +1,7 @@
-"""A run's spend against its Budget; every limit stops the run (ADR-038 §5)."""
+"""A run's spend against its Budget; every limit stops the run (ADR-038 §5).
+
+Vendor calls are bounded separately, by IR-511's `model_call_deadline`.
+"""
 
 from __future__ import annotations
 
@@ -21,10 +24,6 @@ class Spend:
         self.subtask_calls = 0
         self.tool_calls = 0
         self.prompt_tokens = 0
-
-    def time_left(self) -> float:
-        """What a vendor call may take: `min(per-call timeout, time_left())`."""
-        return max(0.0, self._budget.wall_clock_seconds - (self._clock() - self._started))
 
     def begin_round(self) -> None:
         self._check_clock()
@@ -52,5 +51,5 @@ class Spend:
             raise BudgetExhausted("max_prompt_tokens")
 
     def _check_clock(self) -> None:
-        if self.time_left() <= 0:
+        if self._clock() - self._started >= self._budget.wall_clock_seconds:
             raise BudgetExhausted("wall_clock_seconds")
