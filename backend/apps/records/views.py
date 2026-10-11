@@ -39,6 +39,7 @@ from .models import Record, DownloadRequest, DeleteRequest
 from .serializers import (
     RecordListSerializer,
     RecordDetailSerializer,
+    MyResearchSerializer,
     RecordWriteSerializer,
     DownloadRequestSerializer,
     DeleteRequestSerializer,
@@ -886,22 +887,30 @@ class RecordViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def mine(self, request):
-        """GET /records/mine/ -- records the current user owns.
-        Optional: ?pipeline_status=published,approved  (comma-separated)
+        """GET /records/mine/ -- records the current user owns, newest change
+        first. Optional: ?pipeline_status=published,approved  (comma-separated)
 
-        Uses RecordDetailSerializer, not RecordListSerializer -- My Workspace
-        needs clearances[] to show per-office status, which the list
-        serializer doesn't carry. (There is a MyRecordsViewSet elsewhere in
-        this file with serializer_class = RecordDetailSerializer that looks
-        like it already does this -- it isn't registered in urls.py, so it
-        serves nothing. Found live: My Workspace read record.clearances
-        everywhere and always got undefined.)
+        My Library's *My research* list (IR-410), so `MyResearchSerializer`
+        rather than Record detail: Record detail cost about 15.6 queries per
+        record here. Every row's workflow facts are worked out in one pass, so
+        the query count does not grow with the number of records.
         """
-        qs = Record.objects.filter(owners__user=request.user).distinct()
+        from apps.reviews.tracker import workflow_facts
+
+        qs = (
+            Record.objects.filter(owners__user=request.user).distinct()
+            .select_related("record_type", "adviser")
+            .prefetch_related("authors")
+            .order_by("-updated_at", "-pk")
+        )
         statuses = request.query_params.get("pipeline_status")
         if statuses:
             qs = qs.filter(pipeline_status__in=[s.strip() for s in statuses.split(",")])
-        serializer = RecordDetailSerializer(qs, many=True, context={"request": request})
+        records = list(qs)
+        serializer = MyResearchSerializer(
+            records, many=True,
+            context={"request": request, "workflow_facts": workflow_facts(records)},
+        )
         return Response(serializer.data)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])

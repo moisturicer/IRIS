@@ -15,7 +15,6 @@ import { AppShell } from "@/components/layout/AppShell";
 // Feature pages
 import HomePage             from "@/features/dashboard/HomePage";
 import PaperViewPage        from "@/features/records/paper-view/PaperViewPage";
-import MyWorkspacePage      from "@/features/records/MyWorkspacePage";
 import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
@@ -57,16 +56,6 @@ export const router = createBrowserRouter([
           { path: "ai",                    element: <RAGChatPage />,     handle: { crumb: "Ask IRIS" } },
           { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
           { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings & Profile" } },
-
-          {
-            // Authoring. SRS M2-2.1/M2-2.2 name the actor "Record Owner
-            // (Student or Adviser)"; the clearing offices must not author what
-            // they later clear.
-            element: <ProtectedRoute allowedRoles={rolesFor("submit")} />,
-            children: [
-              { path: "workspace",        element: <MyWorkspacePage />, handle: { crumb: "My Workspace" } },
-            ],
-          },
 
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,

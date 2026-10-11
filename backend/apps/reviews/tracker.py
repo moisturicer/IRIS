@@ -45,7 +45,7 @@ from core.enums import (
 )
 from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 
-from .clearance_state import clearance_payload, resubmission_payload
+from .clearance_state import clearance_payload, is_preserved, resubmission_payload
 from .decisions import withdrawn_by_label
 from .models import (
     RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
@@ -182,6 +182,101 @@ def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
         entry_party_has_acted=_entry_party_has_acted(record, entry),
         deciding_parties=lifecycle.deciding_parties_for(record),
     )
+
+
+def workflow_facts(records) -> dict[int, dict[str, Any]]:
+    """
+    What My Library's list shows about each record's workflow, keyed by pk,
+    in a fixed number of queries however many records there are (IR-410):
+
+    - `workflow_state`, from the facts `workflow_state` reads one record at a
+      time, gathered once per kind. The precedence is still
+      `derive_workflow_state`'s alone.
+    - `holders`: the parties with an active assignment, in tracker order,
+      as `{party, label}` -- who has the record now.
+    - `cleared_offices`: each office whose clearance is `cleared`, with
+      `preserved` from `clearance_state.is_preserved`, so a clearance kept
+      through a resubmission reads as kept here exactly as on Record detail.
+
+    Each record's `record_type` should already be loaded.
+    """
+    from apps.documents.models import DocumentRequest
+
+    records = list(records)
+    ids = [r.pk for r in records]
+    in_review = [r.pk for r in records if r.pipeline_status in IN_REVIEW_STATUSES]
+    entry = str(ENTRY_PARTY)
+
+    def per_record(queryset, field):
+        facts: dict[int, list] = {}
+        for record_id, value in queryset.values_list("record_id", field):
+            facts.setdefault(record_id, []).append(value)
+        return facts
+
+    active = per_record(
+        RecordAssignment.objects.filter(record_id__in=ids, state=AssignmentState.ACTIVE),
+        "party",
+    )
+    resubmissions = per_record(
+        ResubmissionRequest.objects.filter(
+            record_id__in=in_review, state=ResubmissionRequestState.OPEN
+        ),
+        "pk",
+    )
+    documents = per_record(
+        DocumentRequest.objects.filter(record_id__in=in_review, state=DocumentRequestState.OPEN),
+        "party",
+    )
+    # `_entry_party_has_acted`: any Review at the entry party's stage, or any
+    # routing out of it. `Party` is `ReviewStage`, so the stage is the party.
+    acted = set(
+        Review.objects.filter(record_id__in=in_review, stage=entry)
+        .values_list("record_id", flat=True)
+    ) | set(
+        RoutingEvent.objects.filter(record_id__in=in_review, from_party=entry)
+        .values_list("record_id", flat=True)
+    )
+    cleared: dict[int, list] = {}
+    for record_id, office, updated_at in (
+        RecordClearance.objects.filter(record_id__in=ids, status=ClearanceStatus.CLEARED)
+        .order_by("office").values_list("record_id", "office", "updated_at")
+    ):
+        cleared.setdefault(record_id, []).append((office, updated_at))
+
+    def holders(record_id):
+        parties = set(active.get(record_id, ()))
+        return [
+            {"party": str(p), "label": party_label(p, staff_viewer=False)}
+            for p in TRACKER_ORDER if p in parties
+        ]
+
+    facts = {}
+    for r in records:
+        facts[r.pk] = {
+            "workflow_state": derive_workflow_state(
+                pipeline_status=r.pipeline_status,
+                open_resubmissions=len(resubmissions.get(r.pk, ())),
+                open_document_requests=len(documents.get(r.pk, ())),
+                active_parties=active.get(r.pk, ()),
+                entry_party=entry,
+                entry_party_has_acted=r.pk in acted,
+                deciding_parties=lifecycle.deciding_parties_for(r),
+            ),
+            "holders": holders(r.pk),
+            "cleared_offices": [
+                {
+                    "office": office,
+                    "label": str(Office(office).label),
+                    "preserved": is_preserved(
+                        status=ClearanceStatus.CLEARED,
+                        clearance_updated_at=updated_at,
+                        last_resubmitted_at=r.last_resubmitted_at,
+                    ),
+                }
+                for office, updated_at in cleared.get(r.pk, ())
+            ],
+        }
+    return facts
 
 
 #: How readers are shown a terminal status where it differs from the stored
