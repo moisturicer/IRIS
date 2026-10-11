@@ -447,6 +447,24 @@ LLM_RESOLVE_REASONING = config("LLM_RESOLVE_REASONING", default=False, cast=bool
 LLM_RESOLVE_PROVIDER_ONLY = config("LLM_RESOLVE_PROVIDER_ONLY", default="")
 LLM_RESOLVE_PROVIDER_PINS = config("LLM_RESOLVE_PROVIDER_PINS", default="")
 
+# IR-514: route inherits resolve's model/account until explicitly configured.
+LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
+LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
+LLM_ROUTE_API_KEY = config("LLM_ROUTE_API_KEY", default="")
+LLM_ROUTE_MODEL = config("LLM_ROUTE_MODEL", default="")
+LLM_ROUTE_FALLBACK_MODELS = config("LLM_ROUTE_FALLBACK_MODELS", default="")
+LLM_ROUTE_REASONING = config("LLM_ROUTE_REASONING", default=False, cast=bool)
+LLM_ROUTE_PROVIDER_ONLY = config("LLM_ROUTE_PROVIDER_ONLY", default="")
+LLM_ROUTE_PROVIDER_PINS = config("LLM_ROUTE_PROVIDER_PINS", default="")
+AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
+AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
+AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)
+AI_ROUTE_UNCERTAIN_MIN = config("AI_ROUTE_UNCERTAIN_MIN", default=0.4, cast=float)
+AI_ROUTE_UNCERTAIN_MAX = config("AI_ROUTE_UNCERTAIN_MAX", default=0.6, cast=float)
+AI_ROUTE_INJECTION_THRESHOLD = config(
+    "AI_ROUTE_INJECTION_THRESHOLD", default=0.5, cast=float
+)
+
 LLM_SUMMARY_VENDOR   = config("LLM_SUMMARY_VENDOR", default="")
 LLM_SUMMARY_BASE_URL = config("LLM_SUMMARY_BASE_URL", default="")
 LLM_SUMMARY_API_KEY  = config("LLM_SUMMARY_API_KEY", default="")

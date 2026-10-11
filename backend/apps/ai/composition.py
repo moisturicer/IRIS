@@ -168,7 +168,7 @@ class CompositionRoot:
 
         The only way to reach a model -- ``llm()``, the untasked accessor
         every caller used before Inference tasks existed, is deleted
-        (IR-388). A task name that is not one of the four raises rather than
+        (IR-388). A task name outside the closed set raises rather than
         resolving to a default, and an injected ``self._llm`` bypasses
         Profile resolution entirely -- the property every fake-driven test in
         ``test_ask_http.py`` depends on.
@@ -181,6 +181,7 @@ class CompositionRoot:
         """
         from apps.ai.inference import (
             CompletionLoggingLLMProvider,
+            InferenceTask,
             build_profile_llm,
             inference_task,
             profile_for,
@@ -198,7 +199,13 @@ class CompositionRoot:
             # `FallbackLLMProvider`), and this is the one seam every
             # production caller reaches a task's model through anyway
             # (IR-387).
-            provider = CompletionLoggingLLMProvider(build_profile_llm(profile), profile)
+            provider = CompletionLoggingLLMProvider(
+                build_profile_llm(
+                    profile,
+                    max_tokens=256 if resolved is InferenceTask.ROUTE else None,
+                ),
+                profile,
+            )
             self._task_llms[resolved] = provider
         return provider
 

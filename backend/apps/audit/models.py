@@ -25,6 +25,7 @@ class AuditEvent(models.Model):
     ACCOUNT_LOCKED   = "ACCOUNT_LOCKED"
     ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
     SESSION_REVOKE   = "SESSION_REVOKE"
+    QUESTION_INJECTION = "QUESTION_INJECTION"
 
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
@@ -41,6 +42,7 @@ class AuditEvent(models.Model):
         (ACCOUNT_LOCKED,   "Account Locked"),
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
         (SESSION_REVOKE,   "Session Revoked"),
+        (QUESTION_INJECTION, "Reader Question Injection Flagged"),
     ]
 
     event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, db_index=True)

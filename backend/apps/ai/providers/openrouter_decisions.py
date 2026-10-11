@@ -2,7 +2,7 @@
 
 `POST https://openrouter.ai/api/alpha/decisions` -- the path says alpha, and it
 is not the OpenAI-style chat endpoint, so `OpenAICompatibleAdapter` cannot
-reach it. Evaluation only: nothing on a reader's path constructs this.
+reach it. IR-514 uses it only when the separate routing approval switch is on.
 
 The model is pinned to a named release and the `~...-latest` alias is refused,
 so a run is reproducible. The response's own `model` (the dated build actually
@@ -25,6 +25,7 @@ from apps.ai.providers.decisions import (
     DecisionModel,
     DecisionUnavailable,
     NoulAnswer,
+    NoulQuestion,
 )
 from apps.ai.providers.errors import ErrorKind, classify_status_code
 
@@ -79,15 +80,29 @@ class OpenRouterDecisionsAdapter(DecisionModel):
         criteria: Mapping[str, str],
         timeout_seconds: Optional[float] = None,
     ) -> NoulAnswer:
+        return self.nouls(
+            state,
+            questions={QUESTION_NAME: NoulQuestion(instructions, criteria)},
+            timeout_seconds=timeout_seconds,
+        )[QUESTION_NAME]
+
+    def nouls(
+        self, state: Any, *, questions: Mapping[str, NoulQuestion],
+        timeout_seconds: Optional[float] = None,
+    ) -> Mapping[str, NoulAnswer]:
+        """Ask all named questions together, retrying singly if the API rejects the shape."""
+        if not questions:
+            raise ValueError("at least one decision question is required")
         payload = {
             "model": self._model,
             "state": state,
             "questions": {
-                QUESTION_NAME: {
+                name: {
                     "type": "noul",
-                    "instructions": instructions,
-                    "criteria": dict(criteria),
+                    "instructions": question.instructions,
+                    "criteria": dict(question.criteria),
                 }
+                for name, question in questions.items()
             },
         }
         timeout = timeout_seconds or self._timeout
@@ -99,13 +114,20 @@ class OpenRouterDecisionsAdapter(DecisionModel):
             raise DecisionUnavailable(
                 f"decision call failed: {type(exc).__name__}", ErrorKind.NETWORK
             ) from exc
-
+        if response.status_code in (400, 422) and len(questions) > 1:
+            return super().nouls(
+                state, questions=questions, timeout_seconds=timeout_seconds
+            )
         if response.status_code >= 400:
             raise DecisionUnavailable(
                 f"decisions endpoint returned {response.status_code}",
                 _kind_for_status(response.status_code, ""),
             )
-        return self._parse(response)
+        parsed = self._parse_named(response, questions)
+        expected_build = re.compile(rf"{re.escape(self._model)}-\d{{8}}")
+        if any(not expected_build.fullmatch(answer.model) for answer in parsed.values()):
+            raise DecisionMalformed("response model is not the pinned Jev build")
+        return parsed
 
     def _post(self, payload: dict, timeout: float) -> httpx.Response:
         headers = {
@@ -122,31 +144,38 @@ class OpenRouterDecisionsAdapter(DecisionModel):
             )
 
     @staticmethod
-    def _parse(response: httpx.Response) -> NoulAnswer:
+    def _parse_named(
+        response: httpx.Response, questions: Mapping[str, NoulQuestion]
+    ) -> Mapping[str, NoulAnswer]:
         try:
             body = response.json()
         except ValueError as exc:
             raise DecisionMalformed("response body is not JSON") from exc
         if not isinstance(body, dict) or not isinstance(body.get("answers"), dict):
             raise DecisionMalformed("response has no answers object")
-        answer = body["answers"].get(QUESTION_NAME)
-        if not isinstance(answer, dict) or answer.get("type") != "noul":
-            raise DecisionMalformed("answer is not a noul answer")
-        value = answer.get("noul")
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(value)
-            or not 0 <= value <= 1
-        ):
-            raise DecisionMalformed("noul is not a probability")
+        if set(body["answers"]) != set(questions):
+            raise DecisionMalformed("response has the wrong question names")
 
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
         tokens = usage.get("input_tokens")
         cost = usage.get("cost")
-        return NoulAnswer(
-            probability=float(value),
-            model=str(body.get("model") or ""),
-            input_tokens=tokens if isinstance(tokens, int) and not isinstance(tokens, bool) else None,
-            cost_usd=float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None,
-        )
+        parsed = {}
+        for name in questions:
+            answer = body["answers"][name]
+            if not isinstance(answer, dict) or answer.get("type") != "noul":
+                raise DecisionMalformed("answer is not a noul answer")
+            value = answer.get("noul")
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or not 0 <= value <= 1
+            ):
+                raise DecisionMalformed("noul is not a probability")
+            parsed[name] = NoulAnswer(
+                probability=float(value),
+                model=str(body.get("model") or ""),
+                input_tokens=tokens if isinstance(tokens, int) and not isinstance(tokens, bool) else None,
+                cost_usd=float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None,
+            )
+        return parsed

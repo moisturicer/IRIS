@@ -265,7 +265,7 @@ Evidence, 2026-09-15, backend container: `pytest apps/reviews/test_resubmission_
 
 ## The audit gap
 
-`AuditEvent` defines **14 event types — all authentication, file or account.** There is **no workflow event**: no `SUBMITTED`, no `RESUBMITTED`, no `CLEARANCE_PRESERVED`, no `STAGE_CHANGED`.
+`AuditEvent` defines **15 event types — authentication, file, account and reader-question screening.** There is **no workflow event**: no `SUBMITTED`, no `RESUBMITTED`, no `CLEARANCE_PRESERVED`, no `STAGE_CHANGED`.
 
 **Consequence:** the research metrics in [`../mvp-validation/03-final-evaluation-plan.md`](../mvp-validation/03-final-evaluation-plan.md) — turnaround time and preserved-clearance counts — have **no data source**.
 
@@ -279,6 +279,14 @@ This is the one unrecoverable item in the plan. Events not written during the We
 - Never move a row to VERIFIED without a link to actual evidence
 - If a requirement is descoped, set DEFERRED and cite the ADR or SRS amendment — do not delete the row
 - Review the whole table before the technical defence; an unverified requirement reported as unverified is defensible, a false VERIFIED is not
+
+## IR-514 — reader-question router (before reader integration)
+
+ADR-038 §3 and §9 require fixed phrase and Paper Chat scope checks, one Jev Decisions request with six route questions and an injection question, a `route` Inference backup on Jev failure or uncertainty, and a passage fallback. `apps/ai/routing/` holds that decision without any Passage or previous answer input. A flagged or unscreenable question has `planner_allowed=False` and records `QUESTION_INJECTION` without the question text, with the reader user attached when supplied. Landscape remains on the passage path until the Lens exists. `AI_JEV_ROUTING_ENABLED` defaults off, and Groq cannot serve the backup without a separately recorded approval switch. IR-515 will consume the decision on the reader path; this change does not alter an answer yet.
+
+Evidence: `apps/ai/tests/test_question_routing.py`, `test_route_question_command.py`, `providers/tests/test_openrouter_decisions.py` and `inference/tests/test_profiles.py` cover request contents, fixed routes, scope, vendor failures, uncertainty, screening, audit dispatch and profile inheritance without vendor accounts. The focused tests and the full backend `pytest` suite passed on 2026-10-11 using a dedicated temporary test database; `manage.py check` and `makemigrations --check --dry-run` also passed. A real public-question call on 2026-10-11 returned all seven named Noul answers in one HTTP 200 response from `typesafe/jev-1.13-20260917`; `count=0.97`, `injection=0.03`. `manage.py route_question 'How many papers about aquaponics are in the repository?'` returned `lane=count`, all seven probabilities and `stage=fixed` with Jev enabled for that command. The one-question fallback remains in the adapter for a provider rejecting a multi-question shape.
+
+**Status: IMPLEMENTED, NOT INTEGRATED.** ADR-038 in `main` still says Proposed despite IR-499 being marked Done. The owner accepted the ticket decisions in Jira, but the ADR document's named approval and merge gate have not been reconciled; this branch must not merge until they are.
 
 ## IR-489 — selected answer models and request data controls
 
