@@ -426,9 +426,16 @@ disclosure and scope, batch/vendor failures, malformed responses, quote
 provenance, budgets, candidate-set caching, screening beyond retrieval's top
 ten, duplicate flags, include/exclude counts and author/version multiplicity.
 The focused research/inference suite and unchanged-answer/retrieval guards
-passed **266 tests** on 2026-10-11. Django configuration and migration drift
-checks passed, with the existing Axes deprecation warning. Full-suite and
-independent review evidence is recorded after final verification.
+passed **266 tests** on 2026-10-11 before the final in-flight-edit regression
+was added. The final full backend suite on a fresh PostgreSQL test database
+passed **3,152 tests, 1 xpassed, zero failures and zero skips** in 217.29
+seconds. The xpass is the existing non-strict IR-469 HNSW scan-depth test.
+Provider/profile configuration was isolated; tests used no live model calls.
+Backend static checks, Django configuration and migration drift checks passed.
+Existing test warnings remain, including Axes deprecation, pagination and a
+closed command-output wrapper. Independent standards and spec reviews found
+no remaining material findings after permission/content-aware caching,
+publication revalidation and in-flight-edit fixes.
 
 No screening quality measurement, real institutional result or reader rollout
 is claimed. ADR-038's overall Proposed status remains unreconciled with Jira's

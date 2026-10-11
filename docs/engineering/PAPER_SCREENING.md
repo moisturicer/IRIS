@@ -81,3 +81,15 @@ configurable starting values, not empirically calibrated quality claims.
 The owner accepted the scope in IR-499's Jira comment, but the ADR document
 still says Proposed. That tracking/document contradiction is recorded here
 and remains a human approval prerequisite for merge and rollout.
+
+## Verification on 2026-10-11
+
+The final reviewed code passed the full backend suite on a fresh PostgreSQL
+test database: **3,152 passed, 1 xpassed, zero failures and zero skips** in
+217.29 seconds. The xpass is the existing non-strict IR-469 scan-depth test.
+Local provider/profile configuration was isolated and providers were scripted;
+no paid model call or screening-quality measurement was performed. The earlier
+focused run passed 266 tests before the final in-flight-edit regression was
+added. Static checks, Django checks and migration consistency passed; no
+migration is needed. Independent standards and spec reviews reported no
+remaining material findings after the cache and publication fixes.
