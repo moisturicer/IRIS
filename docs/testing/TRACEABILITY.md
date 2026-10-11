@@ -366,7 +366,9 @@ history, notes, aggregate context and the outer loop.
 
 `synthesis.py` supplies the ledger to `GroundedAnswerService`, preserving
 numbered-source prompts and `parse_citations`. Validation checks raw markers
-before parsing, literal numbers, marked titles and completeness phrases.
+before parsing, literal numbers, marked/explicitly introduced titles and
+completeness phrases. Leaked reasoning is removed before validation, and
+validation uses the exact sources supplied to synthesis.
 Failures withhold the answer, retaining sources and reason codes. This is
 the conservative implementation proposed for D4, not recorded human policy
 approval. See [RESEARCH_PLANNER.md](../engineering/RESEARCH_PLANNER.md) for
@@ -383,6 +385,13 @@ the remaining run deadline. The pre-change answer-request snapshots in
 `tests/test_shadow_off_snapshot.py` pass unchanged on both Ask IRIS endpoints,
 and `test_one_retrieval_stack.py` passes without widening its one-predicate
 rule. Tests use scripted models and deterministic embeddings/reranking.
+
+The final full backend run on a fresh PostgreSQL test database on 2026-10-11
+reported **3,118 passed, 1 xpassed, zero failures** in 207.37 seconds. Backend
+static checks (`flake8 apps/ config/ core/ testing/`) also passed. The run
+isolated local vendor/profile configuration; no live credentials or models
+were used. Standards and spec reviews found no remaining material blockers
+after the fallback budget, source mapping, reasoning and title fixes.
 
 Migration `0019_research_run_audit` was rolled back and reapplied on a
 development database copy on 2026-10-11, retaining **60 records and 2,145
