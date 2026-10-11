@@ -19,6 +19,8 @@ sanctioned vendors are unchanged — Groq and OpenRouter, and no others.
 
 > **Amendment proposed — 2026-10-10 (IR-487). Not accepted.** The Decisions adapter may move from evaluation-only to a reader's path, behind a per-provider approval switch that fails closed. The owner's data-handling rule (no training; retention acceptable; zero data retention not required) is recorded, and OpenRouter provider routing enforces the hosting rule. Drafted by an AI agent; **awaiting approval by Jive Tyler Revalde**. See §Amendment — 2026-10-10 below.
 
+> **Amendment proposed — 2026-10-11 (IR-499). Not accepted.** Three new Inference tasks (`plan`, `screen`, `route`) and a production approval for Jev, **for routing and reader-question screening only**, which supersedes the 2026-10-10 amendment for those two uses. Drafted by an AI agent; awaiting a named approver. See §Amendment — 2026-10-11 below.
+
 **Does not contradict [ADR-008](008-ai-degradation-to-fts.md).** That ADR
 rejected *"a secondary LLM provider for failover"* — two providers live at once
 for resilience, one covering for the other's outage. Choosing a different
@@ -237,6 +239,17 @@ OpenRouter is a direction, not a decision recorded in this file.
 Its ticket asked for a reviewed amendment, and no review is recorded in this
 file. **Owner: Jive Tyler Revalde.** Accepting this amendment does not
 retroactively review that one.
+
+## Amendment — 2026-10-11 (IR-499): three Inference tasks, and Jev approved for routing and screening
+
+**Status: Proposed, not accepted.** Drafted by an AI agent. The decision is in [ADR-038](038-bounded-research-lane-for-ask-iris.md) §8 and §9. Until a person accepts it, the amendments above stand.
+
+* **The closed task set grows from four to seven:** `answer`, `resolve`, `summary`, `describe_figure` plus `plan` (the research planner, which needs the tool-calling port), `screen` (per-record include or exclude judgements) and `route` (the LLM backup to Jev's routing). Each gets a Profile as the 2026-09-28 amendment requires. `route` **inherits `resolve`'s model by default**. `plan` and `screen` models are chosen by IR-502 and IR-501. A task with no configured model reports unavailable.
+* **This supersedes the 2026-10-10 (IR-487) amendment for two uses only:** Jev, reached through OpenRouter's Decisions API, is approved for **routing and for screening the reader's question**. Its other proposed use, the evidence decision, stays Proposed and is not decided here.
+* **The rule is unchanged:** an approval is a person's act and is never inferred from an API key. The approval switch **defaults to off**, and when it is off or Jev fails, routing falls to the `route` backup. `typesafe/jev-1.13` stays pinned and the `~typesafe/jev-latest` alias stays refused.
+* **Recorded terms:** no training or fine-tuning on input (accepted by the owner on IR-485), retention unstated, US-hosted, alpha endpoint with an unmeasured rate limit.
+* **The `route` backup's vendor must meet the same no-training rule.** Groq has no terms recorded in the repository and is not approved for it.
+* **The Decisions adapter stays outside the Inference task set,** because it writes no text.
 
 ## Consequences
 

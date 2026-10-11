@@ -6,6 +6,8 @@
 
 > **Amendment to §13 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** The evidence decision is a consumer §13's single predicate does not describe: it receives prior **reader questions only** — no prior assistant answer text, no recalled Turns, no Passage text — because a grounded answer is retrieval-derived and may echo text injected into a Passage. A `generated` Turn is admissible to the answering model and **not** to a routing decision, so state is the wrong axis there. Implemented by IR-465; the broader per-consumer refactor is IR-453's. See ADR-035 §8.
 
+> **Amendment proposed — 2026-10-11 (IR-499). Not accepted.** [ADR-038](038-bounded-research-lane-for-ask-iris.md) continues the per-consumer split: the router sees prior reader questions only, and the research planner sees recent history **including prior answers** but not memory-recalled Turns. Drafted by an AI agent; awaiting a named approver. See §Amendment — 2026-10-11 below.
+
 **Implements and amends [ADR-019](019-persisted-unified-conversation-history.md).** ADR-019 decided *that* conversation history is persisted and unified across Ask IRIS and Paper Chat, and that decision stands unchanged. It deliberately left *how* history reaches retrieval unspecified, and its citation-storage mechanics have been overtaken by work completed since. This ADR settles the first and amends the second.
 
 **Depends on [ADR-023](023-retrieval-quality-evaluation.md)** for why one technique here is adopted and two are deferred.
@@ -243,6 +245,22 @@ With "All papers" on, a Paper Chat answer about paper X can cite paper Y. Follow
 
 - **Visibility.** A pinned conversation's citations are the ones it already had, each re-resolved through `visible_to` on replay as before (§10). Pinning shows nothing the reader could not already open.
 - **[ADR-019](019-persisted-unified-conversation-history.md)'s one-Conversation-per-Record model.** No Conversation is created, moved or re-scoped by a pin. The panel only chooses which existing one to show.
+
+## Amendment — 2026-10-11 (IR-499): history per consumer, continued
+
+**Status: Proposed, not accepted.** Drafted by an AI agent. The decision is in [ADR-038](038-bounded-research-lane-for-ask-iris.md) §7. Until a person accepts it, §13 and the 2026-10-02 and 2026-10-06 amendments stand.
+
+| Consumer | Sees of a Conversation |
+|---|---|
+| Router (Jev and its `route` backup) | Prior reader questions only. No prior answer, no recalled Turn, no Passage text |
+| Research planner | Recent history including prior answers. No memory-recalled Turns |
+| Answering model | As §13 already allows |
+
+* "Recent" follows the existing history window by token budget.
+* A planner multi-search is subject to §3's evidence discipline: it is not a free pass to multi-query retrieval, and the aggregate context holds passages with handles, never a summary of the Conversation.
+* **Prior answers are context, not evidence.** They are never cited.
+* **Recorded, not solved:** prior answers are not re-gated if a cited record later becomes restricted, and the planner carries more of them. ADR-038 §12 keeps it open.
+* §6 is unchanged: no summary tier is authorised.
 
 ## Alternatives Considered
 
