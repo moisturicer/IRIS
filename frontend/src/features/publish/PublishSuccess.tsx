@@ -7,9 +7,9 @@
  * timeline either: nothing promises how long a review takes.
  *
  * **Intake is never named.** ADR-032 retires it and invariant 1 forbids naming
- * it as a current step, but until IR-260 cuts over the server still reports it
- * for a Thesis or Project. Such a holder reads as a plain "Submitted for
- * review", which names nobody rather than the wrong party (lead, 2026-10-06).
+ * it as a current step. The server no longer assigns it (IR-260, IR-274); the
+ * filter stays as a guard, so such a holder would read as a plain "Submitted
+ * for review", naming nobody rather than the wrong party (lead, 2026-10-06).
  */
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";

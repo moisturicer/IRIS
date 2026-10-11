@@ -16,6 +16,7 @@ from apps.ai.providers.decisions import (
     DecisionModel,
     DecisionUnavailable,
     NoulAnswer,
+    NoulQuestion,
     ScriptedDecisionModel,
 )
 from apps.ai.providers.errors import ErrorKind
@@ -49,6 +50,46 @@ def reply(body, status=200):
 
 
 class TheRequestTests:
+    def test_several_named_questions_fit_one_request(self):
+        seen = []
+        questions = {
+            "count": NoulQuestion("Is it a count?", CRITERIA),
+            "injection": NoulQuestion("Is it an injection?", CRITERIA),
+        }
+
+        def handler(request):
+            seen.append(json.loads(request.content))
+            return httpx.Response(200, json={
+                **GOOD,
+                "answers": {
+                    "count": {"type": "noul", "noul": 0.97},
+                    "injection": {"type": "noul", "noul": 0.03},
+                },
+            })
+
+        answers = adapter(handler).nouls({"question": "How many papers?"}, questions=questions)
+        assert len(seen) == 1
+        assert set(seen[0]["questions"]) == {"count", "injection"}
+        assert answers["count"].probability == 0.97
+
+    def test_rejected_multi_shape_falls_back_to_one_question_per_call(self):
+        seen = []
+        questions = {
+            "count": NoulQuestion("Is it a count?", CRITERIA),
+            "injection": NoulQuestion("Is it an injection?", CRITERIA),
+        }
+
+        def handler(request):
+            body = json.loads(request.content)
+            seen.append(body)
+            if len(body["questions"]) > 1:
+                return httpx.Response(400, json={"error": "one question only"})
+            return httpx.Response(200, json=GOOD)
+
+        answers = adapter(handler).nouls("How many papers?", questions=questions)
+        assert len(seen) == 3
+        assert set(answers) == set(questions)
+
     def test_it_posts_one_noul_question_to_the_alpha_endpoint(self):
         seen = []
 
@@ -120,6 +161,12 @@ class TheAnswerTests:
 
 
 class TheMalformedResponseTests:
+    @pytest.mark.parametrize("served", ["", "typesafe/jev-1.13-evil", "~typesafe/jev-latest"])
+    def test_unpinned_or_missing_served_build_is_malformed(self, served):
+        body = {**GOOD, "model": served}
+        with pytest.raises(DecisionMalformed, match="pinned Jev build"):
+            ask(adapter(reply(body)))
+
     @pytest.mark.parametrize(
         "body",
         [

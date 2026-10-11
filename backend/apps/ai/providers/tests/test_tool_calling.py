@@ -58,8 +58,11 @@ def _call(name="search_corpus", arguments=""):
 
 
 class ThePortIsAbstractTests:
-    def test_the_method_is_abstract_and_has_no_default(self):
-        assert ToolCallingLLM.__abstractmethods__ == {"complete_with_tools"}
+    def test_the_methods_are_abstract_and_have_no_default(self):
+        assert ToolCallingLLM.__abstractmethods__ == {
+            "complete_with_tools",
+            "converse_with_tools",
+        }
 
     def test_a_provider_that_does_not_implement_it_cannot_be_built(self):
         class Forgetful(ToolCallingLLM):
@@ -102,7 +105,9 @@ class TheAdapterSendsTheSchemaTests:
     def test_the_tool_declares_no_parameters(self):
         assert SEARCH.parameters == {"type": "object", "properties": {}}
 
-    def test_a_timeout_reaches_the_client_and_is_absent_when_unset(self):
+    def test_a_timeout_reaches_the_client_and_defaults_when_unset(self, settings):
+        # IR-511: an unset timeout is the default, never the SDK's minutes.
+        settings.LLM_TIMEOUT_SECONDS = 42
         client = _Client()
         adapter = OpenAICompatibleAdapter(client=client)
 
@@ -110,7 +115,7 @@ class TheAdapterSendsTheSchemaTests:
         adapter.complete_with_tools("s", "u", [SEARCH])
 
         assert client.calls[0]["timeout"] == 7.5
-        assert "timeout" not in client.calls[1]
+        assert client.calls[1]["timeout"] == 42
 
     def test_it_sends_the_reasoning_configuration_generate_sends(self):
         client = _Client()
@@ -152,7 +157,10 @@ class TheAdapterReadsWhatCameBackTests:
             "s", "u", [SEARCH]
         )
 
-        assert completion.tool_calls == (ToolCall("search_corpus", '{"query": "x"}'),)
+        # IR-511: a vendor call with no id is given a stable one.
+        assert completion.tool_calls == (
+            ToolCall("search_corpus", '{"query": "x"}', "call_0"),
+        )
         assert completion.text == ""
 
     def test_text_reasoning_and_token_counts_are_carried(self):

@@ -13,7 +13,7 @@ function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
   return {
     key: "seat:1", kind: "seat", record: 7, title: "Smart Campus Energy Monitor",
     record_type_name: "Thesis / Research", party: "itso", party_label: "ITSO",
-    stage_label: null, seat: 1, assignment: 3, holder: 9, holder_name: "Ana Reyes",
+    seat: 1, assignment: 3, holder: 9, holder_name: "Ana Reyes",
     is_mine: true, routed_by: null, routed_reason: "", submitted_by: null,
     waiting_since: "2026-10-01T00:00:00Z", waiting_days: 2, waiting_on: null,
     outcome: null, outcome_label: null, decided_at: null,
@@ -84,10 +84,6 @@ describe("holderLine", () => {
       .toBe("ITSO · Unassigned");
   });
 
-  it("says a record is still on the old pipeline, naming the office (ADR-032 §9 Amendment)", () => {
-    expect(holderLine(row({ kind: "legacy", stage_label: "ITSO Technical Review", is_mine: false })))
-      .toBe("ITSO · Old pipeline");
-  });
 });
 
 describe("routingLine", () => {

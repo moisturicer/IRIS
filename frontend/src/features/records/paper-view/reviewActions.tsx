@@ -25,9 +25,6 @@
  *
  * `blockedReason` keeps a granted action on the bar but disabled, saying why
  * -- for a condition the server reports but the viewer cannot act past yet.
- *
- * Until IR-260 cuts over, a record still on the legacy pipeline is decided on
- * the current review form; the Review section links to it beside the bar.
  */
 import type { ComponentType } from "react";
 
@@ -35,7 +32,7 @@ import { recordsApi } from "@/api/records";
 import { joinLabels } from "@/lib/utils";
 import { RequestDocumentDialog } from "@/features/document-requests/RequestDocumentDialog";
 import type { Capability } from "@/features/records/capabilities";
-import type { RecordDetail } from "@/types/records";
+import { OPEN_SEAT_STATES, type Party, type RecordDetail } from "@/types/records";
 
 import { AddReviewerDialog } from "./AddReviewerDialog";
 import { DecisionDialog } from "./DecisionDialog";
@@ -130,9 +127,24 @@ function RecordFindingAction({ record, onClose, onDone }: ReviewActionDialogProp
   return <OfficeReviewDialog record={record} outcome="finding" onClose={onClose} onDone={onDone} />;
 }
 
+/** The parties whose assignment takes an added colleague: the offices, RDCO included. */
+const OFFICE_PARTIES: readonly Party[] = ["itso", "ierc", "ktto", "rdco"];
+
+/**
+ * The assignment *Add reviewer* adds to: the viewer's oldest open seat on an
+ * office, as the server's `add_reviewer` offer reads it (IR-418). RDCO holds
+ * no `office_review` block, so the seat, not that block, names it.
+ */
+export function addReviewerAssignment(record: Pick<RecordDetail, "my_seats">): number | null {
+  const seat = record.my_seats.find(
+    (s) => OPEN_SEAT_STATES.includes(s.state) && OFFICE_PARTIES.includes(s.party),
+  );
+  return seat?.assignment ?? null;
+}
+
 /** A seat holder brings in a colleague from their own office (ADR-032 §4). */
 function AddReviewerAction({ record, onClose, onDone }: ReviewActionDialogProps) {
-  const assignment = record.office_review.assignment;
+  const assignment = addReviewerAssignment(record);
   if (assignment == null) return null;
   return (
     <AddReviewerDialog
@@ -247,7 +259,7 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   {
     kind: "dialog",
     capability: "request_revision",
-    // `EvaluationPage`'s words, kept verbatim (ui-ux/16 §4).
+    // The retired review form's words, kept verbatim (ui-ux/16 §4).
     label: "Request Revision…",
     icon: "fa-arrow-rotate-left",
     blockedReason: (record) => record.revision.blocked,

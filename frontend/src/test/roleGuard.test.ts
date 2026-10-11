@@ -1,7 +1,9 @@
 /**
  * The role-name guard (IR-411; spec §4.8): no screen under Paper View, My
- * Library, My Reviews or Publish decides by role or reads `can_act`. Those
- * decisions belong to the capabilities adapter, `features/records/capabilities.ts`.
+ * Library, My Reviews or Publish decides by role or reads `can_act`. Since
+ * IR-418 those decisions are the server's: Record detail carries
+ * `capabilities`, and the adapter (`features/records/capabilities.ts`) passes
+ * it through, so it decides nothing by role either.
  *
  * It reads each guarded file as text, like the palette guard, and fails
  * naming the file and what it found.
@@ -94,8 +96,11 @@ describe("the role-name guard", () => {
     expect(Object.keys(SOURCES).filter(guarded).length).toBeGreaterThan(20);
   });
 
-  it("finds the adapter itself deciding by role, which is where that belongs", () => {
-    expect(roleDecisions(SOURCES[ADAPTER])).not.toEqual([]);
+  // IR-418's third criterion. This replaced IR-411's canary, which expected
+  // the adapter to decide by role (phase 1); the patterns above still prove
+  // the scanner sees a role decision when there is one.
+  it("finds no role decision in the adapter: the server decides (IR-418)", () => {
+    expect(roleDecisions(SOURCES[ADAPTER])).toEqual([]);
   });
 
   it("finds no role decision in a guarded screen outside the adapter", () => {

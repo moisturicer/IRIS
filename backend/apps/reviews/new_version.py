@@ -18,7 +18,7 @@ changed since the newest request:
    reviewers review the new version. Every other party's seats, and the
    Adviser's and RDCO's, are untouched, so if RDCO asked only RDCO looks
    again, and if the Adviser asked only the Adviser does;
-5. records the resubmission on the record, as the legacy path does, so
+5. records the resubmission on the record (IR-139), so
    `clearance_state.is_preserved` tells a surviving clearance from a reset
    one.
 
@@ -32,8 +32,7 @@ nothing.
 
 **What counts as a change** (`unchanged_reason`): a manuscript other than the
 latest version's, a supporting document an owner uploaded since the newest
-request, or a detail edited since then (`Record.details_edited_at`). The
-legacy `resubmit_record()` counts only supporting uploads.
+request, or a detail edited since then (`Record.details_edited_at`).
 
 The requesting parties' reviewers are told, after commit.
 """
@@ -46,6 +45,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records import lifecycle
 from apps.records.services import queue_manuscript_extraction
 from apps.records.versions import latest_version, stored_manuscript_unsubmitted, write_version
@@ -112,6 +112,14 @@ def _reset_offices(record, parties) -> list[str]:
     return list(rows.values_list("office", flat=True))
 
 
+def _kept_offices(record, reset) -> list[str]:
+    """The offices whose `cleared` clearance a version resetting `reset` keeps."""
+    return list(
+        RecordClearance.objects.filter(record=record, status=ClearanceStatus.CLEARED)
+        .exclude(office__in=reset).order_by("office").values_list("office", flat=True)
+    )
+
+
 def new_version_hint(record, user) -> Optional[dict]:
     """
     What record detail tells an owner about the version they would submit
@@ -124,7 +132,7 @@ def new_version_hint(record, user) -> Optional[dict]:
     - `kept`: the offices whose `cleared` clearance it keeps;
     - `blocked`: why it cannot be submitted yet.
     """
-    if not routing.is_new_model(record) or not is_record_owner(user, record):
+    if not routing.is_in_review(record) or not is_record_owner(user, record):
         return None
     requests = list(revisions.open_requests(record))
     if not requests:
@@ -132,10 +140,7 @@ def new_version_hint(record, user) -> Optional[dict]:
     parties = _parties(requests)
     reset = set(_reset_offices(record, parties))
     latest = latest_version(record)
-    kept = (
-        RecordClearance.objects.filter(record=record, status=ClearanceStatus.CLEARED)
-        .exclude(office__in=reset).order_by("office").values_list("office", flat=True)
-    )
+    kept = _kept_offices(record, reset)
     return {
         "number": (latest.number if latest else 0) + 1,
         "rereview": [_label(p) for p in parties],
@@ -156,11 +161,8 @@ def submit_new_version(record, actor):
     record = routing._locked(record)
     if not is_record_owner(actor, record):
         raise NewVersionRefused("Only an owner of this record may submit a new version of it.")
-    if not routing.is_new_model(record):
-        raise NewVersionError(
-            "This record is still on the current review pipeline. Use Resubmit "
-            "for review instead."
-        )
+    if not routing.is_in_review(record):
+        raise NewVersionError("This record is not in review.")
     # Read before anything is written, so a misconfigured policy refuses this
     # version cleanly instead of halfway through it (IR-137).
     lifecycle.resubmission_policy()
@@ -176,6 +178,9 @@ def submit_new_version(record, actor):
 
     parties = _parties(requests)
     reset = _reset_offices(record, parties)
+    # Read before the reset: the offices whose `cleared` clearance this version
+    # keeps -- ADR-003's contribution, counted per office (IR-144).
+    preserved = _kept_offices(record, reset)
     now = timezone.now()
 
     previous = latest_version(record)
@@ -202,8 +207,13 @@ def submit_new_version(record, actor):
         assignment__state=AssignmentState.ACTIVE,
     )
     requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
+    audit.resubmitted(
+        record, actor, version=version, policy=lifecycle.resubmission_policy().value,
+        requests=[r.pk for r in requests], rereview_parties=parties,
+        reset_parties=reset, preserved_parties=preserved,
+    )
 
-    # Which policy was active, per resubmission, as the legacy path logs it
+    # Which policy was active, per resubmission
     # (IR-137, ADR-004's documentation requirement).
     logger.info(
         "record %s: v%s submitted under %s policy; %s review again",

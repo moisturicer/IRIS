@@ -6,6 +6,8 @@
 
 > **Amendment proposed — 2026-10-10 (IR-487). Not accepted.** Jev-first evidence routing: a decision sequence with two deciders (a Jev probability and an LLM route label), replacing §2's tool call as the production mechanism, and amending §1, §3, §5, §8, §9 and §11. Drafted by an AI agent; **awaiting approval by Jive Tyler Revalde**, approver of record. Until a person records that approval in this file, the text above stands unchanged. See §Amendment — 2026-10-10 below.
 
+> **Amendment proposed — 2026-10-11 (IR-499). Not accepted.** [ADR-038](038-bounded-research-lane-for-ask-iris.md) supersedes §4 and §11 **for the research lane only**: executed tool calls, model-written queries within validated arguments, and a bounded plan/replan loop. §8's rule that prior answers are withheld applies to routing and no longer to the research planner. Drafted by an AI agent; awaiting a named approver. See §Amendment — 2026-10-11 below.
+
 **Still open after acceptance, and not resolved by it:** §9's landscape exception needs an accountable owner named by a person before any production `on`, and §11's vendor-retention verification gates shadowing real reader questions.
 
 **This was a governance gate, now cleared.** IR-464 (the deterministic detector) and IR-466 (the reader-invisible shadow pilot) were blocked on this ADR being *approved*, not merely drafted, because both contradict [ADR-028](028-no-tool-calling-in-the-answer-path.md) as it stood. An agent drafted this document; a person approved it.
@@ -307,6 +309,17 @@ The full policy facts, with their sources and dates, are in ADR-036's 2026-10-10
 | Proposal 12 §5 and §10 against the owner's Paper Chat reading (A4) | Recorded. The proposal is not corrected |
 | §2 said *"ADR-036 is not amended"*. ADR-036 is now amended for a production decision adapter | Resolved by ADR-036's 2026-10-10 amendment, if accepted |
 | SECURITY.md §8 and §11 risk 11 describe reader questions as ungated. The owner has now decided that they may go to decision vendors under the no-training rule | Not updated here. SECURITY.md needs its own change |
+
+## Amendment — 2026-10-11 (IR-499): a research lane supersedes §4 and §11 for one lane
+
+**Status: Proposed, not accepted.** Drafted by an AI agent. The decision is in [ADR-038](038-bounded-research-lane-for-ask-iris.md); this section only records what it changes here. Until a person accepts that ADR, §1–§11 and the 2026-10-10 amendment stand unchanged.
+
+* **§4 (nothing is executed, no loop)** no longer holds for the research lane. There, tool calls are executed by the application, with validated arguments that are handles issued in the run, inside an outer plan/replan loop and an inner tool loop, under hard limits.
+* **§11 (out of scope)** no longer excludes, for that lane: adaptive retrieval, model-written search queries, the agent loop and a second tool. It still excludes **web search, a new answer state, and any tool outside the closed set** in ADR-038 §2. §11's per-vendor retention gate still applies to every vendor on the lane.
+* **§8 (the decision call sees prior reader questions only)** is unchanged for routing. The planner is a different consumer and sees recent history including prior answers. The reason §8 gave for withholding them still applies to the planner, and ADR-038 §10 accepts it as residual risk.
+* **§2's option-value bet is taken, for one lane.** The `ToolCallingLLM` port now has a real consumer.
+* **Unchanged:** §3's union rule for the evidence decision, §6 (the model cannot supply or widen identity, scope, visibility or disclosure), §7 (withheld evidence does not affect the route), §9 (the landscape limit) and §10.
+* **A research question never reaches the ungrounded state** (ADR-034 §4). That stays a test-backed invariant of every lane.
 
 ## Alternatives Considered
 

@@ -45,6 +45,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records.versions import latest_version, restore_submitted_manuscript
 from core.enums import (
     OPEN_SEAT_STATES,
@@ -157,7 +158,7 @@ def revision_flags(record, user, *, readable: bool) -> dict:
     """
     from .new_version import new_version_hint
 
-    new_model = routing.is_new_model(record)
+    new_model = routing.is_in_review(record)
     requests = list(
         open_requests(record).select_related("requested_by", "review__version")
     ) if new_model else []
@@ -212,11 +213,8 @@ def request_revision(record, actor, *, reason) -> ResubmissionRequest:
         raise RevisionRefused(
             "Only a reviewer holding this record's review may ask for a revision."
         )
-    if not routing.is_new_model(record):
-        raise RevisionError(
-            "This record is still on the current review pipeline. Use the "
-            "current decision form."
-        )
+    if not routing.is_in_review(record):
+        raise RevisionError("This record is not in review.")
     reason = reason.strip() if isinstance(reason, str) else ""
     if not reason:
         raise RevisionError("Say what needs revising, so the author can act on it.")
@@ -237,6 +235,7 @@ def request_revision(record, actor, *, reason) -> ResubmissionRequest:
         record=record, party=party, assignment=seat.assignment, review=review,
         requested_by=actor, reason=reason, created_at=review.created_at,
     )
+    audit.resubmission_requested(request, actor)
 
     from apps.notifications.services import notify_revision_requested
 
@@ -259,11 +258,8 @@ def withdraw_revision_request(record, actor, request_id) -> ResubmissionRequest:
         raise RevisionRefused(
             f"Only a reviewer for {_label(party)} may withdraw its revision request."
         )
-    if not routing.is_new_model(record):
-        raise RevisionError(
-            "This record is still on the current review pipeline. Use the "
-            "current decision form."
-        )
+    if not routing.is_in_review(record):
+        raise RevisionError("This record is not in review.")
     if request.state != ResubmissionRequestState.OPEN:
         raise RevisionError("Only an open revision request can be withdrawn.")
 
@@ -271,6 +267,7 @@ def withdraw_revision_request(record, actor, request_id) -> ResubmissionRequest:
     request.resolved_by = actor
     request.resolved_at = timezone.now()
     request.save(update_fields=["state", "resolved_by", "resolved_at"])
+    audit.revision_request_withdrawn(request, actor)
     if not open_requests(record).exists():
         # Nothing is asked for any more, so no version can carry a revised
         # manuscript the owner uploaded meanwhile: the submitted one is put

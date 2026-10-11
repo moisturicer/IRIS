@@ -80,11 +80,13 @@ class DecliningOfficeTests:
         for office in CLEARANCE_OFFICES:
             assert declining_office(office) == office
 
-    def test_a_sequential_stage_decline_names_no_office(self):
-        """A decline at adviser/RDCO deletes every clearance -- there is no
-        office to name, and inventing one would imply a preservation that
-        `resubmit_record` did not perform."""
-        for stage in ("adviser_review", "rdco_intake", "rdco_review"):
+    def test_a_party_that_clears_nothing_names_no_office(self):
+        """The Adviser, RDCO and the retired intake hold no clearance, so a
+        revision they asked for names no office; inventing one would imply a
+        preservation nobody performed. IR-274 corrected the inputs: they were
+        pipeline *statuses* (`adviser_review`, `rdco_review`), which a
+        `Review.stage` never holds, plus the removed `rdco_intake`."""
+        for stage in ("adviser", "intake", "rdco"):
             assert declining_office(stage) is None
 
     def test_no_decline_names_no_office(self):
@@ -92,7 +94,7 @@ class DecliningOfficeTests:
 
 
 class RestartAllPolicyTests:
-    """Under RESTART_ALL (IR-137) `resubmit_record` deletes every clearance, so
+    """Under RESTART_ALL (IR-137) a new version resets every clearance, so
     there is nothing to preserve and the UI needs no policy branch -- the same
     payload shape answers both policies with an empty list."""
 

@@ -28,6 +28,7 @@ from apps.reviews.models import (
     RoutingEvent,
 )
 from core.enums import (
+    ASSIGNABLE_PARTIES,
     AssignmentState,
     ClearanceStatus,
     Party,
@@ -48,7 +49,7 @@ def _user(email, role_name=RoleName.RDCO):
     )
 
 
-def _record(owner, pipeline_status=PipelineStatus.RDCO_INTAKE):
+def _record(owner, pipeline_status=PipelineStatus.IN_REVIEW):
     record = Record.objects.create(
         title="IR-256 tables",
         abstract="A" * 40,
@@ -83,6 +84,14 @@ class OneActiveAssignmentPerPartyTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             self._assign(Party.IERC)
 
+    def test_the_database_refuses_an_active_assignment_to_intake(self):
+        """IR-274 (ADR-032 §13): the retired party is history; its closed rows stay."""
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._assign(Party.INTAKE)
+        for state in (AssignmentState.COMPLETED, AssignmentState.WITHDRAWN):
+            with self.subTest(state=state):
+                self.assertEqual(self._assign(Party.INTAKE, state).party, Party.INTAKE)
+
     def test_past_assignments_for_the_same_party_are_all_kept(self):
         self._assign(Party.IERC, AssignmentState.COMPLETED)
         self._assign(Party.IERC, AssignmentState.WITHDRAWN)
@@ -106,8 +115,12 @@ class OneActiveAssignmentPerPartyTests(TestCase):
         )
 
     def test_different_parties_can_be_active_on_one_record_at_once(self):
-        """Concurrent review: an Adviser and ITSO can hold a record together."""
-        for party in (Party.INTAKE, Party.ADVISER, Party.ITSO, Party.IERC, Party.KTTO):
+        """
+        Concurrent review: an Adviser and ITSO can hold a record together.
+        IR-274: RDCO replaces the retired Intake here, which may no longer be
+        active (`test_the_database_refuses_an_active_assignment_to_intake`).
+        """
+        for party in (Party.ADVISER, Party.ITSO, Party.IERC, Party.KTTO, Party.RDCO):
             self._assign(party)
 
         self.assertEqual(
@@ -139,7 +152,7 @@ class NewRowsLinkTogetherTests(TestCase):
         cls.ierc = _user("ir256-link-ierc@cit.edu", RoleName.IERC)
 
     def test_a_review_can_point_at_the_assignment_it_was_made_under(self):
-        record = _record(self.owner, PipelineStatus.PARALLEL_REVIEW)
+        record = _record(self.owner, PipelineStatus.IN_REVIEW)
         assignment = RecordAssignment.objects.create(record=record, party=Party.IERC)
 
         review = Review.objects.create(
@@ -157,7 +170,7 @@ class NewRowsLinkTogetherTests(TestCase):
 
     def test_a_request_keeps_its_review_from_being_deleted_alone(self):
         """No workflow action deletes request history (architecture §5), so its review cannot go first."""
-        record = _record(self.owner, PipelineStatus.PARALLEL_REVIEW)
+        record = _record(self.owner, PipelineStatus.IN_REVIEW)
         review = Review.objects.create(
             record=record, reviewed_by=self.ierc, stage=ReviewStage.IERC,
             status=ReviewDecision.DECLINED,
@@ -172,7 +185,7 @@ class NewRowsLinkTogetherTests(TestCase):
 
     def test_an_existing_review_needs_no_assignment(self):
         """Every review written before IR-257 has none, so the link must be optional."""
-        record = _record(self.owner, PipelineStatus.PARALLEL_REVIEW)
+        record = _record(self.owner, PipelineStatus.IN_REVIEW)
 
         review = Review.objects.create(
             record=record, reviewed_by=self.ierc, stage=ReviewStage.IERC,
@@ -219,15 +232,26 @@ class VocabularyIsAddedBesideTheOldTests(TestCase):
         """ADR-021 §1: no new enum, `Party` is `ReviewStage`."""
         self.assertIs(Party, ReviewStage)
 
-    def test_the_old_values_stay_until_the_contract_step(self):
-        self.assertEqual(ReviewStage.RDCO_INTAKE, "rdco_intake")
+    def test_the_contract_step_removed_the_old_values(self):
+        """
+        Inverted deliberately by IR-274, the contract step this test was
+        waiting for: it asserted the old values *stayed* until then. The fixed
+        pipeline's statuses and `rdco_intake` are gone; the decision and
+        clearance values that older rows still hold are kept as history.
+        """
+        self.assertNotIn("rdco_intake", ReviewStage.values)
         self.assertEqual(ReviewDecision.DECLINED, "declined")
         self.assertEqual(ClearanceStatus.REJECTED, "rejected")
         for value in (
             "adviser_review", "rdco_intake", "itso_review",
             "parallel_review", "rdco_review", "declined",
         ):
-            self.assertIn(value, PipelineStatus.values)
+            self.assertNotIn(value, PipelineStatus.values)
+
+    def test_intake_is_history_and_never_assignable(self):
+        """ADR-032 §13: old rows keep `intake`; nothing new may hold it."""
+        self.assertIn(Party.INTAKE, Party.values)
+        self.assertNotIn(Party.INTAKE, ASSIGNABLE_PARTIES)
 
     def test_an_assignment_party_is_never_rdco_intake(self):
         """ADR-021 §2: `rdco_intake` is a stored Review value, never a party's identity."""

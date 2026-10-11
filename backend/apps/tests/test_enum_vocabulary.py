@@ -5,8 +5,9 @@ Three guarantees, and they fail for different reasons:
 
 1. **The enums match the database.** Every `TextChoices` value equals what the
    corresponding model field actually stores. This is what makes the refactor a
-   source-only change -- if someone "tidies" `rdco_intake` to `intake`, this
-   fails before a migration is ever written.
+   source-only change -- a value renamed in the enum fails here before a
+   migration is ever written. (IR-274 did retire `rdco_intake` in favour of
+   `intake`, and wrote the data migration that rewrites the stored rows.)
 
 2. **No bare vocabulary literal remains in application source.** The scan is
    AST-based rather than textual, so a status word appearing in a comment or a
@@ -122,6 +123,9 @@ ALLOWED = {
     # (IR-466) A Celery job's own lifecycle (pending/.../completed), not a
     # person's request or a Record's stage. Same shape as embedding_space.py.
     "ai/models/shadow.py",
+    # (IR-500) A research tool call's outcome: "rejected" means a malformed
+    # model call, not a clearance decision. Same shape as embedding_space.py.
+    "ai/research/results.py",
 }
 
 
@@ -244,6 +248,40 @@ class VocabularyIsSingleSourcedTests(SimpleTestCase):
         scanned = list(_scanned_files())
         self.assertGreater(len(scanned), 30, "the vocabulary scan found almost no files to read")
         self.assertGreater(len(GOVERNED_VALUES), 30, "the governed vocabulary looks truncated")
+
+    def test_the_retired_pipeline_vocabulary_is_absent_from_app_source(self):
+        """
+        **Updated deliberately by IR-274.** The fixed pipeline's five stage
+        statuses, the stored `declined` and the `rdco_intake` stage left the
+        enums, so they also left `GOVERNED_VALUES` -- and the scan above would
+        no longer notice one typed back in by hand. This scan bans them as
+        string constants in live app source instead.
+
+        `declined` is still a review decision, a clearance and a request
+        status, so only its *pipeline* meaning is asserted gone (from the enum,
+        below). `list_unassigned_intake` is allowed: it is IR-260's cutover
+        preflight, run against a database that has not migrated yet, and it
+        reads the stored values that database still holds.
+        """
+        retired = {
+            "adviser_review", "rdco_intake", "itso_review", "parallel_review", "rdco_review",
+        }
+        self.assertFalse(retired & set(PipelineStatus.values))
+        self.assertNotIn("declined", PipelineStatus.values)
+        self.assertNotIn("rdco_intake", ReviewStage.values)
+
+        allowed = {"records/management/commands/list_unassigned_intake.py"}
+        hits = []
+        for path in sorted(APPS_DIR.rglob("*.py")):
+            rel = path.relative_to(APPS_DIR).as_posix()
+            if "/migrations/" in f"/{rel}" or "test" in path.name or "/tests/" in f"/{rel}":
+                continue
+            if rel in allowed:
+                continue
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Constant) and node.value in retired:
+                    hits.append((rel, node.lineno, node.value))
+        self.assertEqual(hits, [], f"retired pipeline vocabulary is back: {hits}")
 
     def test_ktto_review_is_absent_from_live_backend_code(self):
         """

@@ -1,10 +1,9 @@
 """
 Adviser-first entry and routing into office pools (ADR-032 §1, §3, §4; IR-261).
 
-**The submission path after IR-260.** A record is on the new model when its
-stored `pipeline_status` is `in_review`; the legacy lifecycle table has no edge
-from that status, so the two never act on the same record. The public submit
-endpoint, demo seed and tests all call `enter_at_adviser()`.
+**The submission path.** A record enters review when its stored
+`pipeline_status` becomes `in_review`. The public submit endpoint, demo seed
+and tests all call `enter_at_adviser()`.
 
 **Two acts, one core.**
 
@@ -38,6 +37,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records import versions
 from apps.records.lifecycle import type_name_of
 
@@ -92,6 +92,11 @@ _CLEARING_OFFICES = frozenset(str(o) for o in Office)
 _ROLE_FOR_PARTY = {str(party): role for role, party in OFFICE_PARTY_BY_ROLE.items()}
 
 
+#: The Adviser's verdict when they accept & route, as the audit log names it.
+#: Not a Decision (`decisions` module note): the record stays in review.
+ACCEPTED_AND_ROUTED = "accepted_and_routed"
+
+
 class RoutingError(Exception):
     """Understood, but not possible as asked. A 400."""
 
@@ -103,8 +108,8 @@ class RoutingRefused(Exception):
 _label = seats._label
 
 
-def is_new_model(record) -> bool:
-    """On the adviser-first model: stored `in_review` (module note)."""
+def is_in_review(record) -> bool:
+    """In review: stored `in_review`, whoever holds it (ADR-021 §4)."""
     return record.pipeline_status == PipelineStatus.IN_REVIEW
 
 
@@ -131,9 +136,8 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
     if record.pipeline_status != PipelineStatus.DRAFT:
         raise RoutingError("Only a draft can enter the review workflow.")
 
-    # The one write of `pipeline_status` outside `lifecycle.apply()`: the
-    # legacy table has no edge into `in_review`, and IR-260 moves submission
-    # onto this function (module note).
+    # Entering review writes the status itself, beside the assignment it
+    # opens; `lifecycle.apply()` holds only the record-owned edges.
     record.pipeline_status = PipelineStatus.IN_REVIEW
     record.save(update_fields=["pipeline_status", "updated_at"])
     now = timezone.now()
@@ -147,6 +151,7 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
     )
     # What the Adviser is handed is v1 (ADR-032 §5, IR-416).
     versions.write_version(record, actor, VersionCause.SUBMISSION)
+    audit.submitted(record, actor, to_party=Party.ADVISER)
     original_record.pipeline_status = record.pipeline_status
     return assignment
 
@@ -172,7 +177,7 @@ def _seated_office(record, user):
 
 
 def _routable(record) -> bool:
-    return is_new_model(record) and type_name_of(record) in ROUTABLE_TYPES
+    return is_in_review(record) and type_name_of(record) in ROUTABLE_TYPES
 
 
 def _may_accept_and_route(record, user) -> bool:
@@ -202,11 +207,8 @@ def _require_routable(record):
         raise RoutingError(
             "A Proposal is decided by its Adviser alone and is never routed to an office."
         )
-    if not is_new_model(record):
-        raise RoutingError(
-            "This record is still on the current review pipeline, which routes it "
-            "itself. Use the current decision form."
-        )
+    if not is_in_review(record):
+        raise RoutingError("This record is not in review.")
 
 
 def _from_party_for(record, user, *, accepting: bool) -> str:
@@ -214,7 +216,7 @@ def _from_party_for(record, user, *, accepting: bool) -> str:
     The party `user` routes as. Who comes first, then what (ADR-022
     §Amendment 4, ordered as `seats` orders it): a caller who could never
     route this record is a 403 whatever state it is in; a seated reviewer is
-    told why the record cannot be routed (a Proposal, the legacy pipeline)
+    told why the record cannot be routed (a Proposal, a record not in review)
     with a 400.
     """
     if accepting:
@@ -345,7 +347,8 @@ def _apply(record, actor, plan: _Plan) -> list[_Target]:
     group = uuid.uuid4()
     opened = []
     for target in plan.targets:
-        if target.assignment is None:
+        opens = target.assignment is None
+        if opens:
             target.assignment = RecordAssignment.objects.create(
                 record=record, party=target.party, opened_by=actor, opened_at=now,
                 reason=plan.reason,
@@ -362,6 +365,10 @@ def _apply(record, actor, plan: _Plan) -> list[_Target]:
         RoutingEvent.objects.create(
             record=record, actor=actor, from_party=plan.from_party,
             to_party=target.party, reason=plan.reason, group_id=group, created_at=now,
+        )
+        audit.routed(
+            record, actor, from_party=plan.from_party, to_party=target.party,
+            opened=opens, group=group, nominee=target.nominee,
         )
     return opened
 
@@ -435,10 +442,14 @@ def accept_and_route(record, actor, *, to, reason):
         .filter(state__in=OPEN_SEAT_STATES)
         .first()
     )
-    Review.objects.create(
+    review = Review.objects.create(
         record=record, reviewed_by=actor, stage=Party.ADVISER,
         status=ReviewDecision.APPROVED, comment=plan.reason,
         assignment=adviser_seat.assignment, version=versions.latest_version(record),
+    )
+    audit.decision_recorded(
+        record, actor, party=Party.ADVISER, outcome=ACCEPTED_AND_ROUTED, final=False,
+        review=review,
     )
     def accept_then_route():
         seats.complete_seat(adviser_seat, actor)

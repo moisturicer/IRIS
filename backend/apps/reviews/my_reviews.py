@@ -4,15 +4,11 @@ My Reviews: a reviewer's own seats, plus their office's pool (ADR-032 §9 and it
 
 **Current work and history are sourced differently.**
 
-- **To review** and **In review** are current work, and split by model. A
-  record on the new model (`in_review`) comes from seats and pools. Every other
-  record comes from the old pipeline's own per-role queue, unchanged until
-  IR-260, which puts its pending work in To review. The shadow pools cannot
-  stand in for that queue: IERC is active at `itso_review` before it may act,
-  a `declined` record keeps its requester active, and RDCO's intake work sits
-  under `intake`.
-- **Done** is history, and is never split by model or `pipeline_status` -- a
-  new-model record that gets published is no longer `in_review`. It is the
+- **To review** and **In review** are current work: seats and office pools on
+  records in review (`in_review`). The old pipeline's per-role queue was the
+  third source until IR-274; IR-260 had already moved every record off it.
+- **Done** is history, and is never split by `pipeline_status` -- a record
+  that gets published is no longer `in_review`. It is the
   union of (1) every `done` seat, and (2) every `Review` with no seat behind it
   that My Reviews already shows: no `done` seat of its author on its
   assignment, and no open one on a record whose current work comes from seats.
@@ -36,7 +32,7 @@ import binascii
 from dataclasses import dataclass
 from datetime import datetime
 
-from django.db.models import Exists, F, Max, OuterRef, Q, Subquery
+from django.db.models import Exists, F, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -46,7 +42,6 @@ from apps.records.models import Record, RecordOwner
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
-    ClearanceStatus,
     DocumentRequestState,
     MyReviewsTab,
     Party,
@@ -55,12 +50,10 @@ from core.enums import (
     ReviewDecision,
     ReviewOutcome,
     ReviewStage,
-    RoleName,
     SeatSource,
     SeatState,
 )
 from core.permissions import (
-    get_role_name,
     is_office_coordinator,
     is_office_member,
     office_parties_of,
@@ -68,7 +61,6 @@ from core.permissions import (
 
 from .models import (
     RecordAssignment,
-    RecordClearance,
     ResubmissionRequest,
     Review,
     ReviewerSeat,
@@ -81,41 +73,16 @@ PAGE_SIZE = 50
 SPECIALIST_STAGES = (ReviewStage.ITSO, ReviewStage.IERC, ReviewStage.KTTO)
 
 #: Row kinds. A pool row is an office's assignment nobody is seated on; a
-#: legacy row is the old pipeline's queue; a review row is a Done decision with
-#: no seat behind it.
-SEAT, POOL, LEGACY, REVIEW = "seat", "pool", "legacy", "review"
+#: review row is a Done decision with no seat behind it.
+SEAT, POOL, REVIEW = "seat", "pool", "review"
 
 #: Done's two sources, in the order a tie on time breaks (descending).
 _RANK = {SEAT: 1, REVIEW: 0}
 
-#: The old pipeline's queue, per role: the statuses each role acts at today.
-#: Moved here from the retired `/reviews/pending/`, unchanged (ADR-032 §9
-#: Amendment: old-pipeline records stay exactly where they are until IR-260).
-_LEGACY_STATUSES = {
-    RoleName.ADVISER: (PipelineStatus.ADVISER_REVIEW,),
-    RoleName.RDCO: (PipelineStatus.RDCO_INTAKE, PipelineStatus.RDCO_REVIEW),
-    RoleName.ITSO: (PipelineStatus.ITSO_REVIEW,),
-    RoleName.IERC: (PipelineStatus.PARALLEL_REVIEW,),
-    RoleName.KTTO: (PipelineStatus.ITSO_REVIEW, PipelineStatus.PARALLEL_REVIEW),
-}
-
-#: The party a role reviews as, for a legacy row.
-_PARTY_OF_ROLE = {
-    RoleName.ADVISER: Party.ADVISER,
-    RoleName.RDCO: Party.RDCO,
-    RoleName.ITSO: Party.ITSO,
-    RoleName.IERC: Party.IERC,
-    RoleName.KTTO: Party.KTTO,
-}
-
-#: The party whose routing event explains a legacy row's stage.
-_ROUTED_PARTY_AT = {
-    PipelineStatus.RDCO_INTAKE: Party.INTAKE,
-}
-
-#: The stages a party's Reviews are recorded at. RDCO staffed intake.
+#: The stages a party's Reviews are recorded at. RDCO staffed the retired
+#: intake, so its historical intake decisions are RDCO's history.
 _STAGES_OF_PARTY = {
-    Party.RDCO: (ReviewStage.RDCO, ReviewStage.RDCO_INTAKE),
+    Party.RDCO: (ReviewStage.RDCO, ReviewStage.INTAKE),
 }
 
 
@@ -211,29 +178,6 @@ def _pool(scope):
         record__pipeline_status=PipelineStatus.IN_REVIEW,
         record__in=_visible(scope.user),
     ).exclude(Exists(live))
-
-
-def _legacy_role(scope):
-    """Whose old-pipeline queue the request reads: the caller's role."""
-    return get_role_name(scope.user)
-
-
-def _legacy(scope):
-    """The old pipeline's queue for the caller's role, as `/reviews/pending/` served it."""
-    role = _legacy_role(scope)
-    statuses = _LEGACY_STATUSES.get(role)
-    if not statuses:
-        return Record.objects.none()
-    records = Record.objects.filter(pipeline_status__in=statuses).filter(
-        pk__in=_visible(scope.user).values("pk"),
-    )
-    if role == RoleName.ADVISER:
-        records = records.filter(adviser=scope.user)
-    office = _PARTY_OF_ROLE[role]
-    if str(office) in (str(s) for s in SPECIALIST_STAGES):
-        pending = RecordClearance.objects.filter(office=str(office), status=ClearanceStatus.PENDING)
-        records = records.filter(pk__in=pending.values("record_id"))
-    return records
 
 
 def _verdict(seat_assignment, seat_reviewer):
@@ -387,7 +331,6 @@ def _row(*, kind, pk, record, party, party_label, **fields) -> dict:
         "record_type_name": record.record_type.name if record.record_type_id else None,
         "party": str(party),
         "party_label": party_label,
-        "stage_label": None,
         "seat": None,
         "assignment": None,
         "holder": None,
@@ -411,7 +354,7 @@ def _row(*, kind, pk, record, party, party_label, **fields) -> dict:
 
 def _row_party(stage) -> Party:
     """A Review's stage as a My Reviews party: intake was staffed by RDCO."""
-    if stage in (ReviewStage.RDCO_INTAKE, ReviewStage.INTAKE):
+    if stage == ReviewStage.INTAKE:
         return Party.RDCO
     return Party(stage)
 
@@ -431,7 +374,7 @@ def _seat_row(seat, scope, *, since=None, **fields):
 
 
 def _current_rows(scope, tab) -> list[dict]:
-    """To review or In review: seats, then (To review only) the pool and the old queue."""
+    """To review or In review: seats, then (To review only) the pool."""
     user = scope.user
     rows = []
     state = SeatState.ASSIGNED if tab == MyReviewsTab.TO_REVIEW else SeatState.IN_REVIEW
@@ -452,19 +395,6 @@ def _current_rows(scope, tab) -> list[dict]:
                 can_claim=is_office_member(user, party),
                 can_assign=is_office_coordinator(user, party),
                 **_since(assignment.opened_at),
-            ))
-        role = _legacy_role(scope)
-        legacy = _legacy(scope).select_related("record_type").annotate(
-            last_review=Max("reviews__created_at"),
-        )
-        for record in legacy:
-            party = _PARTY_OF_ROLE[role]
-            rows.append(_row(
-                kind=LEGACY, pk=record.pk, record=record,
-                party=party, party_label=str(RoleName(role).label),
-                stage_label=record.get_pipeline_status_display(),
-                routing_party=_ROUTED_PARTY_AT.get(record.pipeline_status, party),
-                **_since(record.last_review or record.created_at),
             ))
 
     _add_context(rows)
@@ -505,7 +435,7 @@ def _add_context(rows):
     )
 
     for row in rows:
-        party = str(row.pop("routing_party", None) or row["party"])
+        party = str(row["party"])
         event = latest.get((row["record"], party))
         submitted = row.pop("entry", False) or (
             row["party"] == Party.ADVISER and (event is None or event.from_party is None)
@@ -575,7 +505,6 @@ def _counts(scope) -> dict:
         MyReviewsTab.TO_REVIEW.value: (
             _current_seats(scope, SeatState.ASSIGNED).count()
             + _pool(scope).count()
-            + _legacy(scope).count()
         ),
         MyReviewsTab.IN_REVIEW.value: _current_seats(scope, SeatState.IN_REVIEW).count(),
         MyReviewsTab.DONE.value: _done_seats(scope).count() + _seatless_reviews(scope).count(),

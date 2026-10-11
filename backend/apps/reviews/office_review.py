@@ -12,7 +12,7 @@ outcome is refused.
 **Before anything is written**, the act refuses:
 
 - a caller holding no open specialist seat here (403, who before what);
-- a record still on the legacy pipeline (400);
+- a record not in review (400);
 - an outcome other than `cleared` or `finding`, or a finding with no reason;
 - a seat not yet opened: *Open review* stamps the time-on-task start, so
   finishing an unopened seat would leave it empty;
@@ -43,6 +43,7 @@ import uuid
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records.lifecycle import type_name_of
 from apps.records.versions import latest_version
 
@@ -137,7 +138,7 @@ def office_review_flags(record, user) -> dict:
     clear or record a finding as, why they cannot yet, and whether they may
     add a colleague. A rendering hint; the endpoints re-check all of it.
     """
-    party = _seated_specialist(record, user) if routing.is_new_model(record) else None
+    party = _seated_specialist(record, user) if routing.is_in_review(record) else None
     if party is None:
         return {"party": None, "label": None, "blocked": None, "assignment": None}
     seat = _open_seat(record, user, party)
@@ -166,11 +167,8 @@ def record_office_review(record, actor, *, outcome, comment=""):
             "Only a reviewer seated for ITSO, IERC or KTTO on this record may "
             "clear it or record a finding."
         )
-    if not routing.is_new_model(record):
-        raise OfficeReviewError(
-            "This record is still on the current review pipeline. Use the "
-            "current decision form."
-        )
+    if not routing.is_in_review(record):
+        raise OfficeReviewError("This record is not in review.")
     if not isinstance(outcome, str) or outcome not in OUTCOMES:
         raise OfficeReviewError(
             "An office clears a record or records a finding. Offices never "
@@ -185,11 +183,12 @@ def record_office_review(record, actor, *, outcome, comment=""):
     if blocked:
         raise OfficeReviewError(blocked)
 
-    Review.objects.create(
+    review = Review.objects.create(
         record=record, reviewed_by=actor, stage=party, status=OUTCOMES[outcome],
         comment=comment, assignment=seat.assignment,
         version=latest_version(record),
     )
+    audit.decision_recorded(record, actor, party=party, outcome=outcome, final=False, review=review)
     try:
         completed = seats.complete_seat(seat, actor)
     except seats.SeatError as exc:
@@ -249,9 +248,14 @@ def _hand_back(record, from_party):
     opened = RecordAssignment.objects.create(
         record=record, party=Party.RDCO, opened_at=now, reason=HAND_BACK_REASON,
     )
+    group = uuid.uuid4()
     RoutingEvent.objects.create(
         record=record, actor=None, from_party=from_party, to_party=Party.RDCO,
-        reason=HAND_BACK_REASON, group_id=uuid.uuid4(), created_at=now,
+        reason=HAND_BACK_REASON, group_id=group, created_at=now,
+    )
+    audit.routed(
+        record, None, from_party=from_party, to_party=Party.RDCO, opened=True,
+        group=group, hand_back=True,
     )
     return ("opened", opened)
 

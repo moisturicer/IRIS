@@ -3,18 +3,18 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count
 from .models import Record
-from core.enums import DELETE_REVIEW_STATUSES, PUBLICLY_VISIBLE_STATUSES, PipelineStatus
-
-#: The five statuses that mean "somebody is still reviewing this". Named here
-#: rather than inline so the dashboard's "pending" tile and any future caller
-#: agree on what pending means (IR-135).
-IN_REVIEW_STATUSES = (
-    PipelineStatus.ADVISER_REVIEW,
-    PipelineStatus.RDCO_INTAKE,
-    PipelineStatus.ITSO_REVIEW,
-    PipelineStatus.PARALLEL_REVIEW,
-    PipelineStatus.RDCO_REVIEW,
+from apps.reviews.models import ResubmissionRequest
+from core.enums import (
+    DELETE_REVIEW_STATUSES,
+    PUBLICLY_VISIBLE_STATUSES,
+    PipelineStatus,
+    ResubmissionRequestState,
 )
+
+#: The statuses that mean "somebody is still reviewing this". One since
+#: ADR-032: whoever holds a record, it is stored `in_review` (IR-260). The five
+#: fixed-pipeline stages it replaced were deleted by IR-274.
+IN_REVIEW_STATUSES = (PipelineStatus.IN_REVIEW,)
 
 
 class DashboardStatsView(APIView):
@@ -36,7 +36,11 @@ class DashboardStatsView(APIView):
             # DELETE_REVIEW_STATUSES is exactly "accepted" (published, or an
             # approved/completed Proposal).
             "approved_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status__in=DELETE_REVIEW_STATUSES).count(),
-            "declined_mine":    Record.objects.filter(pk__in=my_ids, pipeline_status=PipelineStatus.DECLINED).count(),
+            # The owner's records a reviewer has asked to revise: an open
+            # revision request, which replaced the stored `declined` (IR-274).
+            "declined_mine":    ResubmissionRequest.objects.filter(
+                record_id__in=my_ids, state=ResubmissionRequestState.OPEN,
+            ).values("record_id").distinct().count(),
             # Staff-only totals -- return 0 for students
             "total_published":  Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count() if request.user.role else 0,
         })
@@ -76,7 +80,7 @@ class PSCEDChartView(APIView):
 #
 #   Response:
 #     {
-#       "pipeline_status": str,        # e.g. "parallel_review"
+#       "pipeline_status": str,        # e.g. "in_review"
 #       "clearances": [
 #         { "office": "itso",  "status": "pending" | "cleared" | "declined" },
 #         { "office": "ierc",  "status": "pending" | "cleared" | "declined" },
@@ -85,7 +89,7 @@ class PSCEDChartView(APIView):
 #     }
 #
 #   Note: RDCO does not have a RecordClearance row — its review is reflected
-#   directly in pipeline_status (rdco_intake / rdco_review / published).
+#   in its assignment and Decision, not in a clearance row.
 #
 #   Implementation sketch:
 #     record = get_object_or_404(Record, pk=record_pk)

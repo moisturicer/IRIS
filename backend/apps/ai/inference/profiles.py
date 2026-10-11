@@ -215,6 +215,15 @@ def api_key_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
     """Where ``task``'s key may be set, in the order ``profile_for`` reads them."""
     task = inference_task(task)
     own = f"{task.settings_prefix}_API_KEY"
+    if task in (InferenceTask.ROUTE, InferenceTask.PLAN):
+        parent_task = InferenceTask.RESOLVE if task is InferenceTask.ROUTE else InferenceTask.ANSWER
+        resolve = profile_for(parent_task)
+        route_url = _setting(f"{task.settings_prefix}_BASE_URL")
+        if not _setting(f"{task.settings_prefix}_VENDOR") and (
+            not route_url or _vendor_at(route_url) is resolve.vendor
+        ):
+            return (own, *api_key_variables(parent_task))
+        return (own,)
     _, inherited, _ = _inherited_keys(task)
     return (own, inherited) if inherited else (own,)
 
@@ -229,6 +238,10 @@ def model_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
     """
     task = inference_task(task)
     own = f"{task.settings_prefix}_MODEL"
+    if task is InferenceTask.ROUTE:
+        return (own, "LLM_RESOLVE_MODEL")
+    if task is InferenceTask.PLAN:
+        return (own, *model_variables(InferenceTask.ANSWER))
     inherited = _inherited_model_key(task)
     return (own, inherited) if inherited else (own,)
 
@@ -237,6 +250,34 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
     """Resolve ``task``'s Profile from settings. Never cached, never eager."""
     task = inference_task(task)
     prefix = task.settings_prefix
+    if task in (InferenceTask.ROUTE, InferenceTask.PLAN):
+        parent_task = InferenceTask.RESOLVE if task is InferenceTask.ROUTE else InferenceTask.ANSWER
+        resolve = profile_for(parent_task)
+        named_vendor = _setting(f"{prefix}_VENDOR")
+        chosen = vendor(named_vendor) if named_vendor else resolve.vendor
+        base_url = _setting(f"{prefix}_BASE_URL") or (
+            chosen.base_url if named_vendor else resolve.base_url
+        )
+        if not named_vendor:
+            chosen = _vendor_at(base_url) or resolve.vendor
+        api_key = _setting(f"{prefix}_API_KEY") or (
+            "" if named_vendor or chosen is not resolve.vendor else resolve.api_key
+        )
+        return Profile(
+            task=task,
+            vendor=chosen,
+            model=_setting(f"{prefix}_MODEL") or resolve.model,
+            fallback_models=_fallback_models(prefix),
+            base_url=base_url,
+            api_key=api_key,
+            reasoning_visible=bool(getattr(settings, f"{prefix}_REASONING", False)),
+            provider_only=_listed(f"{prefix}_PROVIDER_ONLY") or (
+                () if named_vendor else resolve.provider_only
+            ),
+            model_provider_pins=_model_provider_pins(prefix) or (
+                resolve.model_provider_pins if task is InferenceTask.PLAN and not named_vendor else ()
+            ),
+        )
     # Already empty when a vendor is named, which is what stops half the flat
     # settings being inherited -- see `_inherited_keys`.
     inherited_base_url, inherited_api_key, _ = _inherited_keys(task)

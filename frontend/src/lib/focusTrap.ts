@@ -49,8 +49,31 @@ export function tabbableWithin(root: HTMLElement): HTMLElement[] {
     // `visibility: hidden` keeps both its offsetParent and its client rects, so
     // it survives the check above -- but browsers do not Tab to it, and neither
     // should we. `getComputedStyle` is the only honest way to see this.
-    return getComputedStyle(el).visibility !== "hidden";
+    if (getComputedStyle(el).visibility === "hidden") return false;
+    return !hiddenByClosedDetails(el);
   }));
+}
+
+/**
+ * True when a closed `<details>` hides `el` (IR-516).
+ *
+ * Chrome hides a closed details' content without `display: none` -- the slot
+ * gets `content-visibility: hidden` -- so the content keeps its client rects
+ * and passes the layout check above. Listing it made Tab from MetadataForm's
+ * closed *More details* aim at a hidden `<select>`, whose `focus()` silently
+ * fails after the trap has already swallowed the key: Save was unreachable.
+ *
+ * The one part of a closed details that stays visible is its own summary,
+ * which is the first `<summary>` child -- a later one is ordinary content.
+ * Every closed details on the way up counts, so the summary of a details
+ * nested inside a closed one is hidden too.
+ */
+function hiddenByClosedDetails(el: HTMLElement): boolean {
+  for (let child: Element = el, parent = el.parentElement; parent; child = parent, parent = parent.parentElement) {
+    if (!(parent instanceof HTMLDetailsElement) || parent.open) continue;
+    if (child !== parent.querySelector(":scope > summary")) return true;
+  }
+  return false;
 }
 
 /**

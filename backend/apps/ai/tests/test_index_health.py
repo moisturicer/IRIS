@@ -238,6 +238,11 @@ class IndexRecallTests:
     def test_it_reports_perfect_recall_on_a_small_table(self, space):
         """A table this size is well inside what HNSW handles exactly; a
         number below 1.0 here would itself be the finding."""
+        # Earlier tests' rolled-back vectors stay in the HNSW graph (nothing
+        # vacuums a test database) and fill the scan; measure a fresh one.
+        # TRUNCATE is transactional, so the test's rollback undoes it.
+        with connection.cursor() as cursor:
+            cursor.execute(f"TRUNCATE {ChunkEmbedding._meta.db_table}")
         _record_with_vectors(space, "A Thesis", 20)
 
         result = measure_index_recall(ChunkEmbedding, space_id=space.pk, k=5, probes=10)

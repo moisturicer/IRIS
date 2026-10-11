@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
+import { pretendLaidOut } from "@/test/layout";
 import { fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
@@ -423,6 +424,23 @@ describe("Details", () => {
     expect(title).toHaveAccessibleDescription("Title must be at least 5 characters.");
   });
 
+  it("Tab from a closed More details reaches Back, not the fields hidden inside it", async () => {
+    // IR-516: the same MetadataForm and Modal trap as Edit details.
+    const layout = pretendLaidOut();
+    try {
+      const user = userEvent.setup();
+      openNew();
+      await completeManuscript(user);
+
+      screen.getByText("More details").closest("summary")!.focus();
+      await user.tab();
+
+      expect(screen.getByRole("button", { name: "Back" })).toHaveFocus();
+    } finally {
+      layout.mockRestore();
+    }
+  });
+
   it("passes axe with More details open", async () => {
     const user = userEvent.setup();
     const { container } = openNew();
@@ -537,7 +555,7 @@ describe("a network failure", () => {
       .mockRejectedValueOnce(new Error("Network Error"))
       .mockResolvedValueOnce({ data: { detail: "Submitted." } } as never);
     vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ pipeline_status: "rdco_intake", current_holders: [] }),
+      data: draftDetail({ pipeline_status: "in_review", current_holders: [] }),
     } as never);
     openNew();
     await completeManuscript(user);
@@ -558,7 +576,7 @@ describe("success", () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
-        pipeline_status: "rdco_intake",
+        pipeline_status: "in_review",
         current_holders: [{ party: "intake", label: "Intake", opened_at: null, opened_by: null }],
       }),
     } as never);
@@ -578,7 +596,7 @@ describe("success", () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
-        pipeline_status: "rdco_intake",
+        pipeline_status: "in_review",
         current_holders: [{ party: "intake", label: "Intake", opened_at: null, opened_by: null }],
       }),
     } as never);
@@ -603,7 +621,7 @@ describe("success", () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({
-        pipeline_status: "adviser_review",
+        pipeline_status: "in_review",
         adviser: 21,
         current_holders: [{ party: "adviser", label: "Adviser", opened_at: null, opened_by: null }],
       }),
@@ -620,7 +638,7 @@ describe("success", () => {
   it("starts over on Publish another", async () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ pipeline_status: "rdco_intake", current_holders: [] }),
+      data: draftDetail({ pipeline_status: "in_review", current_holders: [] }),
     } as never);
     openNew();
     await completeManuscript(user);
@@ -679,7 +697,7 @@ describe("resuming a draft from /?publish=<id>", () => {
 
   it("says so when the record has already been submitted", async () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ pipeline_status: "adviser_review" }),
+      data: draftDetail({ pipeline_status: "in_review" }),
     } as never);
     renderScreen(<PublishDialog />, { route: "/?publish=42" });
 

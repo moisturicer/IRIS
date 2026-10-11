@@ -24,7 +24,6 @@ const NOT_YET_CONVERTED: readonly string[] = [
   // IR-361 -- My Workspace, review and clearance
   "src/features/records/MyWorkspacePage.tsx",
   "src/features/records/WorkspaceOfficePills.tsx",
-  "src/features/review/EvaluationPage.tsx",
   // IR-362 -- My Library, Calls & Conferences, Notifications (Discover's
   // files came off with IR-407, F2)
   "src/features/library/MyLibraryPage.tsx",

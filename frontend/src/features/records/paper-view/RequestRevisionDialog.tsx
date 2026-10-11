@@ -18,7 +18,7 @@ interface RequestRevisionDialogProps {
 /**
  * *Request Revision* for the party the viewer reviews for (ADR-032 §5, IR-272).
  *
- * The copy is `EvaluationPage`'s, kept verbatim (ui-ux/16 §4). The reviewer's
+ * The copy is the retired review form's, kept verbatim (ui-ux/16 §4). The reviewer's
  * own review stays open for the next version, and nothing can be decided
  * until the owner submits one -- the server decides both, so this dialog
  * only says so. A reason is required: the owner acts on it.
