@@ -36,7 +36,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
     setLoading(true);
     setFailed(false);
     try {
-      const { data } = await aiApi.overview(record.id, retry);
+      const { data } = await (retry ? aiApi.overview(record.id, true) : aiApi.overview(record.id));
       setResponse(data);
     } catch {
       setFailed(true);

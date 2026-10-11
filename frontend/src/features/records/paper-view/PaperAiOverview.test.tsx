@@ -72,7 +72,7 @@ describe("the AI overview on a paper", () => {
   });
 
   it("explains that generation is pending and polls until the overview is ready", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     overview
       .mockResolvedValueOnce({ data: { state: "generating", overview: null } })
       .mockResolvedValueOnce({ data: response() });
