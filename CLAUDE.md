@@ -127,6 +127,15 @@ python manage.py load_corpus <dir> --dry-run             # bulk-load PDFs as Rec
                                    # partial load, correctly skipped) and every one extracted and
                                    # chunked cleanly — 354 chunks, zero failures
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
+python manage.py run_research_tool --user EMAIL --call TOOL='{json}' [--call ...]
+                                   # run research-lane tools as a user, no model
+                                   # (IR-509, IR-510). Calls share one run, so
+                                   # `find_records` then `read_record_sections`
+                                   # with its R handle works. Prints the planner
+                                   # payload and each handle's stored pointer.
+                                   # search_passages/find_records embed the query
+                                   # (Voyage). Verified on the dev database
+                                   # 2026-10-11 with count_records and corpus_facets
 python manage.py backfill_embeddings --dry-run           # what indexing the corpus would cost (IR-282).
                                    # Prints records/chunks/tokens and an approximate cost, then stops.
                                    # Drop --dry-run to run it inline; --queue hands each record to a
