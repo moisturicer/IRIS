@@ -112,3 +112,34 @@ def _references_publicly_visible(path: pathlib.Path) -> bool:
         isinstance(node, ast.Attribute) and node.attr == "publicly_visible"
         for node in ast.walk(tree)
     )
+
+
+def test_research_tools_reach_records_only_through_the_one_predicate():
+    """ADR-038 §2.2: tools add no second visibility path (IR-500).
+
+    `Record.objects` appears in one research module, whose function applies
+    `visible_to(user)` before anything else touches the queryset.
+    """
+    research = APPS_AI / "research"
+    reaching = {
+        path.relative_to(research).as_posix()
+        for path in research.rglob("*.py")
+        if "tests" not in path.parts and _reaches_record_manager(path)
+    }
+    assert reaching == {"tools/common.py"}, (
+        f"{sorted(reaching)} query Record directly; go through "
+        f"`tools.common.readable_records`."
+    )
+    common = (research / "tools" / "common.py").read_text(encoding="utf-8")
+    assert "Record.objects.visible_to(ctx.user)" in common
+
+
+def _reaches_record_manager(path: pathlib.Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return any(
+        isinstance(node, ast.Attribute)
+        and node.attr == "objects"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "Record"
+        for node in ast.walk(tree)
+    )

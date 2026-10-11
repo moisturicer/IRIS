@@ -123,6 +123,9 @@ ALLOWED = {
     # (IR-466) A Celery job's own lifecycle (pending/.../completed), not a
     # person's request or a Record's stage. Same shape as embedding_space.py.
     "ai/models/shadow.py",
+    # (IR-500) A research tool call's outcome: "rejected" means a malformed
+    # model call, not a clearance decision. Same shape as embedding_space.py.
+    "ai/research/results.py",
 }
 
 

@@ -675,6 +675,33 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
 AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
 
+# ---- Research lane limits (ADR-038 §5, IR-500) ---------------------------
+# Carried on every run's Budget and enforced by its Spend.
+AI_RESEARCH_MAX_OUTER_ROUNDS = config("AI_RESEARCH_MAX_OUTER_ROUNDS", default=3, cast=int)
+AI_RESEARCH_MAX_CALLS_PER_SUBTASK = config(
+    "AI_RESEARCH_MAX_CALLS_PER_SUBTASK", default=4, cast=int
+)
+AI_RESEARCH_MAX_TOOL_CALLS = config("AI_RESEARCH_MAX_TOOL_CALLS", default=10, cast=int)
+AI_RESEARCH_WALL_CLOCK_SECONDS = config(
+    "AI_RESEARCH_WALL_CLOCK_SECONDS", default=90.0, cast=float
+)
+AI_RESEARCH_MAX_PROMPT_TOKENS = config(
+    "AI_RESEARCH_MAX_PROMPT_TOKENS", default=120_000, cast=int
+)
+AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
+    "AI_RESEARCH_MAX_LEDGER_PASSAGES", default=30, cast=int
+)
+# Tokens one read_record_sections call may return (ADR-038 §2).
+AI_RESEARCH_READ_TOKEN_CAP = config("AI_RESEARCH_READ_TOKEN_CAP", default=3000, cast=int)
+# ADR-027 §1d: corpus_facets refuses below this many visible records. The
+# ADR sets no value; this default is a placeholder until a corpus exists.
+AI_LANDSCAPE_MIN_RECORDS = config("AI_LANDSCAPE_MIN_RECORDS", default=20, cast=int)
+# ADR-027 §1b: corpus_facets refuses above this unclassified share. Also a
+# placeholder; the ADR sets no value.
+AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE = config(
+    "AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE", default=0.5, cast=float
+)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in
