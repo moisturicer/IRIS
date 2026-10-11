@@ -5,7 +5,6 @@ import pytest
 from apps.ai.answers.citations import parse_citations
 from apps.ai.citation_markers import MARKER, PAGE_MARKER, pages_in
 from apps.ai.composition import use_composition_root
-from apps.ai.overview import overview_for
 from apps.ai.overview.pages import build_page_prompt, parse_page_citations
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.regions import Region
