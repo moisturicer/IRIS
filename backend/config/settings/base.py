@@ -693,6 +693,14 @@ AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
 )
 # Tokens one read_record_sections call may return (ADR-038 §2).
 AI_RESEARCH_READ_TOKEN_CAP = config("AI_RESEARCH_READ_TOKEN_CAP", default=3000, cast=int)
+# ADR-027 §1d: corpus_facets refuses below this many visible records. The
+# ADR sets no value; this default is a placeholder until a corpus exists.
+AI_LANDSCAPE_MIN_RECORDS = config("AI_LANDSCAPE_MIN_RECORDS", default=20, cast=int)
+# ADR-027 §1b: corpus_facets refuses above this unclassified share. Also a
+# placeholder; the ADR sets no value.
+AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE = config(
+    "AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE", default=0.5, cast=float
+)
 
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
