@@ -318,26 +318,24 @@ class OnePredicateTests:
     two.
     """
 
-    def test_both_paths_read_the_same_set_of_states(self):
-        from apps.ai.models.conversation import model_history_q
-        from apps.ai.models import Turn as TurnModel, TurnEmbedding
+    def test_both_paths_read_the_same_set_of_states(self, space):
+        from apps.ai.models import Conversation, TurnEmbedding
 
-        turn_sql = str(TurnModel.objects.in_model_history().query)
-        vector_sql = str(TurnEmbedding.objects.in_model_history().query)
-        for state in MODEL_HISTORY_STATES:
-            assert state in turn_sql
-            assert state in vector_sql
-        for state in (NO_SOURCES, UNAVAILABLE, PARTIAL):
-            assert state not in turn_sql
-            assert state not in vector_sql
-        # The `Q` both queryset methods are built from, so a third caller
-        # gets the rule rather than a third copy of it.
-        assert model_history_q().children == [
-            ("state__in", MODEL_HISTORY_STATES)
-        ]
-        assert model_history_q("turn__").children == [
-            ("turn__state__in", MODEL_HISTORY_STATES)
-        ]
+        conversation = Conversation.objects.create(user=make_user("history-predicate@cit.edu"))
+        expected = set()
+        for state, routing in (
+            (GENERATED, {}), (GENERATED, {"lane": "passage"}),
+            (GENERATED, {"lane": "research"}), (GENERATED, {"lane": "listing"}),
+            (GENERATED, {"lane": "count"}), (NO_SOURCES, {}),
+            (UNAVAILABLE, {}), (PARTIAL, {}),
+        ):
+            turn = Turn.objects.create(conversation=conversation, question="q", answer="a",
+                                       state=state, routing=routing)
+            TurnEmbedding.objects.create(turn=turn, space=space, embedding=[0.0] * space.dimensions)
+            if state == GENERATED and routing.get("lane") not in ("listing", "count"):
+                expected.add(turn.pk)
+        assert set(Turn.objects.in_model_history().values_list("pk", flat=True)) == expected
+        assert set(TurnEmbedding.objects.in_model_history().values_list("turn_id", flat=True)) == expected
 
     def test_the_embedding_exclusion_is_the_same_rule(self):
         """IR-447 skips the same states when embedding an answer, and since
