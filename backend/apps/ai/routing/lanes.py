@@ -106,6 +106,9 @@ def _named_records(ctx, question):
     remainder = re.sub(r'"[^"\n]+"|“[^”\n]+”', "", question)
     for record in sorted(matched, key=lambda record: len(record.title), reverse=True):
         remainder = re.sub(re.escape(record.title), "", remainder, flags=re.IGNORECASE)
+    # A trailing comparison criterion is not another paper title.
+    remainder = re.split(r"\b(?:on|in terms of|regarding|focusing on|by|for|their)\b",
+                         remainder, maxsplit=1, flags=re.IGNORECASE)[0]
     # Unresolved text may be another title, including mixed quoted/unquoted
     # input. Ask for explicit names before comparing an ambiguous subset.
     remainder = re.sub(r"\b(compare|comparison|contrast|with|and|vs|versus|to|of|the|papers|paper)\b", "", remainder, flags=re.IGNORECASE)

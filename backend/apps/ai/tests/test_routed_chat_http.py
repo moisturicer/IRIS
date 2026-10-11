@@ -163,7 +163,8 @@ def test_count_uses_screened_rows_and_reports_coverage(endpoint, settings, monke
 
 
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
-def test_comparison_cites_each_paper_and_reports_missing_evidence(endpoint, settings, monkeypatch, embedder, space, client_for):
+@pytest.mark.parametrize("criterion", ["", " on methodology"])
+def test_comparison_cites_each_paper_and_reports_missing_evidence(endpoint, criterion, settings, monkeypatch, embedder, space, client_for):
     settings.AI_RESEARCH_LANE = "on"
     route(monkeypatch, "comparison")
     reader = make_user("compare@cit.edu")
@@ -172,7 +173,7 @@ def test_comparison_cites_each_paper_and_reports_missing_evidence(endpoint, sett
     Record.objects.create(title="Empty Study", pipeline_status=PipelineStatus.PUBLISHED)
     llm = ScriptedLLM("The supplied papers use gauges [1] [2].")
     with use_composition_root(root_with(embedder=embedder, llm=llm)):
-        body = answer(client_for(reader), endpoint, 'Compare "Flood Prediction", "Rainfall Forecast" and "Empty Study"', top_k=3)
+        body = answer(client_for(reader), endpoint, 'Compare "Flood Prediction", "Rainfall Forecast" and "Empty Study"' + criterion, top_k=3)
     assert {c["record_id"] for c in body["citations"]} == {a.pk, b.pk}
     assert "No readable passage evidence was found for: Empty Study" in body["answer"]
     assert {row["id"] for row in body["sources"]} == {a.pk, b.pk}
