@@ -22,8 +22,11 @@ from .embedding_space import (
 from .chunk import ChunkSet, DocumentChunk, ChunkEmbedding
 from .ingestion_job import IngestionJob
 from .shadow import ShadowEvidenceDecision, ShadowEvidenceTally
+from .research import ResearchRun, ResearchStep
 
 __all__ = [
+    "ResearchRun",
+    "ResearchStep",
     "Conversation",
     "Turn",
     "TurnCitation",

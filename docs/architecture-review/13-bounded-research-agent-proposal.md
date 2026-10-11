@@ -801,7 +801,7 @@ Person-days for one developer familiar with the codebase, ±50 % [A]. Excludes r
 | D1 | Adopt workflows-first (A) with a later gated planner (B), or stop at A |
 | D2 | Who owns the landscape and gap capability (ADR-035 §9 requires a named person) |
 | D3 | How records the reader can see but the gate refuses are treated in screening and counts — keyword-only, `unassessed`, or omitted — given what each reveals |
-| D4 | Whether an unsupported number in an answer is removed, flagged or blocks the answer |
+| D4 | ~~Whether an unsupported number in an answer is removed, flagged or blocks the answer~~ — confirmed in the IR-512 implementation chat on 2026-10-11: withhold the whole answer on validation failure and retain sources; see [ADR-038 §12](../adr/038-bounded-research-lane-for-ask-iris.md#12-open-decisions-and-subsequent-confirmations). Broader ADR approval remains outstanding. |
 | D5 | New Inference tasks (`plan`, `screen`) or reuse of `answer`, and their vendors |
 | D6 | Whether prior answers are re-gated when a cited record becomes restricted |
 | D7 | Budget defaults and automatic-rollback thresholds |

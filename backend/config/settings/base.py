@@ -451,6 +451,16 @@ LLM_RESOLVE_PROVIDER_ONLY = config("LLM_RESOLVE_PROVIDER_ONLY", default="")
 LLM_RESOLVE_PROVIDER_PINS = config("LLM_RESOLVE_PROVIDER_PINS", default="")
 
 # IR-514: route inherits resolve's model/account until explicitly configured.
+LLM_PLAN_VENDOR = config("LLM_PLAN_VENDOR", default="")
+LLM_PLAN_BASE_URL = config("LLM_PLAN_BASE_URL", default="")
+LLM_PLAN_API_KEY = config("LLM_PLAN_API_KEY", default="")
+LLM_PLAN_MODEL = config("LLM_PLAN_MODEL", default="")
+LLM_PLAN_FALLBACK_MODELS = config("LLM_PLAN_FALLBACK_MODELS", default="")
+LLM_PLAN_REASONING = config("LLM_PLAN_REASONING", default=False, cast=bool)
+LLM_PLAN_PROVIDER_ONLY = config("LLM_PLAN_PROVIDER_ONLY", default="")
+LLM_PLAN_PROVIDER_PINS = config("LLM_PLAN_PROVIDER_PINS", default="")
+AI_RESEARCH_PLAN_TIMEOUT_SECONDS = config("AI_RESEARCH_PLAN_TIMEOUT_SECONDS", default=30.0, cast=float)
+
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
 LLM_ROUTE_API_KEY = config("LLM_ROUTE_API_KEY", default="")

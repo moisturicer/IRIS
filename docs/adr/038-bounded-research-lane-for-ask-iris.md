@@ -116,7 +116,7 @@ Proposal 13 separated a planner that sees only metadata from a synthesizer that 
    - An **outer loop**: plan, run sub-tasks, replan, then ask "is this answerable from the aggregate context?" and either finish or replan.
    - An **inner loop** of tool calls within each sub-task.
 4. **No step regenerates the answer until a judge agrees.** The reference repository's regenerate-until-the-judge-agrees loop is not adopted (proposal 13 §11).
-5. **The answer is written once, by a call with no tools,** from the ledger, through the existing grounded answer path. After it, deterministic checks run: every marker resolves to a handle, every number appears in a computed row or a cited passage, every named record is in the ledger, and completeness wording matches its label. *This is carried from proposal 13 §4.6 and was not part of the owner's 2026-10-11 decisions. Whether an unsupported number is removed, flagged or blocks the answer is proposal 13 D4, open (§12).* Whether a cited passage actually supports its sentence is **not** checked at runtime and is not claimed.
+5. **The answer is written once, by a call with no tools,** from the ledger, through the existing grounded answer path. After it, deterministic checks run: every marker resolves to a handle, every number appears in a computed row or a cited passage, every named record is in the ledger, and completeness wording matches its label. *This is carried from proposal 13 §4.6 and was not part of the initial owner decisions. The subsequent human confirmation of D4 in the IR-512 implementation chat chooses whole-answer withholding on validation failure, retaining the gathered sources and reason codes (§12).* Whether a cited passage actually supports its sentence is **not** checked at runtime and is not claimed.
 6. **Failure behaviour.** A malformed call gets one corrective message and a second ends planning. A tool or provider failure ends planning and hands the ledger to the answer call. An exhausted budget answers from the ledger with a coverage note that says the run stopped, not that nothing exists. An empty ledger is `no_sources`. A planner that is unavailable falls back to the passage pipeline. "Insufficient evidence" is a coverage note on a grounded answer, not a new answer state.
 
 ### 5. Limits
@@ -215,17 +215,25 @@ What that does and does not mean:
 - **The first measurement will be of a thing already built.** If it shows the lane does worse than the workflows alone, the switch is the rollback, and the passage pipeline, which no part of this ADR modifies, is what remains.
 - **Deployment.** A planner run is up to 90 s. Under WSGI, a handful of concurrent runs would stall the four workers. *Carried from proposal 13 §9, not an owner decision:* ASGI (ADR-017) or running the planner in a Celery worker should be in place before the lane is turned on, and choosing between them is proposal 13 D8, open (§12).
 
-### 12. Open decisions, none resolved by this ADR
+### 12. Open decisions and subsequent confirmations
 
 | Decision | Owner |
 |---|---|
 | Landscape route handling until the Lens exists: confirm §3's reading | Jive Tyler Revalde |
 | Gated-but-visible records in screening and counts (D3) | Jive Tyler Revalde |
-| An unsupported number in an answer: removed, flagged or blocking (D4) | Jive Tyler Revalde |
 | Whether prior answers are re-gated when a cited record becomes restricted (D6) | Jive Tyler Revalde |
 | ASGI against worker offload for long runs (D8) | Jive Tyler Revalde |
 | The uncertain band's values, and the `plan` and `screen` models | Chosen by IR-503, IR-502 and IR-501 |
 | Who approves this ADR | A named person, recorded in this file |
+
+**D4 confirmation — 2026-10-11.** In the IR-512 implementation chat, the
+human user selected **"Withhold the answer (Recommended)"** when asked whether
+an unsupported number, title, citation or completeness claim should cause
+whole-answer withholding or removal of the offending text. The confirmed
+policy withholds the whole answer, reports validation failure and keeps the
+gathered sources available. This is recorded with [IR-512's implementation
+PR](https://github.com/moisturicer/IRIS/pull/234). It confirms this policy only;
+the ADR remains Proposed and its named approval and merge gate are unchanged.
 
 ## Alternatives Considered
 

@@ -26,6 +26,7 @@ class InferenceTask(Enum):
     ANSWER = "answer"
     RESOLVE = "resolve"
     ROUTE = "route"
+    PLAN = "plan"
     SUMMARY = "summary"
     DESCRIBE_FIGURE = "describe_figure"
 
