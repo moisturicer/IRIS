@@ -22,6 +22,14 @@ from .corpus import FLOOD_TEXT, make_record, make_user, root_with
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 
+@pytest.fixture(autouse=True)
+def disclosure_gate_open(embedder):
+    """Explicit, not inherited from a developer .env: the real gate refuses every
+    record until IR-250. Tests that need their own root nest inside this one."""
+    with use_composition_root(root_with(embedder=embedder)):
+        yield
+
+
 def _overview(client, record_id):
     return client.get(reverse("ai-record-overview", args=[record_id]))
 
