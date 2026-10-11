@@ -46,6 +46,8 @@ identity. Unchanged duplicate calls return the cached result and spend a call;
 changed permissions or text require fresh screening. Returned evidence and
 decisions are checked again after all batches. A newly invisible paper is
 removed from every result/count; a newly gated visible paper is unassessed.
+A paper edited while the model is checking it is also unassessed: its earlier
+text and judgment are discarded from the result.
 
 `topic_count(run, criterion, filters=...)` screens all visible filtered
 records at or below the ceiling (default 500). Above it, the existing fused

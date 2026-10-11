@@ -108,7 +108,9 @@ def screen_records(run: ToolRun, args: dict) -> ToolResult:
     current_ids = set(readable_records(run.ctx).filter(pk__in=[r.pk for r in records])
                       .values_list("pk", flat=True))
     allowed = disclosable(run.ctx, current_ids)
-    evidence = [e for e in evidence if e.record_id in allowed]
+    evidence = [e for e in evidence if e.record_id in allowed
+                and e.record_title == allowed[e.record_id].title
+                and e.text == allowed[e.record_id].abstract]
     handles = {e.handle for e in evidence}
     decisions = [row for row in decisions if row["record"] in handles]
     checked = sum(row["decision"] != "unassessed" for row in decisions)

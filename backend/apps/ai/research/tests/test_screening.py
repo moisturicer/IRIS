@@ -205,3 +205,17 @@ def test_restrictions_applied_during_a_screening_call_sanitize_its_result(corpus
     assert result.detail["checked"] == 0
     assert result.detail["unassessed"] == 2
     assert "Flood" not in result.planner_message()
+
+
+def test_a_paper_edited_during_screening_is_unassessed_in_the_result(corpus, embedder):
+    class PaperChangesDuringCall(ScreeningModel):
+        def generate(self, system, user):
+            reply = super().generate(system, user)
+            corpus["public"].title = "Updated study"
+            corpus["public"].save()
+            return reply
+
+    result = call(screening_run(corpus, embedder, PaperChangesDuringCall()),
+                  "screen_records", criterion="Is about aquaponics")
+    assert result.detail["checked"] == result.detail["unassessed"] == 1
+    assert "Flood forecasting" not in result.planner_message()
