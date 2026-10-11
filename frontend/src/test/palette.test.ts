@@ -21,12 +21,8 @@ import { offPaletteClasses } from "./palette";
  * files found on 2026-09-25.
  */
 const NOT_YET_CONVERTED: readonly string[] = [
-  // IR-361 -- My Workspace, review and clearance
-  "src/features/records/MyWorkspacePage.tsx",
-  "src/features/records/WorkspaceOfficePills.tsx",
-  // IR-362 -- My Library, Notifications (Discover's files came off with
-  // IR-407, F2; Calls & Conferences with IR-530)
-  "src/features/library/MyLibraryPage.tsx",
+  // IR-362 -- Notifications (My Library came off with IR-410, Calls &
+  // Conferences with IR-530)
   "src/features/notifications/NotificationsPage.tsx",
   // IR-363 -- Documents and the admin screens
   "src/features/accounts/RoleRequestsPage.tsx",

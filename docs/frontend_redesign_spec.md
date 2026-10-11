@@ -570,6 +570,17 @@ Every screen asks the adapter. No component reads a role name or `can_act` direc
 
 ### 4.9 My Library
 
+> **Amended 2026-10-11 (IR-410, project lead, built).** The lead had the page redesigned with the `impeccable` design skill and allowed the plan below to be overridden. The lead chose **"grouped by who holds it"** from two rounds of three structures. **This amendment supersedes the layout, filter, rail and select text below wherever they differ;** the rest stands.
+>
+> - **Grouping replaces the filters.** An author's research is grouped by who has each record now. The sections are, in order: **Waiting on you**, With your Adviser, With the offices, With RDCO for a decision, In review, Drafts, Finished, Deletion requested, and a collapsed **Archived**. Empty sections are left out. Waiting on you sits in a soft maroon panel; a coloured left edge was rejected.
+>   - The seven filter buttons are gone. So is "Needs my action" as a filter with an attention dot: Waiting on you *is* that list, shown first.
+>   - Grouping reads only server fields: `workflow_state`, the new `holders`, and `pipeline_status` (`features/library/researchSections.ts`). No stage is worked out on the client.
+> - **The office review is on the card.** `/records/mine/` gained `holders` (who has the record now) and `cleared_offices` (each office that cleared it, `preserved` when kept through a resubmission, by `clearance_state.is_preserved`). Each card shows "ITSO cleared · kept", "IERC reviewing" and so on. This is clearance-aware resubmission (ADR-003), shown where the author works. Both fields come from the list's existing bulk pass plus one query, so the flat query count holds.
+> - **The rail is replaced by "Your reading."** It is a panel beside the research, not a left rail. It lists Want to read, Reading, Completed, the reader's own folders, Liked papers, History and New folder, plus the three most recently opened papers. It says "Saved in this browser only." Choosing a folder shows it in the main column with *Back to your research*. Renaming and deleting a folder move into the folder's own view.
+> - **No select below `md`.** Below `lg` the panel stacks under the research, and the header gains a *Your reading* jump link, so saved reading is never hidden behind a control.
+> - **Cards** are `ResearchCard` with its new `compact` option, so titles stay at `text-title` and a screen holds several records. Search covers titles and authors across every section.
+> - **Unchanged:** no counters; the status line is `workflow_state_label`; Continue on a draft opens Publish; Respond opens Paper View at Review or Files; authors open on their research and everyone else on Want to read; and `/workspace` redirects here.
+
 **The page's primary task is to see and continue my own research, and secondarily to find what I saved.**
 
 **Layout:** the folder rail on the left (IR-350-era `LibraryFolderRail`, extended) and the content on the right. This follows the library model already built on the alphaXiv reference:
@@ -1182,11 +1193,11 @@ It never asserts internal state, hook calls or component structure. It is writte
   - the non-author default.
 - **AC:**
   - no numeric counters render;
-  - each *My research* filter maps to `/records/mine/?pipeline_status=` or to the returned `workflow_state`, with no client stage derivation;
+  - each *My research* filter maps to `/records/mine/?pipeline_status=` or to the returned `workflow_state`, with no client stage derivation; *(amended 2026-10-11, §4.9: filters became sections grouped by the server's `workflow_state`, `holders` and `pipeline_status`)*
   - the next-step line appears only when the server's `workflow_state` shows the owner owes something;
   - Continue on a draft opens Publish at that draft;
   - the "this browser only" note stays on Saved;
-  - the rail becomes a select below `md`;
+  - the rail becomes a select below `md`; *(amended 2026-10-11, §4.9: the rail became the "Your reading" panel, which stacks under the research below `lg`, with a jump link)*
   - verified at the four viewports;
   - the old tests for the deleted modules are retired with the reason stated.
 - **Depends:** F0; F3 for Continue (or a stub link).

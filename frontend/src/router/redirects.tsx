@@ -11,6 +11,7 @@
 import { Navigate, useParams, type RouteObject } from "react-router-dom";
 
 export const REDIRECTS: ReadonlyArray<{ path: string; to: string; why: string }> = [
+  { path: "workspace", to: "/records/mine?section=research", why: "My Workspace became My Library's My research section (IR-410)" },
   { path: "records/add", to: "/?publish=new", why: "Submit Disclosure became the Publish dialog (IR-408)" },
   {
     path: "records/:id/documents",

@@ -43,6 +43,12 @@ interface ResearchCardProps {
   actions?:  ReactNode;
   /** The title's heading level; 2 under a page's `h1`, 3 inside a section. */
   headingLevel?: 2 | 3;
+  /**
+   * A working list rather than a feed (My Library, IR-410): the title stays at
+   * `text-title` at every width and the padding stays compact, so a screen
+   * holds several records instead of two.
+   */
+  compact?: boolean;
 }
 
 export function ResearchCard({
@@ -58,6 +64,7 @@ export function ResearchCard({
   footer,
   actions,
   headingLevel = 2,
+  compact = false,
 }: ResearchCardProps) {
   const titleId = useId();
   const Heading = headingLevel === 2 ? "h2" : "h3";
@@ -75,7 +82,7 @@ export function ResearchCard({
         grid && "h-full",
       )}
     >
-      <div className={cn("flex-1 p-card-compact md:p-card", grid && "flex flex-col")}>
+      <div className={cn("flex-1 p-card-compact", !compact && "md:p-card", grid && "flex flex-col")}>
         {(eyebrow || meta) && (
           <div className="flex items-start justify-between gap-3 mb-1.5 text-label font-medium text-stone-600">
             {eyebrow && <span className="min-w-0">{eyebrow}</span>}
@@ -87,7 +94,7 @@ export function ResearchCard({
           id={titleId}
           className={cn(
             "font-display font-semibold text-stone-900",
-            grid ? "text-title line-clamp-3" : "text-title md:text-display",
+            grid ? "text-title line-clamp-3" : compact ? "text-title" : "text-title md:text-display",
           )}
         >
           <Link
@@ -114,7 +121,7 @@ export function ResearchCard({
 
         {(status || nextStep) && (
           <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small", grid ? "mt-auto pt-4" : "mt-3")}>
-            {status && <span className="relative z-10 inline-flex items-center gap-2">{status}</span>}
+            {status && <span className="relative z-10 inline-flex flex-wrap items-center gap-2">{status}</span>}
             {nextStep && (
               <p className="inline-flex items-start gap-1.5 text-stone-700">
                 <i className="fas fa-arrow-right mt-1 text-stone-500" aria-hidden="true" />
@@ -128,7 +135,7 @@ export function ResearchCard({
       </div>
 
       {hasFooter && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-card-compact md:px-card py-3">
+        <div className={cn("flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-card-compact py-3", !compact && "md:px-card")}>
           {footer && <div className="flex flex-wrap items-center gap-4 text-small text-stone-600">{footer}</div>}
           {actions && <div className="relative z-10 ml-auto flex items-center gap-1.5">{actions}</div>}
         </div>
