@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 
-from apps.ai.answers.citations import build_prompt
+from django.conf import settings
+from django.db.models import Sum
+
 from apps.ai.answers.service import generate_cited, model_that_answered
 from apps.ai.composition import composition_root
 from apps.ai.inference import InferenceTask
@@ -18,12 +20,14 @@ from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.records.models import Record
 
 from .assembly import whole_paper
+from .pages import SYSTEM_PROMPT, build_page_prompt, parse_page_citations
 
 logger = logging.getLogger(__name__)
 
 #: 2: grounded in the whole paper, not six retrieved passages (IR-431).
-#: 3: the comprehensive skeleton replaces two paragraphs of prose (IR-433).
-PROMPT_VERSION = 3
+#: 3: cites pages, not chunk numbers (IR-434).
+#: 4: the comprehensive skeleton replaces two paragraphs of prose (IR-433).
+PROMPT_VERSION = 4
 
 # Formatting rules come from SYSTEM_PROMPT (IR-424); only structure lives here.
 # The omission rule matters most: a filled-in Limitations section the paper
@@ -45,6 +49,16 @@ _QUESTION = (
 )
 
 
+def _too_large(chunk_set: ChunkSet) -> bool:
+    ceiling = getattr(settings, "AI_OVERVIEW_TOKEN_CEILING", 0)
+    if not ceiling:
+        return False
+    total = chunk_set.chunks.filter(deleted_at__isnull=True).aggregate(
+        total=Sum("token_count")
+    )["total"]
+    return (total or 0) > ceiling
+
+
 def overview_for(record: Record) -> dict:
     """The record's overview; one stored row serves every reader."""
     chunk_set = (
@@ -62,6 +76,14 @@ def overview_for(record: Record) -> dict:
         and stored.prompt_version == PROMPT_VERSION
     ):
         return {"state": "ready", "overview": _wire(stored), "cached": True}
+
+    if _too_large(chunk_set):
+        # Before assembly: an oversized paper costs nothing and stores nothing (IR-432).
+        logger.info(
+            "overview not generated for record %s: over AI_OVERVIEW_TOKEN_CEILING",
+            record.pk,
+        )
+        return {"state": "unavailable", "overview": None, "reason": "too_large"}
 
     generated = _generate(chunk_set)
     if generated is None:
@@ -104,8 +126,10 @@ def _generate(chunk_set: ChunkSet):
         logger.info("overview not generated: LLM_SUMMARY_MODEL is not set")
         return None
 
-    prompt = build_prompt(f"{record.title}. {_QUESTION}", sources)
-    generated = generate_cited(llm, prompt, sources)
+    prompt = build_page_prompt(f"{record.title}. {_QUESTION}", sources)
+    generated = generate_cited(
+        llm, prompt, sources, system=SYSTEM_PROMPT, parse=parse_page_citations
+    )
     if generated is None:
         return None
     text, citations = generated

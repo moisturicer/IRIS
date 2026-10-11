@@ -55,6 +55,26 @@ MARKER = re.compile(
 )
 
 
+#: What may lead a page marker: `p.`, `pp.`, `pg.`, `page` or `pages`.
+PAGE_PREFIX = r"(?:pages?|pg|pp?)\.?\s*"
+
+#: Pages, or ranges of them: `3`, `3, 5`, `3-5`.
+PAGES = r"\d+(?:\s*[-–]\s*\d+)?(?:\s*,\s*\d+(?:\s*[-–]\s*\d+)?)*"
+
+#: A wider range is not a citation of each page; only its first is kept.
+MAX_PAGE_RANGE = 10
+
+#: Page markers, the AI Overview's form (IR-434): `[p. 3]`, `【p. 3】`,
+#: `［pp. 3-5］`. A widening, not a replacement -- `MARKER` is unchanged and
+#: does not match these, so chat citations stay chunk-level.
+PAGE_MARKER = re.compile(
+    rf"\[\s*{PAGE_PREFIX}({PAGES})\s*{SUFFIX}\]"
+    rf"|【\s*{PAGE_PREFIX}({PAGES})\s*{SUFFIX}】"
+    rf"|［\s*{PAGE_PREFIX}({PAGES})\s*{SUFFIX}］",
+    re.IGNORECASE,
+)
+
+
 def numbers_in(match: re.Match) -> list[int]:
     """The source numbers one `MARKER` match names.
 
@@ -63,3 +83,16 @@ def numbers_in(match: re.Match) -> list[int]:
     """
     digits = next(group for group in match.groups() if group is not None)
     return [int(n) for n in digits.replace(" ", "").split(",") if n]
+
+
+def pages_in(match: re.Match) -> list[int]:
+    """The pages one `PAGE_MARKER` (or `MARKER`) match names, ranges expanded."""
+    digits = next(group for group in match.groups() if group is not None)
+    pages: list[int] = []
+    for part in re.split(r"\s*,\s*", digits.strip()):
+        ends = [int(n) for n in re.split(r"\s*[-–]\s*", part)]
+        start, end = ends[0], ends[-1]
+        if not start <= end <= start + MAX_PAGE_RANGE:
+            end = start
+        pages.extend(range(start, end + 1))
+    return pages

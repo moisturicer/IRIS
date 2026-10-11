@@ -77,7 +77,8 @@ function CitationChip({ citation }: { citation: ChatCitation }) {
       state={citationNavigationState(citation, origin)}
       title={label}
       aria-label={label}
-      className="inline-flex items-center justify-center w-[15px] h-[15px] rounded-full
+      // min-w: an overview chip is a page number, which can run to three digits (IR-434).
+      className="inline-flex items-center justify-center min-w-[15px] px-[2px] h-[15px] rounded-full
         bg-[#6B0F12]/10 text-[8px] font-bold text-[#6B0F12] align-super leading-none
         no-underline hover:bg-[#6B0F12]/20 mx-px"
     >

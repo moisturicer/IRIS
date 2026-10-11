@@ -22,8 +22,9 @@ import type { RecordDetail } from "@/types/records";
 
 import { PaperAiOverview } from "./PaperAiOverview";
 
+// An overview's marker is the page it cites (IR-434).
 const citation: Citation = {
-  marker:       1,
+  marker:       12,
   chunk_id:     11,
   record_id:    7,
   record_title: "Flood Prediction in the Mananga Catchment",
@@ -37,7 +38,7 @@ function response(overrides: Partial<RecordOverviewResponse> = {}): RecordOvervi
   return {
     state: "ready",
     overview: {
-      text: "## Methodology\n\nThe work trains a convolutional network on gauge data [1].",
+      text: "## Methodology\n\nThe work trains a convolutional network on gauge data [12].",
       citations: [citation],
       degraded: false,
       model: "fake-test",

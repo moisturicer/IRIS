@@ -123,8 +123,9 @@ class WholePaperAssemblyTests:
         assert "STALE" not in prompt
         assert "DELETED" not in prompt
 
-    def test_a_marker_resolves_to_the_chunk_assembled_at_that_number(self, paper):
-        llm = ScriptedLLM(reply="The gauge network is sparse [3].")
+    def test_a_marker_resolves_to_the_chunk_on_that_page(self, paper):
+        # Was chunk number 3; a marker names a page as of IR-434.
+        llm = ScriptedLLM(reply="The gauge network is sparse [p. 9].")
 
         with use_composition_root(_root(llm)):
             result = overview_for(paper)
@@ -210,18 +211,22 @@ class ComprehensiveSkeletonTests:
         assert "demonstrates" in user and "suggests" in user
 
     def test_presentation_rules_are_inherited_not_restated(self, paper):
-        from apps.ai.answers.citations import PRESENTATION_RULES, SYSTEM_PROMPT
+        from apps.ai.answers.citations import PRESENTATION_RULES
+        from apps.ai.overview.pages import SYSTEM_PROMPT
 
         system, user = self._sent(paper)
 
+        # The overview's own page-citing prompt since IR-434, same rules.
         assert system == SYSTEM_PROMPT
+        assert PRESENTATION_RULES in system
         assert PRESENTATION_RULES not in user
         assert "LaTeX" not in user
 
-    def test_a_row_from_the_two_paragraph_question_is_stale(self, paper):
+    @pytest.mark.parametrize("version", [2, 3])
+    def test_a_row_from_the_two_paragraph_question_is_stale(self, paper, version):
         RecordOverview.objects.create(
             record=paper, text="Two short paragraphs.", citations=[],
-            content_hash="new-hash", prompt_version=2,
+            content_hash="new-hash", prompt_version=version,
         )
         llm = ScriptedLLM(reply="## Objectives\n\nForecasting [1].")
 
