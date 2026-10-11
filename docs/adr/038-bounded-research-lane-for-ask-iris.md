@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — 2026-10-11 (IR-499). Drafted by an AI agent from [proposal 13](../architecture-review/13-bounded-research-agent-proposal.md) and the owner decisions recorded in its §Owner decisions — 2026-10-11, which **Jive Tyler Revalde** gave in a design review. **Awaiting approval by a named person.** The agent does not mark this accepted. Until a person records that approval in this file, nothing below is a decision, and **none of IR-500 to IR-504 may merge**.
+**Proposed** — 2026-10-11 (IR-499). Drafted by an AI agent from [proposal 13](../architecture-review/13-bounded-research-agent-proposal.md) and the owner decisions recorded in its §Owner decisions — 2026-10-11, which **Jive Tyler Revalde** gave in a design review. **Awaiting approval by a named person.** The agent does not mark this accepted. Until a person records that approval in this file, nothing below is a decision, and **none of IR-500 (tool layer), IR-501 (screening and topic counts), IR-502 (planner, answer validation, run audit), IR-503 (Jev router and injection screen) or IR-504 (production rollout) may merge**.
 
 **Supersedes [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) §4 and §11 for the research lane only.** Everywhere else ADR-035 stands as written, including its Proposed IR-487 amendment, which this ADR neither accepts nor rejects.
 
@@ -42,6 +42,24 @@ ADR-028 named three conditions that must all hold. ADR-035 assessed them on 2026
 **This ADR ships the lane before it is measured.** That is a decision to build ahead of the bar ADR-028 set, taken by a person, and it is stated here so nobody later reads the lane's existence as evidence that the bar was cleared. See §11.
 
 ## Decision
+
+**Provenance, so the approver knows what to confirm.** Three kinds of content follow.
+
+* **Owner decisions of 2026-10-11:** §3 (routing), §4.1 to §4.4 (the planner's view, aggregate context, two loops, no regenerate-until-a-judge-agrees), the numbers in §5, the history split in §7, the three tasks in §8, §9 (Jev), §10 (the residual risk) and the first paragraph of §11.
+* **Carried from proposal 13, not decided by the owner:** the six-tool set and most of the §2 invariants beyond the owner's "unchanged, enforced in code" paragraph, §4.5 and §4.6, §5's duplicate-call cache and per-call timeout, §6's wording of screened counts, and the validators.
+* **Added by the drafter:** the lane's off-by-default switch (§11), the deployment prerequisite (§11), the landscape reading (§3) and the choices marked as the drafter's in §Alternatives Considered.
+
+The approver should confirm the second and third groups explicitly, because accepting this ADR as a whole accepts them. "Owner decisions 1–10" are numbered in proposal 13's section *Owner decisions — 2026-10-11*.
+
+**Terms.**
+
+* **Jev** is TypeSafe's decision model, reached through OpenRouter's Decisions endpoint. It writes no text and returns a probability for each question it is asked (ADR-036).
+* **Handle** is a per-run label such as `R3` (a record) or `E7` (a passage). The model sees handles, never database ids.
+* **Ledger** is the run's list of collected passages and records, each with its handle.
+* **Uncertain band** is the range of Jev probabilities in which the router does not trust Jev alone and asks the LLM backup.
+* **Completeness label** says how much of the corpus a result covers: `exhaustive`, `screened`, `matches_found` or `sample`.
+
+**A worked example.** A reader asks *"how many papers are about aquaponics?"*. Routing sends it to the count route. The application counts the records the reader can see, screens them against the written criterion "is about aquaponics", and finds 7 matches among 112 screened, with 2 records it could not assess. The answer says "7 papers matched, out of 112 screened; 2 could not be assessed", labelled `screened`, and the application renders the list of 7. The model describes the list and cannot add an eighth. Had the reader instead asked *"do the studies on aquaponics agree on yield?"*, routing would send it to the research lane: the planner searches, reads the passages it gets back, replans up to 3 times, and the answer is written once from the passages it cited as `E1`, `E2` and so on.
 
 ### 1. A research lane exists, controlled by the application
 
@@ -84,7 +102,7 @@ The tool set the lane starts with is **`search_passages`, `find_records`, `read_
 
 Routing inputs follow the rule that the router sees **prior reader questions only** (§7). A route is a function of the question, never of what the gate withheld.
 
-**Landscape.** This ADR gives the landscape route no new power. ADR-035 §9's rule stands: ordinary retrieval is not a landscape analysis, and no answer may claim a comprehensive landscape or a research-gap analysis from it. Until the Lens exists, a landscape-routed question is answered by the passage pipeline under that limit and never by the planner. *This is the conservative reading of an unchanged rule. IR-503 confirms it with the owner.*
+**Landscape.** This ADR gives the landscape route no new power. ADR-035 §9's rule stands: ordinary retrieval is not a landscape analysis, and no answer may claim a comprehensive landscape or a research-gap analysis from it. Until the Lens exists, a landscape-routed question is answered by the passage pipeline under that limit and never by the planner. *This is the conservative reading of an unchanged rule. The Jev router ticket (IR-503) confirms it with the owner.*
 
 ### 4. The planner reads documents
 
@@ -114,7 +132,7 @@ Proposal 13 separated a planner that sees only metadata from a synthesizer that 
 | Prompt tokens per run | about 120k |
 | Passages in the ledger | 30, weakest dropped first |
 
-A repeated `(tool, arguments)` pair returns the cached result marked `duplicate` and still counts against the budget. Each vendor call receives `min(per-call timeout, time left)`. Setting names and per-call timeouts are chosen by the implementing tickets. Because `generate` and `stream` carry no explicit timeout today, adding one is part of IR-502.
+A repeated `(tool, arguments)` pair returns the cached result marked `duplicate` and still counts against the budget. Each vendor call receives `min(per-call timeout, time left)`. Setting names and per-call timeouts are chosen by the implementing tickets. Because `generate` and `stream` carry no explicit timeout today, adding one is part of the planner ticket (IR-502).
 
 ### 6. Counts and lists — ADR-027 amended
 
@@ -146,8 +164,8 @@ The closed set grows from four (`answer`, `resolve`, `summary`, `describe_figure
 
 | Task | Does | Notes |
 |---|---|---|
-| `plan` | The planner's tool-calling turns | Needs the `ToolCallingLLM` port. The model and vendor are IR-502's to choose |
-| `screen` | Per-record include or exclude judgements against a criterion | Highest call volume. Model and vendor are IR-501's to choose |
+| `plan` | The planner's tool-calling turns | Needs the `ToolCallingLLM` port. The model and vendor are the planner ticket's (IR-502) to choose |
+| `screen` | Per-record include or exclude judgements against a criterion | Highest call volume. Model and vendor are the screening ticket's (IR-501) to choose |
 | `route` | The LLM backup in §3 | **Inherits `resolve`'s model by default** |
 
 Each gets a Profile (vendor, model, ordered same-vendor fallbacks, reasoning visibility, the uniform no-training data policy) as ADR-036's 2026-09-28 amendment requires. `CompositionRoot.llm_for(task)` stays the only way to reach a model. A task with no configured model reports unavailable rather than borrowing another's, as `summary` does.
@@ -188,14 +206,14 @@ Also recorded, not solved:
 
 ### 11. The design ships before it is measured
 
-*Owner decision.* Evaluation, shadow mode and the ADR-023 amendment are IR-505. That removes proposal 13 §9's phase-2 gate ("the planner beats the workflows, with no page-precision loss") as a precondition for building the production planner.
+*Owner decision.* Evaluation, shadow mode and the ADR-023 amendment are the deferred evaluation ticket (IR-505). That removes proposal 13 §9's phase-2 gate ("the planner beats the workflows, with no page-precision loss") as a precondition for building the production planner.
 
 What that does and does not mean:
 
-- **The lane ships behind a setting that is off by default,** which keeps ADR-033 §5's rule that a technique is off until a harness run turns it on. Turning it on for readers is IR-504's rollout and needs a person's approval. This ADR sets no threshold for it.
+- **The lane ships behind a setting that is off by default** *(the drafter's addition, not an owner decision)*, which keeps ADR-033 §5's rule that a technique is off until a harness run turns it on. Turning it on for readers is the production rollout ticket's (IR-504) and needs a person's approval. This ADR sets no threshold for it.
 - **Nothing may be claimed** that the planner beats the pipeline, that it preserves page precision, or that any number says something about CIT-U research. The corpus is a 40-paper arXiv proxy (ADR-023).
 - **The first measurement will be of a thing already built.** If it shows the lane does worse than the workflows alone, the switch is the rollback, and the passage pipeline, which no part of this ADR modifies, is what remains.
-- **Deployment.** A planner run is up to 90 s. Under WSGI, a handful of concurrent runs would stall the four workers. ASGI (ADR-017) or running the planner in a Celery worker is a prerequisite for turning the lane on, and choosing between them is proposal 13 D8, open (§12).
+- **Deployment.** A planner run is up to 90 s. Under WSGI, a handful of concurrent runs would stall the four workers. *Carried from proposal 13 §9, not an owner decision:* ASGI (ADR-017) or running the planner in a Celery worker should be in place before the lane is turned on, and choosing between them is proposal 13 D8, open (§12).
 
 ### 12. Open decisions, none resolved by this ADR
 
@@ -213,15 +231,15 @@ What that does and does not mean:
 
 **A. Workflows only, no planner.** Application code runs fixed workflows for presence, listing, counts and comparison, and the open-ended research question gets the passage pipeline. *Gain:* cheap, deterministic, testable now, and it is what proposal 13 recommended first. *Cost:* it misses the question whose next search depends on the last result, which is the case the owner wants served. **Not rejected: the workflows are built anyway** (IR-500, IR-501), and the planner calls them as tools.
 
-**B. A planner that sees metadata only, a synthesizer that sees passages.** Proposal 13's original design. *Gain:* an instruction hidden in a document could reach only the answer call, which has no tools, and the planner only through length-capped titles. *Cost:* the planner cannot judge whether a result answered the question, so it either over-searches or stops blind, and a full-context planner replans better. **Rejected by the owner on 2026-10-11.** Its injection benefit is given up and recorded in §10.
+**B. A planner that sees metadata only, a synthesizer that sees passages.** Proposal 13's original design. *Gain:* an instruction hidden in a document could reach only the answer call, which has no tools, and the planner only through length-capped titles. *Cost:* the planner cannot judge whether a result answered the question, so it either over-searches or stops blind, and a full-context planner replans better. **Reversed by the owner on 2026-10-11** (decision 7: the planner sees full context). Its injection benefit is given up and recorded in §10.
 
-**C. A free agent loop, as in the reference repositories.** The model chooses tools, assembles its own context and loops until a judge agrees. *Gain:* fastest to demonstrate. *Cost:* the model builds the evidence it answers from, so counts and lists are unsafe, no per-technique measurement is possible, and the loop is bounded only by a recursion limit. This is what ADR-028 warned about. **Rejected.**
+**C. A free agent loop, as in the reference repositories.** The model chooses tools, assembles its own context and loops until a judge agrees. *Gain:* fastest to demonstrate. *Cost:* the model builds the evidence it answers from, so counts and lists are unsafe, no per-technique measurement is possible, and the loop is bounded only by a recursion limit. This is what ADR-028 warned about. **Rejected** (the drafter's judgement; no owner decision considers it).
 
-**D. Measure first, build second.** Keep proposal 13's phase-2 gate: build the planner offline, show it beats the workflows, then productionise. *Gain:* no capability ships on a hunch, and ADR-028's third condition is met before the lane exists. *Cost:* the thesis timeline pays for the measurement before anything usable exists, and the measurement is cheaper once there is something to measure. **Rejected by the owner.** The compensation is that the lane is off by default and the measurement is IR-505.
+**D. Measure first, build second.** Keep proposal 13's phase-2 gate: build the planner offline, show it beats the workflows, then productionise. *Gain:* no capability ships on a hunch, and ADR-028's third condition is met before the lane exists. *Cost:* the thesis timeline pays for the measurement before anything usable exists, and the measurement is cheaper once there is something to measure. **Not taken, by the owner's decision that the design ships before it is measured.** The compensation is that the lane is off by default and the measurement is IR-505.
 
-**E. Regenerate the answer until a judge agrees.** *Gain:* looks like verification. *Cost:* it is bounded by nothing but the loop limit and accepts whichever draft the judge tolerates. **Rejected** (§4.4).
+**E. Regenerate the answer until a judge agrees.** *Gain:* looks like verification. *Cost:* it is bounded by nothing but the loop limit and accepts whichever draft the judge tolerates. **Rejected** (§4.4; the owner's decision 9 rules out regenerating until a judge agrees).
 
-**F. Reuse the `answer` task for planning, screening and routing.** *Gain:* no new tasks. *Cost:* the three have different volume, tool needs and vendor terms, and ADR-036 chose one Profile per task so each can be tuned and switched off alone. **Rejected.**
+**F. Reuse the `answer` task for planning, screening and routing.** *Gain:* no new tasks. *Cost:* the three have different volume, tool needs and vendor terms, and ADR-036 chose one Profile per task so each can be tuned and switched off alone. **Rejected** (the drafter's judgement; the owner's decisions name the three tasks).
 
 ## Decision Rationale
 
@@ -246,7 +264,7 @@ Three choices need their reasons stated, because each looks like a lapse.
 
 ## MVP Impact
 
-**A real capacity cost.** Proposal 13 §13 estimates 25 to 35 person-days of shared work, 20 to 30 for corpus workflows and 15 to 25 for agent-specific work, ±50%, before review and before IR-250 and IR-278. ADR-001's budget has been reversed four times already. Under `CLAUDE.md`'s Scope rule, RAG is thesis-critical and protected, so the displacement falls on supporting frontend work and the Lens (IR-302 to IR-305), which this ADR then has to cover with the §3 limit on landscape questions.
+**A real capacity cost.** Proposal 13 §13 estimates 25 to 35 person-days of shared work, 20 to 30 for corpus workflows and 15 to 25 for agent-specific work, ±50%, before review and before IR-250 and IR-278. ADR-001's budget has been reversed four times already. Under `CLAUDE.md`'s Scope rule, RAG is thesis-critical and protected, so the displacement falls on supporting frontend work and the Lens, the unbuilt whole-collection feature (IR-302 to IR-305), which this ADR then has to cover with the §3 limit on landscape questions.
 
 ## SaaS Impact
 
@@ -257,7 +275,7 @@ Per instance, under [ADR-005](005-instance-per-tenant.md). The lane switch, ever
 **Net neutral on authorization, a real increase in exposure to injected text.** The invariants in §2 carry the weight and are enforced in code.
 
 - Authorization is unchanged: one visibility predicate, handles in place of ids, the gate before every vendor call, and read-only tools.
-- **Two new vendor flows:** reader questions to Jev, and passage text and prior answers to the `plan` vendor. Passages pass the gate. The question and history do not, as today. This changes SECURITY.md §8 and §11, which describe reader questions as ungated, and **SECURITY.md is not updated by this ADR.**
+- **Two new vendor flows:** reader questions to Jev, and passage text and prior answers to the `plan` vendor. Passages pass the gate. The question and history do not, as today. This changes `docs/security/SECURITY.md` §8 and §11, which describe reader questions as ungated, and **that file is not updated by this ADR.**
 - The authorization tests proposal 13 §7.2 lists must exist before any tool merges: another user's draft never appears in a tool output; an office user and a student get different counts; an unissued or raw-id handle is rejected; Paper Chat's scope cannot be widened by a tool; the gate runs before every vendor call by request capture.
 - Logs carry run ids and reason codes, not question, passage or reasoning text.
 
