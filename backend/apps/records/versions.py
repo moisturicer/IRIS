@@ -78,8 +78,9 @@ def details_editable(record) -> bool:
     """
     May `record`'s owners edit its details now? A `draft`, or while a revision
     is asked for: exactly where Record detail offers `edit_details` (IR-507).
-    Who may edit is the view's question (`IsRecordOwner`); which fields, the
-    serializer's (`SUBMISSION_FIXED_FIELDS`).
+    Who may edit, and this, are the view's questions (`IsRecordOwner`,
+    `RecordViewSet.update`); which fields, the serializer's
+    (`SUBMISSION_FIXED_FIELDS`).
     """
     return record.pipeline_status == PipelineStatus.DRAFT or _awaiting_resubmission(record)
 

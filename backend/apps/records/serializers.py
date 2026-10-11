@@ -410,26 +410,20 @@ class RecordWriteSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        When an owner may edit, and what (IR-507, ADR-032 §10 Amendment).
+        What an owner may change (IR-507, ADR-032 §10 Amendment).
 
-        Only an owner reaches an update (`IsRecordOwner`). They may edit a
-        `draft`, or a record awaiting their revision -- where Record detail
-        offers `edit_details` -- and never anything else. Once submitted, the
-        fields in `versions.SUBMISSION_FIXED_FIELDS` stay as they were
-        submitted. Sending one unchanged is not a change, so a form that
-        re-sends every field still saves; changing any is one refusal naming
-        each field, so a single correction clears them all.
+        Only an owner reaches an update (`IsRecordOwner`), and only while the
+        record is a `draft` or awaits their revision (`RecordViewSet.update`).
+        Once submitted, the fields in `versions.SUBMISSION_FIXED_FIELDS` stay
+        as they were submitted. Sending one unchanged is not a change, so a
+        form that re-sends every field still saves; changing any is one
+        refusal naming each field, so a single correction clears them all.
         """
         if self.instance is None:
             return attrs
-        from .versions import SUBMISSION_FIXED_FIELDS, details_editable
+        from .versions import SUBMISSION_FIXED_FIELDS
 
         record = self.instance
-        if not details_editable(record):
-            raise serializers.ValidationError(
-                "This record's details can be edited only while it is a draft or "
-                f"a revision is asked for, and it is '{record.pipeline_status}'."
-            )
         if record.pipeline_status != PipelineStatus.DRAFT:
             changed = [
                 field for field in SUBMISSION_FIXED_FIELDS

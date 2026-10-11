@@ -144,7 +144,11 @@ class WhenAnOwnerEditsTests(EditPolicyTestBase):
 
         response = self.edit(record, self.owner, {"title": "Changed under the reviewer"})
 
+        # A 400, not a 403: the right person at the wrong moment (settled
+        # 2026-10-11), said as `detail` and naming the status, as submit/ does.
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertEqual(set(response.data), {"detail"})
+        self.assertIn(PipelineStatus.IN_REVIEW, response.data["detail"])
         record.refresh_from_db()
         self.assertEqual(record.title, title)
 
@@ -155,6 +159,16 @@ class WhenAnOwnerEditsTests(EditPolicyTestBase):
         response = self.edit(record, self.owner, {"title": "Changed after acceptance"})
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn(PipelineStatus.PUBLISHED, response.data["detail"])
+
+    def test_not_now_is_said_before_anything_about_the_body(self):
+        """A body the serializer would also refuse still hears "not now" first."""
+        record = self.published()
+
+        response = self.edit(record, self.owner, {"title": "", "adviser": self.other_adviser.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertEqual(set(response.data), {"detail"})
 
 
 # --- what -----------------------------------------------------------------------------

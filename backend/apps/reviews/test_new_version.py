@@ -191,11 +191,19 @@ class UploadVersionTests(NewVersionTestBase):
         self.assertEqual(v1.manuscript.read(), b"%PDF-1.7 v1")
 
     def test_the_owner_may_replace_the_manuscript_only_while_a_revision_is_asked_for(self):
+        """
+        Still a 400, but since IR-507 it is the record update's own "not now"
+        (`detail`, naming the status), answered before the body is read --
+        not the manuscript lock's `abstract_file` error. An owner may edit
+        nothing in review until a revision is asked for, the file included.
+        """
         record = self.thesis(Party.IERC)
 
         refused = self.upload_manuscript(record)
         self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("abstract_file", refused.data)
+        self.assertIn("in_review", refused.data["detail"])
+        record.refresh_from_db()
+        self.assertEqual(record.abstract_file.name, self.versions(record)[0].manuscript.name)
 
         self.opened_seat(record, Party.IERC, self.ierc)
         self.asked(record, self.ierc)
