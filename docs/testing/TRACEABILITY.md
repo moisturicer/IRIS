@@ -591,6 +591,12 @@ replay, list rendering and permitted reruns. No live vendor call or research qua
 measurement is claimed. Execution evidence is recorded on the IR-515 PR. See
 [CHAT_ROUTING.md](../engineering/CHAT_ROUTING.md) for limits and ADR divergence.
 
+Executed 2026-10-11 after merging `main` (`7f35dad`): full backend suite,
+3,330 passed and 1 existing non-strict IR-469 xpass, no failures or skips.
+Full frontend suite: 764 passed across 73 files. Production build/typecheck,
+lint, Django configuration and migration drift checks passed; existing warnings
+remain. Providers were deterministic and the PostgreSQL test database isolated.
+
 
 ## IR-436: overview visibility and disclosure are explicit
 
