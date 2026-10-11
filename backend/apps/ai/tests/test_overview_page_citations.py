@@ -13,8 +13,11 @@ from apps.ai.models import DocumentChunk
 from apps.ai.retrieval.ports import RetrievedChunk
 
 from .corpus import FLOOD_QUESTION, FLOOD_TEXT, ask, make_record, make_user, root_with
+from . import test_overview_whole_paper as whole_paper
 from .test_overview_whole_paper import _root as _overview_root
-from .test_overview_whole_paper import paper  # noqa: F401 -- a fixture
+
+# Re-exported by assignment so pytest collects the fixture.
+paper = whole_paper.paper
 
 
 def _chunk(chunk_id, page, content, regions=()):
