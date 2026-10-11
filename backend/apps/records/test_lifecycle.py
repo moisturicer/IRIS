@@ -294,8 +294,11 @@ class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
         "apps/records/lifecycle.py",  # defines it
         "apps/records/apps.py",  # validates it at startup
         # Applies it to the new model's resubmission (IR-273), and logs which
-        # arm ran. Serializes no policy: only which offices a version keeps,
-        # as `offices_preserved` already does.
+        # arm ran. No API reads or writes the policy here: only which offices a
+        # version keeps, as `offices_preserved` already does. The arm's name
+        # does reach the RDCO-only, read-only audit log in `RESUBMITTED`
+        # (IR-144), because ADR-004's two arms cannot be told apart afterwards
+        # without it; nothing there can set it.
         "apps/reviews/new_version.py",
         "config/settings/base.py",  # loads it from the environment
     }

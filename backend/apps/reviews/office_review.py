@@ -43,6 +43,7 @@ import uuid
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records.lifecycle import type_name_of
 from apps.records.versions import latest_version
 
@@ -182,11 +183,12 @@ def record_office_review(record, actor, *, outcome, comment=""):
     if blocked:
         raise OfficeReviewError(blocked)
 
-    Review.objects.create(
+    review = Review.objects.create(
         record=record, reviewed_by=actor, stage=party, status=OUTCOMES[outcome],
         comment=comment, assignment=seat.assignment,
         version=latest_version(record),
     )
+    audit.decision_recorded(record, actor, party=party, outcome=outcome, final=False, review=review)
     try:
         completed = seats.complete_seat(seat, actor)
     except seats.SeatError as exc:
@@ -246,9 +248,14 @@ def _hand_back(record, from_party):
     opened = RecordAssignment.objects.create(
         record=record, party=Party.RDCO, opened_at=now, reason=HAND_BACK_REASON,
     )
+    group = uuid.uuid4()
     RoutingEvent.objects.create(
         record=record, actor=None, from_party=from_party, to_party=Party.RDCO,
-        reason=HAND_BACK_REASON, group_id=uuid.uuid4(), created_at=now,
+        reason=HAND_BACK_REASON, group_id=group, created_at=now,
+    )
+    audit.routed(
+        record, None, from_party=from_party, to_party=Party.RDCO, opened=True,
+        group=group, hand_back=True,
     )
     return ("opened", opened)
 

@@ -8,6 +8,38 @@
 
 ---
 
+## IR-144 workflow audit events (ADR-011, ADR-003, ADR-004, ADR-022)
+
+**Design:** [ADR-011](../adr/011-evaluation-framework.md) needs per-party and total turnaround
+and the preserved-clearance count, and requires the instrumentation before the Week 11 pilot.
+`apps/audit/workflow.py` writes one `AuditEvent` type per workflow act, called from the
+services (`reviews.routing`, `seats`, `office_review`, `decisions`, `revisions`, `new_version`,
+`withdrawal`; `documents.requests`) inside each act's transaction, after the per-record lock.
+`create_audit_event` now isolates every insert in a savepoint and logs a failure at `ERROR`, so
+an audit failure can never abort the workflow transaction (the IR-216 guarantee). Migration
+`audit/0004` adds the types and widens `event_type` to 40 characters. Keys and the metric
+recipes: [`../evaluation/AUDIT_EXPORT.md`](../evaluation/AUDIT_EXPORT.md). Display, filters and
+CSV export are IR-529.
+
+**Recorded deviation from the card:** its "Clocks" rule starts a clock at `RESUBMITTED` for
+`reset_parties`. No clock starts there, because no reset party is handed new work: a party that
+asked never stopped its clock, and under `restart_all` the other reset offices are not reopened.
+The author's revision time is measured as `RESUBMISSION_REQUESTED` → `RESUBMITTED` instead
+(AUDIT_EXPORT.md §Per-party turnaround).
+
+**Tests:** `apps.audit.tests.test_workflow_events`, read back through `GET /audit/` as RDCO:
+every type with its metadata; `PUBLISHED` only on publish; `RESUBMITTED` under both policies
+with one `CLEARANCE_PRESERVED` per kept office; document-request and revision events kept apart;
+rolled-back and refused acts write nothing; a forced database error on the insert leaves a
+routing act and a document request successful with an `ERROR` logged; and one Thesis's whole
+life, from which per-party turnaround, total turnaround and the preserved count are computed
+from the rows alone and checked against the assignments.
+
+**Evidence:** the IR-144 PR's CI. Deployment smoke test and a sample export are recorded on
+IR-144 after the Oct 17 deployment.
+
+---
+
 ## IR-517 who is told when an owner deletes a record (ADR-032 §10)
 
 **Design:** [ADR-032 §10, IR-517 Amendment of 2026-10-11](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
@@ -326,13 +358,14 @@ Evidence, 2026-09-15, backend container: `pytest apps/reviews/test_resubmission_
 
 ---
 
-## The audit gap
+## The audit gap — closed by IR-144
 
-`AuditEvent` defines **15 event types — authentication, file, account and reader-question screening.** There is **no workflow event**: no `SUBMITTED`, no `RESUBMITTED`, no `CLEARANCE_PRESERVED`, no `STAGE_CHANGED`.
-
-**Consequence:** the research metrics in [`../mvp-validation/03-final-evaluation-plan.md`](../mvp-validation/03-final-evaluation-plan.md) — turnaround time and preserved-clearance counts — have **no data source**.
-
-This is the one unrecoverable item in the plan. Events not written during the Weeks 11-12 pilot cannot be reconstructed afterwards, and there is no second pilot.
+Until IR-144, `AuditEvent` had no workflow event, so the research metrics in
+[`../mvp-validation/03-final-evaluation-plan.md`](../mvp-validation/03-final-evaluation-plan.md)
+(turnaround time and preserved-clearance counts) had no data source. IR-144 adds the workflow
+types (see its section above and [`../evaluation/AUDIT_EXPORT.md`](../evaluation/AUDIT_EXPORT.md)).
+**The log is not backfilled:** acts before the deployment that carries IR-144 have no rows, and
+events not written during the Weeks 11-12 pilot cannot be reconstructed afterwards.
 
 ---
 
