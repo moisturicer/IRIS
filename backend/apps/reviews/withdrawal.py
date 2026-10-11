@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
@@ -80,16 +81,38 @@ def withdraw_review(record, actor) -> None:
     requests and its open document requests.
     """
     now = timezone.now()
-    active = list(
-        _active_assignments(record).select_for_update().values_list("pk", flat=True)
+    active = list(_active_assignments(record).select_for_update().order_by("pk"))
+    ids = [a.pk for a in active]
+    open_seats = dict(
+        ReviewerSeat.objects.filter(assignment_id__in=ids, state__in=OPEN_SEAT_STATES)
+        .values_list("pk", "assignment_id")
     )
-    ReviewerSeat.objects.filter(
-        assignment_id__in=active, state__in=OPEN_SEAT_STATES,
-    ).update(state=SeatState.WITHDRAWN)
-    RecordAssignment.objects.filter(pk__in=active).update(
+    revision_requests = list(
+        ResubmissionRequest.objects.filter(record=record, state=ResubmissionRequestState.OPEN)
+        .order_by("pk")
+    )
+    document_requests = list(_open_document_requests(record).order_by("pk"))
+
+    ReviewerSeat.objects.filter(pk__in=open_seats).update(state=SeatState.WITHDRAWN)
+    RecordAssignment.objects.filter(pk__in=ids).update(
         state=AssignmentState.WITHDRAWN, closed_by=actor, closed_at=now,
     )
-    ResubmissionRequest.objects.filter(
-        record=record, state=ResubmissionRequestState.OPEN,
-    ).update(state=ResubmissionRequestState.WITHDRAWN, resolved_by=actor, resolved_at=now)
+    ResubmissionRequest.objects.filter(pk__in=[r.pk for r in revision_requests]).update(
+        state=ResubmissionRequestState.WITHDRAWN, resolved_by=actor, resolved_at=now,
+    )
     _open_document_requests(record).update(state=DocumentRequestState.WITHDRAWN, closed_at=now)
+
+    # Audited only when there was review to withdraw: a soft-deleted draft or
+    # a published record had none (IR-144).
+    if not active:
+        return
+    audit.record_withdrawn(record, actor, closed_parties=[a.party for a in active])
+    for assignment in active:
+        audit.assignment_closed(
+            assignment, actor, how=audit.WITHDRAWN,
+            withdrawn_seats=[s for s, a in open_seats.items() if a == assignment.pk],
+        )
+    for request in revision_requests:
+        audit.revision_request_withdrawn(request, actor, closed_by=audit.BY_RECORD_WITHDRAWN)
+    for request in document_requests:
+        audit.document_request_withdrawn(request, actor, closed_by=audit.BY_RECORD_WITHDRAWN)

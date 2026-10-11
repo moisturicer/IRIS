@@ -45,6 +45,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records import lifecycle
 from apps.records.services import queue_manuscript_extraction
 from apps.records.versions import latest_version, stored_manuscript_unsubmitted, write_version
@@ -172,6 +173,12 @@ def submit_new_version(record, actor):
 
     parties = _parties(requests)
     reset = _reset_offices(record, parties)
+    # Read before the reset: the offices whose `cleared` clearance this version
+    # keeps -- ADR-003's contribution, counted per office (IR-144).
+    preserved = list(
+        RecordClearance.objects.filter(record=record, status=ClearanceStatus.CLEARED)
+        .exclude(office__in=reset).values_list("office", flat=True)
+    )
     now = timezone.now()
 
     previous = latest_version(record)
@@ -198,6 +205,11 @@ def submit_new_version(record, actor):
         assignment__state=AssignmentState.ACTIVE,
     )
     requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
+    audit.resubmitted(
+        record, actor, version=version, policy=lifecycle.resubmission_policy().value,
+        requests=[r.pk for r in requests], rereview_parties=parties,
+        reset_parties=reset, preserved_parties=preserved,
+    )
 
     # Which policy was active, per resubmission
     # (IR-137, ADR-004's documentation requirement).
