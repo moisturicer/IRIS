@@ -14,7 +14,7 @@ from apps.ai.research.duplicates import possible_duplicates
 from apps.ai.research.registry import Tool, ToolRun
 from apps.ai.research.results import Completeness, Coverage, ToolResult, status_for
 
-from .common import QUERY, collect_record, disclosable, readable_records
+from .common import QUERY, collect_record, disclosable, readable_records, visible_record_ids
 
 SYSTEM = (
     "Screen each paper against the written inclusion criterion using its title "
@@ -123,6 +123,7 @@ def screen_records(run: ToolRun, args: dict) -> ToolResult:
                 "rows": decisions, "checked": checked,
                 "unassessed": len(current_ids) - checked,
                 "possible_duplicates": possible_duplicates(run, evidence)},
+        visible_record_ids=visible_record_ids(run.ctx),
     )
 
 

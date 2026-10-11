@@ -90,11 +90,8 @@ RUN SECRET_KEY=build-time-only \
 
 EXPOSE 8000
 
-# Runs `migrate` before handing off to whatever command the caller passes
-# (gunicorn, runserver, or a Celery worker/beat) -- see entrypoint.sh and
-# ADR-037 (IR-318). Previously unwired: this file existed but nothing in
-# the image ever invoked it, so a container could boot and serve against
-# whatever schema the volume already had.
+# Compose runs migrations in a dedicated one-shot service before starting
+# the application and workers. The entrypoint launches the requested process.
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Production entry point -- gunicorn

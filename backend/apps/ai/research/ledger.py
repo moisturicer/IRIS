@@ -39,11 +39,14 @@ class Ledger:
     """Collected passages and records; a model sees handles, never ids."""
 
     def __init__(self, max_passages: int = 30) -> None:
+        if max_passages < 0:
+            raise ValueError("max_passages must be nonnegative")
         self._max_passages = max_passages
         self._passages: dict[int, EvidenceItem] = {}
         self._passage_handles: dict[int, str] = {}
         self._records: dict[int, EvidenceItem] = {}
         self._record_by_handle: dict[str, int] = {}
+        self.truncated = False
 
     def add_passage(
         self,
@@ -113,5 +116,13 @@ class Ledger:
     def _drop_weakest(self) -> None:
         # ADR-038 §5; records are never dropped.
         while len(self._passages) > self._max_passages:
-            weakest = min(self._passages.values(), key=lambda p: p.score)
-            del self._passages[weakest.chunk_id]
+            self.drop_weakest()
+
+    def drop_weakest(self) -> bool:
+        """Remove one whole passage for a prompt budget; preserve issued handles."""
+        if not self._passages:
+            return False
+        weakest = min(self._passages.values(), key=lambda p: p.score)
+        del self._passages[weakest.chunk_id]
+        self.truncated = True
+        return True
