@@ -18,7 +18,9 @@ Every row is a record state and a viewer. For each row it checks:
 Every probe runs inside a savepoint that is rolled back, so no probe changes
 the state the next one sees. `cite` and `replace_manuscript` have no endpoint
 of their own (`replace_manuscript` rides on the owner's record update and is
-offered exactly with `create_version`), so they are checked by set only.
+offered exactly with `create_version`), so they are checked by set only. The
+three delete keys share `DELETE /records/<id>/` (IR-508), so each is probed only
+in the statuses whose act it names.
 
 **No capability is waived.** The record update and `submit/` were wider than
 any offer until IR-507 narrowed them to owners, and an owner's edit to where
@@ -36,6 +38,7 @@ from django.urls import reverse
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import AssignmentState, Party, RecordTypeName, ResubmissionRequestState, SeatState
+from core.permissions import DELETE_CAPABILITY
 
 # Keys ADR-032 names that no endpoint serves yet, plus `decide`, the legacy
 # decision form IR-260 removed. The server must never offer one.
@@ -146,6 +149,17 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             ok = [r for r in responses if r.status_code < 300]
             return (ok or responses or [None])[0]
 
+        def delete_as(act):
+            # The three delete keys share `DELETE /records/<id>/`, which does
+            # the act of the record's status (IR-508). A key is probed only in
+            # the statuses whose act it names; elsewhere it is not this key's
+            # call, and the key that does name it is probed instead.
+            def probe(record, user, detail):
+                if DELETE_CAPABILITY.get(record.pipeline_status) != act:
+                    return None
+                return self._call(user, "delete", url("record-detail", record))
+            return probe
+
         def open_review(record, user, detail):
             seat = ReviewerSeat.objects.filter(
                 assignment__record=record, reviewer=user, state=SeatState.ASSIGNED,
@@ -188,6 +202,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             ),
             "create_version": lambda r, u, d: self._call(u, "post", url("record-new-version", r)),
             "open_review": open_review,
+            "delete_record": delete_as("delete_record"),
+            "withdraw_submission": delete_as("withdraw_submission"),
+            "request_deletion": delete_as("request_deletion"),
         }
 
     # --- the table ---------------------------------------------------------------------
@@ -210,39 +227,41 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         "cite", "tag_ip", "attach_file", "request_document", "open_review",
         "office_review", "add_reviewer", "route",
     }
+    # An owner is offered the one delete its record's status names (IR-508).
+    OWNER_IN_REVIEW = {"cite", "withdraw_submission"}
     EXPECTED = {
         "draft": {
-            "owner": {"cite", "continue_draft", "edit_details"}, "adviser": {"cite"},
+            "owner": {"cite", "continue_draft", "edit_details", "delete_record"}, "adviser": {"cite"},
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         "with_adviser_unopened": {
-            "owner": {"cite"}, "adviser": ADVISER_AT_ENTRY,
+            "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         "with_adviser_open": {
-            "owner": {"cite"}, "adviser": ADVISER_AT_ENTRY,
+            "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         # ITSO's pool: any ITSO member may file and ask for documents, but
         # opens, clears and routes only once seated.
         "itso_pool": {
-            "owner": {"cite"}, "adviser": {"cite"},
+            "owner": OWNER_IN_REVIEW, "adviser": {"cite"},
             "itso": {"cite", "tag_ip", "attach_file", "request_document"},
             "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         "itso_open": {
-            "owner": {"cite"}, "adviser": {"cite"}, "itso": ITSO_SEATED | {"request_revision"},
+            "owner": OWNER_IN_REVIEW, "adviser": {"cite"}, "itso": ITSO_SEATED | {"request_revision"},
             "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         # ITSO asked once, so it is offered the withdrawal, not a second ask.
         "revision_asked_by_itso": {
-            "owner": {"cite", "create_version", "replace_manuscript", "edit_details"},
+            "owner": OWNER_IN_REVIEW | {"create_version", "replace_manuscript", "edit_details"},
             "adviser": {"cite"}, "itso": ITSO_SEATED | {"withdraw_revision"},
             "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         # RDCO decides, and -- seated on an office party -- may add a colleague.
         "rdco_open": {
-            "owner": {"cite"}, "adviser": {"cite"}, "itso": OFFICE, "ierc": OFFICE,
+            "owner": OWNER_IN_REVIEW, "adviser": {"cite"}, "itso": OFFICE, "ierc": OFFICE,
             "rdco": {
                 "cite", "tag_ip", "attach_file", "request_document", "open_review",
                 "add_reviewer", "route", "request_revision",
@@ -251,12 +270,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "stranger": None,
         },
         "published": {
-            "owner": {"cite"}, "adviser": {"cite"},
+            "owner": {"cite", "request_deletion"}, "adviser": {"cite"},
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": {"cite"},
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
         "proposal_with_adviser": {
-            "owner": {"cite"},
+            "owner": OWNER_IN_REVIEW,
             "adviser": {
                 "cite", "open_review", "accept_proposal", "reject",
                 "request_document", "request_revision",

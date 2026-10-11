@@ -43,6 +43,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-11 (project lead, IR-507): §5 and §10.** Only an owner edits a record's details or submits it. An owner edits only a draft or a record awaiting their revision, and once submitted the Adviser, the type, the IP flags and the routing hints stay fixed. Correcting a published record is deferred. See the *Amendment* note under §10.
 
+**Amended 2026-10-11 (project lead, IR-508): §10.** Only an owner deletes a record. A delete does one of three acts by status, each its own capability key, and a record already awaiting a delete decision is not deleted again. See the *Amendment* note under §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -493,7 +495,24 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 - **Refusals follow ADR-022 §Amendment 4:** a 403 for a record the caller can see, a 404 for one they cannot.
 - **Correcting a published record's details is deferred, not built.** Before publication, a reviewer asks for a revision. After it, nothing in IRIS corrects details: `Record` is not in Django admin, and adding it would bypass every rule here.
     - *Rejected:* a narrow staff correction right (for example RDCO, published records, a fixed field list). It is a new capability with its own allowlist and audit event, and a decision about how the institution runs, not part of narrowing an accidental authority.
-- **Out of scope:** `destroy` has the same `IsOwnerOrStaff` gate. Who may delete is its own decision, on [IR-508](https://citiris.atlassian.net/browse/IR-508).
+- **Out of scope:** `destroy` has the same `IsOwnerOrStaff` gate. Who may delete is its own decision, on [IR-508](https://citiris.atlassian.net/browse/IR-508). *Settled by the IR-508 amendment below.*
+
+**Amendment, 2026-10-11 (project lead, IR-508): who deletes a record, and what a delete does.** Settled in a design grilling. `DELETE /records/<id>/` was `IsOwnerOrStaff`, so any office could soft-delete a student's draft outright, or file a delete request on accepted work with the office member recorded as the requester. No screen offered it; the API did.
+
+- **Only an owner deletes**, any owner, not only the primary one (`IsRecordOwner`). No office and not the Adviser. Refusals follow ADR-022 §Amendment 4: a 403 for a record the caller can see, a 404 for one they cannot. `IsOwnerOrStaff` had no other user and is deleted.
+    - *Deferred, not built:* an institutional takedown, for example RDCO removing a published record for plagiarism. It would be its own act with its own reason, notice and audit. RDCO filing a delete request and then approving it would be one person deciding their own request. *Keep unlisted* already lets RDCO hide a record it decides on.
+- **What a delete does, by status** (ADR-021 §13's `DELETE_REVIEW_STATUSES` is unchanged):
+
+    | Status | What the owner's delete does | Capability |
+    |---|---|---|
+    | `draft`, `rejected` | soft-deleted now | `delete_record` |
+    | `in_review` | soft-deleted now, and its open assignments, seats and revision requests are withdrawn (IR-274) | `withdraw_submission` |
+    | `published`, `approved`, `completed` | a delete request for RDCO to decide; the record waits in `pending_delete` | `request_deletion` |
+    | `pending_delete` | **refused with a 400**: a delete decision is already pending | none |
+
+    The last row closes a bypass. A soft delete is legal from every status, so a second delete removed the record outright and left its request pending against a deleted record. A 400 rather than a 403, as in the IR-507 amendment above, because the owner is the right person at the wrong moment.
+- **One endpoint, three capability keys.** Each names its act, as `accept_proposal` and `keep_unlisted` do (IR-270, IR-271): the act that is gone now, the act that ends other people's work, and the act someone else decides. A button can then name its consequence without deriving it from state. The keys are offered to owners only, exactly where the endpoint does that act. IR-418's table probes each in the statuses it names. No screen renders them yet; the buttons are a frontend follow-up.
+- **Out of scope:** withdrawing a record from review notifies no reviewer and leaves its open document requests open. That is IR-274's behaviour, and it goes to [IR-517](https://citiris.atlassian.net/browse/IR-517).
 
 ### 11. Lifecycle
 

@@ -103,7 +103,11 @@ export interface RecordFileItem {
  * spec's `final_decide`, renamed to the act it grants) and `reject`. IR-271
  * adds `accept_proposal`, a Proposal's Adviser accepting it (the spec's
  * `decide_proposal`, which also named *Reject*; reject is `reject` on every
- * record).
+ * record). IR-508 adds the owner's three deletes, one per act, all served by
+ * `DELETE /records/<id>/`: `delete_record` (a draft or rejected record, gone
+ * now), `withdraw_submission` (in review, ending every open turn) and
+ * `request_deletion` (accepted work, for RDCO to decide). Nothing renders them
+ * yet.
  */
 export type Capability =
   | "open_review"
@@ -122,6 +126,9 @@ export type Capability =
   | "replace_manuscript"
   | "edit_details"
   | "continue_draft"
+  | "delete_record"
+  | "withdraw_submission"
+  | "request_deletion"
   | "continue_as"
   | "set_visibility"
   | "tag_ip"
