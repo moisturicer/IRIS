@@ -15,6 +15,7 @@ import type { Region, SemanticSearchResult } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
+import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
@@ -999,6 +1000,12 @@ export default function PaperViewPage() {
 
                 {/* Public discussion (IR-420) renders here, on its own
                     surface, once it exists (spec §4.11). */}
+
+                {/* The Novelty check (IR-312): the owner's own Proposal only,
+                    per ADR-029's 2026-09-26 amendment, item 9. */}
+                {userIsOwner && record.record_type_name === "Proposal" && (
+                  <RelatedPublishedResearch recordId={record.id} />
+                )}
 
                 <SimilarPapers recordId={record.id} />
               </>

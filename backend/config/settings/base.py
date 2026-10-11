@@ -474,6 +474,11 @@ AI_SCREEN_MAX_RECORDS = config("AI_SCREEN_MAX_RECORDS", default=500, cast=int)
 AI_SCREEN_BATCH_SIZE = config("AI_SCREEN_BATCH_SIZE", default=20, cast=int)
 AI_SCREEN_TIMEOUT_SECONDS = config("AI_SCREEN_TIMEOUT_SECONDS", default=20.0, cast=float)
 AI_SCREEN_DUPLICATE_MIN_SIMILARITY = config("AI_SCREEN_DUPLICATE_MIN_SIMILARITY", default=0.98, cast=float)
+# The Novelty check's "close" (IR-312, ADR-029 amendment item 7): the cosine
+# similarity at which published work is shown on a Proposal as related
+# research. UNTUNED -- the AI track sets it against real proposals once
+# indexing is unblocked (IR-250).
+AI_NOVELTY_MIN_SIMILARITY = config("AI_NOVELTY_MIN_SIMILARITY", default=0.70, cast=float)
 
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")

@@ -6,7 +6,7 @@ class AiConfig(AppConfig):
     name = "apps.ai"
 
     def ready(self):
-        """Startup checks for the AI configuration (IR-317, IR-379, IR-464).
+        """Startup checks for the AI configuration (IR-317, IR-379, IR-464, IR-312).
 
         Here rather than in a settings module because they must hold whichever
         settings module is loaded: the dangerous combination is `DEBUG=False`
@@ -21,6 +21,7 @@ class AiConfig(AppConfig):
             verify_evidence_configuration,
         )
         from apps.ai.inference import verify_inference_configuration
+        from apps.ai.similarity import verify_novelty_configuration
         from apps.ai.policy.bypass import (
             install_bypass_if_enabled,
             verify_bypass_configuration,
@@ -29,6 +30,7 @@ class AiConfig(AppConfig):
         verify_bypass_configuration()
         verify_inference_configuration()
         verify_evidence_configuration()
+        verify_novelty_configuration()
         install_bypass_if_enabled()
         # The evidence rule set is read here and nowhere else, so a
         # `.env` edit cannot remove a requirement between two questions.
