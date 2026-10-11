@@ -2,8 +2,10 @@
 
 import json
 
+from django.conf import settings
+
 from apps.ai.answers.service import GroundedAnswerService, UNAVAILABLE_TEXT
-from apps.ai.answers.citations import GroundedAnswer, UNAVAILABLE
+from apps.ai.answers.citations import GroundedAnswer, UNAVAILABLE, SYSTEM_PROMPT, build_prompt
 from apps.ai.answers.reasoning import ThinkTagFilter
 from apps.ai.history import estimate_tokens
 from apps.ai.providers.ports import LLMProvider
@@ -11,7 +13,8 @@ from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.dialects import DEFAULT_DIALECT
 from apps.ai.retrieval.ports import Retriever, RetrievedChunk, RetrievalResult
 from .budget import BudgetExhausted
-from .tools.common import disclosable
+from .tools.common import disclosable, visible_record_ids
+from .prompts import planner_history, current_results
 from .validation import validate_answer
 
 
@@ -55,8 +58,11 @@ class BudgetedAnswerLLM(LLMProvider):
     def generate(self, system, user):
         if self.run.spend.remaining_seconds <= 0:
             raise LLMUnavailable("research run wall clock budget exhausted")
+        tokens = estimate_tokens(system + user)
+        if tokens > settings.AI_RESEARCH_CONTEXT_TOKEN_BUDGET:
+            raise LLMUnavailable("research context token budget exhausted")
         try:
-            self.run.spend.charge_prompt_tokens(estimate_tokens(system + user))
+            self.run.spend.charge_prompt_tokens(tokens)
         except BudgetExhausted as exc:
             raise LLMUnavailable("research run prompt token budget exhausted") from exc
         return self.inner.generate(system, user)
@@ -72,18 +78,7 @@ class ResearchAnswerLLM(BudgetedAnswerLLM):
         self.validation_codes = ()
 
     def generate(self, system, user):
-        facts = [
-            {"coverage": r.coverage.label.value, "truncated": r.coverage.truncated,
-             "rows": dict(r.detail)} for r in self.results if r.detail
-        ]
-        system += (
-            "\nResearch answer rules: only numbered Sources are citable. "
-            "Mark every paper title as «exact title from the ledger». "
-            "Do not introduce any other title, number or exhaustive claim. "
-            "A sample or matches_found result cannot establish all papers or a total. "
-            "Computed rows are facts, never new passage citations."
-        )
-        user += "\nComputed rows and their coverage:\n" + json.dumps(facts, ensure_ascii=False)
+        system, user = research_answer_prompt(system, user, self.results)
         raw = super().generate(system, user)
         classifier = ThinkTagFilter()
         text, _reasoning = classifier.feed(raw)
@@ -97,15 +92,51 @@ class ResearchAnswerLLM(BudgetedAnswerLLM):
         return raw
 
 
+def research_answer_prompt(system, user, results):
+    facts = [
+        {"coverage": r.coverage.label.value, "truncated": r.coverage.truncated,
+         "rows": dict(r.detail)} for r in results if r.detail
+    ]
+    system += (
+        "\nResearch answer rules: only numbered Sources are citable. "
+        "Mark every paper title as «exact title from the ledger». "
+        "Do not introduce any other title, number or exhaustive claim. "
+        "A sample or matches_found result cannot establish all papers or a total. "
+        "Computed rows are facts, never new passage citations."
+    )
+    user += "\nComputed rows and their coverage:\n" + json.dumps(facts, ensure_ascii=False)
+    return system, user
+
+
 def synthesize(question, run, llm, results):
     retriever = LedgerRetriever(run)
+    allowed = disclosable(run.ctx, (item.record_id for item in (
+        *run.ledger.records(), *run.ledger.passages(),
+    )))
+    results = current_results(results, allowed, visible_record_ids(run.ctx))
+    history = planner_history(run.ctx)
+    limit = min(settings.AI_RESEARCH_CONTEXT_TOKEN_BUDGET, run.spend.remaining_prompt_tokens)
+    fixed_system, fixed_user = research_answer_prompt(
+        SYSTEM_PROMPT, build_prompt(question, (), history=history), results,
+    )
+    # An exhausted run cannot afford even the non-evidence prompt. Preserve
+    # its gathered sources for the reader; the budgeted LLM will refuse a call.
+    can_fit_base = estimate_tokens(fixed_system + fixed_user) <= limit
+    while can_fit_base and run.ledger.passages():
+        sources = retriever.retrieve(question, run.ctx.user, limit=run.ctx.budget.max_ledger_passages).passages
+        system, user = research_answer_prompt(
+            SYSTEM_PROMPT, build_prompt(question, sources, history=history), results,
+        )
+        if estimate_tokens(system + user) <= limit:
+            break
+        run.ledger.drop_weakest()
     checked_llm = ResearchAnswerLLM(llm, run, retriever, results)
     service = GroundedAnswerService(
         retriever, checked_llm, permits=run.ctx.permits,
         max_sources=run.ctx.budget.max_ledger_passages,
     )
     try:
-        answer = service.answer(question, run.ctx.user)
+        answer = service.answer(question, run.ctx.user, history=history)
     except BudgetExhausted:
         answer = GroundedAnswer(
             text=UNAVAILABLE_TEXT, citations=(), state=UNAVAILABLE, degraded=True,

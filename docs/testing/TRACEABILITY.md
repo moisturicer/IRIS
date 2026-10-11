@@ -361,8 +361,9 @@ argument-free `finish`. Identity, scope, disclosure and limits are supplied
 by the application. Duplicate calls reuse the registry cache and spend a
 call; malformed calls get one correction and the second stops planning.
 The `plan` inference profile inherits the answer model/account by default
-and has its own breaker. Tool results are fed back; IR-513 owns recent
-history, notes, aggregate context and the outer loop.
+and has its own breaker. The initial slice fed tool results back; the IR-513
+section below records its extension with history, notes, aggregate context
+and the outer loop.
 
 `synthesis.py` supplies the ledger to `GroundedAnswerService`, preserving
 numbered-source prompts and `parse_citations`. Validation checks raw markers
@@ -401,7 +402,54 @@ measurements; deletion cascades with the owner/Conversation. Django checks
 and migration drift checks pass (the existing Axes deprecation warning
 remains). No paid planner measurement or reader rollout is claimed.
 
+## IR-513 — full research context and bounded outer planning
+
+**Implemented, offline only; ADR-038 remains Proposed.** The human user
+approved the explained design and public test seams on 2026-10-11 with
+"do what you recommend", including D6's policy to omit an entire prior
+exchange if any cited paper is now restricted or gated. The design is
+`docs/superpowers/specs/2026-10-11-ir-513-research-context-design.md`.
+
+The planner makes an explicit short plan before any corpus call. After each
+bounded sub-task, it checks sufficiency against the aggregate evidence and
+finishes, continues or replans. Outer plans, local calls, run-wide calls,
+prompt tokens and time remain bounded by settings; only local calls reset.
+Prompt assembly sends retained passages and abstracts verbatim with stable
+handles, generated recent owned history, separate short non-citable notes
+and code-produced tool facts. No memory recall runs. Visibility, scope and
+disclosure are rechecked, including clearing planner-derived context when
+access is lost. Single-request and cumulative prompt budgets drop whole
+weakest passages first, with a deterministic coverage note.
+
+Evidence: `research/tests/test_context_loop.py` captures requests for recent
+answers, omitted restricted/gated/widened exchanges, no recalled text,
+verbatim passages and abstracts, and permission changes during a run. Stale
+metadata counts leave planner and synthesis requests, and aggregate caches
+recompute when visible membership changes; private provenance is not rendered. It
+demonstrates first-task sufficiency, outer/inner/run limits, unchanged
+duplicate caching across replans, reported token usage accumulated across
+replans, invalid plans, passage-count and prompt-token dropping, and the
+single final answer call. Note/unknown reference tests preserve sources,
+withhold invalid answers and demonstrate no regeneration. Scripted providers
+and deterministic embeddings/reranking are used, never a paid vendor call.
+Existing planner tests were deliberately adapted to the new explicit control
+protocol, including audit step counts; their underlying assertions remain.
+
+Static checks, Django checks and migration consistency passed on 2026-10-11;
+the existing Axes deprecation warning remains. No migration or live routing
+change is needed. The full-suite and independent-review results are recorded
+on an isolated checkout and PostgreSQL test database: **3,176 passed,
+1 expected failure, zero failures and zero skips** in 235.65 seconds. The
+expected failure is the existing non-strict IR-469 HNSW scan-depth test.
+Provider/profile configuration was isolated, with no paid calls. Existing
+test warnings remain. Independent standards and spec reviews using GPT-6 Luna
+found no remaining material findings after the stale-count finding was fixed
+and re-reviewed. This section claims no reader rollout or research-quality
+measurement.
+
 ## IR-501 — paper screening and topic counts
+
+See also IR-513 above for the planner's context assembly around these tools.
 
 **Implemented, offline tools/workflow only.** `screen_records` checks an
 application-supplied candidate set using the independent `screen` inference

@@ -32,13 +32,17 @@ class Spend:
         self.rounds += 1
         self.subtask_calls = 0
 
-    def check(self) -> None:
+    def check(self, *, subtask: bool = True) -> None:
         """Admission check before a model call, including one proposing finish."""
         self._check_clock()
         if self.tool_calls >= self._budget.max_tool_calls:
             raise BudgetExhausted("max_tool_calls")
-        if self.subtask_calls >= self._budget.max_calls_per_subtask:
+        if subtask and self.subtask_calls >= self._budget.max_calls_per_subtask:
             raise BudgetExhausted("max_calls_per_subtask")
+
+    @property
+    def remaining_prompt_tokens(self) -> int:
+        return max(0, self._budget.max_prompt_tokens - self.prompt_tokens)
 
     @property
     def remaining_seconds(self) -> float:
@@ -48,14 +52,11 @@ class Spend:
         self._check_clock()
         self.subtask_calls = 0
 
-    def charge_call(self) -> None:
-        self._check_clock()
-        if self.tool_calls >= self._budget.max_tool_calls:
-            raise BudgetExhausted("max_tool_calls")
-        if self.subtask_calls >= self._budget.max_calls_per_subtask:
-            raise BudgetExhausted("max_calls_per_subtask")
+    def charge_call(self, *, subtask: bool = True) -> None:
+        self.check(subtask=subtask)
         self.tool_calls += 1
-        self.subtask_calls += 1
+        if subtask:
+            self.subtask_calls += 1
 
     def charge_prompt_tokens(self, tokens: int) -> None:
         self.prompt_tokens += tokens

@@ -82,3 +82,8 @@ def test_holds_is_false_for_a_passage_dropped_on_arrival():
     dropped = _passage(ledger, 2, score=0.1)
     assert ledger.holds(kept) and not ledger.holds(dropped)
     assert ledger.holds(_record(ledger, 7))
+
+
+def test_a_negative_passage_cap_is_rejected_before_collection():
+    with pytest.raises(ValueError, match="max_passages"):
+        Ledger(max_passages=-1)
