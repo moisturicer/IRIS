@@ -22,12 +22,26 @@ from .assembly import whole_paper
 logger = logging.getLogger(__name__)
 
 #: 2: grounded in the whole paper, not six retrieved passages (IR-431).
-PROMPT_VERSION = 2
+#: 3: the comprehensive skeleton replaces two paragraphs of prose (IR-433).
+PROMPT_VERSION = 3
 
+# Formatting rules come from SYSTEM_PROMPT (IR-424); only structure lives here.
+# The omission rule matters most: a filled-in Limitations section the paper
+# never wrote is fabrication (ADR-025).
 _QUESTION = (
-    "Summarise this work for a reader deciding whether to read it: its "
-    "research objectives, the methodology it used, and its key findings. "
-    "Write it as flowing prose in two or three short paragraphs."
+    "Write a comprehensive overview of this work for a reader deciding "
+    "whether to read it.\n"
+    "Open with one paragraph: the problem, what the authors did, and what "
+    "they found.\n"
+    "Then use these '## ' sections, in this order: '## Objectives', "
+    "'## Methodology', '## Key findings', '## Limitations and scope'.\n"
+    "Omit any section the paper does not support. Never write a heading you "
+    "cannot fill from the document, and never infer a limitation the authors "
+    "do not state.\n"
+    "Where a figure or table carries a finding, name it in the sentence and "
+    "cite it.\n"
+    "Close with one paragraph separating what the work demonstrates from what "
+    "it only suggests."
 )
 
 
