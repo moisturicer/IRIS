@@ -103,15 +103,14 @@ def _named_records(ctx, question):
     )]
     known = {record.title.casefold() for record in matched}
     missing = [title for title in quoted if title.casefold() not in known]
-    if not quoted:
-        remainder = question
-        for record in sorted(matched, key=lambda record: len(record.title), reverse=True):
-            remainder = re.sub(re.escape(record.title), "", remainder, flags=re.IGNORECASE)
-        # Unresolved text may be another title. Refuse an ambiguous comparison
-        # rather than silently comparing only the names we happened to resolve.
-        remainder = re.sub(r"\b(compare|comparison|contrast|with|and|vs|versus|to|of|the|papers|paper|studies|study)\b", "", remainder, flags=re.IGNORECASE)
-        if remainder.strip(" ,.;:?!"):
-            return [], [remainder.strip(" ,.;:?!")]
+    remainder = re.sub(r'"[^"\n]+"|“[^”\n]+”', "", question)
+    for record in sorted(matched, key=lambda record: len(record.title), reverse=True):
+        remainder = re.sub(re.escape(record.title), "", remainder, flags=re.IGNORECASE)
+    # Unresolved text may be another title, including mixed quoted/unquoted
+    # input. Ask for explicit names before comparing an ambiguous subset.
+    remainder = re.sub(r"\b(compare|comparison|contrast|with|and|vs|versus|to|of|the|papers|paper)\b", "", remainder, flags=re.IGNORECASE)
+    if remainder.strip(" ,.;:?!"):
+        return [], [remainder.strip(" ,.;:?!")]
     return matched, missing
 
 
@@ -176,14 +175,16 @@ def _comparison(run, question, maximum):
                           degraded=degraded or bool(missing), model=model_that_answered(llm)), None
 
 
-def answer_lane(lane, question, user, *, root, conversation=None, scope_record=None, max_sources=8):
+def answer_lane(lane, question, user, *, root, conversation=None, scope_record=None,
+                max_sources=8, history_before_turn_id=None):
     """Run a bounded corpus workflow selected by the application router."""
     if lane not in ("listing", "count", "comparison", "research"):
         raise ValueError(f"No application workflow for lane {lane!r}")
     if max_sources < 1:
         raise ValueError("max_sources must be positive")
     ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation)
-    ctx = replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None)
+    ctx = replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None,
+                  history_before_turn_id=history_before_turn_id)
     if lane == "research":
         ctx = replace(ctx, budget=replace(ctx.budget,
             max_ledger_passages=min(ctx.budget.max_ledger_passages, max_sources)))

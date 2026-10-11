@@ -31,6 +31,7 @@ class ChatQuestion:
     widened: bool
     scope_record: object
     route_override: Optional[str] = None
+    override_turn_id: Optional[int] = None
 
 
 class ChatOrchestrator:

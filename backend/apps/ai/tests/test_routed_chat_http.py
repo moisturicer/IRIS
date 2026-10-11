@@ -229,14 +229,18 @@ def test_scoped_landscape_is_refused_without_passage_lookup(endpoint, settings, 
 
 
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
-def test_unresolved_unquoted_comparison_requests_explicit_titles(endpoint, settings, monkeypatch, embedder, space, client_for):
+@pytest.mark.parametrize("question", [
+    "Compare Flood Prediction with Unknown Thesis",
+    'Compare "Flood Prediction" with Unknown Thesis',
+])
+def test_unresolved_unquoted_comparison_requests_explicit_titles(endpoint, question, settings, monkeypatch, embedder, space, client_for):
     settings.AI_RESEARCH_LANE = "on"
     route(monkeypatch, "comparison")
     reader = make_user("unresolved-compare@cit.edu")
     make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
     llm = ScriptedLLM("A single-paper answer [1].")
     with use_composition_root(root_with(embedder=embedder, llm=llm)):
-        body = answer(client_for(reader), endpoint, "Compare Flood Prediction with Unknown Thesis")
+        body = answer(client_for(reader), endpoint, question)
     assert body["mode"] == "no_results"
     assert "Name each paper by its full title" in body["message"]
     assert "Unknown Thesis" in body["message"]
@@ -305,3 +309,28 @@ def test_count_totals_do_not_reach_planner_after_permission_change(settings, mon
     assert "matched out of" not in sent and "checked;" not in sent
     replay = client_for(reader).get(reverse("ai-conversation-detail", args=[conversation.pk])).json()["turns"]
     assert "1 matched out of 1 checked" in replay[0]["answer"]
+
+
+@pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
+def test_research_override_uses_original_history_boundary(endpoint, settings, monkeypatch, embedder, space, client_for):
+    from apps.ai.providers.fakes import ScriptedToolCallingLLM
+
+    settings.AI_RESEARCH_LANE = "on"
+    route(monkeypatch, "research")
+    reader = make_user("research-old@cit.edu")
+    conversation = Conversation.objects.create(user=reader)
+    Turn.objects.create(conversation=conversation, question="Earlier reader question", answer="Earlier answer", state="generated")
+    source = Turn.objects.create(conversation=conversation, question="What are its methods?", resolved_question=FLOOD_QUESTION, answer="ORIGINALANSWER", state="generated")
+    Turn.objects.create(conversation=conversation, question="UNRELATEDQUESTION", answer="UNRELATEDANSWER", state="generated")
+    root = root_with(embedder=embedder)
+    planner = ScriptedToolCallingLLM([ScriptedToolCallingLLM.calling("finish", "{}", "finish")])
+    real = root.llm_for
+    monkeypatch.setattr(root, "llm_for", lambda task: planner if task == InferenceTask.PLAN else real(task))
+    with use_composition_root(root):
+        body = answer(client_for(reader), endpoint, source.question, conversation_id=conversation.pk,
+                      route_override="research", route_override_turn_id=source.pk)
+    assert body["routing"]["lane"] == "research" and body["resolved_question"] == FLOOD_QUESTION
+    sent = str(planner.conversation_requests)
+    assert "Earlier reader question" in sent and "Earlier answer" in sent
+    assert "UNRELATEDQUESTION" not in sent and "UNRELATEDANSWER" not in sent
+    assert "ORIGINALANSWER" not in sent

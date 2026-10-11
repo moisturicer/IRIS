@@ -205,6 +205,7 @@ def _prepare_ask_request(request):
             widened=widened,
             scope_record=scope_record,
             route_override=route_override,
+            override_turn_id=override_turn.pk if override_turn else None,
         ),
         None,
     )

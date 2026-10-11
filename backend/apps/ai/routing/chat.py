@@ -87,5 +87,6 @@ class RoutedChat:
             self.decision["lane"], self.asked.effective_question, user,
             root=self.root, conversation=self.asked.conversation,
             scope_record=self.asked.scope_record, max_sources=self.max_sources,
+            history_before_turn_id=self.asked.override_turn_id,
         )
         return answer
