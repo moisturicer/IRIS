@@ -161,3 +161,42 @@ def test_every_worker_declares_a_healthcheck():
         f"celery worker service(s) {sorted(missing)} declare no healthcheck, so "
         "a crash-loop there shows only as 'Restarting' and is easy to miss"
     )
+
+
+def test_backend_services_wait_for_one_successful_migration_run():
+    """The web and worker containers must not race schema changes on boot."""
+    compose_files = [
+        _REPO_ROOT / "docker-compose.yml",
+        _REPO_ROOT / "docker-compose.prod.yml",
+    ]
+    for compose_path in compose_files:
+        if not compose_path.is_file():
+            pytest.skip(f"{compose_path.name} is unavailable in this checkout")
+        text = compose_path.read_text(encoding="utf-8")
+        services = list(re.finditer(r"(?m)^  ([\w-]+):\s*$", text))
+        blocks = {
+            match.group(1): text[match.end():services[i + 1].start() if i + 1 < len(services) else len(text)]
+            for i, match in enumerate(services)
+        }
+        migration = blocks.get("migrate", "")
+        assert "python manage.py migrate --noinput" in migration
+        assert 'restart: "no"' in migration
+
+        backend_services = [
+            name for name, block in blocks.items()
+            if name != "migrate" and "context: ./backend" in block
+        ]
+        assert backend_services
+        for name in backend_services:
+            assert re.search(
+                r"(?ms)^    depends_on:\n(?:(?!^    [\w-]+:).)*"
+                r"^      migrate:\n        condition: service_completed_successfully",
+                blocks[name],
+            ), f"{name} does not wait for the one-shot migration service"
+
+
+def test_shared_entrypoint_does_not_run_migrations_again():
+    entrypoint = _REPO_ROOT / "backend" / "entrypoint.sh"
+    if not entrypoint.is_file():
+        pytest.skip("backend entrypoint is unavailable in this checkout")
+    assert "manage.py migrate" not in entrypoint.read_text(encoding="utf-8")

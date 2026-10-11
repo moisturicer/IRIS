@@ -161,14 +161,31 @@ docker compose down                # add -v to drop volumes
 
 ### Migrations
 
-**Every backend-image container migrates itself on boot** — `backend`, and all five Celery services (`celery-default`/`celery-extraction`/`celery-embedding`/`celery-shadow`/`celery-beat`), in both `docker-compose.yml` and `docker-compose.prod.yml` (ADR-037, IR-318). `backend/entrypoint.sh` runs `python manage.py migrate --noinput` before handing off to whatever command Compose passes it (`runserver`, `gunicorn`, or a Celery worker/beat process), and `backend/Dockerfile` wires it in as the image's `ENTRYPOINT`. There is no separate manual step:
+Both Compose files run migrations once in a dedicated `migrate` service after PostgreSQL is healthy. The backend and all five Celery services wait for that service to complete successfully before starting (IR-528; proposed ADR-039). The shared image entrypoint only launches the requested process:
 
 ```bash
-docker compose up --build          # every backend-image container migrates itself before it serves or consumes
-docker compose logs backend        # migrate output appears first, before the runserver/gunicorn banner
+docker compose up --build          # migrate runs once, then backend and workers start
+docker compose logs migrate        # inspect the one migration run
 ```
 
-You should only ever need `docker compose exec backend python manage.py migrate` by hand to diagnose a container that failed to come up — not as a routine step. If a container keeps restarting right after boot, check `docker compose logs <service>` for a migration failure before assuming the task itself is broken.
+If a migration fails, the backend and workers remain stopped. Read `docker compose logs migrate`, correct the reported issue, then recreate the migration service and dependent services with `docker compose up --build --force-recreate`.
+
+#### Refreshing old seeded workflow records
+
+The seeder skips existing records by title, so it does not repair fixtures from
+retired workflows. The reset command lists every `[DEMO]` record first and only
+deletes database rows linked to those records when `--execute` is supplied. It
+is limited to development (`DEBUG=True`); it leaves non-demo records, demo
+accounts, catalogue lookup data, and uploaded files alone. Preview, then
+explicitly delete and reseed when the development database is meant to be
+refreshed:
+
+```bash
+docker compose run --rm --no-deps backend python manage.py reset_demo_records
+docker compose run --rm --no-deps backend python manage.py reset_demo_records --execute
+docker compose up --build --force-recreate
+docker compose exec backend python manage.py seed_demo
+```
 
 ### Celery
 
