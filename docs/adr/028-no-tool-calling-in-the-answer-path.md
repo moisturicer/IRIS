@@ -8,6 +8,8 @@ The reasoning, the evidence table and the three revisit conditions below are **k
 
 > **Supersession — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** It adopts one no-argument `search_corpus` tool call used **only as a route signal** — never executed, no loop, no model-written query — to decide whether a question needs evidence at all. It **keeps every reason, the evidence table and the three revisit conditions below**, assesses each (1 holds · 2 partly · 3 does not), and records that it proceeds on condition 1 plus a design argument rather than on the measurement this ADR asked for. It also records that the page-precision objection in reason (1) **has no instrument** and can be neither confirmed nor refuted today. **ADR-035 has been accepted by a human reviewer, so this ADR's decision no longer stands; its reasoning does.**
 
+> **Note — 2026-10-11 (IR-499). [ADR-038](038-bounded-research-lane-for-ask-iris.md) is Proposed, not accepted.** It builds a bounded research lane that executes tool calls, which ADR-035 §4 still forbids elsewhere. **It does not satisfy revisit condition 3 and says so:** no measured comparison of a loop against the pipeline exists, and reason (1)'s page-precision cost still has no instrument. It ships before it is measured, off by default, and evaluation is IR-505. Reasons (1), (3) and (4) are kept as the standing record of what the lane has not shown. Condition 2 is still partial: the proxy corpus only.
+
 **Constrains [ADR-026](026-conversational-retrieval-and-memory.md) and [ADR-027](027-corpus-level-questions.md)**, both of which specify explicit mechanisms — question resolution, routing, conditional decomposition — that a tool-calling agent would have replaced.
 
 ## Context
