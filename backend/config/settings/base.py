@@ -483,6 +483,8 @@ LLM_ROUTE_FALLBACK_MODELS = config("LLM_ROUTE_FALLBACK_MODELS", default="")
 LLM_ROUTE_REASONING = config("LLM_ROUTE_REASONING", default=False, cast=bool)
 LLM_ROUTE_PROVIDER_ONLY = config("LLM_ROUTE_PROVIDER_ONLY", default="")
 LLM_ROUTE_PROVIDER_PINS = config("LLM_ROUTE_PROVIDER_PINS", default="")
+# Development routing; production rollout belongs to IR-504.
+AI_RESEARCH_LANE = config("AI_RESEARCH_LANE", default="off")
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)

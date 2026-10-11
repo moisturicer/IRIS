@@ -1,3 +1,4 @@
+import type { ChatLane } from "@/types/ai";
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/types/chat";
 import type { StreamingState } from "../hooks/useAskStream";
@@ -8,6 +9,7 @@ import { CHAT_COLUMN } from "./answerLayout";
 import { AskIrisEmblem } from "./AskIrisIcons";
 
 interface ChatMessageListProps {
+  onRouteOverride?: (message: ChatMessage, lane: ChatLane) => void;
   messages:           ChatMessage[];
   isLoading:          boolean;
   /**
@@ -26,6 +28,7 @@ interface ChatMessageListProps {
 
 export function ChatMessageList({
   messages,
+  onRouteOverride,
   isLoading,
   streaming = null,
   suggestions = [],
@@ -79,7 +82,7 @@ export function ChatMessageList({
       {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
       <div className={`${CHAT_COLUMN} space-y-6`}>
         {messages.map((m) => (
-          <ChatMessageBubble key={m.id} message={m} />
+          <ChatMessageBubble key={m.id} message={m} onRouteOverride={onRouteOverride} overrideDisabled={isLoading} />
         ))}
         {isLoading && (streaming ? <StreamingMessageBubble state={streaming} /> : <AssistantMessageSkeleton />)}
         <div ref={bottomRef} />

@@ -1,3 +1,4 @@
+import { routingFixture } from "@/test/routingFixture";
 /**
  * The streaming state machine driving Ask IRIS's live progress (IR-329).
  *
@@ -272,4 +273,26 @@ describe("a request that never starts streaming", () => {
     await expect(act(() => result.current.ask(""))).rejects.toThrow("question is required.");
     expect(result.current.streaming).toBeNull();
   });
+});
+
+it("keeps the live routing event and carries terminal listing rows into the answer", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const listing = { completeness: "matches_found", wording: "Matches found", records: [{ record_id: 7, title: "Flood Prediction" }] };
+  askStream.mockReturnValue((async function* () {
+    yield { event: "routing_decided", data: { routing: routingFixture } };
+    await gate;
+    yield { event: "done", data: { answer: "Found papers", turn_id: 5, routing: routingFixture, listing } };
+  })());
+  const { result } = renderHook(() => useAskStream());
+  let pending!: ReturnType<typeof result.current.ask>;
+  act(() => { pending = result.current.ask("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 }); });
+  await waitFor(() => expect(result.current.streaming?.routing).toEqual(routingFixture));
+  let outcome!: Awaited<typeof pending>;
+  await act(async () => { release(); outcome = await pending; });
+  expect(outcome.message.routing).toEqual(routingFixture);
+  expect(outcome.message.listing).toEqual(listing);
+  expect(outcome.message.question).toBe("Find flooding papers");
+  expect(outcome.message.turnId).toBe(5);
+  expect(askStream).toHaveBeenCalledWith("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 });
 });

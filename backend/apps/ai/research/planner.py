@@ -75,7 +75,8 @@ class ResearchPlanner:
 
     def answer(self, question, ctx):
         if ctx.conversation_id is not None and not Conversation.objects.owned_by(ctx.user).filter(
-            pk=ctx.conversation_id, record_id=ctx.scope_record_id,
+            pk=ctx.conversation_id,
+            **({"record_id": ctx.scope_record_id} if ctx.scope_record_id is not None else {}),
         ).exists():
             raise PermissionError("No such Conversation for this user and scope.")
         run = replace(ToolRun.start(ctx, self.root), spend=Spend(ctx.budget, self.clock))
@@ -254,6 +255,7 @@ class ResearchPlanner:
                 return GroundedAnswer("No readable sources were found for this question.", (), state=NO_SOURCES)
         service = GroundedAnswerService(
             self.root.retriever(record=record), llm, permits=ctx.permits,
+            max_sources=ctx.budget.max_ledger_passages,
         )
         try:
             return service.answer(question, ctx.user)

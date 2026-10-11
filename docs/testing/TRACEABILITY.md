@@ -576,6 +576,28 @@ is claimed. ADR-038's overall Proposed status remains unreconciled with Jira's
 accepted-scope comment; broader human approval remains required before merge.
 
 
+## IR-515 — chat dispatch, decisions and overrides
+
+The default-off development switch preserves the existing passage adapter request
+(snapshot in `apps/ai/tests/test_shadow_off_snapshot.py`) and never constructs routing
+providers. `test_routed_chat_http.py` drives JSON and SSE with deterministic vendors
+for authoritative listing rows, topic-count coverage, per-paper comparison citations
+and missing evidence, landscape refusal (including router outage), overrides, Paper
+Chat/injection restrictions, widened research dispatch, persisted decisions and
+visibility-aware listing replay. `test_research_lane_configuration.py` checks switch
+validation and the development restriction; `test_routing_lanes.py` checks workflow
+bounds. Frontend API, hook, both chat pages and ChatRouting suites cover propagation,
+replay, list rendering and permitted reruns. No live vendor call or research quality
+measurement is claimed. Execution evidence is recorded on the IR-515 PR. See
+[CHAT_ROUTING.md](../engineering/CHAT_ROUTING.md) for limits and ADR divergence.
+
+Executed 2026-10-11 after merging `main` (`7f35dad`): full backend suite,
+3,330 passed and 1 existing non-strict IR-469 xpass, no failures or skips.
+Full frontend suite: 764 passed across 73 files. Production build/typecheck,
+lint, Django configuration and migration drift checks passed; existing warnings
+remain. Providers were deterministic and the PostgreSQL test database isolated.
+
+
 ## IR-436: overview visibility and disclosure are explicit
 
 **Basis:** ADR-015 Security Impact (per-record disclosure), CLAUDE.md Security

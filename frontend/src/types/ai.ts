@@ -1,3 +1,24 @@
+export type ChatLane = "passage" | "listing" | "count" | "comparison" | "research" | "landscape";
+
+export interface RoutingDecision {
+  lane: ChatLane;
+  suggested_lane: ChatLane;
+  stage: string;
+  reason: string;
+  injection_flagged: boolean;
+  planner_allowed: boolean;
+  probabilities: Partial<Record<ChatLane, number>>;
+  override: ChatLane | null;
+  override_applied: boolean;
+  allowed_overrides: ChatLane[];
+}
+
+export interface AnswerListing {
+  completeness: "matches_found" | "screened";
+  wording: string;
+  records: { record_id: number; title: string }[];
+}
+
 /**
  * One highlightable rectangle on a page, as a fraction of it (0–1), left/top
  * origin (IR-334). Fractions rather than pixels or PDF points: a reader's PDF
@@ -125,6 +146,9 @@ export interface RecordOverview {
 }
 
 export interface AIAnswer {
+  turn_id?: number;
+  routing?: RoutingDecision;
+  listing?: AnswerListing;
   /** Answer text, or null when nothing in the corpus matched. */
   answer:    string | null;
   /**
@@ -176,6 +200,8 @@ export type ChatCitation = Citation | ReplayedCitation;
 
 /** One question-and-answer pair in a persisted Conversation (IR-295). */
 export interface ConversationTurn {
+  routing?: RoutingDecision;
+  listing?: AnswerListing;
   id:                 number;
   question:           string;
   resolved_question:  string | null;

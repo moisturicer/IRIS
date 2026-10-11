@@ -150,6 +150,11 @@ def _prepare_ask_request(request):
     happens identically whether the answer that follows is one JSON body or
     a stream of events.
     """
+    from apps.ai.routing.router import LANES
+
+    route_override = request.data.get("route_override")
+    if route_override is not None and (not isinstance(route_override, str) or route_override not in LANES):
+        return None, Response({"detail": "route_override must name a supported lane."}, status=400)
     conversation = _conversation_for(request)
     question = (request.data.get("question") or "").strip()
     if not question:
@@ -162,19 +167,30 @@ def _prepare_ask_request(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    history = _recent_turns(conversation) if conversation is not None else []
-
-    resolved_question = None
-    if conversation is not None:
-        resolver = composition_root().resolver()
-        if resolver is not None:
-            resolved_question = resolver.resolve(question, history)
+    override_turn = None
+    turn_reference = request.data.get("route_override_turn_id")
+    if turn_reference is not None:
+        if route_override is None or conversation is None:
+            return None, Response({"detail": "An override Turn requires a lane and conversation."}, status=400)
+        if type(turn_reference) is not int or turn_reference < 1:
+            return None, Response({"detail": "route_override_turn_id must be a positive integer."}, status=400)
+        override_turn = conversation.turns.filter(pk=turn_reference).first()
+        if override_turn is None:
+            raise Http404
+        question = override_turn.question
+        history = recent_window(conversation.turns.filter(pk__lt=override_turn.pk))
+        resolved_question = override_turn.resolved_question or None
+    else:
+        history = _recent_turns(conversation) if conversation is not None else []
+        resolved_question = None
+        if conversation is not None:
+            resolver = composition_root().resolver()
+            if resolver is not None:
+                resolved_question = resolver.resolve(question, history)
     effective_question = resolved_question or question
 
-    # Widened only when there was a scope to widen *from* -- an unscoped
-    # Conversation, or no Conversation, was never narrower than "every
-    # paper", so `widen` has nothing to do there.
-    widen = bool(request.data.get("widen"))
+    # A saved override reuses the scope choice that produced the original Turn.
+    widen = override_turn.widened if override_turn else bool(request.data.get("widen"))
     scoped_to = conversation.record if conversation is not None else None
     widened = scoped_to is not None and widen
     scope_record = None if widened else scoped_to
@@ -188,6 +204,8 @@ def _prepare_ask_request(request):
             history=history,
             widened=widened,
             scope_record=scope_record,
+            route_override=route_override,
+            override_turn_id=override_turn.pk if override_turn else None,
         ),
         None,
     )
@@ -248,7 +266,8 @@ class ChatQueryView(APIView):
 
         return Response(
             {
-                **answer_body(mode, answer.text),
+                **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
+                **orchestrator.metadata,
                 "conversation_id": (
                     None if prepared.conversation is None else prepared.conversation.pk
                 ),
@@ -349,8 +368,12 @@ class ChatStreamView(APIView):
         def event_source():
             # The orchestrator records the Turn before `Done` reaches here,
             # and as `partial` on interruption (IR-328).
+            from apps.ai.routing.chat import RoutingDecided
+
             for event in orchestrator.answer_stream(request.user):
-                if isinstance(event, RetrievalFinished):
+                if isinstance(event, RoutingDecided):
+                    yield _sse(event.name, {"routing": event.routing})
+                elif isinstance(event, RetrievalFinished):
                     yield _sse(
                         event.name,
                         {
@@ -369,7 +392,8 @@ class ChatStreamView(APIView):
                     yield _sse(
                         event.name,
                         {
-                            **answer_body(mode, answer.text),
+                            **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
+                            **orchestrator.metadata,
                             "conversation_id": (
                                 None
                                 if prepared.conversation is None

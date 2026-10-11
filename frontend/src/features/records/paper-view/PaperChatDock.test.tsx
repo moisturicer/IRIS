@@ -1,3 +1,4 @@
+import { routingFixture } from "@/test/routingFixture";
 /**
  * Paper Chat as a Conversation scoped to the Record being viewed (IR-298).
  *
@@ -336,4 +337,17 @@ describe("minimized to a bar while the reader reads a citation (IR-354)", () => 
 
     await expectNoBlockingA11yViolations(container);
   });
+});
+
+it("reruns with the original answer scope even when the composer scope differs", async () => {
+  findOrCreateForRecord.mockResolvedValue({ data: conversation({ turns: [{
+    id: 1, question: "Find flooding papers", resolved_question: null,
+    answer: "Prior answer", message: null, state: "generative", degraded: false,
+    widened: true, created_at: "2026-10-11", citations: [], routing: routingFixture,
+  }] }) });
+  renderScreen(<PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
+  await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
+    conversationId: 42, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
+  }));
 });

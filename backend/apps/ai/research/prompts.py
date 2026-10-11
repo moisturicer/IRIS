@@ -12,9 +12,12 @@ from .tools.common import disclosable, visible_record_ids
 def planner_history(ctx):
     if ctx.conversation_id is None:
         return []
-    turns = recent_window(Turn.objects.filter(
+    candidates = Turn.objects.filter(
         conversation_id=ctx.conversation_id, conversation__user=ctx.user,
-    ).prefetch_related("citations"))
+    )
+    if ctx.history_before_turn_id is not None:
+        candidates = candidates.filter(pk__lt=ctx.history_before_turn_id)
+    turns = recent_window(candidates.prefetch_related("citations"))
     cited = {c.record_id for turn in turns for c in turn.citations.all()}
     allowed = disclosable(ctx, cited)
     return [turn for turn in turns
