@@ -152,6 +152,8 @@ export interface RecordDetail extends RecordListItem {
   psced:           string | null;
   record_type:     string | null;
   adviser:         number | null;
+  /** The adviser's name, or their email when none is on file; null with no adviser (IR-472). */
+  adviser_name:    string | null;
   added_by:        number | null;
   /** ADR-018: what the submitter requested; RDCO confirms at intake. */
   requires_ethics_review: boolean;

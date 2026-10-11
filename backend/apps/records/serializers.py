@@ -57,6 +57,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     classification_name = serializers.CharField(source="classification.name", read_only=True)
     record_type_name    = serializers.CharField(source="record_type.name", read_only=True)
     file_count          = serializers.SerializerMethodField()
+    # Paper View's byline credits the adviser by name (IR-472). It rides on
+    # the record's own visibility: whoever may read the record may read this.
+    adviser_name   = serializers.SerializerMethodField()
     reviews        = serializers.SerializerMethodField()
     clearances     = serializers.SerializerMethodField()
     resubmission   = serializers.SerializerMethodField()
@@ -312,6 +315,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             for f in files
         ]
 
+    def get_adviser_name(self, obj):
+        if obj.adviser:
+            return obj.adviser.get_full_name() or obj.adviser.email
+        return None
+
     def get_abstract_file(self, obj):
         """The paper, at a URL that is actually served (IR-334).
 
@@ -333,7 +341,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "year_accomplished", "year_completed",
             "classification", "psced", "record_type",
             "classification_name", "record_type_name", "file_count",
-            "adviser", "added_by", "is_ip", "ip_type",
+            "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",

@@ -723,9 +723,8 @@ export default function PaperViewPage() {
                 {record.title}
               </h1>
 
-              {/* Byline: authors · college · year. The detail payload names
-                  no adviser (only an id), so none is shown rather than one
-                  invented. */}
+              {/* Byline: authors · adviser · college · year (spec §4.6).
+                  No adviser line when the record names none (IR-472). */}
               <div className="flex items-center gap-x-3 gap-y-2 flex-wrap text-sm text-stone-600">
                 {byline && (
                   <span className="inline-flex items-center gap-2 min-w-0">
@@ -735,6 +734,7 @@ export default function PaperViewPage() {
                     <span className="font-semibold text-stone-800">{byline}</span>
                   </span>
                 )}
+                {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
                 <span>Cebu Institute of Technology – University</span>
                 {record.year_accomplished && <span>{record.year_accomplished}</span>}
               </div>
