@@ -38,6 +38,9 @@ or gated cited paper is omitted in full; a widened exchange citing another
 paper also stays outside a fixed Paper Chat run. If exposed context loses
 permission, its notes, plan and latest arguments are discarded. Content-bearing
 computed results are withheld in full when one of their sources loses access.
+Metadata counts and screening totals carry private visibility provenance;
+they are withheld if the visible paper set changes, and metadata aggregate
+caches recompute for the new set. These identifiers never enter a vendor prompt.
 
 The run enforces the configured call, round, prompt-token and wall-clock
 limits. Prompt tokens are estimated locally with the existing conservative

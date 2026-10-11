@@ -162,7 +162,7 @@ class ResearchPlanner:
             shape_ok = call is not None and isinstance(call.id, str) and bool(call.id) and len(call.id) <= 128 and call.id not in seen_ids
             if not shape_ok:
                 run.spend.charge_call(subtask=not outer)
-                audit.append(Step("tool", "rejected", tool="invalid"))
+                audit.append(Step("tool", ToolStatus.REJECTED.value, tool="invalid"))
                 malformed += 1
                 if malformed == 2:
                     return "malformed_call"
@@ -194,7 +194,7 @@ class ResearchPlanner:
                         outer = True
                     status, feedback = "ok", "Control accepted."
                 except ArgumentsRejected:
-                    status, feedback = "rejected", CORRECTION
+                    status, feedback = ToolStatus.REJECTED.value, CORRECTION
                 audit.append(Step("tool", status, tool=call.name if definition else "invalid",
                                   argument_digest=argument_digest(call.arguments), latency_ms=self._ms(started)))
                 if status == "ok" and call.name == FINISH.name:
@@ -213,7 +213,7 @@ class ResearchPlanner:
                     return "tool_failure"
                 if result.status is not ToolStatus.REJECTED:
                     results.append(result)
-            if status == "rejected":
+            if status == ToolStatus.REJECTED.value:
                 malformed += 1
                 feedback = CORRECTION
                 if malformed == 2:

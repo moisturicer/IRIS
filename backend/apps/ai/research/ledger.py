@@ -39,6 +39,8 @@ class Ledger:
     """Collected passages and records; a model sees handles, never ids."""
 
     def __init__(self, max_passages: int = 30) -> None:
+        if max_passages < 0:
+            raise ValueError("max_passages must be nonnegative")
         self._max_passages = max_passages
         self._passages: dict[int, EvidenceItem] = {}
         self._passage_handles: dict[int, str] = {}

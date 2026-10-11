@@ -8,7 +8,7 @@ from django.db.models import Count
 from apps.ai.research.registry import Tool, ToolRun
 from apps.ai.research.results import Completeness, Coverage, ToolResult, ToolStatus, status_for
 
-from .common import FILTER_PROPERTIES, apply_filters, readable_records
+from .common import FILTER_PROPERTIES, apply_filters, readable_records, visible_record_ids
 
 _GROUPS = {
     "classification": "classification__name",
@@ -28,7 +28,8 @@ def _grouped(records, column: str) -> list[dict]:
 
 
 def count_records(run: ToolRun, args: dict) -> ToolResult:
-    records = apply_filters(readable_records(run.ctx), args)
+    visible = visible_record_ids(run.ctx)
+    records = apply_filters(readable_records(run.ctx).filter(pk__in=visible), args)
     if "is_ip" in args:
         records = records.filter(is_ip=args["is_ip"])
     total = records.count()
@@ -46,11 +47,13 @@ def count_records(run: ToolRun, args: dict) -> ToolResult:
         status_for(total),
         Coverage(Completeness.EXHAUSTIVE, returned=total),
         detail=detail,
+        visible_record_ids=visible,
     )
 
 
 def corpus_facets(run: ToolRun, args: dict) -> ToolResult:
-    records = readable_records(run.ctx)
+    visible = visible_record_ids(run.ctx)
+    records = readable_records(run.ctx).filter(pk__in=visible)
     sample = records.count()
     floor = settings.AI_LANDSCAPE_MIN_RECORDS
     if sample < floor:
@@ -59,6 +62,7 @@ def corpus_facets(run: ToolRun, args: dict) -> ToolResult:
             ToolStatus.REFUSED,
             Coverage(Completeness.EXHAUSTIVE, note="below_floor"),
             detail={"sample_size": sample, "floor": floor},
+            visible_record_ids=visible,
         )
 
     column = _AREAS[args["dimension"]]
@@ -72,6 +76,7 @@ def corpus_facets(run: ToolRun, args: dict) -> ToolResult:
             Coverage(Completeness.EXHAUSTIVE, note="unclassified_share"),
             detail={"sample_size": sample, "unclassified": unclassified,
                     "unclassified_share": share, "limit": limit},
+            visible_record_ids=visible,
         )
 
     areas = [g for g in _grouped(records, column) if g["value"] is not None]
@@ -97,7 +102,12 @@ def corpus_facets(run: ToolRun, args: dict) -> ToolResult:
             "unclassified_share": share,
             "relative_to": RELATIVE_TO,
         },
+        visible_record_ids=visible,
     )
+
+
+def _visibility_cache_context(run: ToolRun) -> list[int]:
+    return sorted(visible_record_ids(run.ctx))
 
 
 COUNT_RECORDS = Tool(
@@ -117,6 +127,7 @@ COUNT_RECORDS = Tool(
         "additionalProperties": False,
     },
     execute=count_records,
+    cache_context=_visibility_cache_context,
 )
 
 CORPUS_FACETS = Tool(
@@ -133,4 +144,5 @@ CORPUS_FACETS = Tool(
         "additionalProperties": False,
     },
     execute=corpus_facets,
+    cache_context=_visibility_cache_context,
 )

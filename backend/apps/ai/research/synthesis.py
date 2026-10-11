@@ -13,7 +13,7 @@ from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.dialects import DEFAULT_DIALECT
 from apps.ai.retrieval.ports import Retriever, RetrievedChunk, RetrievalResult
 from .budget import BudgetExhausted
-from .tools.common import disclosable
+from .tools.common import disclosable, visible_record_ids
 from .prompts import planner_history, current_results
 from .validation import validate_answer
 
@@ -113,7 +113,7 @@ def synthesize(question, run, llm, results):
     allowed = disclosable(run.ctx, (item.record_id for item in (
         *run.ledger.records(), *run.ledger.passages(),
     )))
-    results = current_results(results, allowed)
+    results = current_results(results, allowed, visible_record_ids(run.ctx))
     history = planner_history(run.ctx)
     limit = min(settings.AI_RESEARCH_CONTEXT_TOKEN_BUDGET, run.spend.remaining_prompt_tokens)
     fixed_system, fixed_user = research_answer_prompt(

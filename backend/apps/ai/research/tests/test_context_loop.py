@@ -287,3 +287,56 @@ def test_a_passage_count_cap_also_reports_reduced_coverage(corpus, embedder):
     result, _ = execute(corpus, embedder, model, max_ledger_passages=1)
     assert len(result.answer.sources) == 1
     assert "lowest-scoring passages" in result.answer.text
+
+
+def test_visibility_loss_removes_old_counts_notes_and_plan_from_later_requests(corpus, embedder):
+    from apps.records.models import Record
+    from core.enums import PipelineStatus
+
+    calls = [
+        ("plan_research", {"subtasks": ["Read papers", "Compare the counted papers"]}, ""),
+        ("search_passages", {"query": TOPIC}, ""),
+        ("count_records", {}, "COUNT_NOTE"),
+        ("subtask_done", {}, ""),
+        ("finish", {}, ""),
+    ]
+
+    def reply(request):
+        i = len(model.conversation_requests) - 1
+        if i == 3:
+            Record.objects.filter(pk=corpus["pond"].pk).update(pipeline_status=PipelineStatus.DRAFT)
+        name, args, note = calls[i]
+        return ScriptedToolCallingLLM.calling(name, json.dumps(args), f"call-{i}", text=note)
+
+    model = ScriptedToolCallingLLM(reply)
+    result, answerer = execute(corpus, embedder, model)
+    before = json.loads(model.conversation_requests[3].messages[1].content)
+    assert any(row.get("detail", {}).get("total") == 2 for row in before["computed_results"])
+    after = str(model.conversation_requests[4].messages)
+    assert '"total": 2' not in after
+    assert "COUNT_NOTE" not in after
+    assert "Compare the counted papers" not in after
+    assert '"total": 2' not in str(answerer.calls)
+    assert {source.record_id for source in result.answer.sources} == {corpus["public"].pk}
+
+
+@pytest.mark.parametrize("name,args", [
+    ("count_records", {}), ("corpus_facets", {"dimension": "classification"}),
+])
+def test_aggregate_cache_recomputes_after_visible_membership_changes(corpus, embedder, name, args):
+    from apps.ai.research.registry import ToolRun, research_tools
+    from apps.records.models import Record
+    from core.enums import PipelineStatus
+
+    stack = root(embedder)
+    run = ToolRun.start(RunContext.for_request(user=corpus["student"], root=stack, lane="research"), stack)
+    registry = research_tools()
+    first = registry.call(run, name, args)
+    assert registry.call(run, name, args).duplicate
+    Record.objects.filter(pk=corpus["pond"].pk).update(pipeline_status=PipelineStatus.DRAFT)
+    second = registry.call(run, name, args)
+    assert not second.duplicate
+    field = "total" if name == "count_records" else "sample_size"
+    assert first.detail[field] == 2
+    assert second.detail[field] == 1
+    assert "visible_record_ids" not in second.planner_message()
