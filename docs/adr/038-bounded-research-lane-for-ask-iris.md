@@ -220,7 +220,6 @@ What that does and does not mean:
 | Decision | Owner |
 |---|---|
 | Landscape route handling until the Lens exists: confirm §3's reading | Jive Tyler Revalde |
-| Whether prior answers are re-gated when a cited record becomes restricted (D6) | Jive Tyler Revalde |
 | ASGI against worker offload for long runs (D8) | Jive Tyler Revalde |
 | The uncertain band's values, and the `plan` and `screen` models | Chosen by IR-503, IR-502 and IR-501 |
 | Who approves this ADR | A named person, recorded in this file |
@@ -233,6 +232,19 @@ policy withholds the whole answer, reports validation failure and keeps the
 gathered sources available. This is recorded with [IR-512's implementation
 PR](https://github.com/moisturicer/IRIS/pull/234). It confirms this policy only;
 the ADR remains Proposed and its named approval and merge gate are unchanged.
+
+**D6 confirmation — 2026-10-11 (IR-513).** In the IR-513 implementation chat,
+the human user instructed **"do what you recommend"** after a plain-language
+explanation of the recommended history policy and its cost: omit an entire
+recent question/answer exchange if any cited paper is now unreadable, outside
+the fixed Paper Chat scope, or refused by disclosure. This avoids resending
+restricted content but can lose context for follow-ups. The approved design
+and test boundaries are recorded in
+[IR-513's design](../superpowers/specs/2026-10-11-ir-513-research-context-design.md).
+The planner rechecks history, passages and abstracts before each request;
+notes and plan text derived from a context that loses permission are cleared.
+This confirms D6 for the research planner only; the existing chat views are
+unchanged, and the broader ADR approval and merge gate remain outstanding.
 
 **D3 confirmation — 2026-10-11.** In the IR-501 implementation chat, the
 human user selected **"Report them as unassessed, with no reason shown

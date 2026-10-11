@@ -712,6 +712,11 @@ AI_RESEARCH_WALL_CLOCK_SECONDS = config(
 AI_RESEARCH_MAX_PROMPT_TOKENS = config(
     "AI_RESEARCH_MAX_PROMPT_TOKENS", default=120_000, cast=int
 )
+# A single planner/synthesis request, including schemas. The run-wide
+# cumulative ceiling above still applies to all calls (IR-513).
+AI_RESEARCH_CONTEXT_TOKEN_BUDGET = config(
+    "AI_RESEARCH_CONTEXT_TOKEN_BUDGET", default=16_000, cast=int
+)
 AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
     "AI_RESEARCH_MAX_LEDGER_PASSAGES", default=30, cast=int
 )
