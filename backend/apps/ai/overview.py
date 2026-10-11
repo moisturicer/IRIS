@@ -22,6 +22,9 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from django.conf import settings
+from django.db.models import Sum
+
 from apps.ai.composition import composition_root
 from apps.ai.models import ChunkSet, RecordOverview
 from apps.ai.presentation import citations as citations_wire
@@ -57,6 +60,18 @@ def _active_content_hash(record: Record) -> Optional[str]:
     )
 
 
+def _active_token_total(record: Record) -> int:
+    total = ChunkSet.objects.filter(record=record, is_active=True).aggregate(
+        total=Sum("chunks__token_count")
+    )["total"]
+    return total or 0
+
+
+def _too_large(record: Record) -> bool:
+    ceiling = getattr(settings, "AI_OVERVIEW_TOKEN_CEILING", 0)
+    return bool(ceiling) and _active_token_total(record) > ceiling
+
+
 def _fresh(overview: RecordOverview, content_hash: str) -> bool:
     return (
         overview.content_hash == content_hash
@@ -81,6 +96,15 @@ def overview_for(record: Record, user) -> dict:
     stored = RecordOverview.objects.filter(record=record).first()
     if stored is not None and _fresh(stored, content_hash):
         return {"state": "ready", "overview": _wire(stored), "cached": True}
+
+    if _too_large(record):
+        # Checked before assembly, so an oversized paper costs nothing and
+        # nothing is stored (IR-432).
+        logger.info(
+            "overview not generated for record %s: over AI_OVERVIEW_TOKEN_CEILING",
+            record.pk,
+        )
+        return {"state": "unavailable", "overview": None, "reason": "too_large"}
 
     generated = _generate(record, user)
     if generated is None:

@@ -746,6 +746,13 @@ AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
 AI_EMBEDDING_TOKEN_CEILING = config(
     "AI_EMBEDDING_TOKEN_CEILING", default=2_000_000, cast=int
 )
+# A paper whose active chunks sum past this gets no AI Overview (IR-432): the
+# state is `unavailable` with reason `too_large`, nothing is stored and no model
+# is called. Default ~7x the 14,600-token mean of the proxy corpus, which clears
+# papers past voyage-context-4's 32k window (IR-423). 0 disables.
+AI_OVERVIEW_TOKEN_CEILING = config(
+    "AI_OVERVIEW_TOKEN_CEILING", default=100_000, cast=int
+)
 # Approximate, and printed as approximate. Vendor pricing is not in this
 # repository's control, so this is a figure for deciding whether a run is
 # worth starting, never a quote. Voyage's contextualized-embedding list price
