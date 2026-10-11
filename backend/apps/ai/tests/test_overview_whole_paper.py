@@ -11,6 +11,7 @@ from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.inference import InferenceTask
 from apps.ai.models import ChunkSet, DocumentChunk, RecordOverview
 from apps.ai.overview import PROMPT_VERSION, overview_for
+from apps.ai.overview.service import generate_overview
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.ports import EmbeddingProvider, Reranker
 from apps.records.models import Record
@@ -19,6 +20,19 @@ from core.enums import PipelineStatus
 from .corpus import DIMENSIONS
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
+
+
+@pytest.fixture(autouse=True)
+def suppress_task_publish(monkeypatch):
+    monkeypatch.setattr("apps.ai.overview.service._enqueue_overview", lambda *args: None)
+
+
+def _generate_overview(record):
+    chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+    pending = overview_for(record)
+    assert pending["state"] == "generating"
+    generate_overview(record.pk, chunk_set.pk, chunk_set.content_hash, PROMPT_VERSION)
+    return overview_for(record)
 
 
 class _FailingEmbedder(EmbeddingProvider):
@@ -107,7 +121,7 @@ class WholePaperAssemblyTests:
         llm = ScriptedLLM(reply="An account [1].")
 
         with use_composition_root(_root(llm)):
-            overview_for(paper)
+            _generate_overview(paper)
 
         prompt = _prompt(llm)
         positions = [prompt.index(word) for word in ("FIRST", "SECOND", "THIRD")]
@@ -117,7 +131,7 @@ class WholePaperAssemblyTests:
         llm = ScriptedLLM(reply="An account [1].")
 
         with use_composition_root(_root(llm)):
-            overview_for(paper)
+            _generate_overview(paper)
 
         prompt = _prompt(llm)
         assert "STALE" not in prompt
@@ -127,7 +141,7 @@ class WholePaperAssemblyTests:
         llm = ScriptedLLM(reply="The gauge network is sparse [3].")
 
         with use_composition_root(_root(llm)):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         [citation] = result["overview"]["citations"]
         third = paper.chunks[2]
@@ -140,7 +154,7 @@ class NoRetrievalTests:
         self, paper
     ):
         with use_composition_root(_root(ScriptedLLM(reply="An account [1]."))):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         assert result["state"] == "ready"
 
@@ -150,7 +164,7 @@ class ReusedSeamsTests:
         root = _root(ScriptedLLM(reply="An account [1]."))
 
         with use_composition_root(root):
-            overview_for(paper)
+            _generate_overview(paper)
 
         assert root.tasks == [InferenceTask.SUMMARY]
 
@@ -158,11 +172,11 @@ class ReusedSeamsTests:
         llm = ScriptedLLM(reply="An account [1].")
 
         with use_composition_root(_root(llm, permits=lambda record: False)):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         assert result == {"state": "unavailable", "overview": None}
         assert llm.calls == []
-        assert not RecordOverview.objects.filter(record=paper).exists()
+        assert RecordOverview.objects.get(record=paper).state == "unavailable"
 
 
 class PromptVersionTests:
@@ -174,7 +188,7 @@ class PromptVersionTests:
         llm = ScriptedLLM(reply="From the whole paper [1].")
 
         with use_composition_root(_root(llm)):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         assert len(llm.calls) == 1
         assert result["overview"]["text"] == "From the whole paper [1]."

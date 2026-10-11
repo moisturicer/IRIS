@@ -14,6 +14,7 @@ things only Postgres actually enforces.
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
+from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
 from apps.ai.chunking import ChunkingOptions
@@ -324,13 +325,24 @@ def test_a_chunking_run_queues_the_vectors_it_leaves_owing(
     where that stage lives.
     """
     queued = []
+    overview_queued = []
     monkeypatch.setattr(
         "apps.ai.tasks.embed_chunk_set.delay", lambda record_id: queued.append(record_id)
     )
+    monkeypatch.setattr(
+        "apps.ai.tasks.generate_record_overview.delay",
+        lambda *args: overview_queued.append(args),
+    )
 
-    chunk_extraction.apply(args=[extraction.id])
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        chunk_extraction.apply(args=[extraction.id])
 
     assert queued == [upload.record_id]
+    assert len(overview_queued) == 1
+    assert overview_queued[0][0] == upload.record_id
+    assert overview_queued[0][1] == ChunkSetModel.objects.get(
+        record_id=upload.record_id, is_active=True
+    ).pk
 
 
 def test_a_re_run_that_writes_nothing_queues_no_embedding(

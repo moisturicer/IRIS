@@ -260,6 +260,7 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
+    "apps.ai.tasks.generate_record_overview": {"queue": "embedding"},
     # IR-466: its own concurrency-1 worker, apart from reader work.
     "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
 }

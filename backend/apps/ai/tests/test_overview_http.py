@@ -1,16 +1,18 @@
-"""GET /api/v1/ai/records/<id>/overview/ (IR-334).
+"""GET /api/v1/ai/records/<id>/overview/ (IR-334, IR-435).
 
 `PaperAiOverview` used to fire `/ai/ask/` on every mount -- a paid vendor
 call on every page view, for an answer that cannot change until the record is
-re-chunked. This is the endpoint that replaced it, and the tests pin down the
-one property that motivated it: the vendor is called once, not once per view.
+re-chunked. The tests pin down that the endpoint queues generation once and
+never waits for the vendor call inside a reader's request.
 """
 
 import pytest
+from django.test import TestCase
 from django.urls import reverse
 
 from apps.ai.composition import use_composition_root
 from apps.ai.models import ChunkSet, RecordOverview
+from apps.ai.tasks import generate_record_overview
 from apps.ai.providers.fakes import ScriptedLLM
 from core.enums import PipelineStatus
 
@@ -23,22 +25,40 @@ def _overview(client, record_id):
     return client.get(reverse("ai-record-overview", args=[record_id]))
 
 
+def _run_queued_generation(client, record, root, queued):
+    with use_composition_root(root):
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            response = _overview(client, record.pk)
+        for args in queued:
+            result = generate_record_overview.apply(args=args)
+            assert result.successful()
+    return response
+
+
 class GeneratedOnceAndCachedTests:
-    def test_two_reads_produce_one_vendor_call(self, embedder, space, client_for):
+    def test_two_readers_share_one_queued_generation(self, embedder, space, client_for, monkeypatch):
         reader = make_user("reader@cit.edu")
         record = make_record(
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
-        llm = ScriptedLLM(reply="A methodology summary [1].")
         client = client_for(reader)
+        llm = ScriptedLLM(reply="A methodology summary [1].")
+        root = root_with(embedder=embedder, llm=llm)
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
+        )
 
-        with use_composition_root(root_with(embedder=embedder, llm=llm)):
-            first = _overview(client, record.pk)
-            second = _overview(client, record.pk)
+        with use_composition_root(root):
+            with TestCase.captureOnCommitCallbacks(execute=True):
+                first = _overview(client, record.pk)
+                second = _overview(client, record.pk)
 
         assert first.status_code == second.status_code == 200
-        assert len(llm.calls) == 1
-        assert first.json()["overview"]["text"] == second.json()["overview"]["text"]
+        assert first.json()["state"] == second.json()["state"] == "generating"
+        assert len(queued) == 1
+        assert llm.calls == []
 
     def test_a_row_is_persisted_after_the_first_read(self, embedder, space, client_for):
         reader = make_user("reader@cit.edu")
@@ -47,23 +67,29 @@ class GeneratedOnceAndCachedTests:
         )
 
         with use_composition_root(root_with(embedder=embedder)):
-            _overview(client_for(reader), record.pk)
+            response = _overview(client_for(reader), record.pk)
 
-        assert RecordOverview.objects.filter(record=record).exists()
+        assert response.json()["state"] == "generating"
+        assert RecordOverview.objects.get(record=record).state == "generating"
 
-    def test_the_second_read_reports_it_came_from_cache(self, embedder, space, client_for):
+    def test_a_ready_row_is_returned_from_the_cache(self, embedder, space, client_for):
         reader = make_user("reader@cit.edu")
         record = make_record(
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
         client = client_for(reader)
+        chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+        RecordOverview.objects.create(
+            record=record,
+            text="A cached overview.",
+            content_hash=chunk_set.content_hash,
+            prompt_version=2,
+        )
 
-        with use_composition_root(root_with(embedder=embedder)):
-            first = _overview(client, record.pk)
-            second = _overview(client, record.pk)
+        response = _overview(client, record.pk)
 
-        assert first.json()["cached"] is False
-        assert second.json()["cached"] is True
+        assert response.json()["state"] == "ready"
+        assert response.json()["cached"] is True
 
 
 class InvalidationTests:
@@ -74,21 +100,21 @@ class InvalidationTests:
         record = make_record(
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
-        llm = ScriptedLLM(reply="First summary [1].")
         client = client_for(reader)
-
-        with use_composition_root(root_with(embedder=embedder, llm=llm)):
-            _overview(client, record.pk)
+        old_chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+        RecordOverview.objects.create(
+            record=record, text="Old overview.", content_hash=old_chunk_set.content_hash,
+            prompt_version=2,
+        )
 
         # A re-chunk: the active set's hash changes underneath the cached row.
         ChunkSet.objects.filter(record=record, is_active=True).update(
             content_hash="a-new-hash-after-rechunking"
         )
 
-        with use_composition_root(root_with(embedder=embedder, llm=llm)):
-            _overview(client, record.pk)
+        response = _overview(client, record.pk)
 
-        assert len(llm.calls) == 2
+        assert response.json()["state"] == "generating"
 
     def test_a_record_with_no_chunk_set_reports_not_indexed(
         self, embedder, space, client_for
@@ -108,39 +134,35 @@ class InvalidationTests:
 
 
 class UnavailableIsNeverCachedTests:
-    def test_an_unavailable_model_is_not_stored(self, embedder, space, client_for):
-        from apps.ai.tests.corpus import _BrokenLLM
-
+    def test_an_unavailable_generation_is_reported_and_can_be_retried(
+        self, embedder, space, client_for, monkeypatch
+    ):
         reader = make_user("reader@cit.edu")
         record = make_record(
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
 
-        with use_composition_root(root_with(embedder=embedder, llm=_BrokenLLM())):
-            response = _overview(client_for(reader), record.pk)
-
-        assert response.json()["state"] == "unavailable"
-        assert not RecordOverview.objects.filter(record=record).exists()
-
-    def test_the_next_view_tries_again_once_the_model_is_back(
-        self, embedder, space, client_for
-    ):
-        from apps.ai.tests.corpus import _BrokenLLM
-
-        reader = make_user("reader@cit.edu")
-        record = make_record(
-            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+        RecordOverview.objects.create(
+            record=record, state="unavailable", text="",
+            content_hash=chunk_set.content_hash, prompt_version=2,
+        )
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
         )
         client = client_for(reader)
 
-        with use_composition_root(root_with(embedder=embedder, llm=_BrokenLLM())):
-            _overview(client, record.pk)
-
-        with use_composition_root(root_with(embedder=embedder)):
+        with TestCase.captureOnCommitCallbacks(execute=True):
             response = _overview(client, record.pk)
+            retry = client.get(
+                reverse("ai-record-overview", args=[record.pk]), {"retry": "true"}
+            )
 
-        assert response.json()["state"] == "ready"
-
+        assert response.json()["state"] == "unavailable"
+        assert retry.json()["state"] == "generating"
+        assert len(queued) == 1
 
 class SummaryRunsAsItsOwnInferenceTaskTests:
     """IR-380: the overview stops borrowing the answer path's model.
@@ -181,7 +203,7 @@ class SummaryRunsAsItsOwnInferenceTaskTests:
         )
 
     def test_the_overview_reaches_the_summary_model_not_the_answer_one(
-        self, embedder, space, client_for, settings, built_configs
+        self, embedder, space, client_for, settings, built_configs, monkeypatch
     ):
         settings.LLM_ANSWER_MODEL = "answer-model"
         settings.LLM_ANSWER_API_KEY = "k"
@@ -192,14 +214,21 @@ class SummaryRunsAsItsOwnInferenceTaskTests:
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
 
-        with use_composition_root(self._profiled_root(embedder)):
-            response = _overview(client_for(make_user("reader@cit.edu")), record.pk)
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
+        )
+        response = _run_queued_generation(
+            client_for(make_user("reader@cit.edu")), record,
+            self._profiled_root(embedder), queued,
+        )
 
         assert response.status_code == 200
         assert [config.model for config in built_configs] == ["summary-model"]
 
     def test_the_summary_request_carries_no_reasoning_configuration(
-        self, embedder, space, client_for, settings, built_configs
+        self, embedder, space, client_for, settings, built_configs, monkeypatch
     ):
         settings.LLM_SUMMARY_MODEL = "summary-model"
         settings.LLM_SUMMARY_API_KEY = "k"
@@ -210,13 +239,20 @@ class SummaryRunsAsItsOwnInferenceTaskTests:
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
 
-        with use_composition_root(self._profiled_root(embedder)):
-            _overview(client_for(make_user("reader@cit.edu")), record.pk)
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
+        )
+        _run_queued_generation(
+            client_for(make_user("reader@cit.edu")), record,
+            self._profiled_root(embedder), queued,
+        )
 
         assert [config.reasoning_effort for config in built_configs] == [""]
 
     def test_an_unconfigured_summary_task_is_unavailable_not_an_error(
-        self, embedder, space, client_for, settings, built_configs
+        self, embedder, space, client_for, settings, built_configs, monkeypatch
     ):
         """No `LLM_SUMMARY_MODEL` switches the overview off, rather than
         falling through to the answer model (ADR-036's no-silent-fall-through
@@ -232,13 +268,20 @@ class SummaryRunsAsItsOwnInferenceTaskTests:
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
 
-        with use_composition_root(self._profiled_root(embedder)):
-            response = _overview(client_for(make_user("reader@cit.edu")), record.pk)
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
+        )
+        response = _run_queued_generation(
+            client_for(make_user("reader@cit.edu")), record,
+            self._profiled_root(embedder), queued,
+        )
 
         assert response.status_code == 200
-        assert response.json()["state"] == "unavailable"
+        assert response.json()["state"] == "generating"
         assert built_configs == []
-        assert not RecordOverview.objects.filter(record=record).exists()
+        assert RecordOverview.objects.get(record=record).state == "unavailable"
 
 
 class OversizedPaperTests:
@@ -273,7 +316,7 @@ class OversizedPaperTests:
         assert not RecordOverview.objects.filter(record=record).exists()
 
     def test_a_paper_at_the_ceiling_is_still_summarised(
-        self, embedder, space, client_for, settings
+        self, embedder, space, client_for, settings, monkeypatch
     ):
         reader = make_user("reader@cit.edu")
         record = make_record(
@@ -281,22 +324,36 @@ class OversizedPaperTests:
         )
         settings.AI_OVERVIEW_TOKEN_CEILING = self._shrink_ceiling(record, settings)
 
-        with use_composition_root(root_with(embedder=embedder)):
-            body = _overview(client_for(reader), record.pk).json()
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
+        )
+        response = _run_queued_generation(
+            client_for(reader), record, root_with(embedder=embedder), queued
+        )
 
-        assert body["state"] == "ready"
+        assert response.json()["state"] == "generating"
+        assert RecordOverview.objects.get(record=record).state == "ready"
 
-    def test_zero_disables_the_ceiling(self, embedder, space, client_for, settings):
+    def test_zero_disables_the_ceiling(self, embedder, space, client_for, settings, monkeypatch):
         reader = make_user("reader@cit.edu")
         record = make_record(
             title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
         )
         settings.AI_OVERVIEW_TOKEN_CEILING = 0
 
-        with use_composition_root(root_with(embedder=embedder)):
-            body = _overview(client_for(reader), record.pk).json()
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
+        )
+        response = _run_queued_generation(
+            client_for(reader), record, root_with(embedder=embedder), queued
+        )
 
-        assert body["state"] == "ready"
+        assert response.json()["state"] == "generating"
+        assert RecordOverview.objects.get(record=record).state == "ready"
 
 
 class VisibilityTests:
