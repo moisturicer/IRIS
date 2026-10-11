@@ -48,3 +48,17 @@ export function toggleSavedOpportunity(id: number): boolean {
   write(next);
   return next.includes(id);
 }
+
+/**
+ * Forgets saved ids that are no longer on the board (IR-530): the call was
+ * deleted, or the server dropped it a month after its deadline. Without this
+ * the Saved count keeps counting calls nobody can see. Call it only with the
+ * full board, never with a filtered or partial list.
+ */
+export function pruneSavedOpportunities(onBoard: readonly number[]): number[] {
+  const keep = new Set(onBoard);
+  const ids = read();
+  const next = ids.filter((id) => keep.has(id));
+  if (next.length !== ids.length) write(next);
+  return next;
+}
