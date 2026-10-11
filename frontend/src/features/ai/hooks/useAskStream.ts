@@ -33,6 +33,7 @@ interface AskStreamOptions {
   topK?:           number;
   widen?:          boolean;
   routeOverride?:  ChatLane;
+  routeOverrideTurnId?: number;
 }
 
 export interface AskStreamResult {
@@ -128,6 +129,7 @@ export function useAskStream() {
             const body = (payload.answer ?? payload.message ?? "No readable sources matched that question.") as string;
             const message = newChatMessage("assistant", body, {
               citations: payload.citations as ChatCitation[],
+              turnId: payload.turn_id as number | undefined,
               routing: (payload.routing as RoutingDecision | undefined) ?? routing,
               listing: payload.listing as ChatMessage["listing"],
               question,

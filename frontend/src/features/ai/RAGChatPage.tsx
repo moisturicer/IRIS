@@ -110,13 +110,13 @@ export default function RAGChatPage() {
    * so it cannot go through `handleSend`'s read of that state.
    */
   const sendQuestion = useCallback(
-    async (conversationId: number, question: string, priorMessages: ChatMessage[], routeOverride?: ChatLane, widen?: boolean) => {
+    async (conversationId: number, question: string, priorMessages: ChatMessage[], routeOverride?: ChatLane, widen?: boolean, routeOverrideTurnId?: number) => {
       const nextMessages = [...priorMessages, newChatMessage("user", question)];
       setMessages(nextMessages);
 
       setLoading(true);
       try {
-        const { message } = await ask(question, { conversationId, ...(routeOverride ? { routeOverride, widen } : {}) });
+        const { message } = await ask(question, { conversationId, ...(routeOverride ? { routeOverride, widen, ...(routeOverrideTurnId !== undefined ? { routeOverrideTurnId } : {}) } : {}) });
         setMessages([...nextMessages, message]);
         if (message.citations?.length) {
           setSourcesOpen(true);
@@ -316,7 +316,7 @@ export default function RAGChatPage() {
           <ChatMessageList
             onRouteOverride={(message, lane) => {
               if (activeId && !loading && message.question) {
-                void sendQuestion(activeId, message.question, messages, lane, message.widened ?? false);
+                void sendQuestion(activeId, message.question, messages, lane, message.widened ?? false, message.turnId);
               }
             }}
             messages={messages}

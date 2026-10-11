@@ -11,6 +11,7 @@ import type { ChatCitation, SemanticSearchResult, RoutingDecision, AnswerListing
 export type ChatRole = "user" | "assistant";
 
 export interface ChatMessage {
+  turnId?: number;
   routing?: RoutingDecision;
   listing?: AnswerListing;
   question?: string;

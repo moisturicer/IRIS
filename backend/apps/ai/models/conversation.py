@@ -69,7 +69,12 @@ def model_history_q(prefix: str = "") -> models.Q:
     Postgres semi-join the whole `Turn` table to answer a question about one
     Conversation's rows.
     """
-    return models.Q(**{f"{prefix}state__in": MODEL_HISTORY_STATES})
+    # Missing JSON keys must be admitted explicitly: SQL NOT(NULL) is NULL.
+    # Aggregate Turns lack full permission provenance for model-history reuse.
+    return models.Q(**{f"{prefix}state__in": MODEL_HISTORY_STATES}) & (
+        models.Q(**{f"{prefix}routing__lane__isnull": True})
+        | ~models.Q(**{f"{prefix}routing__lane__in": ["listing", "count"]})
+    )
 
 
 class TurnQuerySet(models.QuerySet):

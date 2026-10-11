@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from apps.ai.composition import use_composition_root
 from apps.ai.inference import InferenceTask
-from apps.ai.models import Conversation
+from apps.ai.models import Conversation, Turn
 from apps.ai.providers.decisions import ScriptedDecisionModel
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.ports import LLMProvider
@@ -23,7 +23,7 @@ def route(monkeypatch, lane, injection=False):
     probabilities[lane] = 0.95
     probabilities["injection"] = 0.99 if injection else 0.01
     jev = ScriptedDecisionModel(probabilities)
-    monkeypatch.setattr("apps.ai.routing.chat.configured_providers", lambda: (jev, None))
+    monkeypatch.setattr("apps.ai.routing.chat.configured_providers", lambda **kwargs: (jev, None))
     return jev
 
 
@@ -43,7 +43,7 @@ def answer(client, endpoint, question, **options):
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
 def test_off_never_constructs_router_or_changes_response(endpoint, settings, monkeypatch, embedder, space, client_for):
     settings.AI_RESEARCH_LANE = "off"
-    monkeypatch.setattr("apps.ai.routing.chat.configured_providers", lambda: pytest.fail("router constructed while off"))
+    monkeypatch.setattr("apps.ai.routing.chat.configured_providers", lambda **kwargs: pytest.fail("router constructed while off"))
     reader = make_user("off@cit.edu")
     make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
     with use_composition_root(root_with(embedder=embedder)):
@@ -202,7 +202,7 @@ def test_research_reaches_bounded_planner_after_explicit_widen(endpoint, setting
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
 def test_landscape_refusal_survives_router_outage(endpoint, settings, monkeypatch, client_for):
     settings.AI_RESEARCH_LANE = "on"
-    monkeypatch.setattr("apps.ai.routing.chat.configured_providers", lambda: (None, None))
+    monkeypatch.setattr("apps.ai.routing.chat.configured_providers", lambda **kwargs: (None, None))
     root = root_with()
     monkeypatch.setattr(root, "retriever", lambda **kw: pytest.fail("landscape retrieved during outage"))
     with use_composition_root(root):
@@ -210,3 +210,98 @@ def test_landscape_refusal_survives_router_outage(endpoint, settings, monkeypatc
     assert body["routing"]["lane"] == "landscape"
     assert body["mode"] == "no_results"
     assert "landscape" in body["message"]
+
+
+@pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
+def test_scoped_landscape_is_refused_without_passage_lookup(endpoint, settings, monkeypatch, embedder, space, client_for):
+    settings.AI_RESEARCH_LANE = "on"
+    route(monkeypatch, "landscape")
+    reader = make_user("scoped-landscape@cit.edu")
+    paper = make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+    conversation = Conversation.objects.create(user=reader, record=paper)
+    root = root_with(embedder=embedder)
+    monkeypatch.setattr(root, "retriever", lambda **kw: pytest.fail("scoped landscape retrieved"))
+    with use_composition_root(root):
+        body = answer(client_for(reader), endpoint, "What research gaps does this paper reveal?", conversation_id=conversation.pk)
+    assert body["routing"]["lane"] == "landscape"
+    assert body["mode"] == "no_results" and "landscape" in body["message"]
+    assert body["widened"] is False
+
+
+@pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
+def test_unresolved_unquoted_comparison_requests_explicit_titles(endpoint, settings, monkeypatch, embedder, space, client_for):
+    settings.AI_RESEARCH_LANE = "on"
+    route(monkeypatch, "comparison")
+    reader = make_user("unresolved-compare@cit.edu")
+    make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+    llm = ScriptedLLM("A single-paper answer [1].")
+    with use_composition_root(root_with(embedder=embedder, llm=llm)):
+        body = answer(client_for(reader), endpoint, "Compare Flood Prediction with Unknown Thesis")
+    assert body["mode"] == "no_results"
+    assert "Name each paper by its full title" in body["message"]
+    assert "Unknown Thesis" in body["message"]
+    assert not llm.calls
+
+
+@pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
+def test_original_turn_override_keeps_resolution_history_and_scope(endpoint, settings, monkeypatch, embedder, space, client_for):
+    settings.AI_RESEARCH_LANE = "on"
+    route(monkeypatch, "research")
+    reader = make_user("old-override@cit.edu")
+    paper = make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+    conversation = Conversation.objects.create(user=reader, record=paper)
+    Turn.objects.create(conversation=conversation, question="What trained Flood Prediction?", answer="Rainfall gauges.", state="generated")
+    source = Turn.objects.create(conversation=conversation, question="What are its methods?", resolved_question=FLOOD_QUESTION, answer="Rainfall method.", state="generated", widened=False)
+    Turn.objects.create(conversation=conversation, question="Tell me about Other Study", answer="Other Study is about ponds.", state="generated")
+    root = root_with(embedder=embedder)
+    monkeypatch.setattr(root, "resolver", lambda: pytest.fail("saved override re-resolved"))
+    llm = root.llm_for(InferenceTask.ANSWER)
+    with use_composition_root(root):
+        body = answer(client_for(reader), endpoint, source.question, conversation_id=conversation.pk,
+                      route_override="passage", route_override_turn_id=source.pk, widen=True)
+    assert body["resolved_question"] == FLOOD_QUESTION
+    assert body["widened"] is False
+    assert body["turn_id"] > source.pk
+    assert body["routing"]["override_applied"]
+    assert FLOOD_QUESTION in llm.calls[0][1]
+    assert "Other Study" not in llm.calls[0][1]
+    replay = client_for(reader).get(reverse("ai-conversation-detail", args=[conversation.pk])).json()["turns"][-1]
+    assert replay["question"] == source.question
+    assert replay["resolved_question"] == source.resolved_question
+
+
+def test_override_reference_must_belong_to_owned_conversation(settings, client_for):
+    settings.AI_RESEARCH_LANE = "on"
+    reader, other = make_user("ref-reader@cit.edu"), make_user("ref-other@cit.edu")
+    own = Conversation.objects.create(user=reader)
+    foreign = Conversation.objects.create(user=other)
+    turn = Turn.objects.create(conversation=foreign, question="secret", answer="secret", state="generated")
+    client = client_for(reader)
+    for reference in (turn.pk, turn.pk + 999):
+        response = client.post(reverse("ai-ask"), {"question": "q", "conversation_id": own.pk,
+            "route_override": "passage", "route_override_turn_id": reference}, format="json")
+        assert response.status_code == 404
+
+
+def test_count_totals_do_not_reach_planner_after_permission_change(settings, monkeypatch, embedder, space, client_for):
+    from apps.ai.providers.fakes import ScriptedToolCallingLLM
+
+    settings.AI_RESEARCH_LANE = "on"
+    route(monkeypatch, "count")
+    reader = make_user("count-history@cit.edu")
+    paper = make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+    conversation = Conversation.objects.create(user=reader)
+    root = root_with(embedder=embedder)
+    planner = ScriptedToolCallingLLM([ScriptedToolCallingLLM.calling("finish", "{}", "finish")])
+    real = root.llm_for
+    monkeypatch.setattr(root, "llm_for", lambda task: Screen() if task == InferenceTask.SCREEN else planner if task == InferenceTask.PLAN else real(task))
+    with use_composition_root(root):
+        counted = answer(client_for(reader), "ai-ask", "How many papers about rainfall?", conversation_id=conversation.pk)
+        assert "1 matched out of 1 checked" in counted["answer"]
+        Record.objects.filter(pk=paper.pk).update(pipeline_status=PipelineStatus.DRAFT)
+        route(monkeypatch, "research")
+        answer(client_for(reader), "ai-ask", "Investigate pond methods", conversation_id=conversation.pk)
+    sent = str(planner.conversation_requests)
+    assert "matched out of" not in sent and "checked;" not in sent
+    replay = client_for(reader).get(reverse("ai-conversation-detail", args=[conversation.pk])).json()["turns"]
+    assert "1 matched out of 1 checked" in replay[0]["answer"]

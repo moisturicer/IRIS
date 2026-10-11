@@ -7,7 +7,6 @@ from django.core.exceptions import ImproperlyConfigured
 
 from apps.ai.answers.citations import GroundedAnswer, NO_SOURCES
 from apps.ai.answers.events import AnswerEvent
-from apps.ai.composition import composition_root
 from .configuration import configured_providers
 from .router import LANES, route_question
 
@@ -26,8 +25,9 @@ class RoutingDecided(AnswerEvent):
 
 
 class RoutedChat:
-    def __init__(self, asked, *, max_sources):
+    def __init__(self, asked, *, root, max_sources):
         self.asked = asked
+        self.root = root
         self.max_sources = max_sources
         self.decision = None
         self.listing = None
@@ -46,7 +46,7 @@ class RoutedChat:
         if self.decision is not None or settings.AI_RESEARCH_LANE == "off":
             return
         asked = self.asked
-        jev, backup = configured_providers()
+        jev, backup = configured_providers(root=self.root)
         result = route_question(
             asked.question, resolved_question=asked.resolved_question,
             prior_reader_questions=[turn.question for turn in asked.history],
@@ -59,7 +59,7 @@ class RoutedChat:
         allowed = list(LANES)
         lane = result.lane
         # Reader overrides cannot bypass question screening or Paper Chat scope.
-        if result.suggested_lane == "landscape" and asked.scope_record is None:
+        if result.suggested_lane == "landscape":
             lane, allowed = "landscape", ["landscape"]
         elif result.injection_flagged or asked.scope_record is not None:
             allowed = ["passage"]
@@ -85,7 +85,7 @@ class RoutedChat:
 
         answer, self.listing = answer_lane(
             self.decision["lane"], self.asked.effective_question, user,
-            root=composition_root(), conversation=self.asked.conversation,
+            root=self.root, conversation=self.asked.conversation,
             scope_record=self.asked.scope_record, max_sources=self.max_sources,
         )
         return answer

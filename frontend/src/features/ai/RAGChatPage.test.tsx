@@ -201,16 +201,20 @@ describe("the retired browser storage", () => {
   });
 });
 
-it("reruns a replayed answer's original question in its conversation and scope", async () => {
+it("reruns an old answer using its original turn after newer discussion", async () => {
   list.mockResolvedValue({ data: [summary({ id: 9 })] });
   get.mockResolvedValue({ data: detail({ id: 9, turns: [{
     id: 1, question: "Find flooding papers", resolved_question: "A resolved question",
     answer: "Prior answer", message: null, state: "generative", degraded: false,
     widened: true, created_at: "2026-10-11", citations: [], routing: routingFixture,
+  }, {
+    id: 2, question: "Now discuss a different topic", resolved_question: null,
+    answer: "Newer answer", message: null, state: "generative", degraded: false,
+    widened: false, created_at: "2026-10-11", citations: [],
   }] }) });
   renderScreen(<RAGChatPage />);
   await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
   await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
-    conversationId: 9, routeOverride: "listing", widen: true,
+    conversationId: 9, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
   }));
 });

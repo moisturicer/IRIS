@@ -146,6 +146,7 @@ export interface RecordOverview {
 }
 
 export interface AIAnswer {
+  turn_id?: number;
   routing?: RoutingDecision;
   listing?: AnswerListing;
   /** Answer text, or null when nothing in the corpus matched. */

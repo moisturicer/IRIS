@@ -1,6 +1,7 @@
 """Between the two chat views and the answer service (IR-466, ADR-035 §6).
 
-Answers as before, records the Turn, then hands it to the evidence shadow.
+Dispatches default-off research routes, records the Turn and its decision,
+then hands it to the evidence shadow.
 Only the chat views use this, so the AI Overview -- the answer service's third
 caller -- never reaches an evidence decision.
 """
@@ -35,18 +36,21 @@ class ChatQuestion:
 class ChatOrchestrator:
     def __init__(self, asked: ChatQuestion, *, max_sources: int) -> None:
         self._asked = asked
-        self._routing = RoutedChat(asked, max_sources=max_sources)
+        self._root = composition_root()
+        self._routing = RoutedChat(asked, root=self._root, max_sources=max_sources)
         self._max_sources = max_sources
+        self._turn_id = None
 
     @property
     def _service(self):
-        return composition_root().answer_service(
+        return self._root.answer_service(
             max_sources=self._max_sources, record=self._asked.scope_record
         )
 
     @property
     def metadata(self):
-        return self._routing.metadata
+        metadata = self._routing.metadata
+        return {**metadata, "turn_id": self._turn_id} if metadata and self._turn_id else metadata
 
     def answer(self, user):
         asked = self._asked
@@ -100,7 +104,7 @@ class ChatOrchestrator:
         if asked.conversation is None:
             # A one-off question stores nothing, so there is nothing to shadow.
             return None
-        return record_turn(
+        turn = record_turn(
             asked.conversation,
             asked.question,
             answer,
@@ -109,6 +113,8 @@ class ChatOrchestrator:
             routing=self._routing.decision,
             listing=self._routing.listing,
         )
+        self._turn_id = turn.pk
+        return turn
 
     def _shadow(self, turn) -> None:
         if turn is not None:

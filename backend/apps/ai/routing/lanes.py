@@ -103,6 +103,15 @@ def _named_records(ctx, question):
     )]
     known = {record.title.casefold() for record in matched}
     missing = [title for title in quoted if title.casefold() not in known]
+    if not quoted:
+        remainder = question
+        for record in sorted(matched, key=lambda record: len(record.title), reverse=True):
+            remainder = re.sub(re.escape(record.title), "", remainder, flags=re.IGNORECASE)
+        # Unresolved text may be another title. Refuse an ambiguous comparison
+        # rather than silently comparing only the names we happened to resolve.
+        remainder = re.sub(r"\b(compare|comparison|contrast|with|and|vs|versus|to|of|the|papers|paper|studies|study)\b", "", remainder, flags=re.IGNORECASE)
+        if remainder.strip(" ,.;:?!"):
+            return [], [remainder.strip(" ,.;:?!")]
     return matched, missing
 
 
@@ -189,6 +198,3 @@ def answer_lane(lane, question, user, *, root, conversation=None, scope_record=N
             return _comparison(run, question, max_sources)
     except (LLMUnavailable, CircuitOpen, TimeoutError, ArgumentsRejected, BudgetExhausted):
         return _unavailable(), None
-
-
-

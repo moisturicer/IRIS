@@ -37,3 +37,14 @@ prevents model-invented records but gives up model-written grouping. Comparison
 uses exact full titles, so ambiguous or partial names require clarification rather
 than selecting a paper silently. Research holds a web worker and offers no live
 planner steps in this slice, as IR-515 specifies.
+
+
+Saved-turn overrides include `route_override_turn_id`. The owned Turn fixes the
+original question, resolved question, scope choice and history boundary, so rerunning
+an older follow-up does not resolve it against a newer paper. Cross-conversation
+references return the same 404 as missing references. Listing and count Turns remain
+reader-visible but are excluded from model history: this slice does not persist all
+aggregate visibility/disclosure provenance needed to reuse their totals safely.
+Ambiguous unquoted comparisons ask for explicit titles instead of silently omitting
+an unresolved name. Quote each full title to compare available evidence while
+reporting a missing paper.

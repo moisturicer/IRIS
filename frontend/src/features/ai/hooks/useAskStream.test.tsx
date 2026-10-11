@@ -282,15 +282,17 @@ it("keeps the live routing event and carries terminal listing rows into the answ
   askStream.mockReturnValue((async function* () {
     yield { event: "routing_decided", data: { routing: routingFixture } };
     await gate;
-    yield { event: "done", data: { answer: "Found papers", routing: routingFixture, listing } };
+    yield { event: "done", data: { answer: "Found papers", turn_id: 5, routing: routingFixture, listing } };
   })());
   const { result } = renderHook(() => useAskStream());
   let pending!: ReturnType<typeof result.current.ask>;
-  act(() => { pending = result.current.ask("Find flooding papers"); });
+  act(() => { pending = result.current.ask("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 }); });
   await waitFor(() => expect(result.current.streaming?.routing).toEqual(routingFixture));
   let outcome!: Awaited<typeof pending>;
   await act(async () => { release(); outcome = await pending; });
   expect(outcome.message.routing).toEqual(routingFixture);
   expect(outcome.message.listing).toEqual(listing);
   expect(outcome.message.question).toBe("Find flooding papers");
+  expect(outcome.message.turnId).toBe(5);
+  expect(askStream).toHaveBeenCalledWith("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 });
 });

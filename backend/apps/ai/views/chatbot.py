@@ -167,19 +167,30 @@ def _prepare_ask_request(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    history = _recent_turns(conversation) if conversation is not None else []
-
-    resolved_question = None
-    if conversation is not None:
-        resolver = composition_root().resolver()
-        if resolver is not None:
-            resolved_question = resolver.resolve(question, history)
+    override_turn = None
+    turn_reference = request.data.get("route_override_turn_id")
+    if turn_reference is not None:
+        if route_override is None or conversation is None:
+            return None, Response({"detail": "An override Turn requires a lane and conversation."}, status=400)
+        if type(turn_reference) is not int or turn_reference < 1:
+            return None, Response({"detail": "route_override_turn_id must be a positive integer."}, status=400)
+        override_turn = conversation.turns.filter(pk=turn_reference).first()
+        if override_turn is None:
+            raise Http404
+        question = override_turn.question
+        history = recent_window(conversation.turns.filter(pk__lt=override_turn.pk))
+        resolved_question = override_turn.resolved_question or None
+    else:
+        history = _recent_turns(conversation) if conversation is not None else []
+        resolved_question = None
+        if conversation is not None:
+            resolver = composition_root().resolver()
+            if resolver is not None:
+                resolved_question = resolver.resolve(question, history)
     effective_question = resolved_question or question
 
-    # Widened only when there was a scope to widen *from* -- an unscoped
-    # Conversation, or no Conversation, was never narrower than "every
-    # paper", so `widen` has nothing to do there.
-    widen = bool(request.data.get("widen"))
+    # A saved override reuses the scope choice that produced the original Turn.
+    widen = override_turn.widened if override_turn else bool(request.data.get("widen"))
     scoped_to = conversation.record if conversation is not None else None
     widened = scoped_to is not None and widen
     scope_record = None if widened else scoped_to

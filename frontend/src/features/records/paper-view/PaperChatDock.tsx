@@ -237,7 +237,7 @@ export function PaperChatPanel({
     if (!minimized && transcript) transcript.scrollTop = transcriptScrollTop.current;
   }, [minimized]);
 
-  const sendQuestion = async (question: string, questionWiden: boolean, routeOverride?: ChatLane) => {
+  const sendQuestion = async (question: string, questionWiden: boolean, routeOverride?: ChatLane, routeOverrideTurnId?: number) => {
     if (!question || busy || !conversationId) return;
 
     setMessages((prev) => [...prev, newChatMessage("user", question)]);
@@ -249,7 +249,7 @@ export function PaperChatPanel({
       if (subjectId.current === askedAbout) setMessages((prev) => [...prev, reply]);
     };
     try {
-      const { message } = await ask(question, { conversationId, widen: questionWiden, ...(routeOverride ? { routeOverride } : {}) });
+      const { message } = await ask(question, { conversationId, widen: questionWiden, ...(routeOverride ? { routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { routeOverrideTurnId } : {}) });
       show(message);
     } catch {
       show(newChatMessage("assistant", "IRIS could not answer right now."));
@@ -454,7 +454,7 @@ export function PaperChatPanel({
           {messages.map((m) => (
             <ChatMessageBubble key={m.id} message={m} compact overrideDisabled={busy || !conversationId}
               onRouteOverride={(message, lane) => {
-                if (message.question) void sendQuestion(message.question, message.widened ?? false, lane);
+                if (message.question) void sendQuestion(message.question, message.widened ?? false, lane, message.turnId);
               }} />
           ))}
 
