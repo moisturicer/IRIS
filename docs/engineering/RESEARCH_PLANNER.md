@@ -41,7 +41,9 @@ It checks citation numbers against the supplied source-to-handle mapping,
 literal numbers against computed rows or cited passages, marked title spans
 against the ledger, and completeness phrases against all successful results.
 The research prompt requires titles to use `«exact title»`; quoted, italicized
-and `titled ...` spans are checked too. These are literal checks, not semantic
+and explicit unmarked introductions such as `the paper Imaginary Study`
+are checked too. Leaked `<think>` reasoning is removed before these checks.
+These are literal checks, not semantic
 claim verification: unmarked titles, paraphrased completeness and arbitrary
 number wording are not guaranteed to be recognizable. Claim support remains
 an offline measurement. The conservative implementation withholds the whole

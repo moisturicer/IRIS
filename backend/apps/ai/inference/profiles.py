@@ -275,7 +275,7 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
                 () if named_vendor else resolve.provider_only
             ),
             model_provider_pins=_model_provider_pins(prefix) or (
-                () if named_vendor else resolve.model_provider_pins
+                resolve.model_provider_pins if task is InferenceTask.PLAN and not named_vendor else ()
             ),
         )
     # Already empty when a vendor is named, which is what stops half the flat

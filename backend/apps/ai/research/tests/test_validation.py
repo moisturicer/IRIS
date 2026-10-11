@@ -19,6 +19,7 @@ def check(text, *, computed=None, label=Completeness.SAMPLE):
     ("Accuracy was 98 percent [1].", "unsupported_number"),
     ("The paper «Invented flood study» agrees [1].", "unknown_title"),
     ('The paper "Invented flood study" agrees [1].', "unknown_title"),
+    ("The paper Imaginary Study supports this [1].", "unknown_title"),
     ("All papers agree [1].", "completeness_overclaim"),
     ("There are 2 studies [1].", "completeness_overclaim"),
     ("Two gauges were used [E9].", "unknown_citation"),

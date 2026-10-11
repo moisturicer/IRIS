@@ -146,3 +146,42 @@ def test_a_late_planner_response_cannot_start_an_answer_call(corpus, embedder):
     assert result.stop_reason == "wall_clock_seconds"
     assert result.answer.sources
     assert answerer.calls == []
+
+
+def test_an_empty_planning_budget_cannot_be_bypassed_by_fallback(corpus, embedder):
+    stack = root(embedder)
+    ctx = RunContext.for_request(user=corpus["student"], root=stack, lane="research", budget=replace(Budget.from_settings(), max_prompt_tokens=0))
+    answerer = ScriptedLLM()
+    result = ResearchPlanner(stack, planner=planning(("finish", {})), answer_llm=answerer).answer(TOPIC, ctx)
+    assert result.stop_reason == "max_prompt_tokens"
+    assert result.answer.state == "unavailable"
+    assert result.answer.sources
+    assert answerer.calls == []
+
+
+def test_leaked_reasoning_is_never_validated_as_answer_content(corpus, embedder):
+    stack = root(embedder)
+    ctx = RunContext.for_request(user=corpus["student"], root=stack, lane="research")
+    model = planning(("search_passages", {"query": TOPIC}), ("finish", {}))
+    reply = "<think>consider [99] and 987654</think>Supported prose [1]."
+    result = ResearchPlanner(stack, planner=model, answer_llm=ScriptedLLM(reply=reply)).answer(TOPIC, ctx)
+    assert result.validation_codes == ()
+    assert result.answer.state == "generated"
+    assert result.answer.text == "Supported prose [1]."
+
+
+def test_source_mapping_above_thirty_preserves_valid_citations(corpus, embedder):
+    from apps.ai.research.registry import ToolRun
+    from apps.ai.research.synthesis import synthesize
+    stack = root(embedder)
+    ctx = RunContext.for_request(user=corpus["student"], root=stack, lane="research", budget=replace(Budget.from_settings(), max_ledger_passages=40))
+    tool_run = ToolRun.start(ctx, stack)
+    for index in range(40):
+        tool_run.ledger.add_passage(record_id=corpus["public"].pk, chunk_id=index + 1, chunk_set_hash="fixture",
+                                   record_title="Flood forecasting", text="Known passage.", page=1,
+                                   context_path=(), score=1)
+    answer, handles, codes = synthesize(TOPIC, tool_run, ScriptedLLM(reply="Known passage [31]."), [])
+    assert codes == ()
+    assert answer.state == "generated"
+    assert handles[31] == "E31"
+    assert len(handles) == 40

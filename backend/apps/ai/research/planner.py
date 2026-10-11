@@ -24,7 +24,7 @@ from .budget import BudgetExhausted, Spend
 from .registry import ToolRun, research_tools
 from .results import ToolStatus
 from .schema import validate, ArgumentsRejected
-from .synthesis import AnswerTaskLLM, LedgerRetriever, synthesize
+from .synthesis import AnswerTaskLLM, BudgetedAnswerLLM, LedgerRetriever, synthesize
 from .tools.common import readable_records
 
 FINISH = ToolDefinition("finish", "Stop gathering evidence and write the answer once.", {
@@ -101,7 +101,7 @@ class ResearchPlanner:
                     shape_ok = call is not None and isinstance(call.id, str) and bool(call.id) and len(call.id) <= 128 and call.id not in seen_ids
                     if not shape_ok:
                         run.spend.charge_call()
-                        audit.append(Step("tool", "rejected", tool="invalid"))
+                        audit.append(Step("tool", ToolStatus.REJECTED.value, tool="invalid"))
                         malformed += 1
                         if malformed == 2:
                             reason = "malformed_call"
@@ -116,7 +116,7 @@ class ResearchPlanner:
                         try:
                             validate(call.arguments, FINISH.parameters)
                         except ArgumentsRejected:
-                            status, feedback = "rejected", CORRECTION
+                            status, feedback = ToolStatus.REJECTED.value, CORRECTION
                         else:
                             audit.append(Step("tool", "ok", tool="finish", argument_digest=argument_digest(call.arguments), latency_ms=self._ms(started)))
                             break
@@ -137,7 +137,7 @@ class ResearchPlanner:
                             break
                         if result.status is not ToolStatus.REJECTED:
                             results.append(result)
-                    if status == "rejected":
+                    if status == ToolStatus.REJECTED.value:
                         if call.name == "finish":
                             audit.append(Step("tool", status, tool="finish", argument_digest=argument_digest(call.arguments)))
                         malformed += 1
@@ -162,7 +162,7 @@ class ResearchPlanner:
             try:
                 answer_llm = answer_llm or AnswerTaskLLM(self.root)
                 if fallback:
-                    answer = self._fallback(question, ctx, answer_llm)
+                    answer = self._fallback(question, ctx, BudgetedAnswerLLM(answer_llm, run))
                     handles, codes = {}, ()
                 else:
                     answer, handles, codes = synthesize(question, run, answer_llm, results)

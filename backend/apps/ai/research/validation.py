@@ -21,6 +21,10 @@ _WORD_NUMBERS = {
 _WORDS = re.compile(r"\b(" + "|".join(_WORD_NUMBERS) + r")\b", re.I)
 _TITLE = re.compile(r'«([^»\n]+)»|“([^”\n]+)”|"([^"\n]+)"|(?<!\*)\*([^*\n]+)\*(?!\*)|\btitled\s+([^\n.\[]+)', re.I)
 _HANDLE = re.compile(r"\[([ER]\d+)\]")
+_INTRODUCED_TITLE = re.compile(
+    r"\b(?:paper|study|thesis|record)\s+(?:(?:titled|called|named)\s+)?"
+    r"([A-Z][\w'-]*(?:\s+(?:(?:of|the|for|and|in|on|with|a|to)\s+)?[A-Z][\w'-]*)+)"
+)
 _EXHAUSTIVE = re.compile(r"\b(all (?:the )?(?:papers|records|studies)|every (?:paper|record|study)|there are|exhaustive|complete (?:list|corpus)|only \d+ (?:papers|records|studies))\b", re.I)
 
 
@@ -54,6 +58,9 @@ def validate_answer(text, *, sources, ledger, results):
     for match in _TITLE.finditer(body):
         title = next(value for value in match.groups() if value is not None).casefold().strip()
         if title not in titles:
+            failures.add("unknown_title")
+    for match in _INTRODUCED_TITLE.finditer(body):
+        if match.group(1).casefold().strip() not in titles:
             failures.add("unknown_title")
     # Any partial result keeps this whole answer conservative. An exact
     # metadata count does not make a passage search exhaustive.

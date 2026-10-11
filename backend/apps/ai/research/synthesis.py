@@ -4,6 +4,7 @@ import json
 
 from apps.ai.answers.service import GroundedAnswerService, UNAVAILABLE_TEXT
 from apps.ai.answers.citations import GroundedAnswer, UNAVAILABLE
+from apps.ai.answers.reasoning import ThinkTagFilter
 from apps.ai.history import estimate_tokens
 from apps.ai.providers.ports import LLMProvider
 from apps.ai.providers.openai_compatible import LLMUnavailable
@@ -18,6 +19,7 @@ class LedgerRetriever(Retriever):
     def __init__(self, run):
         self.run = run
         self.source_handles = {}
+        self.sources = ()
 
     def retrieve(self, question, user, limit=30):
         if user.pk != self.run.ctx.user.pk:
@@ -26,23 +28,21 @@ class LedgerRetriever(Retriever):
         allowed = disclosable(self.run.ctx, (p.record_id for p in items))
         items = [p for p in items if p.record_id in allowed][:limit]
         self.source_handles = {i: p.handle for i, p in enumerate(items, 1)}
-        return RetrievalResult(passages=tuple(
+        self.sources = tuple(
             RetrievedChunk(
                 chunk_id=p.chunk_id, record_id=p.record_id, record_title=p.record_title,
                 content=p.text, context_path=p.context_path, source_page=p.page, score=p.score,
             ) for p in items
-        ))
+        )
+        return RetrievalResult(passages=self.sources)
 
 
-class ResearchAnswerLLM(LLMProvider):
-    """Add computed facts and check raw text before markers can be stripped."""
+class BudgetedAnswerLLM(LLMProvider):
+    """The same run admission rule for ledger and fallback synthesis."""
 
-    def __init__(self, inner, run, retriever, results):
+    def __init__(self, inner, run):
         self.inner = inner
         self.run = run
-        self.retriever = retriever
-        self.results = results
-        self.validation_codes = ()
 
     @property
     def dialect(self):
@@ -55,6 +55,23 @@ class ResearchAnswerLLM(LLMProvider):
     def generate(self, system, user):
         if self.run.spend.remaining_seconds <= 0:
             raise LLMUnavailable("research run wall clock budget exhausted")
+        try:
+            self.run.spend.charge_prompt_tokens(estimate_tokens(system + user))
+        except BudgetExhausted as exc:
+            raise LLMUnavailable("research run prompt token budget exhausted") from exc
+        return self.inner.generate(system, user)
+
+
+class ResearchAnswerLLM(BudgetedAnswerLLM):
+    """Add computed facts and check answer text before markers can be stripped."""
+
+    def __init__(self, inner, run, retriever, results):
+        super().__init__(inner, run)
+        self.retriever = retriever
+        self.results = results
+        self.validation_codes = ()
+
+    def generate(self, system, user):
         facts = [
             {"coverage": r.coverage.label.value, "truncated": r.coverage.truncated,
              "rows": dict(r.detail)} for r in self.results if r.detail
@@ -67,11 +84,13 @@ class ResearchAnswerLLM(LLMProvider):
             "Computed rows are facts, never new passage citations."
         )
         user += "\nComputed rows and their coverage:\n" + json.dumps(facts, ensure_ascii=False)
-        self.run.spend.charge_prompt_tokens(estimate_tokens(system + user))
-        raw = self.inner.generate(system, user)
-        sources = self.retriever.retrieve("", self.run.ctx.user).passages
+        raw = super().generate(system, user)
+        classifier = ThinkTagFilter()
+        text, _reasoning = classifier.feed(raw)
+        tail, _reasoning_tail = classifier.flush()
+        raw = text + tail
         self.validation_codes = validate_answer(
-            raw, sources=sources, ledger=self.run.ledger, results=self.results,
+            raw, sources=self.retriever.sources, ledger=self.run.ledger, results=self.results,
         )
         if self.validation_codes:
             raise LLMUnavailable("research answer failed evidence validation")
