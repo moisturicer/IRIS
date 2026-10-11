@@ -384,6 +384,9 @@ LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
 # Grounded answering is extraction from supplied sources, not composition. A
 # higher temperature buys variety nobody asked for and invites invention.
 LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
+# Seconds before one model call is abandoned when no run deadline is shorter
+# (IR-511). A timeout is a transient failure: retry and the breaker apply.
+LLM_TIMEOUT_SECONDS = config("LLM_TIMEOUT_SECONDS", default=120.0, cast=float)
 # Unset by default -- a Groq/openai/gpt-oss-120b extension ("low"/"medium"/
 # "high") the openai SDK does not type, sent only when configured (IR-325).
 # Requesting it also requests include_reasoning, so a reasoning model's

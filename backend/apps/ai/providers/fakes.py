@@ -18,7 +18,15 @@ from dataclasses import dataclass
 from typing import Callable, Iterator, Optional, Sequence, Union
 
 from .ports import EmbeddingProvider, LLMProvider, RerankedCandidate, Reranker, StreamDelta
-from .tool_calling import ToolCall, ToolCallingLLM, ToolCompletion, ToolDefinition
+from .tool_calling import (
+    Message,
+    SystemMessage,
+    ToolCall,
+    ToolCallingLLM,
+    ToolCompletion,
+    ToolDefinition,
+    UserMessage,
+)
 
 
 #: Reserved dimension carrying the document/query marker. Reproducing
@@ -174,6 +182,15 @@ class ToolRequest:
     timeout_seconds: Optional[float]
 
 
+@dataclass(frozen=True)
+class ConversationRequest:
+    """One `converse_with_tools` call as it was actually sent."""
+
+    messages: tuple[Message, ...]
+    tools: tuple[ToolDefinition, ...]
+    timeout_seconds: Optional[float]
+
+
 #: What a scripted tool-calling provider hands back for one call: a completion,
 #: an exception to raise, or a function of the request producing either.
 ToolScriptStep = Union[ToolCompletion, BaseException]
@@ -200,6 +217,7 @@ class ScriptedToolCallingLLM(ScriptedLLM, ToolCallingLLM):
         self._script = script
         self._position = 0
         self.tool_requests: list[ToolRequest] = []
+        self.conversation_requests: list[ConversationRequest] = []
 
     def complete_with_tools(
         self,
@@ -211,6 +229,27 @@ class ScriptedToolCallingLLM(ScriptedLLM, ToolCallingLLM):
     ) -> ToolCompletion:
         request = ToolRequest(system, user, tuple(tools), timeout_seconds)
         self.tool_requests.append(request)
+        return self._next(request)
+
+    def converse_with_tools(
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        """Shares the script with `complete_with_tools`; a callable script
+        receives a `ToolRequest` whose `user` is the last user message."""
+        self.conversation_requests.append(
+            ConversationRequest(tuple(messages), tuple(tools), timeout_seconds)
+        )
+        system = next((m.content for m in messages if isinstance(m, SystemMessage)), "")
+        user = next(
+            (m.content for m in reversed(messages) if isinstance(m, UserMessage)), ""
+        )
+        return self._next(ToolRequest(system, user, tuple(tools), timeout_seconds))
+
+    def _next(self, request: ToolRequest) -> ToolCompletion:
         if callable(self._script):
             step = self._script(request)
         else:
@@ -229,9 +268,14 @@ class ScriptedToolCallingLLM(ScriptedLLM, ToolCallingLLM):
 
     @staticmethod
     def calling(
-        name: str = "search_corpus", arguments: str = "", **fields
+        name: str = "search_corpus",
+        arguments: str = "",
+        call_id: str = "",
+        **fields,
     ) -> ToolCompletion:
-        return ToolCompletion(tool_calls=(ToolCall(name, arguments),), **fields)
+        return ToolCompletion(
+            tool_calls=(ToolCall(name, arguments, call_id),), **fields
+        )
 
     @staticmethod
     def calling_twice(

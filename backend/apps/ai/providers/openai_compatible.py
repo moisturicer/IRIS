@@ -30,10 +30,21 @@ from typing import Any, Iterator, Optional, Sequence
 
 from django.conf import settings
 
+from .deadline import bounded, time_left
 from .dialects import DEFAULT_DIALECT, VendorDialect
 from .errors import ClassifiedError, ErrorKind, classify_message, classify_status_code
 from .ports import StreamDelta
-from .tool_calling import ToolCall, ToolCallingLLM, ToolCompletion, ToolDefinition
+from .tool_calling import (
+    AssistantMessage,
+    Message,
+    SystemMessage,
+    ToolCall,
+    ToolCallingLLM,
+    ToolCompletion,
+    ToolDefinition,
+    ToolResultMessage,
+    UserMessage,
+)
 
 
 class LLMUnavailable(RuntimeError):
@@ -97,6 +108,37 @@ def _classify(exc: Exception) -> ClassifiedError:
     return ClassifiedError(classify_message(str(exc)), exc)
 
 
+def _wire(message: Message) -> dict[str, Any]:
+    """One message in the OpenAI chat format."""
+    if isinstance(message, SystemMessage):
+        return {"role": "system", "content": message.content}
+    if isinstance(message, UserMessage):
+        return {"role": "user", "content": message.content}
+    if isinstance(message, ToolResultMessage):
+        return {
+            "role": "tool",
+            "tool_call_id": message.tool_call_id,
+            "content": message.content,
+        }
+    if isinstance(message, AssistantMessage):
+        wire: dict[str, Any] = {"role": "assistant", "content": message.text or None}
+        if message.tool_calls:
+            wire["tool_calls"] = [
+                {
+                    "id": call.id,
+                    "type": "function",
+                    "function": {"name": call.name, "arguments": call.arguments},
+                }
+                for call in message.tool_calls
+            ]
+        return wire
+    raise TypeError(f"not a message: {type(message).__name__}")
+
+
+def _deadline_passed() -> "LLMUnavailable":
+    return LLMUnavailable("the run's deadline has passed", kind=ErrorKind.TIMEOUT)
+
+
 class OpenAICompatibleAdapter(ToolCallingLLM):
     """`LLMProvider` and `ToolCallingLLM` over any OpenAI-compatible
     chat-completions endpoint."""
@@ -112,8 +154,10 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         dialect: Optional[VendorDialect] = None,
         fallback_models: Sequence[str] = (),
         max_tokens: Optional[int] = None,
+        timeout_seconds: Optional[float] = None,
     ) -> None:
         self._max_tokens = max_tokens
+        self._timeout_seconds = timeout_seconds
         self._base_url = base_url
         self._api_key = api_key
         self._model = model
@@ -170,6 +214,21 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             )
         }
 
+    def _call_timeout(self, explicit: Optional[float] = None) -> float:
+        """The timeout for one vendor call, capped by the run's deadline.
+
+        Raises a `timeout` failure, without calling, once the deadline has
+        passed (IR-511).
+        """
+        if explicit is None:
+            explicit = self._timeout_seconds
+        if explicit is None:
+            explicit = getattr(settings, "LLM_TIMEOUT_SECONDS", 120.0)
+        seconds = bounded(explicit)
+        if seconds <= 0:
+            raise _deadline_passed()
+        return seconds
+
     def _resolved_key(self) -> str:
         key = self._api_key or getattr(settings, "LLM_API_KEY", "")
         if not key:
@@ -198,6 +257,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
     # -- the port -----------------------------------------------------------
 
     def generate(self, system: str, user: str) -> str:
+        timeout = self._call_timeout()
         # An injected client is already configured -- it is how the request
         # shaping is tested without an account. Only the real one needs a key,
         # and `_build_client` is where that is demanded.
@@ -222,6 +282,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     {"role": "user", "content": user},
                 ],
                 **self._temperature_kwargs(),
+                timeout=timeout,
                 **extra,
             )
         except LLMUnavailable:
@@ -251,7 +312,11 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         a reasoning token arrives on, are the dialect's to say (IR-382). The
         loop itself -- opening the stream, classifying a failure, refusing an
         empty response -- is written once and knows no vendor.
+
+        The timeout bounds each read; a run's deadline is also checked between
+        chunks, so a stream that keeps trickling still stops in time.
         """
+        timeout = self._call_timeout()
         client = self._client or self._build_client()
 
         extra = self.dialect.request_extras(
@@ -274,6 +339,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                 ],
                 **self._temperature_kwargs(),
                 stream=True,
+                timeout=timeout,
                 **extra,
             )
         except LLMUnavailable:
@@ -295,6 +361,9 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                 reasoning = self.dialect.read_reasoning(delta)
                 if not text and not reasoning:
                     continue
+                left = time_left()
+                if left is not None and left <= 0:
+                    raise _deadline_passed()
                 received_any = True
                 yield StreamDelta(text=text, reasoning=reasoning)
         except LLMUnavailable:
@@ -318,28 +387,40 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
     ) -> ToolCompletion:
         """One buffered call with `tools` on offer (IR-465, ADR-035 §2).
 
-        Buffered, never streamed: the evidence decision is read whole. The
-        reasoning configuration is the same `generate` sends, so the decision
-        reuses the `answer` task unchanged. Nothing is normalised and nothing
-        is refused for being empty: an empty or malformed completion is the
-        caller's to classify, so it comes back as data. Only a transport
-        failure raises.
+        Exactly the two-message conversation `converse_with_tools` sends.
         """
+        return self.converse_with_tools(
+            [SystemMessage(system), UserMessage(user)],
+            tools,
+            timeout_seconds=timeout_seconds,
+        )
+
+    def converse_with_tools(
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        """One buffered call continuing `messages`, with `tools` on offer.
+
+        Buffered, never streamed: the evidence decision and the planner read
+        the completion whole. The reasoning configuration is the same
+        `generate` sends. Nothing is normalised and nothing is refused for
+        being empty: an empty or malformed completion is the caller's to
+        classify, so it comes back as data. Only a transport failure raises.
+        """
+        timeout = self._call_timeout(timeout_seconds)
         client = self._client or self._build_client()
 
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
-        if timeout_seconds is not None:
-            extra["timeout"] = timeout_seconds
 
         try:
             response = client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
+                messages=[_wire(message) for message in messages],
                 **self._temperature_kwargs(),
                 tools=[
                     {
@@ -353,6 +434,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     for tool in tools
                 ],
                 tool_choice="auto",
+                timeout=timeout,
                 **extra,
             )
         except LLMUnavailable:
@@ -377,6 +459,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     name=getattr(getattr(call, "function", None), "name", "") or "",
                     arguments=getattr(getattr(call, "function", None), "arguments", "")
                     or "",
+                    id=getattr(call, "id", "") or "",
                 )
                 for call in (getattr(message, "tool_calls", None) or [])
             ),
