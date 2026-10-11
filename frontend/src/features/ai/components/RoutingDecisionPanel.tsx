@@ -25,14 +25,16 @@ export function RoutingDecisionPanel({ decision, onOverride, disabled = false }:
   return (
     <div className="mt-2 text-xs text-stone-600 space-y-1.5" aria-label="Answer routing">
       <p>Answer approach: <strong>{LABELS[decision.lane]}</strong>
-        {decision.override_applied && " · Your choice"}
+        {decision.override_applied && " Â· Your choice"}
       </p>
       <details>
         <summary className="cursor-pointer hover:text-brand">Why this approach?</summary>
-        <p className="mt-1">{REASONS[decision.reason] ?? "IRIS selected this approach based on your question and the answer approaches available."}</p>
+        {decision.lane !== "landscape" && <p className="mt-1">{decision.override_applied
+          ? "You chose this approach when rerunning the question."
+          : REASONS[decision.reason] ?? "IRIS selected this approach based on your question and the answer approaches available."}</p>}
         {decision.lane === "landscape" && <p>A research landscape or gap analysis is not available yet. Passages alone cannot establish complete coverage of a field.</p>}
         {scopeRestricted && <p>This answer stays within the current paper. Other answer approaches are unavailable in this scope.</p>}
-        {decision.injection_flagged && <p>Only passage answers are available because the question could not be safely cleared for other approaches.</p>}
+        {decision.injection_flagged && decision.lane !== "landscape" && <p>Only passage answers are available because the question could not be safely cleared for other approaches.</p>}
       </details>
       {onOverride && alternatives.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5" aria-label="Rerun answer">
