@@ -8,6 +8,48 @@ Key: **[V]** verified in code, tests, ADRs or files at `origin/main` `5a6ed71` �
 
 ---
 
+## Owner decisions — 2026-10-11
+
+**Decided by the owner, Jive Tyler Revalde, in a design review on 2026-10-11. Recorded by an AI agent.** These decisions **replace** the parts of this proposal marked *Superseded 2026-10-11* below. The original text is kept so the reasoning stays reviewable. The decisions take effect only through IR-499 (the ADR), which must be accepted before IR-500–IR-504 merge.
+
+### Routing (IR-503)
+
+1. **Order.** Fixed phrase rules and logic checks run first. Paper Chat stays on its paper.
+2. **Jev is the main router.** One Decisions request carries six named route questions (passage, listing, count, comparison, research, landscape) plus one injection question. The highest-probability route wins. Whether one request may carry several questions is unverified [?]; the first task is one real call, with one call per question as the fallback.
+3. **LLM backup,** on a new `route` Inference task that inherits `resolve`'s model by default. It runs when Jev fails (timeout, rate limit, malformed reply) **or** when Jev's best probability falls inside an uncertain band, which is a setting.
+4. **Everything failed:** the question goes to the passage pipeline, today's behaviour.
+5. **Injection screening applies to the reader's question only.**
+   - A flagged question skips the planner and is answered by the passage pipeline, and an audit event is logged.
+   - If Jev is down, the backup asks the injection question too. If that also fails, the question is treated as flagged.
+6. The routing decision is shown to the reader and can be overridden (ADR-027 §5).
+
+### Planner (IR-502)
+
+7. **Full context.** The planner sees retrieved passage text, abstracts and recent conversation history including prior answers. It does not see memory-recalled turns.
+8. **Aggregate context.** Collected passages verbatim with their handles (`E1`…), plus short planner notes written in the same turn as a tool call. Notes are a scratchpad and **can never be cited**; citations resolve only to handles.
+9. **Two loops.**
+   - An outer loop: plan → run sub-tasks → replan → "answerable from the aggregate context?" → finish or replan.
+   - An inner loop of tool calls per sub-task.
+   - No step regenerates the answer until a judge agrees.
+10. **Limits, all settings:**
+    - outer loop: 3 rounds
+    - inner loop: 4 tool calls per sub-task
+    - whole run: 10 tool calls, 90 s, about 120k prompt tokens, 30 passages (weakest dropped first)
+
+### Unchanged, enforced in code
+
+Identity, scope, `visible_to(user)`, the disclosure gate and limits never come from a model. Tools are read-only, and arguments must use handles issued in this run.
+
+### What IR-499 must record
+
+- **It reverses principle 2 of §3.2.** The model that acts now reads documents.
+- **It grants Jev's production approval for routing and question screening.** Known vendor terms: no training (accepted on IR-485), retention unstated, US-hosted, alpha endpoint. The switch defaults to off. It supersedes the IR-487 ADR-036 change for these two uses.
+- **Residual risk: documents are not screened for injections.** Passage text and prior answers reach the planner with only the code invariants in front of them. A planted instruction can misdirect searches inside the reader's own visible papers or skew an answer's wording; it cannot reach another user's records. Chunk screening is deferred under IR-505.
+- **New Inference tasks:** `plan`, `screen`, `route`.
+- **The design ships before it is measured.**
+
+---
+
 ## 1. Executive recommendation
 
 **Do not build a free-roaming tool-calling agent. Build three missing data operations, run the corpus questions as fixed workflows over them, and add a bounded planner only for open-ended multi-paper questions — after it beats the workflows on a measured evaluation.**
@@ -186,7 +228,7 @@ flowchart TB
 ### 3.2 Principles, each enforced in code rather than in a prompt
 
 1. **Identity, scope, visibility, disclosure and budgets come from `RunContext`, which the application builds from the request.** No tool argument can set or widen them.
-2. **The model that can act never reads documents; the model that reads documents cannot act.** The planner sees metadata; the synthesizer sees passages and has no tools (§4.5).
+2. ~~**The model that can act never reads documents; the model that reads documents cannot act.** The planner sees metadata; the synthesizer sees passages and has no tools (§4.5).~~ *Superseded 2026-10-11: the planner sees full context; see Owner decisions 7–9.*
 3. **Counts, lists and facts about the corpus are computed by application code.** A model may describe them and may never extend them (ADR-027 §4, §9).
 4. **Every result carries a completeness label** — `exhaustive`, `screened`, `matches_found` or `sample` — and the label decides the wording, not the model.
 5. **The existing pipeline is the fallback for every failure.** A planner that errors, loops or runs out of budget hands over to today's grounded path, which is unchanged.
@@ -396,6 +438,8 @@ class EvidenceItem:
 
 ### 4.5 Who sees what
 
+> *Superseded 2026-10-11 for the router and the planner.* Jev routes and screens the question; the LLM backup uses the `route` task; the planner sees passages, abstracts and history including prior answers. See Owner decisions 2–8. The table is kept as the original reasoning.
+
 | Call | Sees | Does not see | Port |
 |---|---|---|---|
 | Router (classifier) | question, resolved question, prior **reader** questions | passages, prior answers | `generate` |
@@ -474,6 +518,8 @@ Until then the only honest offer is scoped: "Across these 6 papers I retrieved, 
 
 ### 6.1 Bounds (phase 2 onward)
 
+> *Superseded 2026-10-11 in part:* limits are now two-level (outer and inner loops). See Owner decision 10.
+
 | Control | Mechanism | Guaranteed by |
 |---|---|---|
 | Tool calls, per-tool calls, planner turns | Counters in run state; exceeding one ends planning | Code |
@@ -541,6 +587,8 @@ Tool calling does not make the system reliable. It makes the model's choices *vi
 - `test_one_retrieval_stack.py` and `test_outcome_indistinguishable_http.py` keep passing; tool paths are added to them rather than given their own predicate.
 
 ### 7.3 Residual risks, recorded
+
+> *Changed 2026-10-11:* the planner now reads document text, so injections hidden in documents are not narrowed by a metadata-only view. They are bounded only by the code invariants. Recorded as a residual risk in IR-499 (Owner decisions, *What IR-499 must record*).
 
 - **Injection via titles and section headings** reaches the planner. Capped length and no passage text narrow it; they do not close it. Worst case is a wasted or misdirected search inside the user's own visible set — the planner cannot widen scope.
 - **Timing** reveals gate work (ADR-035 §7). An agent adds more steps, so more timing signal.
@@ -688,10 +736,10 @@ Both repositories are read at their local `HEAD`: `Controllable-RAG-Agent` `929b
 > | IR-499 — ADR: bounded research lane | C-1, C-2, and the ADR-036 and ADR-026 §13 amendments |
 > | IR-500 — Tool layer | C-3–C-7, C-17 |
 > | IR-501 — Screening and topic counts | C-13, part of C-14 |
-> | IR-502 — Planner, answer validation, run audit | C-8, C-9, C-16, C-18 |
-> | IR-503 — Routing | C-12, C-14, C-15 |
+> | IR-502 — Planner, answer validation, run audit | C-8, C-9, C-16, C-18; Owner decisions 7–10 |
+> | IR-503 — Jev router and injection screen, with LLM backup | C-12, C-14, C-15; Owner decisions 1–6 |
 > | IR-504 — Production rollout | C-20, phase 3 |
-> | IR-505 — Deferred: evaluation and shadow mode | C-10, C-11, C-19, the ADR-023 amendment |
+> | IR-505 — Deferred: evaluation and shadow mode | C-10, C-11, C-19, the ADR-023 amendment, chunk injection screening |
 >
 > This moves evaluation after the build, so the phase 2 gate in §9 (planner beats workflows, no page-precision loss) is no longer a precondition for building phase 3. IR-499 must record that. C-21 (Lens) and phase 4b (web search) are not included.
 
