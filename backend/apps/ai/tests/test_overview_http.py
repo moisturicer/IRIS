@@ -241,6 +241,64 @@ class SummaryRunsAsItsOwnInferenceTaskTests:
         assert not RecordOverview.objects.filter(record=record).exists()
 
 
+class OversizedPaperTests:
+    """IR-432: a paper over the token ceiling says so and costs nothing."""
+
+    def _shrink_ceiling(self, record, settings):
+        from django.db.models import Sum
+
+        total = ChunkSet.objects.get(record=record, is_active=True).chunks.aggregate(
+            t=Sum("token_count")
+        )["t"]
+        assert total > 1
+        return total
+
+    def test_a_paper_over_the_ceiling_is_unavailable_with_a_reason_and_no_call(
+        self, embedder, space, client_for, settings
+    ):
+        reader = make_user("reader@cit.edu")
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+        settings.AI_OVERVIEW_TOKEN_CEILING = self._shrink_ceiling(record, settings) - 1
+        llm = ScriptedLLM(reply="A methodology summary [1].")
+
+        with use_composition_root(root_with(embedder=embedder, llm=llm)):
+            body = _overview(client_for(reader), record.pk).json()
+
+        assert body["state"] == "unavailable"
+        assert body["overview"] is None
+        assert body["reason"] == "too_large"
+        assert llm.calls == []
+        assert not RecordOverview.objects.filter(record=record).exists()
+
+    def test_a_paper_at_the_ceiling_is_still_summarised(
+        self, embedder, space, client_for, settings
+    ):
+        reader = make_user("reader@cit.edu")
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+        settings.AI_OVERVIEW_TOKEN_CEILING = self._shrink_ceiling(record, settings)
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = _overview(client_for(reader), record.pk).json()
+
+        assert body["state"] == "ready"
+
+    def test_zero_disables_the_ceiling(self, embedder, space, client_for, settings):
+        reader = make_user("reader@cit.edu")
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+        settings.AI_OVERVIEW_TOKEN_CEILING = 0
+
+        with use_composition_root(root_with(embedder=embedder)):
+            body = _overview(client_for(reader), record.pk).json()
+
+        assert body["state"] == "ready"
+
+
 class VisibilityTests:
     def test_a_reader_without_access_gets_404(self, embedder, space, client_for):
         owner = make_user("owner@cit.edu")

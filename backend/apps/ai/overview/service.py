@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
+from django.db.models import Sum
+
 from apps.ai.answers.citations import build_prompt
 from apps.ai.answers.service import generate_cited, model_that_answered
 from apps.ai.composition import composition_root
@@ -31,6 +34,16 @@ _QUESTION = (
 )
 
 
+def _too_large(chunk_set: ChunkSet) -> bool:
+    ceiling = getattr(settings, "AI_OVERVIEW_TOKEN_CEILING", 0)
+    if not ceiling:
+        return False
+    total = chunk_set.chunks.filter(deleted_at__isnull=True).aggregate(
+        total=Sum("token_count")
+    )["total"]
+    return (total or 0) > ceiling
+
+
 def overview_for(record: Record) -> dict:
     """The record's overview; one stored row serves every reader."""
     chunk_set = (
@@ -48,6 +61,14 @@ def overview_for(record: Record) -> dict:
         and stored.prompt_version == PROMPT_VERSION
     ):
         return {"state": "ready", "overview": _wire(stored), "cached": True}
+
+    if _too_large(chunk_set):
+        # Before assembly: an oversized paper costs nothing and stores nothing (IR-432).
+        logger.info(
+            "overview not generated for record %s: over AI_OVERVIEW_TOKEN_CEILING",
+            record.pk,
+        )
+        return {"state": "unavailable", "overview": None, "reason": "too_large"}
 
     generated = _generate(chunk_set)
     if generated is None:
