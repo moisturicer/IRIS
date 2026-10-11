@@ -637,6 +637,141 @@ def notify_delete_declined(delete_request, reviewed_by):
 
 
 # ---------------------------------------------------------------------------
+# An owner's delete (IR-517, ADR-032 §10 Amendment)
+# ---------------------------------------------------------------------------
+#
+# One owner's delete removes the record for every co-owner, and nothing undoes
+# it, so the *other* owners are told in-app and by email; the owner who acted
+# is not. A deleted record is invisible to everyone, so a withdrawal or delete
+# notice carries no record link: a link would only lead to a 404. A delete
+# request leaves the record readable while RDCO decides, so its notices link it.
+
+def _other_owners(record, actor):
+    return [
+        ownership.user
+        for ownership in record.owners.select_related("user").all()
+        if ownership.user_id != getattr(actor, "pk", None)
+    ]
+
+
+def _name(user) -> str:
+    return user.get_full_name() or user.email
+
+
+def _tell_other_owners(record, actor, *, notif_type, message, subject, link):
+    url = _record_url(record) if link else None
+    for owner in _other_owners(record, actor):
+        Notification.objects.create(
+            sender=actor, recipient=owner, record=record if link else None,
+            notif_type=notif_type, message=message,
+        )
+        body = f"{message}\n\n{url}" if url else message
+        send_email_async(
+            subject=subject,
+            message=f"Hello {owner.first_name},\n\n{body}\n\n-- The IRIS Team",
+            recipient_list=[owner.email],
+        )
+
+
+def notify_record_withdrawn(record, *, withdrawn_by, seats, requesting_parties):
+    """
+    An owner withdrew a record from review by deleting it (IR-517).
+
+    - Each reviewer whose open seat closed hears that their review is closed,
+      in-app only, as a Decision's cut-off reviewer does (IR-270). When their
+      party had an open document request, the notice says it is withdrawn.
+      No office pool is told: nobody there had started.
+    - Every other owner hears it, in-app and by email.
+    """
+    try:
+        title = record.title
+        notif_type = NotificationType.objects.get_or_create(name="Record Withdrawn")[0]
+
+        told = set()
+        for reviewer, party in seats:
+            if reviewer.pk in told:
+                continue
+            told.add(reviewer.pk)
+            message = f'The author withdrew "{title}" from review, so your review is closed.'
+            if party in requesting_parties:
+                # The Adviser is a person, not an office (ADR-032 §1).
+                whose = "Your" if party == Party.ADVISER else "Your office's"
+                message += f" {whose} document request is withdrawn."
+            Notification.objects.create(
+                sender=withdrawn_by, recipient=reviewer, record=None,
+                notif_type=notif_type, message=message,
+            )
+
+        _tell_other_owners(
+            record, withdrawn_by, notif_type=notif_type, link=False,
+            message=(
+                f'{_name(withdrawn_by)} withdrew "{title}" from review. '
+                f"It is deleted and can't be restored."
+            ),
+            subject=f"[IRIS] Withdrawn: {title[:60]}",
+        )
+    except Exception:
+        pass
+
+
+def notify_record_deleted(record, *, deleted_by):
+    """An owner deleted a draft or rejected record (IR-517): the other owners hear it."""
+    try:
+        title = record.title
+        _tell_other_owners(
+            record, deleted_by,
+            notif_type=NotificationType.objects.get_or_create(name="Record Deleted")[0],
+            link=False,
+            message=f'{_name(deleted_by)} deleted "{title}". It can\'t be restored.',
+            subject=f"[IRIS] Deleted: {title[:60]}",
+        )
+    except Exception:
+        pass
+
+
+def notify_delete_requested(delete_request, *, requested_by):
+    """
+    An owner asked for accepted work to be deleted (IR-517).
+
+    - RDCO decides it, so every RDCO member hears, in-app and by email, as an
+      office pool hears of new work in `notify_routed`.
+    - Every other owner hears it, in-app and by email.
+
+    Both link the record, which stays readable in `pending_delete`.
+    """
+    try:
+        record = delete_request.record
+        title = record.title
+        notif_type = NotificationType.objects.get_or_create(name="Delete Request Submitted")[0]
+
+        role = _role_for_party(Party.RDCO)
+        if role is not None:
+            message = (
+                f'{_name(requested_by)} asked to delete "{title}". It is on hold '
+                f"in Delete Requests until RDCO decides."
+            )
+            Notification.objects.create(
+                sender=requested_by, broadcast_to_role=role, record=record,
+                notif_type=notif_type, message=message,
+            )
+            _email_role_users(
+                role, subject=f"[IRIS] Delete requested: {title[:60]}", greeting="Hello",
+                body=f"{message}\n\n{_record_url(record)}",
+            )
+
+        _tell_other_owners(
+            record, requested_by, notif_type=notif_type, link=True,
+            message=(
+                f'{_name(requested_by)} asked RDCO to delete "{title}". '
+                f"It is on hold until RDCO decides."
+            ),
+            subject=f"[IRIS] Delete requested: {title[:60]}",
+        )
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
 

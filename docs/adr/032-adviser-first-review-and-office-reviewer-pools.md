@@ -45,6 +45,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-11 (project lead, IR-508): §10.** Only an owner deletes a record. A delete does one of three acts by status, each its own capability key, and a record already awaiting a delete decision is not deleted again. See the *Amendment* note under §10.
 
+**Amended 2026-10-11 (project lead, IR-517): §10.** Who is told when an owner deletes a record: open-seat holders on a withdrawal, the other owners on every delete, and RDCO on a delete request. No office pool is told. A withdrawal also withdraws open document requests. See the *Amendment* note under §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -512,7 +514,22 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 
     The last row closes a bypass. A soft delete is legal from every status, so a second delete removed the record outright and left its request pending against a deleted record. A 400 rather than a 403, as in the IR-507 amendment above, because the owner is the right person at the wrong moment.
 - **One endpoint, three capability keys.** Each names its act, as `accept_proposal` and `keep_unlisted` do (IR-270, IR-271): the act that is gone now, the act that ends other people's work, and the act someone else decides. A button can then name its consequence without deriving it from state. The keys are offered to owners only, exactly where the endpoint does that act. IR-418's table probes each in the statuses it names. No screen renders them yet; the buttons are a frontend follow-up.
-- **Out of scope:** withdrawing a record from review notifies no reviewer and leaves its open document requests open. That is IR-274's behaviour, and it goes to [IR-517](https://citiris.atlassian.net/browse/IR-517).
+- **Out of scope:** withdrawing a record from review notifies no reviewer and leaves its open document requests open. That is IR-274's behaviour, and it goes to [IR-517](https://citiris.atlassian.net/browse/IR-517). *Settled by the IR-517 amendment below.*
+
+**Amendment, 2026-10-11 (project lead, IR-517): who is told when an owner deletes a record.** Settled in a design grilling. None of the three delete acts told anyone, and a withdrawal left open document requests against a record nobody can reach. The rule follows the Decision's precedent (IR-270): the people whose work ends are told, and no office pool is.
+
+| Act | Who is told | Channel | Link |
+|---|---|---|---|
+| `withdraw_submission` | each holder of an **open seat** (the Adviser, office reviewers, RDCO): their review is closed, plus *"your office's document request is withdrawn"* (*"your"* for the Adviser) when their party had one | in-app | none |
+| `withdraw_submission` | every **other owner**: the record is deleted and can't be restored | in-app and email | none |
+| `delete_record` | every other owner | in-app and email | none |
+| `request_deletion` | every other owner, and **RDCO** (the role, plus email to its active members, as `notify_routed` announces pool work) | in-app and email | the record |
+
+- **No office pool is told.** Nobody there had started, so no work ends. The Decision does the same.
+- **The owner who acted is not told.** The other owners are, by email too, because one owner's delete removes the record for every co-author and nothing undoes it.
+- **A deleted record is a 404 for everyone**, so withdrawal and delete notices carry no record link. A delete request leaves the record readable while RDCO decides, so its notices link it.
+- **A withdrawal also withdraws the record's open document requests**, with `closed_at` and no `closed_by_decision`, since there is no Decision to name (`reviews.withdrawal`). They used to be left open.
+- Notices go after commit and never raise into the request, as every notice does.
 
 ### 11. Lifecycle
 

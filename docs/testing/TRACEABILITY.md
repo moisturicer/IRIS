@@ -8,6 +8,25 @@
 
 ---
 
+## IR-517 who is told when an owner deletes a record (ADR-032 §10)
+
+**Design:** [ADR-032 §10, IR-517 Amendment of 2026-10-11](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
+`perform_destroy` sends a notice per act after commit. On a withdrawal, each open-seat
+holder is told in-app (no record link), including their party's document request when one
+was open. Every other owner is told in-app and by email on every delete. On a delete
+request, RDCO is told in-app and by email, with the record linked. No office pool is
+told. `reviews.withdrawal.withdraw_review` also withdraws open document requests, and
+`open_review_work()` reads whose work ends from the same rule.
+
+**Tests:** `apps.notifications.test_delete_notifications`, through `GET /notifications/`
+as each user, with outbound email patched where it leaves the system: seat holder,
+Adviser at entry, pool not told, other owner told and acting owner not, document requests
+withdrawn, sole-owner draft tells no one, and RDCO plus the other owner told with a link.
+
+**Evidence:** the IR-517 PR's CI.
+
+---
+
 ## IR-508 who deletes a record, and what a delete does (ADR-032 §10)
 
 **Design:** [ADR-032 §10, IR-508 Amendment of 2026-10-11](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
