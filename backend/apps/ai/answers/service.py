@@ -424,14 +424,20 @@ def model_that_answered(llm: LLMProvider) -> Optional[str]:
 
 
 def generate_cited(
-    llm: LLMProvider, user_prompt: str, sources: Sequence[RetrievedChunk]
+    llm: LLMProvider,
+    user_prompt: str,
+    sources: Sequence[RetrievedChunk],
+    *,
+    system: str = SYSTEM_PROMPT,
+    parse: Callable = parse_citations,
 ) -> Optional[tuple[str, tuple]]:
     """One non-streaming completion, cited against ``sources``.
 
     ``None`` when the model was unreachable or wrote nothing (ADR-008).
+    ``system`` and ``parse`` let the overview cite pages (IR-434).
     """
     try:
-        raw = llm.generate(system=SYSTEM_PROMPT, user=user_prompt)
+        raw = llm.generate(system=system, user=user_prompt)
     except (LLMUnavailable, CircuitOpen) as exc:
         logger.warning("answer generation unavailable: %s", exc)
         return None
@@ -441,7 +447,7 @@ def generate_cited(
         logger.warning("answer generation produced no text")
         return None
 
-    text, citations = parse_citations(raw, sources)
+    text, citations = parse(raw, sources)
     _warn_if_citations_went_missing(raw, text, citations)
     _warn_if_images_were_stripped(raw)
     return text, citations

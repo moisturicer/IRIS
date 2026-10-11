@@ -312,14 +312,17 @@ def parse_citations(
             return ""
         return "".join(f"[{n}]" for n in valid)
 
-    cleaned = _MARKER.sub(keep, answer)
-    # Dropping a marker can leave a doubled space or a space before a full
-    # stop; tidy those rather than shipping the seam.
-    cleaned = re.sub(r" {2,}", " ", cleaned)
-    cleaned = re.sub(r"\s+([.,;:])", r"\1", cleaned).strip()
+    cleaned = tidy_dropped_markers(_MARKER.sub(keep, answer))
 
     resolved.sort(key=lambda c: c.marker)
     return cleaned, tuple(resolved)
+
+
+def tidy_dropped_markers(cleaned: str) -> str:
+    """Dropping a marker can leave a doubled space or a space before a full
+    stop; tidy those rather than shipping the seam."""
+    cleaned = re.sub(r" {2,}", " ", cleaned)
+    return re.sub(r"\s+([.,;:])", r"\1", cleaned).strip()
 
 
 #: A **deliberately loose** net for things that look like a citation attempt.
