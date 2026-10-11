@@ -24,10 +24,13 @@ class RecordOverviewView(APIView):
     reader without access gets a 404 identical to a missing record rather than
     a 403 that would confirm it exists.
 
+    Disclosure is checked explicitly before reading a cached overview or
+    assembling the whole paper. A refusal returns no overview and calls no model.
+
     Three states, and the client renders each differently: `ready` carries an
     overview, `not_indexed` means nothing has been extracted from this record
-    yet, and `unavailable` means no model could be reached — which is not
-    cached, so the next view tries again.
+    yet, and `unavailable` means disclosure was refused or no model could be
+    reached; this state is not cached, so the next view tries again.
     """
 
     permission_classes = [IsAuthenticated]
