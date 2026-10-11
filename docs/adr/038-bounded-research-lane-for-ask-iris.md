@@ -336,10 +336,10 @@ FR-M4, FR-M4-01 (RAG chatbot) · NFR-R2 (graceful degradation) · NFR-S4 (no una
 **Elsewhere:** [IR-250](https://citiris.atlassian.net/browse/IR-250) (the embargo field the gate waits on) · [IR-278](https://citiris.atlassian.net/browse/IR-278) (a real corpus) · [IR-485](https://citiris.atlassian.net/browse/IR-485) and [IR-487](https://citiris.atlassian.net/browse/IR-487) (Jev's vendor terms, and the proposed amendments this ADR partly supersedes) · IR-302 to IR-305 (the Lens, unbuilt).
 
 
-### IR-515 implementation divergence � 2026-10-11
+### IR-515 implementation divergence — 2026-10-11
 
 IR-515 explicitly requires landscape and gap questions to be refused with a reason,
-never answered from passage retrieval. This conflicts with the draft �3 landscape
+never answered from passage retrieval. This conflicts with the draft §3 landscape
 paragraph. The implementation follows the explicit IR-515 instruction: a landscape
 decision returns `no_sources` with the capability limitation, performs no retrieval,
 and cannot be overridden into an evidence workflow while the capability is absent.
