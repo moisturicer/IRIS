@@ -369,9 +369,10 @@ numbered-source prompts and `parse_citations`. Validation checks raw markers
 before parsing, literal numbers, marked/explicitly introduced titles and
 completeness phrases. Leaked reasoning is removed before validation, and
 validation uses the exact sources supplied to synthesis.
-Failures withhold the answer, retaining sources and reason codes. This is
-the conservative implementation proposed for D4, not recorded human policy
-approval. See [RESEARCH_PLANNER.md](../engineering/RESEARCH_PLANNER.md) for
+Failures withhold the answer, retaining sources and reason codes. The owner
+confirmed this D4 policy in the IR-512 implementation chat on 2026-10-11.
+ADR-038's broader architectural approval remains outstanding.
+See [RESEARCH_PLANNER.md](../engineering/RESEARCH_PLANNER.md) for
 the literal validator's limits and wall-clock exhaustion behavior.
 
 Evidence: `research/tests/test_planner.py` covers successful citation,

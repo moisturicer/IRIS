@@ -46,9 +46,11 @@ are checked too. Leaked `<think>` reasoning is removed before these checks.
 These are literal checks, not semantic
 claim verification: unmarked titles, paraphrased completeness and arbitrary
 number wording are not guaranteed to be recognizable. Claim support remains
-an offline measurement. The conservative implementation withholds the whole
-answer on failure, reports reason codes, and retains the sources. Proposal
-13's open D4 policy still requires human confirmation before merge.
+an offline measurement. The implementation withholds the whole answer on
+failure, reports reason codes, and retains the sources. The owner confirmed
+this D4 policy in the IR-512 implementation chat on 2026-10-11: "Withhold the
+answer (Recommended)". This confirmation applies to the validation-failure
+policy; ADR-038's broader architectural approval remains outstanding.
 
 `ResearchRun` and `ResearchStep` contain identifiers, argument digests, statuses,
 latency and token counts; no question, tool arguments, passage, answer, planner
