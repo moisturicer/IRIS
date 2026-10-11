@@ -69,7 +69,7 @@ flowchart TB
 
 - Every chat question is retrieved and grounded today. There is no direct-answer path [V].
 - The evidence detector (`apps/ai/evidence/detector.py`) and model deciders (`model_decision.py`, `route_label.py`, `jev_noul.py`) are consumed only by the shadow task and `eval_evidence`. Nothing routes on them [V]. `AI_EVIDENCE_DECISION` rejects `on` (ADR-035 §1).
-- The AI Overview (`overview.py`) calls `answer_service(..., task=SUMMARY)` directly and never reaches the orchestrator [V]. `/ai/search/` generates nothing.
+- The AI Overview (`overview/`) reads every chunk of the active ChunkSet and calls `llm_for(SUMMARY)` itself, with no retrieval, as of IR-431; it never reaches the orchestrator [V]. `/ai/search/` generates nothing.
 - Vendor choice is per Inference task with same-vendor fallback only (`inference/profiles.py`, `CompositionRoot.llm_for`). There is no per-request model selection [V].
 
 ---

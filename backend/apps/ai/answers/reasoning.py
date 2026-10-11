@@ -84,3 +84,14 @@ class ThinkTagFilter:
         if self._in_think:
             return "", remaining
         return remaining, ""
+
+
+def without_leaked_reasoning(raw: str) -> str:
+    """``raw`` with any `<think>` span removed, for a reply that did not stream.
+
+    The reasoning is discarded: an overview is not a Turn.
+    """
+    leak_filter = ThinkTagFilter()
+    text, _ = leak_filter.feed(raw)
+    tail, _ = leak_filter.flush()
+    return text + tail
