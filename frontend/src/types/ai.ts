@@ -115,9 +115,9 @@ export interface RecordOverviewResponse {
 
 export interface RecordOverview {
   text:          string;
-  /** The same citation shape chat renders — see `Citation`, minus a `marker`
-   * numbering scheme of its own (the overview's own [n] markers are numbered
-   * independently, same as any other grounded answer). */
+  /** The same citation shape chat renders — see `Citation` — but `marker`
+   * is the cited page, not a source number: `[12]` cites page 12, carrying
+   * every chunk on it (IR-434). */
   citations:     Citation[];
   degraded:      boolean;
   model:         string | null;

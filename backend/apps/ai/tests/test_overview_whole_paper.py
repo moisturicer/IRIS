@@ -123,8 +123,9 @@ class WholePaperAssemblyTests:
         assert "STALE" not in prompt
         assert "DELETED" not in prompt
 
-    def test_a_marker_resolves_to_the_chunk_assembled_at_that_number(self, paper):
-        llm = ScriptedLLM(reply="The gauge network is sparse [3].")
+    def test_a_marker_resolves_to_the_chunk_on_that_page(self, paper):
+        # Was chunk number 3; a marker names a page as of IR-434.
+        llm = ScriptedLLM(reply="The gauge network is sparse [p. 9].")
 
         with use_composition_root(_root(llm)):
             result = overview_for(paper)
