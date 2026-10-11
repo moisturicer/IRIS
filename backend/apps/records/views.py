@@ -27,6 +27,7 @@ from core.permissions import (
     IsAuthor,
     IsOwnerOrStaff,
     IsRDCO,
+    IsRecordOwner,
     IsStaff,
 )
 from .download_service import file_response_for_record
@@ -131,7 +132,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         # later clear the record, could author one (IR-165).
         if self.action == "create":
             return [IsAuthenticated(), IsAuthor()]
-        if self.action in ("update", "partial_update", "destroy", "submit"):
+        # Editing details and submitting are an owner's alone (IR-507, ADR-032
+        # §10 Amendment): no office edits or submits a record that is not
+        # theirs, so submission's consent is always an owner's. When an owner
+        # may edit is `update()`'s question (`versions.details_editable`).
+        if self.action in ("update", "partial_update", "submit"):
+            return [IsAuthenticated(), IsRecordOwner()]
+        # Still owner-or-staff: who may delete is IR-508's decision.
+        if self.action == "destroy":
             return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
@@ -156,6 +164,26 @@ class RecordViewSet(viewsets.ModelViewSet):
         RecordOwner.objects.create(record=record, user=self.request.user, is_primary=True)
         # Record starts as draft — notification fires only when the owner calls /submit/
         self._queue_manuscript_extraction_if_present(serializer, record)
+
+    def update(self, request, *args, **kwargs):
+        """
+        An owner edits only a `draft`, or a record awaiting their revision
+        (IR-507, ADR-032 §10 Amendment). Refused here, before the body is
+        validated, so "not now" is what the owner hears first. A 400, not a
+        403: the owner is the right person at the wrong moment, as with
+        `submit/` on a non-draft. What may change is the serializer's question.
+        `partial_update` comes through here too.
+        """
+        from .versions import details_editable
+
+        record = self.get_object()
+        if not details_editable(record):
+            return Response(
+                {"detail": "This record's details can be edited only while it is a draft "
+                           f"or a revision is asked for, and it is '{record.pipeline_status}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
         record = serializer.save()
@@ -217,7 +245,7 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         Revised work uses the dedicated resubmission action.
         """
-        record = self.get_object()  # enforces IsOwnerOrStaff object permission
+        record = self.get_object()  # enforces IsRecordOwner object permission
 
         if record.pipeline_status != PipelineStatus.DRAFT:
             return Response(

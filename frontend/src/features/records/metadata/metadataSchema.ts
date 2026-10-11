@@ -19,8 +19,20 @@ import type { RecordFormData } from "@/types/records";
 export const ADVISER_REQUIRED = "Choose your adviser.";
 export const ADVISER_IS_SELF = "You can't be your own adviser. Choose another faculty member.";
 
-/** The schema, given who is signed in, since the adviser rule depends on it. */
-export function metadataSchema(selfId: number | null) {
+/**
+ * The schema, given who is signed in, since the adviser rule depends on it.
+ *
+ * Once a record is `submitted` its Adviser is fixed (IR-507): shown, never
+ * sent, so it is not validated either. A legacy record can be awaiting its
+ * owner's revision with no Adviser recorded, and requiring one there blocked
+ * Save with no field to fix and no message shown.
+ */
+export function metadataSchema(selfId: number | null, { submitted = false }: { submitted?: boolean } = {}) {
+  const adviser = z
+    .number({ required_error: ADVISER_REQUIRED, invalid_type_error: ADVISER_REQUIRED })
+    .int()
+    .positive(ADVISER_REQUIRED)
+    .refine((id) => selfId == null || id !== selfId, ADVISER_IS_SELF);
   return z.object({
     title: z
       .string()
@@ -42,11 +54,9 @@ export function metadataSchema(selfId: number | null) {
       .min(1990, "Year must be 1990 or later.")
       .max(new Date().getFullYear() + 1, "Year cannot be in the future."),
 
-    adviser: z
-      .number({ required_error: ADVISER_REQUIRED, invalid_type_error: ADVISER_REQUIRED })
-      .int()
-      .positive(ADVISER_REQUIRED)
-      .refine((id) => selfId == null || id !== selfId, ADVISER_IS_SELF),
+    // The cast keeps `MetadataValues` one type for both forms; a submitted
+    // record's value is display-only and `metadataPayload` leaves it out.
+    adviser: submitted ? (z.any() as unknown as typeof adviser) : adviser,
 
     authors: z.array(z.string().trim().min(1)).min(1, "Add at least one author."),
 
@@ -99,6 +109,13 @@ export const HINTS: ReadonlyArray<{
 ];
 
 /**
+ * The form fields that are fixed once a record is submitted (IR-507, ADR-032
+ * §10 Amendment): the server keeps the Adviser and the hints as they were
+ * submitted, so the form shows them read-only and does not send them.
+ */
+export const FIXED_ONCE_SUBMITTED = ["adviser", "is_ip", "requires_ethics_review", "for_commercialization"] as const;
+
+/**
  * The PATCH body for these values.
  *
  * The hints are sent as hints and nothing more: `requested_itso/ierc/ktto`
@@ -110,6 +127,8 @@ export function metadataPayload(
   // A list that failed to load shows its field as "Not set"; sending that
   // would erase a value the draft already holds, so such a field is left out.
   unloaded: { classification?: boolean; psced?: boolean } = {},
+  // A submitted record's revision: its fixed fields are left out (IR-507).
+  { submitted = false }: { submitted?: boolean } = {},
 ): Partial<RecordFormData> {
   const payload: Partial<RecordFormData> = {
     title:                  values.title.trim(),
@@ -126,5 +145,6 @@ export function metadataPayload(
   };
   if (unloaded.classification) delete payload.classification;
   if (unloaded.psced) delete payload.psced;
+  if (submitted) for (const field of FIXED_ONCE_SUBMITTED) delete payload[field];
   return payload;
 }

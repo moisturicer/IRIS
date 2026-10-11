@@ -156,3 +156,74 @@ describe("Edit details", () => {
     await expectNoBlockingA11yViolations(document.body);
   });
 });
+
+// IR-507 (ADR-032 §10 Amendment): once submitted, the Adviser and the hints
+// are fixed. The server refuses a change to them; the form neither offers one
+// nor sends them.
+describe("Edit details while a revision is asked for", () => {
+  const revising = {
+    ...saved,
+    pipeline_status: "in_review",
+    workflow_state: "awaiting_resubmission",
+  } as unknown as RecordDetail;
+
+  function renderRevising() {
+    renderScreen(<EditDetailsDialog record={revising} selfId={OWNER_ID} onSaved={vi.fn()} onClose={vi.fn()} />);
+  }
+
+  it("shows the Adviser and the hints but offers no way to change them", async () => {
+    renderRevising();
+    const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+    await within(dialog).findByRole("textbox", { name: /Title/ });
+
+    expect(within(dialog).getByText("Maria Santos")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox", { name: /Adviser/, hidden: true })).not.toBeInTheDocument();
+    // The hints sit inside More details, closed by default: `hidden` reads it shut.
+    expect(
+      within(dialog).getByRole("list", { name: "Flagged for your adviser", hidden: true }),
+    ).toHaveTextContent("Possible intellectual property");
+    expect(within(dialog).queryByRole("checkbox", { hidden: true })).not.toBeInTheDocument();
+  });
+
+  it("saves the details without the fixed fields", async () => {
+    const user = userEvent.setup();
+    renderRevising();
+    const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+    const title = await within(dialog).findByRole("textbox", { name: /Title/ });
+
+    await user.clear(title);
+    await user.type(title, "A sharper title for the study");
+    await user.click(within(dialog).getByRole("button", { name: "Save details" }));
+
+    await waitFor(() => expect(recordsApi.update).toHaveBeenCalledTimes(1));
+    const [, payload] = vi.mocked(recordsApi.update).mock.calls[0];
+    expect(payload).toMatchObject({ title: "A sharper title for the study", authors: ["Ada Reyes"] });
+    for (const field of ["adviser", "is_ip", "requires_ethics_review", "for_commercialization"]) {
+      expect(payload).not.toHaveProperty(field);
+    }
+  });
+
+  it("saves a legacy record that has no Adviser recorded", async () => {
+    // Found in the browser check: the hidden Adviser was still validated, so
+    // Save sent nothing and said nothing.
+    const user = userEvent.setup();
+    const legacy = { ...revising, adviser: null } as unknown as RecordDetail;
+    renderScreen(<EditDetailsDialog record={legacy} selfId={OWNER_ID} onSaved={vi.fn()} onClose={vi.fn()} />);
+    const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+    await within(dialog).findByRole("textbox", { name: /Title/ });
+
+    expect(within(dialog).getByText("None recorded")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save details" }));
+
+    await waitFor(() => expect(recordsApi.update).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(recordsApi.update).mock.calls[0][1]).not.toHaveProperty("adviser");
+  });
+
+  it("has no serious or critical accessibility violations", async () => {
+    renderRevising();
+    const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+    await within(dialog).findByRole("textbox", { name: /Title/ });
+
+    await expectNoBlockingA11yViolations(document.body);
+  });
+});

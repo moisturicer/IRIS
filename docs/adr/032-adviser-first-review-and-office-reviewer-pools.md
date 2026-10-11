@@ -41,6 +41,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-09 (project lead, IR-270): §3, §10 and §11.** What a Decision is and what it closes, how the closures name it, the `decision` capabilities and the `final_decide` → `keep_unlisted` rename, the direct status write until IR-260, and the 409 for a stale dialog. See the *Amendment* notes under §3, §10 and §11.
 
+**Amended 2026-10-11 (project lead, IR-507): §5 and §10.** Only an owner edits a record's details or submits it. An owner edits only a draft or a record awaiting their revision, and once submitted the Adviser, the type, the IP flags and the routing hints stay fixed. Correcting a published record is deferred. See the *Amendment* note under §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -295,7 +297,7 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
 
   Otherwise the act is refused, naming who asked and what would count.
 - **The manuscript lock** also opens while `awaiting_resubmission` (new model, a request open), **for an owner only**. Staff stay locked. The frontend offers the upload under a new capability key, `replace_manuscript`, added to §10's list.
-- **Only an owner's edit counts as a change.** A staff member's details edit does not stamp `details_edited_at`: the revision is the owner's to make.
+- **Only an owner's edit counts as a change.** A staff member's details edit does not stamp `details_edited_at`: the revision is the owner's to make. *Superseded 2026-10-11 by the IR-507 amendment under §10: a staff member cannot edit a record's details at all, so every edit, and every stamp, is an owner's.*
 - **Withdrawing the last open request puts the submitted manuscript back.** If the owner has uploaded a revised manuscript but not submitted it, and the last open request is withdrawn, no version can carry that upload. The stored manuscript is reset to the latest version's file. The upload's file stays in storage. Nothing is re-extracted, since the upload never was (next point).
 - **What Ask IRIS answers from (settled with the project lead, 2026-10-08).** An owner's revised manuscript on the new model is **not extracted on upload**. It is extracted when its version is submitted, by `submit_new_version`. A metadata-only version re-extracts nothing. So the active chunk set, which is what Ask IRIS, Paper Chat and the degraded full-text path read, is always the **latest submitted version's manuscript**, the same file reviewers are served.
     - The fix is in the extraction *trigger* (`versions.manuscript_awaits_submission`, called where an upload queues extraction). `apps/ai/` is unchanged. The AI pipeline now relies on this invariant without owning it.
@@ -474,6 +476,24 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 *Deviation from the grilled order, accepted by the project lead on 2026-10-09:* the RDCO bar was first settled as *Accept & publish · Keep unlisted · Route · Request Revision · Request documents · Reject*. The bar is one ordered list for every viewer, and IR-269 settled an office reviewer's order with *Route to office* after *Request documents*. So RDCO gets *Accept & publish · Keep unlisted · Request Revision · Request documents · Route to office · Reject*. The primary and the last button are as settled; moving *Route* for RDCO alone would need per-viewer ordering.
     - *Rejected:* moving *Route* up the shared list. It would reorder every office's bar against ui-ux/16 and IR-261's settled office primary.
     - *Rejected:* ranking actions per party. It adds a concept to the bar for a one-place shift of a secondary button.
+
+**Amendment, 2026-10-11 (project lead, IR-507): who edits a record's details and submits it, when, and what stays fixed.** Settled in a design grilling after IR-418's capabilities table found the record update and `submit/` wider than any offer: both were `IsOwnerOrStaff`, so any office edited any record it could see and could submit a student's draft, recording the staff member as the one who gave the student's Data Privacy Act consent (IR-226). An owner could also edit in every state.
+
+- **Only an owner edits details (`edit_details`).** No office edits a record that is not theirs, and neither does the Adviser. Every owner may, not only the primary one. This rewrites §5's IR-273 line on a staff member's edit (below).
+- **An owner edits only a `draft`, or a record awaiting their revision**, exactly where `edit_details` is offered. In review with no revision asked for, or once decided, the edit is refused with a 400 and a `detail` naming the status. The refusal comes before the body is validated, so "not now" is said before anything about the fields.
+    - *Why 400 and not 403 (settled in a second grilling the same day):* it is the repository's convention. **403 means "not you":** the caller can see the record but may not perform the act (ADR-022 §Amendment 4). **400 means "you, but not now":** `submit/` on a non-draft, the manuscript lock, `new-version/` with no request open, and an unopened seat's "Open the review first" all answer it. **409 stays reserved** for the stale decision token (§11).
+    - *Rejected:* 403, which would tell an owner they lack authority over their own record. *Rejected:* 409, which would make this the only state refusal that is not a 400.
+- **Only an owner submits (`continue_draft`)**, any owner. So `dpa_accepted_by` is always an owner.
+- **What stays fixed once a record leaves `draft`**: `adviser`, `record_type`, `is_ip`, `for_commercialization`, `community_extension`, `requested_itso`, `requested_ierc`, `requested_ktto` and `requires_ethics_review` (`versions.SUBMISSION_FIXED_FIELDS`). A revision answers a reviewer, so only the paper's own details stay open.
+    - **The Adviser**, because its seat stays with the Adviser the record entered with while routing reads `record.adviser`. Changed mid-review, neither Adviser could accept and route.
+    - **The type**, because it picks the decision path (§2).
+    - **The IP flags**, because once submitted they are the offices' through `tags/` (`tag_ip`), and `is_ip` feeds ADR-015's disclosure gate. An owner's save must not undo an office's tag.
+    - **The hints**, because they were for the router (§3), who has already read them. An author who realises mid-revision that the work involves human participants says so in the review discussion.
+- **A fixed field sent unchanged is accepted; a change is one 400 naming every refused field.** A form that re-sends every field still saves. Edit details shows the fixed fields read-only once submitted, and does not send them.
+- **Refusals follow ADR-022 §Amendment 4:** a 403 for a record the caller can see, a 404 for one they cannot.
+- **Correcting a published record's details is deferred, not built.** Before publication, a reviewer asks for a revision. After it, nothing in IRIS corrects details: `Record` is not in Django admin, and adding it would bypass every rule here.
+    - *Rejected:* a narrow staff correction right (for example RDCO, published records, a fixed field list). It is a new capability with its own allowlist and audit event, and a decision about how the institution runs, not part of narrowing an accidental authority.
+- **Out of scope:** `destroy` has the same `IsOwnerOrStaff` gate. Who may delete is its own decision, on [IR-508](https://citiris.atlassian.net/browse/IR-508).
 
 ### 11. Lifecycle
 

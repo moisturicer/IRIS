@@ -1,6 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
-from core.enums import ReviewDecision
+from core.enums import PipelineStatus, ReviewDecision
 
 from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, resubmission_payload
@@ -408,6 +408,34 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(problem)
         return file
 
+    def validate(self, attrs):
+        """
+        What an owner may change (IR-507, ADR-032 §10 Amendment).
+
+        Only an owner reaches an update (`IsRecordOwner`), and only while the
+        record is a `draft` or awaits their revision (`RecordViewSet.update`).
+        Once submitted, the fields in `versions.SUBMISSION_FIXED_FIELDS` stay
+        as they were submitted. Sending one unchanged is not a change, so a
+        form that re-sends every field still saves; changing any is one
+        refusal naming each field, so a single correction clears them all.
+        """
+        if self.instance is None:
+            return attrs
+        from .versions import SUBMISSION_FIXED_FIELDS
+
+        record = self.instance
+        if record.pipeline_status != PipelineStatus.DRAFT:
+            changed = [
+                field for field in SUBMISSION_FIXED_FIELDS
+                if field in attrs and attrs[field] != getattr(record, field)
+            ]
+            if changed:
+                raise serializers.ValidationError({
+                    field: "This was fixed when the record was submitted and cannot be changed now."
+                    for field in changed
+                })
+        return attrs
+
     def _sync_authors(self, record, authors_data: list[str]):
         """Replace all Author rows for a record with the provided name list."""
         from .models import Author
@@ -425,13 +453,11 @@ class RecordWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         authors_data = validated_data.pop("authors", None)
-        from core.permissions import is_record_owner
-
-        editor = getattr(self.context.get("request"), "user", None)
-        if is_record_owner(editor, instance) and self._details_changed(instance, validated_data, authors_data):
+        if self._details_changed(instance, validated_data, authors_data):
             # What a new version answers a revision request with, when no file
-            # changed (IR-273). Only an owner's real change: the revision is
-            # theirs, and saving the same details again answers nothing.
+            # changed (IR-273). Only a real change: saving the same details
+            # again answers nothing. Only an owner edits at all (IR-507), so
+            # every change stamped here is the owner's own revision.
             validated_data["details_edited_at"] = timezone.now()
         record = super().update(instance, validated_data)
         if authors_data is not None:           # only replace when field was explicitly sent

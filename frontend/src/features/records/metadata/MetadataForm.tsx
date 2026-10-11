@@ -25,6 +25,7 @@ import type { Classification, PSCEDClassification } from "@/types/records";
 
 import { AdviserCombobox } from "./AdviserCombobox";
 import { HINTS, type MetadataValues } from "./metadataSchema";
+import { personName } from "./personName";
 
 /** Each field's element id, so a caller can move focus to the first invalid one. */
 export const METADATA_FIELD_IDS: Record<keyof MetadataValues, string> = {
@@ -82,6 +83,11 @@ interface MetadataFormProps {
   /** More details is controlled, so a summary's "Edit hints" can open it. */
   moreOpen:        boolean;
   onMoreOpenChange: (open: boolean) => void;
+  /**
+   * The record has been submitted, so its Adviser and hints are fixed
+   * (IR-507): they are shown, not edited, and the caller does not send them.
+   */
+  submitted?:      boolean;
 }
 
 const MAX_ABSTRACT = 5000;
@@ -94,6 +100,7 @@ export function MetadataForm({
   loadError = false,
   moreOpen,
   onMoreOpenChange,
+  submitted = false,
 }: MetadataFormProps) {
   const {
     register,
@@ -105,6 +112,9 @@ export function MetadataForm({
 
   const abstract = watch("abstract") ?? "";
   const authors = watch("authors") ?? [];
+  const adviserId = watch("adviser");
+  const adviser = advisers.find((a) => a.id === adviserId);
+  const flagged = HINTS.filter(({ field }) => watch(field));
   const [authorInput, setAuthorInput] = useState("");
 
   const ids = METADATA_FIELD_IDS;
@@ -165,6 +175,17 @@ export function MetadataForm({
       </div>
 
       <div className="grid gap-section-sm sm:grid-cols-[minmax(0,1fr)_9rem]">
+        {submitted ? (
+          <div>
+            <p className={LABEL}>Adviser</p>
+            <p id={ids.adviser} tabIndex={-1} aria-describedby={`${ids.adviser}-hint`} className="py-2 text-body text-stone-800">
+              {adviser ? personName(adviser) : adviserId ? "Your adviser" : "None recorded"}
+            </p>
+            <p id={`${ids.adviser}-hint`} className="mt-1 text-small text-stone-600">
+              Your adviser can't be changed once the record is submitted.
+            </p>
+          </div>
+        ) : (
         <div>
           <label htmlFor={ids.adviser} className={LABEL}>
             Adviser <RequiredMark />
@@ -192,6 +213,7 @@ export function MetadataForm({
             The faculty member who supervised this work. They review it first.
           </p>
         </div>
+        )}
 
         <Field label="Year" htmlFor={ids.year} required error={errors.year?.message} errorId={errorId("year")}>
           <input
@@ -299,6 +321,23 @@ export function MetadataForm({
             </div>
           </div>
 
+          {submitted ? (
+            <div>
+              <p className="text-body font-medium text-stone-800">Flagged for your adviser</p>
+              <p className="mt-1 text-small text-stone-600">
+                These can't be changed once the record is submitted.
+              </p>
+              {flagged.length > 0 ? (
+                <ul aria-label="Flagged for your adviser" className="mt-3 flex flex-col gap-1.5">
+                  {flagged.map(({ field, summary }) => (
+                    <li key={field} className="text-body text-stone-700">{summary}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-body text-stone-700">Nothing was flagged.</p>
+              )}
+            </div>
+          ) : (
           <fieldset aria-describedby="metadata-hints-note">
             <legend className="text-body font-medium text-stone-800">Flag for your adviser</legend>
             <p id="metadata-hints-note" className="mt-1 text-small text-stone-600">
@@ -313,6 +352,7 @@ export function MetadataForm({
               ))}
             </div>
           </fieldset>
+          )}
         </div>
       </details>
     </div>
