@@ -87,7 +87,7 @@ def test_replanning_stops_at_the_outer_limit_and_answers_once(corpus, embedder):
     result, answerer = execute(corpus, embedder, model, max_outer_rounds=2, max_tool_calls=20)
     assert result.stop_reason == "max_outer_rounds"
     assert len(answerer.calls) == 1
-    assert "stopped" in result.answer.text
+    assert "stopped" in result.coverage_notes[0]["text"]
     assert len(model.conversation_requests) == 7
 
 
@@ -148,7 +148,7 @@ def test_oversized_weak_evidence_leaves_all_later_prompts_and_reports_coverage(c
     assert "WEAK_PASSAGE" not in str(model.conversation_requests[2:])
     assert "WEAK_PASSAGE" not in str(answerer.calls)
     assert {source.record_id for source in result.answer.sources} == {corpus["public"].pk}
-    assert "lowest-scoring passages" in result.answer.text
+    assert any("lowest-scoring passages" in note["text"] for note in result.coverage_notes)
 
 
 def test_synthesis_also_drops_whole_weak_passages_before_its_single_call(corpus, embedder, settings):
@@ -286,7 +286,7 @@ def test_a_passage_count_cap_also_reports_reduced_coverage(corpus, embedder):
     )
     result, _ = execute(corpus, embedder, model, max_ledger_passages=1)
     assert len(result.answer.sources) == 1
-    assert "lowest-scoring passages" in result.answer.text
+    assert any("lowest-scoring passages" in note["text"] for note in result.coverage_notes)
 
 
 def test_visibility_loss_removes_old_counts_notes_and_plan_from_later_requests(corpus, embedder):

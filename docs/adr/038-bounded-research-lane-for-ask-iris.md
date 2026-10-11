@@ -345,3 +345,20 @@ decision returns `no_sources` with the capability limitation, performs no retrie
 and cannot be overridden into an evidence workflow while the capability is absent.
 This records the contradiction; it does not accept this Proposed ADR or authorize
 merge. The flag remains off and cannot be enabled with `DEBUG=False` until IR-504.
+
+### IR-504 implementation record — 2026-10-12
+
+Records proposal 13 D8 as built; it does not accept this ADR. **D8: ASGI**, which
+production already runs. Against Celery offload it adds no queue or relay, at the
+cost of a run holding a thread and a connection with no resume across a restart
+(trade-offs in [RESEARCH_LANE_ROLLOUT.md](../engineering/RESEARCH_LANE_ROLLOUT.md)).
+Building it found that Django buffers a synchronous SSE stream to the end under
+ASGI, so no progress reached a reader in production; `EventStreamResponse` now
+streams it. `AI_RESEARCH_LANE` gains `staff` and is no longer refused with
+`DEBUG=False`. Planner steps stream as `agent_step` and persist on `Turn.research`
+with the coverage notes, which no longer append to the answer text.
+
+**Contradiction recorded, not resolved:** IR-504 states that IR-499's decisions
+are accepted by the owner, while this file's Status still reads Proposed and says
+IR-504 may not merge until a person records acceptance here. The Status line wins
+until it is updated.

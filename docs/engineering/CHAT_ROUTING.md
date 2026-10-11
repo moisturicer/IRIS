@@ -2,8 +2,9 @@
 
 `AI_RESEARCH_LANE=off` is the default. The chat requests, response shape and stream
 remain on the existing passage path without constructing a router or its providers.
-`on` is development-only: startup rejects it with `DEBUG=False`. Production rollout,
-staff access and asynchronous planner progress belong to IR-504. ADR-038 remains
+IR-504 lifted the development-only restriction and added `staff`; see
+[RESEARCH_LANE_ROLLOUT.md](RESEARCH_LANE_ROLLOUT.md) for serving, `agent_step`
+progress, staff-first rollout and rollback. ADR-038 remains
 Proposed; this branch is reviewable implementation, not approval to merge it.
 
 Both chat endpoints route the raw reader question and resolved question with only
@@ -35,8 +36,8 @@ The conflict remains unresolved rather than silently rewriting either authority.
 Trade-off: listing and count responses use deterministic wording and rows, which
 prevents model-invented records but gives up model-written grouping. Comparison
 uses exact full titles, so ambiguous or partial names require clarification rather
-than selecting a paper silently. Research holds a web worker and offers no live
-planner steps in this slice, as IR-515 specifies.
+than selecting a paper silently. IR-515 shipped research with no live planner
+steps; IR-504 adds them.
 
 
 Saved-turn overrides include `route_override_turn_id`. The owned Turn fixes the

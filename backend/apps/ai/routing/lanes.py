@@ -21,6 +21,15 @@ from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.workflows import topic_count
 from apps.ai.resilience.circuit import CircuitOpen
 
+def drain(events):
+    """Run a step-yielding generator to completion and return its value."""
+    while True:
+        try:
+            next(events)
+        except StopIteration as stop:
+            return stop.value
+
+
 LIST_WORDING = "These are matches found, not a complete list of the papers you can see."
 SUCCESS = (ToolStatus.OK, ToolStatus.EMPTY, ToolStatus.DEGRADED)
 
@@ -178,20 +187,37 @@ def _comparison(run, question, maximum):
                           degraded=degraded or bool(missing), model=model_that_answered(llm)), None
 
 
+def _context(lane, user, *, root, conversation, scope_record, max_sources, history_before_turn_id):
+    if max_sources < 1:
+        raise ValueError("max_sources must be positive")
+    ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation)
+    return replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None,
+                   history_before_turn_id=history_before_turn_id)
+
+
+def research_run(question, user, *, root, conversation=None, scope_record=None,
+                 max_sources=8, history_before_turn_id=None):
+    """Yield the planner's steps; return its `ResearchAnswer` (IR-504)."""
+    ctx = _context("research", user, root=root, conversation=conversation,
+                   scope_record=scope_record, max_sources=max_sources,
+                   history_before_turn_id=history_before_turn_id)
+    ctx = replace(ctx, budget=replace(ctx.budget,
+        max_ledger_passages=min(ctx.budget.max_ledger_passages, max_sources)))
+    return (yield from ResearchPlanner(root).run(question, ctx))
+
+
 def answer_lane(lane, question, user, *, root, conversation=None, scope_record=None,
                 max_sources=8, history_before_turn_id=None):
     """Run a bounded corpus workflow selected by the application router."""
     if lane not in ("listing", "count", "comparison", "research"):
         raise ValueError(f"No application workflow for lane {lane!r}")
-    if max_sources < 1:
-        raise ValueError("max_sources must be positive")
-    ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation)
-    ctx = replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None,
-                  history_before_turn_id=history_before_turn_id)
     if lane == "research":
-        ctx = replace(ctx, budget=replace(ctx.budget,
-            max_ledger_passages=min(ctx.budget.max_ledger_passages, max_sources)))
-        return ResearchPlanner(root).answer(question, ctx).answer, None
+        events = research_run(question, user, root=root, conversation=conversation,
+                              scope_record=scope_record, max_sources=max_sources,
+                              history_before_turn_id=history_before_turn_id)
+        return drain(events).answer, None
+    ctx = _context(lane, user, root=root, conversation=conversation, scope_record=scope_record,
+                   max_sources=max_sources, history_before_turn_id=history_before_turn_id)
     run = ToolRun.start(ctx, root)
     try:
         with model_call_deadline(ctx.budget.wall_clock_seconds):

@@ -577,6 +577,24 @@ is claimed. ADR-038's overall Proposed status remains unreconciled with Jira's
 accepted-scope comment; broader human approval remains required before merge.
 
 
+## IR-504 — research lane rollout: serving, progress and staff-first enablement
+
+ADR-038 (Proposed). `apps/ai/tests/test_asgi_streaming.py` drives Django's real
+`ASGIHandler`: three concurrent long research streams each deliver their first
+events while still running and a fourth request completes meanwhile; a reader
+leaving closes the run on its own thread. Both tests fail with
+`EventStreamResponse` removed (checked 2026-10-12). `test_research_rollout_http.py`
+covers `staff` mode (staff routed, readers on the unchanged `off` path with the
+router never constructed), `agent_step` ordering and content-free payloads, and
+replay of `Turn.research` steps and coverage notes. `test_routed_chat_http.py`'s
+off test still pins every endpoint's off behaviour. `research/tests/test_progress.py`
+covers running-then-outcome steps, an interrupted audit and the content-free run
+log line. Frontend: `ResearchSteps.test.tsx` (live trail, progress line,
+collapsed finished trail, coverage notes, replay, axe) and `useAskStream.test.tsx`
+(step upsert, unknown events ignored). Five planner tests now read coverage notes
+from `coverage_notes` instead of the answer text — a deliberate contract change.
+See [RESEARCH_LANE_ROLLOUT.md](../engineering/RESEARCH_LANE_ROLLOUT.md).
+
 ## IR-515 — chat dispatch, decisions and overrides
 
 The default-off development switch preserves the existing passage adapter request

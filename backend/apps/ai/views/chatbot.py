@@ -21,7 +21,7 @@ whole path drivable from a test with deterministic fakes.
 """
 import json
 
-from django.http import Http404, StreamingHttpResponse
+from django.http import Http404
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -31,6 +31,7 @@ from rest_framework.views import APIView
 
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
+    AgentStep,
     CitationsResolved,
     Done,
     ReasoningDelta,
@@ -40,6 +41,7 @@ from apps.ai.answers.events import (
 from apps.ai.composition import composition_root
 from apps.ai.models import Conversation
 from apps.ai.orchestrator import ChatOrchestrator, ChatQuestion
+from apps.ai.streaming import EventStreamResponse
 from apps.ai.presentation import (
     answer_body,
     answer_mode,
@@ -340,11 +342,13 @@ class ChatStreamView(APIView):
 
     **This stays a plain synchronous view.** Retrieval, the disclosure gate,
     memory recall and persistence are the exact same synchronous calls
-    `ChatQueryView` makes; under the ASGI deployment ADR-017 requires,
-    Django's own ASGI handler is what bridges a synchronous view's
-    `StreamingHttpResponse` onto the event loop -- pulling `streaming_content`
-    one chunk at a time via `sync_to_async` internally -- so there is no
-    async plumbing to write by hand here.
+    `ChatQueryView` makes. Under ASGI, Django would read a synchronous
+    stream to the end before sending any of it, so `EventStreamResponse`
+    hands each event over as it is produced (IR-504).
+
+    On the research lane, `agent_step` events report each planner step
+    between `retrieval_started` and `done` (IR-504); `done` carries the
+    finished steps and coverage notes as `research`.
 
     **Generation streams against the real configured model as of IR-334.**
     The IR-321 resilience decorators implement `stream()` now, rather than
@@ -373,6 +377,8 @@ class ChatStreamView(APIView):
             for event in orchestrator.answer_stream(request.user):
                 if isinstance(event, RoutingDecided):
                     yield _sse(event.name, {"routing": event.routing})
+                elif isinstance(event, AgentStep):
+                    yield _sse(event.name, event.wire())
                 elif isinstance(event, RetrievalFinished):
                     yield _sse(
                         event.name,
@@ -414,14 +420,7 @@ class ChatStreamView(APIView):
                     # beyond the event name itself.
                     yield _sse(event.name, {})
 
-        response = StreamingHttpResponse(
-            event_source(), content_type="text/event-stream"
-        )
-        response["Cache-Control"] = "no-cache"
-        # nginx buffers a proxied response by default, which would turn this
-        # into one delayed burst instead of a stream -- see `nginx.conf`.
-        response["X-Accel-Buffering"] = "no"
-        return response
+        return EventStreamResponse(event_source())
 
 
 class SemanticSearchView(APIView):

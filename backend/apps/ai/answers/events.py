@@ -8,13 +8,14 @@ already draws between the domain's `GroundedAnswer` and the wire's JSON.
 
 **Per ADR-028, this is honest progress reporting for one deterministic
 retrieval call followed by one generation call -- never framed as parallel
-agents or multi-step autonomous search.**
+agents or multi-step autonomous search.** The research lane (ADR-038) is the
+one exception: its planner's steps arrive as `AgentStep` (IR-504).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 from .citations import Citation, GroundedAnswer
 
@@ -95,3 +96,35 @@ class Done(AnswerEvent):
 
     answer: GroundedAnswer
     name: ClassVar[str] = "done"
+
+
+@dataclass(frozen=True)
+class AgentStep(AnswerEvent):
+    """One research-planner step (IR-504): names, codes and counts, no content.
+
+    A step is sent `running` before it starts and again with its outcome;
+    `position` ties the two together.
+    """
+
+    position: int
+    kind: str
+    status: str
+    tool: str = ""
+    duplicate: bool = False
+    latency_ms: int = 0
+    coverage: Optional[str] = None
+    found: Optional[int] = None
+    name: ClassVar[str] = "agent_step"
+
+    @classmethod
+    def of(cls, position: int, step, *, coverage=None, found=None) -> "AgentStep":
+        """From an audit `Step`, which carries no content either."""
+        return cls(position, step.kind, step.status, tool=step.tool, duplicate=step.duplicate,
+                   latency_ms=step.latency_ms, coverage=coverage, found=found)
+
+    def wire(self) -> dict:
+        return {
+            "position": self.position, "kind": self.kind, "status": self.status,
+            "tool": self.tool, "duplicate": self.duplicate, "latency_ms": self.latency_ms,
+            "coverage": self.coverage, "found": self.found,
+        }

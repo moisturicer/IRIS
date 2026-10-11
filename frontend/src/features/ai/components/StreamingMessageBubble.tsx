@@ -6,6 +6,7 @@ import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
 import { ReasoningPanel } from "./ReasoningPanel";
 import { StreamStatusLine } from "./StreamStatusLine";
+import { ResearchSteps } from "./ResearchSteps";
 
 /** The reply while still streaming (IR-329) -- status line, the collapsed
  *  reasoning panel (IR-381), then text rendering progressively. Swapped for
@@ -34,6 +35,7 @@ export function StreamingMessageBubble({
       <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
         <StreamStatusLine state={state} />
         {state.routing && <RoutingDecisionPanel decision={state.routing} />}
+        {state.steps && <ResearchSteps steps={state.steps} live compact={compact} />}
 
         <ReasoningPanel reasoning={state.reasoning} streaming compact={compact} />
 

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage } from "@/lib/chatMessages";
-import type { ChatCitation, ChatLane, RoutingDecision } from "@/types/ai";
+import type { AgentStepEvent, ChatCitation, ChatLane, RoutingDecision } from "@/types/ai";
 import type { ChatMessage } from "@/types/chat";
 
 /**
@@ -13,6 +13,8 @@ export type StreamStage = "searching" | "found" | "thinking" | "answering";
 
 export interface StreamingState {
   routing?: RoutingDecision;
+  /** The research planner's steps so far, one per position (IR-504). */
+  steps?:   AgentStepEvent[];
   stage:     StreamStage;
   foundInfo: { passageCount: number; recordCount: number } | null;
   /** The raw, still-unresolved answer text accumulated so far. */
@@ -86,6 +88,18 @@ export function useAskStream() {
           if (event === "routing_decided") {
             routing = payload.routing as RoutingDecision;
             setStreaming((s) => (s ? { ...s, routing } : s));
+          } else if (event === "agent_step") {
+            const step = payload as unknown as AgentStepEvent;
+            setStreaming((s) =>
+              s
+                ? {
+                    ...s,
+                    // A step arrives `running`, then again with its outcome.
+                    steps: [...(s.steps ?? []).filter((known) => known.position !== step.position), step]
+                      .sort((a, b) => a.position - b.position),
+                  }
+                : s,
+            );
           } else if (event === "retrieval_started") {
             setStreaming((s) => (s ? { ...s, stage: "searching" } : s));
           } else if (event === "retrieval_finished") {
@@ -132,6 +146,7 @@ export function useAskStream() {
               turnId: payload.turn_id as number | undefined,
               routing: (payload.routing as RoutingDecision | undefined) ?? routing,
               listing: payload.listing as ChatMessage["listing"],
+              research: payload.research as ChatMessage["research"],
               question,
               sources:   payload.sources as ChatMessage["sources"],
               degraded:  payload.degraded as boolean,
