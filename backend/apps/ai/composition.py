@@ -358,7 +358,8 @@ class CompositionRoot:
         )
 
     def vendor_permits(self) -> Callable[[Record], bool]:
-        """The gate for content bound to the research planner (ADR-038 §2.3).
+        """The gate for content bound to the research planner (ADR-038 §2.3)
+        or the AI Overview (IR-431).
 
         Unlike reranking's, it does not depend on whether the reranker
         transmits. ``policy_enabled=False`` turns it off, as it does for
@@ -436,23 +437,14 @@ class CompositionRoot:
         )
 
     def answer_service(
-        self,
-        max_sources: int,
-        record: Optional[Record] = None,
-        task: "InferenceTask | str | None" = None,
+        self, max_sources: int, record: Optional[Record] = None
     ) -> GroundedAnswerService:
-        """A grounded-answer service reaching the model for ``task``.
-
-        ``task`` is a call-time argument for the same reason ``record`` is:
-        the AI Overview and Ask IRIS both want a grounded answer over the same
-        stack, but on their own models (IR-380). It defaults to ``ANSWER`` so
-        every caller written before Inference tasks keeps its model.
-        """
+        """A grounded-answer service on the ``answer`` task."""
         from apps.ai.inference import InferenceTask
 
         return GroundedAnswerService(
             retriever=self.retriever(record=record),
-            llm=self.llm_for(task if task is not None else InferenceTask.ANSWER),
+            llm=self.llm_for(InferenceTask.ANSWER),
             permits=self._permits,
             policy_enabled=self._policy_enabled,
             max_sources=max_sources,

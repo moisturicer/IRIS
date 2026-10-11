@@ -53,7 +53,7 @@ from .events import (
     RetrievalStarted,
     TextDelta,
 )
-from .reasoning import ThinkTagFilter
+from .reasoning import ThinkTagFilter, without_leaked_reasoning
 from .selection import SourceSelection
 
 logger = logging.getLogger(__name__)
@@ -223,24 +223,14 @@ class GroundedAnswerService:
 
         recalled = self._recall(retrieved, conversation, history)
 
-        try:
-            raw = self._llm.generate(
-                system=SYSTEM_PROMPT,
-                user=build_prompt(question, sources, history=history, recalled=recalled),
-            )
-        except (LLMUnavailable, CircuitOpen) as exc:
-            logger.warning("answer generation unavailable: %s", exc)
+        generated = generate_cited(
+            self._llm,
+            build_prompt(question, sources, history=history, recalled=recalled),
+            sources,
+        )
+        if generated is None:
             return self._unavailable_answer(retrieved, sources)
-
-        raw = _without_leaked_reasoning(raw)
-
-        if _produced_nothing(raw):
-            logger.warning("answer generation produced no text")
-            return self._unavailable_answer(retrieved, sources)
-
-        text, citations = parse_citations(raw, sources)
-        _warn_if_citations_went_missing(raw, text, citations)
-        _warn_if_images_were_stripped(raw)
+        text, citations = generated
         return self._grounded_answer(retrieved, sources, text, citations)
 
     def answer_stream(
@@ -425,9 +415,36 @@ class GroundedAnswerService:
         provider it can ever call, so falling back to `.model` is correct
         for all of them.
         """
-        return getattr(self._llm, "last_model_used", None) or getattr(
-            self._llm, "model", None
-        )
+        return model_that_answered(self._llm)
+
+
+def model_that_answered(llm: LLMProvider) -> Optional[str]:
+    """``last_model_used`` first: it names the fallback that actually ran."""
+    return getattr(llm, "last_model_used", None) or getattr(llm, "model", None)
+
+
+def generate_cited(
+    llm: LLMProvider, user_prompt: str, sources: Sequence[RetrievedChunk]
+) -> Optional[tuple[str, tuple]]:
+    """One non-streaming completion, cited against ``sources``.
+
+    ``None`` when the model was unreachable or wrote nothing (ADR-008).
+    """
+    try:
+        raw = llm.generate(system=SYSTEM_PROMPT, user=user_prompt)
+    except (LLMUnavailable, CircuitOpen) as exc:
+        logger.warning("answer generation unavailable: %s", exc)
+        return None
+
+    raw = without_leaked_reasoning(raw)
+    if _produced_nothing(raw):
+        logger.warning("answer generation produced no text")
+        return None
+
+    text, citations = parse_citations(raw, sources)
+    _warn_if_citations_went_missing(raw, text, citations)
+    _warn_if_images_were_stripped(raw)
+    return text, citations
 
 
 def _produced_nothing(raw: str | Sequence[str]) -> bool:
@@ -459,17 +476,6 @@ def _parse(
     raw = dialect.normalize_citation_markers("".join(raw_parts))
     text, citations = parse_citations(raw, sources)
     return raw, text, citations
-
-
-def _without_leaked_reasoning(raw: str) -> str:
-    """``raw`` with any `<think>` span removed. The non-streaming path had no
-    such filter (IR-428 "Image syntax never survives into a stored answer").
-    The reasoning is discarded: an overview is not a Turn.
-    """
-    leak_filter = ThinkTagFilter()
-    text, _ = leak_filter.feed(raw)
-    tail, _ = leak_filter.flush()
-    return text + tail
 
 
 def _warn_if_images_were_stripped(raw: str) -> None:
