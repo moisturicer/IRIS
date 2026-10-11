@@ -9,7 +9,7 @@ from apps.ai.inference import InferenceTask, Vendor, profile_for
 from apps.ai.providers.openrouter_decisions import OpenRouterDecisionsAdapter
 
 
-def configured_providers():
+def configured_providers(*, root=None):
     """Jev is opt-in; an unapproved Groq backup is unavailable, not called."""
     jev = None
     if settings.AI_JEV_ROUTING_ENABLED:
@@ -28,5 +28,5 @@ def configured_providers():
     if profile.is_configured and profile.api_key and (
         profile.vendor is not Vendor.GROQ or settings.AI_ROUTE_GROQ_APPROVED
     ):
-        backup = composition_root().llm_for(InferenceTask.ROUTE)
+        backup = (root or composition_root()).llm_for(InferenceTask.ROUTE)
     return jev, backup

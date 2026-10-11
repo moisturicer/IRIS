@@ -78,6 +78,9 @@ def record_turn(
     resolved_question: Optional[str] = None,
     widened: bool = False,
     embedder=None,
+    *,
+    routing=None,
+    listing=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -111,7 +114,7 @@ def record_turn(
     docstring for why that order is not an accident.
     """
     turn = _write_turn(
-        conversation, question, answer, resolved_question, widened
+        conversation, question, answer, resolved_question, widened, routing, listing
     )
     _store_answer_vector(turn, answer, embedder)
     return turn
@@ -124,6 +127,8 @@ def _write_turn(
     answer: GroundedAnswer,
     resolved_question: Optional[str],
     widened: bool,
+    routing=None,
+    listing=None,
 ) -> Turn:
     """The Turn, its citations and its free question vector, all or nothing.
 
@@ -139,6 +144,8 @@ def _write_turn(
         widened=widened,
         had_reasoning=answer.had_reasoning,
         reasoning=answer.reasoning,
+        routing=routing or {},
+        listing=({**listing, "records": [{"record_id": row["record_id"]} for row in listing["records"]]} if listing else {}),
     )
     TurnCitation.objects.bulk_create(
         TurnCitation(
@@ -262,7 +269,9 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
 
     visible_titles = dict(
         Record.objects.visible_to(user)
-        .filter(pk__in={citation.record_id for citation in all_citations})
+        .filter(pk__in={citation.record_id for citation in all_citations} | {
+            row["record_id"] for turn in turns for row in turn.listing.get("records", [])
+        })
         .values_list("pk", "title")
     )
     live_chunks = {
@@ -288,8 +297,9 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
 
     return [
         {
-            **answer_body(answer_mode(turn.state), turn.answer),
+            **answer_body(answer_mode(turn.state), turn.answer, preserve_no_results=bool(turn.routing)),
             "id": turn.pk,
+            **_route_for_reader(turn, visible_titles),
             "question": turn.question,
             "resolved_question": turn.resolved_question or None,
             "state": answer_mode(turn.state),
@@ -353,3 +363,13 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
             normalized_regions(chunk.bboxes, chunk.chunk_set.page_sizes)
         ),
     }
+
+
+def _route_for_reader(turn, titles):
+    metadata = {"routing": turn.routing} if turn.routing else {}
+    if turn.listing:
+        metadata["listing"] = {**turn.listing, "records": [
+            {"record_id": row["record_id"], "title": titles[row["record_id"]]}
+            for row in turn.listing["records"] if row["record_id"] in titles
+        ]}
+    return metadata

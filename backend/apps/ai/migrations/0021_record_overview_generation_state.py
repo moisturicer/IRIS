@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("ai", "0019_research_run_audit"),
+        ("ai", "0020_turn_routing_listing"),
     ]
 
     operations = [

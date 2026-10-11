@@ -575,3 +575,60 @@ publication revalidation and in-flight-edit fixes.
 No screening quality measurement, real institutional result or reader rollout
 is claimed. ADR-038's overall Proposed status remains unreconciled with Jira's
 accepted-scope comment; broader human approval remains required before merge.
+
+
+## IR-515 — chat dispatch, decisions and overrides
+
+The default-off development switch preserves the existing passage adapter request
+(snapshot in `apps/ai/tests/test_shadow_off_snapshot.py`) and never constructs routing
+providers. `test_routed_chat_http.py` drives JSON and SSE with deterministic vendors
+for authoritative listing rows, topic-count coverage, per-paper comparison citations
+and missing evidence, landscape refusal (including router outage), overrides, Paper
+Chat/injection restrictions, widened research dispatch, persisted decisions and
+visibility-aware listing replay. `test_research_lane_configuration.py` checks switch
+validation and the development restriction; `test_routing_lanes.py` checks workflow
+bounds. Frontend API, hook, both chat pages and ChatRouting suites cover propagation,
+replay, list rendering and permitted reruns. No live vendor call or research quality
+measurement is claimed. Execution evidence is recorded on the IR-515 PR. See
+[CHAT_ROUTING.md](../engineering/CHAT_ROUTING.md) for limits and ADR divergence.
+
+Executed 2026-10-11 after merging `main` (`7f35dad`): full backend suite,
+3,330 passed and 1 existing non-strict IR-469 xpass, no failures or skips.
+Full frontend suite: 764 passed across 73 files. Production build/typecheck,
+lint, Django configuration and migration drift checks passed; existing warnings
+remain. Providers were deterministic and the PostgreSQL test database isolated.
+
+
+## IR-436: overview visibility and disclosure are explicit
+
+**Basis:** ADR-015 Security Impact (per-record disclosure), CLAUDE.md Security
+(one visibility predicate), and IR-425 part F.
+
+`RecordOverviewView` resolves through `Record.objects.visible_to(user)` before
+calling the overview service. `overview_for` checks the existing per-record
+vendor disclosure predicate before either cache access or whole-paper assembly.
+A refused record returns `unavailable` with no overview and no model call,
+including when an overview was stored before disclosure was refused. Visibility
+still returns the same 404 body for an inaccessible record and a missing ID.
+Allowed readers continue to share one stored overview row.
+
+Dedicated evidence: `backend/apps/ai/tests/test_overview_security.py` covers draft
+owner access, an inaccessible cached record versus a missing record, refusal
+before assembly with no model call or stored row, refusal of a cached overview,
+and two readers receiving the same stored row and timestamp with one model call.
+These tests are independent of IR-431's whole-paper assembly coverage.
+
+**Executed 2026-10-11:** all four overview test modules, 65 passed. The cached
+refusal regression fails against baseline `b1378a1` and passes with this change.
+Configuration check passes with the existing Axes deprecation warning; flake8
+and `git diff --check` pass. Full backend suite in an isolated test database:
+3,277 passed, 4 failed, 1 xpassed (`python -m pytest -q -o
+addopts=--strict-markers`, `DB_NAME=iris_ir436_verification`, `IRIS_REQUIRE_DB=1`).
+All four failures also reproduce on unchanged baseline `b1378a1`: the two
+`ResolveProfileTests` vendor inheritance tests and the streaming reasoning-body
+and grounded-answer temperature adapter tests. They are local model-configuration
+failures outside this change. An earlier shared-database run was invalidated by
+another test process dropping/rewinding its database; it is not verification
+for this change. Standards and Spec review each found zero actionable issues.
+
+**Status:** implemented and tested; human review and approval remain required.

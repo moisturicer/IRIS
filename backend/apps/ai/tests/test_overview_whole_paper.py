@@ -173,9 +173,23 @@ class ReusedSeamsTests:
         llm = ScriptedLLM(reply="An account [1].")
 
         with use_composition_root(_root(llm, permits=lambda record: False)):
-            result = _generate_overview(paper)
+            result = overview_for(paper)
 
         assert result == {"state": "unavailable", "overview": None}
+        assert llm.calls == []
+        assert not RecordOverview.objects.filter(record=paper).exists()
+
+    def test_a_gate_that_refuses_after_the_claim_still_calls_no_model(self, paper):
+        llm = ScriptedLLM(reply="An account [1].")
+        chunk_set = ChunkSet.objects.get(record=paper, is_active=True)
+        with use_composition_root(_root(llm)):
+            assert overview_for(paper)["state"] == "generating"
+
+        with use_composition_root(_root(llm, permits=lambda record: False)):
+            generate_overview(
+                paper.pk, chunk_set.pk, chunk_set.content_hash, PROMPT_VERSION
+            )
+
         assert llm.calls == []
         assert RecordOverview.objects.get(record=paper).state == "unavailable"
 

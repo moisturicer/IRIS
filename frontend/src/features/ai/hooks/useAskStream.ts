@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage } from "@/lib/chatMessages";
-import type { ChatCitation } from "@/types/ai";
+import type { ChatCitation, ChatLane, RoutingDecision } from "@/types/ai";
 import type { ChatMessage } from "@/types/chat";
 
 /**
@@ -12,6 +12,7 @@ import type { ChatMessage } from "@/types/chat";
 export type StreamStage = "searching" | "found" | "thinking" | "answering";
 
 export interface StreamingState {
+  routing?: RoutingDecision;
   stage:     StreamStage;
   foundInfo: { passageCount: number; recordCount: number } | null;
   /** The raw, still-unresolved answer text accumulated so far. */
@@ -31,6 +32,8 @@ interface AskStreamOptions {
   conversationId?: number;
   topK?:           number;
   widen?:          boolean;
+  routeOverride?:  ChatLane;
+  routeOverrideTurnId?: number;
 }
 
 export interface AskStreamResult {
@@ -53,6 +56,7 @@ export function useAskStream() {
       let text = "";
       let reasoning = "";
       let citations: ChatCitation[] = [];
+      let routing: RoutingDecision | undefined;
       let sawAnyEvent = false;
 
       setStreaming({ stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [] });
@@ -66,6 +70,9 @@ export function useAskStream() {
             // showing -- the server stored the same text on the Turn.
             reasoning: reasoning || null,
             partial: true,
+            routing,
+            question,
+            widened: options.widen,
           }),
           conversationId: options.conversationId ?? null,
         };
@@ -76,7 +83,10 @@ export function useAskStream() {
           sawAnyEvent = true;
           const payload = (data ?? {}) as Record<string, unknown>;
 
-          if (event === "retrieval_started") {
+          if (event === "routing_decided") {
+            routing = payload.routing as RoutingDecision;
+            setStreaming((s) => (s ? { ...s, routing } : s));
+          } else if (event === "retrieval_started") {
             setStreaming((s) => (s ? { ...s, stage: "searching" } : s));
           } else if (event === "retrieval_finished") {
             setStreaming((s) =>
@@ -119,6 +129,10 @@ export function useAskStream() {
             const body = (payload.answer ?? payload.message ?? "No readable sources matched that question.") as string;
             const message = newChatMessage("assistant", body, {
               citations: payload.citations as ChatCitation[],
+              turnId: payload.turn_id as number | undefined,
+              routing: (payload.routing as RoutingDecision | undefined) ?? routing,
+              listing: payload.listing as ChatMessage["listing"],
+              question,
               sources:   payload.sources as ChatMessage["sources"],
               degraded:  payload.degraded as boolean,
               widened:   payload.widened as boolean,

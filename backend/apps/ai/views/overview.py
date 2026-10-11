@@ -24,8 +24,12 @@ class RecordOverviewView(APIView):
     reader without access gets a 404 identical to a missing record rather than
     a 403 that would confirm it exists.
 
+    Disclosure is checked explicitly before reading a cached overview or
+    queueing generation. A refusal returns no overview and calls no model.
+
     `generating` is a persisted claim, so concurrent readers share one queued
-    task. `unavailable` can be retried explicitly with `?retry=true`.
+    task. `unavailable` means disclosure was refused or generation failed, and
+    can be retried explicitly with `?retry=true`.
     """
 
     permission_classes = [IsAuthenticated]

@@ -63,6 +63,11 @@ def _too_large(chunk_set: ChunkSet) -> bool:
 
 def overview_for(record: Record, *, retry: bool = False) -> dict:
     """Return a cached overview or queue one generation for the active paper."""
+    # Disclosure applies to every read, including a previously generated row.
+    if not composition_root().vendor_permits()(record):
+        logger.info("overview not generated for record %s: disclosure gate", record.pk)
+        return {"state": "unavailable", "overview": None}
+
     chunk_set = (
         ChunkSet.objects.filter(record=record, is_active=True)
         .select_related("record")
@@ -218,9 +223,8 @@ def _generate(chunk_set: ChunkSet):
     record = chunk_set.record
     root = composition_root()
 
-    # Before assembly: every chunk is content sent to a vendor.
-    permits = root.vendor_permits()
-    if not permits(record):
+    # Rechecked in the worker: the gate can change between claim and generation.
+    if not root.vendor_permits()(record):
         logger.info("overview not generated for record %s: disclosure gate", record.pk)
         return None
 

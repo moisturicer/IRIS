@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import type { ChatLane } from "@/types/ai";
+import { RoutingDecisionPanel } from "./RoutingDecisionPanel";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
@@ -21,6 +24,8 @@ interface ChatMessageBubbleProps {
    * full-width transcript keeps the default.
    */
   compact?: boolean;
+  onRouteOverride?: (message: ChatMessage, lane: ChatLane) => void;
+  overrideDisabled?: boolean;
 }
 
 /**
@@ -31,7 +36,7 @@ interface ChatMessageBubbleProps {
  * text with no card/border/shadow, closer to a read surface than a chat
  * widget — the avatar is still what tells the two apart.
  */
-export function ChatMessageBubble({ message, compact = false }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, compact = false, onRouteOverride, overrideDisabled }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -70,14 +75,31 @@ export function ChatMessageBubble({ message, compact = false }: ChatMessageBubbl
       >
         {isUser ? (
           <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
-        ) : (
+        ) : !message.listing ? (
           <CitationText
             text={message.content}
             citations={message.citations ?? []}
             className={ANSWER_MARKDOWN}
           />
-        )}
+        ) : null}
 
+        {!isUser && message.listing && (
+          <div className="mt-3">
+            <p className="text-sm text-stone-600">{message.listing.wording}</p>
+            {message.listing.records.length === 0 && <p className="mt-2">No papers are listed for this answer.</p>}
+            <ul className="mt-2 space-y-1">
+              {message.listing.records.map((record) => (
+                <li key={record.record_id}>
+                  <Link to={`/records/${record.record_id}`} className="text-brand hover:underline">{record.title}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {!isUser && message.routing && (
+          <RoutingDecisionPanel decision={message.routing} disabled={overrideDisabled}
+            onOverride={onRouteOverride && message.question ? (lane) => onRouteOverride(message, lane) : undefined} />
+        )}
         {!isUser && message.resolvedQuestion && (
           <ResolvedQuestionNotice question={message.resolvedQuestion} />
         )}
