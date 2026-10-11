@@ -24,6 +24,21 @@ export interface User {
   college_name:    string;
   department_name: string;
   course_name:     string;
+  /**
+   * What review work the user has (IR-415, spec Appendix D · B3). Sent only
+   * on the user's own payload (`/users/me/` and sign-in), never on someone
+   * else's, so it is optional here.
+   */
+  review_access?:  ReviewAccess;
+}
+
+export interface ReviewAccess {
+  /** The user holds or has held a seat, or is a member of an office. */
+  my_reviews:     boolean;
+  /** The office parties the user is a member of. */
+  offices:        ("itso" | "ierc" | "ktto" | "rdco")[];
+  /** A coordinator of their office: may assign its reviewers. */
+  is_coordinator: boolean;
 }
 
 export interface LoginPayload {

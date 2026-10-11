@@ -39,7 +39,7 @@ These restate [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.m
 15. **Clearance-aware resubmission is visible, not reimplemented.** The UI shows which clearances were preserved from server fields; it never computes them.
 16. **Every action is offered only when the server grants it** (capabilities, §4.8), and every endpoint re-checks.
 
-**During the transition** — until IR-260 cuts over — the live backend still runs the legacy pipeline, including RDCO intake for Thesis/Research and Project. The frontend therefore **reads current holders and labels from the server rather than asserting the ADR-032 flow in copy.** For example, Publish's success screen names whoever the server says now holds the record (§4.4); it does not hard-code "Sent to your adviser".
+**After IR-260's cutover**, new submissions of every record type enter at the assigned Adviser. The frontend still reads current holders and labels from the server because migrated history can include `Intake (retired)`.
 
 Sections 1–6 follow the project's `to-spec` template. The appendices hold what the request asked for beyond it:
 
@@ -335,6 +335,15 @@ Administration (RDCO) — unchanged
 - **Error:** "We couldn't load research", with **Try again**.
 - **Rate-limited:** IR-368's message, when that lands.
 
+**Amended 2026-10-10 (IR-407, built).**
+
+- **The Submit Disclosure sidebar item is gone for Students now**, ahead of F1, at the project lead's request: a Student publishes from Discover's **Publish**. **An Adviser keeps it until F1**, because an Adviser's home is still the Dashboard, not Discover (`HomePage`), so the item is an Adviser's only menu route into Publish. The route itself is unchanged for both (`/records/add` → `/?publish=new`); the access map narrows only the sidebar item (`nav.onlyFor`). F1 removes it for everyone when it makes Discover everyone's home.
+- **Result cards show no college.** `RecordListItem` carries none, so the card names none rather than guessing (user story 6 is otherwise met: type, title, authors, year and IP tags).
+- **The card keeps Star, Save and Cite**; the old card's copy-link button and "Quick read" expander are dropped (story 7 names cite and save). Star stays because My Library reads it.
+- **IP & patents is one control for two params:** "Has IP" is `is_ip=true`, a single IP type is `ip_type=<code>`.
+- **The tab container draws no tab bar for a single tab**, so Research alone shows none and an empty Proposals tab is impossible; IR-421 adds the second tab to `DiscoverTabs`.
+- **The search composer's "+ Add a filter" is removed**: the filter row now sits directly beneath it.
+
 ### 4.4 Publish dialog
 
 **Pattern: one dialog, three steps, with a slim progress indicator.**
@@ -362,7 +371,7 @@ At `md` and above it is a centred dialog up to 720 px wide. Below `md` it is a f
 **Step 2 — "Details".**
 
 - **Essential fields:** title, abstract, adviser (searchable, from the existing advisers endpoint), co-authors, year.
-- **More details** (a disclosure, closed by default): classification, PSCED, and "Flag for your adviser" hints (possible IP · human subjects · commercialisation). These are the existing `is_ip`, `requires_ethics_review` and `for_commercialization` fields. Under ADR-032 they are hints the Adviser sees, not routes, and the copy says so. **Publish never writes `requested_*`:** the author picks no office. *(Amended 2026-10-06, IR-408, lead decision: the legacy pipeline still routes on `requested_*` after intake, so until IR-260 cuts over a Publish-submitted Thesis or Project reaches no specialist office. Accepted rather than letting authors choose offices.)*
+- **More details** (a disclosure, closed by default): classification, PSCED, and "Flag for your adviser" hints (possible IP · human subjects · commercialisation). These are the existing `is_ip`, `requires_ethics_review` and `for_commercialization` fields. Under ADR-032 they are hints the Adviser sees, not routes, and the copy says so. **Publish never writes `requested_*`:** the author picks no office; the Adviser may route a Thesis or Project to specialists after reviewing it.
 - **Prefill** (§4.5): a field the server found text for shows a "Found in your PDF" chip with **Use** and **Dismiss**. A suggestion **never overwrites** a field the user has typed in.
 - **While extraction runs:** the title and abstract fields show a quiet inline "Reading your PDF…" line. They are **never** disabled, so the user may type over them at any time.
 - **Adviser ≠ owner.** The client disables choosing oneself, with an explanation. The server refuses it as well (IR-260 owns the server rule).
@@ -543,6 +552,10 @@ Versions and comments join the timeline when their backend lands (ADR-032 §5, �
 **Decision.** One frontend module, the **capabilities adapter**, turns a Record detail payload into the set of action keys ADR-032 §10 names:
 
 - `open_review` · `request_document` · `request_revision` · `route` · `decide` · `create_version` · `edit_details` · `continue_as` · `set_visibility` · `tag_ip` · `comment_review` · `comment_public` · `cite`.
+
+> **Amended 2026-10-09 (IR-270).** The three Decisions are their own keys: `accept_publish` (the Adviser and RDCO), `keep_unlisted` (RDCO; ui-ux/16 called it `final_decide`, renamed to the act it grants) and `reject`. The adapter grants them from record detail's `decision.outcomes`. `decide` stays the link to the current decision form for legacy records until IR-274.
+>
+> **Amended 2026-10-09 (IR-271).** A Proposal's *Accept* is `accept_proposal` and its *Reject* is `reject`, replacing ui-ux/16's single `decide_proposal`. Both open `DecisionDialog`: Reject's reason is required, and its body is the ui-ux/16 copy *"This archives the proposal. The student will need to submit a new one."*
 
 Every screen asks the adapter. No component reads a role name or `can_act` directly.
 

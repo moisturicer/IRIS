@@ -17,6 +17,10 @@ selected by configuration"* is **superseded**. It is replaced by **one adapter
 per protocol, vendor chosen per Inference task**: see §Amendment below. The
 sanctioned vendors are unchanged — Groq and OpenRouter, and no others.
 
+> **Amendment proposed — 2026-10-10 (IR-487). Not accepted.** The Decisions adapter may move from evaluation-only to a reader's path, behind a per-provider approval switch that fails closed. The owner's data-handling rule (no training; retention acceptable; zero data retention not required) is recorded, and OpenRouter provider routing enforces the hosting rule. Drafted by an AI agent; **awaiting approval by Jive Tyler Revalde**. See §Amendment — 2026-10-10 below.
+
+> **Amendment proposed — 2026-10-11 (IR-499). Not accepted.** Three new Inference tasks (`plan`, `screen`, `route`) and a production approval for Jev, **for routing and reader-question screening only**, which supersedes the 2026-10-10 amendment for those two uses. Drafted by an AI agent; awaiting a named approver. See §Amendment — 2026-10-11 below.
+
 **Does not contradict [ADR-008](008-ai-degradation-to-fts.md).** That ADR
 rejected *"a secondary LLM provider for failover"* — two providers live at once
 for resilience, one covering for the other's outage. Choosing a different
@@ -130,6 +134,122 @@ and a deployment that configures none of them must still start and degrade
 honestly rather than boot into a broken generative path. The task set itself is
 closed and defined outside this ADR — see IR-375 (*Spec: Inference tasks and
 Profiles*) and IR-378 (*C · Profile and the closed Inference task set*).
+
+## Amendment — 2026-10-08 (IR-482): an evaluation-only Decisions adapter
+
+OpenRouter also serves a **Decisions API** (`POST https://openrouter.ai/api/alpha/decisions`)
+that answers a typed question about a state with a probability and no text.
+It is not the chat endpoint, so `OpenAICompatibleAdapter` cannot reach it, and
+it generates nothing, so it does not fit `LLMProvider` or the closed Inference
+task set above. This amendment permits one narrow exception:
+
+* **A separate adapter**, `apps/ai/providers/openrouter_decisions.py`, behind a
+  small `DecisionModel` port that returns a probability. It reuses only the
+  OpenRouter key an Inference task already holds; no new setting.
+* **Pinned to `typesafe/jev-1.13`.** The `~typesafe/jev-latest` alias is
+  refused at construction, so a run is reproducible. The dated build the vendor
+  actually served is recorded in each run file.
+* **Evaluation only.** `manage.py eval_evidence --decision-mode jev-noul` is the
+  sole caller. Nothing on a reader's path, the shadow pilot or the answer path
+  constructs it, and it adds no Inference task.
+* **The endpoint is alpha** (the path says so) and may change without notice.
+* **Retention, training and rate-limit terms are unverified.** OpenRouter's
+  docs state none for this endpoint. Live runs are therefore limited to the
+  public arXiv proxy question set, and every run file says the terms are
+  unverified. Reader questions, private documents and sensitive school data are
+  out of scope until the terms are recorded here.
+* **Removal or deferral.** If Jev is not selected for the evidence decision, or
+  the terms cannot be verified, delete the adapter, the port and the mode. They
+  are additive and nothing else depends on them. The ADR-035 detector stays an
+  independent safeguard throughout: a probability can never override it.
+
+## Amendment — 2026-10-10 (IR-487): a production decision adapter, behind an approval switch
+
+**Status: Proposed, not accepted.** Drafted by an AI agent from
+[proposal 12](../architecture-review/12-jev-first-evidence-routing-proposal.md)
+§8 and the owner decisions on IR-485 (2026-10-10). **Approver: Jive Tyler
+Revalde.** Until a person accepts it, the IR-482 amendment above stands, and the
+adapter stays evaluation-only.
+
+**Evidence, and what is exploratory.** Jev's latency and behaviour come from
+four proxy-set runs (`20261008-110112`, `-110304`, `-110450`, `-110632`):
+0.89–0.93 s mean, and 0 failures in 113 × 4 calls (proposal 12 §13 and §5.3).
+That is one labeller and arXiv questions, so it is exploratory. **The
+endpoint's rate limit and its behaviour under reader traffic are not measured.**
+The vendor facts below are read from published policies, not from contracts.
+
+**What this supersedes.** The IR-482 bullet *"Evaluation only. … Nothing on a
+reader's path, the shadow pilot or the answer path constructs it"*. Also
+ADR-035 §2's *"ADR-036 is not amended"*, which assumed the decision would reuse
+the `answer` task with no other adapter.
+
+**The rule.**
+
+* **A decision provider is constructed on a reader's path, in shadow or in
+  `on`, only when its own approval setting is on.** There is one switch per
+  provider (Jev via OpenRouter Decisions, and the LLM route label's vendor). It
+  defaults off. When it is off, the decision **fails closed to evidence**, sends
+  nothing to that vendor and records the skip. The setting's name is IR-490's to
+  choose. **This amendment proposes no key.**
+* **An approval is a person's act, recorded in ADR-035 §11's per-vendor table.**
+  It is never inferred from a configured API key.
+* **Pinning is unchanged.** `typesafe/jev-1.13` stays pinned and the
+  `~typesafe/jev-latest` alias is still refused. A served build that differs
+  from the pin is a failure, and it routes to evidence.
+* **Still not an Inference task.** The Decisions adapter generates no text and
+  stays outside the closed task set. The LLM route label is a `generate` call:
+  it runs on the `answer` Profile today. Whether it gets its own task is open
+  and is not decided here.
+* **The endpoint is still alpha.** A shape change is a malformed reply, and it
+  routes to evidence. The rate limit is unstated.
+
+**Data handling. This replaces "unverified" with what is recorded.** The
+owner's rule (IR-485 #2, 2026-10-10): **retention is acceptable provided no model
+trains on the data**.
+
+* **`provider.zdr` is not required.** `provider.data_collection: "deny"` already
+  excludes providers that train on inputs, and it is sufficient under the rule.
+  The chat dialect sends it today (`providers/dialects.py`).
+* **Hosting.** Endpoints must be hosted in the US or the EU, and no endpoint may
+  be hosted in China. China-origin models served from US or EU hosts are
+  acceptable (IR-485 #6). This excludes DeepSeek's first-party endpoint. Where a
+  task's model is offered by a China-hosted provider, **the request pins
+  providers through OpenRouter's provider-routing object** (an allow-list or
+  ignore-list of providers) so that OpenRouter cannot route there. The exact
+  fields, and whether fallbacks respect them, are **unverified**. They are
+  checked in IR-489 before any answer request depends on them.
+* **Recorded facts.**
+
+  | Party | Recorded | Source |
+  |---|---|---|
+  | TypeSafe | No training or fine-tuning on input. No disclosure except to service providers. Retention unspecified. US-hosted. **Accepted by the owner.** | typesafe.ai privacy policy, updated 2025-11-19, read 2026-10-08 |
+  | OpenRouter | Does not train on inputs or outputs. Cannot control training by the model providers behind it. Retention "as long as reasonably necessary", with no period. May re-identify stored inputs for debugging. A data-processing agreement is available | openrouter.ai/privacy, updated 2026-08-31, read 2026-10-10 |
+
+* **Still unverified:** OpenRouter's retention period. Whether the Decisions
+  endpoint honours a `provider` object; the adapter deliberately sends only
+  `model`, `state` and `questions`. TypeSafe's sub-processors. Groq's own
+  no-training terms, which stop mattering once IRIS migrates its tasks to
+  OpenRouter (owner direction, IR-485). **No data-processing agreement has been
+  requested.**
+
+**Groq stays a sanctioned vendor** until a person removes it. The migration to
+OpenRouter is a direction, not a decision recorded in this file.
+
+**Recorded contradiction.** The IR-482 amendment above was written by an agent.
+Its ticket asked for a reviewed amendment, and no review is recorded in this
+file. **Owner: Jive Tyler Revalde.** Accepting this amendment does not
+retroactively review that one.
+
+## Amendment — 2026-10-11 (IR-499): three Inference tasks, and Jev approved for routing and screening
+
+**Status: Proposed, not accepted.** Drafted by an AI agent. The decision is in [ADR-038](038-bounded-research-lane-for-ask-iris.md) §8 and §9. Until a person accepts it, the amendments above stand.
+
+* **The closed task set grows from four to seven:** `answer`, `resolve`, `summary`, `describe_figure` plus `plan` (the research planner, which needs the tool-calling port), `screen` (per-record include or exclude judgements) and `route` (the LLM backup to Jev's routing). Each gets a Profile as the 2026-09-28 amendment requires. `route` **inherits `resolve`'s model by default**. `plan` and `screen` models are chosen by IR-502 and IR-501. A task with no configured model reports unavailable.
+* **This supersedes the 2026-10-10 (IR-487) amendment for two uses only:** Jev, reached through OpenRouter's Decisions API, is approved for **routing and for screening the reader's question**. Its other proposed use, the evidence decision, stays Proposed and is not decided here.
+* **The rule is unchanged:** an approval is a person's act and is never inferred from an API key. The approval switch **defaults to off**, and when it is off or Jev fails, routing falls to the `route` backup. `typesafe/jev-1.13` stays pinned and the `~typesafe/jev-latest` alias stays refused.
+* **Recorded terms:** no training or fine-tuning on input (accepted by the owner on IR-485), retention unstated, US-hosted, alpha endpoint with an unmeasured rate limit.
+* **The `route` backup's vendor must meet the same no-training rule.** Groq has no terms recorded in the repository and is not approved for it.
+* **The Decisions adapter stays outside the Inference task set,** because it writes no text.
 
 ## Consequences
 

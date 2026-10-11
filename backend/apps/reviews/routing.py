@@ -1,12 +1,9 @@
 """
 Adviser-first entry and routing into office pools (ADR-032 §1, §3, §4; IR-261).
 
-**A new-model slice, beside the legacy pipeline.** A record is on the new
-model when its stored `pipeline_status` is `in_review`; the legacy lifecycle
-table has no edge from that status, so the two never act on the same record.
-Until IR-260's cutover, only `enter_at_adviser()` puts a record there -- the
-demo seed and the tests call it, and `POST /records/<id>/submit/` stays on the
-legacy pipeline (decided 2026-10-07). IR-260 makes submission call it.
+**The submission path.** A record enters review when its stored
+`pipeline_status` becomes `in_review`. The public submit endpoint, demo seed
+and tests all call `enter_at_adviser()`.
 
 **Two acts, one core.**
 
@@ -40,6 +37,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.records import versions
 from apps.records.lifecycle import type_name_of
 
 from core.enums import (
@@ -52,6 +50,7 @@ from core.enums import (
     RecordTypeName,
     ReviewDecision,
     SeatState,
+    VersionCause,
 )
 from core.permissions import OFFICE_PARTY_BY_ROLE, holds_seat, is_office_member
 
@@ -103,8 +102,8 @@ class RoutingRefused(Exception):
 _label = seats._label
 
 
-def is_new_model(record) -> bool:
-    """On the adviser-first model: stored `in_review` (module note)."""
+def is_in_review(record) -> bool:
+    """In review: stored `in_review`, whoever holds it (ADR-021 §4)."""
     return record.pipeline_status == PipelineStatus.IN_REVIEW
 
 
@@ -121,6 +120,8 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
     Adviser is not also an owner (ADR-032 §1); a record with no Adviser is
     refused, since nobody could review it.
     """
+    original_record = record
+    record = _locked(record)
     if record.adviser_id is None:
         raise RoutingError("A record enters at its Adviser, and this one names none.")
     if record.owners.filter(user_id=record.adviser_id).exists():
@@ -129,9 +130,8 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
     if record.pipeline_status != PipelineStatus.DRAFT:
         raise RoutingError("Only a draft can enter the review workflow.")
 
-    # The one write of `pipeline_status` outside `lifecycle.apply()`: the
-    # legacy table has no edge into `in_review`, and IR-260 moves submission
-    # onto this function (module note).
+    # Entering review writes the status itself, beside the assignment it
+    # opens; `lifecycle.apply()` holds only the record-owned edges.
     record.pipeline_status = PipelineStatus.IN_REVIEW
     record.save(update_fields=["pipeline_status", "updated_at"])
     now = timezone.now()
@@ -143,6 +143,9 @@ def enter_at_adviser(record, actor=None) -> RecordAssignment:
         record=record, actor=actor, from_party=None, to_party=Party.ADVISER,
         group_id=uuid.uuid4(), created_at=now,
     )
+    # What the Adviser is handed is v1 (ADR-032 §5, IR-416).
+    versions.write_version(record, actor, VersionCause.SUBMISSION)
+    original_record.pipeline_status = record.pipeline_status
     return assignment
 
 
@@ -167,7 +170,7 @@ def _seated_office(record, user):
 
 
 def _routable(record) -> bool:
-    return is_new_model(record) and type_name_of(record) in ROUTABLE_TYPES
+    return is_in_review(record) and type_name_of(record) in ROUTABLE_TYPES
 
 
 def _may_accept_and_route(record, user) -> bool:
@@ -197,11 +200,8 @@ def _require_routable(record):
         raise RoutingError(
             "A Proposal is decided by its Adviser alone and is never routed to an office."
         )
-    if not is_new_model(record):
-        raise RoutingError(
-            "This record is still on the current review pipeline, which routes it "
-            "itself. Use the current decision form."
-        )
+    if not is_in_review(record):
+        raise RoutingError("This record is not in review.")
 
 
 def _from_party_for(record, user, *, accepting: bool) -> str:
@@ -209,7 +209,7 @@ def _from_party_for(record, user, *, accepting: bool) -> str:
     The party `user` routes as. Who comes first, then what (ADR-022
     §Amendment 4, ordered as `seats` orders it): a caller who could never
     route this record is a 403 whatever state it is in; a seated reviewer is
-    told why the record cannot be routed (a Proposal, the legacy pipeline)
+    told why the record cannot be routed (a Proposal, a record not in review)
     with a 400.
     """
     if accepting:
@@ -410,8 +410,15 @@ def accept_and_route(record, actor, *, to, reason):
     reason; their seat is done, so their assignment completes. The record stays
     `in_review`.
     """
+    from .revisions import decision_blocked_reason
+
     record = _locked(record)
     from_party = _from_party_for(record, actor, accepting=True)
+    # Accepting is a decision, refused while any revision request is open
+    # (ADR-032 §11, IR-272). Routing alone is not.
+    blocked = decision_blocked_reason(record)
+    if blocked:
+        raise RoutingError(blocked)
     plan = _plan(record, from_party, to, reason)
 
     adviser_seat = (
@@ -426,7 +433,7 @@ def accept_and_route(record, actor, *, to, reason):
     Review.objects.create(
         record=record, reviewed_by=actor, stage=Party.ADVISER,
         status=ReviewDecision.APPROVED, comment=plan.reason,
-        assignment=adviser_seat.assignment,
+        assignment=adviser_seat.assignment, version=versions.latest_version(record),
     )
     def accept_then_route():
         seats.complete_seat(adviser_seat, actor)

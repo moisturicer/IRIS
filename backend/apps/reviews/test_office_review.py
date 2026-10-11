@@ -38,7 +38,7 @@ from core.enums import (
 )
 
 from .test_routing import RoutingTestBase
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 
 def office_review_url(record):
@@ -423,10 +423,11 @@ class RefusalTests(OfficeReviewTestBase):
         request.save(update_fields=["party"])
         self.cleared(record, self.ierc)
 
-    def test_a_legacy_record_is_refused(self):
+    def test_a_record_not_in_review_is_refused(self):
+        """IR-274: this was asked of a record still holding a fixed-pipeline status. Those statuses are gone; the refusal they exercised -- a record not in review -- is asked of a published record instead."""
         record = self.routed(Party.ITSO)
         self.opened_seat(record, Party.ITSO, self.itso)
-        record.pipeline_status = PipelineStatus.PARALLEL_REVIEW
+        record.pipeline_status = PipelineStatus.PUBLISHED
         record.save(update_fields=["pipeline_status"])
 
         response = self.review(record, self.itso)

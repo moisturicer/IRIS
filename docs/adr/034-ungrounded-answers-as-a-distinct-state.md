@@ -6,6 +6,8 @@
 
 > **Amendment to §2 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** It makes *withheld evidence does not affect the route* a routing rule: the route, the response and the answer state are a function of whether any Passage was kept and whether the question carried an evidence requirement, **never of why nothing was kept**. This completes the §Security Impact correction IR-460 already applied below. §2's own rule that a withheld question is `no_sources` rather than `ungrounded` is unchanged.
 
+> **Amendment proposed — 2026-10-10 (IR-487). Not accepted.** The ungrounded state is entered **only** by a direct route chosen before retrieval (ADR-035 as amended). The post-retrieval *"zero relevant → ungrounded"* branch in §2 is removed, which resolves §2's contradiction with ADR-035 §7. §3's default and §4's Paper Chat clause change to match. Drafted by an AI agent; **awaiting approval by Jive Tyler Revalde**. See §Amendment — 2026-10-10 below.
+
 **Amends [ADR-008](008-ai-degradation-to-fts.md)** — *"Never a fabricated answer"* is kept for the grounded path and given an explicit boundary rather than an exception. See §1 and that file's IR-453 amendment.
 
 **Amends [ADR-026](026-conversational-retrieval-and-memory.md) §13** — the new state joins the three already excluded from the model's history. See §5 and that file's IR-453 amendment.
@@ -113,6 +115,36 @@ It stays fully visible in the reader's transcript, like every other excluded sta
 - **Labelled in the interface as not from the repository**, not as a footnote under the text. A reader who skims the answer and misses the label is the entire failure mode, and `008`'s own recorded risk about a missing degradation banner is the precedent: the visible state is an acceptance criterion, not a nicety.
 - **The relevance score stays invisible**, under `033` §3 and `apps/ai/presentation.py`'s existing rule. "Nothing cleared the floor" is a state, not a number to show.
 - **`GET /api/v1/ai/status/` and the wire `mode` carry the state**, so a caller can distinguish it without matching on the answer's wording — the coupling `apps/ai/answers/citations.py` already warns against.
+
+## Amendment — 2026-10-10 (IR-487): reached by a route, never by an empty retrieval
+
+**Status: Proposed, not accepted.** Drafted by an AI agent from [proposal 12](../architecture-review/12-jev-first-evidence-routing-proposal.md) §10 and ADR-035's 2026-10-10 amendment. **Approver: Jive Tyler Revalde.** Until a person accepts it, §1–§6 above stand.
+
+**Evidence, and what is exploratory.** This amendment rests on a design argument, not a measurement: the route is fixed before retrieval, so a direct answer never follows an empty retrieval (proposal 12 §10). The routing numbers behind ADR-035's amendment come from proxy-set run files listed there: 113 arXiv questions and one labeller, so they are exploratory. **Nothing measures the Paper Chat change.** The proxy set holds no Paper Chat conversations.
+
+**The contradiction being resolved.** §2 makes a question whose passages were all withheld `no_sources`, and a question where nothing was relevant `ungrounded`. ADR-035 §7 requires the route, the response and the state to **never** depend on *why* nothing was kept. Both cannot hold at once: under §2, a refusal tells the reader that something was withheld. IR-460 corrected §Security Impact's wording, and the 2026-10-06 note above left §2's rule standing. **This amendment removes the rule.**
+
+**§2, replaced.** The ungrounded state is entered on exactly one condition: **the evidence decision (ADR-035 as amended) chose a direct route before retrieval ran.** Then:
+
+- **A direct route runs no retrieval.** Its answer is ungrounded, with the separate prompt and no `Sources:` block (§1, unchanged).
+- **A grounded route never becomes ungrounded.** If retrieval keeps no passage, whether the result was `empty`, `withheld_all` or `none_relevant`, the answer is `no_sources`. The three are one case to the reader, as ADR-035 §7 requires.
+- So **the reason nothing was kept never reaches the state**, and a refusal carries no signal about withheld material.
+- *"One Turn is grounded or it is ungrounded"* and *"no partial mode"* are unchanged.
+
+**What this removes.**
+
+- **The relevance cut-off no longer decides whether an answer is ungrounded.** §2's dependency on ADR-033 §3, and the ADR-033 §5 amendment that shipped the cut-off on because *"leaving it off would delete this behaviour"*, lose the reason this ADR gave them. Whether the cut-off still ships on is ADR-033's question. **Recorded contradiction. Owner: IR-402 (defaults).** This amendment does not change ADR-033.
+- **The sky-colour defect (§Context) is fixed only when ADR-035 is `on`.** With the decision `off`, an off-corpus question routes to evidence, retrieves nothing past the cut-off and is `no_sources`. That is an honest refusal, but it is still a refusal.
+
+**§3, changed.** The behaviour **does not default on**. It is reachable only when ADR-035's decision is `on`, and `on` is rejected until ADR-035 A5's gates hold. IR-491 builds the path behind a flag that is off. **The label still ships in the same change as the behaviour.** That ordering rule is unchanged, and it is now the only part of §3 that carries weight. *Never in degraded mode* is unchanged and is now enforced by ADR-035's hard policy (step 1).
+
+**§4, changed.**
+
+- **The research bound now rests on routing, not on an empty retrieval.** ADR-027 §5's classifier does not exist. A landscape-shaped question routes to evidence until the Lens exists (ADR-035 A6), and the detector's `aggregate_shape` rule is an additive floor. *"A zero-source research question is `no_sources`"* now holds for **every** grounded route, by the replaced §2.
+- **Paper Chat may go ungrounded.** This replaces *"Paper Chat never goes ungrounded"*. The owner's reading (ADR-035 A4) is that a Record-scoped Conversation limits what a search may read, not whether a search is needed. **The cost is the one this section named:** a general-knowledge answer inside Paper Chat, labelled as not from the repository. It is accepted on the owner's decision and gated on a held-out check that Paper Chat questions show no added misses (IR-488).
+- **IR-453's acceptance test becomes a routing test:** a research or landscape-shaped question routes to evidence and never to a direct answer, and a grounded route with zero passages is `no_sources`.
+
+**Unchanged:** §1 (the state and its separate prompt), §5 (history exclusion), §6 (presentation, no citations) and §Security Impact's positive rule, which this amendment now makes true by construction.
 
 ## Alternatives Considered
 

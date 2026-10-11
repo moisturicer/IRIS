@@ -20,11 +20,13 @@ none of the per-task variables behaves exactly as it does now.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Union
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 from .tasks import InferenceTask, inference_task
 
@@ -86,6 +88,10 @@ class Profile:
     api_key: str
     reasoning_visible: bool
     data_policy: DataPolicy = DataPolicy.NO_TRAINING
+    #: OpenRouter providers this task may reach, or empty for any (IR-489).
+    provider_only: tuple[str, ...] = ()
+    #: Per-model OpenRouter endpoints, preserving each model's routing policy.
+    model_provider_pins: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @property
     def is_configured(self) -> bool:
@@ -109,9 +115,41 @@ def _setting(name: str, default: str = "") -> str:
     return (value or "").strip() if isinstance(value, str) else default
 
 
+def _listed(name: str) -> tuple[str, ...]:
+    raw = _setting(name)
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
 def _fallback_models(prefix: str) -> tuple[str, ...]:
-    raw = _setting(f"{prefix}_FALLBACK_MODELS")
-    return tuple(model.strip() for model in raw.split(",") if model.strip())
+    return _listed(f"{prefix}_FALLBACK_MODELS")
+
+
+def _model_provider_pins(prefix: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    name = f"{prefix}_PROVIDER_PINS"
+    raw = _setting(name)
+    if not raw:
+        return ()
+    try:
+        pins = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ImproperlyConfigured(
+            f"{name} must be a JSON object of model to provider endpoint lists"
+        ) from exc
+    if not isinstance(pins, dict) or not all(
+        isinstance(model, str)
+        and model.strip()
+        and isinstance(endpoints, list)
+        and bool(endpoints)
+        and all(
+            isinstance(endpoint, str) and endpoint.strip()
+            for endpoint in endpoints
+        )
+        for model, endpoints in pins.items()
+    ):
+        raise ImproperlyConfigured(
+            f"{name} must map model names to nonempty provider endpoint lists"
+        )
+    return tuple((model, tuple(endpoints)) for model, endpoints in pins.items())
 
 
 #: The setting *names* a task inherits when its own are unset. Keys, not
@@ -177,6 +215,15 @@ def api_key_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
     """Where ``task``'s key may be set, in the order ``profile_for`` reads them."""
     task = inference_task(task)
     own = f"{task.settings_prefix}_API_KEY"
+    if task in (InferenceTask.ROUTE, InferenceTask.PLAN):
+        parent_task = InferenceTask.RESOLVE if task is InferenceTask.ROUTE else InferenceTask.ANSWER
+        resolve = profile_for(parent_task)
+        route_url = _setting(f"{task.settings_prefix}_BASE_URL")
+        if not _setting(f"{task.settings_prefix}_VENDOR") and (
+            not route_url or _vendor_at(route_url) is resolve.vendor
+        ):
+            return (own, *api_key_variables(parent_task))
+        return (own,)
     _, inherited, _ = _inherited_keys(task)
     return (own, inherited) if inherited else (own,)
 
@@ -191,6 +238,10 @@ def model_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
     """
     task = inference_task(task)
     own = f"{task.settings_prefix}_MODEL"
+    if task is InferenceTask.ROUTE:
+        return (own, "LLM_RESOLVE_MODEL")
+    if task is InferenceTask.PLAN:
+        return (own, *model_variables(InferenceTask.ANSWER))
     inherited = _inherited_model_key(task)
     return (own, inherited) if inherited else (own,)
 
@@ -199,6 +250,34 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
     """Resolve ``task``'s Profile from settings. Never cached, never eager."""
     task = inference_task(task)
     prefix = task.settings_prefix
+    if task in (InferenceTask.ROUTE, InferenceTask.PLAN):
+        parent_task = InferenceTask.RESOLVE if task is InferenceTask.ROUTE else InferenceTask.ANSWER
+        resolve = profile_for(parent_task)
+        named_vendor = _setting(f"{prefix}_VENDOR")
+        chosen = vendor(named_vendor) if named_vendor else resolve.vendor
+        base_url = _setting(f"{prefix}_BASE_URL") or (
+            chosen.base_url if named_vendor else resolve.base_url
+        )
+        if not named_vendor:
+            chosen = _vendor_at(base_url) or resolve.vendor
+        api_key = _setting(f"{prefix}_API_KEY") or (
+            "" if named_vendor or chosen is not resolve.vendor else resolve.api_key
+        )
+        return Profile(
+            task=task,
+            vendor=chosen,
+            model=_setting(f"{prefix}_MODEL") or resolve.model,
+            fallback_models=_fallback_models(prefix),
+            base_url=base_url,
+            api_key=api_key,
+            reasoning_visible=bool(getattr(settings, f"{prefix}_REASONING", False)),
+            provider_only=_listed(f"{prefix}_PROVIDER_ONLY") or (
+                () if named_vendor else resolve.provider_only
+            ),
+            model_provider_pins=_model_provider_pins(prefix) or (
+                resolve.model_provider_pins if task is InferenceTask.PLAN and not named_vendor else ()
+            ),
+        )
     # Already empty when a vendor is named, which is what stops half the flat
     # settings being inherited -- see `_inherited_keys`.
     inherited_base_url, inherited_api_key, _ = _inherited_keys(task)
@@ -227,4 +306,7 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
         base_url=base_url or chosen.base_url,
         api_key=api_key,
         reasoning_visible=bool(getattr(settings, f"{prefix}_REASONING", False)),
+        # Never inherited: a pin is a choice about one task's model.
+        provider_only=_listed(f"{prefix}_PROVIDER_ONLY"),
+        model_provider_pins=_model_provider_pins(prefix),
     )

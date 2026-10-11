@@ -20,6 +20,10 @@ _Avoid_: RAG chat, chatbot (fine in casual conversation, but "Ask IRIS" is the p
 An AI-generated account of a Record's content, grounded in that Record's own passages and cached per active `ChunkSet`. Shown on the record's detail page. Deliberately distinct from **Abstract** (below) — the Abstract is what the author wrote, the AI Overview is what IRIS derived, and the two must never be presented as interchangeable.
 _Avoid_: AI Summary (the earlier name for this, now retired — the code, the API field and the UI all say Overview), Summary alone (ambiguous next to Abstract), DocumentSummary (an internal name that no longer matches the model).
 
+**Manuscript**:
+The paper itself: the one document a Record is about, which a reader opens, a citation points into, and reviewers review. Distinct from a supplementary file, which supports the Record without being it (an ethics form, a data sheet, a file an office attached). Once a Record has been submitted, its Manuscript changes only through a new [[Version]].
+_Avoid_: Abstract file (the code's historical field name; the Manuscript is the whole paper, not its abstract), upload or document alone (both also cover supplementary files), paper in specs (fine in UI copy).
+
 **Abstract**:
 The author-submitted summary of a Record, provided at submission time. Existed before AI Summary; not generated, not cached, not related to the chunk pipeline.
 _Avoid_: Summary alone.
@@ -52,6 +56,22 @@ _Avoid_: Thinking or chain of thought (the vendor's words, and both suggest the 
 The self-contained question IRIS actually searches with, worked out from what the reader typed plus the earlier Turns of the Conversation. "What about its limitations?" resolves to "What are the limitations of *[paper]*?". Distinct from what the reader typed, and shown to them — a Resolved question that gets the subject wrong changes what was asked, so it is never hidden.
 _Avoid_: Rewrite or rewritten query (names the mechanism, not the thing), expanded query (a different technique — expansion adds phrasings, resolution supplies a missing subject), the question (ambiguous once the two differ).
 
+**Evidence decision**:
+Working out, before retrieval and from the question alone, whether answering it needs the corpus. Its result is an [[Evidence route]]. It is never a function of what retrieval found or why nothing was kept (ADR-035 §7). Under ADR-035's proposed 2026-10-10 amendment, it runs as a fixed sequence: hard policy, then the detector, then the [[Decider]]s. A direct answer needs every signal that ran to permit it, and any doubt or failure routes to evidence. The detector is an additive floor and never a classifier: it may require evidence and may never permit a direct answer. Nothing a reader sees depends on it yet: the setting accepts only `off` and `shadow`.
+_Avoid_: Classifier (implies the decision sorts questions by kind; it only decides whether evidence is needed), router (choosing which model writes the reply is a separate decision), relevance (that is a property of retrieved passages, not of the question).
+
+**Evidence route**:
+The outcome of an [[Evidence decision]]: either *evidence*, so the question is answered from retrieved passages, or *direct*, so it gets an [[Ungrounded answer]] with no retrieval. A route only selects a path. It never widens scope, identity or visibility, and no model output can make it do so.
+_Avoid_: Mode (the wire field that says how an answer was produced), tool call (one mechanism that once produced a route, not the route itself).
+
+**Decider**:
+A model whose only job is to give one opinion toward an [[Evidence route]], and which writes no answer. Two are proposed (ADR-035, 2026-10-10 amendment, not accepted): Jev (TypeSafe's decision model, reached through OpenRouter's Decisions API), which returns a probability that the question needs the corpus, and an LLM route label, which returns `search` or `answer`. A Decider is advisory. It can never overrule hard policy or the detector, and a direct answer normally needs both Deciders to permit it. The one proposed exception: when Jev fails, the route label decides alone. A Decider receives the question, the Resolved question, earlier reader questions and a fixed corpus description, and never Passages or earlier answers.
+_Avoid_: Classifier, judge, router (see [[Evidence decision]]), detector (the deterministic word rules, which are not a model).
+
+**Ungrounded answer**:
+An answer written from the model's general knowledge with no Passage behind it. It is stored in its own `ungrounded` state, labelled as not from the repository, never cited, and kept out of the model's history (ADR-034). Accepted ADR-034 §2 reaches it when no passage clears the relevance cut-off. ADR-034's 2026-10-10 amendment (proposed, not accepted) would change that: only a *direct* [[Evidence route]] chosen before retrieval reaches it, and a question that searched and found nothing would be `no_sources`. Not built yet.
+_Avoid_: General answer or fallback answer (both blur whether it came from the corpus), fabrication (that is a grounded-looking answer that is not grounded; this one says plainly what it is).
+
 **Area**:
 A named subject grouping that Records belong to, and the unit a question about the collection aggregates over. Today an Area is a Classification or PSCED category — assigned by a person at submission, so it has a name someone chose and siblings to be compared against. An Area is always named: a grouping nobody can name is not yet an Area, which is what makes a claim about one checkable.
 _Avoid_: Topic, cluster, field, domain, category used alone (each is either vaguer than an Area or names one particular way of arriving at one).
@@ -82,6 +102,10 @@ _Avoid_: Full review, RDCO path.
 An office holding a Record that nobody in it is reviewing yet: the office's shared work, until a member claims it, a coordinator assigns someone, or whoever routed it nominated someone.
 _Avoid_: Queue (My Reviews is the queue; a Pool is one of the things in it), unassigned.
 
+**My Reviews**:
+A reviewer's own [[Seat]]s, plus their office's [[Pool]], arranged as the work to do (To review), the work under way (In review) and the decisions already made (Done). Nobody sees another reviewer's My Reviews; an office coordinator alone may see every Seat in their own office. Rejected, Cleared and the other outcomes are filters on Done, never tabs, because they are results rather than work.
+_Avoid_: Review Queue (the retired page, whose tabs were outcomes), queue or inbox alone (both suggest a shared list everyone works from).
+
 **Seat**:
 One person's part in an office's review of a Record: "this member is reviewing it for that office". An office can hold a Record with several Seats, and its review is finished only when every Seat that was not withdrawn is done.
 _Avoid_: Assignment (the office holding the Record, not a person), reviewer slot.
@@ -101,3 +125,27 @@ _Avoid_: Route to RDCO, escalation, final routing.
 **Review round**:
 One [[Specialist office]]'s review of a Record, from being routed the Record until its [[Seat]]s are done. An office routed the same Record again starts a new Review round, and the latest completed one sets the office's [[Clearance]]; the earlier outcome stands until then.
 _Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads as a person being assigned, which is a Seat), pass.
+
+**Revision request**:
+One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and nobody can decide it; the party that asked cannot finish its own review either. Answered by the next Version, or withdrawn by the party that asked. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
+_Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
+
+**Decision**:
+An act that ends a Record's review: accept & publish, keep [[Unlisted]] or reject, made by the Adviser or by RDCO, and a Proposal's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. It is refused while any [[Revision request]] is open. Accept & route is not a Decision: it is an acceptance that sends the Record on to [[Specialist office]]s, closes nothing, and is refused while a Revision request is open, as a Decision is.
+_Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
+
+**Accepted**:
+A Proposal its Adviser accepted: its resting state. It is not published, and nothing further is decided on it.
+_Avoid_: Approved (the stored name), ongoing, completed (the state of the retired *complete* act).
+
+**Unlisted**:
+A Thesis/Research or Project that RDCO accepted but kept out of Discover and Ask IRIS, for example ahead of a patent filing. Its owners and reviewers can still open it.
+_Avoid_: Completed (the code's status name), embargoed, hidden.
+
+**Archived**:
+How a rejected Record is shown to readers. It is terminal: the owner cannot answer it with a new [[Version]] and must submit a new Record.
+_Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision request).
+
+**Version**:
+A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
+_Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).

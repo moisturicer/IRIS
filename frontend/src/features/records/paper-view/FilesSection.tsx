@@ -43,7 +43,10 @@ import { SectionHeading } from "./headings";
 const PDF_LIMIT = 50 * 1024 * 1024;
 
 interface FilesSectionProps {
-  record:    Pick<RecordDetail, "id" | "abstract_file" | "can_request_document" | "current_holders">;
+  record:    Pick<
+    RecordDetail,
+    "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
+  >;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
   /** The owner may add or replace any document, not only a requested one. */
@@ -56,6 +59,11 @@ interface FilesSectionProps {
    * filed it, while it takes part.
    */
   attach:    boolean;
+  /**
+   * The owner may upload a revised manuscript for the next version (the
+   * `replace_manuscript` capability, IR-273).
+   */
+  replaceManuscript?: boolean;
   /** Told after anything changes, so the page can re-read what derives from it. */
   onChanged?: () => void;
 }
@@ -98,7 +106,15 @@ async function saveBlob(fetch: () => Promise<{ data: unknown }>, filename: strin
   downloadBlob(data as Blob, filename);
 }
 
-export function FilesSection({ record, owner, editable, reviewing, attach, onChanged }: FilesSectionProps) {
+export function FilesSection({
+  record,
+  owner,
+  editable,
+  reviewing,
+  attach,
+  replaceManuscript = false,
+  onChanged,
+}: FilesSectionProps) {
   const [slots, setSlots] = useState<SlotWithUploads[] | null>(null);
   const [files, setFiles] = useState<RecordFile[]>([]);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
@@ -190,6 +206,12 @@ export function FilesSection({ record, owner, editable, reviewing, attach, onCha
 
       <section>
         <SectionHeading>Manuscript</SectionHeading>
+        {record.manuscript_unsubmitted && (
+          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-small font-semibold text-brand-dark">
+            <i className="fas fa-file-pen text-2xs" aria-hidden />
+            Revised, not yet submitted
+          </p>
+        )}
         {record.abstract_file ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-body text-stone-700">
@@ -208,6 +230,26 @@ export function FilesSection({ record, owner, editable, reviewing, attach, onCha
           </div>
         ) : (
           <p className="text-body text-stone-600">No manuscript has been uploaded yet.</p>
+        )}
+        {/* A revision request is answered with a new version, which may carry
+            a revised manuscript (IR-273). Reviewers keep reading the submitted
+            one until the owner submits; the server allows the replacement
+            only to an owner, only while a revision is asked for. */}
+        {replaceManuscript && (
+          <div className="mt-3">
+            <UploadDropzone
+              label="Upload revised manuscript"
+              accept=".pdf"
+              validate
+              maxBytes={PDF_LIMIT}
+              upload={uploads.manuscript}
+              onFiles={([file]) =>
+                void send("manuscript", file, (onProgress) =>
+                  recordsApi.uploadManuscript(record.id, file, { onProgress }),
+                )
+              }
+            />
+          </div>
         )}
       </section>
 

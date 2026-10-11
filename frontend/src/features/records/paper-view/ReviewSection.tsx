@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
@@ -39,8 +38,7 @@ interface ReviewSectionProps {
  * **No Ask IRIS here** (spec §4.6, decided 2026-09-26): *Ask about this
  * paper* goes to the Paper tab, where the conversation is waiting.
  *
- * Until IR-260 cuts over, a decision is recorded on the current review form,
- * linked from the bar; its replacements arrive as entries in `REVIEW_ACTIONS`.
+ * Decisions use the adviser-first review actions in `REVIEW_ACTIONS`.
  */
 export function ReviewSection({
   record,
@@ -50,18 +48,6 @@ export function ReviewSection({
   onChanged,
   onAskAboutPaper,
 }: ReviewSectionProps) {
-  const decisionForm = can.has("decide") ? (
-    <Link
-      to={`/review/${record.id}/evaluate`}
-      className={cn(
-        "inline-flex items-center min-h-11 px-2 text-small font-semibold text-brand hover:underline",
-        FOCUS_RING,
-      )}
-    >
-      Record a decision (current form)
-    </Link>
-  ) : null;
-
   return (
     <div className={cn("lg:flex lg:gap-6 lg:items-start", !reader && "max-w-3xl mx-auto")}>
       {reader && <div className="min-w-0 lg:flex-1">{reader}</div>}
@@ -101,7 +87,6 @@ export function ReviewSection({
         <ReviewActionBar
           record={record}
           can={can}
-          secondary={decisionForm}
           onChanged={onChanged}
           className={cn(
             "sticky bottom-0 z-20 mt-4 rounded-t-2xl bg-white ring-1 ring-stone-200 shadow-card-md px-3 py-2",

@@ -9,9 +9,7 @@ Design rules:
   - Use send_email_async from core.utils for all outbound mail.
 """
 from django.conf import settings
-from core.enums import (
-    Office, Party, PipelineStatus, RecordTypeName, ReviewDecision, ReviewStage, RoleName,
-)
+from core.enums import Party, RecordTypeName, RoleName
 from core.utils import send_email_async
 from .models import Notification, NotificationType
 
@@ -55,479 +53,30 @@ def notify_new_record(record, submitted_by):
     try:
         rt_name = record.record_type.name if record.record_type else ""
 
-        if rt_name == RecordTypeName.PROPOSAL:
-            adviser = record.adviser
-            if not adviser:
-                return
-            Notification.objects.create(
-                sender=submitted_by,
-                recipient=adviser,
-                record=record,
-                notif_type=_record_notif_type(record),
-                message=(
-                    f"{submitted_by.get_full_name()} submitted a new Proposal for your review: "
-                    f'"{record.title}".'
-                ),
-            )
-            send_email_async(
-                subject=f"[IRIS] New Proposal awaiting your review: {record.title[:60]}",
-                message=(
-                    f"Hello {adviser.first_name},\n\n"
-                    f"{submitted_by.get_full_name()} has submitted a new Proposal for your review.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review it:\n{_record_url(record)}\n\n"
-                    f"-- The IRIS Team"
-                ),
-                recipient_list=[adviser.email],
-            )
-
-        else:
-            # Thesis/Research and Project go to RDCO intake
-            rdco_role = _role(RoleName.RDCO)
-            if not rdco_role:
-                return
-            Notification.objects.create(
-                sender=submitted_by,
-                broadcast_to_role=rdco_role,
-                record=record,
-                notif_type=_record_notif_type(record),
-                message=(
-                    f"{submitted_by.get_full_name()} submitted a new {rt_name} for RDCO intake review: "
-                    f'"{record.title}".'
-                ),
-            )
-            _email_role_users(
-                role=rdco_role,
-                subject=f"[IRIS] New {rt_name} submitted for intake review: {record.title[:60]}",
-                greeting="Hello RDCO Team",
-                body=(
-                    f"{submitted_by.get_full_name()} has submitted a new {rt_name} record.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review the submission:\n{_record_url(record)}"
-                ),
-            )
-    except Exception:
-        pass
-
-
-def notify_record_reviewed(record, review):
-    """
-    Dispatch notifications after a sequential review action
-    (adviser_review, rdco_intake, rdco_review).
-
-    On approval, notify whoever is next in the pipeline.
-    On decline or rejection, notify the record owners.
-    """
-    try:
-        stage   = review.stage   # adviser | rdco_intake | rdco
-        outcome = review.status  # approved | declined | rejected
-
-        _STAGE_LABELS = {
-            ReviewStage.ADVISER:     "your Adviser",
-            ReviewStage.RDCO_INTAKE: "RDCO (intake review)",
-            # `.label`, not the bare string: this map is prose shown to a
-            # person ("your Adviser"), and the office's display name is the
-            # label rather than the stored key.
-            ReviewStage.RDCO:        RoleName.RDCO.label,
-        }
-        stage_label = _STAGE_LABELS.get(stage, stage)
-
-        if outcome == ReviewDecision.APPROVED:
-            new_status = record.pipeline_status  # already advanced before this call
-
-            if stage == ReviewStage.ADVISER:
-                # Proposal approved → published
-                _notify_owners(
-                    record, review,
-                    notif_type=_get_type("Record Approved"),
-                    message=(
-                        f'Your Proposal "{record.title}" has been approved by your Adviser '
-                        f"and is now published."
-                    ),
-                    email_subject=f"[IRIS] Your record has been approved: {record.title[:60]}",
-                    email_body_template=(
-                        f'Congratulations! Your Proposal "{record.title}" has been approved by your Adviser '
-                        f"and is now published in IRIS.\n\n"
-                        f"You can view it here:\n{_record_url(record)}"
-                    ),
-                )
-
-            elif stage == ReviewStage.RDCO_INTAKE:
-                if new_status == PipelineStatus.ITSO_REVIEW:
-                    # ITSO was requested (either type since IR-266): ITSO reviews
-                    # first; KTTO, if requested, starts here in parallel
-                    _notify_roles_of_advance(
-                        record, review,
-                        role_names=[RoleName.ITSO, RoleName.KTTO],
-                        message=(
-                            f'Record "{record.title}" has passed RDCO intake review '
-                            f"and is ready for ITSO and KTTO review."
-                        ),
-                        email_subject=f"[IRIS] Record awaiting office review: {record.title[:60]}",
-                        email_body=(
-                            f"A record has passed RDCO intake and is now awaiting review.\n\n"
-                            f"Title: {record.title}\n\n"
-                            f"Please log in to IRIS to review it:\n{_record_url(record)}"
-                        ),
-                        email_greeting="Hello Review Team",
-                        owner_message=(
-                            f'Your record "{record.title}" has passed RDCO intake review '
-                            f"and is now with ITSO for technical review (KTTO is also reviewing in parallel)."
-                        ),
-                    )
-                else:
-                    # No ITSO requested: the record went to parallel_review (or
-                    # straight to rdco_review if nothing was requested)
-                    _notify_roles_of_advance(
-                        record, review,
-                        role_names=[RoleName.IERC, RoleName.KTTO],
-                        message=(
-                            f'Record "{record.title}" has passed RDCO intake review '
-                            f"and is ready for IERC and KTTO parallel review."
-                        ),
-                        email_subject=f"[IRIS] Record awaiting parallel office review: {record.title[:60]}",
-                        email_body=(
-                            f"A record has passed RDCO intake and is now awaiting "
-                            f"parallel review by IERC and KTTO.\n\n"
-                            f"Title: {record.title}\n\n"
-                            f"Please log in to IRIS to review it:\n{_record_url(record)}"
-                        ),
-                        email_greeting="Hello Review Team",
-                        owner_message=(
-                            f'Your record "{record.title}" has passed RDCO intake review '
-                            f"and is now with IERC and KTTO for parallel review."
-                        ),
-                    )
-
-            elif stage == ReviewStage.RDCO:
-                # RDCO final approval → published
-                _notify_owners(
-                    record, review,
-                    notif_type=_get_type("Record Approved"),
-                    message=f'Your record "{record.title}" has been approved by RDCO and is now published.',
-                    email_subject=f"[IRIS] Your record has been approved: {record.title[:60]}",
-                    email_body_template=(
-                        f'Congratulations! Your record "{record.title}" has been approved by RDCO '
-                        f"and is now published in IRIS.\n\n"
-                        f"You can view it here:\n{_record_url(record)}"
-                    ),
-                )
-
-        elif outcome == ReviewDecision.DECLINED:
-            reason = review.comment or "No reason was provided."
-            _notify_owners(
-                record, review,
-                notif_type=_get_type("Record Declined"),
-                message=(
-                    f'Your record "{record.title}" has been sent back for revision by {stage_label}. '
-                    f"Reason: {reason}"
-                ),
-                email_subject=f"[IRIS] Revision requested for your record: {record.title[:60]}",
-                email_body_template=(
-                    f'Your record "{record.title}" has been reviewed by {stage_label} '
-                    f"and requires revision.\n\n"
-                    f"Reason: {reason}\n\n"
-                    f"Please log in to IRIS, make the necessary changes, and resubmit:\n"
-                    f"{_record_url(record)}"
-                ),
-            )
-
-        else:  # rejected
-            reason = review.comment or "No reason was provided."
-            _notify_owners(
-                record, review,
-                notif_type=_get_type("Record Declined"),
-                message=(
-                    f'Your record "{record.title}" has been rejected by {stage_label}. '
-                    f"Reason: {reason}"
-                ),
-                email_subject=f"[IRIS] Your record has been rejected: {record.title[:60]}",
-                email_body_template=(
-                    f'Your record "{record.title}" has been rejected by {stage_label}.\n\n'
-                    f"Reason: {reason}\n\n"
-                    f"If you believe this is an error, please contact the relevant office directly.\n\n"
-                    f"You can view the record here:\n{_record_url(record)}"
-                ),
-            )
-
-    except Exception:
-        pass
-
-
-def notify_clearance_result(record, review, *, office: str, advanced: bool, all_done: bool = False):
-    """
-    Notify parties after a parallel office clearance (ITSO, IERC, or KTTO).
-
-    advanced=True, all_done=True  → all offices cleared; RDCO notified for final review;
-                                     owners told record is with RDCO.
-    advanced=True, all_done=False → ITSO cleared; IERC notified to start; owners updated.
-    advanced=False, status=approved → partial clearance; owners told which office cleared.
-    advanced=False, status=declined → revision; owners notified.
-    advanced=False, status=rejected → rejection; owners notified.
-    """
-    try:
-        outcome = review.status  # approved | declined | rejected
-        reason  = review.comment or "No reason was provided."
-
-        _OFFICE_LABELS = {
-            Office.ITSO: RoleName.ITSO,
-            Office.IERC: RoleName.IERC,
-            Office.KTTO: RoleName.KTTO,
-        }
-        office_label = _OFFICE_LABELS.get(office, office.upper())
-
-        if outcome == ReviewDecision.DECLINED:
-            _notify_owners(
-                record, review,
-                notif_type=_get_type("Record Declined"),
-                message=(
-                    f'Your record "{record.title}" has been sent back for revision by {office_label}. '
-                    f"Reason: {reason}"
-                ),
-                email_subject=f"[IRIS] Revision requested by {office_label}: {record.title[:60]}",
-                email_body_template=(
-                    f'Your record "{record.title}" has been reviewed by {office_label} '
-                    f"and requires revision.\n\n"
-                    f"Reason: {reason}\n\n"
-                    f"Please log in to IRIS, make the necessary changes, and resubmit:\n"
-                    f"{_record_url(record)}"
-                ),
-            )
+        adviser = record.adviser
+        if not adviser:
             return
-
-        if outcome == ReviewDecision.REJECTED:
-            _notify_owners(
-                record, review,
-                notif_type=_get_type("Record Declined"),
-                message=(
-                    f'Your record "{record.title}" has been rejected by {office_label}. '
-                    f"Reason: {reason}"
-                ),
-                email_subject=f"[IRIS] Your record has been rejected by {office_label}: {record.title[:60]}",
-                email_body_template=(
-                    f'Your record "{record.title}" has been rejected by {office_label}.\n\n'
-                    f"Reason: {reason}\n\n"
-                    f"If you believe this is an error, please contact the {office_label} office directly.\n\n"
-                    f"You can view the record here:\n{_record_url(record)}"
-                ),
-            )
-            return
-
-        # outcome == 'approved'
-        if all_done:
-            # All offices cleared → RDCO final review
-            _notify_roles_of_advance(
-                record, review,
-                role_names=[RoleName.RDCO],
-                message=(
-                    f'Record "{record.title}" has been cleared by all reviewing offices '
-                    f"and is ready for RDCO final review."
-                ),
-                email_subject=f"[IRIS] Record awaiting RDCO final review: {record.title[:60]}",
-                email_body=(
-                    f"A record has been cleared by all offices and is now awaiting RDCO final review.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review it:\n{_record_url(record)}"
-                ),
-                email_greeting="Hello RDCO Team",
-                owner_message=(
-                    f'Your record "{record.title}" has been cleared by all reviewing offices '
-                    f"and is now awaiting RDCO final review."
-                ),
-            )
-        elif advanced and office == Office.ITSO:
-            # ITSO cleared → IERC now starts; KTTO may still be running
-            _notify_roles_of_advance(
-                record, review,
-                role_names=[RoleName.IERC],
-                message=(
-                    f'Record "{record.title}" has been cleared by ITSO. '
-                    f"IERC ethics review is now required."
-                ),
-                email_subject=f"[IRIS] Record awaiting IERC ethics review: {record.title[:60]}",
-                email_body=(
-                    f"A record has been cleared by ITSO and now requires IERC ethics review.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review it:\n{_record_url(record)}"
-                ),
-                email_greeting="Hello IERC Team",
-                owner_message=(
-                    f'Your record "{record.title}" has been cleared by ITSO '
-                    f"and is now with IERC for ethics review."
-                ),
-            )
-        else:
-            # Partial clearance (KTTO or IERC cleared but not all done yet)
-            notif_type = _get_type("Record Advanced")
-            _notify_owners(
-                record, review,
-                notif_type=notif_type,
-                message=(
-                    f'Your record "{record.title}" has been cleared by {office_label}. '
-                    f"Review is still in progress with other offices."
-                ),
-                email_subject=f"[IRIS] {office_label} cleared your record: {record.title[:60]}",
-                email_body_template=(
-                    f'Your record "{record.title}" has been reviewed and cleared by {office_label}.\n\n'
-                    f"Review is still in progress with other offices. "
-                    f"You will be notified once all offices have cleared your record.\n\n"
-                    f"Track your record here:\n{_record_url(record)}"
-                ),
-            )
-
-    except Exception:
-        pass
-
-
-def notify_resubmit(record, submitted_by, new_status: str):
-    """
-    Notify the correct party when an owner resubmits a declined record.
-
-    new_status == "adviser_review"  → notify the assigned adviser (Proposal)
-    new_status == "rdco_intake"     → notify RDCO (Thesis/Research, Project full restart)
-    new_status == "parallel_review" → notify offices with a pending clearance (IERC/KTTO)
-    new_status == "itso_review"     → notify offices with a pending clearance (ITSO/KTTO)
-    """
-    try:
-        notif_type = _get_type("Record Resubmission")
-        url        = _record_url(record)
-
-        if new_status == PipelineStatus.ADVISER_REVIEW:
-            adviser = record.adviser
-            if not adviser:
-                return
-            Notification.objects.create(
-                sender=submitted_by,
-                recipient=adviser,
-                record=record,
-                notif_type=notif_type,
-                message=(
-                    f"{submitted_by.get_full_name()} has resubmitted "
-                    f'"{record.title}" for your review.'
-                ),
-            )
-            send_email_async(
-                subject=f"[IRIS] Record resubmitted for your review: {record.title[:60]}",
-                message=(
-                    f"Hello {adviser.first_name},\n\n"
-                    f"{submitted_by.get_full_name()} has resubmitted a record after revision.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review it:\n{url}\n\n"
-                    f"-- The IRIS Team"
-                ),
-                recipient_list=[adviser.email],
-            )
-
-        elif new_status in (PipelineStatus.PARALLEL_REVIEW, PipelineStatus.ITSO_REVIEW):
-            # Smart resubmit: notify only the office(s) with a pending clearance
-            from apps.reviews.models import RecordClearance
-            _OFFICE_TO_ROLE = {
-                Office.IERC: RoleName.IERC,
-                Office.KTTO: RoleName.KTTO,
-                Office.ITSO: RoleName.ITSO,
-            }
-            pending_offices = list(
-                RecordClearance.objects.filter(record=record, status="pending")
-                .values_list("office", flat=True)
-            )
-            for office_key in pending_offices:
-                role_name = _OFFICE_TO_ROLE.get(office_key)
-                if not role_name:
-                    continue
-                role = _role(role_name)
-                if not role:
-                    continue
-                Notification.objects.create(
-                    sender=submitted_by,
-                    broadcast_to_role=role,
-                    record=record,
-                    notif_type=notif_type,
-                    message=(
-                        f"{submitted_by.get_full_name()} has resubmitted "
-                        f'"{record.title}" after revision. Please re-review.'
-                    ),
-                )
-                _email_role_users(
-                    role=role,
-                    subject=f"[IRIS] Record resubmitted for {role_name} review: {record.title[:60]}",
-                    greeting=f"Hello {role_name} Team",
-                    body=(
-                        f"{submitted_by.get_full_name()} has resubmitted a record after revision.\n\n"
-                        f"Title: {record.title}\n\n"
-                        f"Please log in to IRIS to review it:\n{url}"
-                    ),
-                )
-
-        else:
-            # rdco_intake: Thesis/Research or Project resubmitted to RDCO
-            rdco_role = _role(RoleName.RDCO)
-            if not rdco_role:
-                return
-            Notification.objects.create(
-                sender=submitted_by,
-                broadcast_to_role=rdco_role,
-                record=record,
-                notif_type=notif_type,
-                message=(
-                    f"{submitted_by.get_full_name()} has resubmitted "
-                    f'"{record.title}" for RDCO intake review.'
-                ),
-            )
-            _email_role_users(
-                role=rdco_role,
-                subject=f"[IRIS] Record resubmitted for intake review: {record.title[:60]}",
-                greeting="Hello RDCO Team",
-                body=(
-                    f"{submitted_by.get_full_name()} has resubmitted a record after revision.\n\n"
-                    f"Title: {record.title}\n\n"
-                    f"Please log in to IRIS to review it:\n{url}"
-                ),
-            )
-    except Exception:
-        pass
-
-
-def notify_proposal_completed(record, marked_by):
-    """
-    Notify record owners when a Proposal is marked completed -- by RDCO or by
-    its assigned Adviser (ADR-021 §3, IR-267). The message names which; it
-    used to say "by RDCO" whoever had acted.
-    """
-    try:
-        notif_type = _get_type("Record Approved")
-        # Keyed on the assignment, not the role: "your Adviser" is only true of
-        # the Adviser this record names.
-        marked_by_label = (
-            "your Adviser"
-            if record.adviser_id is not None and marked_by.pk == record.adviser_id
-            else RoleName.RDCO.label
+        Notification.objects.create(
+            sender=submitted_by,
+            recipient=adviser,
+            record=record,
+            notif_type=_record_notif_type(record),
+            message=(
+                f"{submitted_by.get_full_name()} submitted a new {rt_name} for your review: "
+                f'"{record.title}".'
+            ),
         )
-        message = (
-            f'Your Proposal "{record.title}" has been marked as completed by {marked_by_label}. '
-            f"It remains visible in the repository as a completed research proposal."
+        send_email_async(
+            subject=f"[IRIS] New {rt_name} awaiting your review: {record.title[:60]}",
+            message=(
+                f"Hello {adviser.first_name},\n\n"
+                f"{submitted_by.get_full_name()} has submitted a new {rt_name} for your review.\n\n"
+                f"Title: {record.title}\n\n"
+                f"Please log in to IRIS to review it:\n{_record_url(record)}\n\n"
+                f"-- The IRIS Team"
+            ),
+            recipient_list=[adviser.email],
         )
-        owners = list(record.owners.select_related("user").all())
-        for ownership in owners:
-            Notification.objects.create(
-                sender=marked_by,
-                recipient=ownership.user,
-                record=record,
-                notif_type=notif_type,
-                message=message,
-            )
-        if owners:
-            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
-            send_email_async(
-                subject=f"[IRIS] Your proposal has been marked as completed: {record.title[:60]}",
-                message=(
-                    f"Hello {primary.first_name},\n\n"
-                    f'Your Proposal "{record.title}" has been marked as completed by {marked_by_label}.\n\n'
-                    f"It remains publicly visible in the IRIS repository as a completed research proposal.\n\n"
-                    f"You can view it here:\n{_record_url(record)}\n\n"
-                    f"-- The IRIS Team"
-                ),
-                recipient_list=[primary.email],
-            )
     except Exception:
         pass
 
@@ -683,6 +232,151 @@ def notify_office_completed(
                 else f"[IRIS] {office_label} finished: {title[:60]}",
                 message=f"Hello,\n\n{rdco_message}\n\n{url}\n\n-- The IRIS Team",
                 recipient_list=emails,
+            )
+    except Exception:
+        pass
+
+
+def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off):
+    """
+    A Decision ended the record's review (ADR-032 §2-§3; IR-270, IR-271).
+
+    - Every owner hears it once, in-app, and the primary owner by email. A
+      rejection carries its reason as written; a document request the
+      decision withdrew is mentioned here rather than separately.
+    - Each reviewer whose open seat the decision withdrew hears that their
+      review is closed, in-app only. Nobody else: no office pool is told.
+    """
+    from apps.reviews.decisions import ACCEPT, KEEP_UNLISTED, OUTCOME_PHRASE, PUBLISH
+
+    try:
+        title = record.title
+        if outcome == ACCEPT:
+            message = f'{decided_by} accepted your proposal "{title}".'
+            headline = "Accepted"
+        elif outcome == PUBLISH:
+            message = f'{decided_by} accepted "{title}" and published it to Discover.'
+            headline = "Published"
+        elif outcome == KEEP_UNLISTED:
+            message = (
+                f'{decided_by} accepted "{title}" and kept it unlisted: it is not in '
+                f"Discover, and you can still open it."
+            )
+            headline = "Accepted"
+        else:
+            message = f'{decided_by} rejected "{title}". It is archived. Reason: {reason}'
+            headline = "Rejected"
+        if closed_requests:
+            message += (
+                " Its open document request is withdrawn, so nothing more is needed."
+                if closed_requests == 1 else
+                " Its open document requests are withdrawn, so nothing more is needed."
+            )
+
+        notif_type = NotificationType.objects.get_or_create(name="Record Decided")[0]
+        owners = list(record.owners.select_related("user").all())
+        for ownership in owners:
+            Notification.objects.create(
+                sender=actor, recipient=ownership.user, record=record,
+                notif_type=notif_type, message=message,
+            )
+
+        closed = f'{decided_by} {OUTCOME_PHRASE[outcome]}, so your review of "{title}" is closed.'
+        for reviewer in cut_off:
+            Notification.objects.create(
+                sender=actor, recipient=reviewer, record=record,
+                notif_type=notif_type, message=closed,
+            )
+
+        if owners:
+            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
+            send_email_async(
+                subject=f"[IRIS] {headline}: {title[:60]}",
+                message=(
+                    f"Hello {primary.first_name},\n\n{message}\n\n"
+                    f"{_record_url(record)}\n\n-- The IRIS Team"
+                ),
+                recipient_list=[primary.email],
+            )
+    except Exception:
+        pass
+
+
+def notify_revision_requested(revision_request, *, party_label: str):
+    """
+    Tell every owner that a party has asked for a revision (ADR-032 §5
+    Amendment, IR-272). The owners only: reviewers see *Waiting on author*.
+    """
+    try:
+        record = revision_request.record
+        message = (
+            f'{party_label} asked for a revision of "{record.title}". '
+            f"Nothing can be decided until you submit a new version."
+        )
+        owners = list(record.owners.select_related("user").all())
+        notif_type = NotificationType.objects.get_or_create(name="Revision Requested")[0]
+        for ownership in owners:
+            Notification.objects.create(
+                sender=revision_request.requested_by,
+                recipient=ownership.user,
+                record=record,
+                notif_type=notif_type,
+                message=message,
+            )
+        if owners:
+            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
+            send_email_async(
+                subject=f"[IRIS] Revision requested: {record.title[:60]}",
+                message=(
+                    f"Hello {primary.first_name},\n\n"
+                    f"{message}\n\n"
+                    f"{party_label} wrote:\n{revision_request.reason}\n\n"
+                    f"{_record_url(record)}\n\n"
+                    f"-- The IRIS Team"
+                ),
+                recipient_list=[primary.email],
+            )
+    except Exception:
+        pass
+
+
+def notify_revision_withdrawn(revision_request, *, party_label: str, withdrawn_by):
+    """Tell every owner that a party withdrew its revision request (IR-272). In-app only."""
+    try:
+        record = revision_request.record
+        message = f'{party_label} withdrew its revision request for "{record.title}".'
+        notif_type = NotificationType.objects.get_or_create(name="Revision Requested")[0]
+        for ownership in record.owners.select_related("user").all():
+            Notification.objects.create(
+                sender=withdrawn_by,
+                recipient=ownership.user,
+                record=record,
+                notif_type=notif_type,
+                message=message,
+            )
+    except Exception:
+        pass
+
+
+def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: str):
+    """
+    Tell the reviewers of the parties that asked for a revision that the owner
+    answered with a new version, which they now review (ADR-032 §5, IR-273).
+    Nobody else: every other party's work stands. In-app only.
+    """
+    try:
+        message = (
+            f'The owner submitted v{version.number} of "{record.title}" in answer to '
+            f"{asked_by}'s revision request. Review the new version."
+        )
+        notif_type = NotificationType.objects.get_or_create(name="New Version Submitted")[0]
+        for reviewer in reviewers:
+            Notification.objects.create(
+                sender=submitted_by,
+                recipient=reviewer,
+                record=record,
+                notif_type=notif_type,
+                message=message,
             )
     except Exception:
         pass
@@ -943,88 +637,143 @@ def notify_delete_declined(delete_request, reviewed_by):
 
 
 # ---------------------------------------------------------------------------
+# An owner's delete (IR-517, ADR-032 §10 Amendment)
+# ---------------------------------------------------------------------------
+#
+# One owner's delete removes the record for every co-owner, and nothing undoes
+# it, so the *other* owners are told in-app and by email; the owner who acted
+# is not. A deleted record is invisible to everyone, so a withdrawal or delete
+# notice carries no record link: a link would only lead to a 404. A delete
+# request leaves the record readable while RDCO decides, so its notices link it.
+
+def _other_owners(record, actor):
+    return [
+        ownership.user
+        for ownership in record.owners.select_related("user").all()
+        if ownership.user_id != getattr(actor, "pk", None)
+    ]
+
+
+def _name(user) -> str:
+    return user.get_full_name() or user.email
+
+
+def _tell_other_owners(record, actor, *, notif_type, message, subject, link):
+    url = _record_url(record) if link else None
+    for owner in _other_owners(record, actor):
+        Notification.objects.create(
+            sender=actor, recipient=owner, record=record if link else None,
+            notif_type=notif_type, message=message,
+        )
+        body = f"{message}\n\n{url}" if url else message
+        send_email_async(
+            subject=subject,
+            message=f"Hello {owner.first_name},\n\n{body}\n\n-- The IRIS Team",
+            recipient_list=[owner.email],
+        )
+
+
+def notify_record_withdrawn(record, *, withdrawn_by, seats, requesting_parties):
+    """
+    An owner withdrew a record from review by deleting it (IR-517).
+
+    - Each reviewer whose open seat closed hears that their review is closed,
+      in-app only, as a Decision's cut-off reviewer does (IR-270). When their
+      party had an open document request, the notice says it is withdrawn.
+      No office pool is told: nobody there had started.
+    - Every other owner hears it, in-app and by email.
+    """
+    try:
+        title = record.title
+        notif_type = NotificationType.objects.get_or_create(name="Record Withdrawn")[0]
+
+        told = set()
+        for reviewer, party in seats:
+            if reviewer.pk in told:
+                continue
+            told.add(reviewer.pk)
+            message = f'The author withdrew "{title}" from review, so your review is closed.'
+            if party in requesting_parties:
+                # The Adviser is a person, not an office (ADR-032 §1).
+                whose = "Your" if party == Party.ADVISER else "Your office's"
+                message += f" {whose} document request is withdrawn."
+            Notification.objects.create(
+                sender=withdrawn_by, recipient=reviewer, record=None,
+                notif_type=notif_type, message=message,
+            )
+
+        _tell_other_owners(
+            record, withdrawn_by, notif_type=notif_type, link=False,
+            message=(
+                f'{_name(withdrawn_by)} withdrew "{title}" from review. '
+                f"It is deleted and can't be restored."
+            ),
+            subject=f"[IRIS] Withdrawn: {title[:60]}",
+        )
+    except Exception:
+        pass
+
+
+def notify_record_deleted(record, *, deleted_by):
+    """An owner deleted a draft or rejected record (IR-517): the other owners hear it."""
+    try:
+        title = record.title
+        _tell_other_owners(
+            record, deleted_by,
+            notif_type=NotificationType.objects.get_or_create(name="Record Deleted")[0],
+            link=False,
+            message=f'{_name(deleted_by)} deleted "{title}". It can\'t be restored.',
+            subject=f"[IRIS] Deleted: {title[:60]}",
+        )
+    except Exception:
+        pass
+
+
+def notify_delete_requested(delete_request, *, requested_by):
+    """
+    An owner asked for accepted work to be deleted (IR-517).
+
+    - RDCO decides it, so every RDCO member hears, in-app and by email, as an
+      office pool hears of new work in `notify_routed`.
+    - Every other owner hears it, in-app and by email.
+
+    Both link the record, which stays readable in `pending_delete`.
+    """
+    try:
+        record = delete_request.record
+        title = record.title
+        notif_type = NotificationType.objects.get_or_create(name="Delete Request Submitted")[0]
+
+        role = _role_for_party(Party.RDCO)
+        if role is not None:
+            message = (
+                f'{_name(requested_by)} asked to delete "{title}". It is on hold '
+                f"in Delete Requests until RDCO decides."
+            )
+            Notification.objects.create(
+                sender=requested_by, broadcast_to_role=role, record=record,
+                notif_type=notif_type, message=message,
+            )
+            _email_role_users(
+                role, subject=f"[IRIS] Delete requested: {title[:60]}", greeting="Hello",
+                body=f"{message}\n\n{_record_url(record)}",
+            )
+
+        _tell_other_owners(
+            record, requested_by, notif_type=notif_type, link=True,
+            message=(
+                f'{_name(requested_by)} asked RDCO to delete "{title}". '
+                f"It is on hold until RDCO decides."
+            ),
+            subject=f"[IRIS] Delete requested: {title[:60]}",
+        )
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
-
-def _notify_roles_of_advance(
-    record, review, *, role_names, message,
-    email_subject, email_body, email_greeting,
-    owner_message: str = "",
-):
-    """
-    Create broadcast Notification rows for each role in role_names,
-    send a single email to all users in those roles,
-    and optionally notify the record owners about pipeline progress.
-    """
-    from apps.accounts.models import User as UserModel
-
-    all_emails = []
-    notif_type = _get_type("Record Advanced")
-
-    for role_name in role_names:
-        role = _role(role_name)
-        if not role:
-            continue
-        Notification.objects.create(
-            sender=review.reviewed_by,
-            broadcast_to_role=role,
-            record=record,
-            notif_type=notif_type,
-            message=message,
-        )
-        emails = list(
-            UserModel.objects.filter(role=role, is_active=True)
-            .values_list("email", flat=True)
-        )
-        all_emails.extend(emails)
-
-    if all_emails:
-        send_email_async(
-            subject=email_subject,
-            message=(
-                f"{email_greeting},\n\n"
-                f"{email_body}\n\n"
-                f"-- The IRIS Team"
-            ),
-            recipient_list=list(set(all_emails)),
-        )
-
-    if owner_message:
-        _notify_owners(
-            record, review,
-            notif_type=notif_type,
-            message=owner_message,
-            email_subject=f"[IRIS] Update on your record: {record.title[:60]}",
-            email_body_template=owner_message + f"\n\nTrack your record here:\n{_record_url(record)}",
-        )
-
-
-def _notify_owners(record, review, *, notif_type, message, email_subject, email_body_template):
-    """Create a direct Notification for every record owner, then email the primary owner."""
-    owners = list(record.owners.select_related("user").all())
-    if not owners:
-        return
-
-    for ownership in owners:
-        Notification.objects.create(
-            sender=review.reviewed_by,
-            recipient=ownership.user,
-            record=record,
-            notif_type=notif_type,
-            message=message,
-        )
-
-    primary = next((o.user for o in owners if o.is_primary), owners[0].user)
-    send_email_async(
-        subject=email_subject,
-        message=(
-            f"Hello {primary.first_name},\n\n"
-            f"{email_body_template}\n\n"
-            f"-- The IRIS Team"
-        ),
-        recipient_list=[primary.email],
-    )
-
 
 def _email_role_users(role, *, subject, greeting, body):
     """Send one email to all active users with the given role."""

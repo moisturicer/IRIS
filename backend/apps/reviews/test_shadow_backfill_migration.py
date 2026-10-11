@@ -8,9 +8,9 @@ history**: the old model never recorded who sent a record where, so no
 `RoutingEvent` is written, and an assignment is dated from a real `Review` or
 `RecordClearance` timestamp or not at all.
 
-Mechanics follow `test_workflow_tables_migration.py`: rewind `reviews` only,
-and write the rows through the current models, which is safe here because
-`0008` changes no schema. Rows are written directly rather than through the
+Mechanics follow `test_workflow_tables_migration.py`: rewind `reviews` only.
+`reviews` rows are written and read through the models as of the rewound
+migration, because later migrations add columns to them (IR-416, IR-270). Rows are written directly rather than through the
 workflow, precisely so that no dual-write can produce the rows under test.
 """
 
@@ -24,11 +24,10 @@ from django.utils import timezone
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordType
+from apps.reviews.workflow_test_helpers import purge_records_at_current_state
 from apps.reviews.models import (
-    RecordAssignment,
     RecordClearance,
     ResubmissionRequest,
-    Review,
     RoutingEvent,
 )
 
@@ -54,11 +53,30 @@ def _migrate(target):
     executor.migrate(target)
 
 
+def _model(target, name):
+    """
+    `reviews.<name>` as of `target`. The live models carry columns the rewound
+    tables do not have yet -- `Review.version` (IR-416, `reviews/0011`),
+    `RecordAssignment.closed_by_decision` (IR-270, `reviews/0012`) -- so a row
+    written or read through them would name a column that does not exist.
+    """
+    executor = MigrationExecutor(connection)
+    return executor.loader.project_state(target).apps.get_model("reviews", name)
+
+
+def _review_model(target):
+    return _model(target, "Review")
+
+
+def _assignments(target=_AFTER):
+    return _model(target, "RecordAssignment").objects
+
+
 def _rows(record):
     """{party: (state, opened_at, closed_at, closed_by_id)} for one record."""
     return {
         a.party: (a.state, a.opened_at, a.closed_at, a.closed_by_id)
-        for a in RecordAssignment.objects.filter(record=record)
+        for a in _assignments().filter(record_id=record.pk)
     }
 
 
@@ -100,11 +118,13 @@ class _World:
         """A Review at a strictly later, known time, so dating can be asserted."""
         self.minute += 1
         by = by or (self.office.get(stage) or (self.adviser if stage == "adviser" else self.rdco))
-        review = Review.objects.create(
-            record=record, reviewed_by=by, stage=stage, status=decision, comment=comment,
+        HistoricalReview = _review_model(_BEFORE)
+        review = HistoricalReview.objects.create(
+            record_id=record.pk, reviewed_by_id=by.pk, stage=stage, status=decision,
+            comment=comment,
         )
         at = T0 + timedelta(minutes=self.minute)
-        Review.objects.filter(pk=review.pk).update(created_at=at)
+        HistoricalReview.objects.filter(pk=review.pk).update(created_at=at)
         review.created_at = at
         return review
 
@@ -160,7 +180,7 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
 
         # Already dual-written: the backfill leaves it exactly as it is.
         live = w.record("live", "rdco_intake", "Thesis / Research")
-        existing = RecordAssignment.objects.create(record=live, party="intake")
+        existing = _assignments(_BEFORE).create(record_id=live.pk, party="intake")
 
         _migrate(_AFTER)
 
@@ -176,7 +196,8 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
         assert (_active(by_office), _completed(by_office)) == ({"ierc", "ktto"}, {"intake", "itso"})
         request = ResubmissionRequest.objects.get(record=by_office)
         assert (request.party, request.state, request.review_id) == ("ierc", "open", ierc_decline.pk)
-        assert request.assignment.party == "ierc" and request.assignment.state == "active"
+        held = _assignments().get(pk=request.assignment_id)
+        assert held.party == "ierc" and held.state == "active"
         assert request.reason == "Consent form"
         assert request.created_at == ierc_decline.created_at
 
@@ -192,21 +213,23 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
         assert closed < last.created_at
         assert _rows(published)["rdco"][2:] == (last.created_at, w.rdco.pk)
 
-        assert list(RecordAssignment.objects.filter(record=live)) == [existing]
-        assert RecordAssignment.objects.filter(record=live).get().reason == ""
+        # By pk: historical model classes from two project states never compare equal.
+        assert list(_assignments().filter(record_id=live.pk).values_list("pk", flat=True)) == [existing.pk]
+        assert _assignments().filter(record_id=live.pk).get().reason == ""
 
         # Historical routing is not invented; every backfilled row says what it is.
         assert RoutingEvent.objects.count() == 0
         assert set(
-            RecordAssignment.objects.exclude(record=live).values_list("reason", flat=True)
+            _assignments().exclude(record_id=live.pk).values_list("reason", flat=True)
         ) == {_MARKER}
         assert ResubmissionRequest.objects.count() == 2
 
         # Reverse removes what the backfill wrote, and only that.
         _migrate(_BEFORE)
-        assert list(RecordAssignment.objects.all()) == [existing]
+        assert list(_assignments(_BEFORE).values_list("pk", flat=True)) == [existing.pk]
         assert ResubmissionRequest.objects.count() == 0
     finally:
+        purge_records_at_current_state()  # its own partial rows; IR-260
         call_command("migrate", verbosity=0)
 
 
@@ -219,7 +242,7 @@ def test_a_declined_record_with_no_decline_on_record_stops_the_backfill():
 
         with pytest.raises(Exception, match=str(orphan.pk)):
             _migrate(_AFTER)
-        assert RecordAssignment.objects.count() == 0
+        assert _assignments(_BEFORE).count() == 0
     finally:
         Record.objects.filter(pipeline_status="declined", reviews__isnull=True).delete()
         call_command("migrate", verbosity=0)

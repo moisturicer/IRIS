@@ -31,6 +31,22 @@ Details are in the *Amendment* notes under §8 and §10. The original text is ke
 
 See the *Amendment* notes under §4 and §10.
 
+**Amended 2026-10-08 (project lead, IR-416): §5 and §13.** The manuscript was never a `RecordUpload`, so a version names the stored manuscript file directly. The server locks the manuscript once a record is submitted. Earlier versions are participants-only. The backfill records only what can be known. See the *Amendment* notes under §5 and §13.
+
+**Amended 2026-10-08 (project lead, IR-272): §5.** Who may ask for a revision, one open request per party, what an open request blocks, and why *Changes requested* is derived rather than stored. See the *Amendment* note under §5.
+
+**Amended 2026-10-08 (project lead, IR-268): §9.** What each My Reviews tab is made of. Current work splits by model until IR-260, and Done is history assembled from seats plus the old pipeline's unseated Reviews. It also settles how a Done row's outcome is derived, that the waiting badge is record-level, and the coordinator's office view. See the *Amendment* note under §9.
+
+**Amended 2026-10-09 (project lead, IR-271): §2 and §10.** The Proposal decision on IR-270's act, *complete* retired for every Proposal, `approved` read as *Accepted*, and the `decide_proposal` → `accept_proposal` rename. See the *Amendment* notes under §2 and §10.
+
+**Amended 2026-10-09 (project lead, IR-270): §3, §10 and §11.** What a Decision is and what it closes, how the closures name it, the `decision` capabilities and the `final_decide` → `keep_unlisted` rename, the direct status write until IR-260, and the 409 for a stale dialog. See the *Amendment* notes under §3, §10 and §11.
+
+**Amended 2026-10-11 (project lead, IR-507): §5 and §10.** Only an owner edits a record's details or submits it. An owner edits only a draft or a record awaiting their revision, and once submitted the Adviser, the type, the IP flags and the routing hints stay fixed. Correcting a published record is deferred. See the *Amendment* note under §10.
+
+**Amended 2026-10-11 (project lead, IR-508): §10.** Only an owner deletes a record. A delete does one of three acts by status, each its own capability key, and a record already awaiting a delete decision is not deleted again. See the *Amendment* note under §10.
+
+**Amended 2026-10-11 (project lead, IR-517): §10.** Who is told when an owner deletes a record: open-seat holders on a withdrawal, the other owners on every delete, and RDCO on a delete request. No office pool is told. A withdrawal also withdraws open document requests. See the *Amendment* note under §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -108,6 +124,15 @@ Party = adviser | itso | ierc | ktto | rdco
 - **The Adviser alone decides a Proposal.** RDCO has no Proposal role, and specialist offices are not routed on Proposals.
 - **The "complete" act is retired.** Before, `approved → completed` meant "research finished". That meaning now lives in the child record (§6), so `approved` is a Proposal's resting state. Existing `completed` Proposals keep their value, and nothing new writes it.
 
+**Amendment, 2026-10-09 (project lead, IR-271): building the Proposal decision.** Settled in a design grilling; every recommendation was accepted (Jira comment 10589).
+
+- **The Adviser's *Accept* and *Reject* are Decisions on IR-270's act**, `POST /records/<id>/decide/`. `accept` (→ `approved`) is offered on a Proposal only; `reject` is the same act on every record (`rejected`, *Archived*). A Proposal is never published or kept unlisted, and a Thesis or Project is never merely accepted: each is refused with a 400 saying so. RDCO and the offices hold no Proposal decision, whatever seat they might hold.
+- **Everything IR-270 settled applies unchanged**: the Adviser's seat and assignment close, their own document requests are withdrawn with `closed_by_decision`, the staleness token and 409, a reason required to reject, and a refusal while any revision request is open (the IR-272 hand-off).
+- **Complete is retired for every Proposal**, legacy ones included, as this section says, rather than only for the new model as the ticket first read. `/complete/` answers 400; its permission and queryset layers still answer first (403 for a role that could never complete, 404 for an Adviser who does not advise the record). The route goes with the old pipeline in IR-274. The *Approved Proposals* page, whose only act was *Complete* and whose list had been empty since IR-153, is deleted with its route and navigation entry. IR-267's carried criterion, "Intake cannot complete", is dropped: intake (§1) and complete are both retired.
+- **`approved` reads *Accepted*** wherever a reader sees it: the server's `workflow_state_label`, the frontend's status label and My Workspace's stepper, legacy records included. A `completed` Proposal still reads *Completed*. `CONTEXT.md` records *Accepted*.
+- **The owners are told**, and nobody else: a Proposal decision cuts off no other reviewer.
+- *The accept dialog promises nothing about continuing the Proposal as a Thesis or Project.* That is §6, built by IR-417.
+
 ### 3. Thesis / Research and Project
 
 The Adviser makes two decisions in one review.
@@ -136,6 +161,26 @@ The ADR-018 office booleans on the submission form are shown to the Adviser as t
 *"Keep unlisted" is kept from ADR-021 and was not raised in the session. It is kept because the specialist path exists largely for IP concerns, and a record ITSO flagged as patentable may need to be accepted without being published before a filing. Confirmed at acceptance.*
 
 **Specialist offices never reject and never publish.** This is unchanged from ADR-021 §7.
+
+**Amendment, 2026-10-09 (project lead, IR-270): the Decision.** Settled in a design grilling; the project lead accepted every recommendation (Jira comment 10586). It also touches §10 and §11.
+
+- **A Decision ends a record's review**: the Adviser's *accept & publish* or *reject* while holding their own open seat, or RDCO's *accept & publish*, *keep unlisted* or *reject* on the specialist path. RDCO alone keeps a record unlisted. *Accept & route* is **not** a Decision: it is an acceptance that closes nothing, and shares only the rule that it is refused while a revision request is open. `CONTEXT.md` records the term.
+- **One act**, `POST /records/<id>/decide/` with `outcome ∈ publish | keep_unlisted | reject`, in `apps/reviews/decisions.py`. IR-271 extends it for Proposals.
+- **What each outcome writes.** The decider's own `Review` against the latest version: `approved` for both accepts, `rejected` for a reject. A reject needs a reason, shown to the owner as written; both accepts take an optional comment. No outcome is stored anywhere else: My Reviews tells *published* from *accepted* by the record's status and "this is its latest approval" (§9 Amendment).
+- **What it closes** (ADR-021 §12, kept):
+    - the decider's seat is `done` and their assignment `completed`; any other unfinished seat on that assignment (a second RDCO reviewer) is withdrawn;
+    - every other active assignment, with its unfinished seats, is `withdrawn`. That includes an office RDCO routed to that is still reviewing. Refusing would let RDCO's own routing block RDCO;
+    - every open `DocumentRequest` is `withdrawn`, the decider's own included. A Decision ends the record, so nothing is left waiting on the document. This differs on purpose from Clear, which waits on its office's own request (§4 Amendment);
+    - a withdrawn review round leaves the office's `RecordClearance` as it was: a clearance records completed rounds only (§4 Amendment).
+- **Why, recorded.** `RecordAssignment.closed_by_decision`, `ReviewerSeat.closed_by_decision` and `DocumentRequest.closed_by_decision` (nullable FKs to the decider's `Review`; `reviews/0012`, `reviews/0013` and `documents/0011`) are "the decision as the reason" ADR-021 §12 and ADR-022 §3 ask for. The seat's link was added after code review, so the tracker can tell a seat the Decision withdrew from one a coordinator withdrew earlier. A request its own party withdrew still records no reason (ADR-022 §4).
+    - *Rejected:* a free-text reason on `DocumentRequest` only. It duplicates the `Review`, and seats and assignments would still have none.
+    - *Rejected:* matching closures to the decision by timestamp. Nothing here is tagged from timestamps (§5 Amendment).
+- **The tracker keeps the history.** A party row closed by a Decision carries `withdrawn_by_decision` ("RDCO published the record"), an outcome every reader sees. The seats the Decision withdrew are listed, to readers of the review only (`may_read_review`). A seat a coordinator withdrew stays hidden, as before, even on an assignment a Decision later closed. The RDCO row reads *Not required* on a record an Adviser published, as it did while the record was `in_review`.
+- **How readers see the outcome.** `workflow_state_label` reads **Archived** for a rejected record, and **Unlisted** for a Thesis/Research or Project at `completed`. A Proposal at `completed` keeps its old name: there `completed` was the retired *complete* act.
+- **Nothing opens work behind a Decision.** `decide()` locks the record and every active assignment. A claim or *Add reviewer* locks its assignment, and routing, a revision request and now a document request lock the record. A document request whose party's turn a Decision closed meanwhile is refused (403), never left open on a decided record.
+- **Keep unlisted is terminal for now.** Publishing an unlisted record later would be its own act, and its own ticket, when RDCO first needs it. The dialog says so.
+- **Notifications.** The owners hear once; a reject carries its reason, and a withdrawn document request is mentioned there. Each reviewer whose open seat the Decision withdrew hears that their review is closed. Nobody else is told.
+- **Not audited** in IR-270: no `AuditEvent` type is a workflow event. IR-483 tracks the gap.
 
 ### 4. Office ≠ reviewer: assignments have seats
 
@@ -204,6 +249,68 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
   - If RDCO requests a revision, only RDCO re-reviews. An Adviser-stage revision returns to the Adviser alone.
 - The Paper View's **version picker** opens that version's manuscript. The review timeline marks which version each review and comment was made against.
 
+**Amendment, 2026-10-08 (project lead, IR-416): what a version points at, who sees it, and what writes one.** Settled in a design grilling.
+
+- **The manuscript is not a `RecordUpload`.** It is `Record.abstract_file`, one file field replaced in place, with no history. The `manuscript (FK RecordUpload)` above, and "`RecordUpload.version` keeps numbering files" as a description of the manuscript, assumed otherwise. **`RecordVersion.manuscript` is a file field naming the stored manuscript file** current when the version was written. It is **nullable**, because the server has never refused a submission with no manuscript, and this ticket adds no such rule.
+    - Each upload is stored under a fresh random name, so a later upload never touches a file an earlier version names. **No code may delete a manuscript file that a version still names**, and a test pins that.
+    - *Rejected:* copying the file into version-owned storage. That doubles storage for no gain the shared name lacks.
+    - *Rejected:* moving the manuscript into `RecordUpload` under a slot. It would rewrite the manuscript extraction, chunking, `/manuscript/`, `load_corpus` and the serializers for a field nobody needs moved.
+- **The server locks the manuscript once a record is submitted.** A request that replaces `abstract_file` is refused (400, naming the status) unless the record is a `draft`, or a legacy `declined` until IR-274. IR-273 adds `awaiting_resubmission`. Staff are not exempt. Correcting a published paper's file would be a deliberate act of its own, not an edit. Other detail fields are the `edit_details` capability's concern, not this rule's.
+- **One function writes every version**, called by:
+    - the legacy `POST /records/<id>/submit/` (v1, `submission`);
+    - `routing.enter_at_adviser()` (v1, `submission`);
+    - the legacy `resubmit_record()` (the next version, `revision`);
+    - IR-273's resubmission.
+
+  So every record submitted from today on has an accurate history. IR-274 deletes the legacy call sites with the rest of the old pipeline.
+- **A review records the latest version when it is written**, wherever it is written:
+    - the legacy services;
+    - Clear and Record finding (IR-269);
+    - accept & route (IR-261).
+- **Earlier versions are review material** and follow IR-479's rule, `may_read_review`. A participant gets the version list in the record payload, the picker, and `GET /records/<id>/versions/<n>/manuscript/`. Anyone else gets no list and a 404, and reads the current manuscript as before. Serving a version is audited as a `DOWNLOAD` carrying the version number.
+- **The picker renders only when a record has two or more versions.** There is nothing to choose between with one.
+- **Opening an earlier version** sets `?version=N` and shows "You are viewing vN of M · Back to current". Citation highlights are off while an earlier version is open, because their coordinates are the current manuscript's (ADR-031). Paper Chat says it answers about the current version. Earlier versions are not indexed.
+- **The timeline** shows each version as its own entry ("v2 submitted"), and tags each review with `Review.version`. Nothing else is tagged from timestamps. A comment's version is IR-419's (`ReviewComment.version`).
+- **Settled, built in IR-273:** a non-owner's "current" manuscript is the latest version's, and an owner sees their unsubmitted upload, labelled as such. Until then, the gap exists only while a legacy record is `declined`, when no reviewer is acting.
+
+**Amendment, 2026-10-08 (project lead, IR-272): asking for a revision.** Settled in a design grilling.
+
+- **Who asks.** A holder of an **opened** seat (`in_review`), as that seat's party, on a record on the new model. An unopened seat is refused with "Open the review first", as Clear and Record finding are (§4 *Amendment*). The reason is required and shown to the owner as plain text.
+- **One open request per party, not per person.** A second reviewer from an office that already asked is refused and pointed at the existing request. Their point belongs in the review discussion (§7). This is ADR-022's "party, not person".
+- **What an open request blocks.**
+    - While **any** request is open, every *decision* is refused: accept & route today; accept & publish, keep unlisted, reject and the Proposal decisions when IR-270 and IR-271 build them, through the same predicate.
+    - While an office's **own** request is open, every seat of that office is refused both Clear and Record finding. This mirrors the §4 *Amendment*'s document-request rule, and narrows the completion rule, which already waits on it.
+    - **Other offices may still clear and record findings.** Their outcome then survives the new version, which is exactly what clearance-aware resubmission preserves.
+    - Routing and document requests still work.
+    - *Rejected:* refusing every Clear while any request is open, as the ticket first read. It splits `office_review` in two and refuses an outcome ADR-003 would preserve anyway.
+- **"Changes requested" is derived, not stored.** A party with an open request is shown as *Changes requested*, and `RecordClearance` is left alone. Writing `declined` to it would overwrite an earlier completed review round's outcome while the office has not completed, and the Adviser and RDCO have no clearance row at all. IR-273's resubmission resets the requesting parties' clearances.
+- **The version a request was made against** is its `Review`'s version. That `Review` is required and cannot be deleted from under the request, so no column is added.
+- **Withdrawal.** Any seat holder of the requesting party may withdraw its open request. No reason is asked for. The owners are told, and the tracker keeps the request as `withdrawn`.
+- **Notifications** go to every owner, and to nobody else. Reviewers see the *Waiting on author* badge (§9).
+
+**Amendment, 2026-10-08 (IR-273): answering with a new version.** Built to the card and to the IR-416 hand-off above. The points the card left open were decided in the implementation and are **pending the project lead's review** on the IR-273 pull request.
+
+- **The act.** `POST /records/<id>/new-version/`, by an **owner** only. A reviewer who can see the record gets a 403; anyone else gets a 404. It needs a record on the new model with at least one open request. It writes v(n+1) through the one writer, resolves **every** open request as `resubmitted`, and records `resubmission_count` and `last_resubmitted_at`, so `preserved` is derived exactly as on the legacy path.
+- **What resets.** Under `CLEARANCE_AWARE`, only the requesting parties' clearance rows go back to pending. Under `RESTART_ALL`, every row does.
+    - Seats are the same under both policies, which is the card's "the two policies differ only in which clearances reset". Every `done` seat on a requesting party's active assignment returns to `in_review`, so an office whose second reviewer asked re-reviews the new version in full. Nobody else's seat changes.
+    - *Consequence, for review:* under `RESTART_ALL`, an office that had already completed keeps its completed assignment, and its pending clearance is re-cleared only if it is routed again. If the comparison arm should instead reopen those offices, that is a change to this rule.
+- **What counts as a change** since the **newest** open request:
+    - a manuscript other than the latest version's;
+    - a supporting document an owner uploaded (`RecordUpload`);
+    - a detail that actually changed. That is the new `Record.details_edited_at` (`records/0016`), stamped only when a PATCH changes a value, so saving identical details answers nothing.
+
+  Otherwise the act is refused, naming who asked and what would count.
+- **The manuscript lock** also opens while `awaiting_resubmission` (new model, a request open), **for an owner only**. Staff stay locked. The frontend offers the upload under a new capability key, `replace_manuscript`, added to §10's list.
+- **Only an owner's edit counts as a change.** A staff member's details edit does not stamp `details_edited_at`: the revision is the owner's to make. *Superseded 2026-10-11 by the IR-507 amendment under §10: a staff member cannot edit a record's details at all, so every edit, and every stamp, is an owner's.*
+- **Withdrawing the last open request puts the submitted manuscript back.** If the owner has uploaded a revised manuscript but not submitted it, and the last open request is withdrawn, no version can carry that upload. The stored manuscript is reset to the latest version's file. The upload's file stays in storage. Nothing is re-extracted, since the upload never was (next point).
+- **What Ask IRIS answers from (settled with the project lead, 2026-10-08).** An owner's revised manuscript on the new model is **not extracted on upload**. It is extracted when its version is submitted, by `submit_new_version`. A metadata-only version re-extracts nothing. So the active chunk set, which is what Ask IRIS, Paper Chat and the degraded full-text path read, is always the **latest submitted version's manuscript**, the same file reviewers are served.
+    - The fix is in the extraction *trigger* (`versions.manuscript_awaits_submission`, called where an upload queues extraction). `apps/ai/` is unchanged. The AI pipeline now relies on this invariant without owning it.
+    - The owner's reader says that Ask IRIS answers about the submitted version until they submit. Indexing the revision separately for the owner was *rejected*: a second chunk set and owner-scoped retrieval are AI-pipeline work for little gain.
+    - The legacy `declined` path keeps extracting on upload. No reviewer is acting on a declined record, and IR-274 deletes the path.
+    - *Accepted:* for the extraction latency after a submission, Paper Chat may still quote the previous version. That is the same window every upload has.
+- **Which manuscript is current.** Between the owner's upload and their new version, `/manuscript/` serves everyone but an owner the latest version's file. An owner reads their own upload, and record detail's `manuscript_unsubmitted` labels it. The owner's version picker then offers the latest submitted version too, as `?version=N`.
+- **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else.
+
 ### 6. Lineage: an accepted Proposal continues as a new record
 
 ```
@@ -268,6 +375,38 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
 | **Done** | Your seats in `done`, as your decision history. |
 
 **Why these are not outcome tabs.** Rejected, Cleared and Archived are outcomes, not work, so they are filters on Done. They are not tabs.
+
+**Amendment, 2026-10-08 (project lead, IR-268): what each tab is made of.** Settled in a design grilling.
+
+- **Current work and history are sourced differently.**
+    - **To review** and **In review** are current work, so they split by model.
+        - A record on the new model (`in_review`) comes from seats and pools.
+        - Every other record comes from the old pipeline's own queue, unchanged, until IR-260. Its pending work is in To review. In review holds none of it, because the old pipeline has no "opened" state.
+    - **Done** is history, and it is never split by model or by `pipeline_status`. A new-model record that gets published stops being `in_review`, so a split by status would misfile it. Done is the union of two sets:
+        1. Every `done` seat of yours, on any record.
+        2. Every `Review` of yours with no seat behind it that My Reviews already shows. That means no `done` seat of yours on its assignment, and no open one on a new-model record. This is the old pipeline's history from before IR-415, which the seat backfill (`0010`) did not seat.
+    - Rule 2 excludes on purpose a revision request's `Review` whose seat is still `in_review`. Otherwise the same work would show as both current and done.
+    - *Refined in the implementation:* rule 2 was first worded as "no seat of yours behind it". An old-pipeline record that was declined when the backfill ran has its decider seated `in_review`, and In review never shows an old-pipeline seat. Under that wording, that decline would have disappeared from both tabs. So rule 2 excludes only the seats My Reviews shows.
+- **Rows.**
+    - **One row per seat, and one per unclaimed assignment**, so an office routed the same record twice shows two Done rows, one per Review round.
+    - Every row leads to Paper View's Review section (`/records/<id>?section=review`). My Reviews never links to the old decision form; the Review section reaches it for an old-pipeline decision.
+    - *Open review* stays in Paper View, so the time-on-task start (IR-144) is one act in one place.
+    - A row shows the party and holder ("ITSO · Unassigned", "ITSO · You"), who routed it and why, from the latest routing event into that party, or "Submitted by" for an Adviser's entry seat, and how long it has waited. The peer-clearance strip is not on rows; Paper View's tracker shows it.
+- **A Done row's outcome is the holder's own verdict `Review`** on that seat's assignment.
+    - An office's `approved` is *cleared*; a `negative_finding` is *finding*.
+    - An Adviser's or RDCO's `approved` is *accepted*, or *published* when that decision published the record.
+    - `rejected` is *rejected*.
+    - The old pipeline's `declined` is *revision requested*: shown, and listed under *All*, with no filter of its own, since the new model never closes a seat that way.
+    - A seat done with no verdict of its holder's, because a colleague's verdict completed the office, has no outcome. It reads "Completed by your office" and is listed under *All* only. *All* is the default filter.
+- **Waiting on author / document is record-level.** Any party's open revision request sets *author*, and any open document request sets *document*. *Author* wins when both are open, matching `workflow_state`. The badge replaces the row's action, and the title still opens the record, so a reviewer who may still act is never locked out.
+- **The coordinator's office view**, `?office=<party>`, works inside every tab: every seat of that office in that state, each with its holder, plus the pool in To review. Anyone but a coordinator of that office is refused with **403**. In that view an old-pipeline row reads "<Office> · Old pipeline" and offers no *Assign*, because it has no seat a coordinator could fill until IR-260.
+- **Assign has its own picklist**, `GET /assignments/<id>/assign/`, refused exactly as the act is. The *Add reviewer* list serves only seat holders, and the two acts have different rules.
+- **Counts and paging.**
+    - The response carries the rows and all three tab counts. The counts honour `office` and ignore `outcome`, so changing the filter never changes them.
+    - The query count is flat in the number of rows.
+    - Done is paged newest first, with *Show more*. To review and In review are not paged.
+- **The URL holds the view.** `?tab=` defaults to `to_review`, `?outcome=` to All, and `?office=` to Mine. The old `?status=pending|approved|declined` maps once to `to_review` / `done` / `done` and is then replaced.
+- **After *Claim* or *Assign*** the page refetches and announces where the row went. In Mine view an *Assign* to someone else removes the row; in the office view it stays, with the new holder. A failed act is reported on its row and announces nothing. There is no polling.
 
 ### 10. One Paper View, driven by capabilities
 
@@ -334,6 +473,64 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
     
     Aligning them would reopen ADR-022, so it was not done here.
 
+**Amendment, 2026-10-09 (project lead, IR-270): the Decision's capabilities.** Record detail carries a `decision` block, `{party, outcomes, blocked, closes, token, author_hints}`: the outcomes the viewer may take, why not yet (an unopened seat, an open revision request), what deciding would close (each assignment with its current holders, and the open document requests), the staleness token (§11 Amendment), and, for the Adviser, the author's ADR-018 hints. The frontend grants one capability per outcome: `accept_publish`, `keep_unlisted` and `reject`. **`final_decide` is renamed `keep_unlisted`**, the act it grants, as `record_finding` became `office_review` (above). `decide` stays the link to the current decision form for legacy records until IR-274.
+
+**Amendment, 2026-10-09 (project lead, IR-271).** A Proposal's *Accept* is its own capability, **`accept_proposal`**, and its *Reject* is `reject`, as on every record. This replaces the single `decide_proposal` key, so each button names the act it grants.
+
+*Deviation from the grilled order, accepted by the project lead on 2026-10-09:* the RDCO bar was first settled as *Accept & publish · Keep unlisted · Route · Request Revision · Request documents · Reject*. The bar is one ordered list for every viewer, and IR-269 settled an office reviewer's order with *Route to office* after *Request documents*. So RDCO gets *Accept & publish · Keep unlisted · Request Revision · Request documents · Route to office · Reject*. The primary and the last button are as settled; moving *Route* for RDCO alone would need per-viewer ordering.
+    - *Rejected:* moving *Route* up the shared list. It would reorder every office's bar against ui-ux/16 and IR-261's settled office primary.
+    - *Rejected:* ranking actions per party. It adds a concept to the bar for a one-place shift of a secondary button.
+
+**Amendment, 2026-10-11 (project lead, IR-507): who edits a record's details and submits it, when, and what stays fixed.** Settled in a design grilling after IR-418's capabilities table found the record update and `submit/` wider than any offer: both were `IsOwnerOrStaff`, so any office edited any record it could see and could submit a student's draft, recording the staff member as the one who gave the student's Data Privacy Act consent (IR-226). An owner could also edit in every state.
+
+- **Only an owner edits details (`edit_details`).** No office edits a record that is not theirs, and neither does the Adviser. Every owner may, not only the primary one. This rewrites §5's IR-273 line on a staff member's edit (below).
+- **An owner edits only a `draft`, or a record awaiting their revision**, exactly where `edit_details` is offered. In review with no revision asked for, or once decided, the edit is refused with a 400 and a `detail` naming the status. The refusal comes before the body is validated, so "not now" is said before anything about the fields.
+    - *Why 400 and not 403 (settled in a second grilling the same day):* it is the repository's convention. **403 means "not you":** the caller can see the record but may not perform the act (ADR-022 §Amendment 4). **400 means "you, but not now":** `submit/` on a non-draft, the manuscript lock, `new-version/` with no request open, and an unopened seat's "Open the review first" all answer it. **409 stays reserved** for the stale decision token (§11).
+    - *Rejected:* 403, which would tell an owner they lack authority over their own record. *Rejected:* 409, which would make this the only state refusal that is not a 400.
+- **Only an owner submits (`continue_draft`)**, any owner. So `dpa_accepted_by` is always an owner.
+- **What stays fixed once a record leaves `draft`**: `adviser`, `record_type`, `is_ip`, `for_commercialization`, `community_extension`, `requested_itso`, `requested_ierc`, `requested_ktto` and `requires_ethics_review` (`versions.SUBMISSION_FIXED_FIELDS`). A revision answers a reviewer, so only the paper's own details stay open.
+    - **The Adviser**, because its seat stays with the Adviser the record entered with while routing reads `record.adviser`. Changed mid-review, neither Adviser could accept and route.
+    - **The type**, because it picks the decision path (§2).
+    - **The IP flags**, because once submitted they are the offices' through `tags/` (`tag_ip`), and `is_ip` feeds ADR-015's disclosure gate. An owner's save must not undo an office's tag.
+    - **The hints**, because they were for the router (§3), who has already read them. An author who realises mid-revision that the work involves human participants says so in the review discussion.
+- **A fixed field sent unchanged is accepted; a change is one 400 naming every refused field.** A form that re-sends every field still saves. Edit details shows the fixed fields read-only once submitted, and does not send them.
+- **Refusals follow ADR-022 §Amendment 4:** a 403 for a record the caller can see, a 404 for one they cannot.
+- **Correcting a published record's details is deferred, not built.** Before publication, a reviewer asks for a revision. After it, nothing in IRIS corrects details: `Record` is not in Django admin, and adding it would bypass every rule here.
+    - *Rejected:* a narrow staff correction right (for example RDCO, published records, a fixed field list). It is a new capability with its own allowlist and audit event, and a decision about how the institution runs, not part of narrowing an accidental authority.
+- **Out of scope:** `destroy` has the same `IsOwnerOrStaff` gate. Who may delete is its own decision, on [IR-508](https://citiris.atlassian.net/browse/IR-508). *Settled by the IR-508 amendment below.*
+
+**Amendment, 2026-10-11 (project lead, IR-508): who deletes a record, and what a delete does.** Settled in a design grilling. `DELETE /records/<id>/` was `IsOwnerOrStaff`, so any office could soft-delete a student's draft outright, or file a delete request on accepted work with the office member recorded as the requester. No screen offered it; the API did.
+
+- **Only an owner deletes**, any owner, not only the primary one (`IsRecordOwner`). No office and not the Adviser. Refusals follow ADR-022 §Amendment 4: a 403 for a record the caller can see, a 404 for one they cannot. `IsOwnerOrStaff` had no other user and is deleted.
+    - *Deferred, not built:* an institutional takedown, for example RDCO removing a published record for plagiarism. It would be its own act with its own reason, notice and audit. RDCO filing a delete request and then approving it would be one person deciding their own request. *Keep unlisted* already lets RDCO hide a record it decides on.
+- **What a delete does, by status** (ADR-021 §13's `DELETE_REVIEW_STATUSES` is unchanged):
+
+    | Status | What the owner's delete does | Capability |
+    |---|---|---|
+    | `draft`, `rejected` | soft-deleted now | `delete_record` |
+    | `in_review` | soft-deleted now, and its open assignments, seats and revision requests are withdrawn (IR-274) | `withdraw_submission` |
+    | `published`, `approved`, `completed` | a delete request for RDCO to decide; the record waits in `pending_delete` | `request_deletion` |
+    | `pending_delete` | **refused with a 400**: a delete decision is already pending | none |
+
+    The last row closes a bypass. A soft delete is legal from every status, so a second delete removed the record outright and left its request pending against a deleted record. A 400 rather than a 403, as in the IR-507 amendment above, because the owner is the right person at the wrong moment.
+- **One endpoint, three capability keys.** Each names its act, as `accept_proposal` and `keep_unlisted` do (IR-270, IR-271): the act that is gone now, the act that ends other people's work, and the act someone else decides. A button can then name its consequence without deriving it from state. The keys are offered to owners only, exactly where the endpoint does that act. IR-418's table probes each in the statuses it names. No screen renders them yet; the buttons are a frontend follow-up.
+- **Out of scope:** withdrawing a record from review notifies no reviewer and leaves its open document requests open. That is IR-274's behaviour, and it goes to [IR-517](https://citiris.atlassian.net/browse/IR-517). *Settled by the IR-517 amendment below.*
+
+**Amendment, 2026-10-11 (project lead, IR-517): who is told when an owner deletes a record.** Settled in a design grilling. None of the three delete acts told anyone, and a withdrawal left open document requests against a record nobody can reach. The rule follows the Decision's precedent (IR-270): the people whose work ends are told, and no office pool is.
+
+| Act | Who is told | Channel | Link |
+|---|---|---|---|
+| `withdraw_submission` | each holder of an **open seat** (the Adviser, office reviewers, RDCO): their review is closed, plus *"your office's document request is withdrawn"* (*"your"* for the Adviser) when their party had one | in-app | none |
+| `withdraw_submission` | every **other owner**: the record is deleted and can't be restored | in-app and email | none |
+| `delete_record` | every other owner | in-app and email | none |
+| `request_deletion` | every other owner, and **RDCO** (the role, plus email to its active members, as `notify_routed` announces pool work) | in-app and email | the record |
+
+- **No office pool is told.** Nobody there had started, so no work ends. The Decision does the same.
+- **The owner who acted is not told.** The other owners are, by email too, because one owner's delete removes the record for every co-author and nothing undoes it.
+- **A deleted record is a 404 for everyone**, so withdrawal and delete notices carry no record link. A delete request leaves the record readable while RDCO decides, so its notices link it.
+- **A withdrawal also withdraws the record's open document requests**, with `closed_at` and no `closed_by_decision`, since there is no Decision to name (`reviews.withdrawal`). They used to be left open.
+- Notices go after commit and never raise into the request, as every notice does.
+
 ### 11. Lifecycle
 
 `pipeline_status` stores:
@@ -357,6 +554,12 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 5. `in_review`
 
 A decision still closes the record's other open work (ADR-021 §12). A decision is still refused while any resubmission request is open.
+
+**Amendment, 2026-10-09 (project lead, IR-270): how a Decision moves the status, and a stale dialog.**
+
+- **The status is written by `decisions.decide()` directly**, as `routing.enter_at_adviser()` writes `in_review`: `published`, `completed` or `rejected`. The legacy transition table has no edge out of `in_review`, and `lifecycle.apply()` would run `shadow.sync()`, which closes assignments as *completed* where a Decision withdraws them. These are the only two `pipeline_status` writes outside `apply()`; IR-260's cutover folds them in.
+- **A Decision is never taken on a record that moved since the dialog read it.** Record detail's `decision.token` is a digest of the latest version, the active assignments, the open seats and the open document requests. `decide/` requires it, and a record whose token no longer matches is refused with **409** and the fresh `decision` block, so the dialog shows what deciding would close now and keeps the typed text. The decider decides again deliberately.
+    - *Rejected:* re-checking the rules at submit time only. A Decision would then withdraw whatever appeared meanwhile, unseen, which is what "never submits into a changed state" (IR-143) forbids.
 
 ### 12. Tests that pin the decisions
 
@@ -385,6 +588,17 @@ The migration is additive first, following ADR-021 §7's expand/contract plan.
 
 - **Seats.** One seat per existing active assignment. It goes to `record.adviser` for Adviser assignments, and to the most recent reviewer of that party where one exists. Otherwise it is left seatless, which puts it in the pool.
 - **Versions.** v1 per submitted record, from its current manuscript upload. Older uploads become earlier versions only where their dates bracket a recorded resubmission. Nothing is invented.
+
+**Amendment, 2026-10-08 (project lead, IR-416): the version backfill.** No older manuscript is recorded anywhere (§5 *Amendment*), so the "older uploads" clause can never apply. The backfill is, per non-draft record:
+
+- **never resubmitted** (`resubmission_count = 0`): one **v1**, `submission`, naming the current manuscript;
+- **resubmitted k times**: one version numbered **k + 1**, `revision`, dated `last_resubmitted_at`, naming the current manuscript. No v1…vk rows are made up, so that history starts at v(k + 1), and the next resubmission writes v(k + 2).
+
+The rules that apply to both:
+
+- Records made by import, seed or `load_corpus` get a version with no `created_by`.
+- A record with no manuscript gets a version with none.
+- **Every existing `Review.version` stays null**, as IR-257 left `Review.assignment`. Dating a review against a reconstructed version would invent the link.
 - **In-flight records at `intake`.** Where the record has an Adviser, an Adviser assignment is opened and the intake assignment is withdrawn with reason "ADR-032: intake retired". Records **without** an Adviser are listed by a management command for a person to assign. They are never guessed.
 
 ## Alternatives Considered
@@ -522,7 +736,7 @@ FR-M5-01 · FR-M5-03 · FR-M4 · NFR-R3 · NFR-S4. These are stable labels only.
 - seats, pool and coordinator
 - record versions and the version picker
 - Proposal continuation and lineage
-- capabilities payload and Paper View modes
+- capabilities payload (IR-418; Paper View modes belong to F5 / IR-411)
 - review timeline and `ReviewComment`
 - public discussion
 - Discoverable Proposals and the Discover Proposals section

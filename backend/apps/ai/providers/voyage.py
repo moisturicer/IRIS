@@ -25,6 +25,7 @@ from django.conf import settings
 from .batching import batch_documents_by_token_budget, estimate_tokens
 from .errors import ClassifiedError, ErrorKind, classify_status_code
 from .ports import EmbeddingProvider, RerankedCandidate, Reranker
+from .deadline import bounded
 
 _BASE_URL = "https://api.voyageai.com/v1"
 
@@ -111,12 +112,18 @@ def _classify_response(response: httpx.Response) -> ErrorKind:
 
 
 def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    timeout = bounded(getattr(settings, "VOYAGE_TIMEOUT_SECONDS", 60))
+    if timeout <= 0:
+        # A spent application deadline is not a failure of the vendor.
+        from .openai_compatible import DeadlineExceeded
+
+        raise DeadlineExceeded("the research run's deadline has passed")
     try:
         response = httpx.post(
             f"{_BASE_URL}{path}",
             json=payload,
             headers={"Authorization": f"Bearer {_api_key()}"},
-            timeout=getattr(settings, "VOYAGE_TIMEOUT_SECONDS", 60),
+            timeout=timeout,
         )
     except VoyageError:
         raise

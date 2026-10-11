@@ -1,6 +1,9 @@
 from rest_framework.permissions import BasePermission
 
-from core.enums import OPEN_SEAT_STATES, AssignmentState, Party, RoleName
+from core.enums import (
+    DELETE_REVIEW_STATUSES, OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus,
+    RoleName, WorkflowState,
+)
 
 # Role name constants -- match the Role.name values in the DB exactly.
 # Aliases onto `RoleName` since IR-135: the names are kept because the sets
@@ -22,9 +25,8 @@ ADMIN_ROLES    = {ROLE_RDCO}
 # and M2-2.2 (Submit Record for Review) both name the actor "Record Owner
 # (Student or Adviser)". Deliberately excludes the clearing offices -- ITSO,
 # IERC and KTTO must not author records they may later clear -- and RDCO, which
-# performs both intake and final review, so authoring would mean reviewing its
-# own record at two of the three gates. RDCO files on behalf of others through
-# the bulk import path instead.
+# decides the specialist path, so authoring would mean deciding its own record.
+# RDCO files on behalf of others through the bulk import path instead.
 AUTHOR_ROLES   = {ROLE_STUDENT, ROLE_ADVISER}
 # Who may publish a Calls & Conferences opportunity (IR-121). Deliberately not
 # STAFF_ROLES: that set includes ITSO/IERC, who review clearances and have no
@@ -108,10 +110,15 @@ class IsReviewer(BasePermission):
         return get_role_name(request.user) in REVIEWER_ROLES
 
 
+def is_office_staff(user) -> bool:
+    """KTTO, RDCO, ITSO or IERC. Role only -- see the module note on is_staff."""
+    return get_role_name(user) in STAFF_ROLES
+
+
 class IsStaff(BasePermission):
     """KTTO, RDCO, ITSO or IERC. Role only -- see the module note on is_staff."""
     def has_permission(self, request, view):
-        return get_role_name(request.user) in STAFF_ROLES
+        return is_office_staff(request.user)
 
 
 class IsAdmin(BasePermission):
@@ -131,7 +138,7 @@ class IsOpportunityPoster(BasePermission):
     share a role bucket. Role membership answers "may you post?", never "is this
     yours?".
 
-    The rule mirrors `IsOwnerOrStaff` below: the person who posted it, or an
+    The rule mirrored the old record `IsOwnerOrStaff` (retired by IR-508): the person who posted it, or an
     admin (RDCO/KTTO/Django staff) acting as a moderator. An Adviser can edit
     only their own call; RDCO and KTTO can correct anyone's, which is what an
     institutional noticeboard needs when a deadline changes and the poster is
@@ -170,6 +177,19 @@ def owns_or_staffs_record(user, record) -> bool:
         return False
     if get_role_name(user) in STAFF_ROLES:
         return True
+    return record.owners.filter(user=user).exists()
+
+
+def is_record_owner(user, record) -> bool:
+    """
+    Does `user` own `record`? Ownership alone: no staff role, and no seat,
+    stands in for it. A revision is the owner's to make, so a new version, a
+    replacement manuscript and the details edit that answers a revision
+    request all ask this (IR-273), as do every details edit and submission
+    (IR-507).
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
     return record.owners.filter(user=user).exists()
 
 
@@ -263,9 +283,8 @@ def may_read_review(user, record) -> bool:
 
     - `is_record_participant`: an owner, or anyone who has ever held a seat;
     - or a member of a party holding an **active** assignment on the record
-      right now, its pool included -- someone about to claim, or a reviewer on
-      the legacy pipeline deciding straight from the pool, needs the history
-      before acting. The server twin of the frontend's `isParticipant`.
+      right now, its pool included -- someone about to claim needs the
+      history before acting. The server twin of the frontend's `isParticipant`.
 
     No role reads it everywhere, RDCO included; an audit is Django admin's.
     Document requests keep their own, party-wide rule (`may_read_requests`,
@@ -284,10 +303,98 @@ def may_read_review(user, record) -> bool:
     ).exists()
 
 
-class IsOwnerOrStaff(BasePermission):
+# Which capability offers each Decision outcome (IR-270, IR-271).
+DECISION_CAPABILITY = {
+    "accept": "accept_proposal",
+    "publish": "accept_publish",
+    "keep_unlisted": "keep_unlisted",
+    "reject": "reject",
+}
+
+
+#: What an owner's `DELETE /records/<id>/` does in each status, named as the act
+#: it is (IR-508, ADR-032 §10 Amendment): gone now, withdrawn from review, or a
+#: request RDCO decides. One endpoint, three keys, so a button names its
+#: consequence. `pending_delete` is absent: a decision is already pending.
+DELETE_CAPABILITY = {
+    PipelineStatus.DRAFT: "delete_record",
+    PipelineStatus.REJECTED: "delete_record",
+    PipelineStatus.IN_REVIEW: "withdraw_submission",
+    **{status: "request_deletion" for status in DELETE_REVIEW_STATUSES},
+}
+
+
+def record_capabilities(record, user, *, workflow, my_seats, routing, office_review,
+                        revision, decision) -> list[str]:
+    """Action keys offered by Record detail (ADR-032 §10, IR-418).
+
+    These are rendering hints assembled from the same server predicates and
+    action flags the endpoints use. An action still checks authority and state
+    when called; a blocked action may be offered so its reason can be shown.
+    `apps.records.test_capabilities` pairs every key with its endpoint.
     """
-    Object-level: the user owns the record OR is a staff member.
-    The view must attach `obj.owners` as a queryset or list of users.
+    from apps.documents.attachments import filing_party
+    from apps.reviews.seats import add_reviewer_assignment
+
+    offered = ["cite"]
+    if not user or not getattr(user, "is_authenticated", False):
+        return offered
+
+    # A seat still to work is a review to open (IR-274 retired `can_act`).
+    if any(seat["state"] in OPEN_SEAT_STATES for seat in my_seats):
+        offered.append("open_review")
+    if routing["accept_and_route"]:
+        offered.append("accept_route")
+    if routing["route_as"] is not None:
+        offered.append("route")
+    offered.extend(DECISION_CAPABILITY[outcome] for outcome in decision["outcomes"])
+    if office_review["party"] is not None:
+        offered.append("office_review")
+    # `add-reviewer/`: an open seat on an active office assignment, RDCO's too.
+    if add_reviewer_assignment(record, user) is not None:
+        offered.append("add_reviewer")
+    if workflow["can_request_document"]:
+        offered.append("request_document")
+    if revision["withdrawable"] is not None:
+        offered.append("withdraw_revision")
+    elif revision["party"] is not None:
+        offered.append("request_revision")
+
+    if is_record_owner(user, record):
+        if workflow["workflow_state"] == PipelineStatus.DRAFT:
+            offered.extend(["continue_draft", "edit_details"])
+        elif workflow["workflow_state"] == WorkflowState.AWAITING_RESUBMISSION:
+            if revision["new_version"] is not None:
+                offered.extend(["create_version", "replace_manuscript"])
+            offered.append("edit_details")
+        delete_act = DELETE_CAPABILITY.get(record.pipeline_status)
+        if delete_act is not None:
+            offered.append(delete_act)
+
+    # Both role-gated endpoints refuse anyone who is not office staff
+    # (`IsStaff`) before any other check, so the offers do too.
+    office_staff = is_office_staff(user)
+    # `tags/`: office staff, on any record they can see (decided 2026-10-11:
+    # the offer follows the endpoint, no longer published records alone).
+    if office_staff:
+        offered.append("tag_ip")
+    # `documents/files/upload/`: office staff whose office takes part (IR-474).
+    # An Adviser takes part too, but is not staff, so is never offered it.
+    if office_staff and filing_party(record, user) is not None:
+        offered.append("attach_file")
+    return offered
+
+
+class IsRecordOwner(BasePermission):
+    """
+    Object-level: the user owns the record. No staff role stands in for it.
+
+    The record update, `submit/` and delete (IR-507, IR-508, ADR-032 §10
+    Amendment): a record's details are its owners' to write, its Data Privacy
+    Act consent an owner's to give, and its removal an owner's to start. The
+    retired `IsOwnerOrStaff` let an office do all three on a record that was
+    not theirs -- recorded as `dpa_accepted_by`, or as the requester of a
+    delete request -- and was deleted with its last user (IR-508).
     """
     def has_object_permission(self, request, view, obj):
-        return owns_or_staffs_record(request.user, obj)
+        return is_record_owner(request.user, obj)

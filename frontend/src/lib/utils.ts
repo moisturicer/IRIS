@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
 import { format, parseISO, isValid } from "date-fns";
-import type { PipelineStatus } from "./constants";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -10,26 +9,6 @@ export function formatDate(value: string | Date | null | undefined, pattern = "M
   if (!value) return "—";
   const date = typeof value === "string" ? parseISO(value) : value;
   return isValid(date) ? format(date, pattern) : "—";
-}
-
-const PIPELINE_LABELS: Record<PipelineStatus, string> = {
-  draft:           "Draft",
-  in_review:       "In Review",
-  adviser_review:  "Adviser Review",
-  approved:        "Approved — Ongoing",
-  completed:       "Completed",
-  rdco_intake:     "RDCO Intake Review",
-  itso_review:     "ITSO Review",
-  parallel_review: "Parallel Office Review",
-  rdco_review:     "RDCO Final Review",
-  published:       "Published",
-  declined:        "Revision Requested",
-  rejected:        "Rejected",
-  pending_delete:  "Pending Deletion",
-};
-
-export function pipelineLabel(status: PipelineStatus | string): string {
-  return PIPELINE_LABELS[status as PipelineStatus] ?? status;
 }
 
 export function downloadBlob(data: Blob, filename: string) {
@@ -62,4 +41,10 @@ export function formatBytes(bytes: number): string {
     unit += 1;
   }
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/** A list of names as prose: "IERC", "ITSO and IERC", "ITSO, IERC and KTTO". */
+export function joinLabels(labels: string[]): string {
+  if (labels.length <= 1) return labels.join("");
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }

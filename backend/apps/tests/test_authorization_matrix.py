@@ -26,7 +26,8 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
-from apps.reviews.services import _can_review, _can_submit_clearance
+from apps.reviews import routing, seats
+from apps.reviews.models import RecordAssignment
 
 # Every application role. The matrix is only honest if it enumerates all of
 # them -- a suite that tests "RDCO can, Student cannot" and stops would have
@@ -137,8 +138,8 @@ class AuthorizationMatrixTests(APITestCase):
         SRS Use Cases M2-2.1 (Create IP Disclosure Draft) and M2-2.2 (Submit
         Record for Review) both name the actor "Record Owner (Student or
         Adviser)". The clearing offices must not author records they may later
-        clear, and RDCO performs both intake and final review -- so RDCO
-        submitting would mean reviewing its own record at two of three gates.
+        clear, and RDCO decides the specialist path -- so RDCO submitting would
+        mean deciding its own record.
 
         `RecordViewSet` had no role gate on creation at all.
         """
@@ -220,47 +221,86 @@ class OwnershipMatrixTests(APITestCase):
             "the owner must be able to submit their own draft",
         )
 
-    # --- _can_review: the sequential gates --------------------------------
+    # --- the review gates (rewritten for IR-274) --------------------------
+    #
+    # These asserted the fixed pipeline's `_can_review` and
+    # `_can_submit_clearance` against stage values. Both predicates were
+    # deleted with the pipeline; the same three questions are now asked of the
+    # adviser-first acts, over HTTP. A refusal is a 403 where the caller may
+    # read the record and a 404 where it may not -- the second is IR-153's
+    # rule, and is just as much a refusal.
 
-    def test_only_the_named_adviser_may_review_at_adviser_review(self):
-        """
-        The card's AC: "_can_review no longer short-circuits on a staff flag."
-        Before, every office role was is_staff and so returned True here
-        regardless of stage or assignment.
-        """
-        self.record.pipeline_status = "adviser_review"
-        self.assertTrue(_can_review(self.adviser, self.record),
-                        "the named adviser may review at adviser_review")
-        self.assertFalse(_can_review(self.other_adv, self.record),
-                         "an unrelated Adviser must not review someone else's record")
-        for user, who in ((self.itso, "ITSO"), (self.ierc, "IERC"), (self.owner, "the owner")):
-            self.assertFalse(_can_review(user, self.record),
-                             f"{who} has no standing at the adviser gate")
+    def in_review(self):
+        record = Record.objects.create(
+            title="C" * 10, abstract="D" * 40,
+            # A Thesis: a Proposal is never routed (ADR-032 §2).
+            record_type=RecordType.objects.get(name="Thesis / Research"),
+            added_by=self.owner, pipeline_status="draft", adviser=self.adviser,
+        )
+        RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
+        routing.enter_at_adviser(record, self.owner)
+        return record
 
-    def test_rdco_reviews_only_at_its_own_stages(self):
-        for stage in ("rdco_intake", "rdco_review"):
-            self.record.pipeline_status = stage
-            self.assertTrue(_can_review(self.rdco, self.record), f"RDCO at {stage}")
-        self.record.pipeline_status = "parallel_review"
-        self.assertFalse(_can_review(self.rdco, self.record),
-                         "RDCO must not review at a clearance stage")
+    def post(self, user, name, record, body):
+        self.client.force_authenticate(user)
+        return self.client.post(reverse(name, args=[record.pk]), body, format="json").status_code
+
+    def test_only_the_named_adviser_may_accept_and_route(self):
+        """
+        The card's AC: no staff flag short-circuits the adviser gate. Before
+        IR-165 every office role was is_staff and passed it regardless of
+        assignment.
+        """
+        record = self.in_review()
+        body = {"to": [{"party": "itso"}], "reason": "Possible IP."}
+        for user, who in (
+            (self.other_adv, "an unrelated Adviser"), (self.itso, "ITSO"),
+            (self.ierc, "IERC"), (self.rdco, "RDCO"), (self.owner, "the owner"),
+        ):
+            with self.subTest(who=who):
+                self.assertIn(
+                    self.post(user, "record-accept-and-route", record, body), (403, 404),
+                    f"{who} has no standing at the Adviser's step",
+                )
+        self.assertEqual(
+            set(RecordAssignment.objects.filter(record=record, state="active")
+                .values_list("party", flat=True)),
+            {"adviser"},
+        )
+        self.assertNotIn(self.post(self.adviser, "record-accept-and-route", record, body), (403, 404))
+
+    def test_rdco_decides_only_where_it_holds_a_seat(self):
+        """RDCO enters only by the hand-back; it cannot decide at the Adviser's step."""
+        record = self.in_review()
+        self.assertEqual(
+            self.post(self.rdco, "record-decide", record,
+                      {"outcome": "publish", "comment": "", "token": "none"}),
+            403,
+        )
+        record.refresh_from_db()
+        self.assertEqual(record.pipeline_status, "in_review")
 
     # --- clearance: one office must not sign for another ------------------
 
     def test_an_office_cannot_record_another_offices_clearance(self):
         """
-        The consequence the ticket did not name. `_can_submit_clearance` let any
-        is_staff account act on *whichever* clearance was pending, so an ITSO
-        officer could sign IERC's ethics clearance -- collapsing the office
-        separation the whole workflow rests on.
+        The consequence IR-165 did not name: an ITSO officer could once sign
+        IERC's ethics clearance, collapsing the office separation the whole
+        workflow rests on. Now each office acts only from a seat on its own
+        assignment.
         """
-        self.record.pipeline_status = "itso_review"
-        can_itso, office = _can_submit_clearance(self.itso, self.record)
-        self.assertEqual(office, "itso", "ITSO's role maps to the itso office")
+        record = self.in_review()
+        adviser_seat = RecordAssignment.objects.get(record=record, party="adviser").seats.get()
+        seats.open_review(adviser_seat, self.adviser)
+        routing.accept_and_route(record, self.adviser, to=[{"party": "itso"}], reason="Possible IP.")
+        itso_seat = seats.claim(RecordAssignment.objects.get(record=record, party="itso"), self.itso)
+        seats.open_review(itso_seat, self.itso)
 
-        can_ierc, _ = _can_submit_clearance(self.ierc, self.record)
-        self.assertFalse(can_ierc,
-                         "IERC must not record a clearance at the ITSO stage")
-
-        can_owner, _ = _can_submit_clearance(self.owner, self.record)
-        self.assertFalse(can_owner, "a Student holds no clearance office at all")
+        body = {"outcome": "cleared", "comment": ""}
+        for user, who in ((self.ierc, "IERC"), (self.owner, "the owner"), (self.rdco, "RDCO")):
+            with self.subTest(who=who):
+                self.assertIn(self.post(user, "record-office-review", record, body), (403, 404))
+        self.assertEqual(
+            RecordAssignment.objects.get(record=record, party="itso").state, "active",
+        )
+        self.assertNotIn(self.post(self.itso, "record-office-review", record, body), (403, 404))

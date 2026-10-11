@@ -1,0 +1,130 @@
+{
+  "concurrency": 2,
+  "corpus": {
+    "short": {
+      "bytes": 248647,
+      "pages": 5,
+      "relative_path": "short.pdf",
+      "sha256": "0ca47397c2b812c0673f3c1a3b7f53e56a31eeca85c358fc5d015b660cd8292d"
+    }
+  },
+  "created_at": "2026-10-10T05:30:10.624590+00:00",
+  "host": {
+    "docker_ram_gib": 15.07,
+    "docker_version": "29.8.1",
+    "gpu": {
+      "free_mib": 13913,
+      "name": "NVIDIA GeForce RTX 5070 Ti",
+      "total_mib": 16303,
+      "used_mib": 2083,
+      "utilization_pct": 1
+    },
+    "logical_cpus": 16,
+    "ram_gib": 30.88
+  },
+  "images": {
+    "cpu": "iris-docling:cpu",
+    "gpu": "iris-docling:gpu"
+  },
+  "profiles": {
+    "baseline-end": {
+      "container": "iris-bench-bd98396c9b0c",
+      "effective_limits": {
+        "device_requests": [
+          {
+            "Capabilities": [
+              [
+                "gpu"
+              ]
+            ],
+            "Count": -1,
+            "DeviceIDs": null,
+            "Driver": "",
+            "Options": {}
+          }
+        ],
+        "memory_bytes": 8589934592,
+        "nano_cpus": 4000000000
+      },
+      "image_id": "sha256:10fa43972c3f9a6c2d36e9d5b9e01b7237e157aff7bcabe2382ef5880c080560",
+      "limits": {
+        "cpus": 4,
+        "name": "baseline-end",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "baseline-start": {
+      "container": "iris-bench-9565f13eefad",
+      "effective_limits": {
+        "device_requests": [
+          {
+            "Capabilities": [
+              [
+                "gpu"
+              ]
+            ],
+            "Count": -1,
+            "DeviceIDs": null,
+            "Driver": "",
+            "Options": {}
+          }
+        ],
+        "memory_bytes": 8589934592,
+        "nano_cpus": 4000000000
+      },
+      "image_id": "sha256:10fa43972c3f9a6c2d36e9d5b9e01b7237e157aff7bcabe2382ef5880c080560",
+      "limits": {
+        "cpus": 4,
+        "name": "baseline-start",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "cpu-only-4": {
+      "container": "iris-bench-50284b8056af",
+      "effective_limits": {
+        "device_requests": null,
+        "memory_bytes": 6442450944,
+        "nano_cpus": 4000000000
+      },
+      "image_id": "sha256:45473a2ae645d0e3e8b3fbc85a9614f1466b05eb8edab833e811952baffa48d5",
+      "limits": {
+        "cpus": 4,
+        "name": "cpu-only-4",
+        "ram_gib": 6,
+        "variant": "cpu",
+        "vram_gib": null
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "cpu-only-8": {
+      "container": "iris-bench-93e4262824ea",
+      "effective_limits": {
+        "device_requests": null,
+        "memory_bytes": 12884901888,
+        "nano_cpus": 8000000000
+      },
+      "image_id": "sha256:45473a2ae645d0e3e8b3fbc85a9614f1466b05eb8edab833e811952baffa48d5",
+      "limits": {
+        "cpus": 8,
+        "name": "cpu-only-8",
+        "ram_gib": 12,
+        "variant": "cpu",
+        "vram_gib": null
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    }
+  },
+  "repeats": 1,
+  "sample_interval_seconds": 1.0,
+  "timeout_seconds": 3600
+}

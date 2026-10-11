@@ -4,7 +4,6 @@ from datetime import timedelta
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
-from apps.ai.extraction.docling_client import TABLE_MODES as _DOCLING_TABLE_MODES
 from .validation import missing_required, non_blank
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -385,6 +384,9 @@ LLM_MODEL     = config("LLM_MODEL", default="openai/gpt-oss-120b")
 # Grounded answering is extraction from supplied sources, not composition. A
 # higher temperature buys variety nobody asked for and invites invention.
 LLM_TEMPERATURE = config("LLM_TEMPERATURE", default=0.1, cast=float)
+# Seconds before one model call is abandoned when no run deadline is shorter
+# (IR-511). A timeout is a transient failure: retry and the breaker apply.
+LLM_TIMEOUT_SECONDS = config("LLM_TIMEOUT_SECONDS", default=120.0, cast=float)
 # Unset by default -- a Groq/openai/gpt-oss-120b extension ("low"/"medium"/
 # "high") the openai SDK does not type, sent only when configured (IR-325).
 # Requesting it also requests include_reasoning, so a reasoning model's
@@ -414,6 +416,13 @@ LLM_REASONING_EFFORT = config("LLM_REASONING_EFFORT", default="")
 #
 # FALLBACK_MODELS is a comma-separated list of models at the SAME vendor
 # account (ADR-008 §Amendment); a second vendor is not a fallback.
+#
+# PROVIDER_ONLY (IR-489) is a comma-separated allow-list of OpenRouter
+# provider slugs, sent as provider.only, so no unvetted (e.g. China-hosted,
+# IR-485 #6) provider serves the task. OpenRouter only; elsewhere it refuses
+# startup. OpenRouter answers require a nonempty pin; other tasks may leave
+# it empty for any provider that passes data_collection: deny. A fallback
+# answer chain uses PROVIDER_PINS instead, one endpoint list per model.
 LLM_ANSWER_VENDOR   = config("LLM_ANSWER_VENDOR", default="")
 LLM_ANSWER_BASE_URL = config("LLM_ANSWER_BASE_URL", default="")
 LLM_ANSWER_API_KEY  = config("LLM_ANSWER_API_KEY", default="")
@@ -422,6 +431,8 @@ LLM_ANSWER_FALLBACK_MODELS = config("LLM_ANSWER_FALLBACK_MODELS", default="")
 # Reasoning is shown for `answer` alone: it is the only task with a reader
 # watching it work. The others cost less without it.
 LLM_ANSWER_REASONING = config("LLM_ANSWER_REASONING", default=True, cast=bool)
+LLM_ANSWER_PROVIDER_ONLY = config("LLM_ANSWER_PROVIDER_ONLY", default="")
+LLM_ANSWER_PROVIDER_PINS = config("LLM_ANSWER_PROVIDER_PINS", default="")
 
 # Question resolution runs here as of IR-383, and the old LLM_RESOLUTION_MODEL
 # namespace is gone -- the contradiction recorded here is resolved, not
@@ -436,6 +447,50 @@ LLM_RESOLVE_API_KEY  = config("LLM_RESOLVE_API_KEY", default="")
 LLM_RESOLVE_MODEL    = config("LLM_RESOLVE_MODEL", default="openai/gpt-oss-20b")
 LLM_RESOLVE_FALLBACK_MODELS = config("LLM_RESOLVE_FALLBACK_MODELS", default="")
 LLM_RESOLVE_REASONING = config("LLM_RESOLVE_REASONING", default=False, cast=bool)
+LLM_RESOLVE_PROVIDER_ONLY = config("LLM_RESOLVE_PROVIDER_ONLY", default="")
+LLM_RESOLVE_PROVIDER_PINS = config("LLM_RESOLVE_PROVIDER_PINS", default="")
+
+# IR-514: route inherits resolve's model/account until explicitly configured.
+LLM_PLAN_VENDOR = config("LLM_PLAN_VENDOR", default="")
+LLM_PLAN_BASE_URL = config("LLM_PLAN_BASE_URL", default="")
+LLM_PLAN_API_KEY = config("LLM_PLAN_API_KEY", default="")
+LLM_PLAN_MODEL = config("LLM_PLAN_MODEL", default="")
+LLM_PLAN_FALLBACK_MODELS = config("LLM_PLAN_FALLBACK_MODELS", default="")
+LLM_PLAN_REASONING = config("LLM_PLAN_REASONING", default=False, cast=bool)
+LLM_PLAN_PROVIDER_ONLY = config("LLM_PLAN_PROVIDER_ONLY", default="")
+LLM_PLAN_PROVIDER_PINS = config("LLM_PLAN_PROVIDER_PINS", default="")
+AI_RESEARCH_PLAN_TIMEOUT_SECONDS = config("AI_RESEARCH_PLAN_TIMEOUT_SECONDS", default=30.0, cast=float)
+
+# IR-501: independent, off until a screening model/account is configured.
+LLM_SCREEN_VENDOR = config("LLM_SCREEN_VENDOR", default="")
+LLM_SCREEN_BASE_URL = config("LLM_SCREEN_BASE_URL", default="")
+LLM_SCREEN_API_KEY = config("LLM_SCREEN_API_KEY", default="")
+LLM_SCREEN_MODEL = config("LLM_SCREEN_MODEL", default="")
+LLM_SCREEN_FALLBACK_MODELS = config("LLM_SCREEN_FALLBACK_MODELS", default="")
+LLM_SCREEN_REASONING = config("LLM_SCREEN_REASONING", default=False, cast=bool)
+LLM_SCREEN_PROVIDER_ONLY = config("LLM_SCREEN_PROVIDER_ONLY", default="")
+LLM_SCREEN_PROVIDER_PINS = config("LLM_SCREEN_PROVIDER_PINS", default="")
+AI_SCREEN_MAX_RECORDS = config("AI_SCREEN_MAX_RECORDS", default=500, cast=int)
+AI_SCREEN_BATCH_SIZE = config("AI_SCREEN_BATCH_SIZE", default=20, cast=int)
+AI_SCREEN_TIMEOUT_SECONDS = config("AI_SCREEN_TIMEOUT_SECONDS", default=20.0, cast=float)
+AI_SCREEN_DUPLICATE_MIN_SIMILARITY = config("AI_SCREEN_DUPLICATE_MIN_SIMILARITY", default=0.98, cast=float)
+
+LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
+LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
+LLM_ROUTE_API_KEY = config("LLM_ROUTE_API_KEY", default="")
+LLM_ROUTE_MODEL = config("LLM_ROUTE_MODEL", default="")
+LLM_ROUTE_FALLBACK_MODELS = config("LLM_ROUTE_FALLBACK_MODELS", default="")
+LLM_ROUTE_REASONING = config("LLM_ROUTE_REASONING", default=False, cast=bool)
+LLM_ROUTE_PROVIDER_ONLY = config("LLM_ROUTE_PROVIDER_ONLY", default="")
+LLM_ROUTE_PROVIDER_PINS = config("LLM_ROUTE_PROVIDER_PINS", default="")
+AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
+AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
+AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)
+AI_ROUTE_UNCERTAIN_MIN = config("AI_ROUTE_UNCERTAIN_MIN", default=0.4, cast=float)
+AI_ROUTE_UNCERTAIN_MAX = config("AI_ROUTE_UNCERTAIN_MAX", default=0.6, cast=float)
+AI_ROUTE_INJECTION_THRESHOLD = config(
+    "AI_ROUTE_INJECTION_THRESHOLD", default=0.5, cast=float
+)
 
 LLM_SUMMARY_VENDOR   = config("LLM_SUMMARY_VENDOR", default="")
 LLM_SUMMARY_BASE_URL = config("LLM_SUMMARY_BASE_URL", default="")
@@ -443,6 +498,8 @@ LLM_SUMMARY_API_KEY  = config("LLM_SUMMARY_API_KEY", default="")
 LLM_SUMMARY_MODEL    = config("LLM_SUMMARY_MODEL", default="")
 LLM_SUMMARY_FALLBACK_MODELS = config("LLM_SUMMARY_FALLBACK_MODELS", default="")
 LLM_SUMMARY_REASONING = config("LLM_SUMMARY_REASONING", default=False, cast=bool)
+LLM_SUMMARY_PROVIDER_ONLY = config("LLM_SUMMARY_PROVIDER_ONLY", default="")
+LLM_SUMMARY_PROVIDER_PINS = config("LLM_SUMMARY_PROVIDER_PINS", default="")
 
 # Declared but unused: describe_figure's implementation is its own spec, and
 # reserving the keys here keeps the task set closed rather than growing later.
@@ -456,6 +513,8 @@ LLM_DESCRIBE_FIGURE_FALLBACK_MODELS = config(
 LLM_DESCRIBE_FIGURE_REASONING = config(
     "LLM_DESCRIBE_FIGURE_REASONING", default=False, cast=bool
 )
+LLM_DESCRIBE_FIGURE_PROVIDER_ONLY = config("LLM_DESCRIBE_FIGURE_PROVIDER_ONLY", default="")
+LLM_DESCRIBE_FIGURE_PROVIDER_PINS = config("LLM_DESCRIBE_FIGURE_PROVIDER_PINS", default="")
 
 # ---- Question resolution (IR-296, ADR-026 Decisions 1 and 8) -------------
 #
@@ -640,6 +699,38 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
 AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
 
+# ---- Research lane limits (ADR-038 §5, IR-500) ---------------------------
+# Carried on every run's Budget and enforced by its Spend.
+AI_RESEARCH_MAX_OUTER_ROUNDS = config("AI_RESEARCH_MAX_OUTER_ROUNDS", default=3, cast=int)
+AI_RESEARCH_MAX_CALLS_PER_SUBTASK = config(
+    "AI_RESEARCH_MAX_CALLS_PER_SUBTASK", default=4, cast=int
+)
+AI_RESEARCH_MAX_TOOL_CALLS = config("AI_RESEARCH_MAX_TOOL_CALLS", default=10, cast=int)
+AI_RESEARCH_WALL_CLOCK_SECONDS = config(
+    "AI_RESEARCH_WALL_CLOCK_SECONDS", default=90.0, cast=float
+)
+AI_RESEARCH_MAX_PROMPT_TOKENS = config(
+    "AI_RESEARCH_MAX_PROMPT_TOKENS", default=120_000, cast=int
+)
+# A single planner/synthesis request, including schemas. The run-wide
+# cumulative ceiling above still applies to all calls (IR-513).
+AI_RESEARCH_CONTEXT_TOKEN_BUDGET = config(
+    "AI_RESEARCH_CONTEXT_TOKEN_BUDGET", default=16_000, cast=int
+)
+AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
+    "AI_RESEARCH_MAX_LEDGER_PASSAGES", default=30, cast=int
+)
+# Tokens one read_record_sections call may return (ADR-038 §2).
+AI_RESEARCH_READ_TOKEN_CAP = config("AI_RESEARCH_READ_TOKEN_CAP", default=3000, cast=int)
+# ADR-027 §1d: corpus_facets refuses below this many visible records. The
+# ADR sets no value; this default is a placeholder until a corpus exists.
+AI_LANDSCAPE_MIN_RECORDS = config("AI_LANDSCAPE_MIN_RECORDS", default=20, cast=int)
+# ADR-027 §1b: corpus_facets refuses above this unclassified share. Also a
+# placeholder; the ADR sets no value.
+AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE = config(
+    "AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE", default=0.5, cast=float
+)
+
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
 # One vendor for both stages, embedding and reranking, with no alternative in
@@ -798,15 +889,16 @@ DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int
 # DOCLING_SERVE_CONCURRENCY, not to these flags). OCR stays on because a
 # meaningful share of the corpus is scanned submissions with no text layer at
 # all, and ADR-016 dropped the fallback extractor that used to cover that case.
-DOCLING_DO_OCR = config("DOCLING_DO_OCR", default=True, cast=bool)
-# TABLE_MODES lives on the extractor, not here, so there is one definition of
-# what docling-serve accepts rather than two that can silently disagree.
-DOCLING_TABLE_MODE = config("DOCLING_TABLE_MODE", default="accurate")
-if DOCLING_TABLE_MODE not in _DOCLING_TABLE_MODES:
-    raise ImproperlyConfigured(
-        f"DOCLING_TABLE_MODE must be one of {_DOCLING_TABLE_MODES!r}, got {DOCLING_TABLE_MODE!r}."
-    )
+# **Superseded:** OCR now defaults off. The corpus is born-digital (an exact
+# text layer), and OCR costs time and memory for nothing there. Turn it on for a
+# deployment that accepts scanned submissions -- nothing else extracts them.
+DOCLING_DO_OCR = config("DOCLING_DO_OCR", default=False, cast=bool)
+# Table mode is not a setting: the extractor always asks for "accurate".
 DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=True, cast=bool)
+# Code blocks use the same CodeFormula model as formulas, so this adds little.
+DOCLING_DO_CODE_ENRICHMENT = config("DOCLING_DO_CODE_ENRICHMENT", default=True, cast=bool)
+# A 4M-parameter classifier; the mapper does not store its output yet.
+DOCLING_DO_PICTURE_CLASSIFICATION = config("DOCLING_DO_PICTURE_CLASSIFICATION", default=True, cast=bool)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process

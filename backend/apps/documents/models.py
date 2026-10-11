@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
-from core.enums import ASSIGNABLE_PARTIES, DocumentRequestItemState, DocumentRequestState
+from core.enums import DocumentRequestItemState, DocumentRequestState, Party
 
 
 class UploadSlot(models.Model):
@@ -218,11 +218,11 @@ class RecordFile(models.Model):
     uploaded_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="record_files"
     )
-    #: The office that filed it. RDCO is always `rdco`, never `intake`. Null
+    #: The office that filed it. RDCO files as `rdco`. Null
     #: only on a row backfilled from an uploader who was gone or not an office;
     #: no office may remove such a row, only the superuser in Django admin.
     party       = models.CharField(
-        max_length=20, choices=[(p.value, p.label) for p in ASSIGNABLE_PARTIES],
+        max_length=20, choices=Party.choices,
         null=True, blank=True,
     )
     created_at  = models.DateTimeField(auto_now_add=True)
@@ -253,7 +253,7 @@ class DocumentRequest(models.Model):
         null=True, blank=True, related_name="document_requests",
     )
     party        = models.CharField(
-        max_length=20, choices=[(p.value, p.label) for p in ASSIGNABLE_PARTIES]
+        max_length=20, choices=Party.choices
     )
     requested_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL,
@@ -267,6 +267,13 @@ class DocumentRequest(models.Model):
     )
     created_at   = models.DateTimeField(default=timezone.now)
     closed_at    = models.DateTimeField(null=True, blank=True)
+    #: The Decision that withdrew this request, which is its reason (ADR-021
+    #: §12, ADR-022 §3; IR-270). Null for a request its party withdrew, which
+    #: records no reason (ADR-022 §4), or one that was fulfilled.
+    closed_by_decision = models.ForeignKey(
+        "reviews.Review", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="closed_document_requests",
+    )
 
     class Meta:
         ordering = ["record", "created_at", "pk"]

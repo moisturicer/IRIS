@@ -9,7 +9,6 @@
  * tests show by handing it actions it has never seen, and by the real
  * *Request documents* entry. Every query goes through the accessible tree.
  */
-import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -29,6 +28,8 @@ vi.mock("@/api/records", () => ({
     routeOptions: vi.fn(() => new Promise(() => {})),
     acceptAndRoute: vi.fn(),
     route: vi.fn(),
+    requestRevision: vi.fn(() => Promise.resolve({ data: {} })),
+    withdrawRevisionRequest: vi.fn(() => Promise.resolve({ data: {} })),
   },
 }));
 
@@ -37,6 +38,12 @@ const record = {
   title: "Groundwater Recharge Mapping in Metro Cebu",
   can_request_document: ["ierc"],
   current_holders: [{ party: "ierc", label: "IERC", opened_at: null, opened_by: null }],
+  revision: { party: "ierc", label: "IERC", blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: {
+    party: "rdco", outcomes: ["publish", "keep_unlisted", "reject"], blocked: null,
+    closes: { assignments: [], document_requests: 0 }, token: "t", author_hints: [],
+  },
+  versions: [],
 } as unknown as RecordDetail;
 
 function RouteDialog({ onClose, onDone }: ReviewActionDialogProps) {
@@ -64,7 +71,7 @@ const publish = vi.fn(() => Promise.resolve("Published."));
 
 const acceptAndPublish: ReviewAction = {
   kind: "terminal",
-  capability: "decide",
+  capability: "accept_publish",
   label: "Accept & publish",
   icon: "fa-check",
   confirm: {
@@ -87,14 +94,13 @@ const reviseBlocked: ReviewAction = {
 function renderBar(
   granted: Capability[],
   actions?: ReviewAction[],
-  extra: { secondary?: ReactNode; onChanged?: () => void } = {},
+  extra: { onChanged?: () => void } = {},
 ) {
   return renderScreen(
     <ReviewActionBar
       record={record}
       can={new Set(granted)}
       actions={actions}
-      secondary={extra.secondary}
       onChanged={extra.onChanged ?? (() => {})}
     />,
   );
@@ -118,7 +124,7 @@ describe("ReviewActionBar", () => {
   });
 
   it("puts an action that ends the review last, whatever order it was given in", () => {
-    renderBar(["route", "decide"], [acceptAndPublish, route]);
+    renderBar(["route", "accept_publish"], [acceptAndPublish, route]);
 
     expect(buttonNames()).toEqual(["Route", "Accept & publish"]);
   });
@@ -181,7 +187,7 @@ describe("ReviewActionBar", () => {
 
   it("asks before an action that ends the review, stating the consequence", async () => {
     const onChanged = vi.fn();
-    renderBar(["decide"], [acceptAndPublish], { onChanged });
+    renderBar(["accept_publish"], [acceptAndPublish], { onChanged });
 
     await userEvent.click(screen.getByRole("button", { name: "Accept & publish" }));
     const confirm = screen.getByRole("dialog", { name: "Accept and publish this record?" });
@@ -205,7 +211,7 @@ describe("ReviewActionBar", () => {
 
   it("keeps the confirmation open and says what went wrong when the action fails", async () => {
     publish.mockRejectedValueOnce({ response: { data: { detail: "This record is no longer yours to decide." } } });
-    renderBar(["decide"], [acceptAndPublish]);
+    renderBar(["accept_publish"], [acceptAndPublish]);
 
     await userEvent.click(screen.getByRole("button", { name: "Accept & publish" }));
     const confirm = screen.getByRole("dialog", { name: "Accept and publish this record?" });
@@ -216,15 +222,8 @@ describe("ReviewActionBar", () => {
     );
   });
 
-  it("carries a secondary link in the same toolbar", () => {
-    renderBar(["route"], [route], { secondary: <a href="/review/7/evaluate">Record a decision (current form)</a> });
-
-    const bar = screen.getByRole("toolbar", { name: "Review actions" });
-    expect(within(bar).getByRole("link", { name: "Record a decision (current form)" })).toBeInTheDocument();
-  });
-
   it("moves between its controls with the arrow keys", async () => {
-    renderBar(["route", "decide"], [route, acceptAndPublish]);
+    renderBar(["route", "accept_publish"], [route, acceptAndPublish]);
 
     screen.getByRole("button", { name: "Route" }).focus();
     await userEvent.keyboard("{ArrowRight}");
@@ -277,6 +276,100 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
 
     await userEvent.click(within(bar).getByRole("button", { name: "Route to office…" }));
     expect(screen.getByRole("dialog", { name: "Route to office" })).toBeInTheDocument();
+  });
+
+  // IR-272: accepting is a decision, so an open revision request disables it
+  // and says why; the party that asked is offered the withdrawal, last.
+  it("holds Accept & route while a revision is requested, and lets the asking party withdraw", async () => {
+    const onChanged = vi.fn();
+    const asked = {
+      ...record,
+      revision: {
+        party: "ierc", label: "IERC", blocked: null, withdrawable: 5,
+        decision_blocked: "Waiting on the author: IERC asked for a revision.",
+        open: [],
+      },
+    } as unknown as RecordDetail;
+    renderScreen(
+      <ReviewActionBar
+        record={asked}
+        can={new Set<Capability>(["accept_route", "withdraw_revision"])}
+        onChanged={onChanged}
+      />,
+    );
+
+    const accept = screen.getByRole("button", { name: "Accept & route…" });
+    expect(accept).toBeDisabled();
+    expect(accept).toHaveAccessibleDescription("Waiting on the author: IERC asked for a revision.");
+    expect(buttonNames()).toEqual(["Accept & route…", "Withdraw revision request"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Withdraw revision request" }));
+    const confirm = screen.getByRole("dialog", { name: "Withdraw the revision request?" });
+    await userEvent.click(within(confirm).getByRole("button", { name: "Withdraw request" }));
+
+    expect(recordsApi.withdrawRevisionRequest).toHaveBeenCalledWith(7, 5);
+    expect(await screen.findByRole("status")).toHaveTextContent("Revision request withdrawn.");
+    expect(onChanged).toHaveBeenCalledOnce();
+  });
+
+  // IR-270: a decider's primary is Accept & publish, and Reject is the last
+  // of the dialogs; an open revision request holds all three Decisions.
+  it("orders the Decisions so publishing is primary and rejecting comes last", async () => {
+    const { unmount } = renderBar(["reject", "request_document", "accept_route", "request_revision", "accept_publish"]);
+    expect(buttonNames()).toEqual([
+      "Accept & publish…", "Accept & route…", "Request Revision…", "Request documents", "Reject…",
+    ]);
+    unmount();
+
+    renderBar(["reject", "route", "keep_unlisted", "request_document", "accept_publish"]);
+    expect(buttonNames()).toEqual([
+      "Accept & publish…", "Keep unlisted…", "Request documents", "Route to office…", "Reject…",
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "Keep unlisted…" }));
+    expect(screen.getByRole("dialog", { name: "Accept and keep unlisted?" })).toBeInTheDocument();
+  });
+
+  // IR-271: a Proposal's Adviser has Accept as primary, Reject last.
+  it("orders a Proposal's Decisions so accepting is primary and rejecting comes last", () => {
+    renderBar(["reject", "request_document", "request_revision", "accept_proposal"]);
+    expect(buttonNames()).toEqual([
+      "Accept…", "Request Revision…", "Request documents", "Reject…",
+    ]);
+  });
+
+  it("holds every Decision while the server says it is blocked", () => {
+    const blocked = {
+      ...record,
+      decision: {
+        party: "adviser", outcomes: ["publish", "reject"], token: "t", closes: null, author_hints: [],
+        blocked: "Waiting on the author: IERC asked for a revision.",
+      },
+    } as unknown as RecordDetail;
+    renderScreen(
+      <ReviewActionBar
+        record={blocked}
+        can={new Set<Capability>(["accept_publish", "reject"])}
+        onChanged={() => {}}
+      />,
+    );
+
+    for (const name of ["Accept & publish…", "Reject…"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription("Waiting on the author: IERC asked for a revision.");
+    }
+  });
+
+  it("offers Request Revision under `request_revision`, through its own dialog", async () => {
+    renderBar(["request_revision"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Request Revision…" }));
+    const dialog = screen.getByRole("dialog", { name: "Request Revision" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "What needs revising?" }), "Cite the 2019 survey.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Request Revision" }));
+
+    expect(recordsApi.requestRevision).toHaveBeenCalledWith(7, { reason: "Cite the 2019 survey." });
+    expect(await screen.findByRole("status")).toHaveTextContent("Revision requested. The owner has been notified.");
   });
 
   it("offers nothing a viewer with no review capability was not granted", () => {

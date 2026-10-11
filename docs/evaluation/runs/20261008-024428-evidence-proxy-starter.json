@@ -1,0 +1,771 @@
+{
+  "instrument": "curated",
+  "question_set": {
+    "name": "proxy-starter",
+    "source": "..\\docs\\evaluation\\proxy_starter.json",
+    "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+    "tier": "proxy",
+    "questions": 62,
+    "without_passages": 8,
+    "with_resolved_question": 4,
+    "labels": 59,
+    "skipped_questions": []
+  },
+  "coverage": {
+    "questions_in_set": 62,
+    "annotated": 10,
+    "annotated_fraction": 0.1613,
+    "with_resolved_question": 4,
+    "unannotated": 52
+  },
+  "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+  "rule_set": {
+    "digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+    "summary": "5 rules (aggregate_shape=33, document_reference=39, institution_term=6, sourcing_demand=24) digest=cdbeb62020fd",
+    "term_counts": {
+      "institution_term": 6,
+      "document_reference": 39,
+      "sourcing_demand": 24,
+      "aggregate_shape": 33
+    },
+    "definition": {
+      "version": 1,
+      "codes": [
+        "scope_record",
+        "institution_term",
+        "document_reference",
+        "sourcing_demand",
+        "aggregate_shape"
+      ],
+      "rules": [
+        {
+          "code": "scope_record",
+          "kind": "structural",
+          "terms": []
+        },
+        {
+          "code": "institution_term",
+          "kind": "lexical",
+          "terms": [
+            "cebu institute of technology",
+            "cit u",
+            "cit university",
+            "iris",
+            "the repository",
+            "this repository"
+          ]
+        },
+        {
+          "code": "document_reference",
+          "kind": "lexical",
+          "terms": [
+            "abstract",
+            "article",
+            "articles",
+            "author",
+            "authors",
+            "bibliography",
+            "chapter",
+            "citation",
+            "citations",
+            "cite",
+            "cited",
+            "conference",
+            "dissertation",
+            "dissertations",
+            "doi",
+            "et al",
+            "figure",
+            "findings",
+            "journal",
+            "manuscript",
+            "manuscripts",
+            "paper",
+            "papers",
+            "preprint",
+            "preprints",
+            "proceedings",
+            "publication",
+            "publications",
+            "published",
+            "section",
+            "studies",
+            "study",
+            "table",
+            "theses",
+            "thesis",
+            "this document",
+            "this paper",
+            "this record",
+            "this study"
+          ]
+        },
+        {
+          "code": "sourcing_demand",
+          "kind": "lexical",
+          "terms": [
+            "according to",
+            "back that up",
+            "citation",
+            "citations",
+            "cite your",
+            "evidence for",
+            "evidence that",
+            "give me the source",
+            "on what basis",
+            "page number",
+            "quote",
+            "quoted",
+            "reference",
+            "references",
+            "show me where",
+            "source",
+            "sources",
+            "verbatim",
+            "what does it say",
+            "where does it say",
+            "which page",
+            "who said",
+            "with citations",
+            "with sources"
+          ]
+        },
+        {
+          "code": "aggregate_shape",
+          "kind": "lexical",
+          "terms": [
+            "across the",
+            "all of the papers",
+            "all the papers",
+            "any papers",
+            "body of work",
+            "common themes",
+            "corpus",
+            "gap",
+            "gaps",
+            "how many",
+            "landscape",
+            "list every",
+            "list of",
+            "list the",
+            "literature",
+            "most cited",
+            "most common",
+            "most studied",
+            "number of",
+            "overall trend",
+            "overview of the",
+            "research gap",
+            "research gaps",
+            "state of the art",
+            "survey of",
+            "trend",
+            "trends",
+            "under researched",
+            "what papers",
+            "which papers",
+            "which theses",
+            "who has written",
+            "whole collection"
+          ]
+        }
+      ]
+    }
+  },
+  "detector": {
+    "lanes": [
+      {
+        "lane": "raw",
+        "judged": 10,
+        "correct": 9,
+        "accuracy": 0.9,
+        "over_fires": [],
+        "misses": [
+          "q61"
+        ],
+        "undetermined": [],
+        "rules": [
+          {
+            "code": "scope_record",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55",
+              "q56",
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "institution_term",
+            "fired": 1,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55",
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "fired": 2,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55",
+              "q61"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55",
+              "q56",
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "fired": 1,
+            "over_fires": [],
+            "silent_on_required": [
+              "q56",
+              "q61",
+              "q62"
+            ]
+          }
+        ]
+      },
+      {
+        "lane": "resolved",
+        "judged": 4,
+        "correct": 3,
+        "accuracy": 0.75,
+        "over_fires": [],
+        "misses": [
+          "q62"
+        ],
+        "undetermined": [],
+        "rules": [
+          {
+            "code": "scope_record",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "institution_term",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "fired": 1,
+            "over_fires": [],
+            "silent_on_required": [
+              "q62"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q61",
+              "q62"
+            ]
+          }
+        ]
+      },
+      {
+        "lane": "combined",
+        "judged": 10,
+        "correct": 10,
+        "accuracy": 1.0,
+        "over_fires": [],
+        "misses": [],
+        "undetermined": [],
+        "rules": [
+          {
+            "code": "scope_record",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55",
+              "q56",
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "institution_term",
+            "fired": 1,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55",
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "fired": 3,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55"
+            ]
+          },
+          {
+            "code": "sourcing_demand",
+            "fired": 0,
+            "over_fires": [],
+            "silent_on_required": [
+              "q55",
+              "q56",
+              "q61",
+              "q62"
+            ]
+          },
+          {
+            "code": "aggregate_shape",
+            "fired": 1,
+            "over_fires": [],
+            "silent_on_required": [
+              "q56",
+              "q61",
+              "q62"
+            ]
+          }
+        ]
+      }
+    ],
+    "categories": [
+      {
+        "kind": "ambiguous",
+        "judged": 2,
+        "correct": 2,
+        "accuracy": 1.0,
+        "inconclusive": true,
+        "min_examples": 5
+      },
+      {
+        "kind": "follow-up-after-direct",
+        "judged": 2,
+        "correct": 2,
+        "accuracy": 1.0,
+        "inconclusive": true,
+        "min_examples": 5
+      },
+      {
+        "kind": "follow-up-after-grounded",
+        "judged": 2,
+        "correct": 2,
+        "accuracy": 1.0,
+        "inconclusive": true,
+        "min_examples": 5
+      },
+      {
+        "kind": "general-knowledge",
+        "judged": 2,
+        "correct": 2,
+        "accuracy": 1.0,
+        "inconclusive": true,
+        "min_examples": 5
+      },
+      {
+        "kind": "off-corpus-research",
+        "judged": 2,
+        "correct": 2,
+        "accuracy": 1.0,
+        "inconclusive": true,
+        "min_examples": 5
+      }
+    ],
+    "institutional": {
+      "judged": 1,
+      "incorrect": []
+    }
+  },
+  "model": null,
+  "provenance": {
+    "git_commit": "v0.1.0-619-gafe6976-dirty",
+    "question_set_path": "..\\docs\\evaluation\\proxy_starter.json",
+    "question_set_sha256": "553696988bac8487d447985d30a8df55ef5144bd0981611637f9b586d902ca1b",
+    "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+    "AI_EVIDENCE_DECISION": "off",
+    "institution_terms": 6,
+    "model_decision": false,
+    "model": null
+  },
+  "min_examples": 5,
+  "questions": [
+    {
+      "id": "q53",
+      "question": "what is the difference between a mean and a median?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q54",
+      "question": "what does it mean for an optimization problem to be convex?",
+      "kind": "general-knowledge",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q55",
+      "question": "what did the 2019 survey of reinforcement learning for protein folding conclude?",
+      "kind": "off-corpus-research",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "survey of"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "aggregate_shape"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "aggregate_shape",
+            "source": "raw",
+            "matched": [
+              "survey of"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q56",
+      "question": "which paper in the repository introduced a diffusion model for weather forecasting?",
+      "kind": "off-corpus-research",
+      "institutional": true,
+      "expects_evidence": true,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "institution_term",
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "institution_term",
+            "source": "raw",
+            "matched": [
+              "the repository"
+            ]
+          },
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q57",
+      "question": "how does it compare?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q58",
+      "question": "is the second approach better?",
+      "kind": "ambiguous",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": null,
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": null,
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q59",
+      "question": "can you give a simpler example of that?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "can you give a simpler example of a convex optimization problem?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q60",
+      "question": "and why does that matter in practice?",
+      "kind": "follow-up-after-direct",
+      "institutional": false,
+      "expects_evidence": false,
+      "resolved_question": "and why does convexity matter in practice?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      }
+    },
+    {
+      "id": "q61",
+      "question": "what exactly did they say about that?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "what exactly did the authors say about quantifying uncertainties around Pareto fronts?",
+      "raw": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "resolved": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "resolved",
+            "matched": [
+              "authors"
+            ]
+          }
+        ]
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "resolved",
+            "matched": [
+              "authors"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q62",
+      "question": "and how does that paper define it?",
+      "kind": "follow-up-after-grounded",
+      "institutional": false,
+      "expects_evidence": true,
+      "resolved_question": "and how does Learning to Solve Hard Problems in RL for LLMs by Never Giving Up define continuing to sample a prompt?",
+      "raw": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      },
+      "resolved": {
+        "evidence_required": false,
+        "codes": [],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": []
+      },
+      "combined": {
+        "evidence_required": true,
+        "codes": [
+          "document_reference"
+        ],
+        "undetermined": false,
+        "rule_set_digest": "cdbeb62020fd328f473aad61760fc415f96daa55c35a7d0ac86aef82bdf62c33",
+        "hits": [
+          {
+            "code": "document_reference",
+            "source": "raw",
+            "matched": [
+              "paper"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

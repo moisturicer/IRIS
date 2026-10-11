@@ -2,10 +2,11 @@ from django.db import models
 from django.utils import timezone
 
 from core.enums import (
-    ASSIGNABLE_PARTIES,
+    RETIRED_PARTIES,
     AssignmentState,
     ClearanceStatus,
     Office,
+    Party,
     ResubmissionRequestState,
     ReviewDecision,
     ReviewStage,
@@ -13,15 +14,17 @@ from core.enums import (
     SeatState,
 )
 
-PARTY_CHOICES = [(p.value, p.label) for p in ASSIGNABLE_PARTIES]
+#: Every party, the retired Intake included: these columns hold history, and
+#: an old row must stay readable. What may be newly assigned is
+#: `core.enums.ASSIGNABLE_PARTIES`, enforced for assignments below.
+PARTY_CHOICES = Party.choices
 
 
 class Review(models.Model):
     """
-    One row per review action on a record at a specific pipeline stage.
-    Used for both sequential stages (adviser, rdco_intake, rdco) and
-    parallel clearance stages (itso, ierc, ktto). The comment is embedded
-    directly so you never need a second JOIN.
+    One reviewer's verdict on a record, as the party they reviewed for
+    (`stage`: adviser, itso, ierc, ktto, rdco, or the retired intake on old
+    rows). The comment is embedded directly so you never need a second JOIN.
     """
     #: Values live in core.enums (IR-135). `declined` requests a revision and
     #: the owner may resubmit; `rejected` is terminal.
@@ -45,6 +48,13 @@ class Review(models.Model):
         "reviews.RecordAssignment", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="reviews",
     )
+    #: The record's Version this review was made against (ADR-032 §5, IR-416):
+    #: its latest when the review was written. Null on every review written
+    #: before IR-416, and the backfill does not date one against a version.
+    version     = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="reviews",
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -55,17 +65,18 @@ class Review(models.Model):
 
 class RecordClearance(models.Model):
     """
-    Tracks each reviewing office's individual clearance status for a record.
-    Used during clearance stages (itso_review, parallel_review).
+    One specialist office's clearance of a record (ITSO, IERC, KTTO).
 
-    Lifecycle:
-      - Created by approve_record at rdco_intake, one row per office the record
-        requested (ADR-018; ITSO for either type since IR-266).
-      - When ITSO was requested, the record waits at itso_review and IERC only
-        joins once ITSO clears (pipeline → parallel_review).
-      - On resubmit after a clearance-office decline: only that office's row is reset to
-        "pending"; other offices' clearance progress is preserved.
-      - On resubmit after a sequential-stage decline: all rows are deleted for a clean restart.
+    Lifecycle (ADR-032 §4):
+      - Created when the record is first routed to the office.
+      - Settled when the office's review round completes: `cleared` or
+        `not_cleared`. A withdrawn round leaves it as it was.
+      - On a new version under the clearance-aware policy, only the requesting
+        office's row resets to `pending`; every other office's completed
+        clearance is preserved (ADR-003). `RESTART_ALL` resets every row
+        (ADR-004). Nothing is deleted.
+      - Older rows may hold `declined` or `rejected`, written by the retired
+        fixed pipeline.
     """
     #: Values live in core.enums (IR-135).
     OFFICE_CHOICES = Office.choices
@@ -141,6 +152,13 @@ class RecordAssignment(models.Model):
     )
     closed_at = models.DateTimeField(null=True, blank=True)
     reason    = models.TextField(blank=True)
+    #: The Decision that closed this assignment: the decider's own, which
+    #: completed, or another party's, which it withdrew (ADR-021 §12, IR-270).
+    #: Null for anything closed another way.
+    closed_by_decision = models.ForeignKey(
+        "reviews.Review", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="closed_assignments",
+    )
 
     class Meta:
         ordering = ["record", "opened_at"]
@@ -151,6 +169,15 @@ class RecordAssignment(models.Model):
                 fields=["record", "party"],
                 condition=models.Q(state=AssignmentState.ACTIVE),
                 name="one_active_assignment_per_record_party",
+            ),
+            # ADR-032 §13: a retired party is history only. Its closed rows
+            # stay; an active one can never be written again (IR-274).
+            models.CheckConstraint(
+                condition=~models.Q(
+                    state=AssignmentState.ACTIVE,
+                    party__in=[p.value for p in RETIRED_PARTIES],
+                ),
+                name="no_active_assignment_for_a_retired_party",
             ),
         ]
 
@@ -196,6 +223,12 @@ class ReviewerSeat(models.Model):
     #: Stamped by *Open review* (§4): the time-on-task start IR-144 measures from.
     opened_at   = models.DateTimeField(null=True, blank=True)
     done_at     = models.DateTimeField(null=True, blank=True)
+    #: The Decision that withdrew this seat while it was still open (IR-270),
+    #: which is how the tracker tells it from a seat a coordinator withdrew.
+    closed_by_decision = models.ForeignKey(
+        "reviews.Review", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="closed_seats",
+    )
 
     class Meta:
         ordering = ["assignment", "assigned_at", "pk"]
@@ -221,9 +254,9 @@ class RoutingEvent(models.Model):
     One party sending a record to another. ADR-021 §6.
 
     A `route()` call to several parties writes one event per target, and every
-    event from that call shares a `group_id`, so "Intake -> ITSO + IERC" reads
-    as one decision. The first events whose `from_party` is `intake` are the
-    record's initial routing.
+    event from that call shares a `group_id`, so "Adviser -> ITSO + IERC" reads
+    as one decision. An event with no `from_party` is the submitter sending the
+    record in.
     """
 
     record     = models.ForeignKey(

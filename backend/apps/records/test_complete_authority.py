@@ -1,33 +1,21 @@
 """
-IR-267: the assigned Adviser can complete an approved Proposal.
+The Proposal *complete* act is gone (IR-271 retired it, IR-274 removed it).
 
-ADR-021 §3 gives a Proposal's decision to "the assigned Adviser OR RDCO", and
-the same two parties complete it (`approved` -> `completed`). Until this change
-only RDCO could.
+**History.** IR-267 let the assigned Adviser, as well as RDCO, mark an approved
+Proposal completed (`approved` -> `completed`, ADR-021 §3). ADR-032 §2 retired
+the act: "research finished" now lives in the Thesis or Project the Proposal
+continues as (§6), so `approved` -- shown as *Accepted* -- is a Proposal's
+resting state. IR-271 made `/records/<id>/complete/` refuse every record;
+IR-274 deleted the route and both of IR-267's authority checks with it. RDCO
+keeps a Thesis or Project unlisted through the decide action (IR-270).
 
-**Two layers refuse, and the expected code says which.** A role that can never
-complete -- a student, ITSO, IERC, KTTO -- is refused by the permission class
-with **403** before the record is looked up, so the answer says nothing about
-the record. An Adviser passes that gate, but their queryset for this action is
-narrowed to the records they advise, so an Adviser who is *not* assigned gets
-**404** -- identical to a record that does not exist. (Written when an approved
-Proposal was publicly readable; since IR-264 it is not, so `visible_to()` now
-refuses the unassigned Adviser too. The narrowing still decides the case of an
-Adviser who can read the Proposal on other grounds, such as owning it.)
-
-**Intake is not a separate case yet.** Intake is staffed by the RDCO role, and
-until the party model lands (IR-256 onward) nothing on a request distinguishes
-"RDCO at intake" from "RDCO deciding". The RDCO cases below therefore cover
-both; a separate Intake refusal has nothing to key on in the current pipeline.
-
-**Seam: the records API.** A refusal is asserted in three halves -- the request
-fails, the Record did not move, and nobody was notified. Email is patched at
-`send_email_async`, the boundary the notification service sends through.
+**An existing `completed` Proposal keeps its value** and still reads as
+*Completed*.
 """
 
 from unittest import mock
 
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -48,32 +36,19 @@ def _user(email, role_name):
     )
 
 
-class CompleteAuthorityTests(APITestCase):
+class CompleteRemovedTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
         cls.owner = _user("complete-owner@cit.edu", RoleName.STUDENT)
-        cls.other_student = _user("complete-student@cit.edu", RoleName.STUDENT)
         cls.adviser = _user("complete-adviser@cit.edu", RoleName.ADVISER)
-        cls.other_adviser = _user("complete-other-adviser@cit.edu", RoleName.ADVISER)
         cls.rdco = _user("complete-rdco@cit.edu", RoleName.RDCO)
-        cls.offices = {
-            "itso": _user("complete-itso@cit.edu", RoleName.ITSO),
-            "ierc": _user("complete-ierc@cit.edu", RoleName.IERC),
-            "ktto": _user("complete-ktto@cit.edu", RoleName.KTTO),
-        }
 
-    # --- setup ---------------------------------------------------------------
-
-    def make_record(
-        self,
-        type_name=RecordTypeName.PROPOSAL,
-        pipeline_status=PipelineStatus.APPROVED,
-    ):
+    def make_record(self, pipeline_status=PipelineStatus.APPROVED):
         record = Record.objects.create(
-            title=f"Complete authority {type_name}",
+            title="Complete removed",
             abstract="A" * 40,
-            record_type=RecordType.objects.get(name=type_name),
+            record_type=RecordType.objects.get(name=RecordTypeName.PROPOSAL),
             added_by=self.owner,
             adviser=self.adviser,
             pipeline_status=pipeline_status,
@@ -81,122 +56,34 @@ class CompleteAuthorityTests(APITestCase):
         RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
         return record
 
-    # --- drivers and observations --------------------------------------------
+    def test_the_route_no_longer_exists(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("record-complete", args=[1])
 
-    def complete(self, record_pk, actor):
-        self.client.force_authenticate(actor)
-        with mock.patch(SEND_EMAIL) as send_email:
-            response = self.client.post(reverse("record-complete", args=[record_pk]))
-        return response, send_email
-
-    def status_of(self, record):
-        record.refresh_from_db()
-        return record.pipeline_status
-
-    def owner_notifications(self, record):
-        return Notification.objects.filter(record=record, recipient=self.owner)
-
-    def assert_completed_and_owner_told(self, record, actor):
-        response, send_email = self.complete(record.pk, actor)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(self.status_of(record), PipelineStatus.COMPLETED)
-        self.assertEqual(self.owner_notifications(record).count(), 1)
-        send_email.assert_called_once()
-        self.assertEqual(send_email.call_args.kwargs["recipient_list"], [self.owner.email])
-        return self.owner_notifications(record).get()
-
-    def assert_refused_without_effect(self, record, actor, expected_code):
-        response, send_email = self.complete(record.pk, actor)
-
-        self.assertEqual(response.status_code, expected_code, response.data)
-        self.assertEqual(self.status_of(record), PipelineStatus.APPROVED)
-        self.assertFalse(self.owner_notifications(record).exists())
-        send_email.assert_not_called()
-
-    # --- the two parties who may complete ------------------------------------
-
-    def test_the_assigned_adviser_completes_an_approved_proposal(self):
+    def test_posting_to_the_old_url_finds_nothing_and_changes_nothing(self):
         record = self.make_record()
-        notification = self.assert_completed_and_owner_told(record, self.adviser)
-        # The owner is told who did it. The message used to say "by RDCO"
-        # unconditionally, which would be false for an Adviser completion.
-        self.assertNotIn("RDCO", notification.message)
-        self.assertIn("Adviser", notification.message)
-
-    def test_rdco_still_completes_an_approved_proposal(self):
-        record = self.make_record()
-        notification = self.assert_completed_and_owner_told(record, self.rdco)
-        self.assertIn("RDCO", notification.message)
-
-    # --- everyone else --------------------------------------------------------
-
-    def test_an_unassigned_adviser_is_refused_with_404(self):
-        record = self.make_record()
-        self.assert_refused_without_effect(
-            record, self.other_adviser, status.HTTP_404_NOT_FOUND
-        )
-
-    def test_the_unassigned_advisers_404_is_the_missing_record_response(self):
-        """
-        "Not yours" and "does not exist" must be indistinguishable, so the
-        refusal cannot be used to confirm the record is a Proposal awaiting
-        completion.
-        """
-        record = self.make_record()
-        missing_pk = 999_999_999
-        self.assertFalse(Record.objects.filter(pk=missing_pk).exists())
-
-        refused, _ = self.complete(record.pk, self.other_adviser)
-        missing, _ = self.complete(missing_pk, self.other_adviser)
-
-        self.assertEqual(refused.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(missing.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(refused.data, missing.data)
-
-    def test_an_adviser_who_owns_but_does_not_advise_is_refused_with_404(self):
-        """
-        The case the queryset narrowing still decides after IR-264. An Adviser
-        can author records, so one may own a Proposal someone else advises:
-        `visible_to()` lets them read it, and only the narrowing stops them
-        completing it.
-        """
-        record = self.make_record()
-        RecordOwner.objects.create(record=record, user=self.other_adviser, is_primary=False)
-        self.assert_refused_without_effect(
-            record, self.other_adviser, status.HTTP_404_NOT_FOUND
-        )
-
-    def test_offices_are_refused(self):
-        for name, office_user in self.offices.items():
-            with self.subTest(office=name):
-                record = self.make_record()
-                self.assert_refused_without_effect(
-                    record, office_user, status.HTTP_403_FORBIDDEN
-                )
-
-    def test_students_are_refused_including_the_owner(self):
-        for label, student in (("owner", self.owner), ("other", self.other_student)):
-            with self.subTest(student=label):
-                record = self.make_record()
-                self.assert_refused_without_effect(
-                    record, student, status.HTTP_403_FORBIDDEN
-                )
-
-    # --- the preconditions bind the Adviser too --------------------------------
-
-    def test_the_assigned_adviser_cannot_complete_off_the_proposal_route(self):
-        cases = [
-            ("not yet approved", RecordTypeName.PROPOSAL, PipelineStatus.ADVISER_REVIEW),
-            ("already completed", RecordTypeName.PROPOSAL, PipelineStatus.COMPLETED),
-            ("not a proposal", RecordTypeName.THESIS_RESEARCH, PipelineStatus.APPROVED),
-        ]
-        for label, type_name, pipeline_status in cases:
-            with self.subTest(case=label):
-                record = self.make_record(type_name, pipeline_status)
-                response, send_email = self.complete(record.pk, self.adviser)
-                self.assertEqual(
-                    response.status_code, status.HTTP_400_BAD_REQUEST, response.data
-                )
-                self.assertEqual(self.status_of(record), pipeline_status)
+        url = reverse("record-detail", args=[record.pk]) + "complete/"
+        for actor in (self.adviser, self.rdco):
+            with self.subTest(actor=actor.email), mock.patch(SEND_EMAIL) as send_email:
+                self.client.force_authenticate(actor)
+                response = self.client.post(url)
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+                record.refresh_from_db()
+                self.assertEqual(record.pipeline_status, PipelineStatus.APPROVED)
+                self.assertFalse(Notification.objects.filter(record=record).exists())
                 send_email.assert_not_called()
+
+    # --- what already exists keeps reading correctly -------------------------
+
+    def test_an_existing_completed_proposal_still_reads_as_completed(self):
+        record = self.make_record(pipeline_status=PipelineStatus.COMPLETED)
+        self.client.force_authenticate(self.owner)
+        detail = self.client.get(reverse("record-detail", args=[record.pk])).data
+        self.assertEqual(detail["pipeline_status"], PipelineStatus.COMPLETED)
+        self.assertEqual(detail["workflow_state_label"], "Completed")
+
+    def test_an_accepted_proposal_reads_as_accepted(self):
+        record = self.make_record()
+        self.client.force_authenticate(self.owner)
+        detail = self.client.get(reverse("record-detail", args=[record.pk])).data
+        self.assertEqual(detail["workflow_state_label"], "Accepted")

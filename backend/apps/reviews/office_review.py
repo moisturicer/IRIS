@@ -12,12 +12,13 @@ outcome is refused.
 **Before anything is written**, the act refuses:
 
 - a caller holding no open specialist seat here (403, who before what);
-- a record still on the legacy pipeline (400);
+- a record not in review (400);
 - an outcome other than `cleared` or `finding`, or a finding with no reason;
 - a seat not yet opened: *Open review* stamps the time-on-task start, so
   finishing an unopened seat would leave it empty;
 - an office with its own document request still open. An office never
-  finishes while it is still asking the author for something.
+  finishes while it is still asking the author for something; likewise an
+  office with its own revision request open (IR-272).
 
 **When an office completes** -- every seat it did not withdraw is done, by the
 last verdict or by a coordinator withdrawing the last unfinished seat --
@@ -43,6 +44,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.records.lifecycle import type_name_of
+from apps.records.versions import latest_version
 
 from core.enums import (
     OPEN_SEAT_STATES,
@@ -55,7 +57,7 @@ from core.enums import (
 )
 from core.permissions import holds_seat
 
-from . import routing, seats
+from . import revisions, routing, seats
 from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat, RoutingEvent
 
 #: The specialist offices (ADR-032 §3): the only parties that clear.
@@ -124,7 +126,9 @@ def _blocked_reason(record, user, party):
             f"Withdraw {_label(party)}'s document request first. An office "
             f"finishes only once it is no longer asking the author for anything."
         )
-    return None
+    # Its own revision request, likewise (ADR-032 §5 Amendment, IR-272).
+    # Another office's request blocks nothing here.
+    return revisions.office_blocked_reason(record, party)
 
 
 def office_review_flags(record, user) -> dict:
@@ -133,7 +137,7 @@ def office_review_flags(record, user) -> dict:
     clear or record a finding as, why they cannot yet, and whether they may
     add a colleague. A rendering hint; the endpoints re-check all of it.
     """
-    party = _seated_specialist(record, user) if routing.is_new_model(record) else None
+    party = _seated_specialist(record, user) if routing.is_in_review(record) else None
     if party is None:
         return {"party": None, "label": None, "blocked": None, "assignment": None}
     seat = _open_seat(record, user, party)
@@ -162,11 +166,8 @@ def record_office_review(record, actor, *, outcome, comment=""):
             "Only a reviewer seated for ITSO, IERC or KTTO on this record may "
             "clear it or record a finding."
         )
-    if not routing.is_new_model(record):
-        raise OfficeReviewError(
-            "This record is still on the current review pipeline. Use the "
-            "current decision form."
-        )
+    if not routing.is_in_review(record):
+        raise OfficeReviewError("This record is not in review.")
     if not isinstance(outcome, str) or outcome not in OUTCOMES:
         raise OfficeReviewError(
             "An office clears a record or records a finding. Offices never "
@@ -184,6 +185,7 @@ def record_office_review(record, actor, *, outcome, comment=""):
     Review.objects.create(
         record=record, reviewed_by=actor, stage=party, status=OUTCOMES[outcome],
         comment=comment, assignment=seat.assignment,
+        version=latest_version(record),
     )
     try:
         completed = seats.complete_seat(seat, actor)

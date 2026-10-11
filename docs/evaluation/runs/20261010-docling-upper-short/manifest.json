@@ -1,0 +1,122 @@
+{
+  "concurrency": 2,
+  "corpus": {
+    "short": {
+      "bytes": 248647,
+      "pages": 5,
+      "relative_path": "short.pdf",
+      "sha256": "0ca47397c2b812c0673f3c1a3b7f53e56a31eeca85c358fc5d015b660cd8292d"
+    }
+  },
+  "created_at": "2026-10-10T04:48:52.875744+00:00",
+  "host": {
+    "docker_ram_gib": 15.07,
+    "docker_version": "29.8.1",
+    "gpu": {
+      "free_mib": 14158,
+      "name": "NVIDIA GeForce RTX 5070 Ti",
+      "total_mib": 16303,
+      "used_mib": 1838,
+      "utilization_pct": 1
+    },
+    "logical_cpus": 16,
+    "ram_gib": 30.88
+  },
+  "images": {
+    "cpu": "iris-docling:cpu",
+    "gpu": "iris-docling:gpu"
+  },
+  "profiles": {
+    "baseline-end": {
+      "limits": {
+        "cpus": 4,
+        "name": "baseline-end",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "baseline-start": {
+      "limits": {
+        "cpus": 4,
+        "name": "baseline-start",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "cpu-12": {
+      "limits": {
+        "cpus": 12,
+        "name": "cpu-12",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "cpu-16": {
+      "limits": {
+        "cpus": 16,
+        "name": "cpu-16",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "ram-12": {
+      "limits": {
+        "cpus": 4,
+        "name": "ram-12",
+        "ram_gib": 12,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "ram-14": {
+      "limits": {
+        "cpus": 4,
+        "name": "ram-14",
+        "ram_gib": 14,
+        "variant": "gpu",
+        "vram_gib": 8
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "vram-12": {
+      "limits": {
+        "cpus": 4,
+        "name": "vram-12",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 12
+      },
+      "oom_or_restarts": "false|0",
+      "status": "completed"
+    },
+    "vram-14": {
+      "limits": {
+        "cpus": 4,
+        "name": "vram-14",
+        "ram_gib": 8,
+        "variant": "gpu",
+        "vram_gib": 14
+      },
+      "reason": "GPU tensor cap plus CUDA context exceeds currently free VRAM",
+      "status": "skipped"
+    }
+  },
+  "repeats": 1,
+  "sample_interval_seconds": 1.0,
+  "timeout_seconds": 3600
+}

@@ -1,57 +1,33 @@
 """
-The workflow as data: stages, edges, and one entry point (IR-136, ADR-002).
+The record-level workflow edges, and the resubmission policy (IR-136, ADR-002).
 
-ADR-002 (amended 2026-09-09) decides the shape this module implements. Read the
-amendment before changing anything here — several things that look like
-incidental structure are load-bearing.
+**What is left after IR-274.** This module once held the fixed review pipeline:
+a `STAGES` node registry, ~30 review edges and the resolvers that routed a
+record from intake through the clearance stages to RDCO. ADR-032 retired that
+pipeline. Review is now assignments, seats and Decisions (`apps.reviews`), and
+a record in review is stored as `in_review` whoever holds it. IR-260 cut every
+record over and IR-274 deleted the table.
 
-**Two structures, not one.** `TRANSITIONS` is an edge set; `STAGES` is a node
-registry. The distinction is forced rather than stylistic: "IERC and KTTO clear
-concurrently" is a property of a *node*, and no edge table can express a
-parallel group. `STAGES` also declares each stage's **kind**, and that single
-declaration serves three call sites that each used to re-derive it — most
-importantly `resubmit_record`, which chose preserve-vs-restart by testing a set
-literal, `CLEARANCE_OFFICES`. **That literal was where ADR-003's primary
-research contribution lived.** It reads the table now.
+What remains is what never depended on who reviews:
+
+- the **record-owned edges** -- requesting deletion of accepted work, soft
+  deletion and restoring a record whose delete request was declined -- with
+  `apply()`, their one entry point;
+- **`ResubmissionPolicy`**, ADR-004's experimental control, which
+  `reviews.new_version` reads to choose between the clearance-aware and
+  restart-all arms;
+- **`clearance_reset_fields()`**, what resetting a clearance means, written
+  once so the two arms cannot drift;
+- **who decides** each record type, which the tracker reads.
 
 **What this module does NOT do: authorize.** It answers "is this transition
-legal, and where does it lead". Whether *this* user may act on *this* record
-stays in `reviews.services._can_review` / `_can_submit_clearance` and the
-permission layer (ADR-009, IR-165). That split is forced, not chosen:
-`_can_review` checks `record.adviser_id == user.pk` — the **assigned** adviser,
-not any Adviser — and a table keyed on a *role* cannot express a per-record
-condition. `gate_role` below documents which office owns a gate; it never
-decides who may pass it.
+legal, and where does it lead". Whether *this* user may act on *this* record is
+the permission layer's question (ADR-009, IR-165).
 
-**Divergence from ADR-002's literal key, recorded rather than hidden.** The ADR
-specifies `(from_status, event, actor_role) -> to_status`. Two departures:
-
-1. The key here is `(from_status, event)`, with `gate_role` carried as a *field*
-   on the edge instead. In IRIS the actor's role never changes the destination —
-   it is a function of the stage — so putting it in the key would add a
-   component that is constant per pair and imply the table discriminates on
-   something it does not.
-2. **Four of the eleven edges have a destination that cannot be a literal**:
-   approving at `rdco_intake` depends on which offices the submitter requested
-   (ADR-018), approving at `adviser_review` depends on record type, and both
-   clearance paths depend on whether every office has cleared. Those edges name
-   a **resolver** from the closed set in `_RESOLVERS`. This is still a
-   declarative table — the routing is inspectable in one place — but it is not
-   a pure lookup, and saying otherwise would be false.
-
-**Per-instance configuration.** `STAGES` and `TRANSITIONS` below are CIT-U's
-defaults. `settings.WORKFLOW_TABLE` may override either, which is what makes
-ADR-005's "configuration within the instance" true without a `tenant_id` or a
-migration, and how ADR-004's `RESTART_ALL` evaluation instance will differ from
-production. See `load_table()`.
-
-**Note on the "adding a fourth office requires no code change" criterion**: it is
-not satisfied by this module alone and was never satisfiable as written. A table
-*references* offices; it does not define them. Office identity lives in
-`core.enums.Office`, `ROLE_TO_OFFICE`, `RecordClearance.office`'s choices, plus a
-`RoleName` member and a seeded `Role` row. See ADR-002's amendment — the honest
-criterion is one enum, one role map and this table, rather than eighteen call
-sites.
+**Per-instance configuration.** `TRANSITIONS` below is CIT-U's default.
+`settings.WORKFLOW_TABLE` may override it, and carries `RESUBMISSION_POLICY` as
+its own key. That is ADR-005's "configuration within the instance": a second
+deployment changes configuration rather than forking code. See `load_table()`.
 """
 
 from dataclasses import dataclass
@@ -64,83 +40,36 @@ from django.utils import timezone
 from core.enums import (
     DELETE_REVIEW_STATUSES,
     ClearanceStatus,
-    Office,
     Party,
     PipelineStatus,
     RecordTypeName,
-    ReviewDecision,
-    ReviewStage,
     RoleName,
 )
 from core.exceptions import InvalidPipelineTransition
 
 
 class WorkflowEvent(str, Enum):
-    """
-    What a caller asks for. Views and services name these, never status strings.
+    """What a caller asks of a record's status. Views name these, never status strings."""
 
-    Deliberately not one event per gate: `APPROVE` at a sequential stage and
-    `APPROVE` at a parallel one are the same intent, and `STAGES` already knows
-    which kind it is landing on. One event with a stage-aware destination beats
-    two events a caller has to choose between correctly.
-    """
-
-    APPROVE = "approve"
-    DECLINE = "decline"
-    REJECT = "reject"
-    RESUBMIT = "resubmit"
-
-    # --- stage 2 (IR-136): the record-owned edges, previously assigned by hand
-    # --- in records/views.py and records/services.py.
-    SUBMIT = "submit"
-    MARK_COMPLETE = "mark_complete"
     REQUEST_DELETE = "request_delete"
     SOFT_DELETE = "soft_delete"
     RESTORE = "restore"
 
 
-#: The events a reviewer performs *at a gate*.
-#:
-#: Only these require their origin to be a declared `STAGES` node, because only
-#: these need a stage's kind (to know whether the acting party is an office) and
-#: its `records_as` (to write `Review.stage`). The record-lifecycle events added
-#: in stage 2 — submitting, completing, deleting, restoring — happen at statuses
-#: where nothing is reviewed, so `draft`, `approved` and `pending_delete` are
-#: deliberately absent from `STAGES`. Naming the split here keeps it in one
-#: place rather than as a growing list of exceptions inside a test.
-REVIEW_EVENTS = frozenset({
-    WorkflowEvent.APPROVE,
-    WorkflowEvent.DECLINE,
-    WorkflowEvent.REJECT,
-})
-
-
-class StageKind(str, Enum):
-    """
-    Sequential gate or parallel clearance group.
-
-    Not in `core.enums`: those are values persisted in a column. This is a
-    property of the *table*, never written to the database.
-    """
-
-    SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
-
-
 class ResubmissionPolicy(str, Enum):
     """
-    What a resubmission does to clearances already granted (IR-137, ADR-004).
+    What a new version does to clearances already granted (IR-137, ADR-004).
 
-    Here rather than in `core.enums` for the same reason as `StageKind`: it is
-    configuration of the table, never a value written to a column.
+    Here rather than in `core.enums`: it is configuration of the instance,
+    never a value written to a column.
 
     `CLEARANCE_AWARE` is ADR-003's contribution and production's default.
     `RESTART_ALL` is the *comparison arm*, and it exists because counting
-    preserved clearances cannot produce a negative result — given which office
-    declined, the count is deterministically computable, so the claim is only
-    testable against IRIS running the other policy. ADR-004's operational rule
-    is hard: the comparison runs on a dedicated evaluation instance, never on a
-    customer's production one.
+    preserved clearances cannot produce a negative result -- given which office
+    asked for changes, the count is deterministically computable, so the claim
+    is only testable against IRIS running the other policy. ADR-004's
+    operational rule is hard: the comparison runs on a dedicated evaluation
+    instance, never on a customer's production one.
     """
 
     CLEARANCE_AWARE = "clearance_aware"
@@ -156,8 +85,8 @@ class ResubmissionPolicy(str, Enum):
         an operator types is the spec's own spelling. Rejecting it would fail
         the person who read the documentation correctly.
 
-        Everything else raises. The alternative — treating an unrecognised
-        value as the default — would run the evaluation instance on the
+        Everything else raises. The alternative -- treating an unrecognised
+        value as the default -- would run the evaluation instance on the
         production arm and report nothing, which is the one failure this
         setting cannot be allowed to have.
         """
@@ -173,42 +102,14 @@ class ResubmissionPolicy(str, Enum):
 
 
 @dataclass(frozen=True)
-class Stage:
-    """
-    One node of the workflow.
-
-    `records_as` is the `ReviewStage` a `Review` row gets when a review lands
-    here — but only for sequential gates. A parallel stage leaves it `None`
-    because the value is the **acting office**, resolved from the actor's role,
-    which is why `Review.stage` is a union of gates and offices (ADR-002
-    amendment, point 5). `offices` is the group that may clear a parallel stage
-    and is empty for sequential ones.
-    """
-
-    kind: StageKind
-    records_as: str | None = None
-    offices: tuple = ()
-    label: str | None = None
-
-    @property
-    def is_parallel(self) -> bool:
-        return self.kind is StageKind.PARALLEL
-
-
-@dataclass(frozen=True)
 class Edge:
     """
-    One legal transition.
+    One legal transition. Exactly one of `to` and `resolver` is set.
 
-    Exactly one of `to` and `resolver` is set. `gate_role` documents which role
-    owns the gate; it is descriptive, never enforced here (see the module note
-    on authorization). `decision` is what gets written to `Review.status`, which
-    is why `DECLINE` and `REJECT` are separate edges rather than one with a flag:
-    they are different outcomes and ADR-003's whole contribution rests on the
-    difference.
+    `gate_role` documents which role owns the edge; it is descriptive, never
+    enforced here (see the module note on authorization).
     """
 
-    decision: str
     gate_role: str | None = None
     to: str | None = None
     resolver: str | None = None
@@ -222,142 +123,12 @@ class Edge:
 # CIT-U's table. Override per instance via settings.WORKFLOW_TABLE.
 # ---------------------------------------------------------------------------
 
-#: Nodes. Every status a review can be *acted on* at appears here; terminal and
-#: pre-pipeline statuses (draft, approved, published, declined, rejected,
-#: completed, pending_delete) deliberately do not — nothing is reviewed there.
-STAGES: dict[str, Stage] = {
-    PipelineStatus.ADVISER_REVIEW: Stage(
-        kind=StageKind.SEQUENTIAL,
-        records_as=ReviewStage.ADVISER,
-    ),
-    PipelineStatus.RDCO_INTAKE: Stage(
-        kind=StageKind.SEQUENTIAL,
-        records_as=ReviewStage.RDCO_INTAKE,
-    ),
-    PipelineStatus.RDCO_REVIEW: Stage(
-        kind=StageKind.SEQUENTIAL,
-        records_as=ReviewStage.RDCO,
-    ),
-    # ITSO's stage. KTTO may also act here -- it starts in parallel with ITSO --
-    # which is why the group is both, not ITSO alone.
-    PipelineStatus.ITSO_REVIEW: Stage(
-        kind=StageKind.PARALLEL,
-        offices=(Office.ITSO, Office.KTTO),
-    ),
-    PipelineStatus.PARALLEL_REVIEW: Stage(
-        kind=StageKind.PARALLEL,
-        offices=(Office.IERC, Office.KTTO),
-    ),
-}
-
-#: Edges, keyed `(from_status, event)`. See the module docstring on why
-#: `actor_role` is a field rather than part of the key.
+#: Edges, keyed `(from_status, event)`.
 TRANSITIONS: dict[tuple, Edge] = {
-    # --- Proposal: the adviser gate ---
-    (PipelineStatus.ADVISER_REVIEW, WorkflowEvent.APPROVE): Edge(
-        decision=ReviewDecision.APPROVED,
-        gate_role=RoleName.ADVISER,
-        # Proposals terminate at `approved` (visible as ongoing research);
-        # anything else here publishes. Type-dependent, so a resolver.
-        resolver="after_adviser_review",
-    ),
-    (PipelineStatus.ADVISER_REVIEW, WorkflowEvent.DECLINE): Edge(
-        decision=ReviewDecision.DECLINED,
-        gate_role=RoleName.ADVISER,
-        to=PipelineStatus.DECLINED,
-    ),
-    (PipelineStatus.ADVISER_REVIEW, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        gate_role=RoleName.ADVISER,
-        to=PipelineStatus.REJECTED,
-    ),
-    # --- RDCO intake ---
-    (PipelineStatus.RDCO_INTAKE, WorkflowEvent.APPROVE): Edge(
-        decision=ReviewDecision.APPROVED,
-        gate_role=RoleName.RDCO,
-        # Which offices were requested decides where this lands (ADR-018).
-        resolver="enter_clearance_stage",
-    ),
-    (PipelineStatus.RDCO_INTAKE, WorkflowEvent.DECLINE): Edge(
-        decision=ReviewDecision.DECLINED,
-        gate_role=RoleName.RDCO,
-        to=PipelineStatus.DECLINED,
-    ),
-    # No REJECT edge at intake, nor at either clearance stage below (IR-265).
-    # ADR-021: intake and the specialist offices inform the decision; they do
-    # not make it. Rejection is kept only where the decision is made -- the
-    # assigned Adviser on a Proposal and RDCO at final review.
-    # --- RDCO final review ---
-    (PipelineStatus.RDCO_REVIEW, WorkflowEvent.APPROVE): Edge(
-        decision=ReviewDecision.APPROVED,
-        gate_role=RoleName.RDCO,
-        to=PipelineStatus.PUBLISHED,
-    ),
-    (PipelineStatus.RDCO_REVIEW, WorkflowEvent.DECLINE): Edge(
-        decision=ReviewDecision.DECLINED,
-        gate_role=RoleName.RDCO,
-        to=PipelineStatus.DECLINED,
-    ),
-    (PipelineStatus.RDCO_REVIEW, WorkflowEvent.REJECT): Edge(
-        decision=ReviewDecision.REJECTED,
-        gate_role=RoleName.RDCO,
-        to=PipelineStatus.REJECTED,
-    ),
-    # --- Clearance stages. The acting office comes from the actor's role, so
-    # --- there is one edge per stage, not one per office.
-    (PipelineStatus.ITSO_REVIEW, WorkflowEvent.APPROVE): Edge(
-        decision=ReviewDecision.APPROVED,
-        resolver="after_clearance",
-    ),
-    (PipelineStatus.ITSO_REVIEW, WorkflowEvent.DECLINE): Edge(
-        decision=ReviewDecision.DECLINED,
-        to=PipelineStatus.DECLINED,
-    ),
-    (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.APPROVE): Edge(
-        decision=ReviewDecision.APPROVED,
-        resolver="after_clearance",
-    ),
-    (PipelineStatus.PARALLEL_REVIEW, WorkflowEvent.DECLINE): Edge(
-        decision=ReviewDecision.DECLINED,
-        to=PipelineStatus.DECLINED,
-    ),
-    # --- Resubmission out of `declined`. Where it lands depends on whether the
-    # --- decline came from a clearance office or a sequential gate -- which is
-    # --- ADR-003's contribution, and is now a table lookup.
-    (PipelineStatus.DECLINED, WorkflowEvent.RESUBMIT): Edge(
-        decision=ReviewDecision.APPROVED,  # unused: resubmission writes no Review
-        resolver="after_resubmission",
-    ),
-
-    # --- Stage 2: the record-owned edges -----------------------------------
-    # These were seven hand-written assignments in records/views.py and
-    # records/services.py. None of them writes a Review, so `decision` is unused
-    # on every edge below -- it stays on the dataclass because the review edges
-    # above need it.
-
-    # Submission out of draft. Type-differentiated, so a resolver: a Proposal
-    # enters adviser_review and everything else rdco_intake.
-    (PipelineStatus.DRAFT, WorkflowEvent.SUBMIT): Edge(
-        decision=ReviewDecision.APPROVED,
-        resolver="first_status",
-    ),
-    # RDCO -- or, since IR-267 (ADR-021 §3), the Proposal's assigned Adviser --
-    # marks an approved Proposal finished. `gate_role` holds one role and is
-    # documentation only; the view's permission and queryset decide who may
-    # act, as the module docstring explains. Only Proposals reach `approved`
-    # -- approve_record sends every other type to `published` -- so keying on
-    # the status is sufficient; the view keeps an explicit record-type check as
-    # a defensive precondition rather than as routing.
-    (PipelineStatus.APPROVED, WorkflowEvent.MARK_COMPLETE): Edge(
-        decision=ReviewDecision.APPROVED,
-        gate_role=RoleName.RDCO,
-        to=PipelineStatus.COMPLETED,
-    ),
     # Restoring a record whose delete request was declined. The destination is
     # the status it held before, which lives on the DeleteRequest row, so the
     # caller supplies it.
     (PipelineStatus.PENDING_DELETE, WorkflowEvent.RESTORE): Edge(
-        decision=ReviewDecision.APPROVED,
         gate_role=RoleName.RDCO,
         resolver="restore_previous",
     ),
@@ -366,26 +137,16 @@ TRANSITIONS: dict[tuple, Edge] = {
 # Deleting accepted work raises a delete request for review rather than removing
 # it; anything not yet accepted is soft-deleted outright. Generated rather than
 # typed out so the two sets cannot drift from DELETE_REVIEW_STATUSES, which is
-# what `perform_destroy` branches on. (It branched on PUBLICLY_VISIBLE_STATUSES
-# until IR-264 narrowed that to published only; see core.enums.)
+# what `perform_destroy` branches on.
 for _status in DELETE_REVIEW_STATUSES:
-    TRANSITIONS[(_status, WorkflowEvent.REQUEST_DELETE)] = Edge(
-        decision=ReviewDecision.APPROVED,
-        to=PipelineStatus.PENDING_DELETE,
-    )
+    TRANSITIONS[(_status, WorkflowEvent.REQUEST_DELETE)] = Edge(to=PipelineStatus.PENDING_DELETE)
 
-# Soft delete is legal from **every** status, deliberately. Before IR-136 it was
-# an unguarded assignment reachable from two places -- `perform_destroy` for a
-# not-yet-public record, and delete-request *approve*, where the record is
-# already at `pending_delete`. Declaring a partial edge set here would turn a
-# silent success into an InvalidPipelineTransition, which stage 2 must not do:
-# this stage makes the edges visible, it does not tighten them. Whether every
-# one of these should stay permitted is a separate, deliberate decision.
+# Soft delete is legal from **every** status, deliberately: it is reachable from
+# `perform_destroy` for a record not yet accepted, and from delete-request
+# *approve*, where the record is already at `pending_delete`. Whether every one
+# of these should stay permitted is a separate, deliberate decision.
 for _status in PipelineStatus.values:
-    TRANSITIONS[(_status, WorkflowEvent.SOFT_DELETE)] = Edge(
-        decision=ReviewDecision.APPROVED,
-        to=PipelineStatus.PENDING_DELETE,
-    )
+    TRANSITIONS[(_status, WorkflowEvent.SOFT_DELETE)] = Edge(to=PipelineStatus.PENDING_DELETE)
 
 del _status
 
@@ -398,45 +159,33 @@ del _status
 INITIAL_STATUS = PipelineStatus.DRAFT
 
 #: Where the legacy Excel importer places records -- **straight to published,
-#: bypassing the review pipeline entirely**. ADR-002 calls this "the Excel
-#: bypass" and asks that it become "a declared, auditable edge"; naming it here
-#: is that declaration. It is recorded, not endorsed: whether the bypass stays
-#: permitted is a decision for a person, and stage 2 deliberately preserves
-#: today's behaviour rather than quietly removing it inside a refactor.
+#: bypassing review entirely**. ADR-002 calls this "the Excel bypass" and asks
+#: that it become "a declared, auditable edge"; naming it here is that
+#: declaration. It is recorded, not endorsed.
 LEGACY_IMPORT_STATUS = PipelineStatus.PUBLISHED
 
 
-def load_table() -> tuple[dict, dict]:
+def load_table() -> dict:
     """
-    The active `(STAGES, TRANSITIONS)` for this instance.
+    The active `TRANSITIONS` for this instance.
 
-    `settings.WORKFLOW_TABLE` may supply either key to override CIT-U's default.
-    This is the ADR-005 seam: a second institution changes configuration in its
-    own deployment rather than forking application code. Absent the setting —
-    the normal case — the defaults above are used unchanged.
+    `settings.WORKFLOW_TABLE["TRANSITIONS"]` overrides CIT-U's default. This is
+    the ADR-005 seam: a second institution changes configuration in its own
+    deployment rather than forking application code.
     """
     override = getattr(settings, "WORKFLOW_TABLE", None) or {}
-    return (
-        override.get("STAGES", STAGES),
-        override.get("TRANSITIONS", TRANSITIONS),
-    )
+    return override.get("TRANSITIONS", TRANSITIONS)
 
 
 def resubmission_policy() -> ResubmissionPolicy:
     """
-    The active resubmission policy — the third `WORKFLOW_TABLE` key (ADR-004).
-
-    Not returned by `load_table()` because it is not a structure: every existing
-    caller unpacks exactly two values, and widening that tuple would edit eight
-    call sites to deliver one setting.
+    The active resubmission policy -- `WORKFLOW_TABLE`'s own key (ADR-004).
 
     **An unrecognised value raises rather than falling back**, and
-    `RecordsConfig.ready()` calls this at startup so it raises *there* — before
-    a participant is mid-session — rather than on the first resubmission. A
-    silent default would be the worst possible failure: the evaluation instance
-    would run the production arm, every measurement taken from it would be of
-    the wrong policy, and nothing in the output would say so. A container that
-    refuses to start is a cheaper mistake than a contaminated experiment.
+    `RecordsConfig.ready()` calls this at startup so it raises *there* -- before
+    a participant is mid-session -- rather than on the first new version. A
+    silent default would run the evaluation instance on the production arm,
+    and nothing in its output would say so.
     """
     override = getattr(settings, "WORKFLOW_TABLE", None) or {}
     return ResubmissionPolicy.coerce(
@@ -444,133 +193,7 @@ def resubmission_policy() -> ResubmissionPolicy:
     )
 
 
-def stage_for(status: str) -> Stage | None:
-    """The `Stage` a status names, or None when nothing is reviewed there."""
-    stages, _ = load_table()
-    return stages.get(status)
-
-
-def is_clearance_stage(status: str) -> bool:
-    """True when `status` is a parallel clearance stage."""
-    stage = stage_for(status)
-    return bool(stage and stage.is_parallel)
-
-
-def clearance_offices() -> frozenset:
-    """
-    Every office that owns a parallel gate anywhere in the table.
-
-    Replaces `resubmit_record`'s `CLEARANCE_OFFICES` literal and
-    `clearance_state.CLEARANCE_OFFICES`. Derived from `STAGES` so a table that
-    adds an office to a group does not leave a set literal behind to drift.
-    """
-    stages, _ = load_table()
-    return frozenset(
-        office for stage in stages.values() for office in stage.offices
-    )
-
-
-def review_stage_for(status: str, office: str | None = None) -> str | None:
-    """
-    What `Review.stage` should hold for a review landing at `status`.
-
-    The union, resolved: a sequential gate declares its value in `STAGES`, while
-    a parallel stage takes the **acting office**, which the caller supplies
-    because only it knows who acted. ADR-002 amendment, point 5.
-    """
-    stage = stage_for(status)
-    if stage is None:
-        return None
-    return office if stage.is_parallel else stage.records_as
-
-
-# ---------------------------------------------------------------------------
-# Resolvers -- the closed set of dynamic destinations
-# ---------------------------------------------------------------------------
-
-def _resolve_after_adviser_review(record, **_) -> str:
-    """Proposals stop at `approved` and stay visible as ongoing; others publish."""
-    type_name = record.record_type.name if record.record_type else ""
-    return (
-        PipelineStatus.APPROVED
-        if type_name == RecordTypeName.PROPOSAL
-        else PipelineStatus.PUBLISHED
-    )
-
-
-def _resolve_enter_clearance_stage(record, **_) -> str:
-    """
-    Create the requested offices' clearance rows and say where the record lands.
-
-    ADR-018: the office set is data on the record, not a function of its type.
-    That now holds for ITSO too: ADR-021 §5 reversed ADR-018's Project-only rule
-    (IR-266), so a Thesis/Research requesting ITSO takes the Project's route. A
-    record requesting nothing goes straight to `rdco_review`, because a clearance
-    stage with no office attached would auto-clear, which is worse than skipping
-    it.
-    """
-    from apps.reviews.models import RecordClearance
-
-    offices: list = []
-    if record.requested_itso:
-        offices.append(Office.ITSO)
-    if record.requested_ierc:
-        offices.append(Office.IERC)
-    if record.requested_ktto:
-        offices.append(Office.KTTO)
-
-    for office in offices:
-        RecordClearance.objects.get_or_create(record=record, office=office)
-
-    return _clearance_entry_for(offices)
-
-
-def _clearance_entry_for(offices) -> str:
-    """
-    Where a record whose clearance set is `offices` enters the parallel phase.
-
-    Factored out because two callers need the same answer from different inputs:
-    intake asks it of the offices it just created, and `RESTART_ALL` asks it of
-    the offices already on the record. Two copies of this would be two ideas of
-    where a route begins, and the resubmission arm would drift from the arm it
-    is compared against — which is the one difference the experiment cannot
-    tolerate.
-
-    A record requesting nothing goes to `rdco_review`: a clearance stage with no
-    office attached would auto-clear, which is worse than skipping it.
-    """
-    if Office.ITSO in offices:
-        return PipelineStatus.ITSO_REVIEW
-    if offices:
-        return PipelineStatus.PARALLEL_REVIEW
-    return PipelineStatus.RDCO_REVIEW
-
-
-def _resolve_after_clearance(record, office=None, **_) -> str:
-    """
-    Where the record goes once this office has cleared.
-
-    ITSO clearing is the one sequenced step: IERC's row is created here, and
-    only if it was actually requested (ADR-018) — unconditionally creating it
-    would force an ethics review nobody asked for. KTTO may already have
-    cleared, be pending, or never have been requested, which is exactly what
-    "are all clearances done" reflects.
-    """
-    from apps.reviews.models import RecordClearance
-
-    if office == Office.ITSO and record.pipeline_status == PipelineStatus.ITSO_REVIEW:
-        if record.requested_ierc:
-            RecordClearance.objects.get_or_create(record=record, office=Office.IERC)
-        if _all_clearances_done(record):
-            return PipelineStatus.RDCO_REVIEW
-        return PipelineStatus.PARALLEL_REVIEW
-
-    if _all_clearances_done(record):
-        return PipelineStatus.RDCO_REVIEW
-    return record.pipeline_status  # still waiting on a peer office
-
-
-def _clearance_reset_fields() -> dict:
+def clearance_reset_fields() -> dict:
     """
     What resetting a clearance means, written once.
 
@@ -582,14 +205,10 @@ def _clearance_reset_fields() -> dict:
     **`updated_at` is set by hand because `.update()` bypasses `auto_now`.**
     Without it a reset row keeps the timestamp of the moment it *cleared*, and
     `clearance_state.clearance_payload` publishes that as the office's decision
-    time — so a reviewer would see a stale "decided at" for a clearance that is
-    now pending again. Under `RESTART_ALL` that applies to every row rather than
-    one, which would put a visible difference between the two arms that is not
-    the policy, in an experiment measuring time-on-task.
+    time.
 
     A function, not a module constant: `timezone.now()` in a constant would be
-    evaluated once at import and every reset for the life of the process would
-    claim the same instant.
+    evaluated once at import.
     """
     return {
         "status": ClearanceStatus.PENDING,
@@ -599,154 +218,13 @@ def _clearance_reset_fields() -> dict:
     }
 
 
-def _resolve_after_resubmission(record, declining_stage=None, **_) -> str:
-    """
-    **ADR-003's contribution, as a table lookup rather than a set literal.**
-
-    A decline from a clearance office resets only that office and routes back to
-    the stage it reviews at, preserving every peer's completed work. A decline
-    from a sequential gate is a full restart: all clearances are dropped and the
-    record re-enters its route from the top.
-
-    `declining_stage` is a `Review.stage`, which is a union — the membership test
-    against `clearance_offices()` is what decides which of the two this is, and
-    that set now comes from `STAGES` rather than a literal.
-
-    **The first of those two is what `resubmission_policy()` switches** (IR-137).
-    Under `RESTART_ALL` a clearance decline resets every office instead of one
-    and the record re-enters at the stage its offices started from. The
-    sequential branch below is not policy-dependent and must never become so.
-    """
-    from apps.reviews.models import RecordClearance
-
-    if declining_stage and declining_stage in clearance_offices():
-        # IR-137/ADR-004: the experimental switch, and it belongs *here* -- on
-        # the branch that preserves. Putting it on the `else` below would make
-        # the two arms differ in how non-clearance declines behave as well, and
-        # the comparison would then measure two changes at once.
-        #
-        # Both arms run the same statement against the same rows; only the
-        # filter differs. `RESTART_ALL` resets every office rather than deleting
-        # (ADR-004's wording is "reset every clearance row to pending"), because
-        # which offices a record engages is ADR-018 data on the record -- delete
-        # them and it would re-enter the phase with a different office set than
-        # it left, which is again a second difference.
-        clearances = RecordClearance.objects.filter(record=record)
-        if resubmission_policy() is ResubmissionPolicy.RESTART_ALL:
-            # Read the office set *before* the update: it is what decides where
-            # the record re-enters, and re-reading it afterwards would be a
-            # second query for an answer that cannot have changed.
-            offices = set(clearances.values_list("office", flat=True))
-            clearances.update(**_clearance_reset_fields())
-            return _clearance_entry_for(offices)
-
-        office = declining_stage
-        clearances.filter(office=office).update(**_clearance_reset_fields())
-        return _stage_reviewed_by(record, office)
-
-    RecordClearance.objects.filter(record=record).delete()
-    return first_status_for(record)
-
-
-def _stage_reviewed_by(record, office: str) -> str:
-    """
-    The clearance stage this office reviews at, for this record.
-
-    KTTO is the awkward one: it acts at both `itso_review` and `parallel_review`,
-    so which stage to route back to depends on whether ITSO is still pending.
-    Derived from the table rather than hardcoded, so an added office lands
-    correctly without another branch here.
-    """
-    from apps.reviews.models import RecordClearance
-
-    stages, _ = load_table()
-    candidates = [
-        status
-        for status, stage in stages.items()
-        if stage.is_parallel and office in stage.offices
-    ]
-    if not candidates:
-        return first_status_for(record)
-    if len(candidates) == 1:
-        return candidates[0]
-
-    # Acts at more than one stage. Route to the earliest whose *other* offices
-    # still have work outstanding -- for KTTO that is itso_review while ITSO is
-    # pending, and parallel_review once it is not.
-    for status in (PipelineStatus.ITSO_REVIEW, PipelineStatus.PARALLEL_REVIEW):
-        if status not in candidates:
-            continue
-        peers = [o for o in stages[status].offices if o != office]
-        if RecordClearance.objects.filter(
-            record=record, office__in=peers, status=ClearanceStatus.PENDING
-        ).exists():
-            return status
-    return candidates[-1]
-
-
-def _resolve_first_status(record, **_) -> str:
-    """Submission out of draft — the same type-differentiated entry the pipeline uses."""
-    return first_status_for(record)
-
-
-def _resolve_restore_previous(record, restore_to=None, **_) -> str:
-    """
-    Where a record goes when its delete request is declined.
-
-    `restore_to` is the `DeleteRequest.previous_pipeline_status` the caller
-    holds. The fallback reproduces today's behaviour exactly: an older row may
-    predate that column being populated, and those records fall back to
-    `approved` for a Proposal and `published` for anything else.
-    """
-    if restore_to:
-        return restore_to
-    type_name = record.record_type.name if record.record_type else ""
-    return (
-        PipelineStatus.APPROVED
-        if type_name == RecordTypeName.PROPOSAL
-        else PipelineStatus.PUBLISHED
-    )
-
-
-_RESOLVERS = {
-    "after_adviser_review": _resolve_after_adviser_review,
-    "enter_clearance_stage": _resolve_enter_clearance_stage,
-    "after_clearance": _resolve_after_clearance,
-    "after_resubmission": _resolve_after_resubmission,
-    "first_status": _resolve_first_status,
-    "restore_previous": _resolve_restore_previous,
-}
-
-
 # ---------------------------------------------------------------------------
-# Helpers the table and its callers share
+# Who decides (ADR-032 §2-§3)
 # ---------------------------------------------------------------------------
 
-def _all_clearances_done(record) -> bool:
-    from apps.reviews.models import RecordClearance
-
-    return not RecordClearance.objects.filter(
-        record=record, status=ClearanceStatus.PENDING
-    ).exists()
-
-
-def first_status_for(record) -> str:
-    """The status a record enters when submitted or restarted."""
-    type_name = record.record_type.name if record.record_type else ""
-    return (
-        PipelineStatus.ADVISER_REVIEW
-        if type_name == RecordTypeName.PROPOSAL
-        else PipelineStatus.RDCO_INTAKE
-    )
-
-
-#: Where each record type enters, and who may decide it (ADR-021 §3, §9).
-#: Declared here because §9 puts them beside the table; IR-258's tracker is
-#: their first reader, and IR-260 makes submission and decisions read them
-#: too. Keyed by `RecordTypeName`; a type not listed takes the
-#: Thesis/Research route, as `first_status_for` already does.
-ENTRY_PARTY = {RecordTypeName.PROPOSAL: Party.ADVISER}
-DEFAULT_ENTRY_PARTY = Party.INTAKE
+#: The parties with decision authority over a record of each type. The tracker
+#: reads them to tell *final review* from *in review*. A type not listed takes
+#: the Thesis/Research row. Every type *enters* at its Adviser (ADR-032 §1).
 DECIDING_PARTIES = {RecordTypeName.PROPOSAL: frozenset({Party.ADVISER, Party.RDCO})}
 DEFAULT_DECIDING_PARTIES = frozenset({Party.RDCO})
 
@@ -755,38 +233,44 @@ def type_name_of(record) -> str:
     return record.record_type.name if record.record_type else ""
 
 
-def entry_party_for(record) -> str:
-    """
-    The party a record of this type is submitted to.
-
-    On the adviser-first model (stored `in_review`, IR-261) every type enters
-    at its Adviser (ADR-032 §1). A record still on this pipeline keeps the
-    legacy entry, so the tracker's "submitted" stays right for a Thesis sitting
-    at intake. IR-260 deletes the legacy branch with the pipeline.
-    """
-    if record.pipeline_status == PipelineStatus.IN_REVIEW:
-        return Party.ADVISER
-    return ENTRY_PARTY.get(type_name_of(record), DEFAULT_ENTRY_PARTY)
-
-
 def deciding_parties_for(record) -> frozenset:
     """The parties with decision authority over a record of this type."""
     return DECIDING_PARTIES.get(type_name_of(record), DEFAULT_DECIDING_PARTIES)
 
 
+# ---------------------------------------------------------------------------
+# Resolvers -- the closed set of dynamic destinations
+# ---------------------------------------------------------------------------
+
+def _resolve_restore_previous(record, restore_to=None, **_) -> str:
+    """
+    Where a record goes when its delete request is declined.
+
+    `restore_to` is the `DeleteRequest.previous_pipeline_status` the caller
+    holds. The fallback serves an older row that predates that column being
+    populated: `approved` for a Proposal, `published` for anything else.
+    """
+    if restore_to:
+        return restore_to
+    return (
+        PipelineStatus.APPROVED
+        if type_name_of(record) == RecordTypeName.PROPOSAL
+        else PipelineStatus.PUBLISHED
+    )
+
+
+_RESOLVERS = {
+    "restore_previous": _resolve_restore_previous,
+}
+
+
 def edge_for(status: str, event: WorkflowEvent) -> Edge | None:
     """The declared edge, or None when the transition is not legal."""
-    _, transitions = load_table()
-    return transitions.get((status, event))
+    return load_table().get((status, event))
 
 
 def require_edge(record, event: WorkflowEvent) -> Edge:
-    """
-    The declared edge from the record's current status, or a refusal.
-
-    `apply()` calls this, and so may a caller that must refuse *before* it
-    writes anything of its own (IR-265) -- one legality check, one message.
-    """
+    """The declared edge from the record's current status, or a refusal."""
     edge = edge_for(record.pipeline_status, event)
     if edge is None:
         raise InvalidPipelineTransition(
@@ -801,50 +285,21 @@ def require_edge(record, event: WorkflowEvent) -> Edge:
 # ---------------------------------------------------------------------------
 
 @transaction.atomic
-def apply(
-    record,
-    event: WorkflowEvent,
-    actor=None,
-    *,
-    office=None,
-    declining_stage=None,
-    restore_to=None,
-    review=None,
-) -> str:
+def apply(record, event: WorkflowEvent, actor=None, *, restore_to=None) -> str:
     """
     Resolve and persist the record's next `pipeline_status`. Returns it.
 
-    **Also writes the shadow routing rows** (IR-257): who holds the record, who
-    sent it where, and what revision is outstanding. They land in this same
-    transaction, after the status, so they can never describe a move that did
-    not happen. `review` is the `Review` the caller wrote for this transition,
-    if any; it is linked to the assignment it was made under. See
-    `apps.reviews.shadow`.
-
-    **Atomic from the first commit** (ADR-002's Decision, and its Security
-    Impact: this closes the partial-application defect where a record could
-    advance having been cleared by one office instead of two). The clearance
-    rows a resolver writes and the status change land together or not at all.
+    **A soft delete also ends the record's review**: every active assignment,
+    its open seats and every open revision request are withdrawn in the same
+    transaction (`reviews.withdrawal`). Nobody finished, so nothing is closed
+    as *completed*. The legacy `shadow.sync()` did this as a side effect of
+    reconciling from the old stage; IR-274 states it as its own rule.
 
     Raises `InvalidPipelineTransition` when the table declares no such edge.
-    That is a **legality** verdict, not an authorization one — callers check who
-    may act *before* calling this. See the module docstring.
-
-    Deliberately does not create the `Review` row, send notifications, or touch
-    IR-139's resubmission counters. Those are orchestration and stay in
-    `reviews.services`, which is also what honours IR-136's "do not rebuild the
-    eleven transitions" instruction.
+    That is a **legality** verdict, not an authorization one -- callers check
+    who may act *before* calling this.
     """
-    from apps.reviews import shadow
-
     edge = require_edge(record, event)
-    # Who acted, read before the move: a reviewer acts as the party of the
-    # stage the record was *at*. Anything else was the submitter or the system.
-    acting_party = (
-        shadow.party_for_stage(review_stage_for(record.pipeline_status, office))
-        if event in REVIEW_EVENTS
-        else None
-    )
 
     if edge.to is not None:
         destination = edge.to
@@ -854,17 +309,14 @@ def apply(
             raise InvalidPipelineTransition(
                 f"the table names resolver '{edge.resolver}', which does not exist"
             )
-        destination = resolver(
-            record,
-            office=office,
-            declining_stage=declining_stage,
-            restore_to=restore_to,
-            actor=actor,
-        )
+        destination = resolver(record, restore_to=restore_to, actor=actor)
 
     if destination != record.pipeline_status:
         record.pipeline_status = destination
         record.save(update_fields=["pipeline_status", "updated_at"])
 
-    shadow.sync(record, event, actor, acting_party=acting_party, review=review)
+    if event is WorkflowEvent.SOFT_DELETE:
+        from apps.reviews.withdrawal import withdraw_review
+
+        withdraw_review(record, actor)
     return destination

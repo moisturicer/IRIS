@@ -6,6 +6,8 @@
 
 > **Amendment to §4 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** §4's obligation binds a question *routed as corpus-level or landscape*, and §5's router does not exist (verified 2026-10-06: no routing module, no Lens, IR-302–305 unbuilt), so **§4 is dormant, not satisfied**. ADR-035 §9 records a bounded landscape exception: ordinary retrieval **does not** satisfy Lens-or-refuse, no answer may claim a comprehensive landscape or research-gap analysis from it, an accountable owner must be **named by a person** before any production `on`, and the exception **expires at that go/no-go**. It is not a blanket postponement.
 
+> **Amendment proposed — 2026-10-11 (IR-499). Not accepted.** [ADR-038](038-bounded-research-lane-for-ask-iris.md) defines **topic counts** as screened counts with completeness labels, keeps metadata counts exact, and applies §4 and §9's "the model reports rows and never extends them" to counts and lists of papers. Drafted by an AI agent; awaiting a named approver. See §Amendment — 2026-10-11 below.
+
 **Extends [ADR-013](013-chunk-level-rag-pipeline.md)** rather than amending it. ADR-013 made the chunk the retrievable unit, which is right for questions about a Record's contents. This ADR covers questions about the corpus itself, which retrieval cannot answer at all.
 
 **Depends on [ADR-023](023-retrieval-quality-evaluation.md)** for its evaluation structure, and on [IR-153](https://citiris.atlassian.net)'s visibility guarantee for its security posture.
@@ -166,6 +168,21 @@ That last rule is **§4 applied to Records instead of counts** — *the Lens com
 
 **A separate ADR for listings was considered and rejected.** The guard a listing needs is already written down here: §4's computes-then-reports rule, and §3's visibility-before-aggregation rule. A second ADR would restate both in slightly different words, and the two would then drift — the one thing the source-of-truth hierarchy exists to prevent. A listing is a fourth outcome of this ADR's routing, so it belongs in this ADR.
 
+
+## Amendment — 2026-10-11 (IR-499): topic counts are screened counts
+
+**Status: Proposed, not accepted.** Drafted by an AI agent. The decision is in [ADR-038](038-bounded-research-lane-for-ask-iris.md) §6. Until a person accepts it, §1–§9 stand.
+
+This ADR counted records over named Areas only. A question such as *"how many papers are about aquaponics?"* has no Area. It needs a topic criterion applied to individual papers, which is a judgement, not a predicate.
+
+* **A metadata count stays exact.** The criterion is a database predicate (classification, PSCED, record type, year, IP flag), and the count is `COUNT(DISTINCT id)` over `visible_to(user)`. It is worded "of the records you can see" (§3).
+* **A topic count is a screened count.** Find, screen against a written criterion, de-duplicate by record, count. Its answer states how many records were screened and how many could not be assessed, and it never says "there are N".
+* **Completeness labels** decide the wording, not the model: `exhaustive`, `screened`, `matches_found`, `sample`.
+* **Never from top-k retrieval or from chunks.** Counts are of distinct records. Possible duplicates are reported, not merged.
+* **§4 and §9 extend to counts and lists of papers:** the application computes and renders the rows, and the model may describe them and may never add, remove or invent one.
+* **§3 is unchanged.** Every count is relative to the asker. A cached or cross-user aggregate is not authorised.
+* **§4's landscape obligation is unchanged,** and ADR-035 §9's interim limit still holds until the Lens exists.
+* **Open (ADR-038 §12):** how a record the reader can see but the disclosure gate refuses is counted.
 
 ## Alternatives Considered
 

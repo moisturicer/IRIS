@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
-import { reviewsApi, seatsApi } from "@/api/reviews";
+import { seatsApi } from "@/api/reviews";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button, Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -44,7 +44,10 @@ import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
+import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
+import { REVIEW_ACTIONS } from "./reviewActions";
+import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -287,8 +290,8 @@ const SECTION_LABELS: Record<PaperSection, string> = {
  * Four sections, kept in the URL as `?section=`: **Overview**, **Paper**,
  * **Review** and **Files**. Which ones a viewer sees, and which actions the
  * header offers, come from the capabilities adapter
- * (`features/records/capabilities.ts`); this page reads no role name and no
- * `can_act` of its own. A section the viewer may not open falls back to
+ * (`features/records/capabilities.ts`); this page reads no role name of its
+ * own. A section the viewer may not open falls back to
  * Overview, so an old or shared link never shows a broken page.
  *
  * Switching sections *replaces* the history entry rather than adding one, and
@@ -311,8 +314,9 @@ export default function PaperViewPage() {
   const [attempt, setAttempt] = useState(0);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
-  const [resubmitting, setResubmitting] = useState(false);
-  const [resubmitError, setResubmitError] = useState<string | null>(null);
+  /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
+  const [newVersionOpen, setNewVersionOpen] = useState(false);
+  const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
   /** Bumped when a document request changes, so the tracker reloads. */
   const [trackerVersion, setTrackerVersion] = useState(0);
 
@@ -338,15 +342,18 @@ export default function PaperViewPage() {
     else arrivalKey.current = location.key;
   }
 
-  /** Set or clear one view parameter in place, keeping the rest and the router state. */
-  const setViewParam = (name: string, value: string | null) => {
+  /** Set or clear view parameters in place, keeping the rest and the router state. */
+  const setViewParams = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
-    if (value == null) next.delete(name);
-    else next.set(name, value);
+    for (const [name, value] of Object.entries(changes)) {
+      if (value == null) next.delete(name);
+      else next.set(name, value);
+    }
     const search = next.toString();
     viewChange.current = `${location.pathname}${search ? `?${search}` : ""}`;
     setSearchParams(next, { replace: true, state: location.state });
   };
+  const setViewParam = (name: string, value: string | null) => setViewParams({ [name]: value });
 
   // Below `lg` the docked chat is a bottom sheet over the paper; at `lg` it
   // is a column beside it (IR-352).
@@ -390,24 +397,6 @@ export default function PaperViewPage() {
     // `attempt` is Try again; a retry is not a second visit to count.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, attempt]);
-
-  const handleResubmit = async () => {
-    if (!id) return;
-    setResubmitting(true);
-    setResubmitError(null);
-    try {
-      await reviewsApi.resubmit(Number(id));
-      const { data } = await recordsApi.detail(Number(id));
-      setRecord(data);
-    } catch (err: unknown) {
-      setResubmitError(
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-          "Resubmission failed. Please try again.",
-      );
-    } finally {
-      setResubmitting(false);
-    }
-  };
 
   // Share copies the paper's permanent link (IR-356), the address a reader
   // would paste to a colleague. A blocked clipboard claims nothing.
@@ -482,7 +471,7 @@ export default function PaperViewPage() {
   const arriving = loading || record.id !== Number(id);
 
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
-  const can = capabilitiesFor(record, viewer);
+  const can = capabilitiesFor(record);
   const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
   const participant = isParticipant(record, viewer);
@@ -533,35 +522,89 @@ export default function PaperViewPage() {
           ? DOCKED_PANEL_CLASS
           : FLOATING_PANEL_CLASS;
   const showRail = section === "overview" && !chatDocked && !arriving;
+  // Versions (IR-416). Null to a viewer who may not read the review, so a
+  // reader of a published paper has none, and `?version=` means nothing to
+  // them. An earlier version is open only while it is asked for, exists and
+  // has a manuscript; the newest is the current paper, read as it always was.
+  const versions = record.versions ?? [];
+  const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
+  const askedVersion = Number(searchParams.get("version"));
+  // While the owner's revised manuscript is unsubmitted (IR-273), the current
+  // paper is that upload, so the newest version opens like an earlier one.
+  const viewedVersion =
+    versions.find(
+      (v) =>
+        v.number === askedVersion && (v !== latestVersion || record.manuscript_unsubmitted) && v.manuscript_url,
+    ) ?? null;
+  /** Open version `n`, or the current paper for null, in a section that shows the paper. */
+  const chooseVersion = (n: number | null) =>
+    setViewParams({
+      version: n == null ? null : String(n),
+      ...(section !== "paper" && section !== "review" && sections.includes("paper")
+        ? { section: "paper" }
+        : {}),
+    });
+  // A citation's regions and page are the current paper's (ADR-031), so an
+  // earlier version opens at its start with nothing highlighted.
   const highlightRegions: Region[] =
-    navCitation && navCitation.record_id === record.id && "regions" in navCitation
+    !viewedVersion && navCitation && navCitation.record_id === record.id && "regions" in navCitation
       ? navCitation.regions
       : [];
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = (toolbarStart?: ReactNode) => (
-    <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
-      <PaperPdfReader
-        recordId={record.id}
-        scrollToPage={openAtPage}
-        highlightRegions={highlightRegions}
-        navKey={arrivalKey.current}
-        toolbarStart={toolbarStart}
-      />
-    </Suspense>
+    <>
+      {viewedVersion && latestVersion && (
+        <VersionBanner
+          viewing={viewedVersion.number}
+          latest={latestVersion.number}
+          onBack={() => setViewParam("version", null)}
+        />
+      )}
+      {/* The owner reads their own unsubmitted upload; nobody else is served
+          it (IR-273), so only they are told. */}
+      {!viewedVersion && record.manuscript_unsubmitted && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 flex items-start gap-3">
+          <i className="fas fa-file-pen text-sm text-brand mt-0.5" aria-hidden />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-semibold text-stone-900">Your revised manuscript, not yet submitted</p>
+            <p className="text-stone-700 mt-0.5">
+              Reviewers still read {latestVersion ? `v${latestVersion.number}` : "the submitted version"} until
+              you submit the new version.
+            </p>
+            <p className="text-stone-700 mt-0.5">
+              Ask IRIS answers about the submitted version
+              {latestVersion ? ` (v${latestVersion.number})` : ""} until you submit.
+            </p>
+          </div>
+        </div>
+      )}
+      <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
+        <PaperPdfReader
+          recordId={record.id}
+          version={viewedVersion?.number ?? null}
+          scrollToPage={viewedVersion ? null : openAtPage}
+          highlightRegions={highlightRegions}
+          navKey={arrivalKey.current}
+          toolbarStart={toolbarStart}
+        />
+      </Suspense>
+    </>
   );
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else Save. When
   // the pending action has its own region -- the revision banner, the
-  // Review section's decision -- the header fills nothing.
+  // Review section's action bar -- the header fills nothing. The bar fills
+  // its first granted action, so any granted review action puts the primary
+  // there.
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
       ? "elsewhere"
       : can.has("open_review") && section !== "review"
         ? "open_review"
-        : section === "review" && can.has("decide")
+        : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
           ? "elsewhere"
           : "save";
 
@@ -680,9 +723,8 @@ export default function PaperViewPage() {
                 {record.title}
               </h1>
 
-              {/* Byline: authors · college · year. The detail payload names
-                  no adviser (only an id), so none is shown rather than one
-                  invented. */}
+              {/* Byline: authors · adviser · college · year (spec §4.6).
+                  No adviser line when the record names none (IR-472). */}
               <div className="flex items-center gap-x-3 gap-y-2 flex-wrap text-sm text-stone-600">
                 {byline && (
                   <span className="inline-flex items-center gap-2 min-w-0">
@@ -692,14 +734,24 @@ export default function PaperViewPage() {
                     <span className="font-semibold text-stone-800">{byline}</span>
                   </span>
                 )}
+                {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
                 <span>Cebu Institute of Technology – University</span>
                 {record.year_accomplished && <span>{record.year_accomplished}</span>}
               </div>
 
               {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
-                  and the version picker (IR-416) render here once the
-                  payload carries them. Until then, nothing -- never an
-                  empty or made-up state (spec §4.11). */}
+                  renders here once the payload carries it -- never an empty
+                  or made-up state (spec §4.11). The version picker (IR-416)
+                  only with two or more versions to choose between, or one
+                  beside the owner's unsubmitted revision (IR-273). */}
+              {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (
+                <VersionPicker
+                  unsubmitted={record.manuscript_unsubmitted}
+                  versions={versions}
+                  viewing={viewedVersion?.number ?? null}
+                  onChoose={chooseVersion}
+                />
+              )}
 
               <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-stone-500">
                 <span className="inline-flex items-center gap-1.5">
@@ -815,28 +867,90 @@ export default function PaperViewPage() {
               <>
                 {/* Action required (spec §4.10): what is waiting on the
                     owner comes first. */}
-                {can.has("create_version") && (
-                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                    <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
+                {/* Revision requests are answered through Submit new version. */}
+                {userIsOwner && record.revision.open.length > 0 && (
+                  <section
+                    aria-labelledby="revision-requested-heading"
+                    className="rounded-2xl border border-brand-200 bg-brand-50 p-4"
+                  >
+                    <h2
+                      id="revision-requested-heading"
+                      className="text-sm font-bold text-brand-dark flex items-center gap-2"
+                    >
                       <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
                       Revision requested
-                    </p>
+                    </h2>
                     <p className="text-sm text-brand leading-relaxed mt-1">
-                      Address the reviewer comments in the Review section, then resubmit. Offices that
-                      already cleared this record keep their clearance — only the office that asked for
-                      changes reviews it again.
+                      Nothing can be decided on this record until you answer with a new version. Offices
+                      that already cleared it keep their clearance; only the reviewers who asked look again.
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleResubmit}
-                      disabled={resubmitting}
-                      className={cn(PILL_PRIMARY, "mt-3")}
-                    >
-                      <i className="fas fa-paper-plane text-2xs" aria-hidden />
-                      {resubmitting ? "Resubmitting…" : "Resubmit for review"}
-                    </button>
-                    {resubmitError && <p className="text-xs text-brand mt-2">{resubmitError}</p>}
-                  </div>
+                    <ul className="mt-3 space-y-3">
+                      {record.revision.open.map((r) => (
+                        <li key={r.id} className="text-sm text-stone-900">
+                          <p className="font-semibold">
+                            {r.label} asked for changes
+                            {r.version != null && <span className="font-normal text-stone-600"> · on v{r.version}</span>}
+                          </p>
+                          {r.reason && (
+                            <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
+                              {r.reason}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {can.has("create_version") && record.revision.new_version && (
+                      <div className="mt-4 border-t border-brand-200 pt-3">
+                        <p className="text-sm text-stone-700 leading-relaxed">
+                          Upload a revised manuscript or a requested document in Files, or edit the
+                          details, then submit. {newVersionSummary(record.revision.new_version)}
+                        </p>
+                        {record.revision.new_version.blocked && (
+                          <p id="new-version-blocked" className="text-sm text-brand mt-2">
+                            {record.revision.new_version.blocked}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setNewVersionOpen(true)}
+                          disabled={record.revision.new_version.blocked != null}
+                          aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
+                          className={cn(PILL_PRIMARY, "mt-3")}
+                        >
+                          <i className="fas fa-paper-plane text-2xs" aria-hidden />
+                          Submit new version
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                )}
+                {/* Rendered while a version can be submitted, so the
+                    announcement lands when it fills; nowhere else, so the page
+                    keeps one status region (Share's) otherwise. */}
+                {(record.revision.new_version != null || newVersionDone) && (
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    className={newVersionDone ? "text-sm text-stone-700 flex items-center gap-2" : "sr-only"}
+                  >
+                    {newVersionDone && <i className="fas fa-check text-brand text-xs" aria-hidden />}
+                    {newVersionDone ?? ""}
+                  </p>
+                )}
+                {newVersionOpen && record.revision.new_version && (
+                  <NewVersionDialog
+                    recordId={record.id}
+                    hint={record.revision.new_version}
+                    newManuscript={record.manuscript_unsubmitted}
+                    onClose={() => setNewVersionOpen(false)}
+                    onDone={(outcome) => {
+                      setNewVersionOpen(false);
+                      setNewVersionDone(outcome);
+                      setTrackerVersion((n) => n + 1);
+                      // A failed reload leaves the page as it was; the next visit catches up.
+                      recordsApi.detail(record.id).then(({ data }) => setRecord(data)).catch(() => {});
+                    }}
+                  />
                 )}
 
                 {userIsOwner && (
@@ -915,6 +1029,7 @@ export default function PaperViewPage() {
                 editable={can.has("edit_details")}
                 reviewing={reviewing}
                 attach={can.has("attach_file")}
+                replaceManuscript={can.has("replace_manuscript")}
                 onChanged={handleDocumentRequestChanged}
               />
             )}
@@ -976,6 +1091,7 @@ export default function PaperViewPage() {
           canChangePosition={!onPaperTab}
           minimized={chatMinimized}
           onRestore={() => chat.setMinimized(false)}
+          viewingVersion={viewedVersion?.number ?? null}
           className={chatPanelClass}
         />
       ) : (

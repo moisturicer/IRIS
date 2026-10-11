@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, redirect } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
@@ -19,8 +19,7 @@ import MyWorkspacePage      from "@/features/records/MyWorkspacePage";
 import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
-import ReviewQueuePage      from "@/features/review/ReviewQueuePage";
-import EvaluationPage       from "@/features/review/EvaluationPage";
+import MyReviewsPage        from "@/features/review/MyReviewsPage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
@@ -29,7 +28,6 @@ import SettingsPage         from "@/features/settings/SettingsPage";
 import HelpPage             from "@/features/help/HelpPage";
 import DownloadRequestsPage  from "@/features/admin/DownloadRequestsPage";
 import DeleteRequestsPage    from "@/features/admin/DeleteRequestsPage";
-import ApprovedProposalsPage from "@/features/review/ApprovedProposalsPage";
 
 export const router = createBrowserRouter([
   { path: "/login",  element: <LoginPage /> },
@@ -71,8 +69,8 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
             children: [
-              { path: "review",              element: <ReviewQueuePage />,     handle: { crumb: "Review Queue" } },
-              { path: "review/:id/evaluate", element: <EvaluationPage />,      handle: { crumb: "Evaluate" } },
+              { path: "review",              element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
+              { path: "review/:id/evaluate", loader: ({ params }) => redirect(`/records/${params.id}?section=review`) },
             ],
           },
 
@@ -81,7 +79,6 @@ export const router = createBrowserRouter([
             // path -- which is why RDCO does not also get the submission wizard.
             element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
             children: [
-              { path: "review/approved-proposals", element: <ApprovedProposalsPage />, handle: { crumb: "Approved Proposals" } },
               { path: "records/import",            element: <ImportRecordsPage />,     handle: { crumb: "Import Records" } },
               { path: "admin/role-requests",       element: <RoleRequestsPage />,      handle: { crumb: "Role Requests" } },
               { path: "admin/download-requests",   element: <DownloadRequestsPage />,  handle: { crumb: "Download Requests" } },

@@ -1,6 +1,6 @@
 """The closed set of Inference tasks (IR-378, ADR-036 §Amendment).
 
-Four names, defined here and nowhere else. A caller asks for a task rather
+Task names, defined here and nowhere else. A caller asks for a task rather
 than for "the LLM", and an unrecognised name raises instead of falling
 through to a default -- ADR-036's no-silent-fall-through rule, which the
 amendment says matters more now that configuration is per task.
@@ -25,6 +25,9 @@ class InferenceTask(Enum):
 
     ANSWER = "answer"
     RESOLVE = "resolve"
+    ROUTE = "route"
+    PLAN = "plan"
+    SCREEN = "screen"
     SUMMARY = "summary"
     DESCRIBE_FIGURE = "describe_figure"
 
@@ -46,7 +49,7 @@ class InferenceTask(Enum):
 
 
 class UnknownInferenceTask(ValueError):
-    """A name that is not one of the four."""
+    """A name outside the closed task set."""
 
 
 def inference_task(name: Union[InferenceTask, str]) -> InferenceTask:

@@ -33,7 +33,7 @@ from core.enums import (
     SeatState,
 )
 
-from .test_workflow_characterisation import make_user
+from .workflow_test_helpers import make_user
 
 
 def accept_url(record):
@@ -363,9 +363,10 @@ class RefusalTests(RoutingTestBase):
             status.HTTP_403_FORBIDDEN,
         )
 
-    def test_a_record_on_the_old_pipeline_is_refused(self):
+    def test_a_record_not_in_review_is_refused(self):
+        """IR-274: this was asked of a record still holding a fixed-pipeline status. Those statuses are gone; the refusal they exercised -- a record not in review -- is asked of a published record instead."""
         legacy = self.make_record(requested_itso=True)
-        legacy.pipeline_status = PipelineStatus.ITSO_REVIEW
+        legacy.pipeline_status = PipelineStatus.PUBLISHED
         legacy.save(update_fields=["pipeline_status"])
         RecordAssignment.objects.create(record=legacy, party=Party.ITSO)
         self.seat(legacy, Party.ITSO, self.itso)

@@ -1,0 +1,5 @@
+profile,measured,clean,failures,incomplete,changed,median_warm_seconds,p95_warm_seconds,batch_papers_per_min,peak_cpu_pct,peak_ram_mib,peak_gpu_used_mib,peak_gpu_delta_mib
+baseline-start,2,2,0,0,0,22.251,22.251,2.475,104.71,3069.95,5255,3165
+cpu-only-4,2,0,0,0,2,,,,403.38,3116.03,2144,0
+cpu-only-8,2,0,0,0,2,,,,762.34,2834.43,2055,0
+baseline-end,2,2,0,0,0,26.245,26.245,2.272,117.56,3151.87,4927,2989

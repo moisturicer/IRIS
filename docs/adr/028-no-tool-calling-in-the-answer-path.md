@@ -8,6 +8,8 @@ The reasoning, the evidence table and the three revisit conditions below are **k
 
 > **Supersession — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** It adopts one no-argument `search_corpus` tool call used **only as a route signal** — never executed, no loop, no model-written query — to decide whether a question needs evidence at all. It **keeps every reason, the evidence table and the three revisit conditions below**, assesses each (1 holds · 2 partly · 3 does not), and records that it proceeds on condition 1 plus a design argument rather than on the measurement this ADR asked for. It also records that the page-precision objection in reason (1) **has no instrument** and can be neither confirmed nor refuted today. **ADR-035 has been accepted by a human reviewer, so this ADR's decision no longer stands; its reasoning does.**
 
+> **Amendment proposed — 2026-10-11 (IR-499). Not accepted.** [ADR-038](038-bounded-research-lane-for-ask-iris.md) builds a bounded research lane that executes tool calls. It does **not** satisfy revisit condition 3. See §Amendment — 2026-10-11 below.
+
 **Constrains [ADR-026](026-conversational-retrieval-and-memory.md) and [ADR-027](027-corpus-level-questions.md)**, both of which specify explicit mechanisms — question resolution, routing, conditional decomposition — that a tool-calling agent would have replaced.
 
 ## Context
@@ -64,6 +66,15 @@ It also weakens two protections. `LLMProvider`'s split `system`/`user` arguments
 ### What is kept from the idea
 
 Tool calling's transferable benefit is that **the tool's argument is a visible record of what the system decided to look for**. IRIS already has that, twice, without the architecture: ADR-026's Resolved question is stored and shown, and ADR-027's routing decision is shown and overridable.
+
+## Amendment — 2026-10-11 (IR-499): a research lane is built before condition 3 is met
+
+**Status: Proposed, not accepted.** Drafted by an AI agent. The decision is in [ADR-038](038-bounded-research-lane-for-ask-iris.md). Until a person accepts it, this ADR's status and reasoning stand as above.
+
+* **Revisit condition 3 is still unmet, and ADR-038 says so.** No measured comparison of an agentic loop against the pipeline exists, and reason (1)'s page-precision cost still has no instrument.
+* **Condition 2 is still partial:** the 40-paper arXiv proxy corpus only. Condition 1 holds, as ADR-035 assessed on 2026-10-06.
+* **The lane ships before it is measured,** off by default. Evaluation is the deferred evaluation ticket, IR-505.
+* **Reasons (1), (3) and (4) are kept** as the standing record of what the lane has not shown. Nobody may cite the lane's existence as evidence that this ADR's bar was cleared.
 
 ## Alternatives Considered
 

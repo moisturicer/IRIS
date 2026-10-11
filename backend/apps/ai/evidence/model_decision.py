@@ -79,6 +79,12 @@ REASON_MALFORMED_ARGUMENTS = "malformed_arguments"
 REASON_TIMEOUT = "timeout"
 REASON_RATE_LIMITED = "rate_limited"
 REASON_PROVIDER_FAILURE = "provider_failure"
+#: Route-label mode (IR-481): the model's text was not exactly one label.
+REASON_INVALID_JSON = "invalid_json"
+REASON_EXTRA_TEXT = "extra_text"
+REASON_UNKNOWN_LABEL = "unknown_label"
+#: Jev Noul mode (IR-482): the response was not a probability in the promised shape.
+REASON_MALFORMED_RESPONSE = "malformed_response"
 
 DECIDED_REASONS = (REASON_SEARCH_REQUESTED, REASON_ANSWERED_DIRECTLY)
 FALLBACK_REASONS = (
@@ -90,6 +96,10 @@ FALLBACK_REASONS = (
     REASON_TIMEOUT,
     REASON_RATE_LIMITED,
     REASON_PROVIDER_FAILURE,
+    REASON_INVALID_JSON,
+    REASON_EXTRA_TEXT,
+    REASON_UNKNOWN_LABEL,
+    REASON_MALFORMED_RESPONSE,
 )
 REASONS = DECIDED_REASONS + FALLBACK_REASONS
 
@@ -170,6 +180,12 @@ class ModelDecision:
     answer_present: bool = False
     answer_chars: int = 0
     model: str = ""
+    #: Jev Noul mode only: the returned probability that the corpus is needed.
+    #: A number, not model text; `None` for every other mode and for a fallback.
+    probability: Optional[float] = None
+    #: What the vendor reported for the call, when it reports one (Jev does).
+    #: `None` is "not reported", never zero.
+    cost_usd: Optional[float] = None
 
     @property
     def evidence_required(self) -> bool:
@@ -181,7 +197,7 @@ class ModelDecision:
         return self.reason in DECIDED_REASONS
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "route": self.route,
             "reason": self.reason,
             "anomalies": list(self.anomalies),
@@ -191,7 +207,12 @@ class ModelDecision:
             "answer_present": self.answer_present,
             "answer_chars": self.answer_chars,
             "model": self.model,
+            "probability": self.probability,
         }
+        # Only when reported, so the dict a shadow row stores is unchanged.
+        if self.cost_usd is not None:
+            out["cost_usd"] = self.cost_usd
+        return out
 
 
 def build_user_message(

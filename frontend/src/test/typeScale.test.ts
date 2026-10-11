@@ -89,9 +89,11 @@ describe("type scale", () => {
   });
 
   it("sets Discover titles in the face the paper view gives a title", () => {
+    // Since IR-407 (F2) Discover draws no title of its own: its page head is
+    // `PageHeader` and its results are `ResearchCard`, so the guard reads those.
     for (const file of [
-      "/src/features/discover/DiscoverRecordCard.tsx",
-      "/src/features/discover/DiscoverPage.tsx",
+      "/src/components/shared/ResearchCard.tsx",
+      "/src/components/layout/PageHeader.tsx",
     ]) {
       // Only EB Garamond 600 is loaded, so a title is semibold, never bold.
       expect(sources[file], `${file} has no display-face title`).toMatch(

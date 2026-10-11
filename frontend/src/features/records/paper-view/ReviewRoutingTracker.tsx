@@ -228,8 +228,13 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
     : row.in_pool
       ? IN_POOL_META
       : STATE_META[row.state];
-  // An outcome is shown once there is one. "Pending" is not a conclusion.
-  const outcome = row.outcome && row.outcome !== "pending" ? row.outcome : null;
+  // An outcome is shown once there is one. "Pending" is not a conclusion, and
+  // an open revision request reads as *Changes requested* below rather than
+  // as the review that made it (IR-272).
+  const outcome =
+    row.outcome && row.outcome !== "pending" && !(row.changes_requested && row.outcome === "declined")
+      ? row.outcome
+      : null;
 
   return (
     <tr className="border-t border-stone-100 first:border-t-0 align-top">
@@ -257,8 +262,14 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
             </span>
           )}
           {row.in_pool && <span className="font-semibold text-brand">· Unassigned</span>}
+          {row.changes_requested && (
+            <span className="font-semibold text-brand">· Changes requested</span>
+          )}
           {row.awaiting_document && (
             <span className="font-semibold text-brand">· Awaiting document</span>
+          )}
+          {row.withdrawn_by_decision && (
+            <span className="text-stone-600">· {row.withdrawn_by_decision}</span>
           )}
           {row.preserved && (
             <span

@@ -24,8 +24,9 @@
  * jsdom and no DOM types.
  */
 
-import { nextTrapFocus, oneStopPerRadioGroup } from "./focusTrap";
-import { expect, test } from "vitest";
+import { nextTrapFocus, oneStopPerRadioGroup, tabbableWithin } from "./focusTrap";
+import { afterEach, expect, test, vi } from "vitest";
+import { pretendLaidOut } from "@/test/layout";
 
 
 // --- the smallest assert that does the job ---------------------------------
@@ -131,4 +132,87 @@ test("two groups are two stops, and other controls are untouched", () => {
   box.type = "checkbox";
 
   expect(oneStopPerRadioGroup([a, b, box, x, y])).toEqual([a, box, y]);
+});
+
+// --- a closed <details> hides its content from Tab (IR-516) ----------------
+
+// `pretendLaidOut` gets past jsdom's missing layout, which leaves the
+// closed-details rule deciding -- the rule Chrome needs, because it hides a
+// closed details' content without `display: none`, so the layout check alone
+// passes it.
+function laidOut(html: string): HTMLElement {
+  pretendLaidOut();
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  document.body.append(root);
+  return root;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  document.body.innerHTML = "";
+});
+
+const ids = (els: HTMLElement[]) => els.map((el) => el.id);
+
+test("a closed details offers only its summary; Tab from it reaches the control after", () => {
+  const root = laidOut(`
+    <details id="more">
+      <summary id="summary">More details</summary>
+      <select id="classification"><option>x</option></select>
+      <select id="psced"><option>y</option></select>
+    </details>
+    <button id="cancel">Cancel</button>
+    <button id="save">Save</button>`);
+
+  const ring = tabbableWithin(root);
+  expect(ids(ring)).toEqual(["summary", "cancel", "save"]);
+
+  const summary = root.querySelector<HTMLElement>("#summary")!;
+  expect(nextTrapFocus(ring, summary, FWD)?.id).toBe("cancel");
+});
+
+test("an open details offers its content", () => {
+  const root = laidOut(`
+    <details open>
+      <summary id="summary">More details</summary>
+      <select id="classification"><option>x</option></select>
+    </details>
+    <button id="cancel">Cancel</button>`);
+
+  expect(ids(tabbableWithin(root))).toEqual(["summary", "classification", "cancel"]);
+});
+
+test("a control inside a closed details' summary stays tabbable", () => {
+  const root = laidOut(`
+    <details>
+      <summary id="summary">Hints <a id="help" href="#help">help</a></summary>
+      <input id="hidden" />
+    </details>`);
+
+  expect(ids(tabbableWithin(root))).toEqual(["summary", "help"]);
+});
+
+test("only the details' own summary is exempt: a nested summary inside a closed details is hidden", () => {
+  const root = laidOut(`
+    <details>
+      <summary id="outer">Outer</summary>
+      <details open>
+        <summary id="inner">Inner</summary>
+        <input id="deep" />
+      </details>
+    </details>
+    <button id="after">After</button>`);
+
+  expect(ids(tabbableWithin(root))).toEqual(["outer", "after"]);
+});
+
+test("a second summary in a closed details is content, not the toggle", () => {
+  const root = laidOut(`
+    <details>
+      <summary id="toggle">Toggle</summary>
+      <summary id="stray">Stray</summary>
+    </details>`);
+
+  expect(ids(tabbableWithin(root))).toEqual(["toggle"]);
 });

@@ -26,13 +26,28 @@ def configured_depth() -> int:
 def scan_depth():
     """Run vector queries at the configured depth.
 
-    Evaluate querysets inside the block; a lazy one run later uses 40. Inside
-    an outer transaction the depth lasts until that transaction ends.
+    Evaluate querysets inside the block; a lazy one run later uses 40.
+
+    `transaction.atomic()` is only a savepoint inside an outer transaction --
+    every `django_db` test, and any view under `ATOMIC_REQUESTS` -- so
+    `set_config(..., true)` outlives this block and leaks `hnsw.ef_search`
+    into whatever runs next in that same outer transaction.
+    `apps/ai/index_health.py::_planner` hit the identical leak for planner
+    flags (IR-442) and restores by hand; this does the same rather than
+    leaving the setting to whatever the caller happens to run afterwards.
     """
     with transaction.atomic():
         with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('hnsw.ef_search', true)")
+            prior = cursor.fetchone()[0] or "40"
             cursor.execute(
                 "SELECT set_config('hnsw.ef_search', %s, true)",
                 [str(configured_depth())],
             )
-        yield
+        try:
+            yield
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('hnsw.ef_search', %s, true)", [prior]
+                )

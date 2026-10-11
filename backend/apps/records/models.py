@@ -2,6 +2,7 @@ import uuid
 from pathlib import Path
 
 from django.db import models
+from django.utils import timezone
 from django.contrib.postgres.search import SearchVectorField
 from django.contrib.postgres.indexes import GinIndex
 
@@ -15,6 +16,7 @@ from core.enums import (  # noqa: F401
     IPType,
     PipelineStatus,
     RequestStatus,
+    VersionCause,
 )
 
 
@@ -105,8 +107,8 @@ class RecordManager(models.Manager):
         * **The assigned adviser** sees the record they advise. `Adviser` is in
           `REVIEWER_ROLES` but deliberately not in `STAFF_ROLES`, so the role
           alone grants nothing -- the grant is the `adviser` FK pointing at this
-          user. Without this, `adviser_review`, the first gate in the Proposal
-          pipeline, would be unreachable by the person who has to clear it.
+          user. Without this, every record would be unreachable by the person
+          it enters review with (ADR-032 §1).
         * **Anyone authenticated** sees the public catalogue.
 
         Anonymous users get nothing; DRF refuses them before this runs, but a
@@ -172,13 +174,9 @@ class Record(models.Model):
     # subjects and sensitive data, which none of the flags above cover.
     requires_ethics_review  = models.BooleanField(default=False)
 
-    # Conditional parallel-office routing (ADR-018 -- extends
-    # ADR-002's transition table rather than replacing it). The submitter
-    # requests offices here; apps.reviews.services.approve_record() reads
-    # these at rdco_intake to decide which RecordClearance rows to create,
-    # instead of a hardcoded set per record_type. requested_itso takes effect
-    # for Thesis/Research as well as Project: ADR-021 §5 reversed ADR-018's
-    # Project-only rule for ITSO (IR-266).
+    # The submitter's hint of which offices the record needs (ADR-018). Under
+    # ADR-032 the Adviser routes: `apps.reviews.routing` shows these flags to
+    # the router as hints, and they route nothing by themselves (§3).
     requested_itso           = models.BooleanField(default=False)
     requested_ierc           = models.BooleanField(default=False)
     requested_ktto           = models.BooleanField(default=False)
@@ -194,14 +192,15 @@ class Record(models.Model):
         help_text="Specific IP classification set by RDCO/KTTO after final review.",
     )
 
-    # Denormalized pipeline status -- updated by reviews.services on every review action
+    # Where the record is: draft, in review, or a Decision's outcome (ADR-032).
+    # Who holds a record in review is its active assignments, not this value.
     pipeline_status = models.CharField(
         max_length=20, choices=PipelineStatus.choices,
         default=PipelineStatus.DRAFT, db_index=True
     )
 
     # Resubmission history (IR-139). Both are maintained by
-    # reviews.services.resubmit_record and exist because neither can be derived
+    # reviews.new_version and exist because neither can be derived
     # after the fact: a decline's timestamp is when the reviewer decided, not
     # when the owner resubmitted, and the gap between them is exactly the window
     # in which a clearance is either preserved or re-granted. Serializing
@@ -209,6 +208,12 @@ class Record(models.Model):
     # preserved whenever an office happened to clear before the decline landed.
     resubmission_count   = models.PositiveIntegerField(default=0)
     last_resubmitted_at  = models.DateTimeField(null=True, blank=True)
+    # When a detail field last actually changed (IR-273), stamped by
+    # `RecordWriteSerializer.update`. A new version answers a revision request
+    # only if something changed since the request; `updated_at` cannot say
+    # that, because every workflow save moves it too. The manuscript is not a
+    # detail: a new one is told apart by the file a version names.
+    details_edited_at    = models.DateTimeField(null=True, blank=True)
 
     # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
     # `RecordViewSet.submit` and by nothing else -- neither field is writable
@@ -266,6 +271,53 @@ class Record(models.Model):
 
     def __str__(self):
         return self.title[:80]
+
+
+class RecordVersion(models.Model):
+    """
+    A numbered snapshot of what a record put in front of its reviewers
+    (ADR-032 §5, as amended 2026-10-08 for IR-416).
+
+    v1 is written when the record is first submitted, and each resubmission
+    writes the next. Every write goes through `apps.records.versions`, which
+    numbers them.
+
+    **`manuscript` names the stored manuscript file; it is not an FK.** The
+    manuscript is `Record.abstract_file`, one field replaced in place, not a
+    `RecordUpload`. A new upload is stored under a fresh random name
+    (`abstract_file_path`), so it never touches the file an earlier version
+    names. Nothing may delete a file a version still names;
+    `test_record_versions.py` pins that. Null when the record was submitted
+    with no manuscript, which the server has never refused.
+
+    `created_at` has a default rather than `auto_now_add` so the backfill
+    (`records/0015`) can date a version it reconstructs. `created_by` is null
+    where nobody is recorded: imported, seeded and corpus records, and
+    backfilled revisions.
+    """
+
+    record     = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="versions")
+    number     = models.PositiveIntegerField()
+    manuscript = models.FileField(
+        upload_to=abstract_file_path, max_length=255, null=True, blank=True,
+    )
+    cause      = models.CharField(max_length=16, choices=VersionCause.choices)
+    created_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="record_versions",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["record", "number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["record", "number"], name="record_version_number_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.record_id} v{self.number}"
 
 
 class RecordOwner(models.Model):

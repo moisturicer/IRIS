@@ -1,0 +1,3 @@
+# IR-489's deleted synthetic report recorded a tokenizer SHA-256 digest here.
+# This exact historical finding is a checksum, not an API credential.
+2238d124259a4b14941b9a928a6fe82614fe2f23:docs/evaluation/runs/ir489-offline-answers.json:generic-api-key:904

@@ -19,22 +19,17 @@ from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
     IPType,
     PipelineStatus,
-    RecordTypeName,
     RequestStatus,
-    ReviewStage,
-    RoleName,
 )
 from . import lifecycle
 from core.permissions import (
     IsAdmin,
-    IsAdviser,
     IsAuthor,
-    IsOwnerOrStaff,
     IsRDCO,
+    IsRecordOwner,
     IsStaff,
-    get_role_name,
 )
-from .download_service import file_response_for_record, resolve_record_download_file
+from .download_service import file_response_for_record
 from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
@@ -58,6 +53,7 @@ from apps.notifications.services import (
     notify_delete_declined,
 )
 from apps.audit.services import create_audit_event
+from apps.reviews.routing import RoutingError, enter_at_adviser
 
 
 class RecordViewSet(viewsets.ModelViewSet):
@@ -90,20 +86,6 @@ class RecordViewSet(viewsets.ModelViewSet):
         qs = Record.objects.visible_to(self.request.user).select_related(
             "classification", "psced", "record_type", "adviser"
         ).prefetch_related("owners__user", "authors")
-
-        if (
-            self.action == "complete"
-            and get_role_name(self.request.user) == RoleName.ADVISER
-        ):
-            # An Adviser completes only the Proposal they advise (ADR-021 §3,
-            # IR-267). The role gate in get_permissions() admits every Adviser;
-            # narrowing here, rather than refusing in a permission class, makes
-            # an unassigned Adviser's refusal the same 404 as a missing record.
-            # Since IR-264 visible_to() already hides an approved Proposal from
-            # most unassigned Advisers; this narrowing still matters for one who
-            # can read it on other grounds -- an Adviser can author records, so
-            # may *own* a Proposal someone else advises.
-            qs = qs.filter(adviser=self.request.user)
 
         if self.action == "metadata_suggestions":
             # The Publish dialog's prefill is the manuscript's own text, offered
@@ -149,13 +131,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         # later clear the record, could author one (IR-165).
         if self.action == "create":
             return [IsAuthenticated(), IsAuthor()]
-        if self.action in ("update", "partial_update", "destroy", "submit"):
-            return [IsAuthenticated(), IsOwnerOrStaff()]
-        if self.action == "complete":
-            # RDCO or the *assigned* Adviser (IR-267). The assignment is
-            # per-record, so get_queryset() narrows an Adviser to their own
-            # records; this gate only turns away roles that can never complete.
-            return [IsAuthenticated(), (IsRDCO | IsAdviser)()]
+        # Editing details and submitting are an owner's alone (IR-507, ADR-032
+        # §10 Amendment): no office edits or submits a record that is not
+        # theirs, so submission's consent is always an owner's. When an owner
+        # may edit is `update()`'s question (`versions.details_editable`).
+        # Deleting is an owner's too (IR-508): no office deletes a student's
+        # draft or files a delete request in their name. What a delete does in
+        # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
+        if self.action in ("update", "partial_update", "submit", "destroy"):
+            return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -180,6 +164,26 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Record starts as draft — notification fires only when the owner calls /submit/
         self._queue_manuscript_extraction_if_present(serializer, record)
 
+    def update(self, request, *args, **kwargs):
+        """
+        An owner edits only a `draft`, or a record awaiting their revision
+        (IR-507, ADR-032 §10 Amendment). Refused here, before the body is
+        validated, so "not now" is what the owner hears first. A 400, not a
+        403: the owner is the right person at the wrong moment, as with
+        `submit/` on a non-draft. What may change is the serializer's question.
+        `partial_update` comes through here too.
+        """
+        from .versions import details_editable
+
+        record = self.get_object()
+        if not details_editable(record):
+            return Response(
+                {"detail": "This record's details can be edited only while it is a draft "
+                           f"or a revision is asked for, and it is '{record.pipeline_status}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         record = serializer.save()
         self._queue_manuscript_extraction_if_present(serializer, record)
@@ -194,37 +198,77 @@ class RecordViewSet(viewsets.ModelViewSet):
         # extraction on it costs nothing, and the alternative (comparing
         # file contents) costs a read on every save just to skip the common
         # case.
-        if "abstract_file" not in serializer.validated_data or not record.abstract_file:
+        #
+        # Except an owner's revised manuscript, which waits for its version
+        # (IR-273): reviewers are served the submitted one meanwhile, and the
+        # chunks Ask IRIS answers from must be the same file.
+        if "abstract_file" not in serializer.validated_data:
             return
 
-        from apps.documents.models import DocumentKind, PdfExtraction
-        from apps.documents.tasks import extract_manuscript_text
+        from .services import queue_manuscript_extraction
+        from .versions import manuscript_awaits_submission
 
-        # kind, explicitly: abstract_file *is* the manuscript, and IR-239
-        # moved that judgement onto the row so the chunker reads it there
-        # rather than inferring it from which task was queued.
-        PdfExtraction.objects.update_or_create(
-            record=record,
-            defaults={
-                "status": "queued",
-                "error": "",
-                "kind": DocumentKind.MANUSCRIPT,
-            },
-        )
-        transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
+        if manuscript_awaits_submission(record):
+            return
+        queue_manuscript_extraction(record)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        A record already awaiting a delete decision is not deleted again
+        (IR-508). A soft delete is legal from every status, so without this a
+        second DELETE removed the record outright and skipped RDCO's decision,
+        leaving its request pending against a deleted record. A 400: the owner
+        is the right person at the wrong moment, as with the record update.
+        """
+        record = self.get_object()
+        if record.pipeline_status == PipelineStatus.PENDING_DELETE:
+            return Response(
+                {"detail": "A delete decision is already pending for this record."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
-        # Accepted work goes through the delete request flow (RDCO review);
-        # DELETE_REVIEW_STATUSES, not the public set -- see core.enums (IR-264).
-        if instance.pipeline_status in DELETE_REVIEW_STATUSES:
-            DeleteRequest.objects.create(
-                record=instance,
-                requested_by=self.request.user,
-                previous_pipeline_status=instance.pipeline_status,
-            )
-            lifecycle.apply(instance, lifecycle.WorkflowEvent.REQUEST_DELETE, self.request.user)
-        else:
-            soft_delete_record(instance, deleted_by=self.request.user)
+        """
+        The owner's delete, by status (IR-508), and who is told (IR-517).
+
+        Accepted work goes through the delete request flow (RDCO review);
+        DELETE_REVIEW_STATUSES, not the public set -- see core.enums (IR-264).
+        Anything else is soft-deleted now, which withdraws a record in review
+        (`reviews.withdrawal`). The notices go after commit and never raise.
+        """
+        from apps.notifications.services import (
+            notify_delete_requested,
+            notify_record_deleted,
+            notify_record_withdrawn,
+        )
+        from apps.reviews.withdrawal import open_review_work
+
+        actor = self.request.user
+        with transaction.atomic():
+            if instance.pipeline_status in DELETE_REVIEW_STATUSES:
+                delete_request = DeleteRequest.objects.create(
+                    record=instance,
+                    requested_by=actor,
+                    previous_pipeline_status=instance.pipeline_status,
+                )
+                lifecycle.apply(instance, lifecycle.WorkflowEvent.REQUEST_DELETE, actor)
+                transaction.on_commit(
+                    lambda: notify_delete_requested(delete_request, requested_by=actor)
+                )
+                return
+
+            in_review = instance.pipeline_status == PipelineStatus.IN_REVIEW
+            # Read before the withdrawal closes it: whose work is ending.
+            work = open_review_work(instance) if in_review else None
+            soft_delete_record(instance, deleted_by=actor)
+            if in_review:
+                transaction.on_commit(lambda: notify_record_withdrawn(
+                    instance, withdrawn_by=actor,
+                    seats=work.seats, requesting_parties=work.requesting_parties,
+                ))
+            else:
+                transaction.on_commit(lambda: notify_record_deleted(instance, deleted_by=actor))
 
     # get_permissions() below is a full override with no super() fallback, so a
     # permission_classes kwarg here would never actually run -- that's exactly
@@ -236,22 +280,18 @@ class RecordViewSet(viewsets.ModelViewSet):
         POST /records/<id>/submit/
 
         Transition a new draft record into the pipeline.
-        Routing depends on record type:
-          Proposal        -> adviser_review   (adviser notified)
-          Thesis/Research -> rdco_intake      (RDCO notified)
-          Project         -> rdco_intake      (RDCO notified)
+        Every record type enters review at its assigned Adviser.
 
         Rules:
           - Record must be in 'draft' status.
-          - Proposal: adviser must be assigned.
+          - An Adviser must be assigned and cannot own the record.
           - record_type must be set.
 
-        Also handles resubmission after revision ('declined' → owner fixes and resubmits).
-        'rejected' is the terminal state — rejected records cannot be resubmitted.
+        Revised work uses the dedicated resubmission action.
         """
-        record = self.get_object()  # enforces IsOwnerOrStaff object permission
+        record = self.get_object()  # enforces IsRecordOwner object permission
 
-        if record.pipeline_status not in (PipelineStatus.DRAFT, PipelineStatus.DECLINED):
+        if record.pipeline_status != PipelineStatus.DRAFT:
             return Response(
                 {"detail": f"Record is in '{record.pipeline_status}' status and cannot be submitted."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -263,17 +303,14 @@ class RecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        rt_name = record.record_type.name  # "Proposal" | "Thesis/Research" | "Project"
-
-        # A Proposal's first gate is its adviser, so it cannot enter the pipeline
-        # without one. This is a **precondition on submitting**, not routing --
-        # the destination is the table's (IR-136 stage 2), which is why the
-        # if/else that used to compute `first_status` here is gone rather than
-        # kept alongside it. Two places deciding where a submission lands is
-        # exactly the drift the table removes.
-        if rt_name == RecordTypeName.PROPOSAL and not record.adviser:
+        if not record.adviser_id:
             return Response(
-                {"detail": "An adviser must be assigned before a Proposal can be submitted."},
+                {"detail": "An adviser must be assigned before a record can be submitted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if record.owners.filter(user_id=record.adviser_id).exists():
+            return Response(
+                {"detail": "A record's adviser cannot also be one of its owners."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -298,24 +335,22 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = request.user
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-
-        lifecycle.apply(record, lifecycle.WorkflowEvent.SUBMIT, request.user)
+        try:
+            # Consent, assignment, entry seat and v1 commit together.
+            with transaction.atomic():
+                if not record.dpa_accepted:
+                    record.dpa_accepted_at = timezone.now()
+                    record.dpa_accepted_by = request.user
+                    record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+                enter_at_adviser(record, actor=request.user)
+        except RoutingError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
 
-        # `.label` so the prose below stays single-sourced; lower() keeps the
-        # sentence reading "the adviser has been notified" exactly as before.
-        stage_label = (
-            ReviewStage.ADVISER.label.lower()
-            if rt_name == RecordTypeName.PROPOSAL
-            else RoleName.RDCO.label
-        )
         return Response(
-            {"detail": f"Record submitted successfully. The {stage_label} has been notified."},
+            {"detail": "Record submitted successfully. The adviser has been notified."},
             status=status.HTTP_200_OK,
         )
 
@@ -339,9 +374,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         `get_object()` resolves through `visible_to(user)`, so a reader
         without access gets the same 404 as a missing record — never a 403,
         which would confirm the record exists.
+
+        While an owner's revised manuscript is not yet submitted, everyone
+        else reads the latest version's (`versions.served_manuscript`,
+        IR-273): no reviewer is handed a file nobody submitted.
         """
+        from .download_service import resolve_served_manuscript
+
         record = self.get_object()
-        handle, filename = resolve_record_download_file(record)
+        handle, filename = resolve_served_manuscript(record, request.user)
         if handle is None:
             return Response(
                 {"detail": "No paper has been uploaded for this record."},
@@ -355,6 +396,50 @@ class RecordViewSet(viewsets.ModelViewSet):
         response = FileResponse(
             handle, content_type="application/pdf", as_attachment=False,
             filename=filename,
+        )
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        response["Accept-Ranges"] = "bytes"
+        return response
+
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"versions/(?P<number>[0-9]+)/manuscript", url_name="version-manuscript",
+    )
+    def version_manuscript(self, request, pk=None, number=None):
+        """
+        GET /records/<id>/versions/<n>/manuscript/ -- the manuscript as it
+        stood at version n (ADR-032 §5 Amendment, IR-416).
+
+        Earlier versions are review material, so this follows IR-479's rule:
+        a viewer who may not read the review gets the same 404 as for a
+        version that does not exist, and so does a version with no manuscript.
+        `get_object()` has already turned away a viewer who cannot see the
+        record at all. Served and audited as `manuscript` is.
+        """
+        from core.permissions import may_read_review
+
+        from .download_service import manuscript_download_name
+        from .models import RecordVersion
+
+        record = self.get_object()
+        version = (
+            RecordVersion.objects.filter(record=record, number=number).first()
+            if may_read_review(request.user, record) else None
+        )
+        if version is None or not version.manuscript:
+            return Response(
+                {"detail": "No such version of this paper."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "manuscript", "inline": True, "version": version.number},
+        )
+        filename = manuscript_download_name(record, version.manuscript.name, version=version.number)
+        response = FileResponse(
+            version.manuscript.open("rb"), content_type="application/pdf",
+            as_attachment=False, filename=filename,
         )
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
@@ -464,11 +549,15 @@ class RecordViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": first_error(body.errors)}, status=status.HTTP_400_BAD_REQUEST
             )
-        created = document_requests.create_request(
-            record, request.user, party=party,
-            message=body.validated_data["message"],
-            specs=body.validated_data["items"],
-        )
+        try:
+            created = document_requests.create_request(
+                record, request.user, party=party,
+                message=body.validated_data["message"],
+                specs=body.validated_data["items"],
+            )
+        except document_requests.NotAHolder as exc:
+            # The party's turn closed after the check above -- a Decision (IR-270).
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
         notify_document_requested(
             created, party_label=party_label(created.party, staff_viewer=False)
@@ -582,6 +671,126 @@ class RecordViewSet(viewsets.ModelViewSet):
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
+    def _revision_response(self, request, act):
+        """
+        Run a revision act on the record and answer with its tracker (IR-272).
+        404 for a record the caller cannot see, or a request not on it; 403
+        for a caller who may not act; 400 for what cannot be done now.
+        """
+        from apps.reviews import revisions
+        from apps.reviews.models import ResubmissionRequest
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            act(record)
+        except ResubmissionRequest.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        except revisions.RevisionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except revisions.RevisionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
+
+    @action(detail=True, methods=["post"], url_path="request-revision")
+    def request_revision(self, request, pk=None):
+        """
+        POST /records/<id>/request-revision/  `{"reason": str}`
+
+        A holder of an opened seat -- the Adviser, an office reviewer or RDCO
+        -- asks the owners to revise the record (ADR-032 §5, IR-272). Their
+        seat stays in review; nobody may decide the record until the owner
+        submits a new version. One open request per party.
+        """
+        from apps.reviews import revisions
+
+        return self._revision_response(request, lambda record: revisions.request_revision(
+            record, request.user, reason=request.data.get("reason"),
+        ))
+
+    @action(
+        detail=True, methods=["post"],
+        url_path=r"revision-requests/(?P<request_id>[0-9]+)/withdraw",
+    )
+    def withdraw_revision_request(self, request, pk=None, request_id=None):
+        """
+        POST /records/<id>/revision-requests/<request_id>/withdraw/
+
+        A seat holder of the party that asked withdraws its open revision
+        request. No reason (IR-263's rule for document requests).
+        """
+        from apps.reviews import revisions
+
+        return self._revision_response(request, lambda record: revisions.withdraw_revision_request(
+            record, request.user, int(request_id),
+        ))
+
+    @action(detail=True, methods=["post"], url_path="new-version")
+    def new_version(self, request, pk=None):
+        """
+        POST /records/<id>/new-version/  (no body)
+
+        An owner answers every open revision request with the record's next
+        version (ADR-032 §5, IR-273). Only the parties that asked review it
+        again; under the default policy every other clearance is kept.
+        Answers with the tracker. 404 for a record the caller cannot see, 403
+        for a caller who does not own it, 400 for what cannot be done now --
+        among it, a record that has not changed since the newest request.
+        """
+        from apps.reviews import new_version
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            new_version.submit_new_version(record, request.user)
+        except new_version.NewVersionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except new_version.NewVersionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
+
+    @action(detail=True, methods=["post"])
+    def decide(self, request, pk=None):
+        """
+        POST /records/<id>/decide/
+        `{"outcome": "accept" | "publish" | "keep_unlisted" | "reject",
+          "comment": str, "token": str}`
+
+        The record's Adviser, or RDCO's reviewer on the specialist path,
+        decides a Thesis/Research or Project (ADR-032 §3, IR-270); a
+        Proposal's Adviser alone accepts or rejects it (§2, IR-271). It closes
+        every other open assignment, seat and document request. A reject needs
+        a comment, its reason. `token` is record detail's `decision.token`.
+        Answers with the tracker. 404 for a record the caller cannot see, 403
+        for a caller who may not decide it, 400 for what cannot be done now,
+        409 for a record that changed since the token was read -- with the
+        fresh `decision` block, so the dialog can show what it would close now.
+        """
+        from apps.reviews import decisions
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        try:
+            decisions.decide(
+                record, request.user,
+                outcome=request.data.get("outcome"),
+                comment=request.data.get("comment", ""),
+                token=request.data.get("token"),
+            )
+        except decisions.DecisionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except decisions.DecisionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except decisions.DecisionStale as exc:
+            return Response(
+                {"detail": str(exc), "decision": decisions.decision_flags(record, request.user)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
+
     @action(detail=True, methods=["get"], url_path="route-options")
     def route_options(self, request, pk=None):
         """
@@ -674,38 +883,6 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
 
         return Response(RecordDetailSerializer(record, context={"request": request}).data)
-
-    @action(detail=True, methods=["post"])
-    def complete(self, request, pk=None):
-        """
-        POST /records/<id>/complete/
-        RDCO or the Proposal's assigned Adviser marks an approved Proposal as
-        completed (research finished; ADR-021 §3). The record remains publicly
-        visible. Permission: get_permissions() admits RDCO and Advisers, and
-        get_queryset() narrows an Adviser to the records they advise.
-        """
-        from apps.notifications.services import notify_proposal_completed
-
-        record = self.get_object()
-
-        if record.pipeline_status != PipelineStatus.APPROVED:
-            return Response(
-                {"detail": f"Only approved proposals can be marked as completed (current status: '{record.pipeline_status}')."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        rt_name = record.record_type.name if record.record_type else ""
-        if rt_name != RecordTypeName.PROPOSAL:
-            return Response(
-                {"detail": "Only Proposal records can be marked as completed."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        lifecycle.apply(record, lifecycle.WorkflowEvent.MARK_COMPLETE, request.user)
-
-        notify_proposal_completed(record, marked_by=request.user)
-
-        return Response({"detail": "Proposal marked as completed."}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
     def mine(self, request):
@@ -1081,11 +1258,20 @@ class DownloadRedeemView(APIView):
         return response
 
 
-class DeleteRequestViewSet(viewsets.ModelViewSet):
+class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    GET    /delete-requests/                  -- staff: all requests
-    POST   /delete-requests/                  -- authenticated user requests deletion
-    POST   /delete-requests/<id>/approve/     -- admin: soft-delete record, notify owner
+    GET    /delete-requests/                  -- RDCO: all requests
+    GET    /delete-requests/<id>/             -- RDCO: one request
+    POST   /delete-requests/<id>/approve/     -- RDCO: soft-delete record, notify owner
+    POST   /delete-requests/<id>/decline/     -- RDCO: restore record, notify owner
+
+    Read and decided, never written to directly (IR-496). A request comes into
+    existence only through `DELETE /records/<id>/` (`RecordViewSet.perform_destroy`),
+    which also moves the record to `pending_delete` and records the status to
+    restore. The direct POST skipped both, so approve deleted records nobody had
+    put on hold and decline refused after already marking the request declined;
+    its PATCH could repoint a pending request at another record. Read-only by
+    construction, so neither can be wired back in by a URL alone.
     """
     serializer_class = DeleteRequestSerializer
     queryset         = DeleteRequest.objects.select_related("record", "requested_by")
@@ -1107,9 +1293,6 @@ class DeleteRequestViewSet(viewsets.ModelViewSet):
             # someone else's record. See tests.py::DeadPermissionKwargSweepTests.
             return [IsAuthenticated(), IsRDCO()]
         return super().get_permissions()
-
-    def perform_create(self, serializer):
-        serializer.save(requested_by=self.request.user)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsRDCO])
     def approve(self, request, pk=None):

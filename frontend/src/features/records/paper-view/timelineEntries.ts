@@ -9,9 +9,12 @@
  * a review's verdict, a request's state -- is the server's, word for word, so
  * a retired party such as Intake reads however the server words it.
  *
- * Versions and review comments join this list when their backend lands
- * (IR-416, IR-419); each entry then carries a version tag.
+ * Each version is an entry of its own ("v2 submitted"), and each review is
+ * tagged with the version it was made against (IR-416). Nothing else is
+ * tagged: a version is never worked out from a timestamp. Review comments
+ * join when their backend lands (IR-419).
  */
+import { joinLabels } from "@/lib/utils";
 import type { RecordTracker, TrackerResubmission } from "@/types/records";
 
 export type TimelineKind =
@@ -19,7 +22,8 @@ export type TimelineKind =
   | "review"
   | "revision"
   | "revision_resolved"
-  | "document_request";
+  | "document_request"
+  | "version";
 
 export interface TimelineEntry {
   key: string;
@@ -38,12 +42,12 @@ export interface TimelineEntry {
   note: string | null;
   /** Further lines: the items asked for, an upload turned down. */
   details: string[];
-}
-
-/** "IERC", "IERC and KTTO", "ITSO, IERC and KTTO". */
-function joinLabels(labels: string[]): string {
-  if (labels.length <= 1) return labels.join("");
-  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+  /**
+   * The version a review was made against (IR-416). Null for every other
+   * kind of entry, and for a review written before versions existed: no tag
+   * is shown rather than an invented "v1" (spec §4.11).
+   */
+  version: number | null;
 }
 
 export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
@@ -61,6 +65,7 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       status: null,
       note: g.reason || null,
       details: [],
+      version: null,
     });
   }
 
@@ -88,6 +93,7 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       status: request?.state_label ?? null,
       note: r.comment || null,
       details: [],
+      version: r.version ?? null,
     });
   }
 
@@ -103,13 +109,15 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       status: r.state_label,
       note: r.reason || null,
       details: [],
+      version: null,
     });
   }
 
   // One resubmission answers every open request at once, so the requests it
   // closed share a time, a state and who closed them: one entry, naming every
-  // party answered. A withdrawal (the record was withdrawn) closes them too,
-  // unanswered, and says so.
+  // party answered. A withdrawal closes them too, unanswered, and says so:
+  // the record was withdrawn, or the party that asked took its request back
+  // (IR-272).
   const resolutions = new Map<string, TrackerResubmission[]>();
   for (const r of tracker.resubmissions) {
     if (r.state === "open" || !r.resolved_at) continue;
@@ -135,6 +143,7 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
           ? `Answers ${requests} for changes from ${from}`
           : `Closes ${requests} for changes from ${from}, unanswered`,
       ],
+      version: null,
     });
   }
 
@@ -155,6 +164,24 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
           .filter((i) => i.rejection_reason)
           .map((i) => `Turned down an upload of ${i.label}: “${i.rejection_reason}”`),
       ],
+      version: null,
+    });
+  }
+
+  // Null as `reviews` is, to a viewer who may not read the review (IR-479).
+  // The owner who submitted is not a party: no party is named.
+  for (const v of tracker.versions ?? []) {
+    entries.push({
+      key: `version-${v.number}`,
+      kind: "version",
+      at: v.created_at,
+      actor: v.created_by_name,
+      party: null,
+      act: `v${v.number} submitted`,
+      status: null,
+      note: null,
+      details: [v.manuscript_url ? v.cause_label : `${v.cause_label} · no manuscript`],
+      version: null,
     });
   }
 

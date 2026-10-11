@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -17,8 +17,6 @@ interface ReviewActionBarProps {
   can: ReadonlySet<Capability>;
   /** The actions on offer; `REVIEW_ACTIONS` unless a test hands it others. */
   actions?: readonly ReviewAction[];
-  /** A quieter control after the buttons: the current decision form's link, until IR-274. */
-  secondary?: ReactNode;
   /** Something changed: the page re-reads the record and the timeline. */
   onChanged: () => void;
   /** The bar's own box, where the host places it; drawn only when there is a bar. */
@@ -45,7 +43,6 @@ export function ReviewActionBar({
   record,
   can,
   actions = REVIEW_ACTIONS,
-  secondary,
   onChanged,
   className,
 }: ReviewActionBarProps) {
@@ -62,7 +59,7 @@ export function ReviewActionBar({
     ...granted.filter((a) => a.kind !== "terminal"),
     ...granted.filter((a) => a.kind === "terminal"),
   ];
-  if (ordered.length === 0 && !secondary) return null;
+  if (ordered.length === 0) return null;
 
   // Two actions may share a capability and a reason (*Clear* and *Record
   // finding*, IR-269). Adjacent actions blocked for the same reason state it
@@ -147,7 +144,6 @@ export function ReviewActionBar({
               </span>
             );
           })}
-          {secondary}
         </div>
 
         <p

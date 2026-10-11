@@ -10,7 +10,11 @@
 
 services:
   db:
-    image: pgvector/pgvector:pg16
+    # Pinned by digest (IR-469), matching CI's reasoning in
+    # .github/workflows/ci.yml: `pg16` is a mutable tag, so dev and CI can
+    # silently drift onto different pgvector builds. 0.8.7 on Postgres
+    # 16.15, current as of 2026-10-08.
+    image: pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
     restart: unless-stopped
     environment:
       # Sourced from the repo-root .env (see .env.example). ":?" makes an
@@ -39,6 +43,28 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENT_FILE: development.txt
+    restart: "no"
+    command: python manage.py migrate --noinput
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
+      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
+    depends_on:
+      db:
+        condition: service_healthy
 
   backend:
     build:
@@ -73,6 +99,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     image: node:20-alpine
@@ -93,39 +121,17 @@ services:
 
   # AI services
   docling:
-    build:
-      context: ./docling
-      dockerfile: Dockerfile
-    restart: unless-stopped
+    # Variant (GPU or CPU) is chosen once by scripts/setup_env.py, which writes
+    # DOCLING_VARIANT to the repo-root .env. Sizing, workers, the VRAM cap and
+    # the reasoning are in docling/compose.yml and
+    # docs/engineering/DOCLING_RESOURCES.md.
+    extends:
+      file: docling/compose.yml
+      service: ${DOCLING_VARIANT:-docling-gpu}
     ports:
       - "5001:5001"
     environment:
       - DOCLING_SERVE_ENABLE_UI=1
-      - DOCLING_SERVE_CONCURRENCY=4
-      - DOCLING_SERVE_MAX_NUM_PAGES=200
-      - DOCLING_SERVE_MAX_FILE_SIZE=52428800 # 50MB
-      # Docling-serve's own ceiling on a synchronous conversion, and the
-      # binding one: IRIS waits DOCLING_TIMEOUT_SECONDS (900, on the worker
-      # below), but the server abandons the request at its own default of 120
-      # and returns 504, so no client-side value can extend it. Left unset,
-      # two large PDFs converting concurrently each slow past 120s and both
-      # fail -- which is why single-document runs looked fine and bulk
-      # ingestion did not work at all (IR-249). Keep this equal to
-      # DOCLING_TIMEOUT_SECONDS; raising one without the other is the bug.
-      - DOCLING_SERVE_MAX_SYNC_WAIT=900
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -sf http://localhost:5001/health || exit 1" ]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          # 4g was sized before CodeFormula (IR-290): a single formula
-          # enrichment pass alone peaked at 95% of that cap, and
-          # DOCLING_SERVE_CONCURRENCY allows four such passes at once.
-          memory: 8g
 
   ai-gateway:
     build:
@@ -201,6 +207,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   celery-extraction:
     build:
@@ -247,6 +255,8 @@ services:
         condition: service_healthy
       docling:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   celery-embedding:
     build:
@@ -284,6 +294,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   # IR-466: the evidence-decision shadow pilot. Concurrency 1 bounds how
   # much shadow traffic competes with readers at the vendor, which has no
@@ -324,6 +336,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   celery-beat:
     build:
@@ -349,6 +363,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

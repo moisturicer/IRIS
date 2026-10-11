@@ -1,0 +1,220 @@
+"""
+The owner answers the open revision requests with a new version (ADR-032 §5
+and its 2026-10-08 Amendments; IR-273).
+
+**This is ADR-003's contribution on the new model.** One act, by an owner of
+a record on the new model with at least one revision request open, that has
+changed since the newest request:
+
+1. writes the record's next version through `versions.write_version`, the one
+   writer (IR-416). A metadata-only version names the same manuscript as the
+   version before it;
+2. resolves every open request as `resubmitted` (ADR-021 §11);
+3. resets clearances by the resubmission policy (ADR-004, IR-137):
+   `CLEARANCE_AWARE`, the default, resets only the requesting parties'; the
+   comparison arm `RESTART_ALL` resets every one. **Nothing else differs
+   between the two arms**, so seats and assignments below do not read it;
+4. returns the requesting parties' finished seats to `in_review`. Their
+   reviewers review the new version. Every other party's seats, and the
+   Adviser's and RDCO's, are untouched, so if RDCO asked only RDCO looks
+   again, and if the Adviser asked only the Adviser does;
+5. records the resubmission on the record (IR-139), so
+   `clearance_state.is_preserved` tells a surviving clearance from a reset
+   one.
+
+Nothing is deleted: every round stays visible as a version in the timeline.
+
+**A revised manuscript is extracted here, not on upload.** Until the version
+is submitted, reviewers are served the latest version's manuscript, so the
+chunks Ask IRIS and Paper Chat answer from must stay that file's too
+(`versions.manuscript_awaits_submission`). A metadata-only version re-extracts
+nothing.
+
+**What counts as a change** (`unchanged_reason`): a manuscript other than the
+latest version's, a supporting document an owner uploaded since the newest
+request, or a detail edited since then (`Record.details_edited_at`).
+
+The requesting parties' reviewers are told, after commit.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
+from django.db import transaction
+from django.utils import timezone
+
+from apps.records import lifecycle
+from apps.records.services import queue_manuscript_extraction
+from apps.records.versions import latest_version, stored_manuscript_unsubmitted, write_version
+from core.enums import (
+    OPEN_SEAT_STATES,
+    AssignmentState,
+    ClearanceStatus,
+    ResubmissionRequestState,
+    SeatState,
+    VersionCause,
+)
+from core.permissions import is_record_owner
+
+from . import revisions, routing
+from .models import RecordClearance, ResubmissionRequest, ReviewerSeat
+
+logger = logging.getLogger(__name__)
+
+_label = revisions._label
+
+
+class NewVersionError(Exception):
+    """Understood, but not possible as asked. A 400."""
+
+
+class NewVersionRefused(Exception):
+    """The caller may not submit a new version of this record. A 403."""
+
+
+def _parties(requests) -> list[str]:
+    """The parties that asked, in the tracker's order."""
+    asked = {r.party for r in requests}
+    return [p for p in revisions.ASKING_PARTIES if p in asked]
+
+
+# --- what a version would do ---------------------------------------------------------
+
+def unchanged_reason(record, requests) -> Optional[str]:
+    """Why a new version would answer none of `requests` now, or None (module note)."""
+    from apps.documents.models import RecordUpload
+
+    since = max(r.created_at for r in requests)
+    if latest_version(record) is None or stored_manuscript_unsubmitted(record):
+        return None
+    if record.details_edited_at is not None and record.details_edited_at > since:
+        return None
+    if RecordUpload.objects.filter(
+        record=record, created_at__gt=since, uploaded_by__owned_records__record=record,
+    ).exists():
+        return None
+    who = revisions.join_labels([_label(p) for p in _parties(requests)])
+    return (
+        f"Nothing has changed since {who} asked for a revision. Upload a revised "
+        f"manuscript or a supporting document, or edit the record's details, "
+        f"then submit the new version."
+    )
+
+
+def _reset_offices(record, parties) -> list[str]:
+    """The offices whose clearance this version resets, by the policy (module note)."""
+    rows = RecordClearance.objects.filter(record=record)
+    if lifecycle.resubmission_policy() is not lifecycle.ResubmissionPolicy.RESTART_ALL:
+        rows = rows.filter(office__in=parties)
+    return list(rows.values_list("office", flat=True))
+
+
+def new_version_hint(record, user) -> Optional[dict]:
+    """
+    What record detail tells an owner about the version they would submit
+    (IR-273), for the confirmation that names who reviews it. None for
+    anyone else, or with no request open. A rendering hint; the endpoint
+    re-checks all of it.
+
+    - `number`: the version it would be;
+    - `rereview`: the parties that asked, who review it;
+    - `kept`: the offices whose `cleared` clearance it keeps;
+    - `blocked`: why it cannot be submitted yet.
+    """
+    if not routing.is_in_review(record) or not is_record_owner(user, record):
+        return None
+    requests = list(revisions.open_requests(record))
+    if not requests:
+        return None
+    parties = _parties(requests)
+    reset = set(_reset_offices(record, parties))
+    latest = latest_version(record)
+    kept = (
+        RecordClearance.objects.filter(record=record, status=ClearanceStatus.CLEARED)
+        .exclude(office__in=reset).order_by("office").values_list("office", flat=True)
+    )
+    return {
+        "number": (latest.number if latest else 0) + 1,
+        "rereview": [_label(p) for p in parties],
+        "kept": [_label(o) for o in kept],
+        "blocked": unchanged_reason(record, requests),
+    }
+
+
+# --- the act --------------------------------------------------------------------------
+
+@transaction.atomic
+def submit_new_version(record, actor):
+    """
+    Submit `record`'s next version, answering every open revision request
+    (module note). Who comes first, then what: a caller who is not an owner is
+    a 403 whatever state the record is in.
+    """
+    record = routing._locked(record)
+    if not is_record_owner(actor, record):
+        raise NewVersionRefused("Only an owner of this record may submit a new version of it.")
+    if not routing.is_in_review(record):
+        raise NewVersionError("This record is not in review.")
+    # Read before anything is written, so a misconfigured policy refuses this
+    # version cleanly instead of halfway through it (IR-137).
+    lifecycle.resubmission_policy()
+    requests = list(revisions.open_requests(record))
+    if not requests:
+        raise NewVersionError(
+            "No reviewer has asked for a revision, so there is nothing for a new "
+            "version to answer."
+        )
+    blocked = unchanged_reason(record, requests)
+    if blocked:
+        raise NewVersionError(blocked)
+
+    parties = _parties(requests)
+    reset = _reset_offices(record, parties)
+    now = timezone.now()
+
+    previous = latest_version(record)
+    version = write_version(record, actor, VersionCause.REVISION)
+    if (version.manuscript.name or None) != (previous.manuscript.name or None):
+        # The revised manuscript waited for this version to be extracted
+        # (`versions.manuscript_awaits_submission`); now it is the one
+        # reviewers are served, so it is the one Ask IRIS answers from.
+        queue_manuscript_extraction(record)
+    ResubmissionRequest.objects.filter(pk__in=[r.pk for r in requests]).update(
+        state=ResubmissionRequestState.RESUBMITTED, resolved_by=actor, resolved_at=now,
+    )
+    # Recorded before the reset, so every reset row is dated after it and
+    # never reads as preserved (`clearance_state.is_preserved`).
+    record.resubmission_count = (record.resubmission_count or 0) + 1
+    record.last_resubmitted_at = now
+    record.save(update_fields=["resubmission_count", "last_resubmitted_at", "updated_at"])
+    RecordClearance.objects.filter(record=record, office__in=reset).update(
+        **lifecycle.clearance_reset_fields()
+    )
+    # The requesting parties' seats on the assignments still reviewing.
+    requesting_seats = ReviewerSeat.objects.filter(
+        assignment__record=record, assignment__party__in=parties,
+        assignment__state=AssignmentState.ACTIVE,
+    )
+    requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
+
+    # Which policy was active, per resubmission
+    # (IR-137, ADR-004's documentation requirement).
+    logger.info(
+        "record %s: v%s submitted under %s policy; %s review again",
+        record.pk, version.number, lifecycle.resubmission_policy().value, ", ".join(parties),
+    )
+
+    reviewers = list({
+        seat.reviewer for seat in requesting_seats.filter(
+            state__in=OPEN_SEAT_STATES, reviewer__isnull=False,
+        ).select_related("reviewer")
+    })
+    from apps.notifications.services import notify_new_version
+
+    who = revisions.join_labels([_label(p) for p in parties])
+    transaction.on_commit(lambda: notify_new_version(
+        record, version, submitted_by=actor, reviewers=reviewers, asked_by=who,
+    ))
+    return version

@@ -49,6 +49,8 @@ export interface RecordReview {
   comment:          string;
   reviewed_by_name: string | null;
   created_at:       string;
+  /** The version it was made against; null for reviews written before IR-416. */
+  version:          number | null;
 }
 
 export interface RecordClearance {
@@ -91,7 +93,53 @@ export interface RecordFileItem {
   can_remove: boolean;
 }
 
+/**
+ * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
+ * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
+ * draft in Publish, and `attach_file`, an office filing a supplementary file
+ * on a record it takes part in. IR-273 adds `replace_manuscript`: the owner
+ * uploading a revised manuscript for the next version (ADR-032 §5 Amendment).
+ * IR-270 adds the three Decisions: `accept_publish`, `keep_unlisted` (the
+ * spec's `final_decide`, renamed to the act it grants) and `reject`. IR-271
+ * adds `accept_proposal`, a Proposal's Adviser accepting it (the spec's
+ * `decide_proposal`, which also named *Reject*; reject is `reject` on every
+ * record). IR-508 adds the owner's three deletes, one per act, all served by
+ * `DELETE /records/<id>/`: `delete_record` (a draft or rejected record, gone
+ * now), `withdraw_submission` (in review, ending every open turn) and
+ * `request_deletion` (accepted work, for RDCO to decide). Nothing renders them
+ * yet.
+ */
+export type Capability =
+  | "open_review"
+  | "request_document"
+  | "request_revision"
+  | "withdraw_revision"
+  | "route"
+  | "accept_route"
+  | "accept_publish"
+  | "accept_proposal"
+  | "keep_unlisted"
+  | "reject"
+  | "office_review"
+  | "add_reviewer"
+  | "create_version"
+  | "replace_manuscript"
+  | "edit_details"
+  | "continue_draft"
+  | "delete_record"
+  | "withdraw_submission"
+  | "request_deletion"
+  | "continue_as"
+  | "set_visibility"
+  | "tag_ip"
+  | "attach_file"
+  | "comment_review"
+  | "comment_public"
+  | "cite";
+
 export interface RecordDetail extends RecordListItem {
+  /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
+  capabilities:   Capability[];
   year_completed:  number | null;
   abstract:        string;
   abstract_file:   string | null;
@@ -104,6 +152,8 @@ export interface RecordDetail extends RecordListItem {
   psced:           string | null;
   record_type:     string | null;
   adviser:         number | null;
+  /** The adviser's name, or their email when none is on file; null with no adviser (IR-472). */
+  adviser_name:    string | null;
   added_by:        number | null;
   /** ADR-018: what the submitter requested; RDCO confirms at intake. */
   requires_ethics_review: boolean;
@@ -120,13 +170,6 @@ export interface RecordDetail extends RecordListItem {
   resubmission:    RecordResubmission;
   /** Server-worded stage. Never map a pipeline key to English on the client. */
   stage_label:     string;
-  /**
-   * The office whose clearance the *requesting user* would be recording, or
-   * null for Adviser and RDCO, who decide the record at a sequential stage.
-   * Server-derived so the client needs no role->office table of its own.
-   */
-  your_office:       "itso" | "ierc" | "ktto" | null;
-  your_office_label: string | null;
   files:           RecordFileItem[];
   /**
    * Derived by the server from the routing tables, never stored (ADR-021 §4,
@@ -135,12 +178,9 @@ export interface RecordDetail extends RecordListItem {
   workflow_state:       WorkflowState;
   workflow_state_label: string;
   current_holders:      TrackerHolder[];
-  /** The parties this viewer may act as. Empty for almost everyone. */
-  can_act:              Party[];
   /**
    * The parties this viewer may ask the owner for documents as (ADR-022,
-   * IR-262): a party they hold. Wider than `can_act`, which the legacy
-   * pipeline still narrows.
+   * IR-262): a party they hold.
    */
   can_request_document: Party[];
   /**
@@ -165,6 +205,73 @@ export interface RecordDetail extends RecordListItem {
    * assignment for *Add reviewer*. A rendering hint; the endpoints re-check it.
    */
   office_review:        OfficeReviewFlags;
+  /**
+   * Revision requests (IR-272): whether the viewer may ask for one or
+   * withdraw their party's, why nothing can be decided now, and every open
+   * request for the owner's *Action required*. A rendering hint; the
+   * endpoints re-check it.
+   */
+  revision:             RevisionFlags;
+  /**
+   * Decisions (IR-270): what the viewer may decide this record as -- the
+   * Adviser's *Accept & publish* or *Reject*, RDCO's three -- why not yet,
+   * what deciding would close, and the token `decide/` checks so a stale
+   * dialog never decides into a changed record. A rendering hint; the
+   * endpoint re-checks it.
+   */
+  decision:             DecisionFlags;
+  /**
+   * The record's versions, oldest first (ADR-032 §5, IR-416). Review
+   * material: null to a viewer who may not read the review (IR-479), and
+   * empty before the record is first submitted.
+   */
+  versions:             RecordVersion[] | null;
+  /**
+   * The manuscript is the owner's upload for a version not yet submitted
+   * (IR-273). True for an owner only: everyone else is still served the
+   * latest version's manuscript.
+   */
+  manuscript_unsubmitted: boolean;
+}
+
+/** One numbered snapshot of what the record put in front of its reviewers. */
+export interface RecordVersion {
+  number:          number;
+  cause:           "submission" | "revision";
+  cause_label:     string;
+  created_at:      string;
+  created_by_name: string | null;
+  /** Null when this version was submitted with no manuscript. */
+  manuscript_url:  string | null;
+}
+
+/**
+ * What a Decision ends the review with (ADR-032 §2-§3; IR-270, IR-271):
+ * `accept` on a Proposal only, `publish` / `keep_unlisted` on a Thesis or
+ * Project, `reject` on either.
+ */
+export type DecisionOutcome = "accept" | "publish" | "keep_unlisted" | "reject";
+
+export interface DecisionFlags {
+  /** The party the viewer decides as, `adviser` or `rdco`; null for anyone else. */
+  party:        Party | null;
+  /** The outcomes on offer, in the bar's order; empty for anyone who may not decide. */
+  outcomes:     DecisionOutcome[];
+  /** Why the decision cannot be taken yet: an unopened seat, an open revision request. */
+  blocked:      string | null;
+  /** What deciding now would close; null for anyone who may not decide. */
+  closes:       DecisionCloses | null;
+  /** Echoed to `decide/`: a record that moved since is refused with a 409. */
+  token:        string | null;
+  /** The author's flags, for the Adviser's *Publish without specialist review?* */
+  author_hints: string[];
+}
+
+export interface DecisionCloses {
+  /** Each review a decision would end, with whoever is reviewing there now. */
+  assignments:       { party: Party; label: string; holders: string[] }[];
+  /** How many open document requests it would withdraw. */
+  document_requests: number;
 }
 
 export interface OfficeReviewFlags {
@@ -174,6 +281,49 @@ export interface OfficeReviewFlags {
   /** Why the act cannot be taken yet (an unopened seat, an open document request). */
   blocked:    string | null;
   assignment: number | null;
+}
+
+export interface RevisionFlags {
+  /** The party the viewer holds an open seat for, and may ask as; null otherwise. */
+  party:            Party | null;
+  label:            string | null;
+  /** Why the viewer cannot ask yet: their seat is not opened. */
+  blocked:          string | null;
+  /** Their party's open request, which they may withdraw instead: a party asks once. */
+  withdrawable:     number | null;
+  /** Why nobody may decide the record now: a revision request is open (ADR-032 §11). */
+  decision_blocked: string | null;
+  /** Every open request, oldest first. */
+  open:             OpenRevisionRequest[];
+  /**
+   * For an owner, the version that would answer the open requests (IR-273);
+   * null for anyone else, or with none open.
+   */
+  new_version:      NewVersionHint | null;
+}
+
+/** What submitting a new version would do, for its confirmation (IR-273). */
+export interface NewVersionHint {
+  /** The version it would be. */
+  number:   number;
+  /** The parties that asked, who review it. */
+  rereview: string[];
+  /** The offices whose clearance it keeps; empty under the restart-all policy. */
+  kept:     string[];
+  /** Why it cannot be submitted yet: nothing has changed since the newest request. */
+  blocked:  string | null;
+}
+
+export interface OpenRevisionRequest {
+  id:           number;
+  party:        Party;
+  label:        string;
+  /** Plain text. Null, as `requested_by` is, to a viewer who may not read the review (IR-479). */
+  reason:       string | null;
+  requested_by: string | null;
+  /** The version it was made against; null for one made before versions were recorded. */
+  version:      number | null;
+  created_at:   string;
 }
 
 /** An office reviewer's two outcomes (ADR-032 §3): offices never reject or publish. */
@@ -251,7 +401,11 @@ export interface ReviewerSeat {
 // Review & Routing Tracker (IR-258, ADR-021 §14)
 // ---------------------------------------------------------------------------
 
-/** ADR-021 §1. `intake` is its own party, even though RDCO staffs it. */
+/**
+ * ADR-021 §1. `intake` is retired (ADR-032 §13): it survives only on history
+ * the server sends -- an old assignment, review or request -- and is never
+ * assigned, routed to or staffed.
+ */
 export type Party = "intake" | "adviser" | "itso" | "ierc" | "ktto" | "rdco";
 
 export type WorkflowState =
@@ -291,6 +445,8 @@ export interface TrackerReview {
   comment:          string;
   reviewed_by_name: string | null;
   created_at:       string | null;
+  /** The version it was made against; null for reviews written before IR-416. */
+  version:          number | null;
 }
 
 export interface TrackerHolder {
@@ -329,6 +485,13 @@ export interface TrackerPartyRow {
   outcome_earlier: boolean;
   /** Active, with nobody there reviewing it yet: the office's pool (◌). */
   in_pool:         boolean;
+  /** This party has an open revision request: *Changes requested* (IR-272). */
+  changes_requested: boolean;
+  /**
+   * The Decision that withdrew this party's unfinished work, worded by the
+   * server ("RDCO published the record"); null otherwise (IR-270).
+   */
+  withdrawn_by_decision?: string | null;
   /**
    * Who is reviewing for this party, per seat. Null when the viewer does not
    * take part in the review: not disclosed, which is not the same as none.
@@ -368,6 +531,8 @@ export interface TrackerResubmission {
   reason:       string | null;
   /** The `declined` review that made this request, one of `reviews` (IR-412). */
   review:       number;
+  /** The version it was made against; null for one made before versions were recorded (IR-272). */
+  version:      number | null;
   requested_by: string | null;
   created_at:   string | null;
   resolved_at:  string | null;
@@ -381,7 +546,6 @@ export interface RecordTracker {
   workflow_state:        WorkflowState;
   workflow_state_label:  string;
   current_holders:       TrackerHolder[];
-  can_act:               Party[];
   parties:               TrackerPartyRow[];
   routing_history:       TrackerRoutingGroup[];
   /** Routing was not recorded before this date (IR-257's backfill wrote none). */
@@ -391,6 +555,8 @@ export interface RecordTracker {
    * what they wrote is internal workflow data, as document requests are.
    */
   reviews:               TrackerReview[] | null;
+  /** Each a timeline entry of its own (IR-416). Null as `reviews` is. */
+  versions:              RecordVersion[] | null;
   resubmissions:         TrackerResubmission[];
   /** Null when the viewer may not read them (IR-349) -- not "there are none". */
   document_requests:     DocumentRequest[] | null;

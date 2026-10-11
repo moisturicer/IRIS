@@ -59,7 +59,7 @@ export function highlightMatch(
             "mark",
             {
               key: i,
-              className: "bg-amber-100 text-slate-900 rounded-sm px-0.5 font-bold",
+              className: "bg-brand-50 text-stone-900 rounded-sm px-0.5 font-semibold",
             },
             part,
           )
@@ -128,14 +128,14 @@ export const BADGE_TONE_CLASS: Record<BadgeTone, string> = {
   // Field of research — outlined, uppercase, the quietest but most frequent
   topic:      "text-brand bg-white uppercase tracking-wider text-[11px]",
   // Kind of work (Thesis / Project / Proposal) — solid dark, high contrast
-  type:       "bg-slate-900 text-white",
-  // Pill colour matches its icon so the two never disagree
-  ip:         "bg-blue-50 text-blue-700 border border-blue-200",
-  commercial: "bg-amber-50 text-amber-800 border border-amber-200",
-  extension:  "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  // Teal matches StatusBadge's own colour for `approved`, so the two never
-  // describe the same state in different colours.
-  ongoing:    "bg-teal-50 text-teal-700 border border-teal-200",
+  type:       "bg-stone-900 text-white",
+  // On the palette since IR-407 (IR-357): protection is the one flag that
+  // takes the brand tint; the programme flags are told apart by icon and
+  // word, never by a hue of their own.
+  ip:         "bg-brand-50 text-brand border border-brand-100",
+  commercial: "bg-stone-100 text-stone-800 border border-stone-200",
+  extension:  "bg-stone-100 text-stone-800 border border-stone-200",
+  ongoing:    "bg-stone-100 text-stone-800 border border-stone-200",
 };
 
 /** Human label for an IP type code, driven by the backend enum. */
@@ -148,12 +148,12 @@ export function ipTypeLabel(ipType: IpType): string {
  * Metadata badges for a card, in reading order. Derived only from fields the
  * list serializer actually returns — no invented citation or file counts.
  *
- * `progress` adds the "Research Ongoing" badge for an approved Proposal. Off by
- * default, because the catalogue views (Discover, My Library) must not show
- * it: since IR-264 (ADR-021 §13) an approved Proposal is not public, so the
- * catalogue presenting one as ongoing research would describe something it is
- * not supposed to contain. My Workspace, where an owner tracks their own
- * Proposal, opts in.
+ * `progress` adds the "Accepted" badge for an approved Proposal (IR-271; it
+ * read "Research Ongoing" before ADR-032 retired *complete*). Off by default,
+ * because the catalogue views (Discover, My Library) must not show it: since
+ * IR-264 (ADR-021 §13) an approved Proposal is not public, so the catalogue
+ * presenting one would describe something it is not supposed to contain. My
+ * Workspace, where an owner tracks their own Proposal, opts in.
  */
 export function metaBadges(
   record: RecordListItem,
@@ -169,12 +169,11 @@ export function metaBadges(
     badges.push({ label: record.record_type_name, tone: "type" });
   }
 
-  // A Proposal enters `approved` when its adviser signs off, while the research
-  // itself is still underway. Without this badge nothing on the owner's card
-  // distinguishes in-progress work from a finished one. Only the ongoing case
-  // is marked; no badge means the work is finished.
+  // A Proposal rests at `approved` once its Adviser accepts it (ADR-032 §2,
+  // IR-271): *Accepted*, not "research ongoing", since the retired *complete*
+  // act no longer follows. The owner's card says so, as its stage does.
   if (progress && record.pipeline_status === "approved") {
-    badges.push({ label: "Research Ongoing", tone: "ongoing" });
+    badges.push({ label: "Accepted", tone: "ongoing" });
   }
 
   if (record.is_ip) {

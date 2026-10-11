@@ -37,42 +37,31 @@ from django.db import models
 
 class PipelineStatus(models.TextChoices):
     """
-    Where a record sits in the review pipeline. `Record.pipeline_status`.
+    Where a record is. `Record.pipeline_status`.
 
-    Two routes converge here. A Proposal goes `draft -> adviser_review ->
-    approved -> completed`. A Thesis/Research or Project goes `draft ->
-    rdco_intake -> [itso_review] -> parallel_review -> rdco_review ->
-    published`. `declined`, `rejected` and `pending_delete` can interrupt
-    either.
+    `draft -> in_review ->` a Decision's outcome (ADR-032 §2-§3): `approved`
+    (a Proposal, shown as *Accepted*), `published`, `completed` (kept
+    unlisted, shown as *Unlisted*; or a legacy Proposal the retired *complete*
+    act finished) or `rejected` (shown as *Archived*). `pending_delete` holds
+    accepted work while its delete request is reviewed.
 
-    **`IN_REVIEW` is added beside the stage values, not instead of them**
-    (IR-256, ADR-021 §4). Under reviewer-directed routing a record's place in
-    review is its active assignments, so one stored value replaces the five
-    stage values and `declined`. Nothing stores it until IR-260 migrates those
-    six away, and until then no review edge in `lifecycle.TRANSITIONS` leads to
-    it.
+    **One value for a record in review** (ADR-021 §4). Who holds it is its
+    active assignments, not this column. The fixed pipeline's five stage values
+    (`adviser_review`, `rdco_intake`, `itso_review`, `parallel_review`,
+    `rdco_review`) and the stored `declined` were migrated to `in_review` by
+    IR-260 and removed from the vocabulary by IR-274; a revision request is
+    now an open `ResubmissionRequest`, never a status.
     """
 
     DRAFT = "draft", "Draft"
-
-    # Proposal pipeline
-    ADVISER_REVIEW = "adviser_review", "Adviser Review"
-    APPROVED = "approved", "Approved"
-    COMPLETED = "completed", "Completed"
-
-    # Thesis/Research and Project pipeline
-    RDCO_INTAKE = "rdco_intake", "RDCO Intake Review"
-    ITSO_REVIEW = "itso_review", "ITSO Review"
-    PARALLEL_REVIEW = "parallel_review", "Parallel Office Review"
-    RDCO_REVIEW = "rdco_review", "RDCO Final Review"
-
-    # Reviewer-directed routing (ADR-021 §4). Unused until IR-260.
     IN_REVIEW = "in_review", "In Review"
 
-    # Terminal / visible states
+    # A Decision's outcomes
+    APPROVED = "approved", "Approved"
+    COMPLETED = "completed", "Completed"
     PUBLISHED = "published", "Published"
-    DECLINED = "declined", "Declined"
     REJECTED = "rejected", "Rejected"
+
     PENDING_DELETE = "pending_delete", "Pending Deletion"
 
 
@@ -105,23 +94,22 @@ class ReviewStage(models.TextChoices):
     """
     Which gate a `Review` row was recorded at. `Review.stage`.
 
-    Note these are *not* pipeline statuses, though they read similarly: the
-    stage names the reviewing party (`itso`), while the pipeline status names
-    the state the record is in (`itso_review`).
+    Note these are *not* pipeline statuses: the stage names the reviewing
+    party (`itso`), while the pipeline status names the state the record is in
+    (`in_review`).
 
     **This is also the party vocabulary** (ADR-021 §1), aliased as `Party`
-    below. The six parties are these six values with `rdco_intake` renamed to
-    `intake`. IR-256 adds `INTAKE` beside `RDCO_INTAKE` rather than renaming it:
-    `rdco_intake` is a stored `Review.stage`, and IR-260's migration rewrites
-    those rows and removes the old value in the same step. Until then, nothing
-    new may name a party `rdco_intake`; see `RecordAssignment.party`.
+    below. `intake` survives only as history, labelled "Intake (retired)"
+    (ADR-032 §13): old Review, assignment and request rows keep it. Nothing new
+    may assign or route to it -- see `ASSIGNABLE_PARTIES`, and the database
+    constraint on `RecordAssignment` that refuses an active intake assignment.
+    The old stage value `rdco_intake` meant the same party; IR-274 rewrote its
+    rows to `intake` and removed it.
     """
 
     ADVISER = "adviser", "Adviser"
-    RDCO_INTAKE = "rdco_intake", "RDCO Intake"
-    #: Staff see "Intake & Triage", students see "Intake" (ADR-021 §2). The
-    #: label here is the staff one; the student label is IR-258's to serve.
-    INTAKE = "intake", "Intake & Triage"
+    #: Historical only (ADR-032 §13). Never assignable.
+    INTAKE = "intake", "Intake (retired)"
     ITSO = "itso", "ITSO"
     IERC = "ierc", "IERC"
     KTTO = "ktto", "KTTO"
@@ -132,11 +120,11 @@ class ReviewStage(models.TextChoices):
 #: what it means at the call site.
 Party = ReviewStage
 
-#: The six parties of ADR-021 §1: `Party` without `RDCO_INTAKE`. That value is
-#: a stored stage's history until IR-260 renames the rows, never a party's
-#: identity (§2), so nothing new may be assigned to, routed to, or asked for
-#: changes by it. When IR-260 deletes `RDCO_INTAKE`, this is simply `tuple(Party)`.
-ASSIGNABLE_PARTIES = tuple(p for p in Party if p is not Party.RDCO_INTAKE)
+#: The parties retired by ADR-032 §13. Their rows stay readable as history.
+RETIRED_PARTIES = (Party.INTAKE,)
+
+#: The parties anything new may be assigned, routed or requested as.
+ASSIGNABLE_PARTIES = tuple(p for p in Party if p not in RETIRED_PARTIES)
 
 
 class ReviewDecision(models.TextChoices):
@@ -151,8 +139,6 @@ class ReviewDecision(models.TextChoices):
     "Resubmission requested", which is what it has always meant. The record
     detail and review-queue payloads send the value, never this label. `NEGATIVE_FINDING` is a specialist office's finding
     against a record, which under ADR-021 replaces an office's power to reject.
-    No endpoint accepts it yet: `ReviewWriteSerializer` pins the three decisions
-    `/reviews/submit/` actually implements.
     """
 
     APPROVED = "approved", "Approved"
@@ -187,9 +173,8 @@ class Office(models.TextChoices):
     """
     A clearing office. `RecordClearance.office`.
 
-    Only the three parallel-clearance offices. RDCO is deliberately absent: it
-    performs intake and final review as sequential stages and never holds a
-    `RecordClearance` row, so admitting it here would let a caller construct a
+    Only the three specialist offices. RDCO is deliberately absent: it decides
+    rather than clears, and never holds a `RecordClearance` row, so admitting it here would let a caller construct a
     clearance that the workflow has no gate for. RDCO appears in `ReviewStage`
     and `RoleName` instead.
     """
@@ -256,6 +241,18 @@ class SeatSource(models.TextChoices):
     ASSIGNED = "assigned", "Assigned"
     NOMINATED = "nominated", "Nominated"
     ADDED = "added", "Added"
+
+
+class VersionCause(models.TextChoices):
+    """
+    Why a record has a new Version. `RecordVersion.cause`. ADR-032 §5.
+
+    - `SUBMISSION`: the record was first submitted (v1).
+    - `REVISION`: the owner resubmitted after a reviewer asked for changes.
+    """
+
+    SUBMISSION = "submission", "Submission"
+    REVISION = "revision", "Revision"
 
 
 class ResubmissionRequestState(models.TextChoices):
@@ -349,6 +346,38 @@ class TrackerPartyState(models.TextChoices):
     NOT_REQUIRED = "not_required", "Not required"
 
 
+class MyReviewsTab(models.TextChoices):
+    """
+    The three tabs of My Reviews (ADR-032 §9). Not stored: a request
+    parameter and the wire format. `IN_REVIEW` shares its spelling with
+    `PipelineStatus` and `SeatState`, which is why the tab is named here
+    rather than typed by hand.
+    """
+
+    TO_REVIEW = "to_review", "To review"
+    IN_REVIEW = "in_review", "In review"
+    DONE = "done", "Done"
+
+
+class ReviewOutcome(models.TextChoices):
+    """
+    What one reviewer concluded, as a Done row on My Reviews states it.
+
+    Never stored: derived from the reviewer's own verdict `Review` (ADR-032
+    §9 Amendment, 2026-10-08). `REVISION_REQUESTED` is the old pipeline's
+    decline, which closed a reviewer's part; the new model never closes a
+    seat that way, so it has no filter of its own.
+    """
+
+    CLEARED = "cleared", "Cleared"
+    FINDING = "finding", "Finding recorded"
+    ACCEPTED = "accepted", "Accepted"
+    PUBLISHED = "published", "Published"
+    REJECTED = "rejected", "Rejected"
+    REVISION_REQUESTED = "revision_requested", "Revision requested"
+
+
+
 class RequestStatus(models.TextChoices):
     """
     The outcome of a request a person makes and staff rule on:
@@ -399,8 +428,8 @@ class RecordTypeName(models.TextChoices):
     Canonical `RecordType.name` values, seeded by `records/0002`.
 
     Like `RoleName`, a table rather than a choices field, and named here because
-    routing turns on these strings: `_type_name(record) == "Proposal"` decides
-    whether a submission enters `adviser_review` or `rdco_intake`.
+    workflow rules turn on these strings: a Proposal is decided by its Adviser
+    alone and never routed (ADR-032 §2).
 
     **Note the spaces in `THESIS_RESEARCH`.** The stored value is
     `"Thesis / Research"`; several comments and docstrings in the codebase write

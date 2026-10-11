@@ -70,11 +70,22 @@ test("only Student and Adviser may author a disclosure", () => {
   only("workspace", [ROLES.STUDENT, ROLES.ADVISER]);
 });
 
+test("a Student publishes from Discover, so the sidebar offers no Submit Disclosure (IR-407)", () => {
+  // The route stays open to both authors -- `/records/add` redirects to the
+  // Publish dialog -- only the sidebar shortcut narrows. An Adviser's home is
+  // still the Dashboard, not Discover, so the shortcut is an Adviser's only
+  // menu route into Publish until IR-413 makes Discover everyone's home.
+  const inNav = (role: RoleName) => navFor(role).some((item) => item.key === "submit");
+
+  assertEqual(inNav(ROLES.STUDENT), false, "Student sidebar shows Submit Disclosure");
+  assertEqual(inNav(ROLES.ADVISER), true, "Adviser sidebar shows Submit Disclosure");
+  assertEqual(canAccess(ROLES.STUDENT, "submit"), true, "Student may still open /records/add");
+});
+
 // --- review ----------------------------------------------------------------
 
 test("the review queue is every reviewer, and excludes Student", () => {
   only("reviewQueue", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
-  only("evaluate", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
 });
 
 // --- RDCO coordination -----------------------------------------------------
@@ -86,7 +97,6 @@ test("RDCO alone holds the coordination screens", () => {
   only("roleRequests", [ROLES.RDCO]);
   only("downloadRequests", [ROLES.RDCO]);
   only("deleteRequests", [ROLES.RDCO]);
-  only("approvedProposals", [ROLES.RDCO]);
   only("importRecords", [ROLES.RDCO]);
 });
 

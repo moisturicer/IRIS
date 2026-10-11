@@ -22,8 +22,9 @@
  * completed* is gone: ADR-032 retires the Proposal completion act.
  *
  * **Who sees the review and resubmit controls (IR-259).** Both read the API,
- * never the stored stage: "Open review" appears exactly when `can_act`
- * names a party for this viewer, and "Resubmit for review" exactly when the
+ * never the stored stage: "Open review" appears exactly when the server offers
+ * `open_review` (IR-418), which it does for a seat still to work, and
+ * "Resubmit for review" exactly when the
  * record is `awaiting_resubmission` and the viewer owns it. The records below
  * carry a `pipeline_status` that would have said the opposite, so a gate that
  * still read the stage would fail here.
@@ -74,6 +75,7 @@ const record: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [{ id: 1, name: "R. Dela Cruz", role: null }],
   adviser: null,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,
@@ -90,18 +92,20 @@ const record: RecordDetail = {
     offices_preserved: [],
   },
   stage_label: "Published",
-  your_office: null,
-  your_office_label: null,
   files: [],
   workflow_state: "published",
   workflow_state_label: "Published",
   current_holders: [],
-  can_act: [],
+  capabilities: ["cite"],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
+  versions: null,
+  manuscript_unsubmitted: false,
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -127,6 +131,7 @@ const approvedProposal: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [{ id: 1, name: "Andrea Lim", role: null }],
   adviser: ASSIGNED_ADVISER_ID,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,
@@ -143,25 +148,25 @@ const approvedProposal: RecordDetail = {
     offices_preserved: [],
   },
   stage_label: "Approved",
-  your_office: null,
-  your_office_label: null,
   files: [],
   workflow_state: "approved",
   workflow_state_label: "Approved",
   current_holders: [],
-  can_act: [],
+  capabilities: ["cite"],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
+  versions: null,
+  manuscript_unsubmitted: false,
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
  * since the two concerns below need different records shown. */
 let shownRecord: RecordDetail = record;
-
-const completeProposal = vi.fn((_id: number) => Promise.resolve({ data: { detail: "ok" } }));
 
 function page<T>(results: T[]) {
   return { data: { count: results.length, next: null, previous: null, results } };
@@ -183,7 +188,6 @@ vi.mock("@/api/records", () => ({
     documentRequestSlots:  vi.fn(() => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] })),
     createDocumentRequest: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
     updateTags:       vi.fn(),
-    completeProposal: (id: number) => completeProposal(id),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
@@ -231,15 +235,17 @@ vi.mock("./PaperPdfReader", () => ({
     scrollToPage,
     highlightRegions,
     toolbarStart,
+    version,
   }: {
     scrollToPage: number | null;
     highlightRegions: unknown[];
     toolbarStart?: ReactNode;
+    version?: number | null;
   }) => (
     <div>
       {toolbarStart}
       Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
-      highlight
+      highlight{version != null ? `, reading v${version}` : ", reading the current paper"}
     </div>
   ),
 }));
@@ -335,7 +341,8 @@ describe("arriving from a citation", () => {
 const MARK_COMPLETED = { name: /mark as completed/i };
 
 // ADR-032 retires the Proposal *complete* act and gives RDCO no Proposal
-// role, so nobody is offered it any more (spec §4.6, IR-411).
+// role, so nobody is offered it any more (spec §4.6, IR-411). Since IR-271
+// the client has no completion call at all, and the server refuses one.
 describe("Mark as completed is retired", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -353,7 +360,6 @@ describe("Mark as completed is retired", () => {
     // assertion would pass against the loading skeleton.
     await screen.findByRole("heading", { name: approvedProposal.title });
     expect(screen.queryByRole("button", MARK_COMPLETED)).not.toBeInTheDocument();
-    expect(completeProposal).not.toHaveBeenCalled();
   });
 });
 
@@ -372,12 +378,15 @@ const inReview: RecordDetail = {
   current_holders: [
     { party: "itso", label: "ITSO", opened_at: "2026-09-02T08:00:00Z", opened_by: null },
   ],
-  can_act: [],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
+  versions: null,
+  manuscript_unsubmitted: false,
 };
 
 async function waitForRecord(title: string) {
@@ -385,13 +394,29 @@ async function waitForRecord(title: string) {
   await screen.findByRole("heading", { name: title });
 }
 
-describe("the review control follows can_act", () => {
+/**
+ * A reviewer the API names: an open seat of their own, so a participant
+ * (ADR-032 §4, §10). IR-274 replaced `can_act: ["itso"]`, the retired review
+ * form's flag, with this in every test below that used it.
+ */
+const reviewingSeat: ReviewerSeat = {
+  id: 78, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
+  reviewer: 2, reviewer_name: "ITSO Reviewer", state: "in_review", state_label: "In review",
+  source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
+  opened_at: "2026-10-01T09:00:00Z", done_at: null,
+};
+const reviewing = { my_seats: [reviewingSeat], is_participant: true };
+
+// Since IR-418 the server sends `capabilities`, and the adapter passes it
+// through: each record below carries the list the server computes for that
+// viewer alongside the fields it is computed from.
+describe("the review control follows the server's capabilities", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("is offered when the API says this viewer can act", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+  it("is offered when the API gives this viewer a seat to work", async () => {
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     const { container } = renderPaperView();
 
@@ -399,21 +424,15 @@ describe("the review control follows can_act", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  // Until IR-260 retires it, the Review section's action bar reaches the
-  // decision through the current form, which is left as it is (spec §4.7).
-  it("opens the Review section, whose action bar reaches the current decision form", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+  it("opens the Review section without the retired fixed-stage decision form", async () => {
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     renderPaperView();
 
     await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
 
     expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
-    const bar = screen.getByRole("toolbar", { name: "Review actions" });
-    expect(within(bar).getByRole("link", { name: "Record a decision (current form)" })).toHaveAttribute(
-      "href",
-      `/review/${RECORD_ID}/evaluate`,
-    );
+    expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
   });
 
@@ -425,7 +444,7 @@ describe("the review control follows can_act", () => {
       source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
       opened_at: null, done_at: null,
     };
-    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true };
+    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -436,7 +455,7 @@ describe("the review control follows can_act", () => {
   });
 
   it("only navigates when every seat is already open", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -447,9 +466,9 @@ describe("the review control follows can_act", () => {
   });
 
   it("is not offered to a same-role viewer the API does not name, whatever the stage", async () => {
-    // `parallel_review` is a stage an ITSO reviewer used to be shown the
-    // control at by role alone. The API says this one cannot act.
-    shownRecord = { ...inReview, pipeline_status: "parallel_review", can_act: [] };
+    // An ITSO reviewer was once shown the control by role alone, at the
+    // retired `parallel_review` stage. The API gives this one no seat.
+    shownRecord = { ...inReview };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -467,47 +486,79 @@ describe("the review control follows can_act", () => {
   });
 });
 
-describe("the resubmit control follows workflow_state", () => {
+describe("the new-version control follows revision requests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  const awaiting: RecordDetail = {
+  it("on the adviser-first model, shows the owner what was asked instead of the legacy Resubmit (IR-272)", async () => {
+    shownRecord = {
+      ...inReview,
+      workflow_state: "awaiting_resubmission",
+      workflow_state_label: "Awaiting resubmission",
+      revision: {
+        party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null,
+        open: [{
+          id: 3, party: "ierc", label: "IERC", reason: "Add the assent form\nfor participants under 18.",
+          requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
+        }],
+        new_version: null,
+      },
+    };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const banner = await screen.findByRole("region", { name: "Revision requested" });
+    expect(banner).toHaveTextContent("IERC asked for changes · on v2");
+    expect(banner).toHaveTextContent("Add the assent form for participants under 18.");
+    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+  });
+
+  /** The adviser-first model's revision, with the server offering a new version (IR-273). */
+  const asked = (blocked: string | null): RecordDetail => ({
     ...inReview,
     workflow_state: "awaiting_resubmission",
     workflow_state_label: "Awaiting resubmission",
-  };
+    revision: {
+      party: null, label: null, blocked: null, withdrawable: null,
+      decision_blocked: "Waiting on the author: IERC asked for a revision.",
+      open: [{
+        id: 3, party: "ierc", label: "IERC", reason: "Add the assent form.",
+        requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
+      }],
+      new_version: { number: 3, rereview: ["IERC"], kept: ["ITSO"], blocked },
+    },
+    capabilities: ["cite", "create_version", "replace_manuscript", "edit_details"],
+  });
 
-  it("is offered to the owner of a record awaiting resubmission", async () => {
-    shownRecord = awaiting;
+  it("on the adviser-first model, offers the owner a new version that names who reviews it (IR-273)", async () => {
+    shownRecord = asked(null);
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    expect(await screen.findByRole("button", RESUBMIT)).toBeInTheDocument();
-  });
-
-  it("is not offered to someone who does not own it", async () => {
-    shownRecord = awaiting;
-    signInAs(99, "Student");
-    renderPaperView();
-
-    await waitForRecord(inReview.title);
+    const banner = await screen.findByRole("region", { name: "Revision requested" });
+    expect(banner).toHaveTextContent("IERC will review v3. ITSO's clearance is kept.");
     expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Submit new version" }));
+
+    expect(await screen.findByRole("dialog", { name: "Submit new version" })).toBeInTheDocument();
   });
 
-  it("is not offered while the record is still in review, even if stored as declined", async () => {
-    shownRecord = { ...inReview, pipeline_status: "declined" };
+  it("holds the new version, saying why, until something has changed (IR-273)", async () => {
+    shownRecord = asked("Nothing has changed since IERC asked for a revision.");
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    await waitForRecord(inReview.title);
-    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+    const submit = await screen.findByRole("button", { name: "Submit new version" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
   });
 });
 
 describe("the status the paper shows", () => {
   it("is the API's workflow_state_label, on the badge and in governance", async () => {
-    shownRecord = { ...inReview, pipeline_status: "rdco_review", workflow_state_label: "Final review", workflow_state: "final_review" };
+    shownRecord = { ...inReview, pipeline_status: "in_review", workflow_state_label: "Final review", workflow_state: "final_review" };
     signInAs(99, "Student");
     renderPaperView();
 
@@ -515,6 +566,28 @@ describe("the status the paper shows", () => {
     // Once as the badge, once as the governance ledger's status row.
     expect(screen.getAllByText("Final review")).toHaveLength(2);
     expect(screen.queryByText("RDCO Final Review")).not.toBeInTheDocument();
+  });
+});
+
+describe("the byline credits the adviser (IR-472)", () => {
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  it("names the adviser on a record that has one", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos" };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
+  });
+
+  it("shows no adviser line on a record without one", async () => {
+    shownRecord = { ...record, adviser: null, adviser_name: null };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.queryByText(/^Adviser:/)).not.toBeInTheDocument();
   });
 });
 
@@ -1221,7 +1294,7 @@ describe("the sections follow the capabilities (IR-411)", () => {
   });
 
   it("gives a reviewer the API names Review and Files", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -1292,6 +1365,8 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
     workflow_state: "draft",
     workflow_state_label: "Draft",
     adviser: ASSIGNED_ADVISER_ID,
+    // What the server offers the owner; another viewer gets `cite` alone.
+    capabilities: ["cite", "continue_draft", "edit_details"],
   };
 
   it("offers the owner of a draft Continue, into Publish, as the one primary action", async () => {
@@ -1332,7 +1407,10 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 
   it("offers Edit details to the owner while a revision is requested", async () => {
-    shownRecord = { ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested" };
+    shownRecord = {
+      ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested",
+      capabilities: ["cite", "edit_details"],
+    };
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
@@ -1340,7 +1418,7 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 
   it("offers nobody but the owner Edit details on a draft", async () => {
-    shownRecord = draft;
+    shownRecord = { ...draft, capabilities: ["cite"] };
     signInAs(99, "Student");
     renderPaperView();
 
@@ -1390,7 +1468,6 @@ describe("the Review section (IR-412)", () => {
     workflow_state: "in_review",
     workflow_state_label: "In review",
     current_holders: [],
-    can_act: [],
     parties: [],
     routing_history: [
       {
@@ -1400,6 +1477,7 @@ describe("the Review section (IR-412)", () => {
     ],
     routing_recorded_from: null,
     reviews: [],
+    versions: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
@@ -1419,7 +1497,7 @@ describe("the Review section (IR-412)", () => {
   const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
 
   it("puts the paper beside the timeline, from the tracker", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1430,8 +1508,8 @@ describe("the Review section (IR-412)", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("offers a reviewer who may request documents exactly that, and the current form", async () => {
-    shownRecord = { ...inReview, can_act: ["ierc"], can_request_document: ["ierc"] };
+  it("offers a reviewer who may request documents exactly that action", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1439,11 +1517,11 @@ describe("the Review section (IR-412)", () => {
     expect(within(bar()).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
       "Request documents",
     ]);
-    expect(within(bar()).getByRole("link", { name: "Record a decision (current form)" })).toBeInTheDocument();
+    expect(within(bar()).queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
   });
 
   it("offers Request documents alone to a party that may ask but not decide", async () => {
-    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1463,7 +1541,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("requests documents from the bar and re-reads the timeline after", async () => {
-    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1478,7 +1556,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("has no Ask IRIS, and Ask about this paper takes the reader to the Paper tab with the chat open", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     renderWithProbe(`/records/${RECORD_ID}?section=review`);
 
@@ -1496,7 +1574,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("offers no Ask about this paper when there is no paper to ask about", async () => {
-    shownRecord = { ...inReview, abstract_file: null, files: [], can_act: ["itso"] };
+    shownRecord = { ...inReview, abstract_file: null, files: [], ...reviewing };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1506,7 +1584,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("lands a citation on its passage in the Review section's reader too", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     const citation = {
       marker: 1, chunk_id: 11, record_id: RECORD_ID, record_title: inReview.title, page: 3,
@@ -1541,5 +1619,138 @@ describe("a record the viewer cannot read (IR-411)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitForRecord(record.title);
+  });
+});
+
+// Record versions (IR-416; ADR-032 §5 Amendment). The server sends
+// `versions` only to a participant, so what is under test here is what the
+// page does with the list it was given.
+describe("record versions (IR-416)", () => {
+  const version = (number: number, cause: "submission" | "revision", manuscript = true) => ({
+    number,
+    cause,
+    cause_label: cause === "submission" ? "Submission" : "Revision",
+    created_at: `2026-09-0${number}T08:00:00Z`,
+    created_by_name: "Rhea Owner",
+    manuscript_url: manuscript ? `/api/v1/records/${RECORD_ID}/versions/${number}/manuscript/` : null,
+  });
+  const twoVersions = [version(1, "submission"), version(2, "revision")];
+  const PICKER = { name: "Version" };
+
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  afterEach(() => localStorage.removeItem(DOCK_KEY));
+
+  it("offers no picker with one version, or with none disclosed", async () => {
+    for (const versions of [[version(1, "submission")], null]) {
+      shownRecord = { ...record, versions };
+      const { unmount } = renderPaperView();
+      await waitForRecord(record.title);
+
+      expect(screen.queryByRole("combobox", PICKER)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^v1\b/)).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("lists every version, the newest marked current and chosen", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+
+    const picker = screen.getByRole("combobox", PICKER);
+    expect(picker).toHaveValue("2");
+    expect(within(picker).getByRole("option", { name: /^v2 · Revision · .* \(current\)$/ })).toBeInTheDocument();
+    expect(within(picker).getByRole("option", { name: /^v1 · Submission/ })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("opens an earlier version on the Paper tab, says so, and drops a citation's page and highlight", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    const citation = {
+      marker: 1, chunk_id: 11, record_id: RECORD_ID, record_title: record.title,
+      page: 4, text: "a passage", context_path: [record.title],
+      regions: [{ page: 4, left: 0.1, top: 0.2, right: 0.6, bottom: 0.3 }],
+    };
+    renderPaper(`/records/${RECORD_ID}?page=4`, { citation });
+    expect(await screen.findByText(/open at page 4, 1 region\(s\) to highlight, reading the current paper/i))
+      .toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByRole("combobox", PICKER), "1");
+
+    expect(await screen.findByText(/open at page none, 0 region\(s\) to highlight, reading v1/i))
+      .toBeInTheDocument();
+    expect(screen.getByText("You are viewing v1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Citation highlights and Ask IRIS use the current version.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to current" }));
+
+    expect(await screen.findByText(/reading the current paper/i)).toBeInTheDocument();
+    expect(screen.queryByText("You are viewing v1 of 2")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", PICKER)).toHaveValue("2");
+  });
+
+  it("moves from Overview to the Paper tab when a version is chosen", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    renderPaperView();
+    await waitForRecord(record.title);
+    expect(screen.getByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByRole("combobox", PICKER), "1");
+
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/reading v1/i)).toBeInTheDocument();
+  });
+
+  it("lets an owner with an unsubmitted revision still read the submitted latest version (IR-273)", async () => {
+    shownRecord = { ...record, versions: twoVersions, manuscript_unsubmitted: true };
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    expect(await screen.findByText("Your revised manuscript, not yet submitted")).toBeInTheDocument();
+    expect(screen.getByText("Ask IRIS answers about the submitted version (v2) until you submit."))
+      .toBeInTheDocument();
+
+    const picker = screen.getByRole("combobox", PICKER);
+    expect(picker).toHaveValue("");
+    expect(within(picker).getByRole("option", { name: "Your revision · not yet submitted (current)" }))
+      .toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: /^v2 .*\(current\)$/ })).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(picker, "2");
+
+    expect(await screen.findByText(/reading v2/i)).toBeInTheDocument();
+  });
+
+  it("tells Paper Chat's reader that answers are about the current version", async () => {
+    shownRecord = { ...record, versions: twoVersions };
+    renderPaper(`/records/${RECORD_ID}?section=paper&version=1`);
+    await screen.findByText(/reading v1/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    const panel = await screen.findByRole("complementary", { name: "Paper Chat" });
+    expect(within(panel).getByText("Answers are about the current version, not v1.")).toBeInTheDocument();
+  });
+
+  it("reads the current paper for a version that is current, missing or has no manuscript", async () => {
+    shownRecord = {
+      ...record,
+      versions: [version(1, "submission", false), version(2, "revision"), version(3, "revision")],
+    };
+    for (const asked of ["3", "1", "9"]) {
+      const { unmount } = renderPaper(`/records/${RECORD_ID}?section=paper&version=${asked}`);
+
+      expect(await screen.findByText(/reading the current paper/i)).toBeInTheDocument();
+      expect(screen.queryByText(/You are viewing/)).not.toBeInTheDocument();
+      unmount();
+    }
+    const { unmount } = renderPaperView();
+    await waitForRecord(record.title);
+    expect(
+      within(screen.getByRole("combobox", PICKER)).getByRole("option", { name: /^v1 .*\(no manuscript\)$/ }),
+    ).toBeDisabled();
+    unmount();
   });
 });

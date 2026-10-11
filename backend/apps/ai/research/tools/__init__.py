@@ -1,0 +1,7 @@
+from .aggregates import CORPUS_FACETS, COUNT_RECORDS
+from .passages import SEARCH_PASSAGES
+from .records import FIND_RECORDS
+from .sections import READ_RECORD_SECTIONS
+from .screening import SCREEN_RECORDS
+
+TOOLS = (SEARCH_PASSAGES, FIND_RECORDS, READ_RECORD_SECTIONS, COUNT_RECORDS, CORPUS_FACETS, SCREEN_RECORDS)

@@ -7,12 +7,18 @@ from django.http import FileResponse
 from apps.documents.models import RecordUpload
 
 
-def _manuscript_download_name(record) -> str:
-    # abstract_file's stored name is random, not the title (IR-422) -- rebuild
-    # a readable download name instead of reading it back off the stored path.
-    ext = Path(record.abstract_file.name).suffix or ".pdf"
+def manuscript_download_name(record, stored_name: str, *, version=None) -> str:
+    # The stored name is random, not the title (IR-422) -- rebuild a readable
+    # download name instead of reading it back off the stored path. An earlier
+    # version says which one it is (IR-416).
+    ext = Path(stored_name).suffix or ".pdf"
     title = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", record.title or "download").strip() or "download"
-    return f"{title[:150]}{ext}"
+    suffix = f" (v{version})" if version is not None else ""
+    return f"{title[:150]}{suffix}{ext}"
+
+
+def _manuscript_download_name(record) -> str:
+    return manuscript_download_name(record, record.abstract_file.name)
 
 
 def has_record_download_file(record) -> bool:
@@ -46,6 +52,20 @@ def resolve_record_download_file(record):
         return upload.file.open("rb"), upload.file.name.split("/")[-1]
 
     return None, None
+
+
+def resolve_served_manuscript(record, user):
+    """
+    `resolve_record_download_file`, for the reader `user` (IR-273): while an
+    owner's revised manuscript is not yet submitted, everyone else is handed
+    the latest version's (`versions.served_manuscript`).
+    """
+    from .versions import served_manuscript
+
+    served = served_manuscript(record, user)
+    if served and served.name != (record.abstract_file.name or None):
+        return served.open("rb"), manuscript_download_name(record, served.name)
+    return resolve_record_download_file(record)
 
 
 def file_response_for_record(record) -> FileResponse | None:

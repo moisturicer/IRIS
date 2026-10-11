@@ -37,6 +37,7 @@ from typing import Any, Optional, Sequence
 
 from apps.ai.evidence import REASON_CODES, SOURCE_RAW, SOURCE_RESOLVED, Verdict
 from apps.ai.evidence.detector import EvidenceDetector
+from apps.ai.evidence.jev_noul import REFERENCE_THRESHOLD
 from apps.ai.evidence.model_decision import (
     REASONS as MODEL_REASONS,
     ModelDecision,
@@ -53,6 +54,17 @@ LANE_RAW = SOURCE_RAW
 LANE_RESOLVED = SOURCE_RESOLVED
 LANE_COMBINED = "combined"
 LANES = (LANE_RAW, LANE_RESOLVED, LANE_COMBINED)
+
+#: A question of one of these kinds is too vague to answer, so the right reply
+#: is a clarifying question and a retrieval beforehand costs nothing a reader
+#: sees. Requiring evidence is therefore not an over-fire or an over-search
+#: for it; answering directly is still correct. Recorded in every results file
+#: as `scoring`, because it changes what an over-fire means.
+SEARCH_TOLERATED_KINDS = ("ambiguous",)
+
+#: The thresholds a probability is evaluated at (IR-482). A fixed grid; the
+#: report draws the whole curve and chooses no point on it.
+THRESHOLDS = tuple(round(0.05 * i, 2) for i in range(1, 20))
 
 #: `evidence_required` to whether the question needs the corpus at all.
 _NEEDS_CORPUS = {"none": False, "corpus": True, "corpus_multi": True}
@@ -78,6 +90,7 @@ class Judgement:
     combined: Verdict
     resolved: Optional[Verdict] = None
     resolved_question: Optional[str] = None
+    search_tolerated: bool = False
 
     def verdict(self, lane: str) -> Optional[Verdict]:
         return {
@@ -90,7 +103,15 @@ class Judgement:
         verdict = self.verdict(lane)
         if verdict is None:
             return None
+        if verdict.evidence_required and self.search_tolerated:
+            return True
         return verdict.evidence_required == self.expects_evidence
+
+    @property
+    def counts_as_over_search(self) -> bool:
+        """Needing evidence is an error only where it was not expected and
+        searching was not tolerated."""
+        return not self.expects_evidence and not self.search_tolerated
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -99,6 +120,7 @@ class Judgement:
             "kind": self.kind,
             "institutional": self.institutional,
             "expects_evidence": self.expects_evidence,
+            "search_tolerated": self.search_tolerated,
             "resolved_question": self.resolved_question,
             "raw": self.raw.as_dict(),
             "resolved": self.resolved.as_dict() if self.resolved else None,
@@ -229,7 +251,7 @@ class ModelResult:
         missed: list[str] = []
         for judgement, decision in self._pairs():
             needed = requires(judgement, decision)
-            if needed and not judgement.expects_evidence:
+            if needed and judgement.counts_as_over_search:
                 over.append(judgement.question_id)
             elif judgement.expects_evidence and not needed:
                 missed.append(judgement.question_id)
@@ -257,7 +279,12 @@ class ModelResult:
     def decided(self) -> dict[str, Any]:
         """The model alone, over the calls where it actually ruled."""
         ruled = [(j, d) for j, d in self._pairs() if d.decided]
-        correct = sum(1 for j, d in ruled if d.evidence_required == j.expects_evidence)
+        correct = sum(
+            1
+            for j, d in ruled
+            if d.evidence_required == j.expects_evidence
+            or (d.evidence_required and j.search_tolerated)
+        )
         return {
             "judged": len(ruled),
             "correct": correct,
@@ -312,10 +339,81 @@ class ModelResult:
     def models(self) -> list[str]:
         return sorted({d.model for d in self.decisions if d.model})
 
+    @property
+    def has_probabilities(self) -> bool:
+        return any(d.probability is not None for d in self.decisions)
+
+    @property
+    def curve(self) -> list[dict[str, Any]]:
+        """Missed searches and over-searches at every threshold, by category.
+
+        A decision searches when its probability reaches the threshold; a
+        fallback has none and searches at every threshold, so it can only be an
+        over-search. The union adds the detector as a floor (ADR-035 §3). Empty
+        for a mode that returns no probability.
+        """
+        if not self.has_probabilities:
+            return []
+
+        def by_kind(ids: list[str]) -> dict[str, int]:
+            kinds = {j.question_id: j.kind or "unspecified" for j in self.judgements}
+            counts: dict[str, int] = {}
+            for question_id in ids:
+                counts[kinds[question_id]] = counts.get(kinds[question_id], 0) + 1
+            return dict(sorted(counts.items()))
+
+        rows = []
+        for threshold in THRESHOLDS:
+            missed, over, union_missed, union_over = [], [], [], []
+            for judgement, decision in self._pairs():
+                searches = (
+                    decision.probability is None or decision.probability >= threshold
+                )
+                with_detector = searches or judgement.combined.evidence_required
+                if judgement.expects_evidence:
+                    if not searches:
+                        missed.append(judgement.question_id)
+                    if not with_detector:
+                        union_missed.append(judgement.question_id)
+                elif judgement.counts_as_over_search:
+                    if searches:
+                        over.append(judgement.question_id)
+                    if with_detector:
+                        union_over.append(judgement.question_id)
+            rows.append(
+                {
+                    "threshold": threshold,
+                    "missed_searches": missed,
+                    "over_searches": over,
+                    "missed_by_kind": by_kind(missed),
+                    "over_by_kind": by_kind(over),
+                    "union_missed_searches": union_missed,
+                    "union_over_searches": union_over,
+                }
+            )
+        return rows
+
+    def _curve_dict(self) -> dict[str, Any]:
+        return {
+            "evidence_required": sum(1 for j in self.judgements if j.expects_evidence),
+            "no_evidence_needed": sum(1 for j in self.judgements if j.counts_as_over_search),
+            "thresholds": self.curve,
+        }
+
     def as_dict(self) -> dict[str, Any]:
         latencies = [d.latency_ms for d in self.decisions]
         answers = [d for d in self.decisions if d.answer_present]
+        curve = (
+            {
+                "threshold_curve": self._curve_dict(),
+                "reference_threshold": REFERENCE_THRESHOLD,
+                "operating_point": None,
+            }
+            if self.has_probabilities
+            else {}
+        )
         return {
+            **curve,
             "models": self.models,
             "questions": len(self.decisions),
             "fallbacks": self.fallbacks,
@@ -342,6 +440,7 @@ class ModelResult:
                 {
                     "id": j.question_id,
                     "expects_evidence": j.expects_evidence,
+                    "search_tolerated": j.search_tolerated,
                     "detector": j.combined.evidence_required,
                     **d.as_dict(),
                 }
@@ -360,7 +459,13 @@ class ModelResult:
 
         lines = [
             "Model decision - the model's route beside the detector "
-            "(ADR-035 §3, §10)",
+            "(ADR-035 §3, §10)"
+            + (
+                f"; route at reference threshold {REFERENCE_THRESHOLD}, "
+                "not an operating point"
+                if self.has_probabilities
+                else ""
+            ),
             f"  model(s): {', '.join(self.models) or 'unknown'}; "
             f"{len(self.decisions)} calls, {self.fallbacks} fell back to evidence",
             f"  {'model alone':<28} {fmt(alone):>16}   "
@@ -398,6 +503,26 @@ class ModelResult:
             f"{sum(d.answer_chars for d in answers)} characters in all; "
             "none retained."
         )
+        if self.has_probabilities:
+            curve = self._curve_dict()
+            lines.append(
+                f"  threshold curve: missed searches over the "
+                f"{curve['evidence_required']} evidence-required, over-searches "
+                f"over the {curve['no_evidence_needed']} others; fallbacks search at "
+                "every threshold"
+            )
+            lines.append(
+                f"    {'threshold':>9} {'missed':>7} {'over':>5} "
+                f"{'union missed':>13} {'union over':>11}"
+            )
+            for row in curve["thresholds"]:
+                lines.append(
+                    f"    {row['threshold']:>9.2f} {len(row['missed_searches']):>7} "
+                    f"{len(row['over_searches']):>5} "
+                    f"{len(row['union_missed_searches']):>13} "
+                    f"{len(row['union_over_searches']):>11}"
+                )
+            lines.append("  no operating point chosen.")
         return lines
 
 
@@ -452,6 +577,7 @@ class EvidenceReport:
     def as_dict(self) -> dict[str, Any]:
         return {
             "instrument": "curated",
+            "scoring": {"search_tolerated_kinds": list(SEARCH_TOLERATED_KINDS)},
             "question_set": self.question_set.as_dict(),
             "coverage": self.coverage,
             "rule_set_digest": self.rule_set_digest,
@@ -529,6 +655,12 @@ class EvidenceReport:
         )
         lines.append("")
 
+        lines.append(
+            "Scoring: requiring evidence is not counted as an error for "
+            f"kind {', '.join(SEARCH_TOLERATED_KINDS)} (too vague to answer; "
+            "the right reply is a clarifying question)."
+        )
+        lines.append("")
         lines.append("Categories (by kind), combined lane")
         for category in self.categories:
             accuracy = (
@@ -581,7 +713,7 @@ def _tally(code: str, judgements: Sequence[Judgement], lane: str) -> RuleTally:
             continue
         if verdict.fired(code):
             fired.append(judgement.question_id)
-            if not judgement.expects_evidence:
+            if judgement.counts_as_over_search:
                 over_fires.append(judgement.question_id)
         elif judgement.expects_evidence:
             silent.append(judgement.question_id)
@@ -601,7 +733,7 @@ def _lane_result(lane: str, judgements: Sequence[Judgement]) -> LaneResult:
         over_fires=tuple(
             j.question_id
             for j in judged
-            if j.verdict(lane).evidence_required and not j.expects_evidence
+            if j.verdict(lane).evidence_required and j.counts_as_over_search
         ),
         misses=tuple(
             j.question_id
@@ -664,6 +796,7 @@ def judge(
         kind=question.kind,
         institutional=question.institutional,
         expects_evidence=_NEEDS_CORPUS[question.evidence_required],
+        search_tolerated=question.kind in SEARCH_TOLERATED_KINDS,
         raw=raw,
         resolved=resolved,
         combined=combined,

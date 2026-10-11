@@ -44,7 +44,7 @@ class ReadAccessTestBase(DocumentRequestTestBase):
         record = self.submitted(
             RecordTypeName.THESIS_RESEARCH, requested_itso=True, requested_ierc=True,
         )
-        self.review(record, self.rdco, "approved", "Needs ITSO and IERC.")
+        self.route_requested(record)
         self.review(record, self.itso, "approved", "No patent concerns.")
         self.requested(record, self.ierc, [{"label": ITEM}], message=MESSAGE)
         return record
@@ -110,20 +110,6 @@ class UninvolvedOfficeTests(ReadAccessTestBase):
 
 
 class RoleIsNotParticipationTests(ReadAccessTestBase):
-
-    def test_a_named_adviser_never_assigned_the_adviser_party_sees_none(self):
-        # A Thesis enters at Intake, so its named Adviser never holds it.
-        record = self.submitted(
-            RecordTypeName.THESIS_RESEARCH, adviser=self.adviser,
-            requested_itso=True, requested_ierc=True,
-        )
-        self.review(record, self.rdco, "approved", "Needs ITSO and IERC.")
-        self.review(record, self.itso, "approved", "No patent concerns.")
-        self.requested(record, self.ierc, [{"label": ITEM}], message=MESSAGE)
-        self.assertFalse(RecordAssignment.objects.filter(record=record, party=Party.ADVISER).exists())
-
-        self.assert_non_participant(record, self.adviser)
-
     def test_rdco_before_it_has_held_or_acted_on_a_proposal_sees_none(self):
         record = self.submitted(RecordTypeName.PROPOSAL, adviser=self.adviser)
         self.requested(record, self.adviser, [{"label": ITEM}], message=MESSAGE)
@@ -186,16 +172,22 @@ class ParticipantsSeeEverythingTests(ReadAccessTestBase):
 
     def test_a_party_that_reviewed_under_an_assignment(self):
         record = self.ethics_record()
-        # RDCO reviewed at intake. Without the assignment rows, the review
-        # alone still makes it a participant.
+        # ITSO cleared the record. With its assignment and clearance removed,
+        # the historical review alone still makes it a participant.
         RecordAssignment.objects.filter(
-            record=record, party__in=[Party.INTAKE, Party.RDCO]
+            record=record, party=Party.ITSO
         ).delete()
+        RecordClearance.objects.filter(record=record, office=Office.ITSO).delete()
 
-        self.assert_participant(record, self.rdco)
+        self.assert_participant(record, self.itso)
 
     def test_a_party_that_signed_a_clearance(self):
         record = self.ethics_record()
+        # Legacy clearance rows retain their named signer; the new model
+        # records each reviewer in Review instead.
+        RecordClearance.objects.filter(record=record, office=Office.ITSO).update(
+            reviewed_by=self.itso,
+        )
         RecordAssignment.objects.filter(record=record, party=Party.ITSO).delete()
         record.reviews.filter(stage=ReviewStage.ITSO).delete()
 

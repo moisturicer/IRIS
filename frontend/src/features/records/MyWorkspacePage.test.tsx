@@ -50,6 +50,7 @@ const base: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [],
   adviser: null,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,
@@ -61,18 +62,20 @@ const base: RecordDetail = {
   clearances: [],
   resubmission: { count: 0, last_resubmitted_at: null, declining_office: null, offices_preserved: [] },
   stage_label: "",
-  your_office: null,
-  your_office_label: null,
   files: [],
   workflow_state: "in_review",
   workflow_state_label: "In review",
   current_holders: [],
-  can_act: [],
+  capabilities: ["cite"],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
   routing: { accept_and_route: false, route_as: null },
   office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
+  versions: null,
+  manuscript_unsubmitted: false,
 };
 
 /** The student-facing holder labels the API serves (ADR-021 §2). */
@@ -205,7 +208,7 @@ const CASES: Case[] = [
   {
     was: "approved",
     record: { pipeline_status: "approved", workflow_state: "approved", record_type_name: "Proposal" },
-    current: "Current: Research Ongoing",
+    current: "Current: Accepted",
     office: "—",
   },
   {
@@ -223,15 +226,16 @@ const CASES: Case[] = [
   {
     was: "rejected",
     record: { pipeline_status: "rejected", workflow_state: "rejected" },
-    current: "Current: Rejected",
+    current: "Current: Archived",
     office: "—",
   },
   {
     // A published record whose owner asked RDCO to delete it. Still readable
-    // to its owner; filed with Rejected, as the page always has.
+    // to its owner; filed with the rejected records, as the page always has,
+    // which read Archived since IR-270.
     was: "pending_delete",
     record: { pipeline_status: "pending_delete", workflow_state: "pending_delete" },
-    current: "Current: Rejected",
+    current: "Current: Archived",
     office: "—",
   },
 ];

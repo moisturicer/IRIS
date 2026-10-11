@@ -40,10 +40,13 @@ def _clean_breaker_registry():
 
 
 class ClosedTaskSetTests:
-    def test_the_set_is_exactly_four_named_tasks(self):
+    def test_the_set_has_the_named_routing_task(self):
         assert [task.value for task in InferenceTask] == [
             "answer",
             "resolve",
+            "route",
+            "plan",
+            "screen",
             "summary",
             "describe_figure",
         ]
@@ -113,6 +116,28 @@ class ProfileResolutionTests:
 
         assert profile_for("answer").base_url == "https://openrouter.ai/api/v1"
         assert profile_for("resolve").base_url == "https://api.groq.com/openai/v1"
+
+    def test_route_inherits_the_resolve_model_and_account(self, settings):
+        settings.LLM_RESOLVE_MODEL = "resolve-model"
+        settings.LLM_RESOLVE_API_KEY = "resolve-key"
+        settings.LLM_RESOLVE_VENDOR = "groq"
+        settings.LLM_ROUTE_MODEL = ""
+        settings.LLM_ROUTE_VENDOR = ""
+        settings.LLM_ROUTE_API_KEY = ""
+
+        route = profile_for("route")
+        assert route.model == "resolve-model"
+        assert route.api_key == "resolve-key"
+        assert route.vendor is Vendor.GROQ
+
+    def test_route_moved_to_openrouter_cannot_inherit_groq_key(self, settings):
+        settings.LLM_RESOLVE_VENDOR = "groq"
+        settings.LLM_RESOLVE_API_KEY = "groq-key"
+        settings.LLM_ROUTE_VENDOR = "openrouter"
+        settings.LLM_ROUTE_API_KEY = ""
+
+        assert profile_for("route").api_key == ""
+        assert api_key_variables("route") == ("LLM_ROUTE_API_KEY",)
 
     def test_a_named_vendor_stops_the_flat_key_being_inherited(self, settings):
         """The flat settings describe one vendor. Inheriting half of them is
@@ -399,3 +424,40 @@ class ResolveProfileTests:
 
         adapter = provider._provider._provider  # noqa: SLF001
         assert adapter._reasoning_effort == ""  # noqa: SLF001
+
+
+class ProviderPinTests:
+    """IR-489: an allow-list of OpenRouter providers, per task."""
+
+    def test_a_task_reads_its_own_pin(self, settings):
+        settings.LLM_ANSWER_PROVIDER_ONLY = "together, fireworks"
+
+        assert profile_for(InferenceTask.ANSWER).provider_only == (
+            "together",
+            "fireworks",
+        )
+
+    def test_no_pin_is_an_empty_tuple(self, settings):
+        settings.LLM_SUMMARY_PROVIDER_ONLY = ""
+
+        assert profile_for(InferenceTask.SUMMARY).provider_only == ()
+
+    def test_a_pin_is_not_inherited_by_another_task(self, settings):
+        settings.LLM_ANSWER_PROVIDER_ONLY = "together"
+        settings.LLM_RESOLVE_PROVIDER_ONLY = ""
+
+        assert profile_for(InferenceTask.RESOLVE).provider_only == ()
+
+    def test_the_pin_reaches_the_adapter_a_task_is_built_with(self, settings):
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+        settings.LLM_ANSWER_MODEL = "answer-model"
+        settings.LLM_ANSWER_API_KEY = "k"
+        settings.LLM_ANSWER_PROVIDER_ONLY = "together"
+
+        provider = build_profile_llm(profile_for(InferenceTask.ANSWER))
+
+        adapter = provider._provider._provider  # noqa: SLF001
+        assert adapter.dialect.request_extras("")["extra_body"]["provider"] == {
+            "data_collection": "deny",
+            "only": ["together"],
+        }

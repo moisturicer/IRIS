@@ -25,8 +25,16 @@ from apps.ai.inference import (
     profile_for,
 )
 from apps.ai.inference.completions import LOGGER_NAME
+from apps.ai.providers.fakes import ScriptedToolCallingLLM
 from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
-from apps.ai.providers.tool_calling import ToolCallingLLM, ToolDefinition
+from apps.ai.providers.tool_calling import (
+    AssistantMessage,
+    SystemMessage,
+    ToolCallingLLM,
+    ToolDefinition,
+    ToolResultMessage,
+    UserMessage,
+)
 from apps.ai.resilience.llm import (
     CircuitBreakingLLMProvider,
     FallbackLLMProvider,
@@ -106,10 +114,10 @@ def test_every_provider_on_the_answer_chain_implements_the_port(settings, fallba
     for provider in chain:
         cls = type(provider)
         assert isinstance(provider, ToolCallingLLM), cls.__name__
-        assert "complete_with_tools" in vars(cls), (
-            f"{cls.__name__} inherits complete_with_tools instead of "
-            "implementing it"
-        )
+        for method in ("complete_with_tools", "converse_with_tools"):
+            assert method in vars(cls), (
+                f"{cls.__name__} inherits {method} instead of implementing it"
+            )
 
 
 def test_the_chain_carries_a_decision_end_to_end(settings, vendor):
@@ -162,3 +170,98 @@ def test_the_completion_record_names_the_model_and_never_the_text(
     everything = caplog.text
     for secret in ("HYPOTHETICAL-ANSWER", "SECRET-REASONING", "a user question"):
         assert secret not in everything
+
+
+def _run_planner_shaped_exchange(llm) -> list:
+    """Call, result, call, reply: the shape IR-512's planner will drive."""
+    messages = [SystemMessage("rules"), UserMessage("question")]
+    replies = []
+    while True:
+        completion = llm.converse_with_tools(messages, TOOLS, timeout_seconds=6)
+        replies.append(completion)
+        if not completion.tool_calls:
+            return replies
+        messages = messages + [AssistantMessage.from_completion(completion)]
+        messages += [
+            ToolResultMessage(call.id, f"result {call.id}")
+            for call in completion.tool_calls
+        ]
+
+
+def test_a_scripted_conversation_round_trips_through_every_wrapper(settings):
+    """IR-511: every decorator passes the message list through unchanged, in
+    order, with the model's own call ids, and hands back what it received."""
+    _configure(settings)
+    fake = ScriptedToolCallingLLM(
+        [
+            ScriptedToolCallingLLM.calling(call_id="c1"),
+            ScriptedToolCallingLLM.calling(call_id="c2"),
+            ScriptedToolCallingLLM.answering("final"),
+        ]
+    )
+    chain = CompletionLoggingLLMProvider(
+        CircuitBreakingLLMProvider(
+            RetryingLLMProvider(FallbackLLMProvider([fake]), sleep=lambda _: None)
+        ),
+        profile_for(InferenceTask.ANSWER),
+    )
+
+    replies = _run_planner_shaped_exchange(chain)
+
+    assert [r.text for r in replies] == ["", "", "final"]
+    sent = fake.conversation_requests
+    assert len(sent) == 3
+    assert all(r.timeout_seconds == 6 for r in sent)
+    assert sent[1].messages[2:] == (
+        AssistantMessage(tool_calls=replies[0].tool_calls),
+        ToolResultMessage("c1", "result c1"),
+    )
+    assert [m.tool_call_id for m in sent[2].messages if isinstance(m, ToolResultMessage)] == [
+        "c1",
+        "c2",
+    ]
+
+
+def test_the_real_chain_carries_a_conversation_to_the_vendor(settings, monkeypatch):
+    import openai
+
+    calls: list[dict] = []
+    replies = iter(
+        [
+            SimpleNamespace(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="vendor-1",
+                        function=SimpleNamespace(name="search_corpus", arguments="{}"),
+                    )
+                ],
+            ),
+            SimpleNamespace(content="answer", tool_calls=None),
+        ]
+    )
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=next(replies))], usage=None
+        )
+
+    monkeypatch.setattr(
+        openai,
+        "OpenAI",
+        lambda **kw: SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+        ),
+    )
+    _configure(settings, "second")
+
+    _run_planner_shaped_exchange(CompositionRoot().llm_for(InferenceTask.ANSWER))
+
+    assert len(calls) == 2
+    assert calls[1]["messages"][-1] == {
+        "role": "tool",
+        "tool_call_id": "vendor-1",
+        "content": "result vendor-1",
+    }
+    assert calls[1]["timeout"] == 6

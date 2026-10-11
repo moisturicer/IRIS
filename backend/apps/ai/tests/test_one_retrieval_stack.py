@@ -112,3 +112,89 @@ def _references_publicly_visible(path: pathlib.Path) -> bool:
         isinstance(node, ast.Attribute) and node.attr == "publicly_visible"
         for node in ast.walk(tree)
     )
+
+
+def test_research_tools_reach_records_only_through_the_one_predicate():
+    """ADR-038 §2.2: tools add no second visibility path (IR-500).
+
+    `Record.objects` appears in one research module, whose function applies
+    `visible_to(user)` before anything else touches the queryset.
+    """
+    research = APPS_AI / "research"
+    reaching = {
+        path.relative_to(research).as_posix()
+        for path in research.rglob("*.py")
+        if "tests" not in path.parts and _reaches_record_manager(path)
+    }
+    assert reaching == {"tools/common.py"}, (
+        f"{sorted(reaching)} query Record directly; go through "
+        f"`tools.common.readable_records`."
+    )
+    common = (research / "tools" / "common.py").read_text(encoding="utf-8")
+    assert "Record.objects.visible_to(ctx.user)" in common
+
+
+def _reaches_record_manager(path: pathlib.Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return any(
+        isinstance(node, ast.Attribute)
+        and node.attr == "objects"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "Record"
+        for node in ast.walk(tree)
+    )
+
+
+#: What reaching the retrieval stack looks like from a module: the root's
+#: accessors for it, and the calls a retriever is driven through.
+_RETRIEVAL_CALLS = {
+    "retriever", "answer_service", "source_selection", "embedder", "reranker",
+    "retrieve", "embed_query", "rerank",
+}
+
+
+#: Only the value type `parse_citations` resolves against may be borrowed.
+_ALLOWED_RETRIEVAL_IMPORT = "apps.ai.retrieval.ports."
+_RETRIEVAL_MODULES = ("apps.ai.retrieval", "apps.ai.similarity", "apps.ai.keyword_index")
+
+
+def _imported_names(node):
+    """Fully qualified: `from a import b` is `a.b`."""
+    if isinstance(node, ast.Import):
+        return [alias.name for alias in node.names]
+    if isinstance(node, ast.ImportFrom) and node.module:
+        return [f"{node.module}.{alias.name}" for alias in node.names]
+    return []
+
+
+def test_the_overview_performs_no_retrieval():
+    """The AI Overview reads the whole paper, not a ranked handful (IR-431)."""
+    overview = APPS_AI / "overview"
+    assert overview.is_dir() and not (APPS_AI / "overview.py").exists()
+
+    offenders = []
+    for path in overview.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            offenders += [
+                f"{path.name}: imports {name}"
+                for name in _imported_names(node)
+                if name.startswith(_RETRIEVAL_MODULES)
+                and not name.startswith(_ALLOWED_RETRIEVAL_IMPORT)
+            ]
+            if isinstance(node, ast.Attribute) and node.attr in _RETRIEVAL_CALLS:
+                offenders.append(f"{path.name}: reaches .{node.attr}")
+            if isinstance(node, ast.Name) and node.id == "OVERVIEW_TOP_K":
+                offenders.append(f"{path.name}: OVERVIEW_TOP_K")
+    assert offenders == [], offenders
+
+
+def test_the_answer_service_offers_no_second_way_to_an_overview():
+    """`answer_service(task=...)` existed only for the overview (IR-380)."""
+    tree = ast.parse((APPS_AI / "composition.py").read_text(encoding="utf-8"))
+    method = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "answer_service"
+    )
+    assert "task" not in [arg.arg for arg in method.args.args]

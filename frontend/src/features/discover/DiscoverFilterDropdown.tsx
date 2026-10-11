@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,13 +14,26 @@ export interface FilterOption {
 }
 
 interface BaseProps {
-  label: string;
-  icon?: string;
+  /**
+   * What the control filters, e.g. "Type". It is always the start of the
+   * button's text, so the button keeps its name whatever is chosen, and the
+   * visible text and the accessible name are the same words.
+   */
+  name: string;
   options: FilterOption[];
   /** Shown in place of the list while reference data is still loading. */
   loading?: boolean;
   /** Shown when the endpoint returned nothing. */
   emptyHint?: string;
+  /**
+   * The list opens in the flow under the button rather than floating over the
+   * page. For the filter sheet, whose scrolling body would clip a popover.
+   */
+  inline?: boolean;
+  /** Never drawn as "active": for Sort, which always has a value. */
+  neutral?: boolean;
+  /** Stretch to the container's width, for the stacked sheet layout. */
+  block?: boolean;
 }
 
 interface SingleProps extends BaseProps {
@@ -39,7 +54,7 @@ type DiscoverFilterDropdownProps = SingleProps | MultiProps;
 export const ALL_VALUE = "all";
 
 export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
-  const { label, icon, options, loading = false, emptyHint } = props;
+  const { name, options, loading = false, emptyHint, inline = false, neutral = false, block = false } = props;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -52,64 +67,78 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      // Close this list only. In the filter sheet the same Escape would also
+      // close the dialog; catching it first keeps one key press to one closing.
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
     }
 
     document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [open]);
 
-  const isActive = props.multi
-    ? props.selected.length > 0
-    : props.selected !== ALL_VALUE && props.selected !== "";
+  const isActive =
+    !neutral &&
+    (props.multi ? props.selected.length > 0 : props.selected !== ALL_VALUE && props.selected !== "");
 
-  const activeLabel = !props.multi
-    ? options.find((o) => o.value === props.selected)?.label
+  const chosenLabel = !props.multi
+    ? options.find((o) => o.value === props.selected && o.value !== ALL_VALUE)?.label
     : undefined;
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className={cn("relative", block && "w-full")} ref={containerRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer max-w-[16rem]",
+          "inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 rounded-full border text-small font-medium",
+          COLOUR_TRANSITION,
+          FOCUS_RING,
+          block ? "w-full justify-between" : "max-w-[18rem]",
           isActive
             ? "bg-brand-50 border-brand text-brand"
-            : "bg-white text-stone-700 border-stone-200 hover:border-stone-300",
+            : "bg-white text-stone-700 border-stone-300 hover:border-stone-500",
         )}
       >
-        {icon && <i className={cn("fas", icon, "text-[11px] shrink-0")} aria-hidden />}
-        <span className="truncate">{isActive && activeLabel ? activeLabel : label}</span>
+        <span className="truncate">{chosenLabel ? `${name}: ${chosenLabel}` : name}</span>
 
         {props.multi && props.selected.length > 0 && (
-          <span className="min-w-[16px] h-4 px-1 shrink-0 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
+          <span className="min-w-[18px] h-[18px] px-1 shrink-0 rounded-full bg-brand text-white text-label font-semibold flex items-center justify-center">
             {props.selected.length}
           </span>
         )}
-        <i className={cn("fas fa-chevron-down text-[8px] opacity-60 ml-0.5 shrink-0 transition-transform", open && "rotate-180")} aria-hidden />
+        <i
+          className={cn(
+            "fas fa-chevron-down text-[10px] text-stone-500 shrink-0 transition-transform motion-reduce:transition-none",
+            open && "rotate-180",
+          )}
+          aria-hidden
+        />
       </button>
 
       {open && (
         <div
           role="listbox"
           // A listbox needs its own accessible name (axe: aria-input-field-name).
-          // Found by IR-264's Discover test, the first to open one.
-          aria-label={label}
-          className="absolute left-0 top-full mt-1.5 w-60 max-h-64 overflow-y-auto bg-white rounded-lg shadow-card-md border border-slate-200 py-1.5 z-50"
+          aria-label={name}
+          aria-multiselectable={props.multi || undefined}
+          className={cn(
+            "max-h-64 overflow-y-auto bg-white rounded-xl border border-stone-200 py-1.5",
+            inline ? "mt-2 w-full" : "absolute left-0 top-full mt-2 w-64 shadow-card-md z-50",
+          )}
         >
           {loading ? (
-            <p className="px-3 py-2 text-[13px] text-slate-400">Loading…</p>
+            <p className="px-3 py-2 text-small text-stone-600">Loading…</p>
           ) : options.length === 0 ? (
-            <p className="px-3 py-2 text-[13px] text-slate-400">
-              {emptyHint ?? "No options available."}
-            </p>
+            <p className="px-3 py-2 text-small text-stone-600">{emptyHint ?? "No options available."}</p>
           ) : (
             options.map((option) => {
               const selected = props.multi
@@ -134,7 +163,11 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
                       setOpen(false);
                     }
                   }}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[13px] text-slate-700 hover:bg-slate-50 transition text-left"
+                  className={cn(
+                    "w-full flex items-center justify-between gap-2 px-3 py-2 text-small text-stone-800 text-left hover:bg-stone-50",
+                    COLOUR_TRANSITION,
+                    FOCUS_RING,
+                  )}
                 >
                   <span className="truncate">{option.label}</span>
                   {selected && <i className="fas fa-check text-brand text-[12px] shrink-0" aria-hidden />}
@@ -144,11 +177,15 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
           )}
 
           {props.multi && props.selected.length > 0 && (
-            <div className="border-t border-slate-100 mt-1 pt-1">
+            <div className="border-t border-stone-100 mt-1 pt-1">
               <button
                 type="button"
                 onClick={() => props.onChange([])}
-                className="w-full px-3 py-1.5 text-left text-[13px] font-semibold text-slate-500 hover:text-brand transition"
+                className={cn(
+                  "w-full px-3 py-2 text-left text-small font-medium text-stone-600 hover:text-brand",
+                  COLOUR_TRANSITION,
+                  FOCUS_RING,
+                )}
               >
                 Clear selection
               </button>
