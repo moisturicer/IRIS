@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
+import { pretendLaidOut } from "@/test/layout";
 import { fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
@@ -421,6 +422,23 @@ describe("Details", () => {
     await waitFor(() => expect(title).toHaveFocus());
     expect(title).toHaveAttribute("aria-invalid", "true");
     expect(title).toHaveAccessibleDescription("Title must be at least 5 characters.");
+  });
+
+  it("Tab from a closed More details reaches Back, not the fields hidden inside it", async () => {
+    // IR-516: the same MetadataForm and Modal trap as Edit details.
+    const layout = pretendLaidOut();
+    try {
+      const user = userEvent.setup();
+      openNew();
+      await completeManuscript(user);
+
+      screen.getByText("More details").closest("summary")!.focus();
+      await user.tab();
+
+      expect(screen.getByRole("button", { name: "Back" })).toHaveFocus();
+    } finally {
+      layout.mockRestore();
+    }
   });
 
   it("passes axe with More details open", async () => {

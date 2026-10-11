@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
+import { pretendLaidOut } from "@/test/layout";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { ROLES } from "@/lib/constants";
 import type { RecordDetail } from "@/types/records";
@@ -217,6 +218,25 @@ describe("Edit details while a revision is asked for", () => {
 
     await waitFor(() => expect(recordsApi.update).toHaveBeenCalledTimes(1));
     expect(vi.mocked(recordsApi.update).mock.calls[0][1]).not.toHaveProperty("adviser");
+  });
+
+  it("Tab from a closed More details reaches Cancel, not the fields hidden inside it", async () => {
+    // IR-516, found in IR-507's browser check: the trap counted the closed
+    // details' selects as tabbable, aimed Tab at one, and focus went nowhere.
+    const layout = pretendLaidOut();
+    try {
+      const user = userEvent.setup();
+      renderRevising();
+      const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+      await within(dialog).findByRole("textbox", { name: /Title/ });
+
+      within(dialog).getByText("More details").closest("summary")!.focus();
+      await user.tab();
+
+      expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    } finally {
+      layout.mockRestore();
+    }
   });
 
   it("has no serious or critical accessibility violations", async () => {
