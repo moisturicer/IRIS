@@ -178,3 +178,56 @@ class PromptVersionTests:
 
         assert len(llm.calls) == 1
         assert result["overview"]["text"] == "From the whole paper [1]."
+
+
+class ComprehensiveSkeletonTests:
+    """IR-433: a structured account replaces two paragraphs of prose."""
+
+    def _sent(self, paper):
+        llm = ScriptedLLM(reply="An account [1].")
+        with use_composition_root(_root(llm)):
+            overview_for(paper)
+        [(system, user)] = llm.calls
+        return system, user
+
+    def test_the_question_names_the_four_sections_as_level_two_headings(self, paper):
+        _system, user = self._sent(paper)
+
+        for heading in ("Objectives", "Methodology", "Key findings",
+                        "Limitations and scope"):
+            assert f"## {heading}" in user
+        assert "###" not in user
+        assert "flowing prose" not in user
+
+    def test_the_question_carries_the_omission_rule(self, paper):
+        _system, user = self._sent(paper)
+
+        assert "Omit any section the paper does not support" in user
+
+    def test_the_closing_separates_demonstrated_from_suggested(self, paper):
+        _system, user = self._sent(paper)
+
+        assert "demonstrates" in user and "suggests" in user
+
+    def test_presentation_rules_are_inherited_not_restated(self, paper):
+        from apps.ai.answers.citations import PRESENTATION_RULES, SYSTEM_PROMPT
+
+        system, user = self._sent(paper)
+
+        assert system == SYSTEM_PROMPT
+        assert PRESENTATION_RULES not in user
+        assert "LaTeX" not in user
+
+    def test_a_row_from_the_two_paragraph_question_is_stale(self, paper):
+        RecordOverview.objects.create(
+            record=paper, text="Two short paragraphs.", citations=[],
+            content_hash="new-hash", prompt_version=2,
+        )
+        llm = ScriptedLLM(reply="## Objectives\n\nForecasting [1].")
+
+        with use_composition_root(_root(llm)):
+            result = overview_for(paper)
+
+        assert len(llm.calls) == 1
+        assert result["overview"]["text"] == "## Objectives\n\nForecasting [1]."
+        assert RecordOverview.objects.get(record=paper).prompt_version == PROMPT_VERSION
