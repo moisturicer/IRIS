@@ -25,7 +25,6 @@ from . import lifecycle
 from core.permissions import (
     IsAdmin,
     IsAuthor,
-    IsOwnerOrStaff,
     IsRDCO,
     IsRecordOwner,
     IsStaff,
@@ -136,11 +135,11 @@ class RecordViewSet(viewsets.ModelViewSet):
         # §10 Amendment): no office edits or submits a record that is not
         # theirs, so submission's consent is always an owner's. When an owner
         # may edit is `update()`'s question (`versions.details_editable`).
-        if self.action in ("update", "partial_update", "submit"):
+        # Deleting is an owner's too (IR-508): no office deletes a student's
+        # draft or files a delete request in their name. What a delete does in
+        # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
+        if self.action in ("update", "partial_update", "submit", "destroy"):
             return [IsAuthenticated(), IsRecordOwner()]
-        # Still owner-or-staff: who may delete is IR-508's decision.
-        if self.action == "destroy":
-            return [IsAuthenticated(), IsOwnerOrStaff()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -212,6 +211,22 @@ class RecordViewSet(viewsets.ModelViewSet):
         if manuscript_awaits_submission(record):
             return
         queue_manuscript_extraction(record)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        A record already awaiting a delete decision is not deleted again
+        (IR-508). A soft delete is legal from every status, so without this a
+        second DELETE removed the record outright and skipped RDCO's decision,
+        leaving its request pending against a deleted record. A 400: the owner
+        is the right person at the wrong moment, as with the record update.
+        """
+        record = self.get_object()
+        if record.pipeline_status == PipelineStatus.PENDING_DELETE:
+            return Response(
+                {"detail": "A delete decision is already pending for this record."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
         # Accepted work goes through the delete request flow (RDCO review);

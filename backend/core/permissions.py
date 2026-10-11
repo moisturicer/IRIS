@@ -1,7 +1,8 @@
 from rest_framework.permissions import BasePermission
 
 from core.enums import (
-    OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus, RoleName, WorkflowState,
+    DELETE_REVIEW_STATUSES, OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus,
+    RoleName, WorkflowState,
 )
 
 # Role name constants -- match the Role.name values in the DB exactly.
@@ -137,7 +138,7 @@ class IsOpportunityPoster(BasePermission):
     share a role bucket. Role membership answers "may you post?", never "is this
     yours?".
 
-    The rule mirrors `IsOwnerOrStaff` below: the person who posted it, or an
+    The rule mirrored the old record `IsOwnerOrStaff` (retired by IR-508): the person who posted it, or an
     admin (RDCO/KTTO/Django staff) acting as a moderator. An Adviser can edit
     only their own call; RDCO and KTTO can correct anyone's, which is what an
     institutional noticeboard needs when a deadline changes and the poster is
@@ -311,6 +312,18 @@ DECISION_CAPABILITY = {
 }
 
 
+#: What an owner's `DELETE /records/<id>/` does in each status, named as the act
+#: it is (IR-508, ADR-032 §10 Amendment): gone now, withdrawn from review, or a
+#: request RDCO decides. One endpoint, three keys, so a button names its
+#: consequence. `pending_delete` is absent: a decision is already pending.
+DELETE_CAPABILITY = {
+    PipelineStatus.DRAFT: "delete_record",
+    PipelineStatus.REJECTED: "delete_record",
+    PipelineStatus.IN_REVIEW: "withdraw_submission",
+    **{status: "request_deletion" for status in DELETE_REVIEW_STATUSES},
+}
+
+
 def record_capabilities(record, user, *, workflow, my_seats, routing, office_review,
                         revision, decision) -> list[str]:
     """Action keys offered by Record detail (ADR-032 §10, IR-418).
@@ -354,6 +367,9 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
             if revision["new_version"] is not None:
                 offered.extend(["create_version", "replace_manuscript"])
             offered.append("edit_details")
+        delete_act = DELETE_CAPABILITY.get(record.pipeline_status)
+        if delete_act is not None:
+            offered.append(delete_act)
 
     # Both role-gated endpoints refuse anyone who is not office staff
     # (`IsStaff`) before any other check, so the offers do too.
@@ -369,23 +385,16 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     return offered
 
 
-class IsOwnerOrStaff(BasePermission):
-    """
-    Object-level: the user owns the record OR is a staff member.
-    The view must attach `obj.owners` as a queryset or list of users.
-    """
-    def has_object_permission(self, request, view, obj):
-        return owns_or_staffs_record(request.user, obj)
-
-
 class IsRecordOwner(BasePermission):
     """
     Object-level: the user owns the record. No staff role stands in for it.
 
-    The record update and `submit/` (IR-507, ADR-032 §10 Amendment): a record's
-    details are its owners' to write, and its Data Privacy Act consent is an
-    owner's to give. Under `IsOwnerOrStaff` an office could do both on a record
-    that was not theirs, with the staff member recorded as `dpa_accepted_by`.
+    The record update, `submit/` and delete (IR-507, IR-508, ADR-032 §10
+    Amendment): a record's details are its owners' to write, its Data Privacy
+    Act consent an owner's to give, and its removal an owner's to start. The
+    retired `IsOwnerOrStaff` let an office do all three on a record that was
+    not theirs -- recorded as `dpa_accepted_by`, or as the requester of a
+    delete request -- and was deleted with its last user (IR-508).
     """
     def has_object_permission(self, request, view, obj):
         return is_record_owner(request.user, obj)
