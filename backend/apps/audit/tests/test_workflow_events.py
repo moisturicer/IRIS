@@ -554,6 +554,22 @@ class DocumentRequestTests(AuditTestBase):
         )
 
 
+    def test_a_request_item_upload_that_answers_the_last_item_fulfils_the_request(self):
+        record = self.routed(Party.IERC)
+        asked = self.ask_for_documents(record, self.ierc, [{"label": "Consent form"}])
+        [item] = asked["items"]
+
+        self.upload(record, request_item=item["id"])
+
+        self.assertEqual(
+            self.one(record, AuditEvent.DOCUMENT_REQUEST_FULFILLED)["metadata"],
+            {
+                "party": Party.IERC, "request": asked["id"],
+                "items": [{"id": item["id"], "label": "Consent form"}],
+            },
+        )
+
+
 # --- AC: kept apart (ADR-022) -------------------------------------------------------------
 
 class KeptApartTests(AuditTestBase):

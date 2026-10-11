@@ -451,7 +451,6 @@ def accept_and_route(record, actor, *, to, reason):
         record, actor, party=Party.ADVISER, outcome=ACCEPTED_AND_ROUTED, final=False,
         review=review,
     )
-
     def accept_then_route():
         seats.complete_seat(adviser_seat, actor)
         return _apply(record, actor, plan)

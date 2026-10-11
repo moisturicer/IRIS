@@ -44,7 +44,7 @@ revision only revision events, so "you forgot a form" is never counted as "revis
 | `event_type` | One of the types below |
 | `user` | The acting user's id, or `null` when IRIS acted itself (the hand-back to RDCO) |
 | `record` | The Record's id |
-| `created_at` | When the act committed its row (ISO 8601) |
+| `created_at` | When the row was inserted, inside the act's transaction (ISO 8601). Rows of one act are milliseconds apart |
 | `metadata` | The keys listed per type |
 
 Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `ierc`, `ktto`,
@@ -101,7 +101,7 @@ The Adviser's entry seat writes no seat event: `SUBMITTED` is that act.
 
 | Type | Written when | `metadata` |
 |---|---|---|
-| `RECORD_WITHDRAWN` | The owner deletes a record that is in review | `version`, `closed_parties` (the parties whose open assignment closed) |
+| `RECORD_WITHDRAWN` | A record in review is soft-deleted, which today only its owner can do (IR-508); `user` is whoever deleted it | `version`, `closed_parties` (the parties whose open assignment closed) |
 
 It is followed by an `ASSIGNMENT_CLOSED` (`how`: `withdrawn`) per party, and a
 `REVISION_REQUEST_WITHDRAWN` or `DOCUMENT_REQUEST_WITHDRAWN` (`closed_by`:
@@ -148,10 +148,19 @@ A party routed to again after it finished gets a second clock. Exclude `how ==
 "withdrawn"` and `"closed_by_decision"` when measuring how long a party took to finish:
 those turns were ended, not completed.
 
-**A revision does not stop the clock.** A party with an open revision request cannot
-complete, so its assignment stays open while the author revises. The author's share of
-that time is `RESUBMITTED.created_at - RESUBMISSION_REQUESTED.created_at` for each party
-in `rereview_parties`; subtract it to get the reviewer-side time.
+**A revision does not stop the clock, so `RESUBMITTED` starts none.** IR-144's card says a
+clock also starts at `RESUBMITTED` for `reset_parties`. That rule was not built, deliberately:
+
+- under `clearance_aware`, every reset party is a party that asked, and a party with an
+  open revision request cannot complete, so its clock is still running and restarting it
+  would erase the time before the request;
+- under `restart_all`, the other reset offices' assignments stay completed and nobody is
+  handed work (`new_version.py`: seats and assignments do not read the policy), so there is
+  no clock to start.
+
+Instead, the author's share of a party's clock is
+`RESUBMITTED.created_at - RESUBMISSION_REQUESTED.created_at` for each party in
+`rereview_parties`; subtract it to get the reviewer-side time.
 
 ### Total turnaround
 

@@ -306,7 +306,7 @@ def _lock_decidable(item: DocumentRequestItem) -> tuple[DocumentRequestItem, Doc
     return item, request
 
 
-def accept_item(item: DocumentRequestItem, user=None) -> DocumentRequest:
+def accept_item(item: DocumentRequestItem, user) -> DocumentRequest:
     """
     The upload satisfies the request (ADR-022 §3.4). A request whose items
     were all uploaded is already fulfilled, so it stays closed. The caller has
@@ -349,7 +349,7 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
     return request
 
 
-def withdraw_request(request: DocumentRequest, user=None) -> DocumentRequest:
+def withdraw_request(request: DocumentRequest, user) -> DocumentRequest:
     """
     The requesting party no longer needs it (ADR-022 §4). Only an open
     request: a fulfilled one is already closed, and its uploads are decided

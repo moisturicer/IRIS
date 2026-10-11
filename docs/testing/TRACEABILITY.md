@@ -21,6 +21,12 @@ an audit failure can never abort the workflow transaction (the IR-216 guarantee)
 recipes: [`../evaluation/AUDIT_EXPORT.md`](../evaluation/AUDIT_EXPORT.md). Display, filters and
 CSV export are IR-529.
 
+**Recorded deviation from the card:** its "Clocks" rule starts a clock at `RESUBMITTED` for
+`reset_parties`. No clock starts there, because no reset party is handed new work: a party that
+asked never stopped its clock, and under `restart_all` the other reset offices are not reopened.
+The author's revision time is measured as `RESUBMISSION_REQUESTED` → `RESUBMITTED` instead
+(AUDIT_EXPORT.md §Per-party turnaround).
+
 **Tests:** `apps.audit.tests.test_workflow_events`, read back through `GET /audit/` as RDCO:
 every type with its metadata; `PUBLISHED` only on publish; `RESUBMITTED` under both policies
 with one `CLEARANCE_PRESERVED` per kept office; document-request and revision events kept apart;

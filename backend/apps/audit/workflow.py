@@ -5,8 +5,10 @@ The evaluation's turnaround and preserved-clearance metrics are computed from
 these rows alone, and an event missed during the pilot cannot be
 reconstructed. So:
 
-- **One type per act.** Each function here writes one event type and fixes its
-  metadata keys. `docs/evaluation/AUDIT_EXPORT.md` documents the same keys;
+- **One type per act.** Each act writes its own event type, and the functions
+  here fix their metadata keys (`seat_moved` serves the six seat moves, which
+  share theirs; `resubmitted` also writes the `CLEARANCE_PRESERVED` rows that
+  belong to its act). `docs/evaluation/AUDIT_EXPORT.md` documents the same keys;
   change one and change the other.
 - **Called from the workflow services, inside their transaction**, after the
   per-record lock. A refused or rolled-back act therefore leaves no event.
@@ -203,6 +205,10 @@ def _items(items):
     return [{"id": item.pk, "label": item.label} for item in items]
 
 
+def _every_item(request):
+    return request.items.order_by("sort_order", "pk")
+
+
 def _document_request(event_type, request, actor, items, **extra):
     _write(
         event_type, actor, request.record,
@@ -212,15 +218,14 @@ def _document_request(event_type, request, actor, items, **extra):
 
 def document_requested(request, actor):
     _document_request(
-        AuditEvent.DOCUMENT_REQUESTED, request, actor,
-        request.items.order_by("sort_order", "pk"), message=request.message,
+        AuditEvent.DOCUMENT_REQUESTED, request, actor, _every_item(request),
+        message=request.message,
     )
 
 
 def document_request_fulfilled(request, actor):
     _document_request(
-        AuditEvent.DOCUMENT_REQUEST_FULFILLED, request, actor,
-        request.items.order_by("sort_order", "pk"),
+        AuditEvent.DOCUMENT_REQUEST_FULFILLED, request, actor, _every_item(request),
     )
 
 
@@ -234,7 +239,6 @@ def document_rejected(request, item, actor, *, reason):
 
 def document_request_withdrawn(request, actor, *, closed_by=BY_REQUESTING_PARTY):
     _document_request(
-        AuditEvent.DOCUMENT_REQUEST_WITHDRAWN, request, actor,
-        request.items.order_by("sort_order", "pk"),
+        AuditEvent.DOCUMENT_REQUEST_WITHDRAWN, request, actor, _every_item(request),
         closed_by=closed_by, closed_by_decision=closed_by == BY_DECISION,
     )

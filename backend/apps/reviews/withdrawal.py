@@ -80,33 +80,41 @@ def withdraw_review(record, actor) -> None:
     Withdraw `record`'s active assignments, their open seats, its open revision
     requests and its open document requests.
     """
+    from apps.documents.models import DocumentRequest
+    from apps.records.models import Record
+
+    # The per-record lock every workflow act takes, so a withdrawal and a
+    # Decision or routing act on the same record run one after the other.
+    Record.objects.select_for_update(of=("self",)).get(pk=record.pk)
     now = timezone.now()
+    # Read once under lock, then updated by these ids, so what is closed and
+    # what is audited are the same rows (IR-144).
     active = list(_active_assignments(record).select_for_update().order_by("pk"))
-    ids = [a.pk for a in active]
     open_seats = dict(
-        ReviewerSeat.objects.filter(assignment_id__in=ids, state__in=OPEN_SEAT_STATES)
+        ReviewerSeat.objects.filter(assignment__in=active, state__in=OPEN_SEAT_STATES)
         .values_list("pk", "assignment_id")
     )
     revision_requests = list(
         ResubmissionRequest.objects.filter(record=record, state=ResubmissionRequestState.OPEN)
-        .order_by("pk")
+        .select_for_update().order_by("pk")
     )
-    document_requests = list(_open_document_requests(record).order_by("pk"))
+    document_requests = list(_open_document_requests(record).select_for_update().order_by("pk"))
 
     ReviewerSeat.objects.filter(pk__in=open_seats).update(state=SeatState.WITHDRAWN)
-    RecordAssignment.objects.filter(pk__in=ids).update(
+    RecordAssignment.objects.filter(pk__in=[a.pk for a in active]).update(
         state=AssignmentState.WITHDRAWN, closed_by=actor, closed_at=now,
     )
     ResubmissionRequest.objects.filter(pk__in=[r.pk for r in revision_requests]).update(
         state=ResubmissionRequestState.WITHDRAWN, resolved_by=actor, resolved_at=now,
     )
-    _open_document_requests(record).update(state=DocumentRequestState.WITHDRAWN, closed_at=now)
+    DocumentRequest.objects.filter(pk__in=[r.pk for r in document_requests]).update(
+        state=DocumentRequestState.WITHDRAWN, closed_at=now,
+    )
 
-    # Audited only when there was review to withdraw: a soft-deleted draft or
-    # a published record had none (IR-144).
-    if not active:
-        return
-    audit.record_withdrawn(record, actor, closed_parties=[a.party for a in active])
+    # A record withdrawn from review says so; a soft-deleted draft or a
+    # published record had no review to withdraw (IR-144).
+    if active:
+        audit.record_withdrawn(record, actor, closed_parties=[a.party for a in active])
     for assignment in active:
         audit.assignment_closed(
             assignment, actor, how=audit.WITHDRAWN,

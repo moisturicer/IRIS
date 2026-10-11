@@ -112,6 +112,14 @@ def _reset_offices(record, parties) -> list[str]:
     return list(rows.values_list("office", flat=True))
 
 
+def _kept_offices(record, reset) -> list[str]:
+    """The offices whose `cleared` clearance a version resetting `reset` keeps."""
+    return list(
+        RecordClearance.objects.filter(record=record, status=ClearanceStatus.CLEARED)
+        .exclude(office__in=reset).order_by("office").values_list("office", flat=True)
+    )
+
+
 def new_version_hint(record, user) -> Optional[dict]:
     """
     What record detail tells an owner about the version they would submit
@@ -132,10 +140,7 @@ def new_version_hint(record, user) -> Optional[dict]:
     parties = _parties(requests)
     reset = set(_reset_offices(record, parties))
     latest = latest_version(record)
-    kept = (
-        RecordClearance.objects.filter(record=record, status=ClearanceStatus.CLEARED)
-        .exclude(office__in=reset).order_by("office").values_list("office", flat=True)
-    )
+    kept = _kept_offices(record, reset)
     return {
         "number": (latest.number if latest else 0) + 1,
         "rereview": [_label(p) for p in parties],
@@ -175,10 +180,7 @@ def submit_new_version(record, actor):
     reset = _reset_offices(record, parties)
     # Read before the reset: the offices whose `cleared` clearance this version
     # keeps -- ADR-003's contribution, counted per office (IR-144).
-    preserved = list(
-        RecordClearance.objects.filter(record=record, status=ClearanceStatus.CLEARED)
-        .exclude(office__in=reset).values_list("office", flat=True)
-    )
+    preserved = _kept_offices(record, reset)
     now = timezone.now()
 
     previous = latest_version(record)
