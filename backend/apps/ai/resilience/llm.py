@@ -83,6 +83,7 @@ from typing import Callable, Dict, Iterator, Optional, Sequence, Tuple
 
 from apps.ai.providers.dialects import DEFAULT_DIALECT, VendorDialect
 from apps.ai.providers.errors import ErrorKind
+from apps.ai.providers.openai_compatible import DeadlineExceeded
 from apps.ai.providers.ports import LLMProvider, StreamDelta
 from apps.ai.providers.tool_calling import (
     Message,
@@ -111,6 +112,9 @@ _GIVE_UP_ON_RETRY = (
     ErrorKind.UNKNOWN,
 )
 
+#: A spent run deadline cannot be fixed by trying again.
+_GIVE_UP_ON = (DeadlineExceeded,)
+
 #: Worth trying the next model in the list for -- the same three kinds
 #: `composition._vendor_failures` degrades retrieval on, for the same reason:
 #: each means *this vendor*, not *the question*, is the problem. `auth` and
@@ -130,6 +134,8 @@ def is_switchable_failure(exc: BaseException) -> bool:
     """
     if isinstance(exc, CircuitOpen):
         return True
+    if getattr(exc, "counts_against_circuit", True) is False:
+        return False
     return getattr(exc, "kind", None) in _SWITCH_KINDS
 
 
@@ -213,6 +219,7 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
         return retry_with_backoff(
             lambda: self._provider.generate(system, user),
             attempts=self._attempts,
+            give_up_on=_GIVE_UP_ON,
             give_up_on_kind=_GIVE_UP_ON_RETRY,
             **kwargs,
         )
@@ -229,6 +236,7 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
             retry_with_backoff(
                 lambda: _open_stream(lambda: self._provider.stream(system, user)),
                 attempts=self._attempts,
+                give_up_on=_GIVE_UP_ON,
                 give_up_on_kind=_GIVE_UP_ON_RETRY,
                 **kwargs,
             )
@@ -248,6 +256,7 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
                 system, user, tools, timeout_seconds=timeout_seconds
             ),
             attempts=self._attempts,
+            give_up_on=_GIVE_UP_ON,
             give_up_on_kind=_GIVE_UP_ON_RETRY,
             **kwargs,
         )
@@ -265,6 +274,7 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
                 messages, tools, timeout_seconds=timeout_seconds
             ),
             attempts=self._attempts,
+            give_up_on=_GIVE_UP_ON,
             give_up_on_kind=_GIVE_UP_ON_RETRY,
             **kwargs,
         )

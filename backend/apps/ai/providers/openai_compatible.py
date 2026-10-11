@@ -66,6 +66,19 @@ class LLMUnavailable(RuntimeError):
         self.kind = kind
 
 
+class DeadlineExceeded(LLMUnavailable):
+    """The run's own deadline passed, before or during a call.
+
+    Kind `timeout`, but the caller's budget ran out, not the vendor: retry,
+    model fallback and the circuit breaker all leave it alone.
+    """
+
+    counts_against_circuit = False
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, kind=ErrorKind.TIMEOUT)
+
+
 def is_configured() -> bool:
     """Whether this adapter has what it needs to reach a vendor.
 
@@ -135,8 +148,8 @@ def _wire(message: Message) -> dict[str, Any]:
     raise TypeError(f"not a message: {type(message).__name__}")
 
 
-def _deadline_passed() -> "LLMUnavailable":
-    return LLMUnavailable("the run's deadline has passed", kind=ErrorKind.TIMEOUT)
+def _deadline_passed() -> "DeadlineExceeded":
+    return DeadlineExceeded("the run's deadline has passed")
 
 
 class OpenAICompatibleAdapter(ToolCallingLLM):
@@ -223,7 +236,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         if explicit is None:
             explicit = self._timeout_seconds
         if explicit is None:
-            explicit = getattr(settings, "LLM_TIMEOUT_SECONDS", 120.0)
+            explicit = settings.LLM_TIMEOUT_SECONDS
         seconds = bounded(explicit)
         if seconds <= 0:
             raise _deadline_passed()
@@ -266,6 +279,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
+        extra["timeout"] = timeout
         if self._max_tokens:
             limit_field = (
                 "max_completion_tokens"
@@ -282,7 +296,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     {"role": "user", "content": user},
                 ],
                 **self._temperature_kwargs(),
-                timeout=timeout,
                 **extra,
             )
         except LLMUnavailable:
@@ -322,6 +335,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
+        extra["timeout"] = timeout
         if self._max_tokens:
             limit_field = (
                 "max_completion_tokens"
@@ -339,7 +353,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                 ],
                 **self._temperature_kwargs(),
                 stream=True,
-                timeout=timeout,
                 **extra,
             )
         except LLMUnavailable:
@@ -353,6 +366,9 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         received_any = False
         try:
             for chunk in chunks:
+                left = time_left()
+                if left is not None and left <= 0:
+                    raise _deadline_passed()
                 choices = getattr(chunk, "choices", None) or []
                 if not choices:
                     continue
@@ -361,9 +377,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                 reasoning = self.dialect.read_reasoning(delta)
                 if not text and not reasoning:
                     continue
-                left = time_left()
-                if left is not None and left <= 0:
-                    raise _deadline_passed()
                 received_any = True
                 yield StreamDelta(text=text, reasoning=reasoning)
         except LLMUnavailable:
@@ -416,6 +429,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         extra = self.dialect.request_extras(
             self._resolved_reasoning_effort(), self.models
         )
+        extra["timeout"] = timeout
 
         try:
             response = client.chat.completions.create(
@@ -434,7 +448,6 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     for tool in tools
                 ],
                 tool_choice="auto",
-                timeout=timeout,
                 **extra,
             )
         except LLMUnavailable:
@@ -459,9 +472,11 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                     name=getattr(getattr(call, "function", None), "name", "") or "",
                     arguments=getattr(getattr(call, "function", None), "arguments", "")
                     or "",
-                    id=getattr(call, "id", "") or "",
+                    id=getattr(call, "id", "") or f"call_{position}",
                 )
-                for call in (getattr(message, "tool_calls", None) or [])
+                for position, call in enumerate(
+                    getattr(message, "tool_calls", None) or []
+                )
             ),
             input_tokens=getattr(usage, "prompt_tokens", None),
             output_tokens=getattr(usage, "completion_tokens", None),

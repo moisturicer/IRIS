@@ -157,7 +157,10 @@ class TheAdapterReadsWhatCameBackTests:
             "s", "u", [SEARCH]
         )
 
-        assert completion.tool_calls == (ToolCall("search_corpus", '{"query": "x"}'),)
+        # IR-511: a vendor call with no id is given a stable one.
+        assert completion.tool_calls == (
+            ToolCall("search_corpus", '{"query": "x"}', "call_0"),
+        )
         assert completion.text == ""
 
     def test_text_reasoning_and_token_counts_are_carried(self):

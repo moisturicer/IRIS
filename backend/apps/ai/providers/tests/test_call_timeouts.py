@@ -14,7 +14,11 @@ import pytest
 
 from apps.ai.providers.deadline import model_call_deadline, time_left
 from apps.ai.providers.errors import ErrorKind
-from apps.ai.providers.openai_compatible import LLMUnavailable, OpenAICompatibleAdapter
+from apps.ai.providers.openai_compatible import (
+    DeadlineExceeded,
+    LLMUnavailable,
+    OpenAICompatibleAdapter,
+)
 from apps.ai.providers.tool_calling import ToolDefinition, UserMessage
 from apps.ai.resilience.circuit import CircuitBreaker, CircuitOpen
 from apps.ai.resilience.llm import CircuitBreakingLLMProvider, RetryingLLMProvider
@@ -192,3 +196,63 @@ class ASlowModelIsATransientFailureTests:
             provider.generate("s", "u")
 
         assert len(client.calls) == 2
+
+
+class ASpentDeadlineIsNotTheVendorsFailureTests:
+    def test_it_is_not_retried(self):
+        client = _Client()
+        provider = RetryingLLMProvider(
+            OpenAICompatibleAdapter(client=client), attempts=3, sleep=lambda _: None
+        )
+        with model_call_deadline(0):
+            with pytest.raises(DeadlineExceeded):
+                provider.generate("s", "u")
+
+    def test_it_does_not_walk_the_model_list(self):
+        from apps.ai.resilience.llm import FallbackLLMProvider
+
+        first = OpenAICompatibleAdapter(client=_Client(), model="a")
+        second_client = _Client()
+        second = OpenAICompatibleAdapter(client=second_client, model="b")
+
+        with model_call_deadline(0):
+            with pytest.raises(DeadlineExceeded):
+                FallbackLLMProvider([first, second]).generate("s", "u")
+
+        assert second_client.calls == []
+
+    def test_it_does_not_trip_the_breaker(self):
+        breaker = CircuitBreaker(failure_threshold=1)
+        provider = CircuitBreakingLLMProvider(
+            OpenAICompatibleAdapter(client=_Client()), breaker=breaker
+        )
+
+        with model_call_deadline(0):
+            for _ in range(3):
+                with pytest.raises(DeadlineExceeded):
+                    provider.generate("s", "u")
+
+        assert provider.generate("s", "u") == "text"
+
+
+class RequestShapeTests:
+    def test_a_vendor_call_with_no_id_gets_a_stable_one(self):
+        message = SimpleNamespace(
+            content=None,
+            tool_calls=[
+                SimpleNamespace(
+                    id=None, function=SimpleNamespace(name="search_corpus", arguments="")
+                )
+            ],
+        )
+        client = _Client()
+        client._create = lambda **kw: SimpleNamespace(
+            choices=[SimpleNamespace(message=message)], usage=None
+        )
+        client.chat.completions.create = client._create
+
+        completion = OpenAICompatibleAdapter(client=client).complete_with_tools(
+            "s", "u", [SEARCH]
+        )
+
+        assert completion.tool_calls[0].id == "call_0"
