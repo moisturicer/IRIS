@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 PASSAGE = "passage"
@@ -77,6 +77,9 @@ class Ledger:
     def add_record(self, *, record_id: int, title: str, abstract: str) -> EvidenceItem:
         existing = self._records.get(record_id)
         if existing is not None:
+            if existing.record_title != title or existing.text != abstract:
+                existing = replace(existing, record_title=title, text=abstract)
+                self._records[record_id] = existing
             return existing
         item = EvidenceItem(
             handle=f"R{len(self._records) + 1}", kind=RECORD,

@@ -400,3 +400,43 @@ chunks**. Audit tables store only identifiers, digests, statuses and
 measurements; deletion cascades with the owner/Conversation. Django checks
 and migration drift checks pass (the existing Axes deprecation warning
 remains). No paid planner measurement or reader rollout is claimed.
+
+## IR-501 — paper screening and topic counts
+
+**Implemented, offline tools/workflow only.** `screen_records` checks an
+application-supplied candidate set using the independent `screen` inference
+profile. Model failures, missing/invalid decisions and unsupported quotes
+leave papers unassessed. The disclosure gate is checked before each batch;
+gated candidates contribute only to the unassessed total, without individual
+identity or reason. The human user confirmed this D3 policy and the public
+test boundaries in the IR-501 implementation chat on 2026-10-11.
+
+`topic_count` screens every visible scoped record at or below the ceiling;
+above it, it screens ranked candidates and reports `matches_found`. Its SQL
+count uses distinct included record IDs over current visibility. Owners,
+versions and chunks never multiply the count. The code supplies conservative
+wording and possible-duplicate flags; separate records are never merged.
+Metadata counts retain their existing contract. See
+[PAPER_SCREENING.md](../engineering/PAPER_SCREENING.md).
+
+Evidence: `research/tests/test_screening.py`, `test_topic_count.py` and
+`test_screen_profile.py` exercise the registered tool, count workflow and
+public profile interface with scripted providers and PostgreSQL. They cover
+disclosure and scope, batch/vendor failures, malformed responses, quote
+provenance, budgets, candidate-set caching, screening beyond retrieval's top
+ten, duplicate flags, include/exclude counts and author/version multiplicity.
+The focused research/inference suite and unchanged-answer/retrieval guards
+passed **266 tests** on 2026-10-11 before the final in-flight-edit regression
+was added. The final full backend suite on a fresh PostgreSQL test database
+passed **3,152 tests, 1 xpassed, zero failures and zero skips** in 217.29
+seconds. The xpass is the existing non-strict IR-469 HNSW scan-depth test.
+Provider/profile configuration was isolated; tests used no live model calls.
+Backend static checks, Django configuration and migration drift checks passed.
+Existing test warnings remain, including Axes deprecation, pagination and a
+closed command-output wrapper. Independent standards and spec reviews found
+no remaining material findings after permission/content-aware caching,
+publication revalidation and in-flight-edit fixes.
+
+No screening quality measurement, real institutional result or reader rollout
+is claimed. ADR-038's overall Proposed status remains unreconciled with Jira's
+accepted-scope comment; broader human approval remains required before merge.

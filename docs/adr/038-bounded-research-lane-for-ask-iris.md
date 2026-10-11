@@ -141,7 +141,7 @@ ADR-027 defines counts over named Areas only. This ADR adds:
 - **A metadata count is exact.** A database predicate (classification, PSCED, record type, year, IP flag), computed as `COUNT(DISTINCT id)` over `visible_to(user)`. The wording is "of the records you can see", because every count is relative to the asker (ADR-027 §3).
 - **A topic count is a screened count,** never an exact one. It is find, screen against a written criterion, de-duplicate, count. It is computed in code from the screening results and carries a label: `exhaustive` (every visible record was screened), `screened`, `matches_found` or `sample`. The answer says how many were screened and how many could not be assessed, and it never says "there are N".
 - **Counts are never taken from top-k retrieval or from chunks.** They count distinct `record_id`s. Possible duplicates are reported, never silently merged.
-- **A record the reader can see but the gate refuses is never sent to a vendor.** Whether it is counted as `unassessed`, screened by keyword only, or omitted is proposal 13 D3 and is **open (§12)**. Whichever is chosen must not make the answer depend on *why* the record was withheld (ADR-035 §7).
+- **A record the reader can see but the gate refuses is never sent to a vendor.** D3 was confirmed in the IR-501 implementation chat (§12): a selected candidate is counted as `unassessed`. No withholding reason or individual gated record content appears in a model request or result. This is the same unassessed total used for provider failures, missing replies and insufficient evidence, and never depends on *why* a record was withheld (ADR-035 §7).
 - **The model reports rows and never extends them,** which is ADR-027 §4 and §9 applied to counts of papers.
 
 ### 7. History is per consumer — ADR-026 §13 amended
@@ -220,7 +220,6 @@ What that does and does not mean:
 | Decision | Owner |
 |---|---|
 | Landscape route handling until the Lens exists: confirm §3's reading | Jive Tyler Revalde |
-| Gated-but-visible records in screening and counts (D3) | Jive Tyler Revalde |
 | Whether prior answers are re-gated when a cited record becomes restricted (D6) | Jive Tyler Revalde |
 | ASGI against worker offload for long runs (D8) | Jive Tyler Revalde |
 | The uncertain band's values, and the `plan` and `screen` models | Chosen by IR-503, IR-502 and IR-501 |
@@ -234,6 +233,15 @@ policy withholds the whole answer, reports validation failure and keeps the
 gathered sources available. This is recorded with [IR-512's implementation
 PR](https://github.com/moisturicer/IRIS/pull/234). It confirms this policy only;
 the ADR remains Proposed and its named approval and merge gate are unchanged.
+
+**D3 confirmation — 2026-10-11.** In the IR-501 implementation chat, the
+human user selected **"Report them as unassessed, with no reason shown
+(Recommended)"** after receiving a plain-language example: 7 matches among
+90 checked papers and 10 unassessed papers. The approved design tests the
+registered screening tool and application count workflow, including captured
+scripted-provider requests. Gated candidates are never keyword-screened or
+silently omitted. This confirms D3 only; the ADR remains Proposed and its
+broader named approval and merge gate are unchanged.
 
 ## Alternatives Considered
 
