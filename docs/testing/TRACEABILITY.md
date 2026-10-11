@@ -423,7 +423,9 @@ weakest passages first, with a deterministic coverage note.
 
 Evidence: `research/tests/test_context_loop.py` captures requests for recent
 answers, omitted restricted/gated/widened exchanges, no recalled text,
-verbatim passages and abstracts, and a permission change during a run. It
+verbatim passages and abstracts, and permission changes during a run. Stale
+metadata counts leave planner and synthesis requests, and aggregate caches
+recompute when visible membership changes; private provenance is not rendered. It
 demonstrates first-task sufficiency, outer/inner/run limits, unchanged
 duplicate caching across replans, reported token usage accumulated across
 replans, invalid plans, passage-count and prompt-token dropping, and the
@@ -436,12 +438,18 @@ protocol, including audit step counts; their underlying assertions remain.
 Static checks, Django checks and migration consistency passed on 2026-10-11;
 the existing Axes deprecation warning remains. No migration or live routing
 change is needed. The full-suite and independent-review results are recorded
-with the final evidence update; this section claims no reader rollout or
-research-quality measurement.
+on an isolated checkout and PostgreSQL test database: **3,176 passed,
+1 expected failure, zero failures and zero skips** in 235.65 seconds. The
+expected failure is the existing non-strict IR-469 HNSW scan-depth test.
+Provider/profile configuration was isolated, with no paid calls. Existing
+test warnings remain. Independent standards and spec reviews using GPT-6 Luna
+found no remaining material findings after the stale-count finding was fixed
+and re-reviewed. This section claims no reader rollout or research-quality
+measurement.
 
 ## IR-501 — paper screening and topic counts
 
-See also IR-513 below for the planner's context assembly around these tools.
+See also IR-513 above for the planner's context assembly around these tools.
 
 **Implemented, offline tools/workflow only.** `screen_records` checks an
 application-supplied candidate set using the independent `screen` inference
