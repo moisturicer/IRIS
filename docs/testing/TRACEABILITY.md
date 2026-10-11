@@ -8,6 +8,25 @@
 
 ---
 
+## IR-508 who deletes a record, and what a delete does (ADR-032 §10)
+
+**Design:** [ADR-032 §10, IR-508 Amendment of 2026-10-11](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
+`DELETE /records/<id>/` is `IsRecordOwner` (any owner; no office, no Adviser).
+A draft or rejected record is soft-deleted now. A record in review is
+soft-deleted now and its review withdrawn (IR-274). Accepted work becomes a
+delete request for RDCO. A record in `pending_delete` is refused with a 400, so
+a second delete can no longer skip RDCO's decision. Record detail offers
+`delete_record`, `withdraw_submission` or `request_deletion` (`core.permissions.DELETE_CAPABILITY`)
+to owners only. `IsOwnerOrStaff` is deleted.
+
+**Tests:** `apps.records.test_delete_policy` (who; each status's act; the
+bypass closed; any owner is the requester; the offer by status and viewer);
+`apps.records.test_capabilities` probes each key in the statuses it names.
+
+**Evidence:** the IR-508 PR's CI.
+
+---
+
 ## IR-507 who edits and submits a record (ADR-032 §10, FR-M6-02)
 
 **Design:** [ADR-032 §10, Amendment of 2026-10-11](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
