@@ -33,6 +33,13 @@ The IR-374 redesign extends the IR-356 direction from Paper View to every screen
 | **Dialogs that are tasks** (IR-408) | `Modal` takes three optional props, all off by default: `sheet` (full screen below `md`, a centred dialog from `md` up; spec §4.13, which says `md` where §4.4 says `sm`; §4.13 is followed), `footer` (actions pinned under the scrolling body, so a step's Continue never scrolls away on a phone) and `displayTitle` (the title in `font-display text-title`, as a content title). Publish uses all three. A dialog that asks a question keeps the plain form | `Modal`'s single centred layout at every width |
 | **Shared components** | `ResearchCard` (new: one card for a record, `list`/`grid`, with slots; **IR-410 added `compact`**, which keeps a list card's title at `text-title` and its padding compact for a working list, and lets the status row wrap so several chips never overflow a phone), `EmptyState` (action slot, `error` tone, `framed`; Discover's private copy deleted), `UploadDropzone` (replaces `FileUploadZone`: checks before upload when asked to, progress, retry, Enter/Space), `PageHeader` (restyled to the type roles). Details in [14](14-component-inventory.md) §4–5 | §4's "No change for MVP" for these |
 
+### IR-535 amendment: the entry frame
+
+| Area | Rule now | Replaces |
+|---|---|---|
+| **Entry brand panel** | The sign-in, register, verify and pending screens share `AuthLayout`, whose desktop panel (`AuthBrandPanel`) is a **shelf of bound work**: a `stone-100` ground, a plain statement in `font-display`, one sentence per screen saying what that screen is for, and a row of volumes in `brand`, `brand-dark`, `brand-light` and white whose spines carry only the record types IRIS holds. Chosen by the project lead from an `impeccable` round (2026-10-12). No quotation, figure or claim of prestige. Gold is the two bands at each spine's head and nothing else. **One deliberate exception to the type roles:** the statement is set at `text-4xl` (`2xl:text-5xl`) in `font-display` 600, the size a paper's title takes, rather than at `display` (28px), because it is the one line the screen exists to say. The shelf fades in once (200ms opacity, none under reduced motion) | The cream panel with the design-brief quotation and "a prestigious archive" (signup) and the tagline panel (login) |
+| **`text-spine`** | A utility in `index.css` that sets `writing-mode: vertical-rl` turned to read bottom to top, for spine titles. Tailwind has no writing-mode utility | — |
+| **Entry tokens guard** | `components/auth/entryTokens.test.ts` fails on a hex value, an arbitrary-value class, an inline style, gold as text or fill, or cream in an entry-frame file. IR-537 to IR-540 add their screens to it | — |
 
 ## 1 · Tokens as defined
 
