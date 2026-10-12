@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator, Optional
 
+from apps.ai.admission import scope as admission_scope
 from apps.ai.answers.events import Done, RetrievalStarted
 from apps.ai.routing.chat import RoutedChat, RoutingDecided
 from apps.ai.composition import composition_root
@@ -41,6 +42,9 @@ class ChatOrchestrator:
         self._routing = RoutedChat(asked, root=self._root, max_sources=max_sources)
         self._max_sources = max_sources
         self._turn_id = None
+        # Per-run provider caps sum over this. A queued question's own run,
+        # opened around it by its worker, takes precedence (IR-545).
+        self._run = admission_scope.new_run()
 
     @property
     def _service(self):
@@ -54,6 +58,19 @@ class ChatOrchestrator:
         return {**metadata, "turn_id": self._turn_id} if metadata and self._turn_id else metadata
 
     def answer(self, user):
+        with admission_scope.workload("chat"), admission_scope.run(self._run):
+            return self._answer(user)
+
+    def answer_stream(self, user) -> Iterator:
+        """The service's events, each step charged to this question's run
+        and to the chat lane unless a research lane says otherwise (IR-545)."""
+        return admission_scope.stepwise(
+            self._answer_stream(user),
+            lambda: admission_scope.workload("chat"),
+            lambda: admission_scope.run(self._run),
+        )
+
+    def _answer(self, user):
         asked = self._asked
         routed = self._routing.answer(user)
         answer = routed if routed is not None else self._service.answer(
@@ -65,7 +82,7 @@ class ChatOrchestrator:
         self._shadow(self._record(answer))
         return answer
 
-    def answer_stream(self, user) -> Iterator:
+    def _answer_stream(self, user) -> Iterator:
         """The service's events; the Turn is recorded before `Done` passes
         on, and shadowed only after the reader has it."""
         asked = self._asked

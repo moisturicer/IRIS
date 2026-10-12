@@ -150,9 +150,9 @@ All metrics are **declared before measurement**. They are reported separately an
 
 | Gate | Blocks | Status |
 |---|---|---|
-| Per-stage and per-run values: physical attempts, output tokens, cost | IR-545 enablement and any paid run | **OPEN.** Proposed values need owner approval |
-| Queue sizing (depth, per-user fairness, worker count) | IR-544/IR-545 enablement | **OPEN** |
-| Shared provider quotas across workers, retries and fallbacks | Any concurrent pilot run | **OPEN.** Must be enforced in a shared store, not per worker |
+| Per-stage and per-run values: physical attempts, output tokens, cost | IR-545 enablement and any paid run | **OPEN.** Proposed values need owner approval. The enforcing mechanism exists (§10); every value is an unset, required setting |
+| Queue sizing (depth, per-user fairness, worker count) | IR-544/IR-545 enablement | **OPEN.** Depth and per-user caps are enforced once set (§10); no value is approved and no sizing for 100 simultaneous submissions has been done |
+| Shared provider quotas across workers, retries and fallbacks | Any concurrent pilot run | **Mechanism built** by IR-545 in a shared store, not per worker (§10, ADR-041 Proposed). **Values OPEN** |
 | Endpoint approval per §5 row | Traffic to that endpoint | **OPEN** for every row |
 | Quality/error trade-offs above | IR-550's verdict | **OPEN** |
 
@@ -202,3 +202,17 @@ IR-544 lets a reader leave and come back to a question. It ships **off** (`AI_DU
 - **Leaving unsubscribes.** Closing the stream stops reading the journal and nothing else.
 - **Public only.** The journal never holds reasoning or the router's probabilities. Replay re-checks ownership, re-filters citations and sources to the Records visible now, and rebuilds `done` from the Turn the way a reopened transcript is. `Turn.reasoning` is still written (IR-381). No policy to stop that has been recorded, and nothing historical is deleted.
 - **Measured with fakes only.** `apps/ai/tests/test_durable_ask_http.py` drives submission, disconnect, the worker, reconnect, redelivery, a superseded attempt, deletion before and during the answer, both deadline paths, a foreign run and changed visibility, all with deterministic providers. No claim is made about real-provider throughput or queue behaviour under load.
+
+## 10. Shared capacity and spend controls as built (IR-545)
+
+IR-545 builds the mechanism that §6's quota and queue gates need. **It approves no number.** The design is [ADR-041](../../adr/041-shared-provider-admission.md), which is **Proposed**. It ships **off** (`AI_PROVIDER_ADMISSION=off`). `AI_DURABLE_ASK` now refuses to start without `AI_PROVIDER_ADMISSION=enforce`.
+
+- **Fail closed.** Every limit is a required setting with no default. Under `enforce`, any unset limit refuses every paid attempt. The §7 figures appear in `backend/.env.example` as an illustration only, marked not approved.
+- **One shared ledger.** Postgres, through its own `admission` connection, with the campaign row locked for every admission. Two independent processes contending for one lane limit of 3 admit exactly 3. With the lock removed, the same test admits 4.
+- **Every physical attempt.** The first try, a retry and each fallback model each reserve separately. The SDK's hidden retries are off under enforcement. Covered paths: chat completions, tool calls, Voyage embedding and rerank, and Jev decisions.
+- **Worst case before sending.** A reservation holds input bounded by bytes, the completion cap (always sent, tool calls included), the cost at the dearest model that may answer, and active time. It is then settled to what the vendor reported. Unreported usage stays at its reservation, never zero. An unsent attempt is released.
+- **Leases.** A dead worker's reservation holds its slot until its lease (its own timeout plus grace) ends. It is then abandoned and charged in full. A stream renews its lease, and a refused renewal stops it.
+- **Campaign.** The §7 ceiling's five limits are enforced. The protected 25% stays closed until `AI_ADMISSION_RESERVE_RELEASED` records the budget owner's release. Paid load, probes and debugging go through the same adapters and share it. `manage.py provider_campaign` prints spend against both ceilings.
+- **Queue.** A submission is refused as `503 busy` (`queue_full`, `user_queue_full` or `not_configured`) before anything is created, so one asker cannot fill the queue. The original 30 s deadline bounds every vendor call a worker makes, and retries do not reset it. A run that met a refusal journals `capacity_limited` before `done`. Its answer is the explicit unavailable state with its sources.
+- **Measured with fakes and real Postgres only.** No vendor was called and nothing was billed. The `MeteredAdapter` fake stands where the vendor adapter stands. No throughput or latency claim is made.
+

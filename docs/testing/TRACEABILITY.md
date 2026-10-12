@@ -708,3 +708,67 @@ Evidence:
 
 **Status:** implemented and tested; human review and approval remain required, as does ADR-040's acceptance.
 Enablement is gated by the pilot README §6.
+
+## IR-545 — queued answers under deployment-wide capacity and spend controls
+
+With `AI_PROVIDER_ADMISSION=enforce` (default `off`), every paid provider attempt is admitted against shared limits
+before it is sent. That covers a chat completion, a tool call, a Voyage embedding or rerank, and a Jev decision. A
+retry or a fallback model is another attempt. Reservations live in Postgres (`ProviderCampaign`,
+`ProviderReservation`, migration 0024) and are written on their own `admission` connection under a campaign row lock.
+A queued question is admitted to a bounded queue with per-asker caps. Design:
+[ADR-041](../adr/041-shared-provider-admission.md) (**Proposed**); contract in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md) §10. **No limit value
+is approved.** Every limit is a required setting, and an unset one refuses paid work.
+
+Evidence, with deterministic fakes and real Postgres; no vendor called:
+- `apps/ai/admission/tests/test_shared_processes.py`. Independent processes with their own interpreters contend for
+  the same campaign row:
+  - one lane limit is shared (3 admitted of 10 asked);
+  - one campaign ceiling is shared (7 of 20, the 75% core of 10);
+  - a crashed worker's reservation holds its slot until its lease ends, then is abandoned and charged in full.
+
+  With the row lock removed, the lane test admits 4 and fails.
+- `apps/ai/admission/tests/test_ledger.py`:
+  - worst-case reservation, then settlement to reported usage;
+  - unknown usage charged at its reservation;
+  - an unsent attempt released;
+  - the dearest fallback price reserved;
+  - a retry and each fallback model admitted separately;
+  - refusals that send nothing: unpriced, uncapped, lane not configured, not configured;
+  - denials not retried, failed over or counted against a circuit;
+  - lane and account concurrency, including one credential across two lanes;
+  - the protected reserve, and its release;
+  - a sticky run cap;
+  - a store failure refusing; a settle failure staying charged;
+  - the lease bounded by the run deadline;
+  - a closed stream settled; lease renewal; an abandoned lease refusing renewal;
+  - the campaign-row invariant;
+  - `manage.py provider_campaign`.
+- `apps/ai/admission/tests/test_wiring.py`:
+  - the production chain is Retrying → Admitted → adapter;
+  - the completion cap is sent, tool calls included;
+  - SDK retries are off;
+  - real-adapter usage is reported;
+  - Voyage is charged to its lane or workload;
+  - a refused Voyage request degrades retrieval;
+  - Jev decisions are admitted, and a refused one routes to the backup;
+  - every Inference task has a lane.
+- `apps/ai/admission/tests/test_limits.py`:
+  - every required setting fails closed;
+  - a malformed value stops startup;
+  - `AI_DURABLE_ASK` needs enforcement;
+  - the 75/25 split.
+- `apps/ai/admission/tests/test_scope.py`: lanes and runs around generator steps, including steps in fresh contexts as
+  under ASGI.
+- `apps/ai/tests/test_admission_http.py`, over HTTP and the event stream:
+  - a queued answer is charged to `ask:<run id>`;
+  - every vendor call is bounded by the original 30 s deadline;
+  - an exhausted campaign journals `capacity_limited` and ends `unavailable` with its sources;
+  - the queue is bounded and fair between askers (`503 busy`), and a refusal queues nothing;
+  - unset queue limits refuse;
+  - local fakes incur no charges;
+  - ownership is still rechecked.
+
+**Status:** implemented and tested; human review and approval remain required, as do ADR-041's acceptance and every
+limit value (pilot README §6). Nothing has measured real-provider throughput or sizing for 100 simultaneous
+submissions.

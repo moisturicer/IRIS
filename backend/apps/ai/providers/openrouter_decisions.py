@@ -47,6 +47,25 @@ def _kind_for_status(status: int, message: str) -> ErrorKind:
     return classify_status_code(status, None, message)
 
 
+def _report_decision_usage(response: httpx.Response) -> None:
+    from apps.ai.admission.scope import report_usage
+
+    try:
+        body = response.json()
+    except ValueError:
+        return
+    usage = body.get("usage") if isinstance(body, dict) else None
+    if not isinstance(usage, dict):
+        return
+    tokens, cost = usage.get("input_tokens"), usage.get("cost")
+    if isinstance(tokens, int) and not isinstance(tokens, bool):
+        report_usage(
+            input_tokens=tokens,
+            output_tokens=0,
+            cost_usd=float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None,
+        )
+
+
 class OpenRouterDecisionsAdapter(DecisionModel):
     def __init__(
         self,
@@ -106,8 +125,14 @@ class OpenRouterDecisionsAdapter(DecisionModel):
             },
         }
         timeout = timeout_seconds or self._timeout
+        from apps.ai.admission.errors import AdmissionDenied
+
         try:
             response = self._post(payload, timeout)
+        except AdmissionDenied as exc:
+            # Refused before sending (IR-545): the router falls back, as it
+            # does for any decision it cannot get.
+            raise DecisionUnavailable(str(exc), ErrorKind.RATE_LIMIT) from exc
         except httpx.TimeoutException as exc:
             raise DecisionUnavailable("decision call timed out", ErrorKind.TIMEOUT) from exc
         except httpx.HTTPError as exc:
@@ -130,18 +155,46 @@ class OpenRouterDecisionsAdapter(DecisionModel):
         return parsed
 
     def _post(self, payload: dict, timeout: float) -> httpx.Response:
+        """One physical attempt, admitted under provider admission (IR-545).
+
+        A decision has no completion to cap; it is charged its input tokens,
+        or the vendor's own reported cost when it gives one.
+        """
+        import json
+
+        from apps.ai.admission.ledger import (
+            Request,
+            account_for,
+            estimate_tokens,
+            provider_attempt,
+        )
+        from apps.ai.admission.scope import mark_sent
+
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        if self._client is not None:
-            return self._client.post(
-                DECISIONS_URL, json=payload, headers=headers, timeout=timeout
-            )
-        with httpx.Client() as client:
-            return client.post(
-                DECISIONS_URL, json=payload, headers=headers, timeout=timeout
-            )
+        with provider_attempt(Request(
+            operation="decision",
+            default_lane="chat",
+            account=account_for(DECISIONS_URL, self._api_key),
+            models=(self._model,),
+            input_tokens=estimate_tokens(json.dumps(payload, default=str, ensure_ascii=False)),
+            output_tokens=0,
+            timeout_seconds=timeout,
+        )):
+            mark_sent()
+            if self._client is not None:
+                response = self._client.post(
+                    DECISIONS_URL, json=payload, headers=headers, timeout=timeout
+                )
+            else:
+                with httpx.Client() as client:
+                    response = client.post(
+                        DECISIONS_URL, json=payload, headers=headers, timeout=timeout
+                    )
+            _report_decision_usage(response)
+            return response
 
     @staticmethod
     def _parse_named(
