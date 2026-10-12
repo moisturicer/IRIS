@@ -33,6 +33,10 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 def queued(settings):
     settings.AI_DURABLE_ASK = True
     settings.AI_DURABLE_ASK_POLL_SECONDS = 0
+    # The journal expectations below are the passage lane's; a developer's
+    # .env with the router or research lane on must not change them.
+    settings.AI_RESEARCH_LANE = "off"
+    settings.AI_JEV_ROUTING_ENABLED = False
     return settings
 
 

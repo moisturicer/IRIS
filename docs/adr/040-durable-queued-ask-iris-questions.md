@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — 2026-10-12 (IR-544, under IR-551). Drafted by an AI agent while implementing the ticket. **Awaiting approval by a named person.** The agent does not mark this accepted. The code ships **off** (`AI_DURABLE_ASK=False`), and switching it on is gated separately by the fixed-workflow pilot README §6 (queue sizing, shared quotas), which IR-545 addresses.
+**Proposed** — 2026-10-12 (IR-544, under IR-551). **Awaiting approval by a named person.** The code ships **off** (`AI_DURABLE_ASK=False`), and switching it on is gated separately by the fixed-workflow pilot README §6 (queue sizing, shared quotas), which IR-545 addresses.
 
 ## Context
 
