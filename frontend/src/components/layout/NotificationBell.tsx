@@ -10,7 +10,8 @@ import { formatDate, cn } from "@/lib/utils";
 const PREVIEW_LIMIT = 5;
 
 /**
- * Header notification bell.
+ * The notification bell: at the top of the sidebar, and in the phone bar
+ * below `md`. There is no app header any more (IR-519).
  *
  * Complements NotificationsPage rather than replacing it: the page answers
  * "what has happened to my records?" (full history, filterable), the bell
@@ -26,7 +27,16 @@ const PREVIEW_LIMIT = 5;
  * Backend needed no changes: /notifications/?unread=true, mark-read and
  * mark-all-read all already existed.
  */
-export function NotificationBell() {
+interface NotificationBellProps {
+  /**
+   * Which edge of the bell the dropdown lines up with. "end" (the default)
+   * opens leftward, for a bell near the right of the screen; the sidebar's
+   * bell sits at the left of the screen, so it opens rightward with "start".
+   */
+  align?: "start" | "end";
+}
+
+export function NotificationBell({ align = "end" }: NotificationBellProps) {
   // Shares the mount-time fetch the sidebar already performs.
   const { unreadCount } = useNotifications();
   const items = useNotificationsStore((s) => s.items);
@@ -99,7 +109,10 @@ export function NotificationBell() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-stone-200 shadow-card-md z-50 overflow-hidden"
+          className={cn(
+            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-stone-200 shadow-card-md z-50 overflow-hidden",
+            align === "start" ? "left-0" : "right-0",
+          )}
         >
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-stone-100">
             <p className="text-[13px] font-bold uppercase tracking-wider text-stone-400">

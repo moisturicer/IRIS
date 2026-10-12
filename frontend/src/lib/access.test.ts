@@ -81,6 +81,18 @@ test("a Student publishes from Discover, so the sidebar offers no Submit Disclos
   assertEqual(canAccess(ROLES.STUDENT, "submit"), true, "Student may still open /records/add");
 });
 
+test("Notifications is the bell, not a sidebar link, and its page stays open (IR-519)", () => {
+  // The bell at the top of the sidebar is the one notification entry; a link
+  // beside it said the same thing twice. Its "View all" still reaches the page.
+  for (const role of EVERY_ROLE) {
+    assertEqual(
+      navFor(role).some((item) => item.key === "notifications"), false,
+      `${role} sidebar lists Notifications`,
+    );
+    assertEqual(canAccess(role, "notifications"), true, `${role} may open /notifications`);
+  }
+});
+
 // --- review ----------------------------------------------------------------
 
 test("the review queue is every reviewer, and excludes Student", () => {

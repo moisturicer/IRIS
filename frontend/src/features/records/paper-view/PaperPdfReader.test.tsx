@@ -19,6 +19,7 @@ import type { TextRun } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 
 import { PaperPdfReader } from "./PaperPdfReader";
+import { PANE_TOP_PX, READER_TOOLBAR_TOP_PX } from "./paneLayout";
 
 const manuscriptBlob = vi.fn();
 vi.mock("@/api/records", () => ({
@@ -227,9 +228,9 @@ describe("landing on a cited passage (IR-354)", () => {
       follow(rerender, PASSAGE_LOW);
 
       // The region starts at 1500 + 850 = 2350. It lands 48px of context
-      // below the toolbar, which sticks at 122px and is 44px tall.
+      // below the toolbar, which sticks at READER_TOOLBAR_TOP_PX and is 44px tall.
       await waitFor(() =>
-        expect(scrollBy).toHaveBeenCalledWith({ top: 2350 - (122 + 44) - 48, behavior: "smooth" }),
+        expect(scrollBy).toHaveBeenCalledWith({ top: 2350 - (READER_TOOLBAR_TOP_PX + 44) - 48, behavior: "smooth" }),
       );
     });
 
@@ -238,7 +239,7 @@ describe("landing on a cited passage (IR-354)", () => {
       follow(rerender, PASSAGE_HIGH);
 
       await waitFor(() =>
-        expect(scrollBy).toHaveBeenCalledWith({ top: 1520 - (122 + 44) - 48, behavior: "smooth" }),
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1520 - (READER_TOOLBAR_TOP_PX + 44) - 48, behavior: "smooth" }),
       );
     });
 
@@ -247,7 +248,7 @@ describe("landing on a cited passage (IR-354)", () => {
       follow(rerender, []);
 
       await waitFor(() =>
-        expect(scrollBy).toHaveBeenCalledWith({ top: 1500 - (122 + 44) - 16, behavior: "smooth" }),
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1500 - (READER_TOOLBAR_TOP_PX + 44) - 16, behavior: "smooth" }),
       );
     });
 
@@ -282,7 +283,7 @@ describe("landing on a cited passage (IR-354)", () => {
 
       // From where the passage is now: 1456 + 0.85 * 970 = 2280.5.
       await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(2));
-      expect(scrollBy).toHaveBeenLastCalledWith({ top: 2280.5 - (122 + 44) - 48, behavior: "smooth" });
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 2280.5 - (READER_TOOLBAR_TOP_PX + 44) - 48, behavior: "smooth" });
     });
 
     it("does not pull the reader back to the passage for a refit long after landing", async () => {
@@ -319,8 +320,8 @@ describe("landing on a cited passage (IR-354)", () => {
       const paneScrollBy = vi.fn();
       reader.area.scrollBy = paneScrollBy;
 
-      // The pane is 400px down; it rests at 126px, under the header and the
-      // view switch. Its toolbar ends at 444px, its scroll area at 1000px.
+      // The pane is 400px down; it rests at PANE_TOP_PX, under the view
+      // switch (there is no app header since IR-519). Its toolbar ends at 444px, its scroll area at 1000px.
       vi.spyOn(reader.pane, "getBoundingClientRect").mockReturnValue(box(400, 600));
       vi.spyOn(reader.toolbar, "getBoundingClientRect").mockReturnValue(box(400, 44));
       vi.spyOn(reader.area, "getBoundingClientRect").mockReturnValue(box(444, 556));
@@ -332,7 +333,7 @@ describe("landing on a cited passage (IR-354)", () => {
 
       follow(reader.rerender, PASSAGE_LOW);
 
-      await waitFor(() => expect(windowScrollBy).toHaveBeenCalledWith({ top: 400 - 126, behavior: "auto" }));
+      await waitFor(() => expect(windowScrollBy).toHaveBeenCalledWith({ top: 400 - PANE_TOP_PX, behavior: "auto" }));
       // The region starts at 1476 + 850 = 2326; it lands 48px below the
       // pane's toolbar, measured in the pane, so the window's own scroll
       // (which moves both) does not change it.
@@ -824,20 +825,21 @@ describe("find in this paper (IR-353)", () => {
     await openPaper();
     const input = await openFind();
     // Below lg the window scrolls. Page 3 is 1000px tall, 2516px down; the
-    // toolbar, with find open inside it, is 96px tall once stuck at 122px.
+    // toolbar, with find open inside it, is 96px tall once stuck at
+    // READER_TOOLBAR_TOP_PX.
     placePages([
       { top: 484, height: 1000 },
       { top: 1500, height: 1000 },
       { top: 2516, height: 1000 },
     ]);
-    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(122, 96));
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(READER_TOOLBAR_TOP_PX, 96));
 
     await userEvent.type(input, "arm");
 
     // Page 3's line is half way down: 2516 + 500 = 3016. It lands 48px of
     // context below the toolbar, at once rather than smoothly.
     await waitFor(() =>
-      expect(scrollBy).toHaveBeenCalledWith({ top: 3016 - (122 + 96) - 48, behavior: "auto" }),
+      expect(scrollBy).toHaveBeenCalledWith({ top: 3016 - (READER_TOOLBAR_TOP_PX + 96) - 48, behavior: "auto" }),
     );
   });
 
@@ -852,7 +854,7 @@ describe("find in this paper (IR-353)", () => {
       { top: 1316, height: 1000 },
       { top: 2332, height: 1000 },
     ]);
-    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(122, 96));
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(READER_TOOLBAR_TOP_PX, 96));
 
     await userEvent.type(input, "vision");
     await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 1"));

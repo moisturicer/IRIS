@@ -220,7 +220,7 @@ export function CallsAndConferencesPage() {
         (savedOnBoard > 0 ? " Saved calls are kept in this browser only." : "");
 
   return (
-    <div className="p-4 sm:p-6 max-w-screen-2xl mx-auto">
+    <div>
       <PageHeader
         title="Calls & Conferences"
         description="Internal research calls, conference deadlines and funding windows, posted by CIT-U offices and advisers. Soonest deadline first."

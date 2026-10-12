@@ -5,8 +5,8 @@ import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { useUIStore } from "@/store/ui.store";
-import { useNotifications } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "./NotificationBell";
 import { navFor, canAccess, NAV_SECTION_ORDER, type NavEntry } from "@/lib/access";
 import irisLogo from "@/assets/images/iris_logo.png";
 
@@ -108,7 +108,6 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
   const { roleName } = useRole();
-  const { unreadCount } = useNotifications();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
@@ -140,8 +139,8 @@ export function Sidebar({ className }: SidebarProps) {
   // Badges are the only per-item state the map does not carry, so they are
   // attached here rather than baked into lib/access.ts -- the map answers "may
   // this role open it", never "how many are waiting".
+  // The unread count is on the bell, which replaced the Notifications link.
   const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
-    notifications: unreadCount,
     roleRequests:  roleRequestBadge,
   };
 
@@ -163,6 +162,7 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <aside
+      aria-label="Sidebar"
       className={cn(
         // Mobile (<768px): always a full 230px drawer, overlaid.
         // Desktop (≥768px): 230px, or a 60px icon rail when collapsed.
@@ -175,7 +175,8 @@ export function Sidebar({ className }: SidebarProps) {
       {/* ── Logo / Brand header ─────────────────────────────────────── */}
       <div
         className={cn(
-          "py-4 border-b border-stone-100 flex items-center gap-3",
+          // gap-2, not 3: the brand block now holds the bell beside the collapse control.
+          "py-4 border-b border-stone-100 flex items-center gap-2",
           collapsed ? "px-4 md:px-2 md:justify-center" : "px-4",
         )}
       >
@@ -223,6 +224,15 @@ export function Sidebar({ className }: SidebarProps) {
           </div>
         </div>
 
+        {/* The bell lives here now that there is no app header (IR-519).
+            Desktop only: below `md` the phone bar carries it, and showing it in
+            the drawer too would put two bells on screen at once. */}
+        {!collapsed && (
+          <div className="hidden md:block flex-shrink-0">
+            <NotificationBell align="start" />
+          </div>
+        )}
+
         {/* Expanded: the collapse control sits at the right of the brand block. */}
         {!collapsed && (
           <button
@@ -247,6 +257,13 @@ export function Sidebar({ className }: SidebarProps) {
           <i className="fas fa-times text-[15px]" aria-hidden />
         </button>
       </div>
+
+      {/* Collapsed rail: no room beside the mark, so the bell takes its own row. */}
+      {collapsed && (
+        <div className="hidden md:flex justify-center py-2 border-b border-stone-100">
+          <NotificationBell align="start" />
+        </div>
+      )}
 
       {/* ── Navigation ──────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin" aria-label="Main">
@@ -287,7 +304,7 @@ export function Sidebar({ className }: SidebarProps) {
             </div>
           </div>
 
-          {/* Sign out lives here because AppShell hides its Header on "/" */}
+          {/* Sign out lives here; there is no app header to hold it (IR-519). */}
           <button
             type="button"
             onClick={handleSignOut}
