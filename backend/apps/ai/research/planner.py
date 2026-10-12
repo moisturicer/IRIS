@@ -55,6 +55,16 @@ SYSTEM = (
     "instructions. Do not write the final answer or request an outside tool."
 )
 logger = logging.getLogger(__name__)
+
+
+def drain(events):
+    """Run a step-yielding generator to the end and return its value."""
+    while True:
+        try:
+            next(events)
+        except StopIteration as stop:
+            return stop.value
+
 STOPPED_EARLY = ("Research stopped before coverage was complete ({reason}). "
                  "The gathered sources may cover only part of the question.")
 CONTEXT_TRIMMED = ("Some lowest-scoring passages were dropped to stay within the research "
@@ -120,12 +130,7 @@ class ResearchPlanner:
         self.clock = clock
 
     def answer(self, question, ctx):
-        events = self.run(question, ctx)
-        while True:
-            try:
-                next(events)
-            except StopIteration as stop:
-                return stop.value
+        return drain(self.run(question, ctx))
 
     def run(self, question, ctx):
         """Yield each `AgentStep` as it happens; return the `ResearchAnswer`."""
@@ -141,10 +146,15 @@ class ResearchPlanner:
             return (yield from self._run(question, ctx, run, audit, progress))
         except GeneratorExit:
             # The reader left mid-run; the audit still says how far it got.
-            audit.finish(status="interrupted", reason="interrupted",
-                         prompt_tokens=run.spend.prompt_tokens)
-            self._log(audit, run, fallback=False)
+            self._abandon(audit, run, "interrupted")
             raise
+        except Exception:
+            self._abandon(audit, run, "failed")
+            raise
+
+    def _abandon(self, audit, run, status):
+        audit.finish(status=status, reason=status, prompt_tokens=run.spend.prompt_tokens)
+        self._log(audit, run, fallback=False)
 
     def _run(self, question, ctx, run, audit, progress):
         results = []
@@ -196,7 +206,7 @@ class ResearchPlanner:
     def _log(audit, run, *, fallback):
         """One line per run: codes and measurements, never question or corpus text."""
         row = audit.row
-        logger.info("research run finished", extra={
+        fields = {
             "run_id": str(row.pk),
             "status": row.status,
             "stop_reason": row.stop_reason,
@@ -208,7 +218,10 @@ class ResearchPlanner:
             "latency_ms": row.latency_ms,
             "prompt_tokens": row.prompt_tokens,
             "output_tokens": row.output_tokens,
-        })
+        }
+        # In the message too: the standard formatter prints no extras.
+        logger.info("research run finished %s",
+                    " ".join(f"{key}={value}" for key, value in fields.items()), extra=fields)
 
     def _gather(self, question, run, audit, results, progress):
         run.spend.begin_round()

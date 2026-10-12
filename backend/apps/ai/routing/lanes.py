@@ -11,7 +11,7 @@ from apps.ai.inference import InferenceTask
 from apps.ai.providers.deadline import model_call_deadline
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.research.context import RunContext
-from apps.ai.research.planner import ResearchPlanner
+from apps.ai.research.planner import ResearchPlanner, drain
 from apps.ai.research.registry import ToolRun, research_tools
 from apps.ai.research.results import ToolStatus
 from apps.ai.research.tools.common import disclosable, readable_records
@@ -20,15 +20,6 @@ from apps.ai.research.schema import ArgumentsRejected
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.workflows import topic_count
 from apps.ai.resilience.circuit import CircuitOpen
-
-def drain(events):
-    """Run a step-yielding generator to completion and return its value."""
-    while True:
-        try:
-            next(events)
-        except StopIteration as stop:
-            return stop.value
-
 
 LIST_WORDING = "These are matches found, not a complete list of the papers you can see."
 SUCCESS = (ToolStatus.OK, ToolStatus.EMPTY, ToolStatus.DEGRADED)
@@ -208,14 +199,9 @@ def research_run(question, user, *, root, conversation=None, scope_record=None,
 
 def answer_lane(lane, question, user, *, root, conversation=None, scope_record=None,
                 max_sources=8, history_before_turn_id=None):
-    """Run a bounded corpus workflow selected by the application router."""
-    if lane not in ("listing", "count", "comparison", "research"):
+    """Run a bounded corpus workflow; research goes through `research_run`."""
+    if lane not in ("listing", "count", "comparison"):
         raise ValueError(f"No application workflow for lane {lane!r}")
-    if lane == "research":
-        events = research_run(question, user, root=root, conversation=conversation,
-                              scope_record=scope_record, max_sources=max_sources,
-                              history_before_turn_id=history_before_turn_id)
-        return drain(events).answer, None
     ctx = _context(lane, user, root=root, conversation=conversation, scope_record=scope_record,
                    max_sources=max_sources, history_before_turn_id=history_before_turn_id)
     run = ToolRun.start(ctx, root)

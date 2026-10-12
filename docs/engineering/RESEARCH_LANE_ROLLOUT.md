@@ -48,4 +48,4 @@ Production answers stay empty until IR-250: the disclosure gate refuses every re
 
 ## Logging
 
-One `INFO` line per run from `apps.ai.research.planner`, message `research run finished`, with `run_id`, `status`, `stop_reason`, `limit_hit`, `fallback`, `malformed_calls`, `validation_codes`, `tool_calls`, `latency_ms`, `prompt_tokens` and `output_tokens`. The tool registry already logs each limit hit and each rejected call with its reason code. None of these carry question, argument or corpus text.
+One `INFO` line per run from `apps.ai.research.planner`, `research run finished key=value ...` (also attached as record extras), with `run_id`, `status`, `stop_reason`, `limit_hit`, `fallback`, `malformed_calls`, `validation_codes`, `tool_calls`, `latency_ms`, `prompt_tokens` and `output_tokens`. The tool registry (`apps.ai.research.registry`, IR-509) also logs each limit hit and each rejected call; their reason codes are record extras only, which the standard formatter does not print. None of these carry question, argument or corpus text.
