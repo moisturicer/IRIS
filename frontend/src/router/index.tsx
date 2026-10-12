@@ -1,5 +1,6 @@
 import { createBrowserRouter, redirect } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
 import { rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
 
@@ -60,7 +61,13 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
             children: [
-              { path: "review",              element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
+              {
+                // Only a user with review work (IR-413); anyone else goes to Discover.
+                element: <ReviewAccessRoute />,
+                children: [
+                  { path: "review",          element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
+                ],
+              },
               { path: "review/:id/evaluate", loader: ({ params }) => redirect(`/records/${params.id}?section=review`) },
             ],
           },

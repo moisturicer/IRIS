@@ -78,13 +78,15 @@ describe("the app shell", () => {
     expect(within(phoneBar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
   });
 
-  it("no longer lists Notifications among the sidebar's links", async () => {
+  it("lists neither Notifications nor Settings among the sidebar's links", async () => {
+    // The bell is the notification entry (IR-519); Settings is in the account
+    // menu (IR-413).
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).queryByRole("link", { name: /Notifications/ })).not.toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: /Settings/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { name: /Settings/ })).not.toBeInTheDocument();
   });
 
   it("gives a page the standard width unless its route asks for full", async () => {

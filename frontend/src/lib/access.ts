@@ -52,12 +52,13 @@ const REVIEWERS: RoleName[] = [
  */
 const COORDINATOR: RoleName[] = [ROLES.RDCO];
 
-export type NavSectionName =
-  | "Research Exploration"
-  | "IP Management"
-  | "Review Queue"
-  | "Tools"
-  | "Administration";
+/**
+ * The sidebar's groups (IR-413, spec §4.1). "Main" is one short, unlabelled
+ * list every role shares; "Administration" is RDCO's labelled group. The five
+ * sections before IR-413 (Research Exploration, IP Management, Review Queue,
+ * Tools, Administration) made a one-item "Tools" heading the commonest sight.
+ */
+export type NavSectionName = "Main" | "Administration";
 
 interface ScreenDef {
   /** Route path, as registered in `router/index.tsx`. */
@@ -73,24 +74,29 @@ interface ScreenDef {
      * role outside it can still reach the screen by link or redirect.
      */
     onlyFor?: readonly RoleName[];
+    /**
+     * Shown only when the server says the user has review work
+     * (`review_access.my_reviews`, IR-415). The role stays the outer gate;
+     * this narrows it, so an Adviser with no advisees sees no My Reviews.
+     */
+    needsReviewAccess?: true;
   };
 }
 
 export const SCREEN_ACCESS = {
   // --- open to every authenticated role ---------------------------------
   discover:      { path: "/",              roles: EVERYONE,
-                   nav: { label: "Discover", icon: "fa-compass", section: "Research Exploration" } },
+                   nav: { label: "Discover", icon: "fa-compass", section: "Main" } },
   ai:            { path: "/ai",            roles: EVERYONE,
-                   nav: { label: "Ask IRIS", icon: "fa-brain", section: "Research Exploration" } },
+                   nav: { label: "Ask IRIS", icon: "fa-brain", section: "Main" } },
   library:       { path: "/records/mine",  roles: EVERYONE,
-                   nav: { label: "My Library", icon: "fa-bookmark", section: "Research Exploration" } },
-  opportunities: { path: "/opportunities", roles: EVERYONE,
-                   nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Research Exploration" } },
+                   nav: { label: "My Library", icon: "fa-bookmark", section: "Main" } },
   // The bell at the top of the sidebar is the entry; its "View all" opens the
   // page, so a sidebar link would say the same thing twice (IR-519).
   notifications: { path: "/notifications", roles: EVERYONE },
-  settings:      { path: "/settings",      roles: EVERYONE,
-                   nav: { label: "Settings & Profile", icon: "fa-cog", section: "Tools" } },
+  // Settings and Help live in the account menu in the sidebar's user block
+  // (IR-413, spec §4.2), not in the nav list.
+  settings:      { path: "/settings",      roles: EVERYONE },
   help:          { path: "/help",          roles: EVERYONE },
   // Reached from Discover and the queues, never from the nav. Which *records*
   // are visible is the server's decision (IR-153), not this map's, and what a
@@ -106,20 +112,28 @@ export const SCREEN_ACCESS = {
   // Adviser keeps the shortcut: an Adviser's home is the Dashboard, not
   // Discover, until F1 (IR-413) makes Discover everyone's home.
   submit:     { path: "/records/add",       roles: AUTHORS,
-                nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "IP Management",
+                nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "Main",
                        onlyFor: [ROLES.ADVISER] } },
 
   // --- review ------------------------------------------------------------
   // One queue, three filters (IR-143). Approved and Declined were separate nav
   // entries and separate pages differing only by endpoint; they are now
   // `?status=` on this screen, so the sidebar stops implying three destinations
-  // for one job.
+  // for one job. Named My Reviews since IR-268; the sidebar shows it only to a
+  // user with review work, and `/review` sends anyone else to Discover
+  // (IR-413, `ReviewAccessRoute`).
   reviewQueue: { path: "/review",  roles: REVIEWERS,
-                 nav: { label: "Review Queue", icon: "fa-hourglass-half", section: "Review Queue" } },
+                 nav: { label: "My Reviews", icon: "fa-list-check", section: "Main",
+                        needsReviewAccess: true } },
+
+  // Declared after My Reviews because the sidebar lists entries in
+  // declaration order, and spec §4.1 puts it last in the main list.
+  opportunities: { path: "/opportunities", roles: EVERYONE,
+                   nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Main" } },
 
   // --- RDCO coordination -------------------------------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
-                 nav: { label: "Import Records", icon: "fa-file-import", section: "IP Management" } },
+                 nav: { label: "Import Records", icon: "fa-file-import", section: "Administration" } },
   roleRequests:  { path: "/admin/role-requests", roles: COORDINATOR,
                  nav: { label: "Role Requests", icon: "fa-user-check", section: "Administration" } },
   downloadRequests: { path: "/admin/download-requests", roles: COORDINATOR,
@@ -172,24 +186,36 @@ export interface NavEntry {
  * Sections are not listed separately: a section exists for a role exactly when
  * it has an entry here, which is what keeps an empty "Administration" heading
  * off a student's screen without a second rule to maintain.
+ *
+ * `reviewAccess` is the user's own `review_access` from `/users/me/`. An entry
+ * marked `needsReviewAccess` is left out unless it says `my_reviews`; a
+ * missing object counts as no review work, the same answer the route guard
+ * gives, so the link and the page cannot disagree.
  */
-export function navFor(role: RoleName | null | undefined): NavEntry[] {
+export function navFor(
+  role: RoleName | null | undefined,
+  reviewAccess?: { my_reviews: boolean } | null,
+): NavEntry[] {
   if (!role) return [];
   return ALL_SCREENS.flatMap((key) => {
     const def = SCREEN_ACCESS[key];
     if (!("nav" in def) || !def.nav) return [];
     if (!canAccess(role, key)) return [];
-    const { onlyFor, ...item } = def.nav as NonNullable<ScreenDef["nav"]>;
+    const { onlyFor, needsReviewAccess, ...item } = def.nav as NonNullable<ScreenDef["nav"]>;
     if (onlyFor && !onlyFor.includes(role)) return [];
+    if (needsReviewAccess && !hasReviewWork(reviewAccess)) return [];
     return [{ key, to: def.path, ...item }];
   });
 }
 
+/**
+ * Whether the server says this user has review work (IR-415's
+ * `review_access.my_reviews`). The one reading of the flag, shared by the
+ * sidebar and `ReviewAccessRoute`.
+ */
+export function hasReviewWork(reviewAccess?: { my_reviews: boolean } | null): boolean {
+  return reviewAccess?.my_reviews === true;
+}
+
 /** The sidebar's section order. */
-export const NAV_SECTION_ORDER: NavSectionName[] = [
-  "Research Exploration",
-  "IP Management",
-  "Review Queue",
-  "Tools",
-  "Administration",
-];
+export const NAV_SECTION_ORDER: NavSectionName[] = ["Main", "Administration"];
