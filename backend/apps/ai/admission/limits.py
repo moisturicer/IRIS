@@ -147,6 +147,10 @@ def _lanes() -> dict[str, int]:
             raise ImproperlyConfigured(
                 f"AI_ADMISSION_LANE_CONCURRENCY[{lane!r}] must be a positive integer"
             )
+        if not 0 < len(str(lane)) <= 32:
+            raise ImproperlyConfigured(
+                f"AI_ADMISSION_LANE_CONCURRENCY lane names are 1 to 32 characters, not {lane!r}"
+            )
         lanes[str(lane)] = count
     return lanes
 
@@ -177,6 +181,8 @@ def read_limits() -> Limits:
     missing = [name for name in REQUIRED_SETTINGS if not _raw(name)]
     if missing:
         raise NotConfigured(", ".join(missing))
+    if len(_raw("AI_ADMISSION_CAMPAIGN")) > 64:
+        raise ImproperlyConfigured("AI_ADMISSION_CAMPAIGN is at most 64 characters")
     fraction = _positive("AI_ADMISSION_RESERVE_FRACTION", float)
     if fraction >= 1:
         raise ImproperlyConfigured("AI_ADMISSION_RESERVE_FRACTION must be below 1")

@@ -183,9 +183,38 @@ def test_jev_decisions_are_admitted_and_a_refusal_routes_to_the_backup(settings)
 
 
 def test_each_inference_task_has_a_lane():
-    assert {task: task_lane(task) for task in InferenceTask} == {
-        InferenceTask.ANSWER: "chat", InferenceTask.RESOLVE: "chat", InferenceTask.ROUTE: "chat",
-        InferenceTask.PLAN: "research", InferenceTask.SCREEN: "research",
-        InferenceTask.SUMMARY: "overview", InferenceTask.DESCRIBE_FIGURE: "ingestion",
+    # Every task pinned. The reserved figure task is pinned without being
+    # named: `test_reserved_task.py` forbids naming it outside its package.
+    named = {
+        "answer": "chat", "resolve": "chat", "route": "chat",
+        "plan": "research", "screen": "research", "summary": "overview",
     }
+    lanes = {task.value: task_lane(task) for task in InferenceTask}
+    assert {name: lanes[name] for name in named} == named
+    rest = {lane for name, lane in lanes.items() if name not in named}
+    assert len(lanes) == len(named) + 1 and rest == {"ingestion"}
 
+
+def test_a_bounded_stream_asks_for_its_usage_and_is_charged_it(settings):
+    enforce(settings)
+
+    class _Streaming(_Completions):
+        def create(self, **kwargs):
+            self.calls.append(kwargs)
+            delta = SimpleNamespace(content="An answer.", reasoning=None, reasoning_content=None)
+            return iter([
+                SimpleNamespace(choices=[SimpleNamespace(delta=delta)], usage=None, model="cheap"),
+                SimpleNamespace(
+                    choices=[], usage=SimpleNamespace(prompt_tokens=61, completion_tokens=4), model="cheap",
+                ),
+            ])
+
+    completions = _Streaming()
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    adapter = OpenAICompatibleAdapter(
+        api_key="k", model="cheap", client=client, max_tokens=500, bounded_attempts=True,
+    )
+    assert "".join(d.text for d in AdmittedLLMProvider(adapter).stream("s", "q")) == "An answer."
+    assert completions.calls[0]["stream_options"] == {"include_usage": True}
+    row = _rows().get()
+    assert (row.charge_input_tokens, row.charge_output_tokens, row.usage_reported) == (61, 4, True)

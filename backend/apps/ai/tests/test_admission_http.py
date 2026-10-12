@@ -159,3 +159,26 @@ def test_the_reconnecting_stream_still_rechecks_ownership(scene, dispatched, cli
     stranger = client_for(make_user("stranger@cit.edu"))
     response = stranger.get(reverse("ai-ask-run-stream", args=[run_id]))
     assert response.status_code == 404
+
+
+def test_a_refusal_that_only_degraded_retrieval_is_not_reported_busy(
+    scene, dispatched, django_capture_on_commit_callbacks
+):
+    from apps.ai.admission import scope as admission_scope
+
+    admitted = scene["root"]._llm
+
+    class RerankWasRefused:
+        """A refused rerank earlier in the run, then a generated answer."""
+
+        def __getattr__(self, name):
+            return getattr(admitted, name)
+
+        def stream(self, system, user):
+            admission_scope.note_denial("lane_busy")
+            yield from admitted.stream(system, user)
+
+    scene["root"]._llm = RerankWasRefused()
+    _, frames = _answer(scene, dispatched, django_capture_on_commit_callbacks)
+    assert frames[-1][1] == "done" and frames[-1][2]["mode"] != "unavailable"
+    assert "capacity_limited" not in [frame[1] for frame in frames]

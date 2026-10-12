@@ -129,10 +129,10 @@ def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
     from apps.ai.admission.scope import mark_sent, report_usage
 
     rerank = path == "/rerank"
-    with provider_attempt(Request(
+    with provider_attempt(lambda: Request(
         operation="rerank" if rerank else "embed",
         default_lane="reranking" if rerank else "embedding",
-        account=account_for(_BASE_URL, key),
+        account=account_for(key),
         models=(str(payload.get("model", "")),),
         input_tokens=upper_bound_tokens(json.dumps(payload, ensure_ascii=False)),
         output_tokens=0,

@@ -237,13 +237,18 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         """A digest naming the vendor account this adapter spends (IR-545)."""
         from apps.ai.admission.ledger import account_for
 
-        endpoint = self._base_url or getattr(settings, "LLM_BASE_URL", "") or ""
-        key = self._api_key or getattr(settings, "LLM_API_KEY", "") or ""
-        return account_for(endpoint, key)
+        return account_for(self._api_key or getattr(settings, "LLM_API_KEY", "") or "")
 
     def call_timeout(self, explicit: Optional[float] = None) -> float:
         """The timeout the next call will use; see `_call_timeout`."""
         return self._call_timeout(explicit)
+
+    def _cap(self) -> dict[str, int]:
+        """The completion cap as this model's request field, or nothing."""
+        if not self._max_tokens:
+            return {}
+        field = "max_completion_tokens" if self.model == "openai/gpt-6-luna" else "max_tokens"
+        return {field: self._max_tokens}
 
     def _resolved_reasoning_effort(self) -> str:
         """The effort to send, or `""` to send no reasoning configuration.
@@ -323,13 +328,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             self._resolved_reasoning_effort(), self.models
         )
         extra["timeout"] = timeout
-        if self._max_tokens:
-            limit_field = (
-                "max_completion_tokens"
-                if self.model == "openai/gpt-6-luna"
-                else "max_tokens"
-            )
-            extra[limit_field] = self._max_tokens
+        extra.update(self._cap())
 
         try:
             mark_sent()
@@ -381,14 +380,12 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             self._resolved_reasoning_effort(), self.models
         )
         extra["timeout"] = timeout
-        if self._max_tokens:
-            limit_field = (
-                "max_completion_tokens"
-                if self.model == "openai/gpt-6-luna"
-                else "max_tokens"
-            )
-            extra[limit_field] = self._max_tokens
+        extra.update(self._cap())
 
+        if self._bounded_attempts:
+            # Without this an OpenAI-format stream reports no usage at all,
+            # and every streamed answer is charged its worst case (IR-545).
+            extra["stream_options"] = {"include_usage": True}
         try:
             mark_sent()
             chunks = client.chat.completions.create(
@@ -478,13 +475,8 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             self._resolved_reasoning_effort(), self.models
         )
         extra["timeout"] = timeout
-        if self._bounded_attempts and self._max_tokens:
-            limit_field = (
-                "max_completion_tokens"
-                if self.model == "openai/gpt-6-luna"
-                else "max_tokens"
-            )
-            extra[limit_field] = self._max_tokens
+        if self._bounded_attempts:
+            extra.update(self._cap())
 
         try:
             mark_sent()

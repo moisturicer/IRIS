@@ -19,12 +19,11 @@ CAMPAIGN_EXHAUSTED = "campaign_exhausted"
 RUN_BUDGET_EXHAUSTED = "run_budget_exhausted"
 LEASE_LOST = "lease_lost"
 
-#: Denials that stay true for the rest of a run: trying again inside it
-#: would be refused for the same reason, so the run stops asking.
-STICKY = frozenset({
-    NOT_CONFIGURED, STORE_UNAVAILABLE, UNPRICED_MODEL, UNBOUNDED_OUTPUT,
-    LANE_NOT_CONFIGURED, CAMPAIGN_EXHAUSTED, RUN_BUDGET_EXHAUSTED,
-})
+#: Denials that hold for every later attempt in the run, whatever its lane
+#: or model: the budget is spent, or nothing is configured. The run stops
+#: asking. A refusal tied to one lane, one model or one transient error is not
+#: here -- an unpriced rerank must not stop the answer that follows it.
+STICKY = frozenset({NOT_CONFIGURED, CAMPAIGN_EXHAUSTED, RUN_BUDGET_EXHAUSTED})
 
 
 class AdmissionDenied(LLMUnavailable, RateLimited):

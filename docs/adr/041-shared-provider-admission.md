@@ -38,7 +38,7 @@ IR-545 asks for the following:
    - **Why not Redis**, which `rate_limit.py` uses: Redis as deployed is not durable across restarts, and reservations must be. Postgres is already the system of record and is shared by every process.
 2. **One lock serialises admission.** `admit()` takes the campaign row `FOR UPDATE`, checks every limit and inserts the reservation in one transaction. Every process meets the same row. Without the lock, the two-process test admits 4 attempts against a lane limit of 3.
 3. **The unit is the physical attempt.**
-   - **Chat models.** The admission decorator (`AdmittedLLMProvider`) sits directly on the chat adapter, *inside* `RetryingLLMProvider` and `FallbackLLMProvider`. The first try, the retry and each fallback model are therefore each admitted. Under enforcement the adapter turns the SDK's own retries off (`max_retries=0`).
+   - **Chat models.** The admission decorator (`AdmittedLLMProvider`) sits directly on the chat adapter, *inside* `RetryingLLMProvider` and `FallbackLLMProvider`. The first try, the retry and each fallback model are therefore each admitted. Under enforcement the adapter turns the SDK's own retries off (`max_retries=0`) and asks streams to report their usage (`stream_options.include_usage`).
    - **Voyage.** Embedding and rerank are admitted in `voyage._post`, one request each.
    - **Jev.** Decisions are admitted in `OpenRouterDecisionsAdapter._post`.
    - **Fakes.** Local fakes are injected above the adapter and are never admitted, so they cost nothing.
@@ -57,13 +57,14 @@ IR-545 asks for the following:
 6. **Leases, not timeouts, free a slot.**
    - An open reservation holds its lane and account slots until it is settled or its lease ends.
    - The lease is never shorter than the attempt's timeout, so a slot is not handed on while the request may still be talking to the vendor.
-   - A stream renews its lease as it reads. A refused renewal stops the stream (`AdmissionLost`).
+   - A stream renews its lease once half the grace period has passed since the last renewal, so at least one whole read timeout of lease always lies ahead of each delta. A refused renewal stops the stream (`AdmissionLost`).
+   - **Lock order** is always the campaign row, then the reservation, for admitting, renewing and settling alike, so the three cannot deadlock.
    - A reservation whose lease ran out unsettled (its worker died) is marked abandoned at the next admission. It keeps its full reserved charge.
    - Leases are read against the database's clock, so replicas agree on the time.
 7. **Limits** (`apps/ai/admission/limits.py`):
    - the campaign: attempts, input and output tokens, US$ and active minutes. A protected fraction is held back until `AI_ADMISSION_RESERVE_RELEASED` records the budget owner's release;
    - per-run caps, summed over the run's key. A queued question's key is `ask:<run id>`;
-   - attempts in flight per lane (`AI_ADMISSION_LANE_CONCURRENCY`) and per vendor account (`AI_ADMISSION_ACCOUNT_CONCURRENCY`). The account is a digest of endpoint and key, so a credential shared by two lanes or tasks shares one limit;
+   - attempts in flight per lane (`AI_ADMISSION_LANE_CONCURRENCY`) and per vendor account (`AI_ADMISSION_ACCOUNT_CONCURRENCY`). The account is a digest of the key alone, so a credential shared by two lanes, tasks or endpoints shares one limit;
    - prices per model.
 
    A lane is the workload that caused the call: chat, research, ingestion, overview or shadow. When no workload names one, the provider's own default applies (embedding, reranking, or the Inference task's lane). Lanes travel in context variables, entered around each step of a streamed generator, because under ASGI each step may run in another thread.
@@ -75,8 +76,8 @@ IR-545 asks for the following:
    - `AdmissionDenied` is an `LLMUnavailable`, so every answer path shows its explicit unavailable state with the sources it holds (ADR-008). Screening marks candidates unassessed, never as non-matches.
    - It is also a `RateLimited`, so retrieval degrades to full text.
    - It is not retried, never fails over and never counts against a circuit.
-   - Within a run, a denial that will recur (campaign or run budget exhausted, not configured, store unavailable) is sticky: the run asks no more.
-   - A queued run that met any refusal journals `capacity_limited` `{"status": "busy", "reasons": [...]}` before its terminal event.
+   - Within a run, a denial that holds for every later attempt (campaign or run budget exhausted, nothing configured) is sticky: the run asks no more. A refusal tied to one lane, one model or one transient error is not sticky, so an unpriced rerank does not stop the answer that follows it.
+   - A queued run whose refusals cost it its answer (it ends without one, or with one no model wrote) journals `capacity_limited` `{"status": "busy", "reasons": [...]}` before its terminal event. **No client renders this event yet.** The reader sees the answer's explicit unavailable state, and a full queue's `503` `detail` text.
 10. **A bounded, fair queue.**
     - A submission is admitted only while fewer than `AI_ADMISSION_QUEUE_DEPTH` questions are unfinished, and fewer than `AI_ADMISSION_QUEUE_PER_USER` of them are the asker's. Otherwise the response is `503 {"status": "busy", "reason": ...}` with `Retry-After`, and nothing is queued.
     - The count and the insert are serialised by a transaction-scoped advisory lock.

@@ -52,8 +52,10 @@ process by a transaction-scoped advisory lock.
 time left until the run's original `deadline_at`; a retry, a fallback or a
 redelivery never restarts it. Each provider attempt is admitted against the
 run's own caps (`ask:<run id>`) as well as the shared ones, and a run that met
-a refusal journals `capacity_limited` before its terminal event, so the
-reader sees *busy*, not a silent gap.
+a refusal that cost it its answer journals `capacity_limited` before its
+terminal event, so the journal records *busy* rather than a silent gap. The
+answer itself is the explicit unavailable state; no client renders this event
+yet.
 """
 
 from __future__ import annotations
@@ -195,8 +197,15 @@ def _admit_to_queue(user) -> None:
         raise Busy("queue_full")
 
 
-def _journal_capacity(run: AskRun, attempt) -> None:
-    """Journal the refusals this run met, if any. Locked caller."""
+def _journal_capacity(run: AskRun, attempt, answer_state=None) -> None:
+    """Journal the refusals this run met, when they cost it its answer: the
+    run ends without one, or with one no model wrote. A refused rerank that
+    only degraded retrieval under a generated answer is not "busy". Locked
+    caller."""
+    from apps.ai.answers.citations import GENERATED
+
+    if answer_state == GENERATED:
+        return
     scope = admission_scope.current_run()
     if scope is not None and scope.denials:
         _append(run, attempt, "capacity_limited", {
@@ -343,7 +352,7 @@ class _QueuedOrchestrator(ChatOrchestrator):
                     )
                 from apps.ai.presentation import record_sources
 
-                _journal_capacity(run, self._attempt)
+                _journal_capacity(run, self._attempt, answer.state)
                 _end(
                     run,
                     PARTIAL if answer.state == PARTIAL_ANSWER else SUCCEEDED,

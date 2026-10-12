@@ -72,7 +72,7 @@ class AdmittedLLMProvider(LLMProvider, ToolCallingLLM):
         )
 
     def generate(self, system: str, user: str) -> str:
-        with provider_attempt(self._request((system, user))):
+        with provider_attempt(lambda: self._request((system, user))):
             return self._adapter.generate(system, user)
 
     def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
@@ -87,9 +87,11 @@ class AdmittedLLMProvider(LLMProvider, ToolCallingLLM):
             self._adapter.stream(system, user), lambda: scope.attempt_usage(usage)
         )
         try:
-            # A renewal is due once half the lease has gone, well before a
-            # single read could outlast it.
-            every = ticket.lease_seconds / 2
+            # The lease is the read timeout plus a grace period. Renewing once
+            # half the grace has passed keeps at least a whole read timeout
+            # of lease ahead of every delta, so a slow but healthy read never
+            # outlives it. With no grace, every delta renews.
+            every = ticket.grace_seconds / 2
             renewed = self._clock()
             for delta in deltas:
                 if self._clock() - renewed >= every:
@@ -112,7 +114,7 @@ class AdmittedLLMProvider(LLMProvider, ToolCallingLLM):
         timeout_seconds: Optional[float] = None,
     ) -> ToolCompletion:
         schema = json.dumps([tool.__dict__ for tool in tools], default=str, ensure_ascii=False)
-        with provider_attempt(self._request((system, user, schema), timeout_seconds)):
+        with provider_attempt(lambda: self._request((system, user, schema), timeout_seconds)):
             return self._adapter.complete_with_tools(
                 system, user, tools, timeout_seconds=timeout_seconds
             )
@@ -126,7 +128,7 @@ class AdmittedLLMProvider(LLMProvider, ToolCallingLLM):
     ) -> ToolCompletion:
         texts = [_message_text(message) for message in messages]
         texts.append(json.dumps([tool.__dict__ for tool in tools], default=str, ensure_ascii=False))
-        with provider_attempt(self._request(texts, timeout_seconds)):
+        with provider_attempt(lambda: self._request(texts, timeout_seconds)):
             return self._adapter.converse_with_tools(
                 messages, tools, timeout_seconds=timeout_seconds
             )

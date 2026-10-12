@@ -45,7 +45,7 @@ import math
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Iterator, Optional, Sequence
+from typing import Callable, Iterator, Optional, Sequence
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
@@ -88,9 +88,12 @@ class Request:
     timeout_seconds: float
 
 
-def account_for(endpoint: str, key: str) -> str:
-    """A digest naming a vendor account. Never the key itself."""
-    return hashlib.sha256(f"{endpoint}\0{key}".encode("utf-8")).hexdigest()[:32]
+def account_for(key: str) -> str:
+    """A digest naming the vendor account a credential spends. Never the key
+    itself. The key alone, not the endpoint: one key used through two
+    endpoints (chat and decisions, or a base URL with and without a trailing
+    slash) is one account, with one limit."""
+    return hashlib.sha256(key.strip().encode("utf-8")).hexdigest()[:32]
 
 
 def estimate_tokens(*texts: str) -> int:
@@ -184,16 +187,16 @@ def admit(request: Request) -> "Ticket":
     }
     try:
         with transaction.atomic(using=ALIAS):
-            pk = _reserve(limits, request, lane, run, wanted, lease)
+            pk, campaign_id = _reserve(limits, request, lane, run, wanted, lease)
     except _Refused as refused:
         raise _deny(refused.reason, lane) from None
     except DatabaseError:
         logger.exception("provider admission store unavailable")
         raise _deny(errors.STORE_UNAVAILABLE, lane) from None
-    return Ticket(pk, limits, request, lease)
+    return Ticket(pk, campaign_id, limits, request, lease)
 
 
-def _reserve(limits, request, lane, run, wanted, lease) -> int:
+def _reserve(limits, request, lane, run, wanted, lease) -> tuple[int, int]:
     campaign = _locked_campaign(limits.campaign_key)
     now = _db_now()
     reservations = ProviderReservation.objects.using(ALIAS).filter(campaign=campaign)
@@ -246,14 +249,17 @@ def _reserve(limits, request, lane, run, wanted, lease) -> int:
         charged_cost_micros=F("charged_cost_micros") + wanted["cost_micros"],
         charged_active_ms=F("charged_active_ms") + active_ms,
     )
-    return reservation.pk
+    return reservation.pk, campaign.pk
 
 
 class Ticket:
     """One admitted attempt: renew its lease while it runs, settle it once."""
 
-    def __init__(self, pk: int, limits: Limits, request: Request, lease: timedelta) -> None:
+    def __init__(
+        self, pk: int, campaign_id: int, limits: Limits, request: Request, lease: timedelta
+    ) -> None:
         self.pk = pk
+        self._campaign_id = campaign_id
         self._limits = limits
         self._request = request
         self._lease = lease
@@ -263,14 +269,22 @@ class Ticket:
     def lease_seconds(self) -> float:
         return self._lease.total_seconds()
 
+    @property
+    def grace_seconds(self) -> float:
+        return self._limits.lease_grace_seconds
+
+    def _lock(self) -> ProviderReservation:
+        """The campaign row, then this reservation: the order `admit` takes
+        them in. Taking them the other way round deadlocks against it."""
+        ProviderCampaign.objects.using(ALIAS).select_for_update().get(pk=self._campaign_id)
+        return ProviderReservation.objects.using(ALIAS).select_for_update().get(pk=self.pk)
+
     def renew(self) -> None:
         """Extend the lease from now, or raise `AdmissionLost` when it already
         ran out -- someone else may hold the slot, so the attempt must stop."""
         try:
             with transaction.atomic(using=ALIAS):
-                reservation = (
-                    ProviderReservation.objects.using(ALIAS).select_for_update().get(pk=self.pk)
-                )
+                reservation = self._lock()
                 now = _db_now()
                 if reservation.state != OPEN or reservation.lease_expires_at < now:
                     raise _Refused(errors.LEASE_LOST)
@@ -308,7 +322,7 @@ class Ticket:
             )
 
     def _settle(self, usage: scope.AttemptUsage) -> None:
-        reservation = ProviderReservation.objects.using(ALIAS).select_for_update().get(pk=self.pk)
+        reservation = self._lock()
         if reservation.state in (SETTLED, RELEASED):
             return
         now = _db_now()
@@ -363,16 +377,17 @@ class Ticket:
 
 
 @contextmanager
-def provider_attempt(request: Request) -> Iterator[Optional[Ticket]]:
+def provider_attempt(describe: Callable[[], Request]) -> Iterator[Optional[Ticket]]:
     """Admit one physical attempt around the block that makes it, then settle.
 
-    Does nothing at all with admission off. The block calls `scope.mark_sent`
+    ``describe`` builds the `Request`; it is not called with admission off, so
+    the default path pays nothing for it. The block calls `scope.mark_sent`
     just before sending and `scope.report_usage` with what came back.
     """
     if not enforcing():
         yield None
         return
-    ticket = admit(request)
+    ticket = admit(describe())
     usage = scope.AttemptUsage()
     try:
         with scope.attempt_usage(usage):

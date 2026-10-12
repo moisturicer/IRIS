@@ -325,3 +325,30 @@ def test_the_campaign_command_reports_spend_against_both_ceilings():
     assert "attempts" in text and "360.00" in text and "480.00" in text
     assert "in flight: chat 1/8" in text
     held.settle(scope.AttemptUsage(sent=False))
+
+
+def test_a_refusal_tied_to_one_model_does_not_stop_the_rest_of_the_run(settings):
+    # Review finding: an unpriced rerank must not block the answer after it.
+    with scope.run(scope.new_run("ask:mixed")) as run:
+        with pytest.raises(errors.AdmissionDenied):
+            ledger.admit(_request(models=("rerank-unpriced",)))
+        ledger.admit(_request())
+    assert run.denials == [errors.UNPRICED_MODEL]
+
+
+def test_with_admission_off_the_request_is_never_built(settings):
+    settings.AI_PROVIDER_ADMISSION = "off"
+
+    def describe():
+        raise AssertionError("built with admission off")
+
+    with ledger.provider_attempt(describe) as ticket:
+        assert ticket is None
+
+
+def test_one_key_through_two_endpoints_is_one_account():
+    from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
+
+    chat = OpenAICompatibleAdapter(base_url="https://openrouter.ai/api/v1/", api_key="k1", model="m")
+    assert chat.account == ledger.account_for("k1") == ledger.account_for(" k1 ")
+    assert ledger.account_for("k2") != chat.account

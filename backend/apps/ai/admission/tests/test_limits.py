@@ -76,3 +76,13 @@ def test_the_output_cap_is_sent_only_under_enforcement(settings):
     assert output_cap() is None
     enforce(settings)
     assert output_cap() == 500
+
+
+@pytest.mark.parametrize("name, value", [
+    ("AI_ADMISSION_CAMPAIGN", "x" * 65),
+    ("AI_ADMISSION_LANE_CONCURRENCY", '{"' + "l" * 33 + '": 1}'),
+])
+def test_a_value_too_long_to_store_stops_startup(settings, name, value):
+    enforce(settings, **{name: value})
+    with pytest.raises(ImproperlyConfigured):
+        verify_admission_configuration()

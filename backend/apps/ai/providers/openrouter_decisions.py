@@ -174,10 +174,10 @@ class OpenRouterDecisionsAdapter(DecisionModel):
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        with provider_attempt(Request(
+        with provider_attempt(lambda: Request(
             operation="decision",
             default_lane="chat",
-            account=account_for(DECISIONS_URL, self._api_key),
+            account=account_for(self._api_key),
             models=(self._model,),
             input_tokens=estimate_tokens(json.dumps(payload, default=str, ensure_ascii=False)),
             output_tokens=0,
