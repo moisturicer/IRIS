@@ -179,6 +179,9 @@ vi.mock("@/api/records", () => ({
     detail:           vi.fn(() => Promise.resolve({ data: shownRecord })),
     incrementAccess:  vi.fn(() => Promise.resolve({ data: {} })),
     similar:          vi.fn(() => Promise.resolve({ data: { results: [] } })),
+    // The Novelty check loads itself; its behaviour is
+    // `RelatedPublishedResearch.test.tsx`'s. Here only its placement is.
+    relatedResearch:  vi.fn(() => Promise.resolve({ data: { checked: true, results: [], threshold: 0.7 } })),
     // The tracker panel loads itself; it has its own test file (IR-258).
     tracker:          vi.fn(() => Promise.reject(new Error("not under test"))),
     // The Action required panel loads itself; its behaviour is tested in
@@ -641,6 +644,46 @@ describe("document requests (IR-262)", () => {
 
     await waitForRecord(inReview.title);
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+});
+
+describe("related published research (IR-312)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const ownProposal: RecordDetail = {
+    ...inReview, record_type_name: "Proposal", record_type: "Proposal",
+  };
+  const heading = { name: "Related published research" };
+
+  it("is shown to the owner of a Proposal", async () => {
+    shownRecord = ownProposal;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", heading)).toBeInTheDocument();
+    expect(vi.mocked(recordsApi.relatedResearch)).toHaveBeenCalledWith(RECORD_ID);
+  });
+
+  it("is not shown, or asked for, by anyone who does not own the Proposal", async () => {
+    shownRecord = ownProposal;
+    signInAs(99, "Adviser");
+    renderPaperView();
+
+    await waitForRecord(ownProposal.title);
+    expect(screen.queryByRole("heading", heading)).not.toBeInTheDocument();
+    expect(vi.mocked(recordsApi.relatedResearch)).not.toHaveBeenCalled();
+  });
+
+  it("is not shown on a record that is not a Proposal, even to its owner", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("heading", heading)).not.toBeInTheDocument();
+    expect(vi.mocked(recordsApi.relatedResearch)).not.toHaveBeenCalled();
   });
 });
 
