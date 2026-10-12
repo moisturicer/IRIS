@@ -48,11 +48,10 @@ At 768–1023 px the sidebar has already become a rail while content is still in
 
 | Range | Name | Sidebar | Content |
 |---|---|---|---|
-| **< 768 px** | Phone | Off-canvas drawer, `w-[230px]`, backdrop | Single column, full-bleed |
-| **768–1279 px** | Tablet | 60 px icon rail | Single column, `md:ml-[60px]` |
-| **≥ 1280 px** | Desktop | 230 px, labelled | Up to two columns, `xl:ml-[230px]` |
+| **< 768 px** | Phone | Off-canvas drawer, `w-60` (240 px), backdrop | Single column, full-bleed |
+| **≥ 768 px** | Tablet and desktop | 240 px labelled (`w-60`), or the 64 px icon rail (`w-16`) the user chooses | `md:ml-60`, or `md:ml-16` beside the rail |
 
-`Sidebar.tsx:160` — `w-[230px] md:w-[60px] xl:w-[230px]` — is correct and needs no change.
+*Amended 2026-10-12 (IR-413).* The table above used to name a 60 px rail at 768–1279 px that widened to 230 px at `xl`. The shipped shell never did that: from `md` up the width is the user's **Collapse / Expand** choice, stored per browser (`ui.store.ts`, `iris_sidebar_collapsed`). IR-413 moved the widths onto Tailwind's spacing scale (`w-60`, `w-16`) instead of `230px` and `60px`, and gave the drawer the keyboard behaviour [12](12-accessibility.md) asks for: while it is closed it is `inert`, so its links are out of the tab order; opening it moves focus to its **Close menu** button and makes the page behind it `inert`; Escape closes it and returns focus to **Open menu**.
 
 ---
 

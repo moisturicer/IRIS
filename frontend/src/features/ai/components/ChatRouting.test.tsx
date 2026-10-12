@@ -33,6 +33,20 @@ describe("routing and listing on replayed answers", () => {
     expect(screen.queryByText(turn.answer!)).toBeNull();
   });
 
+  it("shows an exact metadata count as the answer text, with no empty record list", () => {
+    const counted: ConversationTurn = {
+      ...turn, answer: "**3 records** match: every published records you can see.",
+      listing: { completeness: "exact_count", wording: "unused", records: [], count: {
+        total: 3, predicate: "every published records you can see", population: "published records you can see",
+        snapshot: "2026-10-12T14:19:40+00:00", visible: 3, ai_assessable: 3, not_ai_assessable: 0,
+        possible_duplicate_titles: 0, undated: null, unit: "distinct IRIS records, not unique scholarly works",
+      } },
+    };
+    renderScreen(<ChatMessageBubble message={turnToMessages(counted)[1]} />);
+    expect(screen.getByText("3 records")).toBeInTheDocument();
+    expect(screen.queryByText("No papers are listed for this answer.")).toBeNull();
+  });
+
   it("does not invent routing controls when routing is absent", () => {
     renderScreen(<ChatMessageBubble message={turnToMessages({ ...turn, routing: undefined, listing: undefined })[1]} onRouteOverride={vi.fn()} />);
     expect(screen.queryByLabelText("Answer routing")).toBeNull();

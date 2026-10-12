@@ -79,7 +79,7 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
         )}
         {isUser ? (
           <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
-        ) : !message.listing ? (
+        ) : !message.listing || message.listing.count ? (
           <CitationText
             text={message.content}
             citations={message.citations ?? []}
@@ -87,7 +87,7 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
           />
         ) : null}
 
-        {!isUser && message.listing && (
+        {!isUser && message.listing && !message.listing.count && (
           <div className="mt-3">
             <p className="text-sm text-stone-600">{message.listing.wording}</p>
             {message.listing.records.length === 0 && <p className="mt-2">No papers are listed for this answer.</p>}

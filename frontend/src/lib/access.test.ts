@@ -22,11 +22,12 @@ import {
   ALL_SCREENS,
   SCREEN_ACCESS,
   canAccess,
+  hasReviewWork,
   navFor,
   type ScreenKey,
 } from "./access";
 import { ROLES, type RoleName } from "./constants";
-import { test } from "vitest";
+import { expect, test } from "vitest";
 
 
 const EVERY_ROLE: RoleName[] = [
@@ -81,10 +82,79 @@ test("a Student publishes from Discover, so the sidebar offers no Submit Disclos
   assertEqual(canAccess(ROLES.STUDENT, "submit"), true, "Student may still open /records/add");
 });
 
+test("Notifications is the bell, not a sidebar link, and its page stays open (IR-519)", () => {
+  // The bell at the top of the sidebar is the one notification entry; a link
+  // beside it said the same thing twice. Its "View all" still reaches the page.
+  for (const role of EVERY_ROLE) {
+    assertEqual(
+      navFor(role).some((item) => item.key === "notifications"), false,
+      `${role} sidebar lists Notifications`,
+    );
+    assertEqual(canAccess(role, "notifications"), true, `${role} may open /notifications`);
+  }
+});
+
+// --- the sidebar's list (IR-413, spec §4.1) --------------------------------
+
+const REVIEW_WORK = { my_reviews: true };
+const NO_REVIEW_WORK = { my_reviews: false };
+const labels = (role: RoleName, access?: { my_reviews: boolean }) =>
+  navFor(role, access).map((item) => `${item.section}: ${item.label}`);
+
+test("every role shares one short main list, in the spec's order", () => {
+  expect(labels(ROLES.STUDENT)).toEqual([
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Calls & Conferences",
+  ]);
+  for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
+    expect(labels(role, REVIEW_WORK)).toEqual([
+      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+    ]);
+  }
+});
+
+test("an Adviser keeps Submit Disclosure until Discover is their home (IR-534)", () => {
+  expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Submit Disclosure",
+    "Main: My Reviews", "Main: Calls & Conferences",
+  ]);
+});
+
+test("RDCO's coordination screens, Import Records included, are one Administration group", () => {
+  expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+    "Administration: Import Records", "Administration: Role Requests", "Administration: Download Requests",
+    "Administration: Delete Requests", "Administration: Audit Log",
+  ]);
+});
+
+test("Settings & Profile is in the account menu, not the nav, and its page stays open", () => {
+  for (const role of EVERY_ROLE) {
+    assertEqual(navFor(role, REVIEW_WORK).some((item) => item.key === "settings"), false, `${role} nav lists Settings`);
+    assertEqual(canAccess(role, "settings"), true, `${role} may open /settings`);
+  }
+});
+
 // --- review ----------------------------------------------------------------
 
 test("the review queue is every reviewer, and excludes Student", () => {
   only("reviewQueue", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
+});
+
+test("My Reviews is listed only when the server says the user has review work", () => {
+  const listed = (role: RoleName, access?: { my_reviews: boolean } | null) =>
+    navFor(role, access).some((item) => item.key === "reviewQueue");
+
+  // An Adviser with no advisees has the role and nothing to review.
+  assertEqual(listed(ROLES.ADVISER, NO_REVIEW_WORK), false, "Adviser with my_reviews false");
+  // An office member with no seats still has the office pool to claim from.
+  assertEqual(listed(ROLES.ITSO, REVIEW_WORK), true, "ITSO with my_reviews true");
+  // No payload is no review work: the route guard reads it the same way.
+  assertEqual(listed(ROLES.KTTO, undefined), false, "KTTO with no review_access");
+  assertEqual(listed(ROLES.KTTO, null), false, "KTTO with null review_access");
+  // The role stays the outer gate: a Student never sees it, whatever the flag.
+  assertEqual(listed(ROLES.STUDENT, REVIEW_WORK), false, "Student with my_reviews true");
+  assertEqual(hasReviewWork(REVIEW_WORK), true, "hasReviewWork(true)");
+  assertEqual(hasReviewWork(NO_REVIEW_WORK), false, "hasReviewWork(false)");
 });
 
 // --- RDCO coordination -----------------------------------------------------
@@ -128,7 +198,7 @@ test("nav is derived from the same map, so a link cannot outrun its gate", () =>
   // The actual IR-160 defect, stated as a property: anything the nav offers a
   // role, that role can open.
   for (const role of EVERY_ROLE) {
-    for (const item of navFor(role)) {
+    for (const item of navFor(role, REVIEW_WORK)) {
       assertEqual(canAccess(role, item.key), true,
         `nav offered ${role} the ${item.key} screen it cannot open`);
     }
@@ -138,7 +208,7 @@ test("nav is derived from the same map, so a link cannot outrun its gate", () =>
 test("a role is never shown an empty nav section", () => {
   for (const role of EVERY_ROLE) {
     const sections = new Map<string, number>();
-    for (const item of navFor(role)) {
+    for (const item of navFor(role, REVIEW_WORK)) {
       sections.set(item.section, (sections.get(item.section) ?? 0) + 1);
     }
     for (const [section, count] of sections) {

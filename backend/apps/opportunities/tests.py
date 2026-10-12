@@ -173,6 +173,77 @@ class OpportunityPermissionTests(APITestCase):
         self.assertEqual(Opportunity.objects.get(pk=response.data["id"]).posted_by, self.rdco)
 
 
+class OpportunityCapabilityTests(APITestCase):
+    """
+    `can_post` and `can_edit` (IR-530) are what the board draws its Post, Edit
+    and Delete controls from, so each must say exactly what the endpoint would
+    do -- pinned here against the same role matrix as the permission tests.
+    """
+
+    def setUp(self):
+        self.student = make_user("cap-student@cit.edu", "Student")
+        self.adviser = make_user("cap-adviser@cit.edu", "Adviser")
+        self.other_adviser = make_user("cap-adviser2@cit.edu", "Adviser")
+        self.rdco    = make_user("cap-rdco@cit.edu",    "RDCO")
+        self.ktto    = make_user("cap-ktto@cit.edu",    "KTTO")
+        self.itso    = make_user("cap-itso@cit.edu",    "ITSO")
+        self.advisers_call = make_opportunity(title="Adviser's Call", posted_by=self.adviser)
+        self.rdcos_call    = make_opportunity(title="RDCO's Call",    posted_by=self.rdco)
+
+    def _list(self, user):
+        self.client.force_authenticate(user)
+        return self.client.get(reverse("opportunity-list")).data
+
+    def _can_edit(self, user):
+        return {row["title"]: row["can_edit"] for row in self._list(user)["results"]}
+
+    def test_can_post_matches_who_may_create(self):
+        for user, expected in (
+            (self.student, False), (self.itso, False),
+            (self.adviser, True), (self.rdco, True), (self.ktto, True),
+        ):
+            with self.subTest(role=user.role.name):
+                self.assertIs(self._list(user)["can_post"], expected)
+
+    def test_non_posters_can_edit_nothing(self):
+        for user in (self.student, self.itso):
+            with self.subTest(role=user.role.name):
+                self.assertEqual(
+                    self._can_edit(user), {"Adviser's Call": False, "RDCO's Call": False},
+                )
+
+    def test_an_adviser_can_edit_only_their_own_call(self):
+        self.assertEqual(self._can_edit(self.adviser), {"Adviser's Call": True, "RDCO's Call": False})
+        self.assertEqual(
+            self._can_edit(self.other_adviser), {"Adviser's Call": False, "RDCO's Call": False},
+        )
+
+    def test_moderators_can_edit_every_call(self):
+        for user in (self.rdco, self.ktto):
+            with self.subTest(role=user.role.name):
+                self.assertEqual(
+                    self._can_edit(user), {"Adviser's Call": True, "RDCO's Call": True},
+                )
+
+    def test_a_created_call_comes_back_editable_by_its_poster(self):
+        self.client.force_authenticate(self.adviser)
+        response = self.client.post(reverse("opportunity-list"), {
+            "opportunity_type": Opportunity.TYPE_INTERNAL_CALL,
+            "title":            "New Call",
+            "posting_office":   "College of Computer Studies",
+            "due_date":         str(date.today() + timedelta(days=10)),
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertIs(response.data["can_edit"], True)
+
+    def test_can_edit_is_computed_not_accepted_from_the_client(self):
+        self.client.force_authenticate(self.adviser)
+        url = reverse("opportunity-detail", args=[self.advisers_call.pk])
+        response = self.client.patch(url, {"can_edit": False, "title": "Renamed"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIs(response.data["can_edit"], True)
+
+
 class OpportunityVisibilityTests(APITestCase):
     """Closed items grey out in place, then drop off once nobody can act."""
 

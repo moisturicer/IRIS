@@ -21,10 +21,9 @@ import { offPaletteClasses } from "./palette";
  * files found on 2026-09-25.
  */
 const NOT_YET_CONVERTED: readonly string[] = [
-  // IR-362 -- Calls & Conferences and Notifications (My Library came off with IR-410)
+  // IR-362 -- Notifications (My Library came off with IR-410, Calls &
+  // Conferences with IR-530)
   "src/features/notifications/NotificationsPage.tsx",
-  "src/features/opportunities/CallsAndConferencesPage.tsx",
-  "src/features/opportunities/opportunityUtils.ts",
   // IR-363 -- Documents and the admin screens
   "src/features/accounts/RoleRequestsPage.tsx",
   "src/features/admin/DeleteRequestsPage.tsx",

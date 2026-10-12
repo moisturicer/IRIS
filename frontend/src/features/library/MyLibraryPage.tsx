@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { recordsApi } from "@/api/records";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { canAccess } from "@/lib/access";
@@ -91,25 +92,21 @@ export default function MyLibraryPage() {
   const showingResearch = view.kind === "research";
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <header className="mb-section-lg flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-display font-semibold text-stone-900">My Library</h1>
-          <p className="mt-1 text-body text-stone-600">
-            {canAuthor ? "Where your research is, and what you are reading." : "Papers you saved, liked and opened."}
-          </p>
-        </div>
-        {canAuthor && (
-          <div className="flex items-center gap-2">
+    <div>
+      <PageHeader
+        title="My Library"
+        description={canAuthor ? "Where your research is, and what you are reading." : "Papers you saved, liked and opened."}
+        actions={canAuthor && (
+          <>
             {showingResearch && (
               <a href="#your-reading" className={cn("rounded-lg px-3 py-2 text-small font-semibold text-stone-700 hover:bg-stone-100 lg:hidden", COLOUR_TRANSITION, FOCUS_RING)}>
                 Your reading
               </a>
             )}
             <Link to="/?publish=new" className={cn(PILL_PRIMARY, FOCUS_RING)}>Publish</Link>
-          </div>
+          </>
         )}
-      </header>
+      />
 
       <div className="grid gap-section-lg lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <section key={view.kind === "folder" ? `folder:${view.id}` : view.kind} className="min-w-0 motion-safe:animate-fade-in" aria-label={showingResearch ? "Your research" : "Saved reading"}>
@@ -143,7 +140,10 @@ export default function MyLibraryPage() {
           )}
         </section>
 
-        <aside className="lg:sticky lg:top-24">
+        {/* Sticks 24px from the top of the window: there is no app header above
+            it since IR-519 (IR-351: sticky works because AppShell is not a
+            scroll container). */}
+        <aside className="lg:sticky lg:top-6">
           <ReadingPanel
             collections={collections}
             history={history}

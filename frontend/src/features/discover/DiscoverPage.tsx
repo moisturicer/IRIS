@@ -3,17 +3,15 @@ import { useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
-import { NotificationBell } from "@/components/layout/NotificationBell";
+import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Spinner } from "@/components/ui/Spinner";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { FOCUS_RING } from "@/components/ui/interaction";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import { useRole } from "@/hooks/useRole";
 import { canAccess } from "@/lib/access";
 import { cn } from "@/lib/utils";
-import { useUIStore } from "@/store/ui.store";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { RecordListItem } from "@/types/records";
 import { ALL_VALUE, type FilterOption } from "./DiscoverFilterDropdown";
@@ -50,7 +48,6 @@ const ORDERING: Record<DiscoverSort, string> = {
  */
 export default function DiscoverPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const { roleName } = useRole();
   // The access map is the one place that says who authors (Student, Adviser).
   const canPublish = canAccess(roleName as never, "submit");
@@ -330,28 +327,11 @@ export default function DiscoverPage() {
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
-      {/* AppShell draws no shared header on "/" until F1 (IR-413) moves
-          Discover under it, so this bar carries the drawer toggle and the
-          notification bell -- without the bell, Discover would be the one
-          screen where new notifications are invisible. */}
-      <div className="flex items-center gap-3 px-4 sm:px-7 pt-4">
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className={cn(
-            "md:hidden w-10 h-10 shrink-0 rounded-xl border border-stone-200 bg-white flex items-center justify-center text-stone-700",
-            FOCUS_RING,
-          )}
-          aria-label="Toggle navigation"
-        >
-          <i className="fas fa-bars text-[14px]" aria-hidden />
-        </button>
-        <div className="ml-auto shrink-0">
-          <NotificationBell />
-        </div>
-      </div>
-
-      <div className="w-full max-w-6xl mx-auto px-4 sm:px-7 pt-2 pb-12 flex-1">
+      {/* Discover paints its own background, so AppShell draws it full-bleed;
+          the width is still the app's standard one (IR-521). Its private bar
+          (menu button and bell) is gone: the bell is in the sidebar, and
+          AppShell's phone bar carries both below `md` (IR-519). */}
+      <div className={cn(PAGE_WIDTH.standard, "px-4 sm:px-7 pt-4 sm:pt-7 pb-12 flex-1")}>
         <PageHeader
           title="Discover"
           description="Published theses, research and projects from across CIT-U."

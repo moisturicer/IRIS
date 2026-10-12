@@ -86,7 +86,7 @@ class RoutedChat:
         self.decision = decision
 
     def answer(self, user):
-        from .lanes import drain
+        from apps.ai.research.planner import drain
 
         return drain(self.events(user))
 

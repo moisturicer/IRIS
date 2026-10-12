@@ -1,5 +1,6 @@
 import { createBrowserRouter, redirect } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
 import { rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
 
@@ -42,12 +43,14 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <AppShell />,
+        // Every page is centred at the standard width unless its handle says
+        // `width: "full"`: the PDF reader and the wide admin tables (IR-521).
         children: [
           { index: true, element: <HomePage />, handle: { crumb: "Discover" } },
           // Retired URLs (spec §4.1). Outside the role gates: a redirect only
           // moves the address, and the page it lands on applies its own.
           ...redirectRoutes,
-          { path: "records/:id",           element: <PaperViewPage />,   handle: { crumb: "Paper" } },
+          { path: "records/:id",           element: <PaperViewPage />,   handle: { crumb: "Paper", width: "full" } },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
           { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
@@ -58,7 +61,13 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
             children: [
-              { path: "review",              element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
+              {
+                // Only a user with review work (IR-413); anyone else goes to Discover.
+                element: <ReviewAccessRoute />,
+                children: [
+                  { path: "review",          element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
+                ],
+              },
               { path: "review/:id/evaluate", loader: ({ params }) => redirect(`/records/${params.id}?section=review`) },
             ],
           },
@@ -69,10 +78,10 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
             children: [
               { path: "records/import",            element: <ImportRecordsPage />,     handle: { crumb: "Import Records" } },
-              { path: "admin/role-requests",       element: <RoleRequestsPage />,      handle: { crumb: "Role Requests" } },
-              { path: "admin/download-requests",   element: <DownloadRequestsPage />,  handle: { crumb: "Download Requests" } },
-              { path: "admin/delete-requests",     element: <DeleteRequestsPage />,    handle: { crumb: "Delete Requests" } },
-              { path: "admin/audit",               element: <AuditLogPage />,          handle: { crumb: "Audit Log" } },
+              { path: "admin/role-requests",       element: <RoleRequestsPage />,      handle: { crumb: "Role Requests", width: "full" } },
+              { path: "admin/download-requests",   element: <DownloadRequestsPage />,  handle: { crumb: "Download Requests", width: "full" } },
+              { path: "admin/delete-requests",     element: <DeleteRequestsPage />,    handle: { crumb: "Delete Requests", width: "full" } },
+              { path: "admin/audit",               element: <AuditLogPage />,          handle: { crumb: "Audit Log", width: "full" } },
             ],
           },
         ],

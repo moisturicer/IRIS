@@ -287,6 +287,8 @@ Celery does not currently consume its own queue ([IR-83](https://citiris.atlassi
 and a scheduled reminder would silently never fire. Bookmarks are `localStorage`, with
 the same no-server-state caveat as My Library.
 
+**Redesigned by [IR-530](https://citiris.atlassian.net/browse/IR-530) (2026-10-11).** The board is one column grouped by deadline (within a week, within a month, later, recently closed), date-ordered inside each group. RDCO, KTTO and Advisers can now post, edit and delete calls from the page. Before that, the only route was Django admin. Whether the page offers those actions comes from two server fields, `can_post` on the list and `can_edit` per call, both decided by `IsOpportunityPoster`, so the screen compares no role names. The page also reads every page of the list now; it used to stop at the first 20 calls. Still no requirement, so `TRACEABILITY.md` still does not change.
+
 **One criterion met, one recommended for a human to close out.** This was open against IR-86 (now
 **[IR-160](https://citiris.atlassian.net/browse/IR-160)** — *Reduce the pilot surface to 16
 screens*), whose acceptance criteria were *"16 routes remain"* and *"Every remaining nav item leads
