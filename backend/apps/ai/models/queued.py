@@ -63,7 +63,7 @@ class AskRun(models.Model):
         "ai.Turn", null=True, blank=True, on_delete=models.SET_NULL, related_name="ask_run"
     )
     #: A code: the Turn's state, or why the run ended without one.
-    outcome = models.CharField(max_length=32, blank=True)
+    end_reason = models.CharField(max_length=32, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 
     objects = AskRunQuerySet.as_manager()

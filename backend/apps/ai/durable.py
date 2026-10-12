@@ -181,23 +181,23 @@ def append(attempt: AskRunAttempt, name: str, data: dict) -> None:
         _append(_locked(attempt), attempt, name, data)
 
 
-def _end(run: AskRun, state: str, outcome: str, *, attempt=None, turn=None, event=None) -> None:
+def _end(run: AskRun, state: str, reason: str, *, attempt=None, turn=None, event=None) -> None:
     """Make ``run`` terminal and journal its one terminal event. Locked caller."""
     now = timezone.now()
     if run.current_attempt_id is not None:
         AskRunAttempt.objects.filter(pk=run.current_attempt_id).update(
             state=AskRunAttempt.FINISHED, finished_at=now,
         )
-    run.state, run.outcome, run.finished_at = state, outcome, now
+    run.state, run.end_reason, run.finished_at = state, reason, now
     run.current_attempt, run.turn = None, turn
-    run.save(update_fields=["state", "outcome", "finished_at", "current_attempt", "turn"])
-    name, data = event or ("run_failed", {"run_id": str(run.pk), "state": state, "reason": outcome})
+    run.save(update_fields=["state", "end_reason", "finished_at", "current_attempt", "turn"])
+    name, data = event or ("run_failed", {"run_id": str(run.pk), "state": state, "reason": reason})
     _append(run, attempt, name, data)
 
 
-def finish_without_turn(attempt: AskRunAttempt, state: str, outcome: str) -> None:
+def finish_without_turn(attempt: AskRunAttempt, state: str, reason: str) -> None:
     with transaction.atomic():
-        _end(_locked(attempt), state, outcome, attempt=attempt)
+        _end(_locked(attempt), state, reason, attempt=attempt)
 
 
 def claim(run_id):

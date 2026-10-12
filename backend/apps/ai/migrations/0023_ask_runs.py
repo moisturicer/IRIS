@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("deadline_at", models.DateTimeField()),
                 ("last_sequence", models.PositiveIntegerField(default=0)),
-                ("outcome", models.CharField(blank=True, max_length=32)),
+                ("end_reason", models.CharField(blank=True, max_length=32)),
                 ("finished_at", models.DateTimeField(blank=True, null=True)),
                 (
                     "conversation",

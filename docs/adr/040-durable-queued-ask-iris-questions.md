@@ -17,7 +17,7 @@ The ticket constrains the shape: reuse the existing event stream and parser, wit
 ## Decision
 
 1. **Three new tables** (`apps/ai/models/queued.py`, migration 0023):
-   - `AskRun`: owner, Conversation, validated request, state, original `deadline_at`, a fencing pointer `current_attempt`, `last_sequence`, a **one-to-one** `turn` and an `outcome` code.
+   - `AskRun`: owner, Conversation, validated request, state, original `deadline_at`, a fencing pointer `current_attempt`, `last_sequence`, a **one-to-one** `turn` and an `end_reason` code.
    - `AskRunAttempt`: one per worker delivery, linked to the `ResearchRun` its planner wrote, if any.
    - `AskRunEvent`: the ordered public journal, unique on `(run, sequence)`.
 

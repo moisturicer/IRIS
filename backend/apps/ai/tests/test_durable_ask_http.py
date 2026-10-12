@@ -139,7 +139,7 @@ class QueuedQuestionTests:
         assert stored["citations"] == done["citations"]
 
         run.refresh_from_db()
-        assert (run.state, run.outcome, run.turn_id) == ("succeeded", "generated", turn.pk)
+        assert (run.state, run.end_reason, run.turn_id) == ("succeeded", "generated", turn.pk)
         assert [a.state for a in run.attempts.all()] == ["finished"]
 
     def test_the_whole_journal_replays_from_the_start_or_a_last_event_id(
