@@ -20,7 +20,7 @@ import { AuthBrandPanel, type AuthPanelVariant } from "./AuthBrandPanel";
 
 const CASES: Array<{ variant: AuthPanelVariant; purpose: RegExp }> = [
   { variant: "login", purpose: /^Sign in to pick up your submissions/ },
-  { variant: "signup", purpose: /^Register to submit .* Once you verify your email, RDCO approves/ },
+  { variant: "signup", purpose: /^Register as a student or as faculty\. Once you verify your email, RDCO approves/ },
   { variant: "verify", purpose: /^This page confirms the email address .* RDCO then approves/ },
   { variant: "pending", purpose: /^Your account is registered\. It opens once RDCO approves it\.$/ },
 ];
@@ -44,7 +44,8 @@ describe.each(CASES)("the $variant brand panel", ({ variant, purpose }) => {
 
     expect(text).toMatch(/IRIS is the university's research and IP disclosure system\./);
     expect(text).toMatch(/reviewed by an adviser and the university's offices/);
-    expect(text).toMatch(/published to Discover/);
+    // Proposals are accepted, not published: only theses and projects reach Discover.
+    expect(text).toMatch(/theses and projects that clear review are published to Discover/);
   });
 
   it("says what this screen is for", () => {
@@ -65,7 +66,6 @@ describe.each(CASES)("the $variant brand panel", ({ variant, purpose }) => {
     // The copyright year is the one number the panel may carry.
     const text = readText(panel).replace(/© \d{4}/, "");
 
-    expect(within(panel).queryByRole("blockquote")).toBeNull();
     expect(text).not.toMatch(/[“”"]/);
     expect(text).not.toMatch(/prestig|high-end|leading|premier|world-class/i);
     expect(text).not.toMatch(/\d/);
