@@ -290,7 +290,7 @@ def test_possible_duplicate_works_are_flagged_but_counted_separately(
     ("How many papers were published in 2023?", "not a publication year"),
     ("How many papers are there by publication year 2022?", "not a publication year"),
     ("How many papers were completed last year?", "relative date"),
-    ("How many papers did Maria Santos author?", "does not store 'author'"),
+    ("How many papers were authored by Maria Santos?", "does not store"),
 ])
 def test_unsupported_fields_are_declined_by_name_with_no_count(
     question, fragment, lane, embedder, space, client_for, make_root

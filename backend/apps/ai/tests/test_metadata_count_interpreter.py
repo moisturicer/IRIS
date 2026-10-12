@@ -24,6 +24,14 @@ def read(question):
     "How many papers are about software engineering?",
     "What are the papers on flooding?",
     "aquaponics",
+    "How many papers are about budget planning?",
+    "How many papers study college students?",
+    "How many papers cover recent advances in flood control?",
+    "How many papers were published on climate change?",
+    "How many papers study the library?",
+    "How many papers on intellectual property are there?",
+    "How many papers on Networks are there?",
+    "How many papers did Maria Santos author?",
 ])
 def test_topics_and_non_counts_are_left_to_the_topic_workflow(question):
     assert read(question) is None
@@ -41,7 +49,8 @@ def test_the_whole_repository_has_no_filter():
     verdict = read("How many papers are in the repository?")
     assert isinstance(verdict, Predicate)
     assert dict(verdict.filters) == {}
-    assert verdict.description == "every published records you can see"
+    assert verdict.conditions == ()
+    assert verdict.describe("published records you can see") == "all published records you can see"
 
 
 def test_the_longest_name_wins_over_a_name_it_contains():
@@ -74,7 +83,11 @@ def test_year_ip_and_combined_predicates(question, filters):
     ("How many papers were published in 2023?", "not a publication year"),
     ("How many papers have a publication date in 2021?", "not a publication year"),
     ("How many papers were completed last year?", "relative date"),
-    ("How many recent papers are there?", "relative date"),
+    ("How many papers were completed in recent years?", "relative date"),
+    ("How many papers were authored by Maria Santos?", "does not store"),
+    ("How many records from 2020?", "could mean that year only"),
+    ("How many papers were completed in 2020 or 2021?", "more than one year"),
+    ("How many papers were completed after 2020 and before 2023?", "more than one year"),
     ("How many papers did each author write?", "does not store"),
     ("How many papers are advised by Dr Cruz?", "does not store"),
     ("How many Networks and Software Engineering papers?", "more than one"),
@@ -89,3 +102,23 @@ def test_a_plain_published_papers_question_is_not_a_publication_year_question():
     verdict = read("How many published papers are there?")
     assert isinstance(verdict, Predicate)
     assert dict(verdict.filters) == {}
+
+
+def test_place_words_are_removed_only_after_a_preposition():
+    for question in ("How many papers are in the repository?",
+                     "How many papers are in IRIS?",
+                     "How many records of the collection are there?"):
+        assert isinstance(read(question), Predicate)
+    assert read("How many papers study the archive?") is None
+
+
+def test_a_scoped_count_says_so_and_pluralises():
+    from apps.ai.research.metadata_count import SCOPED_POPULATION, MetadataCount, render
+
+    result = MetadataCount(total=1, visible=1, ai_assessable=1, duplicate_groups=0, undated=None,
+                           predicate=Predicate({}, ()), population=SCOPED_POPULATION,
+                           snapshot="2026-10-12T00:00:00+00:00")
+    text, listing = render(result)
+    assert "**1 record** matches" in text
+    assert "limited to the paper this chat is about" in text
+    assert listing["count"]["population"] == SCOPED_POPULATION
