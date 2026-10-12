@@ -99,7 +99,7 @@ Each case runs on both endpoints. Every run checks four things:
 
 The reopened conversation must then return the same listing.
 
-**No paid provider calls.** Vendors come from `use_composition_root`. Jev is replaced by `ScriptedDecisionModel`. `httpx` and `requests` sends fail the test.
+**No paid provider calls.** Vendors come from `use_composition_root`. Jev is replaced by `ScriptedDecisionModel`. Any `httpx` send fails the test; every vendor adapter and the `openai` SDK go through it.
 
 **Execution status.** The fixture-integrity tests pass locally. The database-backed HTTP tests could not run in the authoring environment: no Postgres role was available, and creating one was not permitted. They run in CI's pgvector job. Their result is reported on the PR, not here.
 

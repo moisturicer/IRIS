@@ -18,7 +18,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-import requests
 from django.urls import reverse
 
 from apps.ai.composition import CompositionRoot, use_composition_root
@@ -54,7 +53,6 @@ def no_network(monkeypatch):
 
     monkeypatch.setattr(httpx.Client, "send", refuse)
     monkeypatch.setattr(httpx.AsyncClient, "send", refuse)
-    monkeypatch.setattr(requests.Session, "send", refuse)
 
 
 @pytest.fixture
