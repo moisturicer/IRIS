@@ -184,20 +184,32 @@ def _comparison(run, question, maximum):
                           degraded=degraded or bool(missing), model=model_that_answered(llm)), None
 
 
-def answer_lane(lane, question, user, *, root, conversation=None, scope_record=None,
-                max_sources=8, history_before_turn_id=None):
-    """Run a bounded corpus workflow selected by the application router."""
-    if lane not in ("listing", "count", "comparison", "research"):
-        raise ValueError(f"No application workflow for lane {lane!r}")
+def _context(lane, user, *, root, conversation, scope_record, max_sources, history_before_turn_id):
     if max_sources < 1:
         raise ValueError("max_sources must be positive")
     ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation)
-    ctx = replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None,
-                  history_before_turn_id=history_before_turn_id)
-    if lane == "research":
-        ctx = replace(ctx, budget=replace(ctx.budget,
-            max_ledger_passages=min(ctx.budget.max_ledger_passages, max_sources)))
-        return ResearchPlanner(root).answer(question, ctx).answer, None
+    return replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None,
+                   history_before_turn_id=history_before_turn_id)
+
+
+def research_run(question, user, *, root, conversation=None, scope_record=None,
+                 max_sources=8, history_before_turn_id=None):
+    """Yield the planner's steps; return its `ResearchAnswer` (IR-504)."""
+    ctx = _context("research", user, root=root, conversation=conversation,
+                   scope_record=scope_record, max_sources=max_sources,
+                   history_before_turn_id=history_before_turn_id)
+    ctx = replace(ctx, budget=replace(ctx.budget,
+        max_ledger_passages=min(ctx.budget.max_ledger_passages, max_sources)))
+    return (yield from ResearchPlanner(root).run(question, ctx))
+
+
+def answer_lane(lane, question, user, *, root, conversation=None, scope_record=None,
+                max_sources=8, history_before_turn_id=None):
+    """Run a bounded corpus workflow; research goes through `research_run`."""
+    if lane not in ("listing", "count", "comparison"):
+        raise ValueError(f"No application workflow for lane {lane!r}")
+    ctx = _context(lane, user, root=root, conversation=conversation, scope_record=scope_record,
+                   max_sources=max_sources, history_before_turn_id=history_before_turn_id)
     run = ToolRun.start(ctx, root)
     try:
         with model_call_deadline(ctx.budget.wall_clock_seconds):

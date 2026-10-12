@@ -74,7 +74,7 @@ class ChatOrchestrator:
             yield RoutingDecided(self._routing.decision)
         if self._routing.nonpassage:
             yield RetrievalStarted()
-            answer = self._routing.answer(user)
+            answer = yield from self._routing.events(user)
             turn = self._record(answer)
             try:
                 yield Done(answer)
@@ -113,6 +113,7 @@ class ChatOrchestrator:
             asked.widened,
             routing=self._routing.decision,
             listing=self._routing.listing,
+            research=self._routing.research,
         )
         self._turn_id = turn.pk
         return turn

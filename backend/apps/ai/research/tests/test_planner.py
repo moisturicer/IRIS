@@ -53,7 +53,7 @@ def test_duplicate_is_fed_back_and_spends_the_inner_budget(corpus, embedder):
     model = planning(*[("search_passages", {"query": TOPIC})] * 2)
     result = run(corpus, embedder, model, max_calls_per_subtask=2, max_tool_calls=3)
     assert result.stop_reason == "max_tool_calls"
-    assert "stopped" in result.answer.text
+    assert "stopped" in result.coverage_notes[0]["text"]
     assert [step for step in result.steps if step.kind == "tool"][-1].duplicate is True
 
 
@@ -90,7 +90,7 @@ def test_provider_failure_with_evidence_synthesizes_without_another_search(corpu
     assert result.fallback is False
     assert result.answer.citations
     assert result.stop_reason == "planner_unavailable"
-    assert "stopped" in result.answer.text
+    assert "stopped" in result.coverage_notes[0]["text"]
 
 
 @pytest.mark.parametrize("reply, code", [

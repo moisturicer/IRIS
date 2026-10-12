@@ -81,6 +81,7 @@ def record_turn(
     *,
     routing=None,
     listing=None,
+    research=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -114,7 +115,7 @@ def record_turn(
     docstring for why that order is not an accident.
     """
     turn = _write_turn(
-        conversation, question, answer, resolved_question, widened, routing, listing
+        conversation, question, answer, resolved_question, widened, routing, listing, research
     )
     _store_answer_vector(turn, answer, embedder)
     return turn
@@ -129,6 +130,7 @@ def _write_turn(
     widened: bool,
     routing=None,
     listing=None,
+    research=None,
 ) -> Turn:
     """The Turn, its citations and its free question vector, all or nothing.
 
@@ -145,6 +147,7 @@ def _write_turn(
         had_reasoning=answer.had_reasoning,
         reasoning=answer.reasoning,
         routing=routing or {},
+        research=research or {},
         listing=({**listing, "records": [{"record_id": row["record_id"]} for row in listing["records"]]} if listing else {}),
     )
     TurnCitation.objects.bulk_create(
@@ -367,6 +370,9 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
 
 def _route_for_reader(turn, titles):
     metadata = {"routing": turn.routing} if turn.routing else {}
+    if turn.research:
+        # Steps and notes carry codes and counts only, so nothing to re-gate.
+        metadata["research"] = turn.research
     if turn.listing:
         metadata["listing"] = {**turn.listing, "records": [
             {"record_id": row["record_id"], "title": titles[row["record_id"]]}

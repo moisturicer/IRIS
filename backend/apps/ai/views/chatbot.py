@@ -20,8 +20,9 @@ retriever or an answer service, and shape the reply — which is what makes the
 whole path drivable from a test with deterministic fakes.
 """
 import json
+from contextlib import closing
 
-from django.http import Http404, StreamingHttpResponse
+from django.http import Http404
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -31,6 +32,7 @@ from rest_framework.views import APIView
 
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
+    AgentStep,
     CitationsResolved,
     Done,
     ReasoningDelta,
@@ -40,6 +42,7 @@ from apps.ai.answers.events import (
 from apps.ai.composition import composition_root
 from apps.ai.models import Conversation
 from apps.ai.orchestrator import ChatOrchestrator, ChatQuestion
+from apps.ai.streaming import EventStreamResponse
 from apps.ai.presentation import (
     answer_body,
     answer_mode,
@@ -340,11 +343,8 @@ class ChatStreamView(APIView):
 
     **This stays a plain synchronous view.** Retrieval, the disclosure gate,
     memory recall and persistence are the exact same synchronous calls
-    `ChatQueryView` makes; under the ASGI deployment ADR-017 requires,
-    Django's own ASGI handler is what bridges a synchronous view's
-    `StreamingHttpResponse` onto the event loop -- pulling `streaming_content`
-    one chunk at a time via `sync_to_async` internally -- so there is no
-    async plumbing to write by hand here.
+    `ChatQueryView` makes; `EventStreamResponse` streams it under ASGI.
+    The research lane adds `agent_step` events and `done.research` (IR-504).
 
     **Generation streams against the real configured model as of IR-334.**
     The IR-321 resilience decorators implement `stream()` now, rather than
@@ -370,58 +370,56 @@ class ChatStreamView(APIView):
             # and as `partial` on interruption (IR-328).
             from apps.ai.routing.chat import RoutingDecided
 
-            for event in orchestrator.answer_stream(request.user):
-                if isinstance(event, RoutingDecided):
-                    yield _sse(event.name, {"routing": event.routing})
-                elif isinstance(event, RetrievalFinished):
-                    yield _sse(
-                        event.name,
-                        {
-                            "passage_count": event.passage_count,
-                            "record_count": event.record_count,
-                            "degraded": event.degraded,
-                        },
-                    )
-                elif isinstance(event, (TextDelta, ReasoningDelta)):
-                    yield _sse(event.name, {"text": event.text})
-                elif isinstance(event, CitationsResolved):
-                    yield _sse(event.name, {"citations": citations(event.citations)})
-                elif isinstance(event, Done):
-                    answer = event.answer
-                    mode = answer_mode(answer.state)
-                    yield _sse(
-                        event.name,
-                        {
-                            **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
-                            **orchestrator.metadata,
-                            "conversation_id": (
-                                None
-                                if prepared.conversation is None
-                                else prepared.conversation.pk
-                            ),
-                            "resolved_question": prepared.resolved_question,
-                            "citations": citations(answer.citations),
-                            "sources": record_sources(answer.sources),
-                            "mode": mode,
-                            "degraded": answer.degraded,
-                            "widened": prepared.widened,
-                            "had_reasoning": answer.had_reasoning,
-                            "reasoning": answer.reasoning or None,
-                        },
-                    )
-                else:
-                    # RetrievalStarted, GenerationStarted -- no payload
-                    # beyond the event name itself.
-                    yield _sse(event.name, {})
+            # Closed explicitly, so a run never waits on garbage collection.
+            events = orchestrator.answer_stream(request.user)
+            with closing(events):
+                for event in events:
+                    if isinstance(event, RoutingDecided):
+                        yield _sse(event.name, {"routing": event.routing})
+                    elif isinstance(event, AgentStep):
+                        yield _sse(event.name, event.wire())
+                    elif isinstance(event, RetrievalFinished):
+                        yield _sse(
+                            event.name,
+                            {
+                                "passage_count": event.passage_count,
+                                "record_count": event.record_count,
+                                "degraded": event.degraded,
+                            },
+                        )
+                    elif isinstance(event, (TextDelta, ReasoningDelta)):
+                        yield _sse(event.name, {"text": event.text})
+                    elif isinstance(event, CitationsResolved):
+                        yield _sse(event.name, {"citations": citations(event.citations)})
+                    elif isinstance(event, Done):
+                        answer = event.answer
+                        mode = answer_mode(answer.state)
+                        yield _sse(
+                            event.name,
+                            {
+                                **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
+                                **orchestrator.metadata,
+                                "conversation_id": (
+                                    None
+                                    if prepared.conversation is None
+                                    else prepared.conversation.pk
+                                ),
+                                "resolved_question": prepared.resolved_question,
+                                "citations": citations(answer.citations),
+                                "sources": record_sources(answer.sources),
+                                "mode": mode,
+                                "degraded": answer.degraded,
+                                "widened": prepared.widened,
+                                "had_reasoning": answer.had_reasoning,
+                                "reasoning": answer.reasoning or None,
+                            },
+                        )
+                    else:
+                        # RetrievalStarted, GenerationStarted -- no payload
+                        # beyond the event name itself.
+                        yield _sse(event.name, {})
 
-        response = StreamingHttpResponse(
-            event_source(), content_type="text/event-stream"
-        )
-        response["Cache-Control"] = "no-cache"
-        # nginx buffers a proxied response by default, which would turn this
-        # into one delayed burst instead of a stream -- see `nginx.conf`.
-        response["X-Accel-Buffering"] = "no"
-        return response
+        return EventStreamResponse(event_source())
 
 
 class SemanticSearchView(APIView):

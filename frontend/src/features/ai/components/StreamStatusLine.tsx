@@ -1,8 +1,12 @@
 import type { StreamingState } from "../hooks/useAskStream";
+import { stepLabel } from "./ResearchSteps";
 
 /** Honest progress copy (IR-329) -- one deterministic pipeline stage per
  *  line, never phrasing that reads as parallel agents (ADR-028). */
 export function statusLineText(state: StreamingState): string | null {
+  // The research lane names the planner's current step instead (IR-504).
+  const current = [...(state.steps ?? [])].reverse().find((step) => step.status === "running");
+  if (current && state.stage !== "answering") return `${stepLabel(current)}…`;
   switch (state.stage) {
     case "searching":
       return "Searching the repository…";

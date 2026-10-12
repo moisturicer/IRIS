@@ -1,4 +1,4 @@
-"""Request-owned dispatch and metadata for the development research lane."""
+"""Request-owned dispatch and metadata for the research lane (IR-515, IR-504)."""
 from dataclasses import asdict, dataclass
 from typing import ClassVar
 
@@ -7,15 +7,23 @@ from django.core.exceptions import ImproperlyConfigured
 
 from apps.ai.answers.citations import GroundedAnswer, NO_SOURCES
 from apps.ai.answers.events import AnswerEvent
+from core.permissions import is_office_staff
 from .configuration import configured_providers
 from .router import LANES, route_question
 
 
+MODES = ("off", "staff", "on")
+
+
 def verify_research_configuration():
-    if settings.AI_RESEARCH_LANE not in ("off", "on"):
-        raise ImproperlyConfigured("AI_RESEARCH_LANE must be off or on")
-    if settings.AI_RESEARCH_LANE == "on" and not settings.DEBUG:
-        raise ImproperlyConfigured("AI_RESEARCH_LANE is development-only until IR-504")
+    if settings.AI_RESEARCH_LANE not in MODES:
+        raise ImproperlyConfigured("AI_RESEARCH_LANE must be off, staff or on")
+
+
+def research_lane_enabled(user) -> bool:
+    """`staff` turns the lane on for office staff only, ahead of readers (IR-504)."""
+    mode = settings.AI_RESEARCH_LANE
+    return mode == "on" or (mode == "staff" and is_office_staff(user))
 
 
 @dataclass(frozen=True)
@@ -31,19 +39,24 @@ class RoutedChat:
         self.max_sources = max_sources
         self.decision = None
         self.listing = None
+        self.research = None
 
     @property
     def metadata(self):
         if self.decision is None:
             return {}
-        return {"routing": self.decision, **({"listing": self.listing} if self.listing else {})}
+        return {
+            "routing": self.decision,
+            **({"listing": self.listing} if self.listing else {}),
+            **({"research": self.research} if self.research else {}),
+        }
 
     @property
     def nonpassage(self):
         return self.decision is not None and self.decision["lane"] != "passage"
 
     def decide(self, user):
-        if self.decision is not None or settings.AI_RESEARCH_LANE == "off":
+        if self.decision is not None or not research_lane_enabled(user):
             return
         asked = self.asked
         jev, backup = configured_providers(root=self.root)
@@ -73,6 +86,13 @@ class RoutedChat:
         self.decision = decision
 
     def answer(self, user):
+        from apps.ai.research.planner import drain
+
+        return drain(self.events(user))
+
+    def events(self, user):
+        """Yield the planner's steps on the research lane; return the answer,
+        or `None` when the passage pipeline should answer."""
         self.decide(user)
         if not self.nonpassage:
             return None
@@ -81,8 +101,16 @@ class RoutedChat:
                 text="IRIS cannot provide a research landscape or gap analysis until the research-landscape capability is available. Retrieved passages cannot establish comprehensive coverage.",
                 citations=(), state=NO_SOURCES,
             )
-        from .lanes import answer_lane
+        from .lanes import answer_lane, research_run
 
+        if self.decision["lane"] == "research":
+            result = yield from research_run(
+                self.asked.effective_question, user, root=self.root,
+                conversation=self.asked.conversation, scope_record=self.asked.scope_record,
+                max_sources=self.max_sources, history_before_turn_id=self.asked.override_turn_id,
+            )
+            self.research = result.wire()
+            return result.answer
         answer, self.listing = answer_lane(
             self.decision["lane"], self.asked.effective_question, user,
             root=self.root, conversation=self.asked.conversation,

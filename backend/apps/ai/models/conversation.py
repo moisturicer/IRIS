@@ -212,6 +212,8 @@ class Turn(models.Model):
     reasoning = models.TextField(blank=True)
     routing = models.JSONField(default=dict, blank=True)
     listing = models.JSONField(default=dict, blank=True)
+    #: The research planner's steps and coverage notes (IR-504), never content.
+    research = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = TurnQuerySet.as_manager()

@@ -296,3 +296,54 @@ it("keeps the live routing event and carries terminal listing rows into the answ
   expect(outcome.message.turnId).toBe(5);
   expect(askStream).toHaveBeenCalledWith("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 });
 });
+
+describe("the research lane (IR-504)", () => {
+  it("tracks each step by position and keeps the finished trace", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const step = { kind: "tool", tool: "search_passages", duplicate: false, latency_ms: 0, coverage: null, found: null };
+    const research = { run_id: "r", stop_reason: "finish", steps: [], coverage_notes: [] };
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "retrieval_started", data: {} };
+        yield { event: "agent_step", data: { ...step, position: 0, status: "running" } };
+        yield { event: "agent_step", data: { ...step, position: 0, status: "ok", found: 2 } };
+        await gate;
+        yield {
+          event: "done",
+          data: { answer: "A.", citations: [], sources: [], message: null, mode: "generative",
+                  degraded: false, conversation_id: 3, resolved_question: null, widened: false,
+                  had_reasoning: false, research },
+        };
+      })(),
+    );
+    const { result } = renderHook(() => useAskStream());
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.ask("q"); });
+
+    await waitFor(() => expect(result.current.streaming?.steps?.[0]?.status).toBe("ok"));
+    expect(result.current.streaming?.steps).toHaveLength(1);
+    release();
+    const outcome = await pending as { message: { research?: unknown } };
+    expect(outcome.message.research).toEqual(research);
+  });
+
+  it("ignores an event type it does not know", async () => {
+    askStream.mockReturnValue(
+      eventsOf(
+        { event: "retrieval_started", data: {} },
+        { event: "some_future_event", data: { anything: true } },
+        {
+          event: "done",
+          data: { answer: "Fine.", citations: [], sources: [], message: null, mode: "generative",
+                  degraded: false, conversation_id: null, resolved_question: null, widened: false,
+                  had_reasoning: false },
+        },
+      ),
+    );
+    const { result } = renderHook(() => useAskStream());
+    const outcome = await act(() => result.current.ask("q"));
+    expect(outcome.message.content).toBe("Fine.");
+    expect(outcome.message.partial).toBeUndefined();
+  });
+});

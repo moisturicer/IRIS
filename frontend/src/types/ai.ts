@@ -13,6 +13,33 @@ export interface RoutingDecision {
   allowed_overrides: ChatLane[];
 }
 
+/** One research-planner step (IR-504): names, codes and counts, no content.
+ *  Sent `running` first, then again at the same `position` with its outcome. */
+export interface AgentStepEvent {
+  position:   number;
+  kind:       string;
+  status:     string;
+  tool:       string;
+  duplicate:  boolean;
+  latency_ms: number;
+  coverage:   string | null;
+  found:      number | null;
+}
+
+export interface CoverageNote {
+  code:    string;
+  reason?: string;
+  text:    string;
+}
+
+/** A research answer's finished steps and what it could not cover (IR-504). */
+export interface ResearchTrace {
+  run_id:         string;
+  stop_reason:    string;
+  steps:          AgentStepEvent[];
+  coverage_notes: CoverageNote[];
+}
+
 /**
  * What an exact metadata count (IR-543) was counted over. Present only on a
  * database count; `total` is of distinct IRIS records, never of unique works.
@@ -168,6 +195,7 @@ export interface AIAnswer {
   turn_id?: number;
   routing?: RoutingDecision;
   listing?: AnswerListing;
+  research?: ResearchTrace;
   /** Answer text, or null when nothing in the corpus matched. */
   answer:    string | null;
   /**
@@ -221,6 +249,7 @@ export type ChatCitation = Citation | ReplayedCitation;
 export interface ConversationTurn {
   routing?: RoutingDecision;
   listing?: AnswerListing;
+  research?: ResearchTrace;
   id:                 number;
   question:           string;
   resolved_question:  string | null;

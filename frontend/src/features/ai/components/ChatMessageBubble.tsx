@@ -14,6 +14,7 @@ import {
   ScopeNotice,
 } from "./PassageQuote";
 import { ReasoningPanel } from "./ReasoningPanel";
+import { CoverageNotes, ResearchSteps } from "./ResearchSteps";
 import "highlight.js/styles/github.min.css";
 
 interface ChatMessageBubbleProps {
@@ -73,6 +74,9 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
             : "min-w-0 flex-1",
         )}
       >
+        {!isUser && message.research && (
+          <ResearchSteps steps={message.research.steps} compact={compact} />
+        )}
         {isUser ? (
           <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
         ) : !message.listing || message.listing.count ? (
@@ -95,6 +99,9 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
               ))}
             </ul>
           </div>
+        )}
+        {!isUser && message.research && (
+          <CoverageNotes notes={message.research.coverage_notes} />
         )}
         {!isUser && message.routing && (
           <RoutingDecisionPanel decision={message.routing} disabled={overrideDisabled}
