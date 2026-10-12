@@ -48,15 +48,34 @@ async function* streamAsk(
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
-  const token = useAuthStore.getState().accessToken;
-  const response = await fetch(`${API_BASE}/ai/ask/stream/`, {
+  yield* openStream(`${API_BASE}/ai/ask/stream/`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal,
+  });
+}
+
+/** The same event stream, for one already-submitted queued run (IR-544). */
+async function* resumeAskRun(
+  runId: string,
+  after: number,
+  signal?: AbortSignal,
+): AsyncGenerator<SSEEvent> {
+  yield* openStream(
+    `${API_BASE}/ai/ask/runs/${encodeURIComponent(runId)}/stream/?after=${after}`,
+    { method: "GET", signal },
+  );
+}
+
+async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEvent> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      ...(init.headers as Record<string, string> | undefined),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
 
   if (!response.ok) {
@@ -111,6 +130,9 @@ export const aiApi = {
       { question, top_k: topK, conversation_id: conversationId, widen, ...(routeOverride ? { route_override: routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}) },
       signal,
     ),
+
+  /** Reconnect to a queued run after event `after` (IR-544) -- see `resumeAskRun`. */
+  resumeAskRun,
 
   conversations: {
     /** The caller's own Conversations, most recent first — optionally the

@@ -12,14 +12,16 @@ import { describe, expect, it, vi } from "vitest";
 import { useAskStream } from "./useAskStream";
 
 const askStream = vi.fn();
+const resumeAskRun = vi.fn();
 
 vi.mock("@/api/ai", () => ({
   aiApi: {
     askStream: (...args: unknown[]) => askStream(...args),
+    resumeAskRun: (...args: unknown[]) => resumeAskRun(...args),
   },
 }));
 
-async function* eventsOf(...events: { event: string; data: unknown }[]) {
+async function* eventsOf(...events: { event: string; data: unknown; id?: string }[]) {
   for (const event of events) yield event;
 }
 
@@ -345,5 +347,105 @@ describe("the research lane (IR-504)", () => {
     const outcome = await act(() => result.current.ask("q"));
     expect(outcome.message.content).toBe("Fine.");
     expect(outcome.message.partial).toBeUndefined();
+  });
+});
+
+describe("a queued run (IR-544)", () => {
+  const done = {
+    event: "done", id: "9",
+    data: {
+      answer: "Rainfall gauges feed the model.", citations: [], sources: [], message: null,
+      mode: "generative", degraded: false, conversation_id: 9, resolved_question: null,
+      widened: false, had_reasoning: false, turn_id: 41,
+    },
+  };
+
+  it("reconnects after a dropped connection from the last event it saw", async () => {
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "run_queued", id: "1", data: { run_id: "r-1", state: "queued" } };
+        yield { event: "run_started", id: "2", data: { run_id: "r-1", state: "running", attempt: 1 } };
+        throw new Error("connection reset");
+      })(),
+    );
+    resumeAskRun.mockReturnValue(
+      eventsOf(
+        { event: "text_delta", id: "3", data: { text: "Rainfall gauges feed the model." } },
+        done,
+      ),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+    const outcome = await act(() => result.current.ask("What predicts flooding?", { conversationId: 9 }));
+
+    expect(resumeAskRun).toHaveBeenCalledWith("r-1", 2);
+    expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
+    expect(outcome.message.turnId).toBe(41);
+    expect(outcome.message.partial).toBeFalsy();
+  });
+
+  it("shows the queued stage, then starts over when a new attempt begins", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let resume: () => void = () => {};
+    const restarted = new Promise<void>((resolve) => { resume = resolve; });
+
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "run_queued", id: "1", data: { run_id: "r-2", state: "queued" } };
+        await gate;
+        yield { event: "run_started", id: "2", data: { attempt: 1 } };
+        yield { event: "text_delta", id: "3", data: { text: "half an ans" } };
+        await restarted;
+        yield { event: "run_started", id: "4", data: { attempt: 2 } };
+        yield done;
+      })(),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
+
+    await waitFor(() => expect(result.current.streaming?.stage).toBe("queued"));
+    release();
+    await waitFor(() => expect(result.current.streaming?.text).toBe("half an ans"));
+    resume();
+    const outcome = (await pending) as { message: { content: string } };
+    expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
+  });
+
+  it("ends with an explicit message when the run fails", async () => {
+    askStream.mockReturnValue(
+      eventsOf(
+        { event: "run_queued", data: { run_id: "r-3", state: "queued" } },
+        { event: "run_failed", data: { run_id: "r-3", state: "expired", reason: "deadline_exceeded" } },
+      ),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+    const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
+
+    expect(outcome.message.content).toMatch(/ran out of time/);
+    expect(outcome.message.partial).toBe(true);
+  });
+
+  it("gives up after repeated reconnections bring nothing", async () => {
+    askStream.mockReturnValue(eventsOf({ event: "run_queued", id: "1", data: { run_id: "r-4" } }));
+    resumeAskRun.mockImplementation(() => eventsOf());
+
+    const { result } = renderHook(() => useAskStream());
+    const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
+
+    expect(resumeAskRun).toHaveBeenCalledTimes(3);
+    expect(outcome.message.partial).toBe(true);
+  }, 10_000);
+
+  it("ignores an event name it does not know", async () => {
+    askStream.mockReturnValue(eventsOf({ event: "something_new", data: { x: 1 } }, done));
+
+    const { result } = renderHook(() => useAskStream());
+    const outcome = await act(() => result.current.ask("q"));
+
+    expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
   });
 });

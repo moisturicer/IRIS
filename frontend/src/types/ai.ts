@@ -7,7 +7,8 @@ export interface RoutingDecision {
   reason: string;
   injection_flagged: boolean;
   planner_allowed: boolean;
-  probabilities: Partial<Record<ChatLane, number>>;
+  /** Absent from a queued run's events, which keep router output out (IR-544). */
+  probabilities?: Partial<Record<ChatLane, number>>;
   override: ChatLane | null;
   override_applied: boolean;
   allowed_overrides: ChatLane[];
