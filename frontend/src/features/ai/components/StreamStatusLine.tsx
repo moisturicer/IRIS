@@ -8,6 +8,8 @@ export function statusLineText(state: StreamingState): string | null {
   const current = [...(state.steps ?? [])].reverse().find((step) => step.status === "running");
   if (current && state.stage !== "answering") return `${stepLabel(current)}…`;
   switch (state.stage) {
+    case "queued":
+      return "Waiting to start…";
     case "searching":
       return "Searching the repository…";
     case "found": {

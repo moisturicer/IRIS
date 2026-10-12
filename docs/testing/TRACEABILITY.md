@@ -681,3 +681,30 @@ records, changed permissions, declined fields; every model and outbound HTTP for
 
 **Status:** implemented and tested; human review and approval remain required. Scope is the development
 research lane only.
+
+## IR-544 — durable queued questions resumed through the existing progress stream
+
+With `AI_DURABLE_ASK` on (default off), a question asked inside a Conversation over `/ask/stream/` becomes an owned
+`AskRun`. The run is created with its first event in one transaction and dispatched after commit to the `default`
+Celery queue. The same SSE stream follows the run's ordered public journal (`id:` cursor), and
+`GET /ask/runs/<uuid>/stream/?after=N` replays and tails it. Fenced attempts give exactly one terminal outcome and at
+most one Turn. Design: [ADR-040](../adr/040-durable-queued-ask-iris-questions.md) (**Proposed**); contract in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md) §9.
+
+Evidence:
+- `apps/ai/tests/test_durable_ask_http.py`, with deterministic providers only:
+  - submit, disconnect and reconnect to one final Turn equal to the reopened transcript;
+  - full replay and `Last-Event-ID`;
+  - redelivery after success writes nothing;
+  - a restarted worker fences out the attempt it replaced;
+  - a conversation deleted before, or during, the answer stays deleted;
+  - no reasoning and no router probabilities in the journal;
+  - replay re-checks visibility;
+  - a foreign run is indistinguishable from a missing one;
+  - deadline expiry by the worker and by a reader;
+  - switch off and one-off questions unchanged.
+- `src/lib/sse.test.ts` (the `id:` cursor and keepalive comments).
+- `src/features/ai/hooks/useAskStream.test.tsx` (reconnect from the cursor, a restarted attempt, `run_failed`, giving up, unknown events ignored).
+
+**Status:** implemented and tested; human review and approval remain required, as does ADR-040's acceptance.
+Enablement is gated by the pilot README §6.

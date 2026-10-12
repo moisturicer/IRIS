@@ -486,6 +486,17 @@ LLM_ROUTE_PROVIDER_ONLY = config("LLM_ROUTE_PROVIDER_ONLY", default="")
 LLM_ROUTE_PROVIDER_PINS = config("LLM_ROUTE_PROVIDER_PINS", default="")
 # off | staff | on (IR-504): staff routes office staff only, ahead of readers.
 AI_RESEARCH_LANE = config("AI_RESEARCH_LANE", default="off")
+# IR-544: when on, EVERY `/ask/stream/` question asked inside a Conversation,
+# from any client, is answered by a worker on `default` and can be resumed.
+# Off until IR-545's queue sizing and spend gates are approved (fixed-workflow
+# pilot README §6).
+AI_DURABLE_ASK = config("AI_DURABLE_ASK", default=False, cast=bool)
+# Fixed at submission and never moved by a redelivery (pilot contract §1).
+AI_DURABLE_ASK_DEADLINE_SECONDS = config("AI_DURABLE_ASK_DEADLINE_SECONDS", default=30, cast=int)
+# How long past its deadline an unfinished run waits before a reader expires it.
+AI_DURABLE_ASK_STALE_SECONDS = config("AI_DURABLE_ASK_STALE_SECONDS", default=30, cast=int)
+# How often a following stream checks the journal for new events.
+AI_DURABLE_ASK_POLL_SECONDS = config("AI_DURABLE_ASK_POLL_SECONDS", default=0.25, cast=float)
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)

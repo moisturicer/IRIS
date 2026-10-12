@@ -23,8 +23,12 @@ from .chunk import ChunkSet, DocumentChunk, ChunkEmbedding
 from .ingestion_job import IngestionJob
 from .shadow import ShadowEvidenceDecision, ShadowEvidenceTally
 from .research import ResearchRun, ResearchStep
+from .queued import AskRun, AskRunAttempt, AskRunEvent
 
 __all__ = [
+    "AskRun",
+    "AskRunAttempt",
+    "AskRunEvent",
     "ResearchRun",
     "ResearchStep",
     "Conversation",

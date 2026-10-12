@@ -21,6 +21,7 @@ text it once pointed at may no longer represent it.
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from typing import Optional
 
 from django.conf import settings
@@ -82,6 +83,7 @@ def record_turn(
     routing=None,
     listing=None,
     research=None,
+    guard=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -113,10 +115,18 @@ def record_turn(
     with a fake and count the calls. The call is made **after** the Turn is
     committed and its failure is logged rather than raised -- see the module
     docstring for why that order is not an accident.
+
+    ``guard`` (IR-544) is a context manager the write happens inside. It
+    yields a callback that receives the new Turn before the transaction
+    commits, so a queued run can lock and fence itself first and record its
+    outcome in the same commit. The vector still waits until after.
     """
-    turn = _write_turn(
-        conversation, question, answer, resolved_question, widened, routing, listing, research
-    )
+    with (guard if guard is not None else nullcontext()) as written:
+        turn = _write_turn(
+            conversation, question, answer, resolved_question, widened, routing, listing, research
+        )
+        if written is not None:
+            written(turn)
     _store_answer_vector(turn, answer, embedder)
     return turn
 
@@ -265,7 +275,20 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
     live. Everything else -- dropping an invisible citation, degrading a
     tombstoned one -- is a lookup into those two results.
     """
-    turns = list(conversation.turns.prefetch_related("citations"))
+    return _for_reader(list(conversation.turns.prefetch_related("citations")), user)
+
+
+def turn_for_reader(turn: Turn, user) -> dict:
+    """One Turn, re-resolved exactly as a reopened transcript would show it.
+
+    What a queued run's replayed `done` is built from (IR-544), so a reader
+    who reconnects gets the permissions of now, not of when it was written.
+    """
+    turn = Turn.objects.prefetch_related("citations").get(pk=turn.pk)
+    return _for_reader([turn], user)[0]
+
+
+def _for_reader(turns: list, user) -> list[dict]:
     all_citations = [
         citation for turn in turns for citation in turn.citations.all()
     ]

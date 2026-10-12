@@ -6,20 +6,28 @@
 export interface SSEEvent {
   event: string;
   data: unknown;
+  /** The record's `id:` -- a queued run's journal cursor (IR-544). */
+  id?: string;
 }
 
 function parseBlock(block: string): SSEEvent | null {
   let name: string | null = null;
   let data: string | null = null;
+  let id: string | null = null;
   for (const line of block.split("\n")) {
     if (line.startsWith("event:")) {
       name = line.slice("event:".length).trim();
     } else if (line.startsWith("data:")) {
       data = line.slice("data:".length).trim();
+    } else if (line.startsWith("id:")) {
+      id = line.slice("id:".length).trim();
     }
   }
+  // A comment record (`: keepalive`) has no name and is skipped here.
   if (!name) return null;
-  return { event: name, data: data ? JSON.parse(data) : null };
+  const parsed: SSEEvent = { event: name, data: data ? JSON.parse(data) : null };
+  if (id !== null) parsed.id = id;
+  return parsed;
 }
 
 /**

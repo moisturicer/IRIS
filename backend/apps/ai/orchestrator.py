@@ -114,9 +114,15 @@ class ChatOrchestrator:
             routing=self._routing.decision,
             listing=self._routing.listing,
             research=self._routing.research,
+            guard=self._record_guard(answer),
         )
         self._turn_id = turn.pk
         return turn
+
+    def _record_guard(self, answer):
+        """What the Turn's write happens inside. Nothing here; a queued run
+        fences itself with it (IR-544, `apps.ai.durable`)."""
+        return None
 
     def _shadow(self, turn) -> None:
         if turn is not None:
