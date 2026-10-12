@@ -98,6 +98,15 @@
         {
           "lane": "off",
           "expect": {"listing": null, "mode": "generative", "never_mentions": ["flood-draft"]}
+        },
+        {
+          "lane": "count",
+          "expect": {
+            "routing_lane": "count",
+            "listing": {"completeness": "exact_count", "record_keys": []},
+            "answer_contains": "**5 records** match",
+            "never_mentions": ["flood-draft", "flood-warning"]
+          }
         }
       ]
     },

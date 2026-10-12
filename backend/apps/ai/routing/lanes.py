@@ -18,6 +18,7 @@ from apps.ai.research.tools.common import disclosable, readable_records
 from apps.ai.research.tools.records import _relevant
 from apps.ai.research.schema import ArgumentsRejected
 from apps.ai.research.budget import BudgetExhausted
+from apps.ai.research import metadata_count
 from apps.ai.research.workflows import topic_count
 from apps.ai.resilience.circuit import CircuitOpen
 
@@ -78,6 +79,11 @@ def _listing(run, question, maximum):
 
 
 def _count(run, question):
+    # A metadata inventory question is a database count and uses no model
+    # (IR-543); anything with a topic in it is still screened.
+    metadata = metadata_count.answer(run.ctx, question)
+    if metadata is not None:
+        return metadata
     result = topic_count(run, question)
     if result.status not in SUCCESS:
         return _unavailable(), None
