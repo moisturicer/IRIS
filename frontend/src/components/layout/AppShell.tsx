@@ -3,6 +3,8 @@ import { Sidebar } from "./Sidebar";
 import { Breadcrumbs, type RouteHandle } from "./Breadcrumbs";
 import { NotificationBell } from "./NotificationBell";
 import { PageContainer } from "./PageContainer";
+import { Button } from "@/components/ui/Button";
+import { FOCUS_RING } from "@/components/ui/interaction";
 import { useUIStore } from "@/store/ui.store";
 import { useAuth } from "@/hooks/useAuth";
 import { PendingApprovalPage } from "@/features/auth/PendingApprovalPage";
@@ -24,14 +26,9 @@ function PhoneBar() {
       aria-label="Menu"
       className="md:hidden flex items-center justify-between gap-3 h-14 px-4 bg-white border-b border-stone-200"
     >
-      <button
-        type="button"
-        onClick={toggleSidebar}
-        className="w-10 h-10 rounded-lg border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50"
-        aria-label="Open menu"
-      >
+      <Button type="button" variant="outline" size="icon" onClick={toggleSidebar} aria-label="Open menu" className={FOCUS_RING}>
         <i className="fas fa-bars text-base" aria-hidden />
-      </button>
+      </Button>
       <NotificationBell />
     </nav>
   );

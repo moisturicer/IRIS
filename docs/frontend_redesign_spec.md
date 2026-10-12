@@ -960,7 +960,7 @@ It never asserts internal state, hook calls or component structure. It is writte
 
 | View | Class | Primary task → verdict |
 |---|---|---|
-| Sidebar / navigation | 3 | Wayfinding. Five sections → one short list and Administration; Tools to the header |
+| Sidebar / navigation | 3 | Wayfinding. Five sections → one short list and Administration; Tools to the sidebar bell and the account menu (no header since IR-519) |
 | Header | 2 | ~~One header everywhere~~ No header (IR-519, 2026-10-11): bell to the sidebar, inert search dropped |
 | Discover | 3 | Find research. Dissolve the saved views, add Publish, the Research/Proposals split, `ResearchCard`, the shared empty state |
 | Discover Proposals tab | 6 | Blocked on the Discoverable backend |
@@ -1419,10 +1419,10 @@ The ADR-032 vertical tickets are created later, per the hold recorded on IR-255.
 
 | Ticket | Remains that ticket's responsibility | Belongs to the redesign | Rule for the redesign |
 |---|---|---|---|
-| **IR-351** Chat and chrome stay available while scrolling | `main` is not a scroll container; sticky offsets clear the header; the rail is capped | F1 changes `AppShell` (Discover under the shared header). *IR-519 removed the header and recomputed the offsets from the top of the window* | F1 **must not** add `overflow` to `main`, and keeps the sticky offsets. A regression test is added in F1 |
+| **IR-351** Chat and chrome stay available while scrolling | `main` is not a scroll container; sticky offsets clear the header; the rail is capped | F1 changes `AppShell` (Discover under the shared header). *IR-519 removed the header and recomputed the offsets from the top of the window* | F1 **must not** add `overflow` to `main`, and keeps the sticky offsets as IR-519 recomputed them (`paneLayout.ts`, pinned by `paneLayout.test.ts`). A regression test is added in F1 |
 | **IR-352** Contained PDF viewer | The reader, its pane geometry, fit-to-width, the page counter, `readerGeometry` / `paneLayout` | The Review section places the same reader beside the review pane | F6 **reuses** `PaperPdfReader` and the pane helpers unchanged; no second reader |
 | **IR-353** Find in paper (Done) | Find UI in the reader chrome | — | It comes free wherever the reader renders; no work |
-| **IR-354** Citation lands on the passage | `citationLandingDelta`, first-region landing, the below-`lg` sheet behaviour | Any new pane mode the Review section adds | F6 adds a test that a citation landing in the Review section clears the header and the pane (IR-354's helper, not a new one) |
+| **IR-354** Citation lands on the passage | `citationLandingDelta`, first-region landing, the below-`lg` sheet behaviour | Any new pane mode the Review section adds | F6 adds a test that a citation landing in the Review section clears the pane and its sticky section switch (IR-354's helper, not a new one). *There is no app header since IR-519.* |
 | **IR-355** Cross-paper citation keeps the conversation (To Do) | Pinning, the header "Chatting about X", release triggers, the ADR-026 §9 amendment (Jive reviews) | F5 restructures `PaperViewPage` sections, which touches the same mount path | **Land IR-355 before F5**, or F5 carries its regression test. F5 must not reintroduce the `LoadingSkeleton` unmount that IR-355 fixes |
 | **IR-356** Editorial visual redesign | The Paper View visual language: serif titles, header block, Abstract reading column, chat panel design (AI label, scope toggle in the header, composer, starter questions) | F0 extends the *tokens* app-wide; F5 rebuilds the header *structure* (sections, slots) | F5 keeps IR-356's visual treatment and only adds structure. Ask IRIS stays out of the Review section (§4.6), so IR-356's chat design is untouched |
 | **IR-372** Paper tab = reader + Ask IRIS docked right, full width | The Paper tab's layout rule and the dock preference behaviour | Overview (was Abstract), Review and Files sections | The Paper section is unchanged, and the Review section has no chat, so IR-372's rule is not stretched. Correct the card's stale "left" wording |

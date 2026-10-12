@@ -9,6 +9,10 @@ export default {
 
   theme: {
     extend: {
+      // The one cap for an app page (IR-519): PageContainer's "standard" width.
+      maxWidth: {
+        page: "90rem",
+      },
       colors: {
         // Primary brand color -- deep maroon
         gold: {

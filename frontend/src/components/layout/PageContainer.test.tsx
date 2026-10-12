@@ -10,6 +10,8 @@
  * classes are the exported constants, not strings repeated here.
  */
 import { describe, expect, it } from "vitest";
+// @ts-expect-error -- the config is plain JS and ships no declaration file
+import tailwindConfig from "../../../tailwind.config.js";
 
 import { renderScreen, screen } from "@/test/render";
 
@@ -25,7 +27,9 @@ describe("PageContainer", () => {
 
     const box = screen.getByText("Body").parentElement!;
     expect(box.className).toContain(PAGE_WIDTH.standard);
-    expect(PAGE_WIDTH.standard).toContain("max-w-[90rem]");
+    expect(PAGE_WIDTH.standard).toContain("max-w-page");
+    // The cap is a theme token, not a literal: 90rem is 1440px.
+    expect(tailwindConfig.theme.extend.maxWidth.page).toBe("90rem");
     expect(PAGE_WIDTH.standard).toContain("mx-auto");
   });
 

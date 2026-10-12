@@ -21,7 +21,7 @@ export type PageWidth = "standard" | "full";
 
 /** Whole class strings, because Tailwind only generates what it finds written out. */
 export const PAGE_WIDTH: Record<PageWidth, string> = {
-  standard: "w-full max-w-[90rem] mx-auto",
+  standard: "w-full max-w-page mx-auto",
   full: "w-full",
 };
 

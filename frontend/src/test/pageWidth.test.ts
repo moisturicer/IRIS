@@ -14,8 +14,11 @@ const pages = Object.entries(
   import.meta.glob<string>("/src/features/**/*Page.tsx", { query: "?raw", import: "default", eager: true }),
 );
 
-/** A cap wide enough to be a page's: 5xl (64rem) and up, or four-digit pixels. */
-const PAGE_CAP = /\bmax-w-(?:[5-7]xl|screen-\w+|\[\d{4}px\])/g;
+/**
+ * A cap wide enough to be a page's: 5xl (64rem) and up, the `page` token itself,
+ * four-digit pixels, or 64rem and up written as an arbitrary value.
+ */
+const PAGE_CAP = /\bmax-w-(?:[5-7]xl|screen-\w+|page\b|\[\d{4}px\]|\[(?:6[4-9]|[7-9]\d|\d{3,})(?:\.\d+)?rem\])/g;
 
 describe("page width", () => {
   it("finds the pages it scans", () => {
