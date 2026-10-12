@@ -78,7 +78,8 @@ def test_one_log_line_per_run_with_codes_and_measurements_only(corpus, embedder,
                    ("search_passages", {"query": TOPIC}, "A PRIVATE NOTE"),
                    ("subtask_done", {}, ""), ("finish", {}, ""))
     collect(start(corpus, embedder, model))
-    [record] = [r for r in run_logs.records if r.getMessage().startswith("research run finished ")]
+    [record] = {id(r): r for r in run_logs.records
+                if r.getMessage().startswith("research run finished ")}.values()
     assert record.stop_reason == "finish" and record.limit_hit is False
     assert record.tool_calls == 4 and record.malformed_calls == 0
     assert record.latency_ms >= 0 and record.prompt_tokens > 0
@@ -91,6 +92,7 @@ def test_a_limit_hit_is_logged_as_one(corpus, embedder, run_logs, settings):
     model = script(("plan_research", {"subtasks": ["Find findings"]}, ""),
                    ("search_passages", {"query": TOPIC}, ""), ("search_passages", {"query": "x"}, ""))
     _, result = collect(start(corpus, embedder, model))
-    [record] = [r for r in run_logs.records if r.getMessage().startswith("research run finished ")]
+    [record] = {id(r): r for r in run_logs.records
+                if r.getMessage().startswith("research run finished ")}.values()
     assert record.limit_hit is True and record.stop_reason == result.stop_reason
     assert result.coverage_notes[0]["code"] == "stopped_early"

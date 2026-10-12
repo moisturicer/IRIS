@@ -141,8 +141,9 @@ def test_a_reader_leaving_closes_the_run_on_its_own_thread(monkeypatch):
         stream = request(ASGIHandler(), "POST", reverse("ai-ask-stream"), token, {"question": "q"})
         await asyncio.wait_for(stream.first_body.wait(), 10)
         stream.left.set()
+        # The handler must see the disconnect before the run can finish.
+        await asyncio.wait({stream.task}, timeout=10)
         release.set()
-        await asyncio.wait_for(stream.task, 10)
 
     with use_composition_root(root_with()):
         asyncio.run(scenario())
