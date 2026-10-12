@@ -90,6 +90,13 @@ export default {
         "card-md": "0 4px 12px 0 rgb(0 0 0 / 0.08)",
       },
 
+      // The app shell (IR-413): the drawer slides, the rail narrows and the
+      // content margin follows, so one element can carry all three without one
+      // `transition-property` class silently overriding another.
+      transitionProperty: {
+        shell: "transform, width, margin",
+      },
+
       // Line clamp utilities (built-in in Tailwind v3.3+, kept here for older versions)
       lineClamp: {
         1: "1",

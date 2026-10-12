@@ -151,9 +151,22 @@ Font Awesome 6 via CDN, `<i className="fas fa-…" />`, 95 usages.
 
 ## 6 · Layout
 
-`AppShell` composes Sidebar + Header + Breadcrumbs + main, with three responsive states ([13](13-responsive.md)). Genuinely good and needs no change.
+`AppShell` composes Sidebar + Breadcrumbs + main; there has been no Header since IR-519. Its responsive states are in [13](13-responsive.md) §2.
 
-One quirk: the Discover home is special-cased full-bleed with no Header. Acceptable, but it makes that route inconsistent with every other — worth resolving if Discover survives scope ([15](15-mvp-ui-scope.md)).
+**The sidebar (IR-413, 2026-10-12).** Redesigned with impeccable's *Quiet white* direction, inside these tokens:
+
+- **Brand:** the logo, the **IRIS** wordmark in `font-display` (`text-title`, semibold, `tracking-widest`, `text-brand`) and the bell. The tagline *Research-to-IP Platform* is on its own line under the wordmark at `text-3xs` (11 px) `stone-500`. It was 9 px and wrapped onto three lines beside the bell, below this file's 11 px floor.
+- **Nav:** one unlabelled main list, plus RDCO's labelled *Administration* group (`text-3xs`, uppercase, `tracking-wider`, `stone-500`). Rows are `text-sm`, `rounded-lg`, `px-3 py-2`, with a `w-5` icon.
+  - **Active** is the brand tint: `bg-brand-50`, `text-brand`, semibold, with the icon in brand. The 4 px maroon left bar is gone.
+  - **Hover** is neutral, `bg-stone-100`, so it is never mistaken for the active row.
+  - Every row carries `FOCUS_RING`.
+- **The account menu** in the user block holds Settings & Profile, Help and Sign out (`AccountMenu.tsx`). It is a disclosure: a button that shows and hides a list of plain links and buttons, not an ARIA `menu`. It opens upward, or to the right of the rail, and uses `shadow-card-md`.
+- **Collapse / Expand** is one always-visible control at the bottom. It replaced a toggle that only appeared when you hovered the logo, which a touch tablet could not reach.
+- **Widths:** `w-60` / `w-16` instead of `230px` / `60px`.
+- **One new token:** `transition-shell` (`transitionProperty.shell`: transform, width, margin) in `tailwind.config.js`. The drawer slides, the rail narrows and the content margin follows. Two separate `transition-*` classes on one element silently override each other, because `cn` does not merge Tailwind classes.
+- **The app background is `stone-100`**, previously `gray-100`, and the drawer backdrop is `stone-900/40`, previously `black/40`, following the palette rule at the top of this file.
+
+One quirk: the Discover home and Ask IRIS are special-cased full-bleed, with no `PageContainer` or breadcrumbs, and paint their own page.
 
 ---
 
