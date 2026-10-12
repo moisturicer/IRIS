@@ -1,0 +1,236 @@
+{
+  "name": "fixed-workflow-baseline",
+  "ticket": "IR-542",
+  "tier": "synthetic",
+  "notes": "IR-542's labelled baseline for the fixed-workflow pilot (IR-551). Synthetic records only: no CIT-U content, no proxy paper, no vendor call. `contract` is what IR-543/IR-546/IR-547 must eventually return; `baseline` is what main returns today through the authenticated Ask IRIS HTTP, SSE and conversation boundary, pinned by apps/ai/tests/test_fixed_workflow_baseline_http.py. The screening fake decides from the human labels below, so a baseline run measures the workflow's plumbing and coverage wording, never screening quality. Contract text: docs/evaluation/fixed-workflow-pilot/README.md.",
+  "snapshot": {
+    "id": "S0",
+    "asker": "reader",
+    "description": "One reader with no role beyond student. Another user owns one draft. One published record is refused by the disclosure gate, standing in for an embargoed or unconsented paper."
+  },
+  "records": [
+    {
+      "key": "flood-gauges",
+      "title": "Flood Prediction with Rainfall Gauges",
+      "text": "we trained a convolutional neural network on rainfall gauge data to predict flooding in the Mananga catchment",
+      "state": "published",
+      "owner": null,
+      "disclosure": "permitted"
+    },
+    {
+      "key": "flood-hazard",
+      "title": "Flood Hazard Mapping Along the Butuanon",
+      "text": "we mapped flood hazard zones along the Butuanon river using elevation surveys and household interviews",
+      "state": "published",
+      "owner": null,
+      "disclosure": "permitted"
+    },
+    {
+      "key": "tilapia",
+      "title": "Tilapia Pond Stocking",
+      "text": "sampling procedure for tilapia ponds stocked in brackish water",
+      "state": "published",
+      "owner": null,
+      "disclosure": "permitted"
+    },
+    {
+      "key": "rainfall-note",
+      "title": "Rainfall Variability Note",
+      "text": "monthly rainfall totals varied widely between the dry and wet seasons of the study year",
+      "state": "published",
+      "owner": null,
+      "disclosure": "permitted"
+    },
+    {
+      "key": "flood-warning",
+      "title": "Flood Early Warning Pilot",
+      "text": "a community siren network issued flood early warnings to three barangays",
+      "state": "published",
+      "owner": null,
+      "disclosure": "refused"
+    },
+    {
+      "key": "flood-draft",
+      "title": "Flood Draft Thesis",
+      "text": "draft chapter on flood insurance uptake among coastal households",
+      "state": "draft",
+      "owner": "other",
+      "disclosure": "permitted"
+    }
+  ],
+  "populations": {
+    "metadata_count": {
+      "predicate": "Record.objects.visible_to(asker) restricted to pipeline_status in PUBLICLY_VISIBLE_STATUSES, counted as COUNT(DISTINCT id) at snapshot S0",
+      "record_keys": ["flood-gauges", "flood-hazard", "tilapia", "rainfall-note", "flood-warning"]
+    },
+    "ai_assessment_eligible": {
+      "predicate": "metadata_count population AND the disclosure gate permits the record's content to reach a vendor",
+      "record_keys": ["flood-gauges", "flood-hazard", "tilapia", "rainfall-note"]
+    }
+  },
+  "relevance": {
+    "flooding": {
+      "criterion": "The paper's own subject is flooding, flood risk or flood response.",
+      "labeller": "IR-542 author (synthetic; no human reviewer has confirmed these yet)",
+      "labels": {
+        "flood-gauges": "relevant",
+        "flood-hazard": "relevant",
+        "tilapia": "not_relevant",
+        "rainfall-note": "uncertain",
+        "flood-warning": "relevant",
+        "flood-draft": "relevant"
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "b01",
+      "family": "metadata_count",
+      "question": "How many papers are in the repository?",
+      "contract": {
+        "outcome": "exact_metadata_count",
+        "count": 5,
+        "population": "metadata_count",
+        "ai_calls": 0,
+        "notes": "Answered by a database predicate, never by screening. Includes flood-warning, which AI may not read; excludes flood-draft, which the asker cannot see."
+      },
+      "baseline": [
+        {
+          "lane": "off",
+          "expect": {"listing": null, "mode": "generative", "never_mentions": ["flood-draft"]}
+        }
+      ]
+    },
+    {
+      "id": "b02",
+      "family": "topic_match_count",
+      "question": "How many papers are about flooding?",
+      "topic": "flooding",
+      "contract": {
+        "outcome": "subset_topic_count",
+        "candidate_limit": 20,
+        "assessed_match_keys": ["flood-gauges", "flood-hazard"],
+        "excluded_keys": ["tilapia"],
+        "uncertain_keys": ["rainfall-note"],
+        "unassessed_keys": ["flood-warning"],
+        "notes": "A count of assessed matches among at most twenty distinct candidates, worded as a subset; never an exhaustive absence or total claim."
+      },
+      "baseline": [
+        {
+          "lane": "off",
+          "expect": {"listing": null, "mode": "generative", "citations_within": ["flood-gauges", "flood-hazard", "tilapia", "rainfall-note"], "never_mentions": ["flood-draft", "flood-warning"]}
+        },
+        {
+          "lane": "count",
+          "expect": {
+            "routing_lane": "count",
+            "listing": {"completeness": "screened", "record_keys": ["flood-gauges", "flood-hazard"]},
+            "answer_contains": "2 matched out of 3 checked; 2 could not be assessed.",
+            "never_mentions": ["flood-draft", "flood-warning"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "b03",
+      "family": "presence_listing",
+      "question": "Which papers are about flooding?",
+      "topic": "flooding",
+      "contract": {
+        "outcome": "relevance_pending_preview_then_assessed_subset",
+        "candidate_limit": 20,
+        "assessed_match_keys": ["flood-gauges", "flood-hazard"],
+        "uncertain_keys": ["rainfall-note"],
+        "unassessed_keys": ["flood-warning"],
+        "notes": "Candidates may be previewed early as relevance pending; the final list separates assessed matches, exclusions, uncertainty and unassessed Records."
+      },
+      "baseline": [
+        {
+          "lane": "listing",
+          "expect": {
+            "routing_lane": "listing",
+            "listing": {"completeness": "matches_found", "record_keys_within": ["flood-gauges", "flood-hazard"]},
+            "answer_contains": "These are matches found, not a complete list",
+            "never_mentions": ["flood-draft", "flood-warning"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "b04",
+      "family": "paper_chat_scope",
+      "question": "How many papers are about flooding?",
+      "scope_record": "tilapia",
+      "contract": {
+        "outcome": "scoped_passage_answer",
+        "notes": "Paper Chat stays on its paper: a corpus-shaped question asked inside a paper is answered from that paper only, or the reader is offered to widen."
+      },
+      "baseline": [
+        {
+          "lane": "count",
+          "expect": {"routing_lane": "passage", "listing": null, "citations_within": ["tilapia"], "never_mentions": ["flood-draft", "flood-warning"]}
+        }
+      ]
+    },
+    {
+      "id": "b05",
+      "family": "passage_citation",
+      "question": "neural network rainfall flooding catchment",
+      "contract": {
+        "outcome": "cited_answer",
+        "citations": [
+          {"record": "flood-gauges", "page": 4, "quote": "rainfall gauge data to predict flooding"}
+        ]
+      },
+      "baseline": [
+        {
+          "lane": "off",
+          "expect": {
+            "listing": null,
+            "mode": "generative",
+            "citation": {"record": "flood-gauges", "page": 4, "quote": "rainfall gauge data to predict flooding"},
+            "citations_within": ["flood-gauges", "flood-hazard", "tilapia", "rainfall-note"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "b06",
+      "family": "failure_generation_unavailable",
+      "question": "neural network rainfall flooding catchment",
+      "failure": "answer_model_down",
+      "contract": {
+        "outcome": "explicit_unavailable_with_sources",
+        "notes": "ADR-008: no extractive substitute; the sources found are still returned."
+      },
+      "baseline": [
+        {
+          "lane": "off",
+          "expect": {"listing": null, "mode": "unavailable", "answer_is_null": true, "sources_within": ["flood-gauges", "flood-hazard", "tilapia", "rainfall-note"], "sources_nonempty": true}
+        }
+      ]
+    },
+    {
+      "id": "b07",
+      "family": "failure_screening_unavailable",
+      "question": "How many papers are about flooding?",
+      "topic": "flooding",
+      "failure": "screening_model_down",
+      "contract": {
+        "outcome": "partial_with_all_unassessed",
+        "notes": "Every candidate is unassessed; the answer says so and claims no zero."
+      },
+      "baseline": [
+        {
+          "lane": "count",
+          "expect": {
+            "routing_lane": "count",
+            "listing": {"completeness": "screened", "record_keys": []},
+            "answer_contains": "0 matched out of 0 checked; 5 could not be assessed.",
+            "never_mentions": ["flood-draft"]
+          }
+        }
+      ]
+    }
+  ]
+}

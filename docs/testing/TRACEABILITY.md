@@ -633,3 +633,16 @@ another test process dropping/rewinding its database; it is not verification
 for this change. Standards and Spec review each found zero actionable issues.
 
 **Status:** implemented and tested; human review and approval remain required.
+
+## IR-542 — fixed-workflow pilot contract and labelled baseline
+
+No requirement changes behaviour here. The pilot contract, approval table and gates are in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md),
+built from the IR-551/IR-542 descriptions because the 12 October specification is not in
+the repository (recorded there as a source conflict). `apps/ai/tests/test_fixed_workflow_baseline_http.py`
+pins today's outcome for seven pilot cases through JSON, SSE `done` and conversation replay
+with deterministic vendors and no outbound HTTP; `apps/ai/evaluation/tests/test_fixed_workflow_fixture.py`
+checks the fixture's populations, labels and the proxy audit's pinned SHA-256 and split.
+
+**Status:** prepared for human review. No approval, threshold or reviewer beyond the recorded
+exploratory reviewer is decided.
