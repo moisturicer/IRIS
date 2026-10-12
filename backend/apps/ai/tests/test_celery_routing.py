@@ -129,6 +129,10 @@ def test_the_embedding_task_routes_to_the_worker_with_vendor_access():
     assert _resolved_queue("apps.ai.tasks.embed_record") == "embedding"
 
 
+def test_the_overview_generation_routes_to_a_compose_worker_with_vendor_access():
+    assert _resolved_queue("apps.ai.tasks.generate_record_overview") == "embedding"
+
+
 def test_a_task_with_no_special_dependency_routes_to_the_default_worker():
     """Covers every task that isn't explicitly routed -- present
     (``chunk_extraction``, the accounts email tasks) and future -- so
@@ -142,6 +146,7 @@ def test_every_routed_queue_has_a_worker_subscribed_to_it():
         "apps.documents.tasks.extract_pdf_text",
         "apps.ai.tasks.embed_record",
         "apps.ai.tasks.chunk_extraction",
+        "apps.ai.tasks.generate_record_overview",
     ):
         assert _resolved_queue(task_name) in WORKER_QUEUES
 

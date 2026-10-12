@@ -54,6 +54,7 @@ class RunContext:
     #: One of the router's lanes (IR-514).
     lane: str
     budget: Budget
+    history_before_turn_id: Optional[int] = None
     run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     @classmethod

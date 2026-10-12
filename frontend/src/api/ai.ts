@@ -4,6 +4,7 @@ import { readSSE, type SSEEvent } from "@/lib/sse";
 import { useAuthStore } from "@/store/auth.store";
 import type {
   Passage,
+  ChatLane,
   SemanticSearchResult,
   AIAnswer,
   AIStatus,
@@ -25,6 +26,8 @@ interface SemanticSearchResponse {
 
 interface AskOptions {
   topK?: number;
+  routeOverride?: ChatLane;
+  routeOverrideTurnId?: number;
   /** Appends the question and its answer to this Conversation as a Turn (IR-295). */
   conversationId?: number;
   /**
@@ -78,30 +81,34 @@ export const aiApi = {
    * A record's AI Overview, generated once and cached server-side (IR-334).
    * Replaces firing `ask()` from the paper view on every mount.
    */
-  overview: (recordId: number) =>
-    apiClient.get<RecordOverviewResponse>(`/ai/records/${recordId}/overview/`),
+  overview: (recordId: number, retry = false) =>
+    apiClient.get<RecordOverviewResponse>(`/ai/records/${recordId}/overview/`, {
+      params: retry ? { retry: true } : undefined,
+    }),
 
   /** Ranked retrieval over the readable corpus, without synthesis. */
   search: (query: string, topK = 10) =>
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
   /** Grounded answer plus the records it cites. */
-  ask: (question: string, { topK = 5, conversationId, widen }: AskOptions = {}) =>
+  ask: (question: string, { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId }: AskOptions = {}) =>
     apiClient.post<AIAnswer>("/ai/ask/", {
       question,
       top_k: topK,
       conversation_id: conversationId,
       widen,
+      ...(routeOverride ? { route_override: routeOverride } : {}),
+      ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}),
     }),
 
   /** The same question, narrated as SSE (IR-326, IR-329) -- see `streamAsk`. */
   askStream: (
     question: string,
-    { topK = 5, conversationId, widen }: AskOptions = {},
+    { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId }: AskOptions = {},
     signal?: AbortSignal,
   ) =>
     streamAsk(
-      { question, top_k: topK, conversation_id: conversationId, widen },
+      { question, top_k: topK, conversation_id: conversationId, widen, ...(routeOverride ? { route_override: routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}) },
       signal,
     ),
 

@@ -1,3 +1,4 @@
+import { RoutingDecisionPanel } from "./RoutingDecisionPanel";
 import { cn } from "@/lib/utils";
 import type { StreamingState } from "../hooks/useAskStream";
 import { AskIrisMark } from "./AskIrisIcons";
@@ -32,6 +33,7 @@ export function StreamingMessageBubble({
 
       <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
         <StreamStatusLine state={state} />
+        {state.routing && <RoutingDecisionPanel decision={state.routing} />}
 
         <ReasoningPanel reasoning={state.reasoning} streaming compact={compact} />
 

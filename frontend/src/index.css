@@ -34,6 +34,18 @@
 }
 
 @layer utilities {
+  /* No scrollbar at all, for a row that scrolls sideways on a phone and is
+     cued by the chip cut off at its edge instead (IR-530). `scrollbar-thin`
+     is not enough there: with `scrollbar-width` set, Chromium ignores the
+     ::-webkit-scrollbar rules and draws the classic Windows bar. */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Thin scrollbar for sidebar and panels */
   .scrollbar-thin {
     scrollbar-width: thin;

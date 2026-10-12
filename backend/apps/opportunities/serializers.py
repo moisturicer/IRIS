@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from core.permissions import IsOpportunityPoster
+
 from .models import Opportunity
 
 
@@ -10,6 +12,10 @@ class OpportunitySerializer(serializers.ModelSerializer):
     is_closed        = serializers.SerializerMethodField()
     type_display     = serializers.CharField(source="get_opportunity_type_display", read_only=True)
     posted_by_name   = serializers.SerializerMethodField()
+    # A capability, not a role (IR-530): the board shows Edit and Delete from
+    # this field, so the client never re-derives the poster rule and cannot
+    # drift from it. Decided by the same class that guards update and destroy.
+    can_edit         = serializers.SerializerMethodField()
 
     class Meta:
         model  = Opportunity
@@ -18,7 +24,7 @@ class OpportunitySerializer(serializers.ModelSerializer):
             "audience", "description", "funding_ceiling", "external_url",
             "due_date", "is_featured", "tags", "source",
             "posted_by", "posted_by_name", "created_at", "updated_at",
-            "days_left", "is_closed",
+            "days_left", "is_closed", "can_edit",
         ]
         # posted_by is set from request.user in perform_create, never accepted
         # from the client -- otherwise a poster could attribute a call to
@@ -30,6 +36,17 @@ class OpportunitySerializer(serializers.ModelSerializer):
 
     def get_is_closed(self, obj):
         return obj.is_closed()
+
+    def get_can_edit(self, obj):
+        request = self.context.get("request")
+        if request is None:
+            return False
+        view = self.context.get("view")
+        permission = IsOpportunityPoster()
+        return (
+            permission.has_permission(request, view)
+            and permission.has_object_permission(request, view, obj)
+        )
 
     def get_posted_by_name(self, obj):
         if not obj.posted_by:

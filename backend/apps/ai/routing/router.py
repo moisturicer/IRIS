@@ -1,7 +1,7 @@
 """Choose a bounded lane and screen only the reader's own question.
 
-No retriever, passage, answer or planner enters this interface. IR-515 will
-consume the decision; until then the command can demonstrate it in isolation.
+No retriever, passage, answer or planner enters this interface. Chat consumes
+the decision only when its development research-lane switch is on.
 """
 
 from __future__ import annotations
@@ -71,17 +71,17 @@ class RouteDecision:
 
 
 def _fixed_lane(question: str, *, paper_chat: bool, widened: bool) -> Optional[str]:
+    text = question.lower()
+    if re.search(r"\b(research gaps?|literature landscape|state of the field)\b", text):
+        return "landscape"
     if paper_chat and not widened:
         return "passage"
-    text = question.lower()
     if re.search(r"\b(how many|number of|count of)\b", text):
         return "count"
     if re.search(r"\b(which papers|list (?:the )?papers|what papers)\b", text):
         return "listing"
     if re.search(r"\b(compare|comparison|contrast)\b", text):
         return "comparison"
-    if re.search(r"\b(research gaps?|literature landscape|state of the field)\b", text):
-        return "landscape"
     return None
 
 
@@ -175,7 +175,7 @@ def route_question(
             probabilities, reason, paper_chat, widened, audit_user,
         )
     except (LLMUnavailable, CircuitOpen, DecisionMalformed):
-        suggested = "passage"
+        suggested = "landscape" if fixed == "landscape" else "passage"
         # An uncertain route does not undo a successful Jev screen.
         flagged = not jev_safe
         return _finish(
