@@ -13,10 +13,29 @@ export interface RoutingDecision {
   allowed_overrides: ChatLane[];
 }
 
+/**
+ * What an exact metadata count (IR-543) was counted over. Present only on a
+ * database count; `total` is of distinct IRIS records, never of unique works.
+ */
+export interface MetadataCountBasis {
+  total: number;
+  predicate: string;
+  population: string;
+  /** When the count was read; a reopened transcript keeps the original. */
+  snapshot: string;
+  visible: number;
+  ai_assessable: number;
+  not_ai_assessable: number;
+  possible_duplicate_titles: number;
+  undated: number | null;
+  unit: string;
+}
+
 export interface AnswerListing {
-  completeness: "matches_found" | "screened";
+  completeness: "matches_found" | "screened" | "exact_count";
   wording: string;
   records: { record_id: number; title: string }[];
+  count?: MetadataCountBasis;
 }
 
 /**

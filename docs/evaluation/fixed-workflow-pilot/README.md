@@ -40,7 +40,7 @@ The ticket names "the fixed-workflow specification and revised proposal dated 12
 **Where `main` differs from this contract today.** These were found by reading the code. The cases marked as pinned have a test in the baseline fixture.
 
 - `research/workflows.py::topic_count` screens **every visible Record up to `AI_SCREEN_MAX_RECORDS` (500)**, not twenty. Past 500 it falls back to the top 10. Pinned by case b02: five candidates are screened, which is all of them.
-- With the research lane on, "How many papers are in the repository?" matches the fixed `count` rule (`routing/router.py::_fixed_lane`) and goes to topic screening. No database metadata count runs. This was read, not tested; the b01 contract records the target.
+- **Changed by IR-543.** With the research lane on, "How many papers are in the repository?" matches the fixed `count` rule (`routing/router.py::_fixed_lane`), and `research/metadata_count.py` now answers it from `COUNT(DISTINCT id)` before topic screening is considered. b01's `count` baseline pins it (5 records, no model call). Before IR-543 it went to topic screening and no database count ran.
 - With the lane off, which is the default, no count or listing is returned at all. The question gets a passage answer (b01, b02 lane-off).
 - A disclosure-refused Record is reported only as "could not be assessed". The wording does not separate *not eligible for AI* from *the screener was unsure* (b02: "2 could not be assessed" merges `rainfall-note` and `flood-warning`).
 
@@ -179,3 +179,15 @@ A retry, fallback or re-run counts against the same campaign as a physical attem
 - **IR-505's unfulfilled scope.** ADR-038 §10 defers *chunk* injection screening to IR-505. Upload and extraction screening is not recorded anywhere as anyone's scope.
 - **Residual risk.** Passage text and abstracts reach the screening and answer models without being screened. A planted instruction in a paper can skew how that paper is screened or worded inside the asker's own visible Records. It cannot widen visibility, change counts that come from the database, or cite a Record outside the run. Those limits are enforced in code: `visible_to`, the disclosure gate and code-owned identity (`_rows`).
 - **Also out of scope:** bulk deletion of historical reasoning, and any automatic deployment.
+
+## 8. Metadata counts as built (IR-543)
+
+IR-543 implements the **Metadata count** population of §2 inside the existing `count` lane. It is reachable only where the research lane already is (`AI_RESEARCH_LANE=on`, development only until IR-504); nothing here widens that switch.
+
+- **Code.** `apps/ai/research/metadata_count.py`, called first by `routing/lanes.py::_count`. A question with a topic left in it ("about flooding") is not a metadata count and still goes to topic screening (IR-547's scope).
+- **No model.** A closed rule set reads the question, one `COUNT(DISTINCT id)` counts, and the sentence is assembled in code. The `answer`, `screen` and `resolve` models are never called for the count.
+- **Supported predicates**, all stored on `Record`: classification, PSCED area, record type, completion year (a year, a range, `since`/`after`/`before`) and the IP flag. Names are read from the taxonomy tables, so nothing is invented.
+- **Declined by name, with no count:** a publication year (IRIS stores completion year and the two are never equated), relative dates ("last year", "recent"), fields it does not store (author, adviser, department, keywords, budget, ...) and a question naming two values of one field.
+- **Population.** `visible_to(asker)` and Paper Chat scope, narrowed to `PUBLICLY_VISIBLE_STATUSES`. Staff, owners and a student therefore get the same number, and a draft is never counted.
+- **Reader-visible parts.** The count, the stated predicate, the snapshot time, the unit ("distinct IRIS records, not unique scholarly works"), titles that appear on more than one counted Record (flagged, still counted separately), records with no completion year when a year was asked, and AI eligibility, described separately and only over the asker's own counted Records. `listing.count` carries the same facts as structured data and is stored on the Turn, so a reopened transcript keeps the original snapshot.
+- **Not done here:** grouping ("by classification"), topic-match counts, a metadata question asked inside Paper Chat without widening (it stays a passage answer), and any run with the research lane off.

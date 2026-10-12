@@ -646,3 +646,20 @@ checks the fixture's populations, labels and the proxy audit's pinned SHA-256 an
 
 **Status:** prepared for human review. No approval, threshold or reviewer beyond the recorded
 exploratory reviewer is decided.
+
+## IR-543 — exact metadata counts in the `count` lane
+
+A supported metadata inventory question ("how many papers are in the repository", by classification,
+PSCED area, record type, completion year or IP flag) returns a database `COUNT(DISTINCT id)` over the
+public catalogue the asker can read, with its predicate, snapshot, distinct-Record unit, possible
+duplicate titles and AI eligibility stated; unsupported fields are declined by name.
+`apps/ai/research/metadata_count.py`; contract in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md) §8.
+Evidence: `apps/ai/tests/test_metadata_count_http.py` (JSON and SSE boundary, reopened conversation, exact
+fixture counts, repeated owner/chunk joins, duplicates, empty results, staff vs student, AI-ineligible
+records, changed permissions, declined fields; every model and outbound HTTP forbidden),
+`apps/ai/tests/test_metadata_count_interpreter.py` (rule set, no database), the b01 `count` baseline in
+`fixed_workflow_baseline.json`, and `ChatRouting.test.tsx` for the transcript rendering.
+
+**Status:** implemented and tested; human review and approval remain required. Scope is the development
+research lane only.
