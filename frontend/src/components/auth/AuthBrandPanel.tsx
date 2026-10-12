@@ -41,10 +41,10 @@ const BINDING: Record<Binding, string> = {
  */
 const VOLUMES: ReadonlyArray<{ title: string; binding: Binding; size: string }> = [
   { title: "Thesis", binding: "brand", size: "w-14 h-5/6" },
-  { title: "Project", binding: "brandDark", size: "w-11 h-4/5" },
+  { title: "Project", binding: "brandDark", size: "w-14 h-4/5" },
   { title: "Proposal", binding: "white", size: "w-12 h-3/4" },
   { title: "Research", binding: "brandLight", size: "w-16 h-full" },
-  { title: "Project", binding: "brand", size: "w-10 h-3/4" },
+  { title: "Project", binding: "brand", size: "w-12 h-3/4" },
   { title: "Proposal", binding: "brandDark", size: "w-12 h-5/6" },
   { title: "Thesis", binding: "brand", size: "w-12 h-5/6" },
   { title: "Project", binding: "white", size: "w-14 h-5/6" },
@@ -53,7 +53,8 @@ const VOLUMES: ReadonlyArray<{ title: string; binding: Binding; size: string }> 
   { title: "Project", binding: "brand", size: "w-11 h-4/5" },
   { title: "Proposal", binding: "white", size: "w-11 h-2/3" },
   // Enough volumes to run off the panel's edge even at 1745px: the row is cut
-  // by the panel, never ended inside it.
+  // by the panel, never ended inside it. The widths above put that cut through
+  // a volume, not a gap, at 1024, 1280, 1440 and 1745.
   { title: "Thesis", binding: "brandLight", size: "w-12 h-5/6" },
   { title: "Project", binding: "brandDark", size: "w-10 h-3/4" },
   { title: "Research", binding: "brand", size: "w-14 h-full" },
@@ -65,7 +66,7 @@ const VOLUMES: ReadonlyArray<{ title: string; binding: Binding; size: string }> 
 function Shelf() {
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-end" aria-hidden>
-      <div className="flex h-full max-h-80 min-h-0 items-end gap-1.5 pl-14 motion-safe:animate-fade-in xl:pl-20">
+      <div className="flex h-full max-h-80 min-h-0 items-end 2xl:max-h-96 gap-1.5 pl-14 motion-safe:animate-fade-in xl:pl-20">
         {VOLUMES.map(({ title, binding, size }, i) => (
           <div
             key={i}
@@ -78,7 +79,9 @@ function Shelf() {
             {/* Two gold bands at the head of each spine: decoration, nothing over them. */}
             <span className="absolute inset-x-2 top-4 border-t-2 border-gold/80" />
             <span className="absolute inset-x-2 top-6 border-t-2 border-gold/80" />
-            <span className="text-spine whitespace-nowrap font-display text-title font-semibold">
+            {/* On a short window the shortest spines fall under ~80px and a
+                centred title would climb into the bands, so titles go. */}
+            <span className="text-spine whitespace-nowrap font-display text-title font-semibold short:hidden">
               {title}
             </span>
           </div>
@@ -152,12 +155,12 @@ export function AuthBrandPanel({ variant, className }: AuthBrandPanelProps) {
           <p className="mt-section-lg max-w-xl text-balance font-display text-4xl font-semibold leading-tight text-stone-900 xl:mt-12 2xl:text-5xl 2xl:leading-tight">
             CIT-U theses, projects and proposals, <span className="text-brand">on one shelf.</span>
           </p>
-          <p className="mt-4 max-w-lg text-body text-stone-700">
+          <p className="mt-4 max-w-lg text-pretty text-body text-stone-700">
             IRIS is the university&apos;s research and IP disclosure system. Work is submitted here and
             reviewed by an adviser and the university&apos;s offices; theses and projects that clear
             review are published to Discover.
           </p>
-          <p className="mt-section max-w-lg border-t border-stone-300 pt-section text-heading font-medium text-stone-900">
+          <p className="mt-section max-w-lg border-t border-stone-300 pt-section text-balance text-heading font-medium text-stone-900">
             {PURPOSE[variant]}
           </p>
         </div>
