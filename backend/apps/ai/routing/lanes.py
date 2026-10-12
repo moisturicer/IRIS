@@ -11,7 +11,7 @@ from apps.ai.inference import InferenceTask
 from apps.ai.providers.deadline import model_call_deadline
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.research.context import RunContext
-from apps.ai.research.planner import ResearchPlanner, drain
+from apps.ai.research.planner import ResearchPlanner
 from apps.ai.research.registry import ToolRun, research_tools
 from apps.ai.research.results import ToolStatus
 from apps.ai.research.tools.common import disclosable, readable_records
