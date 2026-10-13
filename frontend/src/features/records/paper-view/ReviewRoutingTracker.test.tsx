@@ -64,7 +64,6 @@ function payload(overrides: Partial<RecordTracker>): RecordTracker {
     workflow_state: "submitted",
     workflow_state_label: "Submitted",
     current_holders: [],
-    can_act: [],
     parties: [],
     routing_history: [],
     routing_recorded_from: "2026-09-19T12:00:00Z",

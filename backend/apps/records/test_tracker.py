@@ -4,8 +4,9 @@ The Review & Routing Tracker after the adviser-first cutover (IR-260).
 ADR-021 §14 and `docs/workflow_routing_architecture.md` §8: `GET
 /records/<id>/tracker/` answers who holds a record, who has finished and how,
 who was never asked, where it was routed and what revisions were asked for --
-all from persisted rows. Record detail gains three of those answers,
-`workflow_state`, `current_holders` and `can_act`.
+all from persisted rows. Record detail carries two of those answers,
+`workflow_state` and `current_holders`. (A third, `can_act`, answered for the
+retired fixed pipeline's review form and was deleted with it by IR-274.)
 
 **Seam: the records API.** Submission, routing, office review and revision use
 the public endpoints. Document requests are covered by the shared fixture in
@@ -147,6 +148,22 @@ class TrackerPartiesTests(TrackerTestBase):
         self.assertEqual(self.states(payload)["adviser"], "active")
         self.assertNotIn("intake", [holder["party"] for holder in payload["current_holders"]])
         self.assertEqual(self.detail(record)["current_holders"][0]["party"], "adviser")
+
+    def test_intake_is_never_shown_as_a_step(self):
+        """IR-274 (ADR-032 §13): no Intake row unless the record has Intake history."""
+        record = self.submitted(RecordTypeName.THESIS_RESEARCH)
+        self.assertNotIn("intake", self.rows(self.tracker_ok(record)))
+
+    def test_intake_history_stays_readable(self):
+        from apps.reviews.models import RecordAssignment
+
+        record = self.submitted(RecordTypeName.THESIS_RESEARCH)
+        RecordAssignment.objects.create(
+            record=record, party="intake", state="withdrawn",
+            reason="ADR-032: intake retired",
+        )
+        row = self.rows(self.tracker_ok(record))["intake"]
+        self.assertEqual((row["label"], row["state"]), ("Intake (retired)", "withdrawn"))
 
     def test_routed_offices_and_preserved_itso_clearance(self):
         record = self.at_parallel_review()

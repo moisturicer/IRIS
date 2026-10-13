@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent,
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
+import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button, Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -46,6 +47,7 @@ import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
+import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
 import { SectionHeading } from "./headings";
@@ -289,8 +291,8 @@ const SECTION_LABELS: Record<PaperSection, string> = {
  * Four sections, kept in the URL as `?section=`: **Overview**, **Paper**,
  * **Review** and **Files**. Which ones a viewer sees, and which actions the
  * header offers, come from the capabilities adapter
- * (`features/records/capabilities.ts`); this page reads no role name and no
- * `can_act` of its own. A section the viewer may not open falls back to
+ * (`features/records/capabilities.ts`); this page reads no role name of its
+ * own. A section the viewer may not open falls back to
  * Overview, so an old or shared link never shows a broken page.
  *
  * Switching sections *replaces* the history entry rather than adding one, and
@@ -470,7 +472,7 @@ export default function PaperViewPage() {
   const arriving = loading || record.id !== Number(id);
 
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
-  const can = capabilitiesFor(record, viewer);
+  const can = capabilitiesFor(record);
   const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
   const participant = isParticipant(record, viewer);
@@ -594,14 +596,16 @@ export default function PaperViewPage() {
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else Save. When
   // the pending action has its own region -- the revision banner, the
-  // Review section's decision -- the header fills nothing.
+  // Review section's action bar -- the header fills nothing. The bar fills
+  // its first granted action, so any granted review action puts the primary
+  // there.
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
       ? "elsewhere"
       : can.has("open_review") && section !== "review"
         ? "open_review"
-        : section === "review" && can.has("decide")
+        : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
           ? "elsewhere"
           : "save";
 
@@ -635,15 +639,12 @@ export default function PaperViewPage() {
   };
 
   return (
-    // Centred, not stretched edge to edge (IR-335) -- alphaxiv's reading
-    // layout. `AppShell`'s own `<main>` sets no max-width, deliberately: it
-    // is shared by every screen, and this constraint belongs to the one that
-    // reads like a paper. The right rail stays inside this same container,
-    // centred with the main column as a pair, rather than moving elsewhere.
-    // The Paper section is the exception (IR-372): the reader and Ask IRIS
-    // use the whole width, so a wide screen gives the paper more room
-    // instead of margins.
-    <div className={cn(!onPaperTab && !onReviewTab && "max-w-6xl mx-auto")}>
+    // Centred at the app's standard width (IR-335, IR-521), with the right
+    // rail inside the same container so the two centre as a pair. The route
+    // asks AppShell for the full width because the Paper and Review sections
+    // use all of it (IR-372): the reader and the review pane get the room
+    // rather than margins. The other sections take the standard width here.
+    <div className={cn(!onPaperTab && !onReviewTab && PAGE_WIDTH.standard)}>
       <div
         className={cn(
           "lg:flex lg:gap-6 lg:items-start",
@@ -651,7 +652,7 @@ export default function PaperViewPage() {
         )}
       >
         <div className="min-w-0 lg:flex-1">
-          {/* The section switch floats just under the app header, so every
+          {/* The section switch floats at the top of the window, so every
               section is one click away at any depth (IR-356). */}
           <div className={cn("sticky z-30 flex justify-center mb-4 pointer-events-none", VIEW_SWITCH_TOP)}>
             <div
@@ -685,7 +686,9 @@ export default function PaperViewPage() {
           <div
             className={cn(
               "grid gap-6 items-start",
-              showRail && "lg:grid-cols-[minmax(0,1fr)_20rem]",
+              // The rail takes some of a wide screen's extra width (IR-521);
+              // the Abstract keeps its reading measure either way.
+              showRail && "lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]",
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -720,9 +723,8 @@ export default function PaperViewPage() {
                 {record.title}
               </h1>
 
-              {/* Byline: authors · college · year. The detail payload names
-                  no adviser (only an id), so none is shown rather than one
-                  invented. */}
+              {/* Byline: authors · adviser · college · year (spec §4.6).
+                  No adviser line when the record names none (IR-472). */}
               <div className="flex items-center gap-x-3 gap-y-2 flex-wrap text-sm text-stone-600">
                 {byline && (
                   <span className="inline-flex items-center gap-2 min-w-0">
@@ -732,6 +734,7 @@ export default function PaperViewPage() {
                     <span className="font-semibold text-stone-800">{byline}</span>
                   </span>
                 )}
+                {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
                 <span>Cebu Institute of Technology – University</span>
                 {record.year_accomplished && <span>{record.year_accomplished}</span>}
               </div>
@@ -1040,7 +1043,7 @@ export default function PaperViewPage() {
           {/* Overview only (IR-372 keeps it off the Paper tab). Not shown
               while chat is docked (IR-351): a docked chat beside the rail
               squeezed the paper under it. Floating or closing the chat brings
-              it back. Sticky below the fixed 58px header, capped to the
+              it back. Sticky under the section switch, capped to the
               viewport and scrollable, because a sticky rail taller than the
               window would hide its lower cards until the paper ended. The
               party status strip is for participants only (spec §4.6). */}

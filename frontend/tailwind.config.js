@@ -9,6 +9,10 @@ export default {
 
   theme: {
     extend: {
+      // The one cap for an app page (IR-519): PageContainer's "standard" width.
+      maxWidth: {
+        page: "90rem",
+      },
       colors: {
         // Primary brand color -- deep maroon
         gold: {
@@ -84,6 +88,13 @@ export default {
       boxShadow: {
         card: "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04)",
         "card-md": "0 4px 12px 0 rgb(0 0 0 / 0.08)",
+      },
+
+      // The app shell (IR-413): the drawer slides, the rail narrows and the
+      // content margin follows, so one element can carry all three without one
+      // `transition-property` class silently overriding another.
+      transitionProperty: {
+        shell: "transform, width, margin",
       },
 
       // Line clamp utilities (built-in in Tailwind v3.3+, kept here for older versions)

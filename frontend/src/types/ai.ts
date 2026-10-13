@@ -1,3 +1,71 @@
+export type ChatLane = "passage" | "listing" | "count" | "comparison" | "research" | "landscape";
+
+export interface RoutingDecision {
+  lane: ChatLane;
+  suggested_lane: ChatLane;
+  stage: string;
+  reason: string;
+  injection_flagged: boolean;
+  planner_allowed: boolean;
+  /** Absent from a queued run's events, which keep router output out (IR-544). */
+  probabilities?: Partial<Record<ChatLane, number>>;
+  override: ChatLane | null;
+  override_applied: boolean;
+  allowed_overrides: ChatLane[];
+}
+
+/** One research-planner step (IR-504): names, codes and counts, no content.
+ *  Sent `running` first, then again at the same `position` with its outcome. */
+export interface AgentStepEvent {
+  position:   number;
+  kind:       string;
+  status:     string;
+  tool:       string;
+  duplicate:  boolean;
+  latency_ms: number;
+  coverage:   string | null;
+  found:      number | null;
+}
+
+export interface CoverageNote {
+  code:    string;
+  reason?: string;
+  text:    string;
+}
+
+/** A research answer's finished steps and what it could not cover (IR-504). */
+export interface ResearchTrace {
+  run_id:         string;
+  stop_reason:    string;
+  steps:          AgentStepEvent[];
+  coverage_notes: CoverageNote[];
+}
+
+/**
+ * What an exact metadata count (IR-543) was counted over. Present only on a
+ * database count; `total` is of distinct IRIS records, never of unique works.
+ */
+export interface MetadataCountBasis {
+  total: number;
+  predicate: string;
+  population: string;
+  /** When the count was read; a reopened transcript keeps the original. */
+  snapshot: string;
+  visible: number;
+  ai_assessable: number;
+  not_ai_assessable: number;
+  possible_duplicate_titles: number;
+  undated: number | null;
+  unit: string;
+}
+
+export interface AnswerListing {
+  completeness: "matches_found" | "screened" | "exact_count";
+  wording: string;
+  records: { record_id: number; title: string }[];
+  count?: MetadataCountBasis;
+}
+
 /**
  * One highlightable rectangle on a page, as a fraction of it (0–1), left/top
  * origin (IR-334). Fractions rather than pixels or PDF points: a reader's PDF
@@ -107,7 +175,7 @@ export interface AIStatus {
  * "no overview" as one undifferentiated blank.
  */
 export interface RecordOverviewResponse {
-  state:    "ready" | "not_indexed" | "unavailable";
+  state:    "ready" | "generating" | "not_indexed" | "unavailable";
   overview: RecordOverview | null;
   /** Present only on `ready` — whether this read hit the cache. */
   cached?:  boolean;
@@ -115,9 +183,9 @@ export interface RecordOverviewResponse {
 
 export interface RecordOverview {
   text:          string;
-  /** The same citation shape chat renders — see `Citation`, minus a `marker`
-   * numbering scheme of its own (the overview's own [n] markers are numbered
-   * independently, same as any other grounded answer). */
+  /** The same citation shape chat renders — see `Citation` — but `marker`
+   * is the cited page, not a source number: `[12]` cites page 12, carrying
+   * every chunk on it (IR-434). */
   citations:     Citation[];
   degraded:      boolean;
   model:         string | null;
@@ -125,6 +193,10 @@ export interface RecordOverview {
 }
 
 export interface AIAnswer {
+  turn_id?: number;
+  routing?: RoutingDecision;
+  listing?: AnswerListing;
+  research?: ResearchTrace;
   /** Answer text, or null when nothing in the corpus matched. */
   answer:    string | null;
   /**
@@ -176,6 +248,9 @@ export type ChatCitation = Citation | ReplayedCitation;
 
 /** One question-and-answer pair in a persisted Conversation (IR-295). */
 export interface ConversationTurn {
+  routing?: RoutingDecision;
+  listing?: AnswerListing;
+  research?: ResearchTrace;
   id:                 number;
   question:           string;
   resolved_question:  string | null;

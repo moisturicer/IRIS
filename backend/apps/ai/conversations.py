@@ -21,6 +21,7 @@ text it once pointed at may no longer represent it.
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from typing import Optional
 
 from django.conf import settings
@@ -78,6 +79,11 @@ def record_turn(
     resolved_question: Optional[str] = None,
     widened: bool = False,
     embedder=None,
+    *,
+    routing=None,
+    listing=None,
+    research=None,
+    guard=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -109,10 +115,18 @@ def record_turn(
     with a fake and count the calls. The call is made **after** the Turn is
     committed and its failure is logged rather than raised -- see the module
     docstring for why that order is not an accident.
+
+    ``guard`` (IR-544) is a context manager the write happens inside. It
+    yields a callback that receives the new Turn before the transaction
+    commits, so a queued run can lock and fence itself first and record its
+    outcome in the same commit. The vector still waits until after.
     """
-    turn = _write_turn(
-        conversation, question, answer, resolved_question, widened
-    )
+    with (guard if guard is not None else nullcontext()) as written:
+        turn = _write_turn(
+            conversation, question, answer, resolved_question, widened, routing, listing, research
+        )
+        if written is not None:
+            written(turn)
     _store_answer_vector(turn, answer, embedder)
     return turn
 
@@ -124,6 +138,9 @@ def _write_turn(
     answer: GroundedAnswer,
     resolved_question: Optional[str],
     widened: bool,
+    routing=None,
+    listing=None,
+    research=None,
 ) -> Turn:
     """The Turn, its citations and its free question vector, all or nothing.
 
@@ -139,6 +156,9 @@ def _write_turn(
         widened=widened,
         had_reasoning=answer.had_reasoning,
         reasoning=answer.reasoning,
+        routing=routing or {},
+        research=research or {},
+        listing=({**listing, "records": [{"record_id": row["record_id"]} for row in listing["records"]]} if listing else {}),
     )
     TurnCitation.objects.bulk_create(
         TurnCitation(
@@ -255,14 +275,29 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
     live. Everything else -- dropping an invisible citation, degrading a
     tombstoned one -- is a lookup into those two results.
     """
-    turns = list(conversation.turns.prefetch_related("citations"))
+    return _for_reader(list(conversation.turns.prefetch_related("citations")), user)
+
+
+def turn_for_reader(turn: Turn, user) -> dict:
+    """One Turn, re-resolved exactly as a reopened transcript would show it.
+
+    What a queued run's replayed `done` is built from (IR-544), so a reader
+    who reconnects gets the permissions of now, not of when it was written.
+    """
+    turn = Turn.objects.prefetch_related("citations").get(pk=turn.pk)
+    return _for_reader([turn], user)[0]
+
+
+def _for_reader(turns: list, user) -> list[dict]:
     all_citations = [
         citation for turn in turns for citation in turn.citations.all()
     ]
 
     visible_titles = dict(
         Record.objects.visible_to(user)
-        .filter(pk__in={citation.record_id for citation in all_citations})
+        .filter(pk__in={citation.record_id for citation in all_citations} | {
+            row["record_id"] for turn in turns for row in turn.listing.get("records", [])
+        })
         .values_list("pk", "title")
     )
     live_chunks = {
@@ -288,8 +323,9 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
 
     return [
         {
-            **answer_body(answer_mode(turn.state), turn.answer),
+            **answer_body(answer_mode(turn.state), turn.answer, preserve_no_results=bool(turn.routing)),
             "id": turn.pk,
+            **_route_for_reader(turn, visible_titles),
             "question": turn.question,
             "resolved_question": turn.resolved_question or None,
             "state": answer_mode(turn.state),
@@ -353,3 +389,16 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
             normalized_regions(chunk.bboxes, chunk.chunk_set.page_sizes)
         ),
     }
+
+
+def _route_for_reader(turn, titles):
+    metadata = {"routing": turn.routing} if turn.routing else {}
+    if turn.research:
+        # Steps and notes carry codes and counts only, so nothing to re-gate.
+        metadata["research"] = turn.research
+    if turn.listing:
+        metadata["listing"] = {**turn.listing, "records": [
+            {"record_id": row["record_id"], "title": titles[row["record_id"]]}
+            for row in turn.listing["records"] if row["record_id"] in titles
+        ]}
+    return metadata

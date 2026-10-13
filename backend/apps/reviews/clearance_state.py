@@ -54,9 +54,8 @@ def is_preserved(
 def declining_office(latest_decline_stage: Optional[str]) -> Optional[str]:
     """The office whose decline caused the most recent resubmission, if any.
 
-    A decline at a sequential stage (adviser, `rdco_intake`, `rdco_review`)
-    resets everything, so there is no *office* to name — `resubmit_record`
-    deletes every clearance in that case and the answer is honestly None.
+    A revision asked for by the Adviser, RDCO or the retired intake names no
+    clearing office, so the answer is honestly None.
     """
     if latest_decline_stage in CLEARANCE_OFFICES:
         return latest_decline_stage

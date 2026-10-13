@@ -13,7 +13,7 @@ import { aiApi } from "@/api/ai";
 import { useUIStore } from "@/store/ui.store";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import type { ChatMessage } from "@/types/chat";
-import type { AIStatus, ConversationSummary } from "@/types/ai";
+import type { AIStatus, ConversationSummary, ChatLane } from "@/types/ai";
 import { recordsApi } from "@/api/records";
 import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
@@ -110,13 +110,13 @@ export default function RAGChatPage() {
    * so it cannot go through `handleSend`'s read of that state.
    */
   const sendQuestion = useCallback(
-    async (conversationId: number, question: string, priorMessages: ChatMessage[]) => {
+    async (conversationId: number, question: string, priorMessages: ChatMessage[], routeOverride?: ChatLane, widen?: boolean, routeOverrideTurnId?: number) => {
       const nextMessages = [...priorMessages, newChatMessage("user", question)];
       setMessages(nextMessages);
 
       setLoading(true);
       try {
-        const { message } = await ask(question, { conversationId });
+        const { message } = await ask(question, { conversationId, ...(routeOverride ? { routeOverride, widen, ...(routeOverrideTurnId !== undefined ? { routeOverrideTurnId } : {}) } : {}) });
         setMessages([...nextMessages, message]);
         if (message.citations?.length) {
           setSourcesOpen(true);
@@ -314,6 +314,11 @@ export default function RAGChatPage() {
           )}
 
           <ChatMessageList
+            onRouteOverride={(message, lane) => {
+              if (activeId && !loading && message.question) {
+                void sendQuestion(activeId, message.question, messages, lane, message.widened ?? false, message.turnId);
+              }
+            }}
             messages={messages}
             isLoading={loading}
             streaming={streaming}

@@ -12,7 +12,7 @@ import type { ConversationTurn } from "@/types/ai";
 export function newChatMessage(
   role: ChatMessage["role"],
   content: string,
-  grounding: Pick<ChatMessage, "citations" | "sources" | "degraded" | "widened" | "partial" | "resolvedQuestion" | "reasoning"> = {},
+  grounding: Pick<ChatMessage, "citations" | "sources" | "degraded" | "widened" | "partial" | "resolvedQuestion" | "reasoning" | "routing" | "listing" | "research" | "question" | "turnId"> = {},
 ): ChatMessage {
   return {
     id:        crypto.randomUUID(),
@@ -41,6 +41,11 @@ export function turnToMessages(turn: ConversationTurn): ChatMessage[] {
       widened:   turn.widened,
       partial:   turn.partial,
       reasoning: turn.reasoning,
+      turnId: turn.id,
+      routing: turn.routing,
+      listing: turn.listing,
+      research: turn.research,
+      question: turn.question,
       resolvedQuestion: turn.resolved_question,
       createdAt: turn.created_at,
     },

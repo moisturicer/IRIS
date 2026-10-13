@@ -22,7 +22,7 @@ the permission layer.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import AbstractSet, Optional
 
 from pgvector.django import CosineDistance
 
@@ -53,6 +53,7 @@ class TwoStageRetriever(Retriever):
         record_candidates: int = DEFAULT_RECORD_CANDIDATES,
         space: Optional[EmbeddingSpace] = None,
         record: Optional[Record] = None,
+        records: Optional[AbstractSet[int]] = None,
     ) -> None:
         """``record`` narrows stage 1 to one Record, constructor-time (IR-298).
 
@@ -61,11 +62,16 @@ class TwoStageRetriever(Retriever):
         satisfies (ADR-026 §7 / IR-294 story 31) — the composition root builds
         a differently-scoped retriever per request instead of widening the
         interface every caller shares.
+
+        ``records`` narrows to a set of Record ids the same way (IR-500), for
+        the research lane's tools. Intersected with ``visible_to``, never
+        instead of it; an empty set finds nothing.
         """
         self._embedder = embedder
         self._record_candidates = record_candidates
         self._space = space
         self._record = record
+        self._records = records
 
     def _active_space(self) -> Optional[EmbeddingSpace]:
         if self._space is not None:
@@ -92,6 +98,8 @@ class TwoStageRetriever(Retriever):
                 # readable since it was scoped, and this is the same fail-closed
                 # check every other retrieval path applies.
                 visible_records = visible_records.filter(pk=self._record.pk)
+            if self._records is not None:
+                visible_records = visible_records.filter(pk__in=self._records)
             visible_records = visible_records.values("pk")
             candidate_ids = list(
                 RecordEmbedding.objects.filter(record__in=visible_records)

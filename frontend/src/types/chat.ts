@@ -6,11 +6,17 @@
  * straight onto one of these, and so does a replayed Turn, which is what
  * lets both surfaces render through the same `ChatMessageBubble`.
  */
-import type { ChatCitation, SemanticSearchResult } from "./ai";
+import type { ChatCitation, SemanticSearchResult, RoutingDecision, AnswerListing, ResearchTrace } from "./ai";
 
 export type ChatRole = "user" | "assistant";
 
 export interface ChatMessage {
+  turnId?: number;
+  routing?: RoutingDecision;
+  listing?: AnswerListing;
+  /** The research planner's steps and coverage notes (IR-504). */
+  research?: ResearchTrace;
+  question?: string;
   id:         string;
   role:       ChatRole;
   content:    string;

@@ -22,8 +22,9 @@
  * completed* is gone: ADR-032 retires the Proposal completion act.
  *
  * **Who sees the review and resubmit controls (IR-259).** Both read the API,
- * never the stored stage: "Open review" appears exactly when `can_act`
- * names a party for this viewer, and "Resubmit for review" exactly when the
+ * never the stored stage: "Open review" appears exactly when the server offers
+ * `open_review` (IR-418), which it does for a seat still to work, and
+ * "Resubmit for review" exactly when the
  * record is `awaiting_resubmission` and the viewer owns it. The records below
  * carry a `pipeline_status` that would have said the opposite, so a gate that
  * still read the stage would fail here.
@@ -74,6 +75,7 @@ const record: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [{ id: 1, name: "R. Dela Cruz", role: null }],
   adviser: null,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,
@@ -90,13 +92,11 @@ const record: RecordDetail = {
     offices_preserved: [],
   },
   stage_label: "Published",
-  your_office: null,
-  your_office_label: null,
   files: [],
   workflow_state: "published",
   workflow_state_label: "Published",
   current_holders: [],
-  can_act: [],
+  capabilities: ["cite"],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
@@ -131,6 +131,7 @@ const approvedProposal: RecordDetail = {
   created_at: "2026-09-01T08:00:00Z",
   authors: [{ id: 1, name: "Andrea Lim", role: null }],
   adviser: ASSIGNED_ADVISER_ID,
+  adviser_name: null,
   added_by: null,
   requires_ethics_review: false,
   requested_itso: false,
@@ -147,13 +148,11 @@ const approvedProposal: RecordDetail = {
     offices_preserved: [],
   },
   stage_label: "Approved",
-  your_office: null,
-  your_office_label: null,
   files: [],
   workflow_state: "approved",
   workflow_state_label: "Approved",
   current_holders: [],
-  can_act: [],
+  capabilities: ["cite"],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
@@ -379,7 +378,6 @@ const inReview: RecordDetail = {
   current_holders: [
     { party: "itso", label: "ITSO", opened_at: "2026-09-02T08:00:00Z", opened_by: null },
   ],
-  can_act: [],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
@@ -396,13 +394,29 @@ async function waitForRecord(title: string) {
   await screen.findByRole("heading", { name: title });
 }
 
-describe("the review control follows can_act", () => {
+/**
+ * A reviewer the API names: an open seat of their own, so a participant
+ * (ADR-032 §4, §10). IR-274 replaced `can_act: ["itso"]`, the retired review
+ * form's flag, with this in every test below that used it.
+ */
+const reviewingSeat: ReviewerSeat = {
+  id: 78, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
+  reviewer: 2, reviewer_name: "ITSO Reviewer", state: "in_review", state_label: "In review",
+  source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
+  opened_at: "2026-10-01T09:00:00Z", done_at: null,
+};
+const reviewing = { my_seats: [reviewingSeat], is_participant: true };
+
+// Since IR-418 the server sends `capabilities`, and the adapter passes it
+// through: each record below carries the list the server computes for that
+// viewer alongside the fields it is computed from.
+describe("the review control follows the server's capabilities", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("is offered when the API says this viewer can act", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+  it("is offered when the API gives this viewer a seat to work", async () => {
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     const { container } = renderPaperView();
 
@@ -411,7 +425,7 @@ describe("the review control follows can_act", () => {
   });
 
   it("opens the Review section without the retired fixed-stage decision form", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -430,7 +444,7 @@ describe("the review control follows can_act", () => {
       source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
       opened_at: null, done_at: null,
     };
-    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true };
+    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -441,7 +455,7 @@ describe("the review control follows can_act", () => {
   });
 
   it("only navigates when every seat is already open", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -452,9 +466,9 @@ describe("the review control follows can_act", () => {
   });
 
   it("is not offered to a same-role viewer the API does not name, whatever the stage", async () => {
-    // `parallel_review` is a stage an ITSO reviewer used to be shown the
-    // control at by role alone. The API says this one cannot act.
-    shownRecord = { ...inReview, pipeline_status: "parallel_review", can_act: [] };
+    // An ITSO reviewer was once shown the control by role alone, at the
+    // retired `parallel_review` stage. The API gives this one no seat.
+    shownRecord = { ...inReview };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -514,6 +528,7 @@ describe("the new-version control follows revision requests", () => {
       }],
       new_version: { number: 3, rereview: ["IERC"], kept: ["ITSO"], blocked },
     },
+    capabilities: ["cite", "create_version", "replace_manuscript", "edit_details"],
   });
 
   it("on the adviser-first model, offers the owner a new version that names who reviews it (IR-273)", async () => {
@@ -543,7 +558,7 @@ describe("the new-version control follows revision requests", () => {
 
 describe("the status the paper shows", () => {
   it("is the API's workflow_state_label, on the badge and in governance", async () => {
-    shownRecord = { ...inReview, pipeline_status: "rdco_review", workflow_state_label: "Final review", workflow_state: "final_review" };
+    shownRecord = { ...inReview, pipeline_status: "in_review", workflow_state_label: "Final review", workflow_state: "final_review" };
     signInAs(99, "Student");
     renderPaperView();
 
@@ -551,6 +566,28 @@ describe("the status the paper shows", () => {
     // Once as the badge, once as the governance ledger's status row.
     expect(screen.getAllByText("Final review")).toHaveLength(2);
     expect(screen.queryByText("RDCO Final Review")).not.toBeInTheDocument();
+  });
+});
+
+describe("the byline credits the adviser (IR-472)", () => {
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  it("names the adviser on a record that has one", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos" };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
+  });
+
+  it("shows no adviser line on a record without one", async () => {
+    shownRecord = { ...record, adviser: null, adviser_name: null };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.queryByText(/^Adviser:/)).not.toBeInTheDocument();
   });
 });
 
@@ -1257,7 +1294,7 @@ describe("the sections follow the capabilities (IR-411)", () => {
   });
 
   it("gives a reviewer the API names Review and Files", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     renderPaperView();
 
@@ -1328,6 +1365,8 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
     workflow_state: "draft",
     workflow_state_label: "Draft",
     adviser: ASSIGNED_ADVISER_ID,
+    // What the server offers the owner; another viewer gets `cite` alone.
+    capabilities: ["cite", "continue_draft", "edit_details"],
   };
 
   it("offers the owner of a draft Continue, into Publish, as the one primary action", async () => {
@@ -1368,7 +1407,10 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 
   it("offers Edit details to the owner while a revision is requested", async () => {
-    shownRecord = { ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested" };
+    shownRecord = {
+      ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested",
+      capabilities: ["cite", "edit_details"],
+    };
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
@@ -1376,7 +1418,7 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 
   it("offers nobody but the owner Edit details on a draft", async () => {
-    shownRecord = draft;
+    shownRecord = { ...draft, capabilities: ["cite"] };
     signInAs(99, "Student");
     renderPaperView();
 
@@ -1426,7 +1468,6 @@ describe("the Review section (IR-412)", () => {
     workflow_state: "in_review",
     workflow_state_label: "In review",
     current_holders: [],
-    can_act: [],
     parties: [],
     routing_history: [
       {
@@ -1456,7 +1497,7 @@ describe("the Review section (IR-412)", () => {
   const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
 
   it("puts the paper beside the timeline, from the tracker", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1468,7 +1509,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("offers a reviewer who may request documents exactly that action", async () => {
-    shownRecord = { ...inReview, can_act: ["ierc"], can_request_document: ["ierc"] };
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1480,7 +1521,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("offers Request documents alone to a party that may ask but not decide", async () => {
-    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1500,7 +1541,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("requests documents from the bar and re-reads the timeline after", async () => {
-    shownRecord = { ...inReview, can_request_document: ["ierc"] };
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1515,7 +1556,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("has no Ask IRIS, and Ask about this paper takes the reader to the Paper tab with the chat open", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     renderWithProbe(`/records/${RECORD_ID}?section=review`);
 
@@ -1533,7 +1574,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("offers no Ask about this paper when there is no paper to ask about", async () => {
-    shownRecord = { ...inReview, abstract_file: null, files: [], can_act: ["itso"] };
+    shownRecord = { ...inReview, abstract_file: null, files: [], ...reviewing };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -1543,7 +1584,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it("lands a citation on its passage in the Review section's reader too", async () => {
-    shownRecord = { ...inReview, can_act: ["itso"] };
+    shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     const citation = {
       marker: 1, chunk_id: 11, record_id: RECORD_ID, record_title: inReview.title, page: 3,

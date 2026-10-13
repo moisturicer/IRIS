@@ -98,7 +98,11 @@ class CircuitBreaker:
 
         try:
             result = operation()
-        except Exception:
+        except Exception as exc:
+            if getattr(exc, "counts_against_circuit", True) is False:
+                with self._lock:
+                    self._half_open = False
+                raise
             with self._lock:
                 if trial:
                     # A failed trial reopens immediately. Giving a dependency

@@ -107,8 +107,8 @@ class RecordManager(models.Manager):
         * **The assigned adviser** sees the record they advise. `Adviser` is in
           `REVIEWER_ROLES` but deliberately not in `STAFF_ROLES`, so the role
           alone grants nothing -- the grant is the `adviser` FK pointing at this
-          user. Without this, `adviser_review`, the first gate in the Proposal
-          pipeline, would be unreachable by the person who has to clear it.
+          user. Without this, every record would be unreachable by the person
+          it enters review with (ADR-032 §1).
         * **Anyone authenticated** sees the public catalogue.
 
         Anonymous users get nothing; DRF refuses them before this runs, but a
@@ -174,13 +174,9 @@ class Record(models.Model):
     # subjects and sensitive data, which none of the flags above cover.
     requires_ethics_review  = models.BooleanField(default=False)
 
-    # Conditional parallel-office routing (ADR-018 -- extends
-    # ADR-002's transition table rather than replacing it). The submitter
-    # requests offices here; apps.reviews.services.approve_record() reads
-    # these at rdco_intake to decide which RecordClearance rows to create,
-    # instead of a hardcoded set per record_type. requested_itso takes effect
-    # for Thesis/Research as well as Project: ADR-021 §5 reversed ADR-018's
-    # Project-only rule for ITSO (IR-266).
+    # The submitter's hint of which offices the record needs (ADR-018). Under
+    # ADR-032 the Adviser routes: `apps.reviews.routing` shows these flags to
+    # the router as hints, and they route nothing by themselves (§3).
     requested_itso           = models.BooleanField(default=False)
     requested_ierc           = models.BooleanField(default=False)
     requested_ktto           = models.BooleanField(default=False)
@@ -196,14 +192,15 @@ class Record(models.Model):
         help_text="Specific IP classification set by RDCO/KTTO after final review.",
     )
 
-    # Denormalized pipeline status -- updated by reviews.services on every review action
+    # Where the record is: draft, in review, or a Decision's outcome (ADR-032).
+    # Who holds a record in review is its active assignments, not this value.
     pipeline_status = models.CharField(
         max_length=20, choices=PipelineStatus.choices,
         default=PipelineStatus.DRAFT, db_index=True
     )
 
     # Resubmission history (IR-139). Both are maintained by
-    # reviews.services.resubmit_record and exist because neither can be derived
+    # reviews.new_version and exist because neither can be derived
     # after the fact: a decline's timestamp is when the reviewer decided, not
     # when the owner resubmitted, and the gap between them is exactly the window
     # in which a clearance is either preserved or re-granted. Serializing

@@ -74,6 +74,7 @@ def _request_for(endpoint, embedder, space, client_for) -> dict:
 
 @override_settings(
     AI_EVIDENCE_DECISION="off",
+    AI_RESEARCH_LANE="off",
     AI_QUESTION_RESOLUTION_ENABLED=False,
     AI_CONVERSATION_MEMORY_ENABLED=False,
     LLM_TEMPERATURE=0.1,
@@ -84,6 +85,9 @@ def test_the_answer_request_matches_the_pre_change_snapshot(
     name, endpoint, embedder, space, client_for
 ):
     request = _request_for(endpoint, embedder, space, client_for)
+    # IR-511 added an explicit timeout to every call: the one deliberate
+    # difference from the pre-change request. Everything else is unchanged.
+    assert request.pop("timeout") > 0
 
     if os.environ.get("IRIS_WRITE_ASK_SNAPSHOT") == "1":
         stored = json.loads(SNAPSHOT.read_text("utf-8")) if SNAPSHOT.exists() else {}

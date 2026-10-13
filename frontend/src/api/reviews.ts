@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 import type { AddReviewerOptions, ReviewerSeat } from "@/types/records";
-import type { MyReviewsPage, MyReviewsQuery, Review, ReviewSubmitPayload } from "@/types/reviews";
+import type { MyReviewsPage, MyReviewsQuery } from "@/types/reviews";
 
 /**
  * Reviewer seats (ADR-032 §4, IR-415). The server re-checks every act: a
@@ -49,8 +49,6 @@ export const reviewsApi = {
         ...(cursor ? { cursor } : {}),
       },
     }),
-  submit:     (data: ReviewSubmitPayload) => apiClient.post<Review>("/reviews/submit/", data),
-  resubmit:   (recordId: number)         => apiClient.post("/reviews/resubmit/", { record_id: recordId }),
   /** Request a one-time PIN emailed to the current user's account email. */
   generatePin:(recordId: number) => apiClient.post("/reviews/pin/generate/", { record_id: recordId }),
   /** Verify a PIN and confirm access. Returns { verified: true, record_id }. */

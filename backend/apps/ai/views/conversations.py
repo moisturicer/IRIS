@@ -7,6 +7,7 @@ the IR-153 shape, so a refusal is a 404 identical to a missing row.
 Staff are excluded, unlike everywhere else in IRIS: a transcript records what
 someone asked about confidential IP (IR-294 Privacy).
 """
+from django.db import transaction
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
@@ -58,3 +59,11 @@ class ConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Conversation.objects.owned_by(self.request.user)
+
+    def perform_destroy(self, instance):
+        # Lock the row before collecting what cascades, in the order a queued
+        # run finishing takes it (IR-544, `apps.ai.durable`): a Turn that run
+        # writes is then either collected here or never written.
+        with transaction.atomic():
+            Conversation.objects.select_for_update().filter(pk=instance.pk).first()
+            instance.delete()

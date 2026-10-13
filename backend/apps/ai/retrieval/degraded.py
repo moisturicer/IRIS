@@ -21,7 +21,7 @@ on `RetrievalResult`, which a decorator has to work to lose.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional
+from typing import AbstractSet, Callable, Optional
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.db.models import F
@@ -72,8 +72,14 @@ class FullTextRetriever(Retriever):
     quietly widening because the vendor happened to be down.
     """
 
-    def __init__(self, record: Optional[Record] = None) -> None:
+    def __init__(
+        self,
+        record: Optional[Record] = None,
+        records: Optional[AbstractSet[int]] = None,
+    ) -> None:
         self._record = record
+        # A set of Record ids (IR-500), intersected with `visible_to`.
+        self._records = records
 
     def retrieve(self, question: str, user, limit: int = 20):
         if not question.strip():
@@ -82,6 +88,8 @@ class FullTextRetriever(Retriever):
         visible = Record.objects.visible_to(user)
         if self._record is not None:
             visible = visible.filter(pk=self._record.pk)
+        if self._records is not None:
+            visible = visible.filter(pk__in=self._records)
         visible = visible.values("pk")
         query = SearchQuery(question, config=CONFIG)
 

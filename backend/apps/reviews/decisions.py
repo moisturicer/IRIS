@@ -35,18 +35,17 @@ is open (`revisions.decision_blocked_reason`).
    `closed_by_decision`, which is the reason ADR-021 §12 asks for. A withdrawn office round leaves
    its `RecordClearance` as it was: a clearance records completed rounds only
    (ADR-032 §4 Amendment);
-4. `pipeline_status` -- written here, not through `lifecycle.apply()`. The
-   legacy table has no edge out of `in_review`, and `apply()` would run
-   `shadow.sync()`, which closes assignments as *completed* where a Decision
-   withdraws them. This is the second write outside `apply()`, beside
-   `routing.enter_at_adviser()`; IR-260 folds both in.
+4. `pipeline_status` -- written here. `lifecycle.apply()` holds only the
+   record-owned edges (deletion and restore); entering review
+   (`routing.enter_at_adviser()`) and a Decision write the status themselves,
+   in the transaction that writes the review state it summarises.
 
 **Before anything is written**, the act refuses, who before what:
 
 - a caller holding no open Adviser or RDCO seat here (403). An Adviser who
   has already accepted & routed is told RDCO decides now; an RDCO member
   without a seat is told to claim it;
-- a record still on the legacy pipeline (400);
+- a record not in review (400);
 - an unknown outcome, or one that does not fit -- a Proposal is never
   published or kept unlisted, a Thesis or Project is never merely accepted,
   and only RDCO keeps a record unlisted (400);
@@ -72,10 +71,12 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
 from apps.records.lifecycle import type_name_of
 from apps.records.versions import latest_version
 from core.enums import (
     OPEN_SEAT_STATES,
+    PUBLICLY_VISIBLE_STATUSES,
     AssignmentState,
     DocumentRequestState,
     Party,
@@ -219,16 +220,13 @@ def _refusal(record, user) -> str:
 
 
 def _decidable(record) -> bool:
-    """On the new model, and a type a Decision is taken on."""
-    return routing.is_new_model(record) and type_name_of(record) in DECIDABLE_TYPES
+    """In review, and a type a Decision is taken on."""
+    return routing.is_in_review(record) and type_name_of(record) in DECIDABLE_TYPES
 
 
 def _require_decidable(record):
     if not _decidable(record):
-        raise DecisionError(
-            "This record is still on the current review pipeline. Use the "
-            "current decision form."
-        )
+        raise DecisionError("This record is not in review.")
 
 
 def _blocked_reason(record, seat) -> Optional[str]:
@@ -422,6 +420,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         record=record, reviewed_by=actor, stage=party, status=verdict,
         comment=comment, assignment=seat.assignment, version=latest_version(record),
     )
+    audit.decision_recorded(record, actor, party=party, outcome=outcome, final=True, review=review)
 
     # Seats are closed here rather than through `seats.complete_seat()` and
     # `seats.withdraw()`: those run the office completion rule and its
@@ -440,6 +439,10 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
             assignment, actor, now, review,
             AssignmentState.COMPLETED if own else AssignmentState.WITHDRAWN,
         )
+        audit.assignment_closed(
+            assignment, actor, how=audit.COMPLETED if own else audit.CLOSED_BY_DECISION,
+            decision=review, withdrawn_seats=[s.pk for s in others],
+        )
     ReviewerSeat.objects.filter(pk=seat.pk).update(state=SeatState.DONE, done_at=now)
 
     requests = list(_open_document_requests(record).select_for_update())
@@ -448,10 +451,13 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         request.closed_at = now
         request.closed_by_decision = review
         request.save(update_fields=["state", "closed_at", "closed_by_decision"])
+        audit.document_request_withdrawn(request, actor, closed_by=audit.BY_DECISION)
 
     # The one status write of a Decision (module note, point 4).
     record.pipeline_status = new_status
     record.save(update_fields=["pipeline_status", "updated_at"])
+    if new_status in PUBLICLY_VISIBLE_STATUSES:
+        audit.published(record, actor, party=party)
 
     _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off)
     return review

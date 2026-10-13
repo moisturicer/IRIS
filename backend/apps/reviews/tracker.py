@@ -13,12 +13,10 @@ part ADR-021 says must not be reordered -- is one readable block. Open
 `DocumentRequest` rows (ADR-022, IR-262) are what make a record
 `awaiting_document`.
 
-**`can_act` answers what the server will accept today.** Under ADR-021 a party
-may act when it holds an active assignment and the viewer can staff it. Until
-IR-260 the pipeline is still authoritative, and it is narrower: IERC holds an
-assignment at `itso_review` but may not clear there, and nobody may act on a
-`declined` record. `_legacy_gate_allows` applies that narrowing, so the page
-never offers an action the server would refuse. IR-260 deletes it.
+**What a viewer may do is not decided here.** Record detail carries each act's
+own flag (`routing`, `decision`, `office_review`, `revision`), computed by the
+module that performs it. The legacy `can_act`, which answered for the retired
+fixed pipeline's review form, was deleted with it (IR-274).
 """
 
 from __future__ import annotations
@@ -47,33 +45,31 @@ from core.enums import (
 )
 from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 
-from .clearance_state import clearance_payload, resubmission_payload
+from .clearance_state import clearance_payload, is_preserved, resubmission_payload
 from .decisions import withdrawn_by_label
 from .models import (
     RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
 )
-from .shadow import party_for_stage
 
-#: The statuses at which a record is in review. The five stage values and
-#: `declined` are the pipeline's spellings of it until IR-260 migrates them to
-#: `in_review`; every other status is reported as itself (ADR-021 §4:
-#: "terminal states pass through as-is").
-IN_REVIEW_STATUSES = frozenset({
-    PipelineStatus.IN_REVIEW,
-    PipelineStatus.ADVISER_REVIEW,
-    PipelineStatus.RDCO_INTAKE,
-    PipelineStatus.ITSO_REVIEW,
-    PipelineStatus.PARALLEL_REVIEW,
-    PipelineStatus.RDCO_REVIEW,
-    PipelineStatus.DECLINED,
-})
+#: The statuses at which a record is in review. Every other status is reported
+#: as itself (ADR-021 §4: "terminal states pass through as-is").
+IN_REVIEW_STATUSES = frozenset({PipelineStatus.IN_REVIEW})
 
-#: Which parties a role can staff (ADR-021 §1). RDCO staffs two. An Adviser
-#: staffs `adviser` only on a record whose `adviser` is that user --
-#: `staffable_parties` applies that per-record condition.
+#: Every record type enters review at its named Adviser (ADR-032 §1, IR-260).
+ENTRY_PARTY = Party.ADVISER
+
+
+def party_for_stage(stage) -> Optional[Party]:
+    """The party a `Review.stage` names, or None. `Party` is `ReviewStage`."""
+    return Party(stage) if stage else None
+
+
+#: Which parties a role can staff (ADR-021 §1). An Adviser staffs `adviser`
+#: only on a record whose `adviser` is that user -- `staffable_parties` applies
+#: that per-record condition. RDCO no longer staffs the retired intake.
 ROLE_TO_PARTIES = {
     RoleName.ADVISER: frozenset({Party.ADVISER}),
-    RoleName.RDCO: frozenset({Party.INTAKE, Party.RDCO}),
+    RoleName.RDCO: frozenset({Party.RDCO}),
     RoleName.ITSO: frozenset({Party.ITSO}),
     RoleName.IERC: frozenset({Party.IERC}),
     RoleName.KTTO: frozenset({Party.KTTO}),
@@ -86,13 +82,15 @@ SHADOW_BACKFILL_MIGRATION = ("reviews", "0008_backfill_shadow_assignments")
 
 _CLEARING_OFFICES = frozenset(str(o) for o in Office)
 
-#: The tracker's row order: the two entry parties, the three specialist
-#: offices, then the decider. Fixed, so a row never moves as a record
-#: progresses. Every assignable party appears exactly once.
+#: The tracker's row order: the retired Intake, the Adviser, the three
+#: specialist offices, then the decider. Fixed, so a row never moves as a
+#: record progresses. Every party appears exactly once; Intake's row is shown
+#: only on a record that has Intake history (`_party_rows`).
 TRACKER_ORDER = (
     Party.INTAKE, Party.ADVISER, Party.ITSO, Party.IERC, Party.KTTO, Party.RDCO,
 )
-assert set(TRACKER_ORDER) == set(ASSIGNABLE_PARTIES), "TRACKER_ORDER must list every party"
+assert set(TRACKER_ORDER) == set(Party), "TRACKER_ORDER must list every party"
+assert set(ASSIGNABLE_PARTIES) < set(TRACKER_ORDER)
 
 
 # --- workflow_state -----------------------------------------------------------
@@ -172,7 +170,7 @@ def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
     if record.pipeline_status not in IN_REVIEW_STATUSES:
         return str(record.pipeline_status)
     active = active_assignments if active_assignments is not None else _active_assignments(record)
-    entry = str(lifecycle.entry_party_for(record))
+    entry = str(ENTRY_PARTY)
     return derive_workflow_state(
         pipeline_status=record.pipeline_status,
         open_resubmissions=ResubmissionRequest.objects.filter(
@@ -184,6 +182,101 @@ def workflow_state(record, *, active_assignments: Optional[list] = None) -> str:
         entry_party_has_acted=_entry_party_has_acted(record, entry),
         deciding_parties=lifecycle.deciding_parties_for(record),
     )
+
+
+def workflow_facts(records) -> dict[int, dict[str, Any]]:
+    """
+    What My Library's list shows about each record's workflow, keyed by pk,
+    in a fixed number of queries however many records there are (IR-410):
+
+    - `workflow_state`, from the facts `workflow_state` reads one record at a
+      time, gathered once per kind. The precedence is still
+      `derive_workflow_state`'s alone.
+    - `holders`: the parties with an active assignment, in tracker order,
+      as `{party, label}` -- who has the record now.
+    - `cleared_offices`: each office whose clearance is `cleared`, with
+      `preserved` from `clearance_state.is_preserved`, so a clearance kept
+      through a resubmission reads as kept here exactly as on Record detail.
+
+    Each record's `record_type` should already be loaded.
+    """
+    from apps.documents.models import DocumentRequest
+
+    records = list(records)
+    ids = [r.pk for r in records]
+    in_review = [r.pk for r in records if r.pipeline_status in IN_REVIEW_STATUSES]
+    entry = str(ENTRY_PARTY)
+
+    def per_record(queryset, field):
+        facts: dict[int, list] = {}
+        for record_id, value in queryset.values_list("record_id", field):
+            facts.setdefault(record_id, []).append(value)
+        return facts
+
+    active = per_record(
+        RecordAssignment.objects.filter(record_id__in=ids, state=AssignmentState.ACTIVE),
+        "party",
+    )
+    resubmissions = per_record(
+        ResubmissionRequest.objects.filter(
+            record_id__in=in_review, state=ResubmissionRequestState.OPEN
+        ),
+        "pk",
+    )
+    documents = per_record(
+        DocumentRequest.objects.filter(record_id__in=in_review, state=DocumentRequestState.OPEN),
+        "party",
+    )
+    # `_entry_party_has_acted`: any Review at the entry party's stage, or any
+    # routing out of it. `Party` is `ReviewStage`, so the stage is the party.
+    acted = set(
+        Review.objects.filter(record_id__in=in_review, stage=entry)
+        .values_list("record_id", flat=True)
+    ) | set(
+        RoutingEvent.objects.filter(record_id__in=in_review, from_party=entry)
+        .values_list("record_id", flat=True)
+    )
+    cleared: dict[int, list] = {}
+    for record_id, office, updated_at in (
+        RecordClearance.objects.filter(record_id__in=ids, status=ClearanceStatus.CLEARED)
+        .order_by("office").values_list("record_id", "office", "updated_at")
+    ):
+        cleared.setdefault(record_id, []).append((office, updated_at))
+
+    def holders(record_id):
+        parties = set(active.get(record_id, ()))
+        return [
+            {"party": str(p), "label": party_label(p, staff_viewer=False)}
+            for p in TRACKER_ORDER if p in parties
+        ]
+
+    facts = {}
+    for r in records:
+        facts[r.pk] = {
+            "workflow_state": derive_workflow_state(
+                pipeline_status=r.pipeline_status,
+                open_resubmissions=len(resubmissions.get(r.pk, ())),
+                open_document_requests=len(documents.get(r.pk, ())),
+                active_parties=active.get(r.pk, ()),
+                entry_party=entry,
+                entry_party_has_acted=r.pk in acted,
+                deciding_parties=lifecycle.deciding_parties_for(r),
+            ),
+            "holders": holders(r.pk),
+            "cleared_offices": [
+                {
+                    "office": office,
+                    "label": str(Office(office).label),
+                    "preserved": is_preserved(
+                        status=ClearanceStatus.CLEARED,
+                        clearance_updated_at=updated_at,
+                        last_resubmitted_at=r.last_resubmitted_at,
+                    ),
+                }
+                for office, updated_at in cleared.get(r.pk, ())
+            ],
+        }
+    return facts
 
 
 #: How readers are shown a terminal status where it differs from the stored
@@ -263,53 +356,10 @@ def participating_parties(record) -> frozenset:
     return frozenset(parties)
 
 
-def _legacy_gate_allows(record, user) -> frozenset:
-    """
-    The parties the current pipeline will actually let `user` act as.
-
-    Temporary, and deleted by IR-260: it asks the same two predicates
-    `/reviews/submit/` asks, and names the party each one admits.
-    """
-    from .services import _can_review, _can_submit_clearance
-
-    allowed = set()
-    if _can_review(user, record):
-        by_status = {
-            PipelineStatus.ADVISER_REVIEW: Party.ADVISER,
-            PipelineStatus.RDCO_INTAKE: Party.INTAKE,
-            PipelineStatus.RDCO_REVIEW: Party.RDCO,
-        }
-        party = by_status.get(record.pipeline_status)
-        if party:
-            allowed.add(str(party))
-    can_clear, office = _can_submit_clearance(user, record)
-    if can_clear and office:
-        allowed.add(str(office))
-    return frozenset(allowed)
-
-
-def can_act(record, user, *, active_assignments: Optional[list] = None) -> list[str]:
-    """
-    The parties `user` may act as on `record`, in party order.
-
-    A party qualifies when it holds an active assignment and the user can
-    staff it (ADR-021 §1), narrowed by what the pipeline accepts until IR-260.
-    """
-    if user is None or not getattr(user, "is_authenticated", False):
-        return []
-    active = active_assignments if active_assignments is not None else _active_assignments(record)
-    held = {a.party for a in active}
-    eligible = held & staffable_parties(record, user) & _legacy_gate_allows(record, user)
-    return [str(p) for p in TRACKER_ORDER if str(p) in eligible]
-
-
 def requestable_parties(record, user, *, active_assignments: Optional[list] = None) -> list[str]:
     """
-    The parties `user` may ask for documents as (ADR-022 §Security).
-
-    An active assignment the user can staff -- `can_act` without the legacy
-    pipeline narrowing. A request moves nothing that narrowing protects, so
-    IERC may ask for a consent form while ITSO still holds the clearance gate.
+    The parties `user` may ask for documents as (ADR-022 §Security): an active
+    assignment the user can staff.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return []
@@ -364,7 +414,6 @@ def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[st
         "current_holders": current_holders(
             record, user, active_assignments=active, readable=readable,
         ),
-        "can_act": can_act(record, user, active_assignments=active),
         "can_request_document": requestable_parties(record, user, active_assignments=active),
     }
 
@@ -415,10 +464,10 @@ def _party_rows(
     ):
         assignments[a.party] = a  # last one wins: the party's latest turn
     # The adviser-first model's rule for the RDCO row applies while a record
-    # is on it (stored `in_review`, IR-261), and once a Decision on that model
-    # closed it (IR-270): an Adviser's publish never involved RDCO. Any other
-    # decided record says nothing about which model reviewed it until IR-260
-    # migrates the legacy ones.
+    # is in review (stored `in_review`, IR-261), and once a Decision closed it
+    # (IR-270): an Adviser's publish never involved RDCO. A record the retired
+    # fixed pipeline finished says nothing about which model reviewed it, so
+    # it keeps that pipeline's reading of the RDCO row.
     new_model = record.pipeline_status == PipelineStatus.IN_REVIEW or any(
         a.closed_by_decision_id is not None for a in assignments.values()
     )
@@ -446,6 +495,9 @@ def _party_rows(
         party = str(member)
         assignment = assignments.get(party)
         review = latest_review.get(party)
+        if member is Party.INTAKE and assignment is None and review is None:
+            # Retired (ADR-032 §13): shown only as history, never as a step.
+            continue
         clearance = clearance_by_office.get(party) if party in _CLEARING_OFFICES else None
 
         if assignment is None and party == Party.RDCO and new_model:
@@ -525,7 +577,7 @@ def _party_rows(
             # one runs (IR-269).
             "outcome_earlier": earlier,
             # ◌ on the strip: an active office nobody there is reviewing yet.
-            # New model only: the legacy pipeline decides from the pool
+            # New model only: the retired fixed pipeline decided from the pool
             # without seating anyone, so "unassigned" would be false there.
             "in_pool": (
                 new_model and state is TrackerPartyState.ACTIVE and assignment is not None

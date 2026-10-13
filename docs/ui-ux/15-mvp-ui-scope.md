@@ -265,7 +265,9 @@ or unrouted before the pilot.
 | `MyLibraryPage` | `/records/mine` | Built, routed | **Not in the sixteen.** A reader-side saved-research surface: folders, likes, reading history. Took over the `My Library` route from `MyRecordsPage mode="library"`, which duplicated My Workspace behind a status filter |
 | `CallsAndConferencesPage` | `/opportunities` | Built, routed | **Not in the sixteen, and not in any requirement.** A deadline board for internal calls, conference deadlines, funding windows and institutional grants, backed by a new `apps.opportunities`. Requested directly by the team; see [IR-121](https://citiris.atlassian.net/browse/IR-121) |
 
-**`MyLibraryPage` carries no server state.** There is no bookmark, folder, like or
+**Amended 2026-10-11 (IR-410).** My Library now leads with the author's own research from `/records/mine/`, which is account-backed. That half absorbed My Workspace; spec §4.9 as amended has the layout. What follows still holds for the saved-reading half.
+
+**`MyLibraryPage`'s saved reading carries no server state.** There is no bookmark, folder, like or
 reading-history model in `backend/apps/` — `apps.storage` stores uploaded files and is
 removed server-side by `P0-06`. Everything the page saves lives in the viewer's
 `localStorage` (`lib/recordLibrary`), and every surface on it says so. Saved ids resolve
@@ -284,6 +286,8 @@ calendar action emits an `.ics` file rather than scheduling an in-app reminder, 
 Celery does not currently consume its own queue ([IR-83](https://citiris.atlassian.net/browse/IR-83))
 and a scheduled reminder would silently never fire. Bookmarks are `localStorage`, with
 the same no-server-state caveat as My Library.
+
+**Redesigned by [IR-530](https://citiris.atlassian.net/browse/IR-530) (2026-10-11).** The board is one column grouped by deadline (within a week, within a month, later, recently closed), date-ordered inside each group. RDCO, KTTO and Advisers can now post, edit and delete calls from the page. Before that, the only route was Django admin. Whether the page offers those actions comes from two server fields, `can_post` on the list and `can_edit` per call, both decided by `IsOpportunityPoster`, so the screen compares no role names. The page also reads every page of the list now; it used to stop at the first 20 calls. Still no requirement, so `TRACEABILITY.md` still does not change.
 
 **One criterion met, one recommended for a human to close out.** This was open against IR-86 (now
 **[IR-160](https://citiris.atlassian.net/browse/IR-160)** — *Reduce the pilot surface to 16

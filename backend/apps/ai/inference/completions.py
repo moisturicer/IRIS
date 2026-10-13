@@ -38,6 +38,7 @@ from typing import Iterator, Optional, Sequence
 from apps.ai.providers.dialects import DEFAULT_DIALECT, VendorDialect
 from apps.ai.providers.ports import LLMProvider, StreamDelta
 from apps.ai.providers.tool_calling import (
+    Message,
     ToolCallingLLM,
     ToolCompletion,
     ToolDefinition,
@@ -190,6 +191,32 @@ class CompletionLoggingLLMProvider(LLMProvider, ToolCallingLLM):
         try:
             completion = require_tool_calling(self._provider).complete_with_tools(
                 system, user, tools, timeout_seconds=timeout_seconds
+            )
+        except Exception as exc:
+            self._record(
+                model=self._model_attempted(),
+                reasoning_present=False,
+                error_kind=self._error_kind(exc),
+            )
+            raise
+        self._record(
+            model=self._model_used(),
+            reasoning_present=bool(completion.reasoning),
+            error_kind=None,
+        )
+        return completion
+
+    def converse_with_tools(
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolDefinition],
+        *,
+        timeout_seconds: Optional[float] = None,
+    ) -> ToolCompletion:
+        """One record per call, as `complete_with_tools` writes it."""
+        try:
+            completion = require_tool_calling(self._provider).converse_with_tools(
+                messages, tools, timeout_seconds=timeout_seconds
             )
         except Exception as exc:
             self._record(
