@@ -48,6 +48,11 @@ const ORDERING: Record<DiscoverSort, string> = {
  */
 export default function DiscoverPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  // react-router's functional `setSearchParams` builds from the URL of the
+  // render that created it, so a timer must call the latest one: an older one
+  // writes back a URL that predates anything set since (IR-554).
+  const latestSetSearchParams = useRef(setSearchParams);
+  latestSetSearchParams.current = setSearchParams;
   const { roleName } = useRole();
   // The access map is the one place that says who authors (Student, Adviser).
   const canPublish = canAccess(roleName as never, "submit");
@@ -116,7 +121,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     const handle = setTimeout(() => {
       setActiveQuery(searchInput.trim());
-      setSearchParams(
+      latestSetSearchParams.current(
         (prev) => {
           const next = new URLSearchParams(prev);
           if (searchInput.trim()) next.set("q", searchInput.trim());
@@ -128,9 +133,8 @@ export default function DiscoverPage() {
     }, 300);
 
     return () => clearTimeout(handle);
-    // Re-running on a `setSearchParams` identity change would loop on every
-    // URL write; only the typed text should start the debounce.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only the typed text starts the debounce; the setter is read through the
+    // ref, so it is the current one when the timer fires.
   }, [searchInput]);
 
   /* ── The query the API actually understands ─────────────────────────── */

@@ -708,3 +708,11 @@ Evidence:
 
 **Status:** implemented and tested; human review and approval remain required, as does ADR-040's acceptance.
 Enablement is gated by the pilot README §6.
+
+## IR-554: a Publish click survives Discover's search debounce
+
+**Defect.** Discover's search box writes `q` to the URL 300ms after the last keystroke, and once on load. The timer called the `setSearchParams` of the render that armed it, and react-router-dom 6.30's functional form builds from that render's URL, so a Publish click inside the window was written back out and the dialog closed. It surfaced as a flaky page-head test (5 of 12 runs failed on `main`, 2026-10-13) and failed PR #249's Frontend job once.
+
+**Fix.** `DiscoverPage` keeps the latest `setSearchParams` in a ref and the timer calls that, so it builds from the current URL.
+
+**Test.** `src/features/discover/DiscoverPage.test.tsx` › "keeps the Publish dialog open when the search debounce fires after the click" and "keeps both a just-typed search and the Publish dialog in the URL" — both failed on `main` before the fix. Evidence, 2026-10-13, local: the Discover file **21 passed**, and **0 of 20** consecutive runs failed; `npm test` **876 passed, 3 failed**, the same three failing on `main` without this change (`Sidebar.test.tsx` ×2, `PaperAiOverview.test.tsx` ×1, timing-sensitive on this machine; green in CI); lint 0 errors, build green.
