@@ -19,6 +19,7 @@ from testing.hypothesis_profiles import (
     profile_for,
     register_profiles,
 )
+from testing.source_files import python_sources
 
 
 class ProfileSelectionTests:
@@ -105,7 +106,7 @@ class ProfileIsActuallyReachedTests:
         """
         root = Path(__file__).resolve().parent.parent / "ai"
         offenders = []
-        for path in root.rglob("test_*.py"):
+        for path in python_sources(root, pattern="test_*.py"):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             for node in ast.walk(tree):
                 if not isinstance(node, ast.Call):
