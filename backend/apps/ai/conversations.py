@@ -142,6 +142,11 @@ def _stored_listing(listing) -> dict:
             for row in listing["candidates"]
         ]
         stored.pop("wording", None)
+    if "topic_count" in listing:
+        # Provenance of the run only: every figure is rebuilt from the candidates.
+        from apps.ai.research.listing import TOPIC_PROVENANCE
+
+        stored["topic_count"] = {key: listing["topic_count"][key] for key in TOPIC_PROVENANCE}
     return stored
 
 

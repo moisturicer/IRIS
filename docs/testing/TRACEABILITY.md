@@ -803,3 +803,35 @@ Evidence, with deterministic fakes and real Postgres; no vendor called:
 **Status:** implemented and tested; human review and approval remain required. The `screen` endpoint is still not
 approved for pilot traffic (pilot README §5). No screening recall, latency or cost has been measured, so the
 twenty-candidate limit and the 10 s goal stay unvalidated.
+
+## IR-547 — topic-match counts and the screening cache
+
+A "how many papers match X" question in the `count` lane now selects at most twenty distinct candidate Records through
+the IR-546 workflow, screens them, and states the include decisions as a classified-subset count with its assessed and
+unassessed totals, criterion, method and version. It is never a model-written number, a catalogue metadata count or a
+claim about the whole repository. A per-reader screening cache (`AI_SCREEN_CACHE`, off by default) reuses verdicts for
+listings and counts, re-checking access, disclosure, content and quote on every reuse. Cross-reader sharing is not
+built and needs a named person's approval. `apps/ai/research/listing.py`, `apps/ai/research/screening_cache.py`,
+`apps/ai/models/screening.py`; contract in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md) §12.
+
+Evidence, with deterministic fakes and real Postgres; no vendor called:
+- `apps/ai/tests/test_topic_count_http.py`, over the JSON, SSE, queued-replay and reopened-conversation boundaries:
+  - seven matches among sixteen assessed of twenty selected, with four unassessed, the criterion, method, version and
+    the not-a-catalogue-count statement; the sentence equals `done.answer` and the reopened Turn;
+  - pending contributes nothing; all-unassessed is inconclusive and never "0 matches"; zero, none found, uncertain and
+    twenty-five available (twenty selected) are worded as subsets; many chunks are one candidate;
+  - a model reply carrying its own count is rejected whole; malformed, timed-out and unavailable screens are unassessed;
+  - cold, warm, changed abstract, extraction, model, approval policy, criterion and prompt; one reader never reads
+    another's rows; listing and count share verdicts; the cache holds a decision and its verbatim quote, never a title, abstract or failure;
+  - revoked access before, during and after a warm run, a gate that now refuses a cached paper, and a quote that no
+    longer holds; hits never exceed the twenty-record allowance;
+  - concurrent writers and a lost insert race leave one row; an unreadable cache never fails a count;
+  - observed hits, misses, calls, estimated tokens and stage times, with the note that a warm run shows no capacity;
+  - the queued journal replays a count and re-filters it for the reader; a reopened Turn rebuilds the count.
+- `apps/ai/tests/test_routing_lanes.py` (the count seam, no database) and the b02 baseline in
+  `fixed_workflow_baseline.json` with `test_fixed_workflow_baseline_http.py`.
+
+**Status:** implemented and tested; human review and approval remain required. The `screen` endpoint is still not
+approved for pilot traffic (pilot README §5), enabling `AI_SCREEN_CACHE` needs the policy label set by someone with
+authority, and no screening recall, latency or cost has been measured.

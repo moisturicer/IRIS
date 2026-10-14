@@ -25,6 +25,7 @@ from .shadow import ShadowEvidenceDecision, ShadowEvidenceTally
 from .research import ResearchRun, ResearchStep
 from .queued import AskRun, AskRunAttempt, AskRunEvent
 from .admission import ProviderCampaign, ProviderReservation
+from .screening import ScreeningJudgment
 
 __all__ = [
     "AskRun",
@@ -34,6 +35,7 @@ __all__ = [
     "ProviderReservation",
     "ResearchRun",
     "ResearchStep",
+    "ScreeningJudgment",
     "Conversation",
     "Turn",
     "TurnCitation",

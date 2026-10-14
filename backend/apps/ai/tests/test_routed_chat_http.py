@@ -157,9 +157,9 @@ def test_count_uses_screened_rows_and_reports_coverage(endpoint, settings, monke
     with use_composition_root(root):
         body = answer(client_for(reader), endpoint, "How many papers about rainfall?")
     assert body["routing"]["lane"] == "count"
-    assert body["listing"]["completeness"] == "screened"
+    assert body["listing"]["completeness"] == "matches_found"
     assert body["listing"]["records"] == [{"record_id": paper.pk, "title": paper.title}]
-    assert "1 matched out of 1 checked; 0 could not be assessed" in body["answer"]
+    assert "1 match among 1 assessed of 1 selected candidate paper, with 0 not assessed" in body["answer"]
 
 
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
@@ -302,14 +302,15 @@ def test_count_totals_do_not_reach_planner_after_permission_change(settings, mon
     monkeypatch.setattr(root, "llm_for", lambda task: Screen() if task == InferenceTask.SCREEN else planner if task == InferenceTask.PLAN else real(task))
     with use_composition_root(root):
         counted = answer(client_for(reader), "ai-ask", "How many papers about rainfall?", conversation_id=conversation.pk)
-        assert "1 matched out of 1 checked" in counted["answer"]
+        assert "1 match among 1 assessed of 1 selected candidate paper" in counted["answer"]
         Record.objects.filter(pk=paper.pk).update(pipeline_status=PipelineStatus.DRAFT)
         route(monkeypatch, "research")
         answer(client_for(reader), "ai-ask", "Investigate pond methods", conversation_id=conversation.pk)
     sent = str(planner.conversation_requests)
-    assert "matched out of" not in sent and "checked;" not in sent
+    assert "match among" not in sent and "selected candidate" not in sent
     replay = client_for(reader).get(reverse("ai-conversation-detail", args=[conversation.pk])).json()["turns"]
-    assert "1 matched out of 1 checked" in replay[0]["answer"]
+    # A reopened count is rebuilt for what the reader can read now: the revoked paper is gone.
+    assert "match among" not in replay[0]["answer"] and paper.title not in str(replay[0])
 
 
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])

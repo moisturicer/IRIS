@@ -20,17 +20,14 @@ from apps.ai.research.context import RunContext
 from apps.ai.research.listing import screen_listing
 from apps.ai.research.planner import ResearchPlanner
 from apps.ai.research.registry import ToolRun
-from apps.ai.research.results import ToolStatus
 from apps.ai.research.tools.common import disclosable, readable_records
 from apps.ai.research.tools.records import _relevant
 from apps.ai.research.schema import ArgumentsRejected
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research import metadata_count
-from apps.ai.research.workflows import topic_count
 from apps.ai.resilience.circuit import CircuitOpen
 
 logger = logging.getLogger(__name__)
-SUCCESS = (ToolStatus.OK, ToolStatus.EMPTY, ToolStatus.DEGRADED)
 
 
 def _empty(text="No readable sources were found for this question."):
@@ -42,31 +39,15 @@ def _unavailable(text="The requested corpus workflow is unavailable right now.",
                           sources=tuple(sources), degraded=True)
 
 
-def _rows(run, evidence, handles):
-    """Recheck both gates and use current database titles, never model titles."""
-    candidates = {e.handle: e for e in evidence}
-    allowed = disclosable(run.ctx, [e.record_id for e in candidates.values()])
-    rows, seen = [], set()
-    for handle in handles:
-        item = candidates.get(handle)
-        if item is None or item.record_id not in allowed or item.record_id in seen:
-            continue
-        record = allowed[item.record_id]
-        if item.record_title != record.title or item.text != record.abstract:
-            continue
-        seen.add(item.record_id)
-        rows.append({"record_id": record.pk, "title": record.title})
-    return rows
-
-
-def _listing_events(run, question):
-    """Preview, screen and describe at most twenty candidates (IR-546).
+def _screened_events(run, question, *, count):
+    """Preview, screen and describe at most twenty candidates (IR-546, IR-547).
 
     Yields the candidate events; returns `(answer, listing)`. The answer text
-    is the listing's wording, written in code. No model writes a sentence here.
+    is the listing's wording, written in code, and a count is the include
+    decisions among those candidates. No model writes a sentence or a number.
     """
     try:
-        outcome = yield from screen_listing(run, question)
+        outcome = yield from screen_listing(run, question, count=count)
     except Exception as exc:
         # Selection or the final read failed: say so, never "nothing found".
         logger.warning("listing failed", extra={"run_id": run.ctx.run_id, "error": type(exc).__name__})
@@ -78,24 +59,17 @@ def _listing_events(run, question):
     return GroundedAnswer(text=text, citations=(), degraded=outcome.degraded), listing
 
 
-def _count(run, question):
+def _listing_events(run, question):
+    return (yield from _screened_events(run, question, count=False))
+
+
+def _count_events(run, question):
     # A metadata inventory question is a database count and uses no model
-    # (IR-543); anything with a topic in it is still screened.
+    # (IR-543); anything with a topic in it is a screened subset count (IR-547).
     metadata = metadata_count.answer(run.ctx, question)
     if metadata is not None:
         return metadata
-    result = topic_count(run, question)
-    if result.status not in SUCCESS:
-        return _unavailable(), None
-    handles = [row["record"] for row in result.detail.get("matches", ())]
-    rows = _rows(run, result.evidence, handles)
-    if len(rows) != result.detail.get("total"):
-        return _unavailable("The readable papers changed during counting. Please try again."), None
-    wording = result.detail["wording"] + " This count is of the records you can see."
-    text = wording
-    return GroundedAnswer(text=text, citations=(), degraded=result.status is ToolStatus.DEGRADED), {
-        "completeness": result.coverage.label.value, "wording": wording, "records": rows,
-    }
+    return (yield from _screened_events(run, question, count=True))
 
 
 def _named_records(ctx, question):
@@ -207,8 +181,9 @@ def lane_events(lane, question, user, *, root, conversation=None, scope_record=N
                 max_sources=8, history_before_turn_id=None, clock=time.monotonic):
     """Run a bounded corpus workflow, yielding what a reader can watch.
 
-    Only a listing yields (its candidates, IR-546); the others return at once.
-    Returns `(answer, listing)`. Research goes through `research_run`.
+    A listing and a topic count yield their candidates (IR-546, IR-547); a
+    comparison returns at once. Returns `(answer, listing)`. Research goes
+    through `research_run`.
     """
     if lane not in ("listing", "count", "comparison"):
         raise ValueError(f"No application workflow for lane {lane!r}")
@@ -216,7 +191,7 @@ def lane_events(lane, question, user, *, root, conversation=None, scope_record=N
                    max_sources=max_sources, history_before_turn_id=history_before_turn_id)
     run = ToolRun.start(ctx, root)
     seconds = ctx.budget.wall_clock_seconds
-    if lane == "listing":
+    if lane in ("listing", "count"):
         seconds = min(seconds, settings.AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS)
     end = clock() + seconds
 
@@ -228,9 +203,9 @@ def lane_events(lane, question, user, *, root, conversation=None, scope_record=N
     try:
         if lane == "listing":
             return (yield from stepwise(_listing_events(run, question), deadline))
+        if lane == "count":
+            return (yield from stepwise(_count_events(run, question), deadline))
         with deadline():
-            if lane == "count":
-                return _count(run, question)
             return _comparison(run, question, max_sources)
     except (LLMUnavailable, CircuitOpen, TimeoutError, ArgumentsRejected, BudgetExhausted):
         return _unavailable(), None
