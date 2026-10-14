@@ -827,10 +827,10 @@ export default function PaperViewPage() {
             className={cn(
               "min-w-0",
               onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
-              // The Overview reads in one column, up to 50rem, set against
+              // The Overview reads in one column, up to 60rem, set against
               // what is beside it (Ask IRIS, or the rail) with the room left
               // over on its left (IR-569).
-              showRail && "w-full max-w-[50rem] justify-self-end",
+              showRail && "w-full max-w-[60rem] justify-self-end",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
