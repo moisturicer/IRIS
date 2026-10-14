@@ -29,6 +29,8 @@ from typing import Callable, ContextManager, Iterator, Optional
 _workload: ContextVar[Optional[str]] = ContextVar("admission_workload", default=None)
 _run: ContextVar[Optional["RunScope"]] = ContextVar("admission_run", default=None)
 _attempt: ContextVar[Optional["AttemptUsage"]] = ContextVar("admission_attempt", default=None)
+_send_guard: ContextVar[Optional[Callable]] = ContextVar("provider_send_guard", default=None)
+_usage_observer: ContextVar[Optional[list]] = ContextVar("provider_usage_observer", default=None)
 
 
 @dataclass
@@ -129,9 +131,33 @@ def attempt_usage(usage: AttemptUsage) -> Iterator[AttemptUsage]:
         _attempt.reset(token)
 
 
-def mark_sent() -> None:
+@contextmanager
+def before_send(guard: Callable) -> Iterator[None]:
+    """A workload's permission/context check immediately before each transport."""
+    token = _send_guard.set(guard)
+    try:
+        yield
+    finally:
+        _send_guard.reset(token)
+
+
+@contextmanager
+def observe_usage() -> Iterator[list[AttemptUsage]]:
+    """Observe current-call response metadata independently of ledger settlement."""
+    reports = []
+    token = _usage_observer.set(reports)
+    try:
+        yield reports
+    finally:
+        _usage_observer.reset(token)
+
+
+def mark_sent(*, model: Optional[str] = None) -> None:
     """Called by an adapter immediately before handing a request to its
     transport. An attempt that ends before this is released, not charged."""
+    guard = _send_guard.get()
+    if guard is not None:
+        guard(model)
     usage = _attempt.get()
     if usage is not None:
         usage.sent = True
@@ -146,6 +172,12 @@ def report_usage(
 ) -> None:
     """What the vendor said the attempt used. Anything left ``None`` is
     charged at its reservation."""
+    observer = _usage_observer.get()
+    if observer is not None:
+        observer.append(AttemptUsage(
+            input_tokens=input_tokens, output_tokens=output_tokens,
+            model=model, cost_usd=cost_usd,
+        ))
     usage = _attempt.get()
     if usage is None:
         return
