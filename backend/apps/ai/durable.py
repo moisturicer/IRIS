@@ -492,6 +492,8 @@ def _frame(event: AskRunEvent, user):
     if event.name == "citations_resolved":
         visible = _visible_ids(user, [c["record_id"] for c in data["citations"]])
         data = {"citations": [c for c in data["citations"] if c["record_id"] in visible]}
+    elif event.name in ("candidates_selected", "candidates_updated"):
+        data = _visible_candidates(user, data)
     elif event.name == "done":
         data = _done(event, user)
         if data is None:
@@ -508,6 +510,20 @@ def _sse(sequence: int, name: str, data: dict) -> str:
 
 def _visible_ids(user, ids) -> set:
     return set(Record.objects.visible_to(user).filter(pk__in=set(ids)).values_list("pk", flat=True))
+
+
+def _visible_candidates(user, data: dict) -> dict:
+    """A candidate event as it reads now: only Records the reader may see, and
+    their current titles. One that is not visible is simply absent (IR-546)."""
+    rows = data["candidates"]
+    titles = dict(
+        Record.objects.visible_to(user)
+        .filter(pk__in={row["record_id"] for row in rows}).values_list("pk", "title")
+    )
+    return {**data, "candidates": [
+        {**row, **({"title": titles[row["record_id"]]} if "title" in row else {})}
+        for row in rows if row["record_id"] in titles
+    ]}
 
 
 def _done(event: AskRunEvent, user):

@@ -59,10 +59,42 @@ export interface MetadataCountBasis {
   unit: string;
 }
 
+/**
+ * A candidate's state in a listing (IR-546). `pending` is only a preview and is
+ * never a match; `unassessed` is a paper that was not judged, never a rejection.
+ */
+export type CandidateState = "pending" | "included" | "excluded" | "uncertain" | "unassessed";
+
+export interface CandidateRow {
+  record_id: number;
+  /** Absent for a paper IRIS may not read: it is counted, never named. */
+  title?: string;
+  state: CandidateState;
+  withheld?: boolean;
+  /** Verbatim text that decided it, and where it came from (final listing only). */
+  quote?: string;
+  source?: { field: "title" | "abstract" | "passage"; page?: number | null; chunk_id?: number };
+}
+
+export interface CandidateCoverage {
+  limit: number;
+  selected: number;
+  included: number;
+  excluded: number;
+  uncertain: number;
+  unassessed: number;
+  more_available: boolean;
+  search_degraded: boolean;
+  changed: boolean;
+}
+
 export interface AnswerListing {
-  completeness: "matches_found" | "screened" | "exact_count";
+  completeness: "matches_found" | "screened" | "exact_count" | "inconclusive";
   wording: string;
   records: { record_id: number; title: string }[];
+  /** Every selected candidate in one state each (IR-546). */
+  candidates?: CandidateRow[];
+  coverage?: CandidateCoverage;
   count?: MetadataCountBasis;
 }
 

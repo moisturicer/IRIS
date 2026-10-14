@@ -481,6 +481,15 @@ AI_SCREEN_MAX_RECORDS = config("AI_SCREEN_MAX_RECORDS", default=500, cast=int)
 AI_SCREEN_BATCH_SIZE = config("AI_SCREEN_BATCH_SIZE", default=20, cast=int)
 AI_SCREEN_TIMEOUT_SECONDS = config("AI_SCREEN_TIMEOUT_SECONDS", default=20.0, cast=float)
 AI_SCREEN_DUPLICATE_MIN_SIMILARITY = config("AI_SCREEN_DUPLICATE_MIN_SIMILARITY", default=0.98, cast=float)
+# IR-546: screening batches in flight at once, passages read for an uncertain
+# paper, and uncertain papers rechecked. Initial pilot values, not measured.
+AI_SCREEN_CONCURRENCY = config("AI_SCREEN_CONCURRENCY", default=3, cast=int)
+AI_SCREEN_RECHECK_PASSAGES = config("AI_SCREEN_RECHECK_PASSAGES", default=2, cast=int)
+AI_SCREEN_RECHECK_MAX_RECORDS = config("AI_SCREEN_RECHECK_MAX_RECORDS", default=5, cast=int)
+# IR-546: hard deadline for an ordinary listing, from the start of its workflow.
+AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS = config(
+    "AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS", default=30.0, cast=float
+)
 
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
