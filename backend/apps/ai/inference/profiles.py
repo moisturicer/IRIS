@@ -21,7 +21,7 @@ none of the per-task variables behaves exactly as it does now.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Optional, Union
 
@@ -92,6 +92,8 @@ class Profile:
     provider_only: tuple[str, ...] = ()
     #: Per-model OpenRouter endpoints, preserving each model's routing policy.
     model_provider_pins: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    #: Operator-verified context windows, in tokens; absence means unknown.
+    model_context_windows: tuple[tuple[str, int], ...] = ()
 
     @property
     def is_configured(self) -> bool:
@@ -150,6 +152,30 @@ def _model_provider_pins(prefix: str) -> tuple[tuple[str, tuple[str, ...]], ...]
             f"{name} must map model names to nonempty provider endpoint lists"
         )
     return tuple((model, tuple(endpoints)) for model, endpoints in pins.items())
+
+
+def _model_context_windows(prefix: str) -> tuple[tuple[str, int], ...]:
+    name = f"{prefix}_CONTEXT_WINDOWS"
+    raw = _setting(name)
+    if not raw:
+        return ()
+    try:
+        windows = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ImproperlyConfigured(
+            f"{name} must be a JSON object of model to positive token counts"
+        ) from exc
+    if not isinstance(windows, dict) or not all(
+        isinstance(model, str)
+        and bool(model.strip())
+        and type(tokens) is int
+        and tokens > 0
+        for model, tokens in windows.items()
+    ):
+        raise ImproperlyConfigured(
+            f"{name} must map model names to positive integer token counts"
+        )
+    return tuple(windows.items())
 
 
 #: The setting *names* a task inherits when its own are unset. Keys, not
@@ -214,6 +240,8 @@ def _inherited_keys(task: InferenceTask) -> tuple[str, str, str]:
 def api_key_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
     """Where ``task``'s key may be set, in the order ``profile_for`` reads them."""
     task = inference_task(task)
+    if task is InferenceTask.BRIEF:
+        return api_key_variables(InferenceTask.ANSWER)
     own = f"{task.settings_prefix}_API_KEY"
     if task in (InferenceTask.ROUTE, InferenceTask.PLAN):
         parent_task = InferenceTask.RESOLVE if task is InferenceTask.ROUTE else InferenceTask.ANSWER
@@ -237,6 +265,8 @@ def model_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
     model does not mean anyone chose one.
     """
     task = inference_task(task)
+    if task is InferenceTask.BRIEF:
+        return model_variables(InferenceTask.ANSWER)
     own = f"{task.settings_prefix}_MODEL"
     if task is InferenceTask.ROUTE:
         return (own, "LLM_RESOLVE_MODEL")
@@ -249,6 +279,8 @@ def model_variables(task: Union[InferenceTask, str]) -> tuple[str, ...]:
 def profile_for(task: Union[InferenceTask, str]) -> Profile:
     """Resolve ``task``'s Profile from settings. Never cached, never eager."""
     task = inference_task(task)
+    if task is InferenceTask.BRIEF:
+        return replace(profile_for(InferenceTask.ANSWER), task=task, reasoning_visible=False)
     prefix = task.settings_prefix
     if task in (InferenceTask.ROUTE, InferenceTask.PLAN):
         parent_task = InferenceTask.RESOLVE if task is InferenceTask.ROUTE else InferenceTask.ANSWER
@@ -309,4 +341,5 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
         # Never inherited: a pin is a choice about one task's model.
         provider_only=_listed(f"{prefix}_PROVIDER_ONLY"),
         model_provider_pins=_model_provider_pins(prefix),
+        model_context_windows=_model_context_windows(prefix),
     )

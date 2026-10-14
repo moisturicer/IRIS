@@ -7,7 +7,10 @@ building the provider it describes only reaches the network inside
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
 from apps.ai.inference import (
     DataPolicy,
@@ -43,6 +46,7 @@ class ClosedTaskSetTests:
     def test_the_set_has_the_named_routing_task(self):
         assert [task.value for task in InferenceTask] == [
             "answer",
+            "brief",
             "resolve",
             "route",
             "plan",
@@ -68,6 +72,33 @@ class ClosedTaskSetTests:
 
 
 class ProfileResolutionTests:
+    def test_brief_inherits_the_complete_answer_profile(self, settings):
+        settings.LLM_ANSWER_VENDOR = "openrouter"
+        settings.LLM_ANSWER_MODEL = "primary"
+        settings.LLM_ANSWER_FALLBACK_MODELS = "fallback"
+        settings.LLM_ANSWER_API_KEY = "answer-key"
+        settings.LLM_ANSWER_REASONING = True
+        settings.LLM_ANSWER_PROVIDER_ONLY = ""
+        settings.LLM_ANSWER_PROVIDER_PINS = '{"primary":["us"],"fallback":["eu"]}'
+        settings.LLM_ANSWER_CONTEXT_WINDOWS = '{"primary":8192,"fallback":4096}'
+        answer = profile_for(InferenceTask.ANSWER)
+        brief = profile_for(InferenceTask.BRIEF)
+        assert brief == replace(answer, task=InferenceTask.BRIEF, reasoning_visible=False)
+        assert dict(brief.model_context_windows) == {"primary": 8192, "fallback": 4096}
+        assert api_key_variables("brief") == api_key_variables("answer")
+        assert model_variables("brief") == model_variables("answer")
+
+    @pytest.mark.parametrize("raw", ["[]", '{"m":true}', '{"m":0}', '{"m":-1}',
+                                     '{"m":1.5}', '{"":100}', "invalid"])
+    def test_context_windows_refuse_invalid_operator_configuration(self, settings, raw):
+        settings.LLM_ANSWER_CONTEXT_WINDOWS = raw
+        with pytest.raises(ImproperlyConfigured, match="LLM_ANSWER_CONTEXT_WINDOWS"):
+            profile_for(InferenceTask.BRIEF)
+
+    def test_unknown_context_windows_are_not_guessed(self, settings):
+        settings.LLM_ANSWER_CONTEXT_WINDOWS = ""
+        assert profile_for(InferenceTask.BRIEF).model_context_windows == ()
+
     def test_a_profile_carries_everything_a_task_needs(self, settings):
         settings.LLM_ANSWER_VENDOR = "openrouter"
         settings.LLM_ANSWER_MODEL = "primary-model"
@@ -222,6 +253,23 @@ class WhereASettingMayBeSetTests:
 
 
 class BuildingTheProviderTests:
+    def test_brief_caps_each_fallback_without_capping_answer(self, settings, monkeypatch):
+        from apps.ai.inference import providers
+
+        settings.LLM_ANSWER_VENDOR = "groq"
+        settings.LLM_ANSWER_MODEL = "primary"
+        settings.LLM_ANSWER_FALLBACK_MODELS = "fallback"
+        settings.LLM_ANSWER_PROVIDER_PINS = ""
+        monkeypatch.setattr(providers, "build_task_llm", lambda configs, breaker_key: (configs, breaker_key))
+        configs, breaker = build_profile_llm(profile_for(InferenceTask.BRIEF))
+        assert len(configs) == 2
+        assert all(config.max_tokens == providers.BRIEF_OUTPUT_TOKENS for config in configs)
+        assert all(config.lane == "research" and config.reasoning_effort == "" for config in configs)
+        assert breaker == InferenceTask.BRIEF.breaker_key
+        answer, answer_breaker = build_profile_llm(profile_for(InferenceTask.ANSWER))
+        assert all(config.max_tokens is None for config in answer)
+        assert answer_breaker != breaker
+
     def test_one_model_builds_the_same_resilient_provider_as_before(self, settings):
         settings.LLM_ANSWER_MODEL = "only-model"
         settings.LLM_ANSWER_API_KEY = "k"

@@ -269,6 +269,16 @@ class StartupTests:
             timeout=180,
         )
 
+    def test_manage_py_check_refuses_independent_brief_configuration(self):
+        result = self._check(LLM_BRIEF_MODEL="some-model")
+        assert result.returncode != 0
+        assert "cannot configure brief independently" in result.stderr + result.stdout
+
+    def test_manage_py_check_validates_context_windows(self):
+        result = self._check(LLM_ANSWER_CONTEXT_WINDOWS='{"model":true}')
+        assert result.returncode != 0
+        assert "LLM_ANSWER_CONTEXT_WINDOWS" in result.stderr + result.stdout
+
     def test_manage_py_check_refuses_a_configured_task_with_no_key(self):
         """CI catches it without booting a server."""
         result = self._check(LLM_SUMMARY_MODEL="some-model", LLM_SUMMARY_API_KEY="")

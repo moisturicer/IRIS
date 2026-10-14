@@ -11,8 +11,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import (
-    AdviserProfile, Course, Role, StudentProfile, User,
+    AdviserProfile, Course, Role, RoleRequest, StudentProfile, User,
 )
+from core.enums import RequestStatus
 
 
 def make_user(email, role_name=None, **extra):
@@ -144,3 +145,103 @@ class AffiliationDisplayTests(APITestCase):
 
         self.client.patch(self.url, {"college_name": "Somewhere Else"}, format="json")
         self.assertEqual(self.client.get(self.url).data["college_name"], self.college.name)
+
+
+class OwnRoleRequestTests(APITestCase):
+    """
+    `role_request` on `/users/me/` (IR-537) is what lets the pending screen tell
+    an applicant still waiting from one RDCO has declined. Before it, both saw
+    "Account Pending Approval" indefinitely.
+    """
+
+    def setUp(self):
+        self.url     = reverse("user-me")
+        self.student = Role.objects.get_or_create(name="Student")[0]
+
+    def _file_request(self, user, status_=RequestStatus.PENDING, role=None):
+        return RoleRequest.objects.create(
+            user=user, requested_role=role or self.student, status=status_,
+        )
+
+    def _role_request(self, user):
+        self.client.force_authenticate(user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["role_request"]
+
+    def test_pending_request_reports_pending_and_the_role(self):
+        applicant = make_user("applicant@cit.edu")
+        self._file_request(applicant)
+
+        self.assertEqual(
+            self._role_request(applicant),
+            {"status": "pending", "requested_role": "Student"},
+        )
+
+    def test_declined_request_reports_declined(self):
+        applicant = make_user("declined@cit.edu")
+        self._file_request(applicant, RequestStatus.DECLINED)
+
+        self.assertEqual(
+            self._role_request(applicant),
+            {"status": "declined", "requested_role": "Student"},
+        )
+
+    def test_the_latest_request_is_the_one_reported(self):
+        applicant = make_user("twice@cit.edu")
+        adviser   = Role.objects.get_or_create(name="Adviser")[0]
+        self._file_request(applicant, RequestStatus.DECLINED)
+        self._file_request(applicant, RequestStatus.PENDING, role=adviser)
+
+        self.assertEqual(
+            self._role_request(applicant),
+            {"status": "pending", "requested_role": "Adviser"},
+        )
+
+    def test_user_with_an_approved_role_gets_null(self):
+        member = make_user("member@cit.edu", "Student")
+        self._file_request(member, RequestStatus.APPROVED)
+
+        self.assertIsNone(self._role_request(member))
+
+    def test_user_with_a_role_gets_null_even_beside_an_older_pending_request(self):
+        member = make_user("assigned@cit.edu", "Student")
+        self._file_request(member, RequestStatus.PENDING)
+
+        self.assertIsNone(self._role_request(member))
+
+    def test_user_with_no_request_gets_null(self):
+        self.assertIsNone(self._role_request(make_user("norequest@cit.edu")))
+
+    def test_sign_in_carries_it_too(self):
+        applicant = make_user("signin@cit.edu")
+        self._file_request(applicant)
+
+        response = self.client.post(
+            reverse("auth-login"),
+            {"email": "signin@cit.edu", "password": "pw12345!"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["user"]["role_request"],
+            {"status": "pending", "requested_role": "Student"},
+        )
+
+    def test_the_field_cannot_be_written(self):
+        applicant = make_user("writer@cit.edu")
+        request   = self._file_request(applicant, RequestStatus.DECLINED)
+        self.client.force_authenticate(applicant)
+
+        response = self.client.patch(
+            self.url,
+            {"role_request": {"status": "pending", "requested_role": "RDCO"}},
+            format="json",
+        )
+        request.refresh_from_db()
+        self.assertEqual(request.status, RequestStatus.DECLINED)
+        self.assertEqual(request.requested_role, self.student)
+        self.assertEqual(
+            response.data["role_request"],
+            {"status": "declined", "requested_role": "Student"},
+        )
