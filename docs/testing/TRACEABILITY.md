@@ -974,3 +974,32 @@ behaviour is unmeasured. `Turn.reasoning` keeps IR-381's policy and no historica
 carries none.
 
 **Status:** implemented and tested; human review and approval remain required, as does ADR-040's acceptance.
+
+
+### IR-549 / PR #271: integration and CI repair — 14 October 2026
+
+Merged `main` through `ae4f794`, retaining IR-548's owned cancellation/retry
+flow and IR-549's comparison budget snapshot. Initial and retried comparisons
+use the comparison deadline; their admission scope retains both the ceiling
+and the cancellation check. Migration `0029` joins the two independent AI
+migration branches without rewriting either branch's migrations.
+
+The three proposal-visibility CI failures were reproduced with rolled-back
+vectors still occupying HNSW's search graph: the real retrieval path returned
+no passages despite readable indexed fixtures. Transactionally clearing the
+Record and chunk embedding tables before this class seeds its fixtures gives
+it fresh real indexes, following the existing index-recall tests. The same
+forced-index reproduction changed from **3 failed** to **3 passed**; all
+positive and negative authorization assertions remain intact. This is a
+fixture-isolation correction, not a retrieval-policy change.
+
+Comparison, durable-run and proposal-visibility integration tests: **69 passed**,
+including cancellation blocking new provider attempts and retry retaining the
+comparison ceiling/deadline before publishing exactly one Turn. Focused
+frontend API, table, streaming and owned-conversation tests: **64 passed**;
+build/typecheck and lint pass (six existing warnings). Static backend checks,
+Django configuration and migration consistency pass (existing axes warning).
+The joined migration graph preserves twelve populated legacy Turns, an
+existing queued run and existing reservation charges. Independent focused
+Standards and Spec reviews found no material blockers. These checks do not
+replace human approval, labelled quality evaluation or rollout approval.
