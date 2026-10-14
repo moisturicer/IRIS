@@ -35,6 +35,14 @@ describe("a finished message's inline citations", () => {
     expect(chip.textContent).toBe("1");
   });
 
+  it("reads a page marker as the page, 'p4', in the AI Overview's form (IR-569)", () => {
+    renderScreen(<CitationText text="Rainfall gauges feed the model [4]." citations={[{ ...citation, marker: 4 }]} pageMarkers />);
+
+    const chip = screen.getByRole("link", { name: /at page 4/i });
+    expect(chip.textContent).toBe("p4");
+    expect(chip.getAttribute("href")).toBe("/records/7?page=4");
+  });
+
   it("renders an out-of-range marker as nothing, with no dangling chip", () => {
     renderScreen(<CitationText text="Rainfall gauges feed the model [7]." citations={[citation]} />);
 

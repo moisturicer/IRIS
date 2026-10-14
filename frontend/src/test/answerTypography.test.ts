@@ -141,7 +141,9 @@ describe("answer markdown typography", () => {
   it("sizes the chat column by the viewport, never a fixed width", () => {
     expect(CHAT_COLUMN).toContain("vw");
     expect(CHAT_COLUMN).not.toMatch(/\d+px/);
-    expect(OVERVIEW_MARKDOWN).not.toContain("max-w-none");
+    // The Overview fills the column its page sets (IR-569), not a cap of its own.
+    expect(OVERVIEW_MARKDOWN).toContain("max-w-none");
+    expect(OVERVIEW_MARKDOWN).not.toMatch(/max-w-\[\d+ch\]/);
   });
 
   it.each(Object.entries(sources))("%s uses the shared markdown class", (_file, source) => {

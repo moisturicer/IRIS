@@ -36,6 +36,23 @@ const shelfRise = plugin(({ addBase, addComponents }) => {
   });
 });
 
+/**
+ * The record page's workspace tiers (IR-569): container queries on the
+ * `reading` container, so the layout follows the content width, not the
+ * window. `paneLayout.ts` holds the same numbers for React.
+ */
+export const readingVariants = {
+  "reading-split": "@container reading (min-width: 640px)",
+  "reading-wide": "@container reading (min-width: 1000px)",
+  // The Overview's own column, which Ask IRIS narrows when it sits beside it:
+  // the record details sit beside the page only while there is room for both.
+  "overview-wide": "@container overview (min-width: 64rem)",
+};
+
+const readingTiers = plugin(({ addVariant }) => {
+  for (const [name, query] of Object.entries(readingVariants)) addVariant(name, query);
+});
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -282,8 +299,14 @@ export default {
           "0%":   { backgroundColor: "rgb(252 211 77 / 0.75)" },
           "100%": { backgroundColor: "rgb(252 211 77 / 0.35)" },
         },
+        // Ask IRIS arriving from the edge it is docked to (IR-569).
+        "panel-in": {
+          "0%":   { opacity: "0", transform: "translateX(1.5rem)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
       },
       animation: {
+        "panel-in": "panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "fade-in-up": "fade-in-up 0.3s ease-out",
         "fade-in":    "fade-in 0.2s ease-out",
         "citation-flash": "citation-flash 1.6s ease-out",
@@ -297,5 +320,6 @@ export default {
     // list and table. @tailwindcss/forms is still not needed.
     typography,
     shelfRise,
+    readingTiers,
   ],
 };

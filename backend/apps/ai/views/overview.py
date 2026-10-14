@@ -4,12 +4,21 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai.overview import overview_for
 from apps.records.models import Record
 
-from .chatbot import AIQueryThrottle
+
+class AIOverviewThrottle(UserRateThrottle):
+    """
+    A cached read and its polling, not a paid question: it must not draw on
+    `ai_query`, which bounds Ask IRIS. Opening sixty records used to lock a
+    reader out of both (IR-569). Generation stays one claim per record.
+    """
+
+    scope = "ai_overview"
 
 
 class RecordOverviewView(APIView):
@@ -33,7 +42,7 @@ class RecordOverviewView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIQueryThrottle]
+    throttle_classes = [AIOverviewThrottle]
 
     def get(self, request, pk: int):
         record = get_object_or_404(Record.objects.visible_to(request.user), pk=pk)

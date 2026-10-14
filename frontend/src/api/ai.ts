@@ -198,19 +198,18 @@ export const aiApi = {
     remove: (id: number) => apiClient.delete(`/ai/conversations/${id}/`),
 
     /**
-     * The Conversation already scoped to this Record, or a new one if none
-     * exists yet — what Paper Chat opens on (IR-298). Kept next to the calls
-     * it composes rather than in the component, so the "find one, else start
-     * one" decision lives with the data it is about.
+     * The Conversation already scoped to this Record, or null -- what Paper
+     * Chat opens on (IR-298). Opening never starts one (IR-569): Paper Chat
+     * creates it with the first question.
      */
-    findOrCreateForRecord: async (recordId: number): Promise<{ data: ConversationDetail }> => {
+    findForRecord: async (recordId: number): Promise<ConversationDetail | null> => {
       const { data: existing } = await apiClient.get<ConversationSummary[]>(
         "/ai/conversations/",
         { params: { record: recordId } },
       );
-      return existing[0]
-        ? apiClient.get<ConversationDetail>(`/ai/conversations/${existing[0].id}/`)
-        : createConversation({ record: recordId });
+      if (!existing[0]) return null;
+      const { data } = await apiClient.get<ConversationDetail>(`/ai/conversations/${existing[0].id}/`);
+      return data;
     },
   },
 };

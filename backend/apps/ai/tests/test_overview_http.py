@@ -398,3 +398,15 @@ class VisibilityTests:
             response = _overview(client_for(stranger), record.pk)
 
         assert response.status_code == 404
+
+
+class OverviewThrottleTests:
+    """Opening records must not spend Ask IRIS's question budget (IR-569)."""
+
+    def test_the_overview_has_a_budget_of_its_own(self, settings):
+        from apps.ai.views.overview import RecordOverviewView
+
+        scopes = {throttle.scope for throttle in RecordOverviewView.throttle_classes}
+
+        assert scopes == {"ai_overview"}
+        assert "ai_overview" in settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]

@@ -16,7 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { act, renderScreen, screen, waitFor } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor } from "@/test/render";
 import type { Citation, RecordOverviewResponse } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 
@@ -97,6 +97,53 @@ describe("the AI overview on a paper", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Methodology" })).toBeTruthy();
   });
 
+  it("sits on the page under a heading, with no card around it (IR-569)", async () => {
+    renderScreen(<PaperAiOverview record={record} />);
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "AI Overview" });
+    const section = heading.closest("section");
+    expect(section).not.toBeNull();
+    for (const card of ["bg-white", "ring-1", "rounded-2xl", "shadow-card", "border-t-2"]) {
+      expect(section).not.toHaveClass(card);
+    }
+  });
+
+  it("carries no label about how it was made (IR-569)", async () => {
+    renderScreen(<PaperAiOverview record={record} />);
+    await screen.findByRole("heading", { level: 2, name: "Methodology" });
+
+    expect(screen.queryByText(/RAG-indexed/i)).not.toBeInTheDocument();
+  });
+
+  it("copies the overview as prose, without its page markers, and says so", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderScreen(<PaperAiOverview record={record} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Copy" }));
+
+    expect(writeText).toHaveBeenCalledWith("## Methodology\n\nThe work trains a convolutional network on gauge data.");
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
+  });
+
+  it("says when it could not copy, rather than failing silently", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn(() => Promise.reject(new Error("no permission"))) },
+      configurable: true,
+    });
+    renderScreen(<PaperAiOverview record={record} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Copy" }));
+
+    expect(await screen.findByRole("button", { name: /couldn.t copy/i })).toBeInTheDocument();
+  });
+
+  it("names a cited page as the page, 'p12'", async () => {
+    renderScreen(<PaperAiOverview record={record} />);
+
+    expect((await screen.findByRole("link", { name: /at page 12/i })).textContent).toBe("p12");
+  });
+
   it("offers the cited passage as a link into the paper at that page", async () => {
     renderScreen(<PaperAiOverview record={record} />);
 
@@ -133,6 +180,14 @@ describe("the AI overview on a paper", () => {
 
     expect(await screen.findByText(/AI overview unavailable/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Try again/i })).toBeTruthy();
+  });
+
+  it("says it is busy, not down, when the request limit is reached", async () => {
+    overview.mockRejectedValue({ response: { status: 429 } });
+    renderScreen(<PaperAiOverview record={record} />);
+
+    expect(await screen.findByText("AI overview is busy")).toBeTruthy();
+    expect(screen.queryByText(/could not reach the answering service/i)).toBeNull();
   });
 
   it("has no serious or critical accessibility violations", async () => {

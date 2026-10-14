@@ -6,7 +6,7 @@ import { NotificationBell } from "./NotificationBell";
 import { PageContainer } from "./PageContainer";
 import { Button } from "@/components/ui/Button";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { useUIStore } from "@/store/ui.store";
+import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
@@ -48,13 +48,15 @@ const PhoneBar = forwardRef<HTMLButtonElement>(function PhoneBar(_props, menuBut
 
 export function AppShell() {
   const sidebarOpen  = useUIStore((s) => s.sidebarOpen);
-  const collapsed    = useUIStore((s) => s.sidebarCollapsed);
+  const collapsed    = useUIStore(selectSidebarCollapsed);
   const closeSidebar = useUIStore((s) => s.closeSidebar);
   const { pathname } = useLocation();
   // Routes that paint their own page and manage their own scrolling.
   // Ask IRIS is `/ai` and every conversation address under it (IR-548).
   const isAskIris = pathname === ASK_PATH || pathname.startsWith(`${ASK_PATH}/`);
-  const isFullBleed = pathname === "/" || isAskIris;
+  // A record lays out its own bar and workspace (IR-569).
+  const isRecord = /^\/records\/\d+\/?$/.test(pathname);
+  const isFullBleed = pathname === "/" || isAskIris || isRecord;
   // Ask IRIS fills the window exactly (`h-screen`) and its toolbar carries the
   // bell on a phone, so a bar above it would push the composer off screen.
   const showPhoneBar = !isAskIris;
