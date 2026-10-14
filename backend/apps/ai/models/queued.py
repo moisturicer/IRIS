@@ -28,9 +28,15 @@ SUCCEEDED = "succeeded"
 PARTIAL = "partial"
 FAILED = "failed"
 EXPIRED = "expired"
-TERMINAL_STATES = frozenset({SUCCEEDED, PARTIAL, FAILED, EXPIRED})
+#: The asker stopped it (IR-548). No Turn, and nothing written after.
+CANCELLED = "cancelled"
+TERMINAL_STATES = frozenset({SUCCEEDED, PARTIAL, FAILED, EXPIRED, CANCELLED})
+#: Ended without the answer it was asked for, so the asker may retry it.
+RETRYABLE_STATES = frozenset({PARTIAL, FAILED, EXPIRED, CANCELLED})
 
-_RUN_STATES = [(s, s.title()) for s in (QUEUED, RUNNING, SUCCEEDED, PARTIAL, FAILED, EXPIRED)]
+_RUN_STATES = [
+    (s, s.title()) for s in (QUEUED, RUNNING, SUCCEEDED, PARTIAL, FAILED, EXPIRED, CANCELLED)
+]
 
 
 class AskRunQuerySet(models.QuerySet):
@@ -65,6 +71,11 @@ class AskRun(models.Model):
     #: A code: the Turn's state, or why the run ended without one.
     end_reason = models.CharField(max_length=32, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
+    #: The run this one retries (IR-548). One-to-one, so asking to retry the
+    #: same run twice finds the first retry instead of starting another.
+    retry_of = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="retry"
+    )
 
     objects = AskRunQuerySet.as_manager()
 

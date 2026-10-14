@@ -478,6 +478,81 @@ class RunStreamView(APIView):
         return EventStreamResponse(durable.follow(pk, request.user, after=after))
 
 
+class RunCancelView(APIView):
+    """
+    POST /api/v1/ai/ask/runs/<uuid>/cancel/
+
+    Stop the asker's queued question (IR-548). 200 with ``cancelled`` once it
+    is, or if it already was; 409 with the state it ended in when it had
+    already finished. Someone else's run is a 404 identical to a missing one.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from apps.ai import durable
+
+        run = durable.cancel(pk, request.user)
+        if run is None:
+            raise Http404
+        body = {"run_id": str(run.pk), "state": run.state}
+        return Response(body, status=200 if run.state == "cancelled" else status.HTTP_409_CONFLICT)
+
+
+class RunRetryView(APIView):
+    """
+    POST /api/v1/ai/ask/runs/<uuid>/retry/
+
+    Ask a run's question again as a new, linked run (IR-548): 201 with its
+    id, which `RunStreamView` follows from the start. Repeating the request
+    returns that same run with 200 instead of starting another. 409 while the
+    run has not ended, once it ended with its answer, or while another run in
+    its Conversation is unfinished; 503 when the queue is full.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AIQueryThrottle]
+
+    def post(self, request, pk):
+        from apps.ai import durable
+        from apps.ai.models import AskRun
+
+        if not durable.enabled():
+            if not AskRun.objects.owned_by(request.user).filter(pk=pk).exists():
+                raise Http404
+            return Response(
+                {"detail": "Queued questions are switched off; ask the question again."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            result = durable.retry(pk, request.user)
+        except durable.NotRetryable as refused:
+            return Response(
+                {"detail": "Only a question that ended without its answer can be retried.",
+                 "run_id": str(pk), "state": refused.state},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except durable.Busy as busy:
+            return Response(
+                {"detail": "IRIS is busy answering other questions. Please try again shortly.",
+                 "status": "busy", "reason": busy.reason},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                headers={"Retry-After": "5"},
+            )
+        if result is None:
+            if not AskRun.objects.owned_by(request.user).filter(pk=pk).exists():
+                raise Http404
+            return Response(
+                {"detail": "IRIS is still answering another question in this conversation."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        run, created = result
+        return Response(
+            {"run_id": str(run.pk), "retry_of": str(run.retry_of_id), "state": run.state},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
 class SemanticSearchView(APIView):
     """
     POST /api/v1/ai/search/

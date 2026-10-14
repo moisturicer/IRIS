@@ -53,3 +53,43 @@ The ticket constrains the shape: reuse the existing event stream and parser, wit
 - Whether `Turn.reasoning` keeps being written. IR-381 stands until a recorded policy changes it, and there is no bulk deletion of historical reasoning.
 - Queue sizing and enablement (pilot README §6).
 - Real-provider throughput. Only deterministic fakes have exercised this.
+
+## Amendment — IR-548: cancel, retry and conversation addresses (Proposed, 2026-10-14)
+
+**Context.** A reader who opens a conversation directly, refreshes it or goes Back needs to land on the same run's
+progress. They also need to stop a question they no longer want, and to ask one again when it ended without an
+answer. Retry must not be confused with redelivery, which this ADR already makes safe and which must never reset a
+budget.
+
+**Decision.**
+
+12. **Cancel is a terminal state.** `cancelled` joins the terminal states, carries no Turn and is journaled as
+    `run_cancelled`. `POST /ask/runs/<uuid>/cancel/` takes the Conversation's lock and then the run's, the order a
+    finishing attempt takes (§5), so a cancel and a final Turn cannot both commit. Whichever commits first wins. A
+    cancel after completion is a 409 naming the state it ended in; a second cancel changes nothing.
+13. **Nothing after a cancel is heard.** The fenced writes of §4 refuse the attempt, so no later event, partial Turn
+    or whole Turn is written. The run's admission scope asks before every provider attempt whether its run was
+    cancelled, and refuses with the sticky reason `run_cancelled`. A call already sent finishes and is charged; it is
+    not interrupted.
+14. **Retry is a new run, linked.** `POST /ask/runs/<uuid>/retry/` accepts a run that ended without its answer
+    (`partial`, `failed`, `expired`, `cancelled`). It creates a new `AskRun` with `retry_of` (one-to-one) pointing at
+    the original, the same validated request, a new deadline, its own per-run caps (`ask:<new id>`) and the same queue
+    admission, one-run-per-Conversation rule (409) and busy refusal (503) as a new question. The original keeps its
+    state. Asking to retry the same run again returns that retry (200) and never starts a third. The shared campaign is
+    untouched: retry spends from it like any question.
+15. **The conversation names its unfinished run.** The Conversation detail carries `latest_run` while no Turn shows for
+    the latest run: still `queued`/`running`, or ended without an answer. A client opening the conversation follows it
+    from event 0, through the same re-authorising replay as §8.
+16. **Addresses grant nothing.** The interface gives every conversation its own address. Opening it goes through the
+    owner-scoped API, so a foreign, missing or deleted conversation is the same "not available".
+
+**Consequences.**
+
+- Gains: a reader can stop paying attention to, and stop spending on, a question they abandoned. A failed question
+  can be asked again in one action. A link, a refresh and Back all reach the same progress.
+- Costs: each provider admission inside a queued run adds one indexed read of the run's state. A cancel does not save
+  the cost of a call already in flight. A retried question is a second run and, if it succeeds, its Turn is the only
+  one; the original's journal stays for replay. Paper Chat does not re-attach to an unfinished run when its panel
+  opens; the same conversation at its Ask IRIS address does.
+- Not decided: whether a cancelled run should keep a partial Turn. It does not, because the reader's cancel says they
+  do not want the answer.

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { useUIStore } from "@/store/ui.store";
 import { cn } from "@/lib/utils";
+import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
@@ -29,7 +30,8 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
     <li>
       <NavLink
         to={item.to}
-        end
+        // Ask IRIS stays current on its conversation addresses (IR-548).
+        end={item.to !== ASK_PATH}
         onClick={onNavigate}
         // A tooltip for the rail. Not the accessible name: the label below
         // stays in the tree as `sr-only` while it is visually hidden.

@@ -38,6 +38,16 @@ reopened transcript gets.
 is unfinished is refused (409) rather than answered against a history that
 lacks the earlier Turn.
 
+**Cancel and retry (IR-548).** The asker may cancel an unfinished run. That
+commits its one terminal state, `cancelled`, under the same locks a finishing
+attempt takes, so whichever commits first wins and the other is refused.
+After it the attempt can write nothing -- no event, no Turn, partial or
+whole -- and its run scope admits no new provider attempt. A call already
+sent is left to finish and is charged. A run that ended without its answer
+may be retried: a new run linked by `retry_of`, with its own deadline, its
+own per-run caps and the queue admission any new question meets. It is not a
+redelivery. Asking to retry the same run again returns the first retry.
+
 **Off by default** (`AI_DURABLE_ASK`), and Django refuses to start with it on
 unless provider admission is enforced (IR-545, ADR-041).
 
@@ -83,7 +93,9 @@ from apps.ai.models import (
     ResearchRun,
     Turn,
 )
-from apps.ai.models.queued import EXPIRED, FAILED, PARTIAL, QUEUED, RUNNING, SUCCEEDED
+from apps.ai.models.queued import (
+    CANCELLED, EXPIRED, FAILED, PARTIAL, QUEUED, RETRYABLE_STATES, RUNNING, SUCCEEDED,
+)
 from apps.ai.orchestrator import ChatOrchestrator
 from apps.ai.providers.deadline import model_call_deadline
 from apps.records.models import Record
@@ -111,6 +123,14 @@ _BATCH = 100
 
 class StaleAttempt(Exception):
     """This attempt no longer owns the run: superseded, finished or deleted."""
+
+
+class NotRetryable(Exception):
+    """The run has not ended, or ended with its answer. ``state`` is public."""
+
+    def __init__(self, state: str) -> None:
+        super().__init__(state)
+        self.state = state
 
 
 class Busy(Exception):
@@ -155,24 +175,97 @@ def submit(prepared, user, data, *, max_sources: int):
     """
     request = {key: data[key] for key in REQUEST_FIELDS if key in data}
     request.update(conversation_id=prepared.conversation.pk, top_k=max_sources)
-    deadline = timezone.now() + timedelta(seconds=settings.AI_DURABLE_ASK_DEADLINE_SECONDS)
     with transaction.atomic():
         # The Conversation, then its runs: the order finishing a run takes.
         Conversation.objects.select_for_update().filter(pk=prepared.conversation.pk).first()
-        busy = AskRun.objects.select_for_update().filter(
-            conversation=prepared.conversation, state__in=(QUEUED, RUNNING),
-        )
-        if any(not _expire_overdue(run) for run in busy):
+        return _queue(user, prepared.conversation.pk, request)
+
+
+def retry(run_id, user):
+    """``(run, created)``: a new run asking ``run_id``'s question again, or
+    the retry it already has. ``None`` when the run is not the asker's (or is
+    gone), or while another run in its Conversation is unfinished.
+
+    Raises `NotRetryable` unless the run ended without its answer, and `Busy`
+    as any new question would. The worker prepares the request again as the
+    asker, so a Conversation or override Turn they lost fails the retry.
+    """
+    original = AskRun.objects.owned_by(user).filter(pk=run_id).first()
+    if original is None:
+        return None
+    with transaction.atomic():
+        Conversation.objects.select_for_update().filter(pk=original.conversation_id).first()
+        original = AskRun.objects.owned_by(user).select_for_update().filter(pk=run_id).first()
+        if original is None:
             return None
-        _admit_to_queue(user)
-        run = AskRun.objects.create(
-            user=user, conversation=prepared.conversation, request=request, deadline_at=deadline,
-        )
-        _append(run, None, "run_queued", {
-            "run_id": str(run.pk), "state": QUEUED, "deadline_at": deadline.isoformat(),
-        })
-        transaction.on_commit(lambda: _dispatch(run.pk))
+        existing = AskRun.objects.filter(retry_of=original).first()
+        if existing is not None:
+            return existing, False
+        if original.state not in RETRYABLE_STATES:
+            raise NotRetryable(original.state)
+        run = _queue(user, original.conversation_id, original.request, retry_of=original)
+    return (run, True) if run is not None else None
+
+
+def _queue(user, conversation_id, request: dict, *, retry_of=None):
+    """Create a run and its `run_queued` event, dispatched once committed;
+    ``None`` while the Conversation has an unfinished run. The caller holds
+    the Conversation's lock."""
+    busy = AskRun.objects.select_for_update().filter(
+        conversation_id=conversation_id, state__in=(QUEUED, RUNNING),
+    )
+    if any(not _expire_overdue(run) for run in busy):
+        return None
+    _admit_to_queue(user)
+    deadline = timezone.now() + timedelta(seconds=settings.AI_DURABLE_ASK_DEADLINE_SECONDS)
+    run = AskRun.objects.create(
+        user=user, conversation_id=conversation_id, request=request, deadline_at=deadline,
+        retry_of=retry_of,
+    )
+    _append(run, None, "run_queued", {
+        "run_id": str(run.pk), "state": QUEUED, "deadline_at": deadline.isoformat(),
+        "retry_of": str(retry_of.pk) if retry_of is not None else None,
+    })
+    transaction.on_commit(lambda: _dispatch(run.pk))
     return run
+
+
+def cancel(run_id, user):
+    """End the asker's unfinished run as `cancelled`. Returns the run as it
+    now stands -- already terminal, it is unchanged -- or ``None`` when it is
+    not the asker's or is gone.
+
+    Takes the Conversation's lock and then the run's, the order a finishing
+    attempt takes, so a cancel and a final Turn cannot both commit."""
+    run = AskRun.objects.owned_by(user).filter(pk=run_id).first()
+    if run is None:
+        return None
+    with transaction.atomic():
+        Conversation.objects.select_for_update().filter(pk=run.conversation_id).first()
+        run = AskRun.objects.owned_by(user).select_for_update().filter(pk=run_id).first()
+        if run is not None and not run.is_terminal:
+            _end(run, CANCELLED, "cancelled", event=("run_cancelled", {
+                "run_id": str(run.pk), "state": CANCELLED, "reason": "cancelled",
+            }))
+    return run
+
+
+def latest_run_for_reader(conversation):
+    """The Conversation's latest run while it has no Turn to show for it:
+    unfinished, or ended without an answer. ``None`` once its Turn is in the
+    transcript. What a reader opening the Conversation needs to follow the
+    run again, or to see that it stopped and retry it."""
+    run = conversation.ask_runs.order_by("-created_at").first()
+    if run is None or run.state in (SUCCEEDED, PARTIAL):
+        return None
+    return {
+        "id": str(run.pk),
+        "state": run.state,
+        "end_reason": run.end_reason,
+        "question": run.request.get("question", ""),
+        "retry_of": str(run.retry_of_id) if run.retry_of_id else None,
+        "last_sequence": run.last_sequence,
+    }
 
 
 def _admit_to_queue(user) -> None:
@@ -409,9 +502,18 @@ def _answer(attempt: AskRunAttempt) -> None:
     # is charged to the run's own budget and bounded by the time left until
     # the deadline fixed at submission (IR-545). A redelivery opens the same
     # run key and the same deadline; neither is reset.
-    with admission_scope.run(admission_scope.new_run(f"ask:{run.pk}")), \
+    with admission_scope.run(run_scope(run)), \
             model_call_deadline(max(0.0, left)):
         _answer_run(attempt, run)
+
+
+def run_scope(run: AskRun) -> admission_scope.RunScope:
+    """The admission scope a run's provider attempts are charged to, halted
+    once the run is cancelled (IR-548)."""
+    pk = run.pk
+    return admission_scope.RunScope(
+        f"ask:{pk}", halted=lambda: AskRun.objects.filter(pk=pk, state=CANCELLED).exists(),
+    )
 
 
 def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:

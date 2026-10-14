@@ -4,7 +4,7 @@ import { routingFixture } from "@/test/routingFixture";
  *
  * Chat history used to live in browser storage and every question glued the
  * whole prior transcript onto itself before sending it. Both are gone: this
- * asserts the replacement — the page reads and writes Conversations through
+ * asserts the replacement â€” the page reads and writes Conversations through
  * the API, a question is sent as itself, and a reader whose old chats
  * vanished is told why rather than left to wonder.
  *
@@ -12,9 +12,9 @@ import { routingFixture } from "@/test/routingFixture";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useLocation } from "react-router-dom";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
-import type { AIAnswer, AIStatus, ConversationDetail, ConversationSummary } from "@/types/ai";
+import type { AIAnswer, AIStatus, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
 
 import RAGChatPage from "./RAGChatPage";
 
@@ -51,6 +51,9 @@ const get = vi.fn();
 const create = vi.fn();
 const remove = vi.fn();
 const askStream = vi.fn();
+const resumeAskRun = vi.fn();
+const cancelRun = vi.fn();
+const retryRun = vi.fn();
 const status = vi.fn();
 const classifications = vi.fn();
 
@@ -63,6 +66,9 @@ vi.mock("@/api/ai", () => ({
       remove: (...args: unknown[]) => remove(...(args as [])),
     },
     askStream: (...args: unknown[]) => askStream(...(args as [])),
+    resumeAskRun: (...args: unknown[]) => resumeAskRun(...(args as [])),
+    cancelRun: (...args: unknown[]) => cancelRun(...(args as [])),
+    retryRun: (...args: unknown[]) => retryRun(...(args as [])),
     status:    (...args: unknown[]) => status(...(args as [])),
   },
 }));
@@ -163,6 +169,9 @@ describe("persisted conversations", () => {
 
   it("removes a conversation and falls back to what remains", async () => {
     list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    // The server answers for the conversation it was asked for (IR-548: the
+    // page now shows the id the server returns, not the one it asked for).
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
     remove.mockResolvedValue({});
 
     renderScreen(<RAGChatPage />);
@@ -218,7 +227,7 @@ it("reruns an old answer using its original turn after newer discussion", async 
   await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
   await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
     conversationId: 9, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
-  }));
+  }, expect.any(AbortSignal)));
 });
 
 
@@ -284,7 +293,7 @@ describe("a question handed off from Discover (IR-559)", () => {
 
     const box = await draftBox();
     await waitFor(() => expect(box.value).toBe(QUESTION));
-    await waitFor(() => expect(screen.getByLabelText("address").textContent).toBe("/ai"));
+    await waitFor(() => expect(screen.getByLabelText("address").textContent).toBe("/ai/conversations/1"));
     expect(askStream).not.toHaveBeenCalled();
   });
 
@@ -292,12 +301,169 @@ describe("a question handed off from Discover (IR-559)", () => {
     renderChat(`/ai?q=${encodeURIComponent(QUESTION)}`);
     const box = await draftBox();
     await waitFor(() => expect(box.value).toBe(QUESTION));
-    await waitFor(() => expect(screen.getByLabelText("address").textContent).toBe("/ai"));
+    await waitFor(() => expect(screen.getByLabelText("address").textContent).toBe("/ai/conversations/1"));
 
     await userEvent.clear(box);
     await new Promise((r) => setTimeout(r, 20));
 
     expect(box.value).toBe("");
     expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("owned conversation URLs (IR-548)", () => {
+  /** The page under its real routes, with the address bar and a Back button. */
+  function Chrome() {
+    const navigate = useNavigate();
+    return (
+      <>
+        <RAGChatPage />
+        <Address />
+        <button type="button" onClick={() => navigate(-1)}>Go back</button>
+      </>
+    );
+  }
+
+  function renderRoutes(route: string, state?: unknown) {
+    return renderScreen(
+      <Routes>
+        <Route path="/ai" element={<Chrome />} />
+        <Route path="/ai/conversations/:conversationId" element={<Chrome />} />
+      </Routes>,
+      { route, state },
+    );
+  }
+
+  const address = () => screen.getByLabelText("address").textContent;
+
+  function run(overrides: Partial<LatestAskRun> = {}): LatestAskRun {
+    return {
+      id: "r-1", state: "running", end_reason: "", question: "What predicts flooding?",
+      retry_of: null, last_sequence: 3, ...overrides,
+    };
+  }
+
+  async function* runEvents(runId: string, ...events: { event: string; data: unknown }[]) {
+    yield { event: "run_queued", id: "1", data: { run_id: runId, state: "queued" } };
+    for (const event of events) yield event;
+  }
+
+  it("gives the opened conversation its own address", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+
+    renderRoutes("/ai");
+
+    await waitFor(() => expect(address()).toBe("/ai/conversations/9"));
+  });
+
+  it("opens the conversation its address names, not the latest one", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 }), summary({ id: 7, title: "Older" })] });
+    get.mockResolvedValue({ data: detail({ id: 7, title: "Older" }) });
+
+    renderRoutes("/ai/conversations/7");
+
+    await waitFor(() => expect(get).toHaveBeenCalledWith(7));
+    expect(get).not.toHaveBeenCalledWith(9);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("moves between conversations by address, and back again", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" }), summary({ id: 7, title: "Bridges" })] });
+    get.mockImplementation(async (id: number) => ({
+      data: detail({ id, title: id === 9 ? "Flooding" : "Bridges", turns: [{
+        id: id * 10, question: `Question in ${id}`, resolved_question: null, answer: "An answer",
+        message: null, state: "generative", degraded: false, widened: false,
+        created_at: "2026-10-14", citations: [],
+      }] }),
+    }));
+
+    renderRoutes("/ai/conversations/9");
+    expect(await screen.findByText("Question in 9")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("link", { name: /^Bridges/ }));
+    expect(await screen.findByText("Question in 7")).toBeTruthy();
+    expect(address()).toBe("/ai/conversations/7");
+
+    await userEvent.click(screen.getByRole("button", { name: "Go back" }));
+    expect(await screen.findByText("Question in 9")).toBeTruthy();
+    expect(address()).toBe("/ai/conversations/9");
+  });
+
+  it("says a missing or someone else's conversation is unavailable, and asks nothing", async () => {
+    get.mockRejectedValue({ response: { status: 404 } });
+
+    renderRoutes("/ai/conversations/404");
+
+    expect(await screen.findByText(/this conversation is not available/i)).toBeTruthy();
+    expect(create).not.toHaveBeenCalled();
+    expect(askStream).not.toHaveBeenCalled();
+    expect((screen.getByRole("textbox", { name: /ask a follow-up/i }) as HTMLTextAreaElement).disabled).toBe(true);
+  });
+
+  it("follows a run still answering when the conversation is opened", async () => {
+    get.mockResolvedValue({ data: detail({ id: 9, latest_run: run({ id: "r-5" }) }) });
+    resumeAskRun.mockReturnValue(runEvents("r-5", {
+      event: "done", data: { ...answer({ answer: "Rainfall gauges help." }), turn_id: 50 },
+    }));
+
+    renderRoutes("/ai/conversations/9");
+
+    expect(await screen.findByText("Rainfall gauges help.")).toBeTruthy();
+    expect(screen.getByText("What predicts flooding?")).toBeTruthy();
+    expect(resumeAskRun).toHaveBeenCalledWith("r-5", 0, expect.any(AbortSignal));
+    expect(askStream).not.toHaveBeenCalled();
+  });
+
+  it("stops a run when the reader asks, and shows it stopped", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    get.mockResolvedValue({ data: detail({ id: 9, latest_run: run({ id: "r-6" }) }) });
+    resumeAskRun.mockReturnValue((async function* () {
+      yield { event: "run_queued", id: "1", data: { run_id: "r-6", state: "queued" } };
+      await gate;
+      yield { event: "run_cancelled", id: "2", data: { run_id: "r-6", state: "cancelled", reason: "cancelled" } };
+    })());
+    cancelRun.mockImplementation(async () => { release(); return { data: { run_id: "r-6", state: "cancelled" } }; });
+
+    renderRoutes("/ai/conversations/9");
+    await userEvent.click(await screen.findByRole("button", { name: /stop answering/i }));
+
+    expect(cancelRun).toHaveBeenCalledWith("r-6");
+    expect(await screen.findByText(/you stopped this question/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeTruthy();
+  });
+
+  it("retries a stopped question as a new run and shows its answer", async () => {
+    get.mockResolvedValue({
+      data: detail({ id: 9, latest_run: run({ id: "r-7", state: "cancelled", end_reason: "cancelled" }) }),
+    });
+    retryRun.mockResolvedValue({ data: { run_id: "r-8", retry_of: "r-7", state: "queued" } });
+    resumeAskRun.mockReturnValue(runEvents("r-8", {
+      event: "done", data: { ...answer({ answer: "Answered on retry." }), turn_id: 51 },
+    }));
+
+    renderRoutes("/ai/conversations/9");
+    expect(await screen.findByText(/you stopped this question/i)).toBeTruthy();
+    expect(resumeAskRun).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    expect(retryRun).toHaveBeenCalledWith("r-7");
+    expect(await screen.findByText("Answered on retry.")).toBeTruthy();
+    expect(resumeAskRun).toHaveBeenCalledWith("r-8", 0, expect.any(AbortSignal));
+    expect(screen.queryByRole("button", { name: /retry/i })).toBeNull();
+  });
+
+  it("keeps a Record's conversation and its draft under the conversation's address", async () => {
+    create.mockResolvedValue({ data: detail({ id: 4, record: 5 }) });
+    get.mockResolvedValue({ data: detail({ id: 4, record: 5 }) });
+
+    renderRoutes("/ai?record=5");
+
+    await waitFor(() => expect(address()).toBe("/ai/conversations/4"));
+    const box = (await screen.findByRole("textbox", { name: /ask a follow-up/i })) as HTMLTextAreaElement;
+    await waitFor(() => expect(box.value).toMatch(/record #5/i));
+    expect(askStream).not.toHaveBeenCalled();
   });
 });

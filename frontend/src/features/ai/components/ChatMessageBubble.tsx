@@ -28,6 +28,28 @@ interface ChatMessageBubbleProps {
   compact?: boolean;
   onRouteOverride?: (message: ChatMessage, lane: ChatLane) => void;
   overrideDisabled?: boolean;
+  /** Ask a run that ended without its answer again (IR-548). */
+  onRetry?: (message: ChatMessage) => void;
+}
+
+/** A queued question that ended unanswered, and the way to ask it again. */
+function RunEndedNotice({ onRetry, disabled }: { onRetry?: () => void; disabled?: boolean }) {
+  if (!onRetry) return null;
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={disabled}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5
+          text-[13px] font-medium text-stone-700 hover:border-brand/40 hover:text-brand
+          disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <i className="fas fa-rotate-right text-[11px]" aria-hidden />
+        Retry
+      </button>
+    </div>
+  );
 }
 
 /**
@@ -38,7 +60,7 @@ interface ChatMessageBubbleProps {
  * text with no card/border/shadow, closer to a read surface than a chat
  * widget — the avatar is still what tells the two apart.
  */
-export function ChatMessageBubble({ message, compact = false, onRouteOverride, overrideDisabled }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, compact = false, onRouteOverride, overrideDisabled, onRetry }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -114,7 +136,13 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
         )}
         {!isUser && message.degraded && <DegradedNotice subject="answer" />}
         {!isUser && message.widened && <ScopeNotice />}
-        {!isUser && message.partial && <PartialAnswerNotice />}
+        {!isUser && message.partial && !message.endedRun && <PartialAnswerNotice />}
+        {!isUser && message.endedRun && (
+          <RunEndedNotice
+            onRetry={onRetry ? () => onRetry(message) : undefined}
+            disabled={overrideDisabled}
+          />
+        )}
 
         {/* Collapsed by default here too (IR-381) -- a reopened transcript
             reads the same as one just finished streaming. */}

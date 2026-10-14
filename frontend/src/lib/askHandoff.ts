@@ -10,6 +10,14 @@ import { useCallback, useEffect, useState } from "react";
 
 export const ASK_PATH = "/ai";
 
+/**
+ * A Conversation's own address (IR-548). Owning it grants nothing: the API
+ * decides who may read it, and someone else's reads as missing.
+ */
+export function conversationPath(id: number): string {
+  return `${ASK_PATH}/conversations/${id}`;
+}
+
 interface HandoffState {
   draft?: unknown;
 }
