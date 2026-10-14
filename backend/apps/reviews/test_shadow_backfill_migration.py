@@ -244,5 +244,5 @@ def test_a_declined_record_with_no_decline_on_record_stops_the_backfill():
             _migrate(_AFTER)
         assert _assignments(_BEFORE).count() == 0
     finally:
-        Record.objects.filter(pipeline_status="declined", reviews__isnull=True).delete()
+        purge_records_at_current_state()
         call_command("migrate", verbosity=0)

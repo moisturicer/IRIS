@@ -154,8 +154,6 @@ def _report(response) -> None:
     """Hand the vendor's own usage figures to provider admission (IR-545).
     A response without them leaves the attempt charged at its reservation."""
     usage = getattr(response, "usage", None)
-    if usage is None:
-        return
     prompt = getattr(usage, "prompt_tokens", None)
     completion = getattr(usage, "completion_tokens", None)
     report_usage(
@@ -331,7 +329,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         extra.update(self._cap())
 
         try:
-            mark_sent()
+            mark_sent(model=self.model)
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -387,7 +385,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             # and every streamed answer is charged its worst case (IR-545).
             extra["stream_options"] = {"include_usage": True}
         try:
-            mark_sent()
+            mark_sent(model=self.model)
             chunks = client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -479,7 +477,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             extra.update(self._cap())
 
         try:
-            mark_sent()
+            mark_sent(model=self.model)
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[_wire(message) for message in messages],

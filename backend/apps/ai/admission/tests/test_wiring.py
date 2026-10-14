@@ -186,7 +186,7 @@ def test_each_inference_task_has_a_lane():
     # Every task pinned. The reserved figure task is pinned without being
     # named: `test_reserved_task.py` forbids naming it outside its package.
     named = {
-        "answer": "chat", "resolve": "chat", "route": "chat",
+        "answer": "chat", "brief": "research", "resolve": "chat", "route": "chat",
         "plan": "research", "screen": "research", "summary": "overview",
     }
     lanes = {task.value: task_lane(task) for task in InferenceTask}

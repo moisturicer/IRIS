@@ -267,6 +267,7 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
     "apps.ai.tasks.generate_record_overview": {"queue": "embedding"},
+    "apps.ai.tasks.generate_paper_brief": {"queue": "embedding"},
     # IR-466: its own concurrency-1 worker, apart from reader work.
     "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
 }
@@ -440,6 +441,9 @@ LLM_ANSWER_FALLBACK_MODELS = config("LLM_ANSWER_FALLBACK_MODELS", default="")
 LLM_ANSWER_REASONING = config("LLM_ANSWER_REASONING", default=True, cast=bool)
 LLM_ANSWER_PROVIDER_ONLY = config("LLM_ANSWER_PROVIDER_ONLY", default="")
 LLM_ANSWER_PROVIDER_PINS = config("LLM_ANSWER_PROVIDER_PINS", default="")
+# Verified model context windows for full-paper briefs. Unknown windows refuse
+# brief generation; answer requests retain their existing behavior.
+LLM_ANSWER_CONTEXT_WINDOWS = config("LLM_ANSWER_CONTEXT_WINDOWS", default="")
 
 # Question resolution runs here as of IR-383, and the old LLM_RESOLUTION_MODEL
 # namespace is gone -- the contradiction recorded here is resolved, not
@@ -920,6 +924,9 @@ AI_EMBEDDING_TOKEN_CEILING = config(
 AI_OVERVIEW_TOKEN_CEILING = config(
     "AI_OVERVIEW_TOKEN_CEILING", default=100_000, cast=int
 )
+# Full-paper briefs remain off pending acceptance of their proposed ADR.
+# Generation additionally requires enforced shared provider admission.
+AI_PAPER_BRIEFS_ENABLED = config("AI_PAPER_BRIEFS_ENABLED", default=False, cast=bool)
 # Approximate, and printed as approximate. Vendor pricing is not in this
 # repository's control, so this is a figure for deciding whether a run is
 # worth starting, never a quote. Voyage's contextualized-embedding list price

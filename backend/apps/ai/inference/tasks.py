@@ -24,6 +24,7 @@ class InferenceTask(Enum):
     """
 
     ANSWER = "answer"
+    BRIEF = "brief"
     RESOLVE = "resolve"
     ROUTE = "route"
     PLAN = "plan"

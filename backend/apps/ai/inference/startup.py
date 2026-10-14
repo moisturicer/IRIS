@@ -55,6 +55,7 @@ PROFILE_SUFFIXES = (
     "REASONING",
     "PROVIDER_ONLY",
     "PROVIDER_PINS",
+    "CONTEXT_WINDOWS",
 )
 
 #: Segments that no longer configure anything, and what to do instead. A
@@ -311,6 +312,12 @@ def verify_inference_configuration() -> None:
     problems = inference_configuration_problems(
         names=environment.keys(), keys=keys
     ) + provider_pin_problems(profile_for(task) for task in InferenceTask)
+    problems += tuple(
+        f"{name} cannot configure brief independently; the brief task inherits "
+        "the answer Profile. Configure LLM_ANSWER_* instead."
+        for name, value in sorted(environment.items())
+        if (_task_segment(name) or "").lower() == "brief" and value.strip()
+    )
     if problems:
         raise ImproperlyConfigured(
             "Inference configuration (IR-379):\n"
