@@ -71,12 +71,20 @@ const VOLUMES: ReadonlyArray<{ title: string; binding: Binding; size: string }> 
 function Shelf() {
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-end" aria-hidden>
-      <div className="flex h-full max-h-80 min-h-0 items-end 2xl:max-h-96 gap-1.5 pl-14 motion-safe:animate-fade-in xl:pl-20">
+      {/* `shelf-rise` shelves the volumes in one after another, left to right
+          (IR-586; the stagger is generated in tailwind.config.js, because the
+          entry frame takes no inline style). It runs only when motion is
+          welcome, so a reader who asked for less sees the shelf still and
+          whole from the first frame. */}
+      <div className="shelf-rise flex h-full max-h-80 min-h-0 items-end 2xl:max-h-96 gap-1.5 pl-14 xl:pl-20">
         {VOLUMES.map(({ title, binding, size }, i) => (
           <div
             key={i}
             className={cn(
               "relative flex shrink-0 items-center justify-center overflow-clip rounded-t-sm pt-8",
+              // A spine lifts a little under the pointer, as a volume does
+              // when a finger finds it. It is decoration and opens nothing.
+              "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out motion-safe:hover:-translate-y-1.5",
               BINDING[binding],
               size,
             )}

@@ -1,5 +1,40 @@
 import typography from "@tailwindcss/typography";
 import defaultColors from "tailwindcss/colors";
+import plugin from "tailwindcss/plugin";
+
+/**
+ * The entry panel's shelf (IR-586): each volume rises onto the shelf in turn,
+ * `SHELF_STEP_MS` after the one to its left. Generated rather than written
+ * out, because the entry frame takes no inline style to carry a per-volume
+ * delay. The fill is `backwards` so a volume waits unseen through its delay,
+ * and once it has landed the animation lets go of `transform`, leaving the
+ * hover lift free to move it. Nothing of it runs under reduced motion.
+ */
+const SHELF_VOLUMES = 24;
+const SHELF_STEP_MS = 35;
+
+const shelfRise = plugin(({ addBase, addComponents }) => {
+  const stagger = Object.fromEntries(
+    Array.from({ length: SHELF_VOLUMES - 1 }, (_, i) => [
+      `.shelf-rise > :nth-child(${i + 2})`,
+      { animationDelay: `${(i + 1) * SHELF_STEP_MS}ms` },
+    ]),
+  );
+  // In the base layer rather than `theme.keyframes`: Tailwind emits a theme
+  // keyframe only beside an `animate-*` utility that names it, and none does.
+  addBase({
+    "@keyframes shelve": {
+      "0%":   { opacity: "0", transform: "translateY(1.5rem)" },
+      "100%": { opacity: "1", transform: "translateY(0)" },
+    },
+  });
+  addComponents({
+    "@media (prefers-reduced-motion: no-preference)": {
+      ".shelf-rise > *": { animation: "shelve 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards" },
+      ...stagger,
+    },
+  });
+});
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -261,5 +296,6 @@ export default {
     // Without it they emit no CSS and Preflight flattens every heading,
     // list and table. @tailwindcss/forms is still not needed.
     typography,
+    shelfRise,
   ],
 };
