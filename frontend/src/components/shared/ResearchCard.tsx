@@ -75,7 +75,7 @@ export function ResearchCard({
     <article
       aria-labelledby={titleId}
       className={cn(
-        "group relative flex flex-col bg-white rounded-xl border border-stone-200",
+        "group relative flex flex-col bg-surface rounded-xl border border-stone-200",
         COLOUR_TRANSITION,
         "hover:border-stone-400",
         "focus-within:border-stone-400",

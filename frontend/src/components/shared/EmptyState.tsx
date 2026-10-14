@@ -41,7 +41,7 @@ export function EmptyState({
       role={error ? "alert" : undefined}
       className={cn(
         "flex flex-col items-center justify-center text-center px-6 py-16",
-        framed && "bg-white rounded-2xl border border-stone-200",
+        framed && "bg-surface rounded-2xl border border-stone-200",
       )}
     >
       <div

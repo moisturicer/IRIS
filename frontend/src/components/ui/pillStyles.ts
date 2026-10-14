@@ -15,7 +15,7 @@ const PILL =
 export const PILL_PRIMARY = `${PILL} bg-brand text-white shadow-card hover:bg-brand-light`;
 
 /** Every other action. */
-export const PILL_SECONDARY = `${PILL} bg-white text-stone-700 ring-1 ring-stone-300 hover:ring-brand/40 hover:text-brand`;
+export const PILL_SECONDARY = `${PILL} bg-transparent text-stone-700 ring-1 ring-stone-300 hover:ring-brand/40 hover:text-brand`;
 
 /** A toggle that is on (a paper saved to a collection). */
 export const PILL_SELECTED = `${PILL} bg-brand-50 text-brand ring-1 ring-brand-200`;
