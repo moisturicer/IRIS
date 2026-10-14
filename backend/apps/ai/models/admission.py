@@ -61,6 +61,7 @@ class ProviderReservation(models.Model):
     #: The run that owns the call (``ask:<uuid>`` for a queued question), or
     #: blank outside one. Per-run caps sum over it.
     run_key = models.CharField(max_length=64, blank=True)
+    work_key = models.CharField(max_length=64, blank=True, db_index=True)
     state = models.CharField(max_length=16, choices=_STATES, default=OPEN)
     created_at = models.DateTimeField()
     #: Until this moment the attempt may still be talking to the vendor, so

@@ -7,6 +7,7 @@ import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
 import { CandidateList } from "./CandidateList";
+import { ComparisonTable } from "./ComparisonTable";
 import { CopyButton } from "./CopyButton";
 import {
   DegradedNotice,
@@ -100,6 +101,7 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
         {!isUser && message.research && (
           <ResearchSteps steps={message.research.steps} compact={compact} />
         )}
+        {!isUser && message.comparison && <ComparisonTable comparison={message.comparison} />}
         {isUser ? (
           <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
         ) : !message.listing || message.listing.count ? (

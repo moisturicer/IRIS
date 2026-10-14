@@ -927,6 +927,14 @@ AI_OVERVIEW_TOKEN_CEILING = config(
 # Full-paper briefs remain off pending acceptance of their proposed ADR.
 # Generation additionally requires enforced shared provider admission.
 AI_PAPER_BRIEFS_ENABLED = config("AI_PAPER_BRIEFS_ENABLED", default=False, cast=bool)
+# Full-reading comparisons are opt-in while their governing proposals await approval.
+AI_COMPARISON_ENABLED = config("AI_COMPARISON_ENABLED", default=False, cast=bool)
+AI_COMPARISON_MAX_RECORDS = config("AI_COMPARISON_MAX_RECORDS", default=6, cast=int)
+AI_COMPARISON_DEADLINE_SECONDS = config("AI_COMPARISON_DEADLINE_SECONDS", default=300, cast=int)
+AI_COMPARISON_MAX_ATTEMPTS = config("AI_COMPARISON_MAX_ATTEMPTS", default="")
+AI_COMPARISON_MAX_INPUT_TOKENS = config("AI_COMPARISON_MAX_INPUT_TOKENS", default="")
+AI_COMPARISON_MAX_OUTPUT_TOKENS = config("AI_COMPARISON_MAX_OUTPUT_TOKENS", default="")
+AI_COMPARISON_MAX_COST_USD = config("AI_COMPARISON_MAX_COST_USD", default="")
 # Approximate, and printed as approximate. Vendor pricing is not in this
 # repository's control, so this is a figure for deciding whether a run is
 # worth starting, never a quote. Voyage's contextualized-embedding list price

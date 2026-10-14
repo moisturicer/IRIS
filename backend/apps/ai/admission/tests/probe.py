@@ -31,18 +31,23 @@ def main() -> None:
     )
     time.sleep(max(0.0, start_at - time.time()))  # start together
     admitted, refused = 0, []
-    for _ in range(count):
-        try:
-            ticket = ledger.admit(request)
-        except errors.AdmissionDenied as denied:
-            refused.append(denied.reason)
-            continue
-        admitted += 1
-        if mode == "spend":
-            ticket.settle(scope.AttemptUsage(sent=True, input_tokens=10, output_tokens=10))
-        if mode == "crash":
-            print(json.dumps({"admitted": admitted, "refused": refused}), flush=True)
-            os._exit(1)
+    ceiling = None
+    if os.environ.get("PROBE_COMPARISON"):
+        from apps.ai.comparison_configuration import comparison_ceiling
+        ceiling = comparison_ceiling()
+    with scope.run(scope.new_run(os.environ.get("PROBE_RUN_KEY"), ceiling=ceiling)):
+        for _ in range(count):
+            try:
+                ticket = ledger.admit(request)
+            except errors.AdmissionDenied as denied:
+                refused.append(denied.reason)
+                continue
+            admitted += 1
+            if mode == "spend":
+                ticket.settle(scope.AttemptUsage(sent=True, input_tokens=10, output_tokens=10))
+            if mode == "crash":
+                print(json.dumps({"admitted": admitted, "refused": refused}), flush=True)
+                os._exit(1)
     print(json.dumps({"admitted": admitted, "refused": refused}), flush=True)
 
 

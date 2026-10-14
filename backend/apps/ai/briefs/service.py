@@ -10,7 +10,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from apps.ai.admission import scope
@@ -63,15 +63,16 @@ def _authorized(record_id, user_id):
 
 def _wire(stored):
     return {
-        "id": stored.pk, "record_id": stored.record_id,
+        "id": stored.pk, "record_id": stored.record_id, "chunk_set_id": stored.chunk_set_id,
         "content_hash": stored.content_hash, "prompt_version": stored.prompt_version,
         "fields": stored.fields, "model": stored.model_id,
         "models_used": stored.models_used, "usage": stored.usage,
+        "section_count": len(stored.section_briefs),
         "generated_at": stored.updated_at,
     }
 
 
-def brief_for(record, *, user, retry=False):
+def brief_for(record, *, user, retry=False, dispatch=True):
     """First comparison use queues one reading; later uses reuse its version.
 
     The caller passes the current reader, even if it already checked access.
@@ -103,7 +104,11 @@ def brief_for(record, *, user, retry=False):
             if stored.state == "ready":
                 return {"state": "ready", "brief": _wire(stored), "cached": True}
             if stored.state == "generating":
-                return {"state": "generating", "brief": None}
+                result = {"state": "generating", "brief": None}
+                if not dispatch:
+                    result.update(brief_id=stored.pk, claim=str(stored.claim),
+                                  started=stored.started_at is not None)
+                return result
             if not retry:
                 return _unavailable(stored.reason)
         if not enforcing():
@@ -126,8 +131,12 @@ def brief_for(record, *, user, retry=False):
         stored.usage = {}
         stored.save()
         brief_id, claim = stored.pk, str(stored.claim)
-        transaction.on_commit(lambda: _enqueue(brief_id, claim))
-    return {"state": "generating", "brief": None}
+        if dispatch:
+            transaction.on_commit(lambda: _enqueue(brief_id, claim))
+    result = {"state": "generating", "brief": None}
+    if not dispatch:
+        result.update(brief_id=brief_id, claim=claim, started=False)
+    return result
 
 
 def _enqueue(brief_id, claim):
@@ -157,7 +166,9 @@ def _current(stored, profile):
 
 
 def _usage(run_key):
-    rows = ProviderReservation.objects.using("admission").filter(run_key=run_key)
+    rows = ProviderReservation.objects.using("admission").filter(
+        Q(work_key=run_key) | Q(work_key="", run_key=run_key),
+    )
     totals = rows.aggregate(input_tokens=Sum("charge_input_tokens"), output_tokens=Sum("charge_output_tokens"))
     # Deterministic unmetered fakes have no reservations; missing usage is unknown.
     if not rows.exists():
@@ -197,7 +208,7 @@ def generate_brief(brief_id, claim):
         stored_text = dict(stored.chunk_set.chunks.values_list("pk", "text"))
         batches = reading_sections(stored.record.title, sources, _window(profile), BRIEF_OUTPUT_TOKENS)
         llm = composition_root().llm_for(InferenceTask.BRIEF)
-        with scope.run(scope.new_run(run_key)), scope.workload("research"):
+        with scope.run(scope.new_run(run_key)), scope.work_item(run_key), scope.workload("research"):
             for batch in batches:
                 # Access, disclosure, version and profile are rechecked before every send.
                 if not _current(stored, profile_for(InferenceTask.BRIEF)):

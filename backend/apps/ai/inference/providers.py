@@ -67,6 +67,7 @@ def build_profile_llm(
     breaker_key: Optional[str] = None,
     max_tokens: Optional[int] = None,
     lane: Optional[str] = None,
+    application_fallbacks: bool = False,
 ) -> LLMProvider:
     """The provider `profile`'s task reaches its model through.
 
@@ -118,7 +119,7 @@ def build_profile_llm(
             lane=lane or task_lane(profile.task),
         )
 
-    if pins or profile.task is InferenceTask.BRIEF:
+    if pins or profile.task is InferenceTask.BRIEF or application_fallbacks:
         configs = [config(model) for model in profile.models]
     elif dialect_for(profile.vendor.value).resolves_fallback:
         configs = [config(profile.model, profile.fallback_models)]

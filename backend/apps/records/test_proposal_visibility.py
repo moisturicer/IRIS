@@ -37,6 +37,7 @@ exercised in `apps/ai/policy/tests/`.
 """
 
 from django.core.cache import cache
+from django.db import connection
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -90,6 +91,11 @@ class ProposalVisibilityTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        # Rolled-back vectors remain in HNSW until vacuumed and can fill its
+        # scan before these fixtures are reached. Keep this visibility test's
+        # real indexes, but start them empty, as the index-recall tests do.
+        with connection.cursor() as cursor:
+            cursor.execute(f"TRUNCATE {RecordEmbedding._meta.db_table}, {ChunkEmbedding._meta.db_table}")
         cls.owner = _user("vis-owner@cit.edu", RoleName.STUDENT)
         cls.stranger = _user("vis-stranger@cit.edu", RoleName.STUDENT)
         cls.adviser = _user("vis-adviser@cit.edu", RoleName.ADVISER)
