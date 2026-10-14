@@ -42,7 +42,7 @@ export function Skeleton({ rows = 3, label = "Loading…", className = "" }: Ske
         {Array.from({ length: rows }, (_, i) => (
           <div
             key={i}
-            className="h-4 rounded bg-gray-200 animate-pulse"
+            className="h-4 rounded bg-stone-200 animate-pulse"
             // Ragged widths read as content rather than as a loading bar chart.
             style={{ width: `${100 - i * 8}%` }}
           />

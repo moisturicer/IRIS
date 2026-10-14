@@ -25,7 +25,7 @@ const PhoneBar = forwardRef<HTMLButtonElement>(function PhoneBar(_props, menuBut
   return (
     <nav
       aria-label="Menu"
-      className="md:hidden flex items-center justify-between gap-3 h-14 px-4 bg-white border-b border-stone-200"
+      className="md:hidden flex items-center justify-between gap-3 h-14 px-4 bg-surface border-b border-stone-200"
     >
       <Button
         ref={menuButtonRef}
@@ -104,7 +104,7 @@ export function AppShell() {
   // shows them the pending screen instead (IR-537).
 
   return (
-    <div className="flex min-h-screen bg-stone-100 font-sans">
+    <div className="flex min-h-screen bg-canvas font-sans">
       {sidebarOpen && (
         // A pointer target only: the drawer's own Close menu button and Escape
         // are the keyboard route, so this is kept out of the tab order and the

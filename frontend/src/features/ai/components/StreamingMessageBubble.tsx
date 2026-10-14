@@ -6,6 +6,7 @@ import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
 import { ReasoningPanel } from "./ReasoningPanel";
 import { StreamStatusLine } from "./StreamStatusLine";
+import { LiveCandidates } from "./CandidateList";
 import { ResearchSteps } from "./ResearchSteps";
 
 /** The reply while still streaming (IR-329) -- status line, the collapsed
@@ -36,6 +37,7 @@ export function StreamingMessageBubble({
         <StreamStatusLine state={state} />
         {state.routing && <RoutingDecisionPanel decision={state.routing} />}
         {state.steps && <ResearchSteps steps={state.steps} live compact={compact} />}
+        {state.candidates && <LiveCandidates candidates={state.candidates} compact={compact} />}
 
         <ReasoningPanel reasoning={state.reasoning} streaming compact={compact} />
 

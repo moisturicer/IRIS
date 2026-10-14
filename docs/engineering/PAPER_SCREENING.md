@@ -49,12 +49,14 @@ removed from every result/count; a newly gated visible paper is unassessed.
 A paper edited while the model is checking it is also unassessed: its earlier
 text and judgment are discarded from the result.
 
-`topic_count(run, criterion, filters=...)` screens all visible filtered
-records at or below the ceiling (default 500). Above it, the existing fused
-paper ranking supplies at most ten candidates, bounded by the ceiling.
-Ranking keeps candidate IDs inside the application so refused candidates
-remain unassessed. Only approved content reaches screening. Every included
-record is counted in SQL with `COUNT(DISTINCT pk)` against current visibility.
+**Superseded for the `count` lane by IR-547.** The `topic_count` workflow that
+screened every visible record up to the ceiling is deleted. A reader's topic
+count now goes through `research/listing.py::screen_listing(..., count=True)`:
+at most twenty distinct candidates, shown pending, screened, and counted in
+code from the include decisions, worded as "N matches among M assessed of S
+selected candidate papers, with K not assessed", never as a catalogue count
+(pilot README §12). The `screen_records` tool above is unchanged for the
+research planner, and its ceiling and exact-contract text still describe it.
 Metadata counts through `count_records` retain their existing exact contract.
 
 Screening uses title and abstract in batches of 20, within the run's prompt

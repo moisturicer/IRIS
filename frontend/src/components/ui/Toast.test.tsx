@@ -30,6 +30,17 @@ describe("ToastContainer", () => {
     expect(container.querySelector(`i.${glyph}`)).toHaveAttribute("aria-hidden");
   });
 
+  it.each(["success", "error", "info"] as const)(
+    "paints a %s toast opaque, because it floats over content (IR-558)",
+    (type) => {
+      show(type, "Record saved");
+
+      const toast = screen.getByText("Record saved").parentElement!;
+      expect(toast.className).not.toMatch(/bg-transparent|bg-white\//);
+      expect(toast.className).toMatch(/\bbg-(overlay|brand|stone-900)\b/);
+    },
+  );
+
   it("still dismisses", async () => {
     show("info", "Record saved");
 

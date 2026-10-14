@@ -133,8 +133,8 @@
           "lane": "count",
           "expect": {
             "routing_lane": "count",
-            "listing": {"completeness": "screened", "record_keys": ["flood-gauges", "flood-hazard"]},
-            "answer_contains": "2 matched out of 3 checked; 2 could not be assessed.",
+            "listing": {"completeness": "matches_found", "record_keys": ["flood-gauges", "flood-hazard"]},
+            "answer_contains": "2 matches among 4 assessed of 5 selected candidate papers, 1 of them uncertain, with 1 not assessed.",
             "never_mentions": ["flood-draft", "flood-warning"]
           }
         }
@@ -151,15 +151,24 @@
         "assessed_match_keys": ["flood-gauges", "flood-hazard"],
         "uncertain_keys": ["rainfall-note"],
         "unassessed_keys": ["flood-warning"],
-        "notes": "Candidates may be previewed early as relevance pending; the final list separates assessed matches, exclusions, uncertainty and unassessed Records."
+        "notes": "Candidates may be previewed early as relevance pending; the final list separates assessed matches, exclusions, uncertainty and unassessed Records. IR-546 delivers this: the baseline below pins its behaviour. A Record AI may not read is counted as unassessed but not named."
       },
       "baseline": [
         {
           "lane": "listing",
           "expect": {
             "routing_lane": "listing",
-            "listing": {"completeness": "matches_found", "record_keys_within": ["flood-gauges", "flood-hazard"]},
-            "answer_contains": "These are matches found, not a complete list",
+            "listing": {
+              "completeness": "matches_found",
+              "record_keys": ["flood-gauges", "flood-hazard"],
+              "candidates": {
+                "included_keys": ["flood-gauges", "flood-hazard"],
+                "excluded_keys": ["tilapia"],
+                "uncertain_keys": ["rainfall-note"],
+                "restricted_keys": ["flood-warning"]
+              }
+            },
+            "answer_contains": "Screened 5 candidate papers: 2 matched, 1 did not match, 1 uncertain, 1 could not be assessed.",
             "never_mentions": ["flood-draft", "flood-warning"]
           }
         }
@@ -234,8 +243,8 @@
           "lane": "count",
           "expect": {
             "routing_lane": "count",
-            "listing": {"completeness": "screened", "record_keys": []},
-            "answer_contains": "0 matched out of 0 checked; 5 could not be assessed.",
+            "listing": {"completeness": "inconclusive", "record_keys": []},
+            "answer_contains": "Inconclusive: none of the 5 candidate papers could be assessed",
             "never_mentions": ["flood-draft"]
           }
         }

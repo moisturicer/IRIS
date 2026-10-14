@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { offPaletteClasses } from "./palette";
+import { offGreyClasses, offPaletteClasses, seeThroughWhiteClasses } from "./palette";
 
 /**
  * IR-357: files not yet converted to the white, black, grey and maroon
@@ -40,6 +40,52 @@ const NOT_YET_CONVERTED: readonly string[] = [
   "src/features/ai/AIHubPage.tsx",
   "src/features/ai/components/ConversationSidebar.tsx",
   "src/features/ai/RAGChatPage.tsx",
+];
+
+/**
+ * IR-558: files that still use a `gray` or `slate` class, a second and third
+ * grey beside `stone`. **This list must only shrink.** Never add a file to it:
+ * write `stone`. The Ask IRIS files stay on it until IR-365 lands, and
+ * IR-366 deletes the list with the one above.
+ */
+const GREY_NOT_YET_CONVERTED: readonly string[] = [
+  // IR-365 -- Ask IRIS
+  "src/features/ai/AIHubPage.tsx",
+  "src/features/ai/components/answerLayout.ts",
+  // IR-362 -- Notifications
+  "src/features/notifications/NotificationsPage.tsx",
+  // IR-363 -- Documents and the admin screens
+  "src/features/accounts/RoleRequestsPage.tsx",
+  "src/features/accounts/UserListPage.tsx",
+  "src/features/admin/DeleteRequestsPage.tsx",
+  "src/features/admin/DownloadRequestsPage.tsx",
+  "src/features/admin/SessionsPage.tsx",
+  "src/features/audit/AuditLogPage.tsx",
+  "src/features/download/DownloadTokenPage.tsx",
+  "src/features/records/ImportRecordsPage.tsx",
+  "src/features/requests/AccessRequestsPage.tsx",
+  // IR-364 -- sign-up, account and error screens
+  "src/components/auth/AuthBootstrap.tsx",
+  "src/features/auth/EmailVerifyPage.tsx",
+  "src/features/auth/LoginPage.tsx",
+  "src/features/auth/PendingApprovalPage.tsx",
+  "src/features/auth/SignupPage.tsx",
+  "src/features/errors/ForbiddenPage.tsx",
+  // Shared pieces no subtask names yet
+  "src/components/compliance/DpaConsentModal.tsx",
+  "src/components/layout/Breadcrumbs.tsx",
+  "src/components/layout/NotificationBell.tsx",
+  "src/components/records/DownloadRequestModal.tsx",
+  "src/components/shared/DataTable.tsx",
+  "src/features/discover/PaperCiteModal.tsx",
+];
+
+/**
+ * IR-558: files with a see-through white background left on purpose. The
+ * email-verify screen's decorative circles are IR-533/IR-538's to redraw.
+ */
+const SEE_THROUGH_ALLOWED: readonly string[] = [
+  "src/features/auth/EmailVerifyPage.tsx",
 ];
 
 const THIS_FILE = "src/test/palette.test.ts";
@@ -86,6 +132,30 @@ describe("what counts as off-palette", () => {
   });
 });
 
+describe("what counts as a second grey or a see-through white (IR-558)", () => {
+  it("catches gray and slate on any colour utility, with variants and opacity", () => {
+    expect(
+      offGreyClasses('className="bg-gray-50 hover:text-slate-700 md:border-t-gray-200 ring-slate-500/40"'),
+    ).toEqual(["bg-gray-50", "text-slate-700", "border-t-gray-200", "ring-slate-500"]);
+  });
+
+  it("lets stone through, and a word that merely contains gray", () => {
+    expect(offGreyClasses("bg-stone-50 text-stone-700 grayscale -webkit-grayscale bg-gray-5000")).toEqual([]);
+  });
+
+  it("catches a white background with any opacity below full", () => {
+    expect(
+      seeThroughWhiteClasses("bg-white/90 backdrop-blur hover:bg-white/[0.6] md:bg-white/60 !bg-white/5"),
+    ).toEqual(["bg-white/90", "bg-white/[0.6]", "bg-white/60", "bg-white/5"]);
+  });
+
+  it("lets an opaque white, a text or border white and a see-through grey through", () => {
+    expect(
+      seeThroughWhiteClasses("bg-white bg-white/100 bg-surface bg-overlay text-white/70 border-white/20 bg-stone-50/80"),
+    ).toEqual([]);
+  });
+});
+
 describe("the palette guard", () => {
   it("reads the whole source tree, not an empty one", () => {
     // A broken glob would make both guards below pass by reading nothing.
@@ -123,5 +193,60 @@ describe("the palette guard", () => {
 
   it("lists each not-yet-converted file once", () => {
     expect(new Set(NOT_YET_CONVERTED).size).toBe(NOT_YET_CONVERTED.length);
+  });
+
+  it("finds no gray or slate class outside the not-yet-converted files", () => {
+    const allowed = new Set([...GREY_NOT_YET_CONVERTED, THIS_FILE]);
+    const offenders = Object.fromEntries(
+      Object.entries(SOURCES)
+        .filter(([path]) => !allowed.has(path))
+        .map(([path, text]) => [path, offGreyClasses(text)])
+        .filter(([, classes]) => classes.length > 0),
+    );
+
+    expect(
+      offenders,
+      "gray and slate are a second grey beside stone (01-design-system.md section 0). Write stone; " +
+      "do not add the file to GREY_NOT_YET_CONVERTED.",
+    ).toEqual({});
+  });
+
+  it("finds a gray or slate class in every file on the grey list, so it only shrinks", () => {
+    const converted = GREY_NOT_YET_CONVERTED.filter(
+      (path) => offGreyClasses(SOURCES[path] ?? "").length === 0,
+    );
+
+    expect(
+      converted,
+      "Converted, renamed or deleted: take these off GREY_NOT_YET_CONVERTED in src/test/palette.test.ts.",
+    ).toEqual([]);
+    expect(new Set(GREY_NOT_YET_CONVERTED).size).toBe(GREY_NOT_YET_CONVERTED.length);
+  });
+
+  it("finds no see-through white background outside the allowed files", () => {
+    const allowed = new Set([...SEE_THROUGH_ALLOWED, THIS_FILE]);
+    const offenders = Object.fromEntries(
+      Object.entries(SOURCES)
+        .filter(([path]) => !allowed.has(path))
+        .map(([path, text]) => [path, seeThroughWhiteClasses(text)])
+        .filter(([, classes]) => classes.length > 0),
+    );
+
+    expect(
+      offenders,
+      "A see-through white shows whatever is behind it. Use bg-surface for content and bg-overlay " +
+      "for floating controls (01-design-system.md section 0).",
+    ).toEqual({});
+  });
+
+  it("finds a see-through white in every allowed file, so the list only shrinks", () => {
+    const converted = SEE_THROUGH_ALLOWED.filter(
+      (path) => seeThroughWhiteClasses(SOURCES[path] ?? "").length === 0,
+    );
+
+    expect(
+      converted,
+      "Converted, renamed or deleted: take these off SEE_THROUGH_ALLOWED in src/test/palette.test.ts.",
+    ).toEqual([]);
   });
 });

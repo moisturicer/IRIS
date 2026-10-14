@@ -150,6 +150,30 @@ describe("the page head", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  // IR-554: the search box's debounce timer, armed on load and on every
+  // keystroke, used to write back the URL it saw when armed -- so a Publish
+  // click inside its 300ms was erased when it fired.
+  it("keeps the Publish dialog open when the search debounce fires after the click", async () => {
+    renderDiscover();
+
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent("publish=new");
+  });
+
+  it("keeps both a just-typed search and the Publish dialog in the URL", async () => {
+    renderDiscover();
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "rainfall");
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const query = screen.getByRole("status", { name: "Current query" });
+    expect(query).toHaveTextContent("publish=new");
+    expect(query).toHaveTextContent("q=rainfall");
+  });
+
   it("shows an Adviser the Publish action too, because an Adviser authors", async () => {
     signInAs("Adviser");
     renderDiscover();

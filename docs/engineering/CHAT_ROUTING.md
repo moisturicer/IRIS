@@ -10,12 +10,14 @@ Proposed; this branch is reviewable implementation, not approval to merge it.
 Both chat endpoints route the raw reader question and resolved question with only
 recent reader questions as routing history. Passage keeps the existing pipeline;
 research calls the bounded planner synchronously; listing finds and screens records;
-count uses the application topic-count workflow; comparison resolves full paper
+count answers a metadata question from the database and screens a topic question over
+at most twenty candidates, counting the includes in code (IR-547); comparison resolves full paper
 titles and reserves a passage per paper before selecting extra passages.
 
 Lists contain application rows only. Their titles are resolved from current readable
 database records; model text cannot add a row. They say `matches_found`, while topic
-counts retain their screening coverage and unassessed totals. A comparison requires
+counts state their selected, assessed and unassessed totals and are `inconclusive`
+when nothing could be assessed. A comparison requires
 at least one citation for every paper with supplied evidence, otherwise its answer
 is withheld and the sources remain available. Papers with no evidence are named.
 

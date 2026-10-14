@@ -106,7 +106,7 @@ function Section({ section }: { section: ResearchSection }) {
 
   if (section.id === "archived") {
     return (
-      <details className="group rounded-2xl border border-stone-200 bg-white/60 p-card-compact md:p-card">
+      <details className="group rounded-2xl border border-stone-200 bg-surface p-card-compact md:p-card">
         <summary className={cn("cursor-pointer list-none rounded-sm", FOCUS_RING)}>
           <span className="inline-flex items-center gap-2 font-display text-title font-semibold text-stone-900">
             <i className="fas fa-chevron-right text-label text-stone-500 transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" aria-hidden />

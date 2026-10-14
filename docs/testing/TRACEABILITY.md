@@ -773,3 +773,74 @@ Evidence, with deterministic fakes and real Postgres; no vendor called:
 **Status:** implemented and tested; human review and approval remain required, as do ADR-041's acceptance and every
 limit value (pilot README §6). Nothing has measured real-provider throughput or sizing for 100 simultaneous
 submissions.
+
+## IR-546 — early candidate preview and bounded, screened listing
+
+A "which papers are about X" question in the `listing` lane selects at most twenty distinct candidate Records from
+the approved word, meaning and passage signals, shows them at once as relevance-pending, screens them in bounded
+parallel title-and-abstract checks, and returns every candidate in exactly one state (matches, does not match,
+uncertain, could not be assessed) with source-linked quotes, subset wording and explicit inconclusive, zero-match and
+degraded-search states. Access is read again before each send, update, replay and output.
+`apps/ai/research/listing.py`; contract in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md) §11.
+
+Evidence, with deterministic fakes and real Postgres; no vendor called:
+- `apps/ai/tests/test_listing_workflow_http.py`, over the JSON, SSE and conversation boundaries:
+  - preview before any decision, every state reconciled, stable ids, reopened Turn equal to the live listing;
+  - the twenty-candidate cap, including when every assessment fails and with many chunks per Record;
+  - an invented handle, title or quote cannot become a decision;
+  - a paper AI may not read is counted and never sent or named;
+  - uncertain papers rechecked with passages when limits allow, and not when they do not;
+  - a paper that loses access before sends, during a call or after the run, and one edited mid-call;
+  - no candidates, zero matches and word-matching-only search worded as subsets;
+  - batches in flight never exceed the configured bound; a stalled batch ends at the deadline with partial results;
+  - a worker carries the question's workload and admission run;
+  - the queued journal replays candidates in order and re-filters them for the reader.
+- `apps/ai/research/tests/test_listing_outcome.py` (selection cap and wording, no database).
+- The b03 `listing` baseline in `fixed_workflow_baseline.json` and `test_fixed_workflow_baseline_http.py`.
+- `src/features/ai/components/CandidateList.test.tsx` and `useAskStream.test.tsx` (pending then moved by id, status
+  announcement, axe, AI-restricted never named, inconclusive, older listings).
+
+**Status:** implemented and tested; human review and approval remain required. The `screen` endpoint is still not
+approved for pilot traffic (pilot README §5). No screening recall, latency or cost has been measured, so the
+twenty-candidate limit and the 10 s goal stay unvalidated.
+
+## IR-547 — topic-match counts and the screening cache
+
+A "how many papers match X" question in the `count` lane now selects at most twenty distinct candidate Records through
+the IR-546 workflow, screens them, and states the include decisions as a classified-subset count with its assessed and
+unassessed totals, criterion, method and version. It is never a model-written number, a catalogue metadata count or a
+claim about the whole repository. A per-reader screening cache (`AI_SCREEN_CACHE`, off by default) reuses verdicts for
+listings and counts, re-checking access, disclosure, content and quote on every reuse. Cross-reader sharing is not
+built and needs a named person's approval. `apps/ai/research/listing.py`, `apps/ai/research/screening_cache.py`,
+`apps/ai/models/screening.py`; contract in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md) §12.
+
+Evidence, with deterministic fakes and real Postgres; no vendor called:
+- `apps/ai/tests/test_topic_count_http.py`, over the JSON, SSE, queued-replay and reopened-conversation boundaries:
+  - seven matches among sixteen assessed of twenty selected, with four unassessed, the criterion, method, version and
+    the not-a-catalogue-count statement; the sentence equals `done.answer` and the reopened Turn;
+  - pending contributes nothing; all-unassessed is inconclusive and never "0 matches"; zero, none found, uncertain and
+    twenty-five available (twenty selected) are worded as subsets; many chunks are one candidate;
+  - a model reply carrying its own count is rejected whole; malformed, timed-out and unavailable screens are unassessed;
+  - cold, warm, changed abstract, extraction, model, approval policy, criterion and prompt; one reader never reads
+    another's rows; listing and count share verdicts; the cache holds a decision and its verbatim quote, never a title, abstract or failure;
+  - revoked access before, during and after a warm run, a gate that now refuses a cached paper, and a quote that no
+    longer holds; hits never exceed the twenty-record allowance;
+  - concurrent writers and a lost insert race leave one row; an unreadable cache never fails a count;
+  - observed hits, misses, calls, estimated tokens and stage times, with the note that a warm run shows no capacity;
+  - the queued journal replays a count and re-filters it for the reader; a reopened Turn rebuilds the count.
+- `apps/ai/tests/test_routing_lanes.py` (the count seam, no database) and the b02 baseline in
+  `fixed_workflow_baseline.json` with `test_fixed_workflow_baseline_http.py`.
+
+**Status:** implemented and tested; human review and approval remain required. The `screen` endpoint is still not
+approved for pilot traffic (pilot README §5), enabling `AI_SCREEN_CACHE` needs the policy label set by someone with
+authority, and no screening recall, latency or cost has been measured.
+
+## IR-554: a Publish click survives Discover's search debounce
+
+**Defect.** Discover's search box writes `q` to the URL 300ms after the last keystroke, and once on load. The timer called the `setSearchParams` of the render that armed it, and react-router-dom 6.30's functional form builds from that render's URL, so a Publish click inside the window was written back out and the dialog closed. It surfaced as a flaky page-head test (5 of 12 runs failed on `main`, 2026-10-13) and failed PR #249's Frontend job once.
+
+**Fix.** `DiscoverPage` keeps the latest `setSearchParams` in a ref and the timer calls that, so it builds from the current URL.
+
+**Test.** `src/features/discover/DiscoverPage.test.tsx` › "keeps the Publish dialog open when the search debounce fires after the click" and "keeps both a just-typed search and the Publish dialog in the URL" — both failed on `main` before the fix. Evidence, 2026-10-13, local: the Discover file **21 passed**, and **0 of 20** consecutive runs failed; `npm test` **876 passed, 3 failed**, the same three failing on `main` without this change (`Sidebar.test.tsx` ×2, `PaperAiOverview.test.tsx` ×1, timing-sensitive on this machine; green in CI); lint 0 errors, build green.

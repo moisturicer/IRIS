@@ -110,7 +110,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
           role="dialog"
           aria-label="Notifications"
           className={cn(
-            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-white rounded-xl border border-stone-200 shadow-card-md z-50 overflow-hidden",
+            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-overlay rounded-xl border border-stone-200 shadow-card-md z-50 overflow-hidden",
             align === "start" ? "left-0" : "right-0",
           )}
         >

@@ -6,16 +6,10 @@ from unittest.mock import Mock
 import pytest
 
 from apps.ai.answers.citations import Citation, NO_SOURCES, UNAVAILABLE
-from apps.ai.research.ledger import EvidenceItem, RECORD
-from apps.ai.research.results import Completeness, Coverage, ToolResult, ToolStatus
 from apps.ai.retrieval.ports import RetrievedChunk, RetrievalResult
 from apps.ai.routing import lanes
 
 pytestmark = pytest.mark.django_required
-
-
-def item(pk, title):
-    return EvidenceItem(f"R{pk}", RECORD, pk, title, "abstract")
 
 
 def run_for(records):
@@ -30,43 +24,47 @@ def record(pk):
     return SimpleNamespace(pk=pk, title=f"Paper {pk}", abstract="abstract")
 
 
-def test_listing_screen_cannot_invent_a_record_or_replace_database_title(monkeypatch):
-    records = [record(1)]
-    run, allowed = run_for(records)
-    # ToolRun is a dataclass in production, so replace it using a seam here.
-    monkeypatch.setattr(lanes, "replace", lambda run, **kwargs: SimpleNamespace(**vars(run), **kwargs))
-    monkeypatch.setattr(lanes, "disclosable", lambda ctx, ids: {pk: allowed[pk] for pk in ids if pk in allowed})
-    found = ToolResult(ToolStatus.OK, Coverage(Completeness.MATCHES_FOUND), (item(1, "Paper 1"),))
-    screened = ToolResult(ToolStatus.OK, Coverage(Completeness.SCREENED),
-        (item(1, "Paper 1"), item(99, "Invented")),
-        detail={"rows": [{"record": "R1", "decision": "include"},
-                         {"record": "R99", "decision": "include"}], "unassessed": 0})
-    registry = Mock()
-    registry.call.side_effect = [found, screened]
-    monkeypatch.setattr(lanes, "research_tools", lambda: registry)
-    answer, listing = lanes._listing(run, "aquaponics", 8)
+# IR-546 replaced the listing lane's find-then-screen tool calls with
+# `research.listing.screen_listing`, so the two tests that mocked those calls
+# are replaced here by the same two invariants at the new seam. The end-to-end
+# behaviour is in `test_listing_workflow_http.py`.
+def listing_outcome(*candidates):
+    from apps.ai.research.listing import Candidate, Outcome
+
+    return Outcome(tuple(Candidate(pk, f"Paper {pk}", state) for pk, state in candidates))
+
+
+def run_listing(monkeypatch, outcome, workflow=lanes._listing_events):
+    run = SimpleNamespace(root=Mock(), ctx=SimpleNamespace())
+
+    def screened(run, question, **kwargs):
+        return outcome
+        yield  # a generator, as the real one is
+
+    monkeypatch.setattr(lanes, "screen_listing", screened)
+    events = workflow(run, "aquaponics")
+    try:
+        while True:
+            next(events)
+    except StopIteration as stop:
+        return stop.value, run
+
+
+def test_listing_answer_is_the_code_written_wording_and_lists_only_included(monkeypatch):
+    (answer, listing), run = run_listing(
+        monkeypatch, listing_outcome((1, "included"), (2, "excluded"), (3, "uncertain")))
     assert listing["records"] == [{"record_id": 1, "title": "Paper 1"}]
-    assert listing["completeness"] == "matches_found"
-    assert "Invented" not in answer.text
-    assert registry.call.call_args.args[0].screen_candidate_ids == (1,)
+    assert answer.text == listing["wording"] and answer.state != NO_SOURCES
+    assert "1 matched, 1 did not match, 1 uncertain, 0 could not be assessed" in answer.text
     run.root.llm_for.assert_not_called()
 
 
 def test_listing_unassessed_is_not_claimed_as_a_match(monkeypatch):
-    run, allowed = run_for([record(1)])
-    monkeypatch.setattr(lanes, "replace", lambda run, **kwargs: SimpleNamespace(**vars(run), **kwargs))
-    monkeypatch.setattr(lanes, "disclosable", lambda ctx, ids: allowed)
-    registry = Mock()
-    registry.call.side_effect = [
-        ToolResult(ToolStatus.OK, Coverage(Completeness.MATCHES_FOUND), (item(1, "Paper 1"),)),
-        ToolResult(ToolStatus.DEGRADED, Coverage(Completeness.SCREENED),
-                   detail={"rows": [{"record": "R1", "decision": "unassessed"}], "unassessed": 1}),
-    ]
-    monkeypatch.setattr(lanes, "research_tools", lambda: registry)
-    answer, listing = lanes._listing(run, "aquaponics", 8)
+    (answer, listing), run = run_listing(monkeypatch, listing_outcome((1, "unassessed")))
     assert answer.state == NO_SOURCES
-    assert listing["records"] == []
-    assert "could not be assessed" in answer.text
+    assert listing["records"] == [] and listing["completeness"] == "inconclusive"
+    assert answer.text.startswith("Inconclusive: none of the 1 candidate papers could be assessed")
+    run.root.llm_for.assert_not_called()
 
 
 def passage(pk, n):
@@ -123,17 +121,39 @@ def test_comparison_does_not_retrieve_or_transmit_gated_paper(monkeypatch):
     assert "Paper 2" in answer.text
 
 
-def test_count_uses_computed_workflow_wording_without_answer_model(monkeypatch):
-    run, allowed = run_for([record(1)])
-    monkeypatch.setattr(lanes, "disclosable", lambda ctx, ids: allowed)
-    monkeypatch.setattr(lanes, "topic_count", lambda run, q: ToolResult(
-        ToolStatus.OK, Coverage(Completeness.SCREENED), (item(1, "Paper 1"),),
-        detail={"total": 1, "wording": "1 matched out of 2 checked; 0 could not be assessed.",
-                "matches": [{"record": "R1"}]}))
-    answer, listing = lanes._count(run, "aquaponics")
-    assert answer.text.startswith("1 matched out of 2 checked")
+# IR-547 replaced the count lane's `topic_count` tool calls with the same
+# screened-subset workflow as a listing; the end-to-end behaviour is in
+# `test_topic_count_http.py`. The same two invariants hold at this seam.
+def topic_outcome(*candidates):
+    from apps.ai.research.listing import Candidate, Outcome
+
+    topic = {"criterion": "aquaponics", "method": "title_and_abstract_screening", "version": "screen-test"}
+    return Outcome(tuple(Candidate(pk, f"Paper {pk}", state) for pk, state in candidates), topic=topic)
+
+
+@pytest.fixture
+def topic_question(monkeypatch):
+    monkeypatch.setattr(lanes.metadata_count, "answer", lambda ctx, question: None)
+
+
+def test_count_is_the_code_written_count_of_included_decisions_without_any_model(
+    monkeypatch, topic_question
+):
+    (answer, listing), run = run_listing(
+        monkeypatch, topic_outcome((1, "included"), (2, "excluded"), (3, "unassessed")),
+        workflow=lanes._count_events)
+    assert listing["topic_count"]["matches"] == 1 and listing["topic_count"]["assessed"] == 2
     assert listing["records"] == [{"record_id": 1, "title": "Paper 1"}]
+    assert answer.text == listing["wording"] and answer.state != NO_SOURCES
+    assert answer.text.startswith("1 match among 2 assessed of 3 selected candidate papers, with 1 not assessed.")
     run.root.llm_for.assert_not_called()
+
+
+def test_a_count_with_nothing_assessed_is_inconclusive_not_zero(monkeypatch, topic_question):
+    (answer, listing), _ = run_listing(
+        monkeypatch, topic_outcome((1, "unassessed"), (2, "unassessed")), workflow=lanes._count_events)
+    assert answer.state == NO_SOURCES and listing["completeness"] == "inconclusive"
+    assert answer.text.startswith("Inconclusive") and "0 match" not in answer.text
 
 
 def test_comparison_over_source_limit_does_not_silently_drop_a_paper(monkeypatch):

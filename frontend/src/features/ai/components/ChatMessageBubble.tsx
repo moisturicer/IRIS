@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
+import { CandidateList } from "./CandidateList";
 import { CopyButton } from "./CopyButton";
 import {
   DegradedNotice,
@@ -87,7 +88,8 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
           />
         ) : null}
 
-        {!isUser && message.listing && !message.listing.count && (
+        {!isUser && message.listing?.candidates && <CandidateList listing={message.listing} />}
+        {!isUser && message.listing && !message.listing.count && !message.listing.candidates && (
           <div className="mt-3">
             <p className="text-sm text-stone-600">{message.listing.wording}</p>
             {message.listing.records.length === 0 && <p className="mt-2">No papers are listed for this answer.</p>}

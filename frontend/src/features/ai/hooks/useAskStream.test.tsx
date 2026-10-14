@@ -350,6 +350,76 @@ describe("the research lane (IR-504)", () => {
   });
 });
 
+describe("a listing's candidates (IR-546)", () => {
+  const preview = {
+    event: "candidates_selected",
+    data: { limit: 20, more_available: false, degraded: false, candidates: [
+      { record_id: 1, title: "Flood Prediction", state: "pending" },
+      { record_id: 2, title: "Tilapia Ponds", state: "pending" },
+    ] },
+  };
+  const listing = {
+    completeness: "matches_found", wording: "Screened 2 candidate papers: 1 matched, 1 did not match, 0 uncertain, 0 could not be assessed.",
+    records: [{ record_id: 1, title: "Flood Prediction" }],
+    candidates: [
+      { record_id: 1, title: "Flood Prediction", state: "included" },
+      { record_id: 2, title: "Tilapia Ponds", state: "excluded" },
+    ],
+  };
+
+  it("shows the preview as pending, moves each paper by id, and ends on the final listing", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockReturnValue(
+      (async function* () {
+        yield preview;
+        yield { event: "candidates_updated", data: { candidates: [{ record_id: 1, state: "included" }] } };
+        // A replay or a repeat must not add a second card.
+        yield { event: "candidates_updated", data: { candidates: [{ record_id: 1, state: "included" }] } };
+        await gate;
+        yield { event: "done", data: { answer: listing.wording, citations: [], sources: [], message: null,
+          mode: "generative", degraded: false, conversation_id: 4, resolved_question: null, widened: false,
+          had_reasoning: false, listing } };
+      })(),
+    );
+    const { result } = renderHook(() => useAskStream());
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.ask("Which papers are about flooding?"); });
+
+    await waitFor(() => expect(result.current.streaming?.candidates?.[0]?.state).toBe("included"));
+    expect(result.current.streaming?.candidates).toEqual([
+      { record_id: 1, title: "Flood Prediction", state: "included" },
+      { record_id: 2, title: "Tilapia Ponds", state: "pending" },
+    ]);
+
+    release();
+    const outcome = await pending as { message: { listing?: typeof listing } };
+    expect(outcome.message.listing?.candidates).toEqual(listing.candidates);
+    await waitFor(() => expect(result.current.streaming).toBeNull());
+  });
+
+  it("starts the candidates over when a new attempt begins", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "run_queued", id: "1", data: { run_id: "r-9", state: "queued" } };
+        yield { ...preview, id: "2" };
+        yield { event: "run_started", id: "3", data: { run_id: "r-9", state: "running", attempt: 2 } };
+        await gate;
+        yield { event: "run_failed", id: "4", data: { run_id: "r-9", state: "failed" } };
+      })(),
+    );
+    const { result } = renderHook(() => useAskStream());
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.ask("q"); });
+    await waitFor(() => expect(result.current.streaming?.stage).toBe("searching"));
+    expect(result.current.streaming?.candidates).toBeUndefined();
+    release();
+    await pending;
+  });
+});
+
 describe("a queued run (IR-544)", () => {
   const done = {
     event: "done", id: "9",

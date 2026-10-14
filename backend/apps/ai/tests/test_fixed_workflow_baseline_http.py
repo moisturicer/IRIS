@@ -94,7 +94,7 @@ class OracleScreen(LLMProvider):
         for paper in json.loads(user)["records"]:
             label = self.decide[paper["title"]]
             if label == "uncertain":
-                rows.append({"record": paper["record"], "decision": "unassessed", "quote": ""})
+                rows.append({"record": paper["record"], "decision": "uncertain", "quote": ""})
             else:
                 rows.append({"record": paper["record"], "quote": paper["title"],
                              "decision": "include" if label == "relevant" else "exclude"})
@@ -165,7 +165,8 @@ def test_baseline_outcome_through_http_sse_and_replay(
     if expect.get("answer_is_null"):
         assert body["answer"] is None
     if "answer_contains" in expect:
-        assert expect["answer_contains"] in body["answer"]
+        # A non-answer (nothing assessed, none found) says so in `message`, not `answer`.
+        assert expect["answer_contains"] in (body["answer"] or body["message"])
 
     listing = expect["listing"]
     if listing is None:
@@ -178,6 +179,21 @@ def test_baseline_outcome_through_http_sse_and_replay(
             assert sorted(returned) == sorted(listing["record_keys"])
         if "record_keys_within" in listing:
             assert set(returned) <= set(listing["record_keys_within"])
+        if "candidates" in listing:
+            # IR-546: every candidate in exactly one state; a restricted Record is
+            # counted as unassessed and never named.
+            rows = body["listing"]["candidates"]
+            assert len({row["record_id"] for row in rows}) == len(rows) <= 20
+            by_state = {state: sorted(keys[row["record_id"]] for row in rows
+                                      if row["state"] == state and not row.get("restricted"))
+                        for state in ("included", "excluded", "uncertain")}
+            expected = listing["candidates"]
+            assert by_state == {"included": sorted(expected["included_keys"]),
+                                "excluded": sorted(expected["excluded_keys"]),
+                                "uncertain": sorted(expected["uncertain_keys"])}
+            assert sorted(keys[row["record_id"]] for row in rows if row.get("restricted")) == sorted(
+                expected["restricted_keys"])
+            assert all("title" not in row for row in rows if row.get("restricted"))
 
     cited = {keys[c["record_id"]] for c in body["citations"]}
     if "citations_within" in expect:
