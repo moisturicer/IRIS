@@ -900,7 +900,7 @@ campaign and concurrency limits still apply. Cache reuse, generation, publicatio
 and replay recheck permissions, disclosure and source versions. Stale replay
 withholds prose, table and sources. Comparison history is excluded from model reuse.
 
-**Evidence, 14 October 2026.** `apps/ai/tests/test_comparison_http.py`: **25 passed**,
+**Evidence, 14 October 2026.** `apps/ai/tests/test_comparison_http.py`: **28 passed**,
 covering first use/cache, bounds/ambiguity, hidden/missing/gated Records, partial
 results, invented claims, source changes during generation and replay, independent
 sectioned long papers and question-specific rows. `admission/tests/test_shared_processes.py`
@@ -918,3 +918,21 @@ fake-provider tests establish application behavior, not semantic correctness or
 real-provider quality. Human labels and separate correctness/claim/citation review
 remain necessary. No paid evaluation, architectural acceptance or rollout occurred.
 See [Record comparison contract](../engineering/RECORD_COMPARISON.md).
+
+Final fresh isolated backend suite: **3,708 passed, 1 xpassed**, zero failures.
+The first non-isolated attempt overlapped another test process using the same
+database; it was stopped and superseded by the isolated run. The prior isolated
+run found a workflow-status literal, now replaced by the existing tool status,
+and the already documented Windows CRLF proxy-checksum mismatch. Restoring the
+unchanged committed LF bytes fixed the checksum; no fixture content changes ship.
+Both new migrations also preserved 12 populated legacy Turns and existing
+reservation charges in the isolated database. Migration consistency, Django
+configuration and backend static checks pass (the existing axes warning remains).
+Synthetic comparison layout checks at 360, 768, 1280 and 1745 px found no page-wide
+horizontal overflow; the table scrolls within its region at phone width.
+
+Independent standards/spec reviews found and resolved citation-text duplication
+in Turns, first-use brief accounting, named-route admission and incomplete detail
+reading. No material blockers remain; one nonblocking duplicated-reading-loop
+smell was noted. These reviews do not replace human approval or labelled quality
+evaluation, and the feature remains disabled by default.
