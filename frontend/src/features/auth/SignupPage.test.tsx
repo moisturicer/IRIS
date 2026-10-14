@@ -74,6 +74,13 @@ async function finish(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Register" }));
 }
 
+/** A complete Student registration, submitted with consent. */
+async function submitStudent(user: ReturnType<typeof userEvent.setup>) {
+  await fillCommonFields(user);
+  await user.selectOptions(program(), "BS Computer Science");
+  await finish(user);
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -264,9 +271,7 @@ describe("what the register screen sends", { timeout: 30_000 }, () => {
     renderSignup();
     await optionsLoaded();
 
-    await fillCommonFields(user);
-    await user.selectOptions(program(), "BS Computer Science");
-    await finish(user);
+    await submitStudent(user);
 
     await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
     const payload = register.mock.calls[0][0];
@@ -404,10 +409,11 @@ describe("consent on the register screen", { timeout: 30_000 }, () => {
   });
 
   it("links to no page that does not exist", async () => {
-    const { container } = renderSignup();
+    renderSignup();
     await optionsLoaded();
 
-    expect(container.querySelector('a[href="#"]')).toBeNull();
+    const dead = screen.queryAllByRole("link").filter((a) => a.getAttribute("href") === "#");
+    expect(dead).toEqual([]);
   });
 
   it("leaves Register enabled, and refuses a submit without consent on the checkbox itself", async () => {
@@ -453,9 +459,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     renderSignup();
     await optionsLoaded();
 
-    await fillCommonFields(user);
-    await user.selectOptions(program(), "BS Computer Science");
-    await finish(user);
+    await submitStudent(user);
 
     const confirmation = await screen.findByRole("heading", { level: 2, name: "Check your email" });
     expect(register).toHaveBeenCalledTimes(1);
@@ -477,12 +481,6 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
 describe("a refused registration", { timeout: 30_000 }, () => {
   const refuse = (data: unknown) =>
     vi.spyOn(authApi, "register").mockRejectedValue({ response: { status: 400, data } });
-
-  async function submitStudent(user: ReturnType<typeof userEvent.setup>) {
-    await fillCommonFields(user);
-    await user.selectOptions(program(), "BS Computer Science");
-    await finish(user);
-  }
 
   it("puts a server field error on its field", async () => {
     const user = userEvent.setup();
@@ -572,9 +570,7 @@ describe("a registration in flight", { timeout: 30_000 }, () => {
     );
     renderSignup();
     await optionsLoaded();
-    await fillCommonFields(user);
-    await user.selectOptions(program(), "BS Computer Science");
-    await finish(user);
+    await submitStudent(user);
 
     const working = await screen.findByRole("button", { name: "Creating account…" });
     expect(working).toBeDisabled();
@@ -601,9 +597,7 @@ describe("the register screen's accessibility in its IR-540 states", { timeout: 
     acceptRegistration();
     const { container } = renderSignup();
     await optionsLoaded();
-    await fillCommonFields(user);
-    await user.selectOptions(program(), "BS Computer Science");
-    await finish(user);
+    await submitStudent(user);
     await screen.findByRole("heading", { name: "Check your email" });
 
     await expectNoBlockingA11yViolations(container);

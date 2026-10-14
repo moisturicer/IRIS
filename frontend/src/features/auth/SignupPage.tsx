@@ -5,6 +5,7 @@ import { accountsApi } from "@/api/accounts";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { Button, Input, Select } from "@/components/ui";
+import { FOCUS_RING } from "@/components/ui/interaction";
 import { DataNotice } from "./DataNotice";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export default function SignupPage() {
   const [form, setForm]             = useState<FormState>(EMPTY);
   const [errors, setErrors]         = useState<FieldErrors>({});
   const [touched, setTouched]       = useState<Partial<Record<keyof FormState, boolean>>>({});
-  const [terms, setTerms]           = useState(false);
+  const [consented, setConsented]   = useState(false);
   const [consentError, setConsentError] = useState<string>();
   const [formAlert, setFormAlert]   = useState<FormAlert | null>(null);
   const [noticeOpen, setNoticeOpen] = useState(false);
@@ -128,11 +129,6 @@ export default function SignupPage() {
   const [registered, setRegistered] = useState<{ email: string; role: Role } | null>(null);
   const confirmationRef = useRef<HTMLHeadingElement>(null);
 
-  // The form a screen-reader user was in has just gone, so their focus goes
-  // to what replaced it.
-  useEffect(() => {
-    if (registered) confirmationRef.current?.focus();
-  }, [registered]);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword]   = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
@@ -162,6 +158,11 @@ export default function SignupPage() {
   }, []);
 
   useEffect(loadOptions, [loadOptions]);
+  // The form a screen-reader user was in has just gone, so their focus goes
+  // to what replaced it.
+  useEffect(() => {
+    if (registered) confirmationRef.current?.focus();
+  }, [registered]);
 
   const collegeNum = Number(form.college_id);
   const filteredDepts = allDepts.filter((d) => d.college === collegeNum);
@@ -206,8 +207,8 @@ export default function SignupPage() {
     setErrors(errs);
     // Consent is checked with the fields, not after them, so one press of
     // Register shows everything that is missing at once (IR-540).
-    setConsentError(terms ? undefined : CONSENT_REQUIRED);
-    if (Object.values(errs).some(Boolean) || !terms) return;
+    setConsentError(consented ? undefined : CONSENT_REQUIRED);
+    if (Object.values(errs).some(Boolean) || !consented) return;
 
     setFormAlert(null);
     setSubmitting(true);
@@ -297,12 +298,17 @@ export default function SignupPage() {
             emails you when they decide.
           </li>
         </ol>
+        {/* Not "contact RDCO": an email is read-only to every IRIS screen,
+            RDCO's included, so the only fix IRIS offers is a fresh registration. */}
         <p className="mt-section text-small text-stone-600">
-          If that address is wrong, contact RDCO: IRIS cannot change it for you.
+          If that address is wrong, register again with the right one.
         </p>
         <Link
           to="/login"
-          className="mt-section-lg flex min-h-11 w-full items-center justify-center rounded-lg bg-brand px-5 py-3.5 text-md font-medium text-white transition-colors hover:bg-brand-light"
+          // Drawn as the primary action, since it is the only one left. Button
+          // cannot render as a link yet (IR-538 adds that); until then this
+          // copies its `primary` + `full` look, in type-role sizes.
+          className={`mt-section-lg flex min-h-11 w-full items-center justify-center rounded-lg bg-brand px-5 py-3.5 text-heading font-medium text-white transition-colors hover:bg-brand-light ${FOCUS_RING}`}
         >
           Go to sign in
         </Link>
@@ -324,7 +330,7 @@ export default function SignupPage() {
           <AuthAlert variant="error" title="Some of this form didn't load">
             IRIS couldn&apos;t load the colleges, programs and departments to choose from.
             <div className="mt-3">
-              <Button type="button" variant="outline" size="md" onClick={loadOptions}>
+              <Button type="button" variant="outline" size="full" onClick={loadOptions}>
                 Try again
               </Button>
             </div>
@@ -452,17 +458,17 @@ export default function SignupPage() {
           <div className="flex items-start gap-2.5">
             <input
               type="checkbox"
-              id="terms"
-              checked={terms}
+              id="signup-consent"
+              checked={consented}
               onChange={(e) => {
-                setTerms(e.target.checked);
+                setConsented(e.target.checked);
                 if (e.target.checked) setConsentError(undefined);
               }}
               aria-invalid={consentError ? true : undefined}
               aria-describedby={consentError ? consentErrorId : undefined}
               className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
             />
-            <label htmlFor="terms" className="cursor-pointer text-small text-stone-600">
+            <label htmlFor="signup-consent" className="cursor-pointer text-small text-stone-600">
               I have read the data notice and agree to IRIS using my details as it describes.
             </label>
           </div>
@@ -479,9 +485,9 @@ export default function SignupPage() {
             aria-controls={noticeId}
             onClick={() => setNoticeOpen((v) => !v)}
             // 44px tall, as sign-in's "Forgot password?" is (2.5.5).
-            className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand hover:underline"
+            className={`mt-1 inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
           >
-            <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-xs`} aria-hidden />
+            <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-label`} aria-hidden />
             Read the data notice
           </button>
           {noticeOpen && (
