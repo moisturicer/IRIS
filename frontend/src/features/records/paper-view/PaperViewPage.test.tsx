@@ -45,6 +45,7 @@ import type { RecordDetail, ReviewerSeat } from "@/types/records";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 
+import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
 
@@ -1948,5 +1949,79 @@ describe("record versions (IR-416)", () => {
       within(screen.getByRole("combobox", PICKER)).getByRole("option", { name: /^v1 .*\(no manuscript\)$/ }),
     ).toBeDisabled();
     unmount();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// IR-569: the Overview is one reading column, and View is its filled action
+// ---------------------------------------------------------------------------
+
+describe("the Overview's header (IR-569)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+  });
+
+  it("fills View, which opens the paper, and leaves Save outlined", async () => {
+    renderWithProbe(`/records/${RECORD_ID}`);
+    await waitForRecord(record.title);
+
+    const view = screen.getByRole("button", { name: "View" });
+    expect(view).toHaveClass(...PILL_PRIMARY.split(" "));
+    expect(screen.getByRole("button", { name: "Save to collection" })).not.toHaveClass("bg-brand");
+
+    await userEvent.click(view);
+
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent("section=paper");
+  });
+
+  it("fills Save instead where there is no paper to view", async () => {
+    shownRecord = { ...record, abstract_file: null, files: [] };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save to collection" })).toHaveClass("bg-brand");
+  });
+
+  it("lists the authors as chips, and says what the record is", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const authors = screen.getByRole("list", { name: "Authors" });
+    expect(within(authors).getByText("R. Dela Cruz")).toBeInTheDocument();
+    expect(screen.getAllByText("Thesis/Research").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Applied Research").length).toBeGreaterThan(0);
+  });
+
+  it("holds governance and documents in a Record details section, not a rail", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("region", { name: "Record details" });
+    expect(within(details).getByRole("heading", { name: "Institutional Governance" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Institutional Governance" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the section tabs (IR-569)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+  });
+
+  it("slides one thumb to the chosen tab", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+    const thumb = screen.getByRole("tablist").firstElementChild as HTMLElement;
+    expect(thumb).toHaveAttribute("aria-hidden", "true");
+    expect(thumb.style.transform).toBe("translateX(0%)");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+
+    expect(thumb.style.transform).toBe("translateX(100%)");
+    // Half the track less its padding, as the browser normalises it.
+    expect(thumb.style.width).toMatch(/^calc\((0\.5 \* \(100% - 4px\)|\(100% - 4px\) \/ 2)\)$/);
   });
 });

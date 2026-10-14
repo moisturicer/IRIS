@@ -10,8 +10,6 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error -- the config is plain JS and ships no declaration file
 import { readingVariants } from "../../../../tailwind.config.js";
 import {
-  OVERVIEW_RAIL_MAX_HEIGHT,
-  OVERVIEW_RAIL_TOP,
   PANE_TOP_PX,
   READER_TOOLBAR_TOP,
   READER_TOOLBAR_TOP_PX,
@@ -26,12 +24,10 @@ import {
 describe("pane offsets", () => {
   it("puts the panes 12px under the reading header", () => {
     expect(PANE_TOP_PX).toBe(READING_HEADER_PX + 12);
-    expect(OVERVIEW_RAIL_TOP).toBe(`overview-rail:top-[${PANE_TOP_PX}px]`);
     expect(READING_PANE_TOP).toBe(`reading-wide:top-[${PANE_TOP_PX}px]`);
   });
 
   it("ends the panes at the page's 28px bottom padding", () => {
-    expect(OVERVIEW_RAIL_MAX_HEIGHT).toBe(`overview-rail:max-h-[calc(100vh-${PANE_TOP_PX + 28}px)]`);
     expect(READING_PANE_HEIGHT).toBe(`reading-wide:h-[calc(100vh-${PANE_TOP_PX + 28}px)]`);
   });
 

@@ -49,7 +49,7 @@ import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
-import { OVERVIEW_RAIL_MAX_HEIGHT, OVERVIEW_RAIL_TOP, readingTier, type ReadingTier } from "./paneLayout";
+import { readingTier, type ReadingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -217,7 +217,7 @@ function SimilarPapers({ recordId }: { recordId: number }) {
           <Link
             key={item.id}
             to={`/records/${item.id}`}
-            className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 border-t-2 border-t-brand/70 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
+            className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
           >
             <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
               CIT-U #{item.id}
@@ -267,6 +267,10 @@ function LoadingSkeleton() {
     </div>
   );
 }
+
+/** An outlined fact about the record: its type, classification, programme flags. */
+const META_CHIP =
+  "px-2.5 py-1 rounded-full ring-1 ring-stone-300 text-xs font-semibold text-stone-700";
 
 /** Initials for the byline's mark. */
 function initials(name: string): string {
@@ -584,9 +588,12 @@ export default function PaperViewPage() {
   const editOpen = searchParams.get("edit") === "details" && can.has("edit_details") && !arriving;
 
   const primaryOwner = record.owners.find((o) => o.is_primary) ?? record.owners[0];
-  const byline = record.authors.length > 0
-    ? record.authors.map((a) => a.name).join(", ")
-    : primaryOwner?.full_name ?? null;
+  const authorNames =
+    record.authors.length > 0
+      ? record.authors.map((a) => a.name)
+      : primaryOwner?.full_name
+        ? [primaryOwner.full_name]
+        : [];
 
   // A citation carries the exact chunk it points at as router `state`
   // (IR-335), so the reader draws its highlight with no second fetch. A
@@ -605,7 +612,6 @@ export default function PaperViewPage() {
       : onPaperTab
         ? PAPER_WORKSPACE_PANEL_CLASS
         : DOCKED_PANEL_CLASS;
-  const showRail = section === "overview" && !arriving;
   // Versions (IR-416). Null to a viewer who may not read the review, so a
   // reader of a published paper has none, and `?version=` means nothing to
   // them. An earlier version is open only while it is asked for, exists and
@@ -682,11 +688,13 @@ export default function PaperViewPage() {
   );
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
-  // owner's pending action, else the reviewer's Open review, else Save. When
+  // owner's pending action, else the reviewer's Open review, else View (Save
+  // where there is no paper to view, IR-569). When
   // the pending action has its own region -- the revision banner, the
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
   // there.
+  const hasPaper = sections.includes("paper");
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
@@ -695,7 +703,9 @@ export default function PaperViewPage() {
         ? "open_review"
         : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
           ? "elsewhere"
-          : "save";
+          : hasPaper
+            ? "view"
+            : "save";
 
   // *Open review* (ADR-032 §4) records when this reviewer started -- the
   // seat moves to `in_review` and the server stamps `opened_at` -- then moves
@@ -788,11 +798,8 @@ export default function PaperViewPage() {
 
           <div
             className={cn(
-              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-6 items-start",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:px-7 pt-6 pb-7", PAGE_WIDTH.standard),
-              // The rail sits beside the page while the column has room for
-              // both, and under it otherwise; the Abstract keeps its measure.
-              showRail && "overview-rail:grid-cols-[minmax(0,1fr)_20rem]",
+              onPaperTab && "flex-1 min-h-0 flex flex-col",
+              !onPaperTab && !onReviewTab && cn("px-4 sm:px-7 pt-8 pb-12", PAGE_WIDTH.standard),
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -801,39 +808,70 @@ export default function PaperViewPage() {
           {arriving ? (
             <MainColumnSkeleton />
           ) : (
-          <div className={cn("min-w-0", onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-6")}>
+          <div
+            className={cn(
+              "min-w-0",
+              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
+              // A reading column, like a paper's page: the Overview is one
+              // measure, centred in whatever room the panel leaves (IR-569).
+              section === "overview" && "mx-auto w-full max-w-3xl",
+            )}
+          >
             {/* Editorial header (IR-356): what it is, who wrote it, then
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
             {!onPaperTab && (
-            <header className="space-y-3">
-              <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
-                {(record.record_type_name || record.classification_name) && (
-                  <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand">
-                    {[record.record_type_name, record.classification_name].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
-              </div>
+            <header className="space-y-5">
+              <p className="flex items-center gap-x-2 text-small text-stone-500">
+                <span>Added {formatDate(record.created_at)}</span>
+                <span aria-hidden className="text-stone-300">·</span>
+                <span>
+                  {record.access_count} view{record.access_count === 1 ? "" : "s"}
+                </span>
+              </p>
 
-              <h1 className="font-display font-semibold text-3xl sm:text-4xl leading-tight text-stone-900 text-balance">
+              <h1 className="font-display font-semibold text-4xl sm:text-5xl leading-[1.08] tracking-tight text-stone-900 text-balance">
                 {record.title}
               </h1>
 
-              {/* Byline: authors · adviser · college · year (spec §4.6).
-                  No adviser line when the record names none (IR-472). */}
-              <div className="flex items-center gap-x-3 gap-y-2 flex-wrap text-sm text-stone-600">
-                {byline && (
-                  <span className="inline-flex items-center gap-2 min-w-0">
-                    <span className="w-7 h-7 shrink-0 rounded-full bg-brand text-white text-2xs font-bold flex items-center justify-center" aria-hidden>
-                      {initials(record.authors[0]?.name ?? byline)}
-                    </span>
-                    <span className="font-semibold text-stone-800">{byline}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
+                {record.record_type_name && <span className={META_CHIP}>{record.record_type_name}</span>}
+                {record.classification_name && <span className={META_CHIP}>{record.classification_name}</span>}
+                {record.is_ip && (
+                  <span className="px-2.5 py-1 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 text-xs font-semibold inline-flex items-center gap-1.5">
+                    <i className="fas fa-shield-halved text-2xs" aria-hidden />
+                    Intellectual Property
                   </span>
                 )}
-                {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
-                <span>Cebu Institute of Technology – University</span>
-                {record.year_accomplished && <span>{record.year_accomplished}</span>}
+                {record.ip_type && <span className={META_CHIP}>{IP_TYPE_LABELS[record.ip_type]}</span>}
+                {record.for_commercialization && <span className={META_CHIP}>For Commercialization</span>}
+                {record.community_extension && <span className={META_CHIP}>Community Extension</span>}
+              </div>
+
+              {/* Byline: authors, then adviser, college and year (spec §4.6).
+                  No adviser line when the record names none (IR-472). */}
+              <div className="space-y-2">
+                {authorNames.length > 0 && (
+                  <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
+                    {authorNames.map((name) => (
+                      <li
+                        key={name}
+                        className="inline-flex items-center gap-2 rounded-full bg-white pl-1 pr-3.5 py-1 ring-1 ring-stone-200 text-small font-semibold text-stone-800"
+                      >
+                        <span className="w-6 h-6 shrink-0 rounded-full bg-brand text-white text-3xs font-bold flex items-center justify-center" aria-hidden>
+                          {initials(name)}
+                        </span>
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
+                  {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
+                  <span>Cebu Institute of Technology – University</span>
+                  {record.year_accomplished && <span>{record.year_accomplished}</span>}
+                </div>
               </div>
 
               {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
@@ -850,93 +888,70 @@ export default function PaperViewPage() {
                 />
               )}
 
-              <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-stone-500">
-                <span className="inline-flex items-center gap-1.5">
-                  <i className="fas fa-calendar text-2xs" aria-hidden />
-                  Added {formatDate(record.created_at)}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <i className="fas fa-eye text-2xs" aria-hidden />
-                  {record.access_count} view{record.access_count === 1 ? "" : "s"}
-                </span>
-                {record.is_ip && (
-                  <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 font-semibold inline-flex items-center gap-1">
-                    <i className="fas fa-shield-halved text-2xs" aria-hidden />
-                    Intellectual Property
-                  </span>
+              {/* View · Save · Cite · Share, plus what the capabilities add.
+                  One filled pill (IR-356): see `primary` above. */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {primary === "continue" && (
+                  <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
+                    <i className="fas fa-pen-to-square text-xs" aria-hidden />
+                    Continue
+                  </Link>
                 )}
-                {record.ip_type && (
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
-                    {IP_TYPE_LABELS[record.ip_type]}
-                  </span>
+
+                {primary === "open_review" && (
+                  <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
+                    <i className="fas fa-clipboard-check text-xs" aria-hidden />
+                    Open review
+                  </button>
                 )}
-                {record.for_commercialization && (
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
-                    For Commercialization
-                  </span>
+
+                {hasPaper && (
+                  <button
+                    type="button"
+                    onClick={() => setViewParam("section", "paper")}
+                    className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
+                  >
+                    <i className="fas fa-book-open text-xs" aria-hidden />
+                    View
+                  </button>
                 )}
-                {record.community_extension && (
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
-                    Community Extension
-                  </span>
+
+                {can.has("edit_details") && (
+                  <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
+                    <i className="fas fa-pen text-2xs" aria-hidden />
+                    Edit details
+                  </button>
                 )}
-              </div>
 
-              {!onPaperTab && (
-                // Cite · Save · Share, plus what the capabilities add. One
-                // filled pill (IR-356): see `primary` above.
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  {primary === "continue" && (
-                    <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
-                      <i className="fas fa-pen-to-square text-xs" aria-hidden />
-                      Continue
-                    </Link>
-                  )}
+                <PaperSaveDropdown
+                  record={record}
+                  variant="pill"
+                  emphasis={primary === "save" ? "primary" : "secondary"}
+                />
 
-                  {primary === "open_review" && (
-                    <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
-                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                      Open review
-                    </button>
-                  )}
+                <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
+                  <i className="fas fa-quote-right text-2xs" aria-hidden />
+                  Cite
+                </button>
 
-                  {can.has("edit_details") && (
-                    <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
-                      <i className="fas fa-pen text-2xs" aria-hidden />
-                      Edit details
-                    </button>
-                  )}
-
-                  <PaperSaveDropdown
-                    record={record}
-                    variant="pill"
-                    emphasis={primary === "save" ? "primary" : "secondary"}
+                <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
+                  <i
+                    className={cn(
+                      "fas text-2xs",
+                      shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
+                    )}
+                    aria-hidden
                   />
-
-                  <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
-                    <i className="fas fa-quote-right text-2xs" aria-hidden />
-                    Cite
-                  </button>
-
-                  <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
-                    <i
-                      className={cn(
-                        "fas text-2xs",
-                        shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
-                      )}
-                      aria-hidden
-                    />
-                    {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
-                  </button>
-                  <span className="sr-only" role="status" aria-live="polite">
-                    {shareState === "copied"
-                      ? "Link to this paper copied"
-                      : shareState === "failed"
-                        ? "Couldn’t copy the link. Copy it from the address bar."
-                        : ""}
-                  </span>
-                </div>
-              )}
+                  {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
+                </button>
+                <span className="sr-only" role="status" aria-live="polite">
+                  {shareState === "copied"
+                    ? "Link to this paper copied"
+                    : shareState === "failed"
+                      ? "Couldn’t copy the link. Copy it from the address bar."
+                      : ""}
+                </span>
+              </div>
             </header>
             )}
 
@@ -944,7 +959,7 @@ export default function PaperViewPage() {
               id={`${tabsId}-panel`}
               role="tabpanel"
               aria-labelledby={tabId(section)}
-              className={onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-6"}
+              className={onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
             >
             {section === "paper" && reader()}
 
@@ -1074,6 +1089,27 @@ export default function PaperViewPage() {
 
                 <PaperAiOverview record={record} />
 
+                {/* What the record is held under, and what is attached (spec
+                    §4.6): the old right rail, as a section the column owns.
+                    The party status strip is for participants only. */}
+                <section aria-labelledby={`${tabsId}-details`}>
+                  <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900 mb-3">
+                    Record details
+                  </h2>
+                  <div className="grid gap-4 items-start overview-wide:grid-cols-2">
+                    {participant && (
+                      <div className="overview-wide:col-span-2">
+                        <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
+                      </div>
+                    )}
+                    <PaperGovernance record={record} />
+                    <PaperDocuments
+                      files={record.files}
+                      manageHref={participant ? `/records/${record.id}?section=files` : null}
+                    />
+                  </div>
+                </section>
+
                 {can.has("tag_ip") && (
                   <IpTagger
                     recordId={record.id}
@@ -1121,26 +1157,7 @@ export default function PaperViewPage() {
             </div>
           </div>
           )}
-
-          {/* ------------------------------------------------------------- */}
-          {/* Right rail                                                     */}
-          {/* ------------------------------------------------------------- */}
-          {/* Overview only (IR-372 keeps it off the Paper tab). Sticky under
-              the record bar, capped to the viewport and scrollable, because a
-              sticky rail taller than the window would hide its lower cards
-              until the paper ended. The party status strip is for
-              participants only (spec §4.6). */}
-          {showRail && (
-            <aside className={cn("space-y-4 overview-rail:sticky overview-rail:overflow-y-auto", OVERVIEW_RAIL_TOP, OVERVIEW_RAIL_MAX_HEIGHT)}>
-              {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
-              <PaperGovernance record={record} />
-              <PaperDocuments
-                files={record.files}
-                manageHref={participant ? `/records/${record.id}?section=files` : null}
-              />
-            </aside>
-          )}
-        </div>
+          </div>
 
         <PaperCiteModal record={record} isOpen={citeOpen} onClose={() => setCiteOpen(false)} />
         {editOpen && (

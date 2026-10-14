@@ -64,7 +64,7 @@ export function ReadingHeader({
         )}
       >
         <i className="fas fa-chevron-left text-2xs" aria-hidden />
-        <span className="sr-only reading-split:not-sr-only">Back</span>
+        <span>Back</span>
       </button>
       <span aria-hidden className="hidden reading-split:block w-px h-5 bg-stone-300 shrink-0" />
 
@@ -79,15 +79,28 @@ export function ReadingHeader({
         {title != null && version}
       </div>
 
+      {/* A recessed track with a thumb that slides to the chosen section. */}
       <div
         role="tablist"
         aria-label="Paper view"
         onKeyDown={onTabKeyDown}
         className={cn(
-          "flex items-center gap-0.5 w-full my-1.5 p-0.5 overflow-x-auto rounded-lg bg-stone-200",
+          "relative grid grid-flow-col auto-cols-fr w-full my-1.5 p-0.5 rounded-lg bg-stone-200",
+          "shadow-[inset_0_1px_3px_rgb(41_37_36/0.28),inset_0_0_0_1px_rgb(41_37_36/0.07)]",
           "reading-split:w-auto reading-split:my-0 reading-split:shrink-0",
         )}
       >
+        <span
+          aria-hidden
+          className={cn(
+            "absolute inset-y-0.5 left-0.5 rounded-md bg-brand shadow-[0_1px_2px_rgb(41_37_36/0.35),0_2px_6px_rgb(107_15_18/0.25)]",
+            "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+          )}
+          style={{
+            width: `calc((100% - 4px) / ${sections.length})`,
+            transform: `translateX(${Math.max(0, sections.indexOf(section)) * 100}%)`,
+          }}
+        />
         {sections.map((s) => (
           <button
             key={s}
@@ -99,9 +112,10 @@ export function ReadingHeader({
             tabIndex={section === s ? 0 : -1}
             onClick={() => onSelect(s)}
             className={cn(
-              "shrink-0 h-9 px-3 rounded-md text-small transition-colors duration-200",
+              "relative z-10 min-h-11 reading-split:min-h-9 px-3 reading-split:px-5 rounded-md text-small font-semibold",
+              "transition-colors duration-300",
               FOCUS_RING,
-              section === s ? "bg-brand text-white font-semibold" : "text-stone-700 hover:text-brand hover:bg-stone-300/60",
+              section === s ? "text-white" : "text-stone-600 hover:text-brand",
             )}
           >
             {SECTION_LABELS[s]}

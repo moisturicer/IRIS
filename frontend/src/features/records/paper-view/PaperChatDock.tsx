@@ -492,7 +492,7 @@ function ResizeEdge({
 }) {
   const clampTo = (n: number) => Math.max(PANEL_WIDTH_MIN, Math.min(n, max));
   const drag = (e: PointerEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) return;
     const right = e.currentTarget.parentElement?.getBoundingClientRect().right ?? 0;
     onChange(clampTo(right - e.clientX));
   };
@@ -515,7 +515,7 @@ function ResizeEdge({
       aria-valuenow={width}
       tabIndex={0}
       onKeyDown={onKeyDown}
-      onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+      onPointerDown={(e) => e.currentTarget.setPointerCapture?.(e.pointerId)}
       onPointerMove={drag}
       onDoubleClick={() => onChange(clampTo(PANEL_WIDTH_DEFAULT))}
       className="hidden reading-split:block absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none transition-colors hover:bg-brand/30 focus-visible:bg-brand/40 focus:outline-none"
