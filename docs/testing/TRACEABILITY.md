@@ -798,7 +798,7 @@ Evidence, with deterministic fakes and real Postgres; no vendor called:
 - `apps/ai/research/tests/test_listing_outcome.py` (selection cap and wording, no database).
 - The b03 `listing` baseline in `fixed_workflow_baseline.json` and `test_fixed_workflow_baseline_http.py`.
 - `src/features/ai/components/CandidateList.test.tsx` and `useAskStream.test.tsx` (pending then moved by id, status
-  announcement, axe, withheld never named, inconclusive, older listings).
+  announcement, axe, AI-restricted never named, inconclusive, older listings).
 
 **Status:** implemented and tested; human review and approval remain required. The `screen` endpoint is still not
 approved for pilot traffic (pilot README §5). No screening recall, latency or cost has been measured, so the

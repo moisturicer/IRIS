@@ -316,7 +316,7 @@ def test_content_a_model_may_not_read_is_counted_but_never_sent_or_named(embedde
 
     assert closed.title not in json.dumps(events) and closed.title not in json.dumps(screen.requests)
     assert closed.abstract not in json.dumps(screen.requests)
-    assert {"record_id": closed.pk, "state": "unassessed", "withheld": True} in preview["candidates"]
+    assert {"record_id": closed.pk, "state": "unassessed", "restricted": True} in preview["candidates"]
     assert listing["coverage"]["selected"] == 2 and listing["coverage"]["unassessed"] == 1
     assert listing["coverage"]["included"] == 1
     assert [r["record_id"] for r in listing["records"]] == [open_paper.pk]
@@ -449,6 +449,42 @@ def test_a_paper_that_loses_access_during_the_call_is_dropped_from_the_result(em
     assert [row["record_id"] for row in listing["candidates"]] == [kept.pk]
     updates = [row for name, data in events if name == "candidates_updated" for row in data["candidates"]]
     assert lost.pk not in [row["record_id"] for row in updates]
+
+
+def test_a_paper_the_gate_refuses_after_the_preview_is_no_longer_named(embedder, space, reader):
+    user, client = reader
+    kept, gated = papers(embedder, space, 2)
+    closed = []
+    screen = Screener()
+    root = make_root(embedder, screen, permits=lambda record: not (closed and record.pk == gated.pk))
+    events = []
+    with use_composition_root(root):
+        for name, data in watch(client):
+            events.append((name, data))
+            if name == "candidates_selected":
+                closed.append(True)
+
+    assert gated.title not in screen.titles_sent
+    listing = done_of(events)["listing"]
+    assert {"record_id": gated.pk, "state": "unassessed", "restricted": True} in listing["candidates"]
+    assert gated.title not in json.dumps(listing)
+    assert states(listing)[kept.pk] == "included"
+
+
+def test_a_retrieval_failure_is_unavailable_not_a_search_with_nothing_found(
+    embedder, space, reader, monkeypatch
+):
+    user, client = reader
+    papers(embedder, space, 2)
+
+    def broken(run, args):
+        raise RuntimeError("index unreachable")
+
+    monkeypatch.setattr("apps.ai.research.listing.rank_record_candidates", broken)
+    events = run_stream(client, make_root(embedder, Screener()))
+    done = done_of(events)
+    assert done["mode"] == "unavailable" and "listing" not in done
+    assert "candidates_selected" not in [name for name, _ in events]
 
 
 # -- honest coverage -------------------------------------------------------------

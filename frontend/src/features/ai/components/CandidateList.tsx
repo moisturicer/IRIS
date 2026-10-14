@@ -31,7 +31,7 @@ function Item({ row }: { row: CandidateRow }) {
       <i aria-hidden className={cn("fas text-2xs shrink-0", STATE_ICON[row.state])} />
       <span className="min-w-0">
         <Link to={candidateHref(row)} className="text-brand hover:underline">
-          {row.withheld ? "A paper IRIS may not read" : row.title}
+          {row.restricted ? "A paper IRIS may not read" : row.title}
         </Link>
         <span className="text-xs text-stone-500"> · {label}</span>
         {row.quote && (

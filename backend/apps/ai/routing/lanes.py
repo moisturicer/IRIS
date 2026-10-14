@@ -1,6 +1,7 @@
 """Application-owned lane workflows; models never choose listing row identity."""
 
 from dataclasses import replace
+import logging
 import re
 import time
 
@@ -17,7 +18,7 @@ from apps.ai.providers.deadline import model_call_deadline
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.research.context import RunContext
 from apps.ai.research.listing import screen_listing
-from apps.ai.research.planner import ResearchPlanner, drain
+from apps.ai.research.planner import ResearchPlanner
 from apps.ai.research.registry import ToolRun
 from apps.ai.research.results import ToolStatus
 from apps.ai.research.tools.common import disclosable, readable_records
@@ -28,6 +29,7 @@ from apps.ai.research import metadata_count
 from apps.ai.research.workflows import topic_count
 from apps.ai.resilience.circuit import CircuitOpen
 
+logger = logging.getLogger(__name__)
 SUCCESS = (ToolStatus.OK, ToolStatus.EMPTY, ToolStatus.DEGRADED)
 
 
@@ -63,7 +65,12 @@ def _listing_events(run, question):
     Yields the candidate events; returns `(answer, listing)`. The answer text
     is the listing's wording, written in code. No model writes a sentence here.
     """
-    outcome = yield from screen_listing(run, question)
+    try:
+        outcome = yield from screen_listing(run, question)
+    except Exception as exc:
+        # Selection or the final read failed: say so, never "nothing found".
+        logger.warning("listing failed", extra={"run_id": run.ctx.run_id, "error": type(exc).__name__})
+        return _unavailable(), None
     listing = outcome.wire()
     text = listing["wording"]
     if not any(c.state == INCLUDED for c in outcome.candidates):
@@ -227,8 +234,3 @@ def lane_events(lane, question, user, *, root, conversation=None, scope_record=N
             return _comparison(run, question, max_sources)
     except (LLMUnavailable, CircuitOpen, TimeoutError, ArgumentsRejected, BudgetExhausted):
         return _unavailable(), None
-
-
-def answer_lane(lane, question, user, **options):
-    """`lane_events` run to its end, for a caller with no one watching."""
-    return drain(lane_events(lane, question, user, **options))

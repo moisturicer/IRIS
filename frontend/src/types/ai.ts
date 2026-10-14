@@ -70,7 +70,7 @@ export interface CandidateRow {
   /** Absent for a paper IRIS may not read: it is counted, never named. */
   title?: string;
   state: CandidateState;
-  withheld?: boolean;
+  restricted?: boolean;
   /** Verbatim text that decided it, and where it came from (final listing only). */
   quote?: string;
   source?: { field: "title" | "abstract" | "passage"; page?: number | null; chunk_id?: number };

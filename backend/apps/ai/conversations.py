@@ -132,18 +132,13 @@ def record_turn(
 
 
 def _stored_listing(listing) -> dict:
-    """A listing as a Turn keeps it: Record ids and states, never titles.
-
-    Titles are read again when the Turn is, so a Record the reader can no
-    longer see leaves no name behind. A quote stays: it is checked against
-    the Record as it is then (`research.listing.reader_view`).
-    """
+    """A listing as a Turn keeps it: ids, states and quotes, never titles or wording."""
     if not listing:
         return {}
     stored = {**listing, "records": [{"record_id": row["record_id"]} for row in listing["records"]]}
     if "candidates" in listing:
         stored["candidates"] = [
-            {key: row[key] for key in ("record_id", "state", "quote", "source", "withheld") if key in row}
+            {key: row[key] for key in ("record_id", "state", "quote", "source", "restricted") if key in row}
             for row in listing["candidates"]
         ]
         stored.pop("wording", None)
@@ -421,11 +416,7 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
 
 
 def _listing_answer(body: dict, turn, records) -> dict:
-    """A candidate listing's answer text is its wording, rebuilt for this reader.
-
-    The stored sentence counts every candidate; one the reader can no longer
-    see must not still be counted in it.
-    """
+    """A candidate listing's answer is its wording, rebuilt so it counts only what this reader sees."""
     if "candidates" not in turn.listing:
         return body
     from apps.ai.research.listing import reader_view

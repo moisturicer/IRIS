@@ -1,16 +1,9 @@
-"""Presence and listing: a bounded candidate list, shown early, then screened (IR-546).
+"""Presence and listing (IR-546): at most twenty candidates, shown pending, then screened.
 
-The application owns every identity and every state. Retrieval ranks, at most
-`CANDIDATE_LIMIT` distinct Records are selected, and the reader sees them at
-once as `pending`. A model is then shown title-and-abstract (and, for a
-paper it was unsure of, a few passages) and may only answer include, exclude
-or uncertain for a handle it was issued. Whatever it cannot or does not
-answer stays `unassessed`. A candidate is never replaced, so a retry cannot
-widen the list, and none is ever described as a match until it is decided.
-
-Access is read again before every send, before every update the reader sees
-and before the final list. A paper that became unreadable disappears without
-a trace; one whose text changed since it was sent loses its decision.
+The application owns every identity and state; a model only answers include,
+exclude or uncertain for a handle it was issued. Anything else stays
+`unassessed`, never excluded. Access is read again before every send, update
+and the final list.
 """
 
 from __future__ import annotations
@@ -64,13 +57,14 @@ class Selection:
     degraded: bool
 
 
-def select_candidates(run: ToolRun, topic: str, *, limit: int = CANDIDATE_LIMIT) -> Selection:
-    """The best `limit` distinct readable Records for ``topic``.
+def select_candidates(run: ToolRun, topic: str, *, filters=None,
+                      limit: int = CANDIDATE_LIMIT) -> Selection:
+    """The best `limit` distinct readable Records for ``topic``, inside ``filters``.
 
-    One ranked list from the vector, word and passage signals already fused
-    by Record, so a Record found three ways, or in many chunks, counts once.
+    The ranked list is already fused by Record, so one found three ways or in
+    many chunks counts once.
     """
-    fused, degraded, _ = rank_record_candidates(run, {"topic": topic})
+    fused, degraded, _ = rank_record_candidates(run, {"topic": topic, **(filters or {})})
     ids = tuple(dict.fromkeys(fused))
     return Selection(ids[:limit], len(ids) > limit, degraded)
 
@@ -89,11 +83,11 @@ class Candidate:
     #: The Record is readable but its content may not go to a model. It counts
     #: as a candidate and as unassessed, and is not named: a paper that AI may
     #: not read is reported only as one that could not be assessed.
-    withheld: bool = False
+    restricted: bool = False
 
     def wire(self) -> dict:
-        if self.withheld:
-            return {"record_id": self.record_id, "state": UNASSESSED, "withheld": True}
+        if self.restricted:
+            return {"record_id": self.record_id, "state": UNASSESSED, "restricted": True}
         row = {"record_id": self.record_id, "title": self.title, "state": self.state}
         if self.quote:
             row.update(quote=self.quote, source=self.source)
@@ -140,15 +134,15 @@ class Outcome:
 
     def wording(self) -> str:
         selected = len(self.candidates)
-        if not selected:
-            return ("No candidate papers were found among the papers you can see. "
-                    "This is a search result, not proof that none exist.")
         notes = []
         if self.more_available:
             notes.append(f"More candidates were found than were screened (limit {self.limit}).")
         if self.search_degraded:
             notes.append("Meaning-based search was unavailable, so candidates came from word "
                          "matching only.")
+        if not selected:
+            return " ".join(["No candidate papers were found among the papers you can see. "
+                             "This is a search result, not proof that none exist.", *notes])
         if self.changed:
             notes.append("The papers you can read changed while this ran; this covers the "
                          "papers still readable.")
@@ -192,12 +186,10 @@ def verify_quote(quote: str, source: Optional[dict], record) -> bool:
 
 
 def reader_view(stored: dict, visible: dict) -> dict:
-    """A stored listing as the reader may see it now.
+    """A stored listing as this reader may see it now (``visible``: id to Record).
 
-    ``visible`` maps Record id to the Record, for the Records the reader can
-    see. A candidate that is not there is gone; one whose quote no longer
-    holds is unassessed. The wording is rebuilt from what remains, so it
-    never counts a paper the reader can no longer see.
+    Unseen candidates are gone and a quote that no longer holds reads as
+    unassessed; the wording is rebuilt, so it never counts a paper not visible.
     """
     coverage = stored.get("coverage") or {}
     candidates, changed = [], bool(coverage.get("changed"))
@@ -206,8 +198,8 @@ def reader_view(stored: dict, visible: dict) -> dict:
         if record is None:
             changed = True
             continue
-        if row.get("withheld"):
-            candidates.append(Candidate(record.pk, "", UNASSESSED, withheld=True))
+        if row.get("restricted"):
+            candidates.append(Candidate(record.pk, "", UNASSESSED, restricted=True))
             continue
         quote, source, state = row.get("quote", ""), row.get("source"), row["state"]
         if quote and not verify_quote(quote, source, record):
@@ -255,11 +247,10 @@ def _locate(quote: str, item, passages) -> Optional[dict]:
 
 
 def _dispatch(jobs, call):
-    """``call(job)`` for each job on at most `AI_SCREEN_CONCURRENCY` threads.
+    """Yield ``(job, future)`` as jobs finish on at most `AI_SCREEN_CONCURRENCY` threads.
 
-    Yields ``(job, future)`` as each finishes, and ``(job, None)`` for any job
-    still running when the run's deadline arrives. Each job runs in a copy of
-    this context, so it carries the run's deadline and admission scope.
+    A job still running at the run's deadline yields ``(job, None)``. Each runs
+    in a copy of this context, so it keeps the deadline and admission scope.
     """
     if not jobs:
         return
@@ -291,10 +282,10 @@ def _dispatch(jobs, call):
 
 class _Screening:
     def __init__(self, run: ToolRun, criterion: str, ids: tuple[int, ...],
-                 withheld: frozenset = frozenset()) -> None:
-        self.run, self.criterion, self.ids, self.withheld = run, criterion, ids, withheld
+                 restricted: frozenset = frozenset()) -> None:
+        self.run, self.criterion, self.ids, self.restricted = run, criterion, ids, restricted
         self.verdicts: dict[int, _Verdict] = {}
-        self.announced = {pk: UNASSESSED if pk in withheld else PENDING for pk in ids}
+        self.announced = {pk: UNASSESSED if pk in restricted else PENDING for pk in ids}
         self.changed = False
         self.llm = None
 
@@ -304,7 +295,7 @@ class _Screening:
         self.llm = self._llm()
         size = max(1, settings.AI_SCREEN_BATCH_SIZE)
         jobs, never_sent = [], []
-        sendable_ids = [pk for pk in self.ids if pk not in self.withheld]
+        sendable_ids = [pk for pk in self.ids if pk not in self.restricted]
         for start in range(0, len(sendable_ids), size):
             chunk = sendable_ids[start:start + size]
             allowed = disclosable(self.run.ctx, chunk)
@@ -416,7 +407,9 @@ class _Screening:
             return None
         try:
             return validate_decisions(future.result(), job.batch, job.passages)
-        except Exception:
+        except Exception as exc:
+            logger.info("listing screening reply rejected",
+                        extra={"run_id": self.run.ctx.run_id, "error": type(exc).__name__})
             return None
 
     def _passages(self, record) -> tuple:
@@ -424,7 +417,9 @@ class _Screening:
             found = self.run.root.retriever(records=frozenset({record.pk})).retrieve(
                 self.criterion, self.run.ctx.user, limit=settings.AI_SCREEN_RECHECK_PASSAGES,
             )
-        except Exception:
+        except Exception as exc:
+            logger.info("listing passage recheck unavailable",
+                        extra={"run_id": self.run.ctx.run_id, "error": type(exc).__name__})
             return ()
         return tuple(
             (p.source_page, p.content[:PASSAGE_CHARS], p.chunk_id)
@@ -477,11 +472,14 @@ class _Screening:
             if record is None:
                 self.changed = True
                 continue
-            if pk in self.withheld:
-                candidates.append(Candidate(pk, "", UNASSESSED, withheld=True))
-                continue
+            # Also a paper the gate has refused since the preview: no longer named.
             verdict = self.verdicts.get(pk)
-            kept = (verdict is not None and self.run.ctx.permits(record)
+            if pk in self.restricted or not self.run.ctx.permits(record):
+                if verdict is not None and verdict.state != UNASSESSED:
+                    self.changed = True
+                candidates.append(Candidate(pk, "", UNASSESSED, restricted=True))
+                continue
+            kept = (verdict is not None
                     and verdict.evidence == (record.title, record.abstract)
                     and (not verdict.quote or verify_quote(verdict.quote, verdict.source, record)))
             if kept:
@@ -493,10 +491,10 @@ class _Screening:
         return Outcome(tuple(candidates), selection.more_available, selection.degraded, self.changed)
 
 
-def screen_listing(run: ToolRun, question: str):
+def screen_listing(run: ToolRun, question: str, *, filters=None):
     """Yield the preview and every update; return the `Outcome`."""
     criterion = question.strip()[:QUERY["maxLength"]]
-    selection = select_candidates(run, criterion)
+    selection = select_candidates(run, criterion, filters=filters)
     records = {r.pk: r for r in readable_records(run.ctx).filter(pk__in=selection.ids)}
     ids = tuple(pk for pk in selection.ids if pk in records)
     if not ids:
@@ -504,13 +502,13 @@ def screen_listing(run: ToolRun, question: str):
 
     # Counted among the twenty, never sent, never named.
     allowed = disclosable(run.ctx, ids)
-    withheld = frozenset(pk for pk in ids if pk not in allowed)
+    restricted = frozenset(pk for pk in ids if pk not in allowed)
     yield CandidatesSelected(
-        tuple({"record_id": pk, "state": UNASSESSED, "withheld": True} if pk in withheld else
+        tuple({"record_id": pk, "state": UNASSESSED, "restricted": True} if pk in restricted else
               {"record_id": pk, "title": records[pk].title, "state": PENDING} for pk in ids),
         CANDIDATE_LIMIT, selection.more_available, selection.degraded,
     )
-    screening = _Screening(run, criterion, ids, withheld)
+    screening = _Screening(run, criterion, ids, restricted)
     try:
         yield from screening.screen()
     except Exception as exc:

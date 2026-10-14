@@ -20,7 +20,7 @@ import { StreamingMessageBubble } from "./StreamingMessageBubble";
 const PENDING: CandidateRow[] = [
   { record_id: 1, title: "Flood Prediction", state: "pending" },
   { record_id: 2, title: "Tilapia Ponds", state: "pending" },
-  { record_id: 3, state: "unassessed", withheld: true },
+  { record_id: 3, state: "unassessed", restricted: true },
 ];
 
 describe("the live candidates", () => {
@@ -36,7 +36,7 @@ describe("the live candidates", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("links each paper, and a withheld one never shows a title", () => {
+  it("links each paper, and a restricted one never shows a title", () => {
     renderScreen(<LiveCandidates candidates={PENDING} />);
     expect(screen.getByRole("link", { name: "Flood Prediction" })).toHaveAttribute("href", "/records/1");
     expect(screen.getByRole("link", { name: "A paper IRIS may not read" })).toHaveAttribute("href", "/records/3");
@@ -83,7 +83,7 @@ const LISTING: AnswerListing = {
     { record_id: 2, title: "Tilapia Ponds", state: "excluded" },
     { record_id: 3, title: "Rainfall Note", state: "uncertain" },
     { record_id: 4, title: "Flood Hazard", state: "unassessed" },
-    { record_id: 5, state: "unassessed", withheld: true },
+    { record_id: 5, state: "unassessed", restricted: true },
   ],
   coverage: {
     limit: 20, selected: 5, included: 1, excluded: 1, uncertain: 1, unassessed: 2,

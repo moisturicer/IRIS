@@ -165,7 +165,7 @@
                 "included_keys": ["flood-gauges", "flood-hazard"],
                 "excluded_keys": ["tilapia"],
                 "uncertain_keys": ["rainfall-note"],
-                "withheld_keys": ["flood-warning"]
+                "restricted_keys": ["flood-warning"]
               }
             },
             "answer_contains": "Screened 5 candidate papers: 2 matched, 1 did not match, 1 uncertain, 1 could not be assessed.",

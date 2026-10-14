@@ -62,10 +62,15 @@ def test_notes_disclose_the_cap_degraded_search_and_changed_access():
     assert "changed while this ran" in text
 
 
-def test_a_withheld_candidate_is_counted_but_never_named():
-    rows = Outcome((Candidate(1, "Secret Title", "unassessed", withheld=True),
+def test_an_empty_search_still_discloses_a_degraded_search():
+    text = outcome([], search_degraded=True).wording()
+    assert "not proof that none exist" in text and "word matching only" in text
+
+
+def test_a_restricted_candidate_is_counted_but_never_named():
+    rows = Outcome((Candidate(1, "Secret Title", "unassessed", restricted=True),
                     Candidate(2, "Open", "included")))
     wire = rows.wire()
-    assert wire["candidates"][0] == {"record_id": 1, "state": "unassessed", "withheld": True}
+    assert wire["candidates"][0] == {"record_id": 1, "state": "unassessed", "restricted": True}
     assert "Secret Title" not in str(wire)
     assert wire["coverage"]["selected"] == 2 and wire["coverage"]["unassessed"] == 1
