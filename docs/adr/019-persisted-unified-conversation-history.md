@@ -2,8 +2,6 @@
 
 ## Status
 
-> **Reader-presentation change proposed — 2026-10-15 (IR-589), not accepted.** [ADR-042](042-general-tools-conversation-contract.md) separates public activity, optional validated reasoning summary and answer. It proposes safe historical projection without deleting stored reasoning or deciding new retention.
-
 Accepted — 2026-09-07.
 
 **Reverses, for this one capability, the exclusion in [ADR-001](001-mvp-scope-boundary.md) §Scope** ("conversational RAG with history" was out of scope for Semester 2) **and in [ADR-013](013-chunk-level-rag-pipeline.md) §Decision** ("Still excluded: conversational memory and history"). Neither ADR is otherwise superseded — their remaining scope calls and the RAG pipeline decision stand. Document summarization, the other half of ADR-013's same exclusion line (FR-M4-02), is **not** reversed by this ADR; it is being specified separately as an independent capability with its own trigger, provider fallback and consumer, deliberately not bundled with conversation history even though both surfaced from the same grilling session.

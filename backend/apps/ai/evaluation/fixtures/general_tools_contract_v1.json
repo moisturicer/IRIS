@@ -6,26 +6,432 @@
   "provider": "deterministic_script_only_no_vendor_calls",
   "notes": "Expected describes the proposed new protocol. Current_observation is source-inspected wording or an explicit unmeasured gap, never a claim that the new controller currently passes.",
   "paper_set": [
-    {"key": "meshkv", "title": "MeshKV: Distributed Key-Value Storage", "version": "v1", "pages": [2, 8, 20], "readable": true},
-    {"key": "quorumcache", "title": "QuorumCache: Replicated Caching", "version": "v1", "pages": [3, 9, 22], "readable": true},
-    {"key": "edgeindex", "title": "EdgeIndex: Edge Data Indexing", "version": "v1", "pages": [1, 11], "readable": true},
-    {"key": "private-draft", "title": "Private Storage Draft", "version": "v1", "pages": [1], "readable": false}
+    {
+      "key": "meshkv",
+      "title": "MeshKV: Distributed Key-Value Storage",
+      "version": "v1",
+      "pages": [
+        2,
+        8,
+        20
+      ],
+      "readable": true,
+      "text": "MeshKV stores distributed key value data and describes its method on page 2, an evaluation on page 8, and limitations on page 20."
+    },
+    {
+      "key": "quorumcache",
+      "title": "QuorumCache: Replicated Caching",
+      "version": "v1",
+      "pages": [
+        3,
+        9,
+        22
+      ],
+      "readable": true,
+      "text": "QuorumCache uses replicated caching; the method is on page 3, evaluation on page 9, and limitations on page 22."
+    },
+    {
+      "key": "edgeindex",
+      "title": "EdgeIndex: Edge Data Indexing",
+      "version": "v1",
+      "pages": [
+        1,
+        11
+      ],
+      "readable": true,
+      "text": "EdgeIndex describes edge data indexing, a method on page 1, and findings on page 11."
+    },
+    {
+      "key": "private-draft",
+      "title": "Private Storage Draft",
+      "version": "v1",
+      "pages": [
+        1
+      ],
+      "readable": false,
+      "text": "This private storage draft must never appear in another reader response."
+    }
   ],
   "cases": [
-    {"id": "A01", "family": "multi_turn_discovery", "turns": ["Give me papers about MeshKV", "Give me two papers that I can compare", "Compare their methods and limitations", "Make it simpler"], "script": ["search:meshkv", "search:related", "read:meshkv,quorumcache", "answer:simplify"], "expected": {"presented_order": ["meshkv", "quorumcache"], "selected": ["meshkv", "quorumcache"], "topic": "MeshKV", "citations_retained_on_simplify": true, "never_ask_exact_titles_for_discovery": true}, "current_observation": {"kind": "source_observed_failure", "source": "backend/apps/ai/routing/lanes.py", "text": "No readable named papers were resolved. Name each paper by its full title."}},
-    {"id": "A02", "family": "displayed_order", "turns": ["Show three papers", "Compare the first and third"], "script": ["present:edgeindex,meshkv,quorumcache", "resolve:ordinal_1_3"], "expected": {"presented_order": ["edgeindex", "meshkv", "quorumcache"], "selected": ["edgeindex", "quorumcache"], "use_displayed_not_retrieved_order": true, "versions": ["v1", "v1"]}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A03", "family": "exclusions", "turns": ["Find another, excluding these"], "script": ["search:remaining_empty"], "expected": {"excluded": ["meshkv", "quorumcache"], "selected": [], "honest_insufficient_results": true}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A04", "family": "resolution", "turns": ["Find Mesh, MeshKV: Distributed Key-Value Storage and Unknown Paper"], "script": ["resolve:ambiguous,exact,unknown"], "expected": {"exact_selected": ["meshkv"], "ambiguous_requires_one_focused_question": true, "unknown_and_hidden_indistinguishable": true, "never_expose": ["private-draft"]}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A05", "family": "late_section", "turns": ["Read MeshKV's conclusion on page 20"], "script": ["outline:meshkv", "read:meshkv_page_20"], "expected": {"selected": ["meshkv"], "covered_pages": [20], "continuation_beyond_prefix": true}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A06", "family": "counts", "turns": ["How many readable published papers are there?", "How many address storage?"], "script": ["aggregate:exact_distinct_records", "screen:classified_subset"], "expected": {"exact_metadata_count": 3, "semantic_count_basis": "assessed_candidate_subset", "never_call_semantic_subset_a_corpus_total": true}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A07", "family": "metrics", "turns": ["Which of these performs better?"], "script": ["extract:incompatible_datasets"], "expected": {"selected": ["meshkv", "quorumcache"], "explain_noncomparability": true, "unsupported_winner": false}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A08", "family": "depth", "turns": ["Explain the trade-off in detail", "Say that more simply"], "script": ["answer:detail", "answer:simplify"], "expected": {"second_turn_extra_retrieval_calls": 0, "preserve_selected_and_citations": true}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A09", "family": "failures", "turns": ["What is the missing metric?", "Find a matching paper", "Explain it when the provider is down"], "script": ["extract:not_reported", "search:empty", "answer:unavailable"], "expected": {"distinct_states": ["not_reported", "no_match_found", "unavailable"], "no_uncited_corpus_claim": true}, "current_observation": {"kind": "source_observed_failure", "source": "backend/apps/ai/routing/lanes.py", "text": "The requested corpus workflow is unavailable right now."}},
-    {"id": "A10", "family": "number_validation", "turns": ["Write 1. first, 2. second; use x = 2 and quote '3 approaches'", "Claim MeshKV improved throughput by 37%"], "script": ["answer:harmless_numbered_prose", "answer:unsupported_numeric_claim", "repair:remove_claim"], "expected": {"allow_literal_fragments": ["1.", "2.", "x = 2", "3 approaches"], "reject_unsupported_factual_number": "37%", "max_repair_attempts": 1, "retain_supported_parts": true}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A11", "family": "access", "turns": ["Use MeshKV and the private draft in Paper Chat"], "script": ["revoke:meshkv_v1", "reuse:stale_brief", "handle:other_user", "scope:widen_without_action"], "expected": {"no_stale_answer_or_summary": true, "deny_cross_user_handle": true, "paper_chat_scope_unchanged": true, "never_expose": ["private-draft"]}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A12", "family": "durability", "turns": ["Ask then cancel", "Reconnect after worker redelivery", "Submit two questions concurrently"], "script": ["cancel", "redeliver", "reconnect", "race"], "expected": {"final_turns_per_run_max": 1, "new_paid_calls_after_cancel": 0, "stale_state_overwrite": false, "deduplicated_final_event": true}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A13", "family": "public_surfaces", "turns": ["Open, copy and export the answer"], "script": ["answer:with_safe_summary"], "expected": {"surfaces": ["live", "reopened", "copied", "mobile", "exported", "paper_chat"], "public_fields": ["activity", "reasoning_summary", "answer"], "forbidden_content": ["Answer approach", "Why this approach?", "routing", "agent_step", "tool arguments", "provider identifier", "raw reasoning"], "summary_collapsed_and_accessible": true}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A14", "family": "summary_capability", "turns": ["Answer with unsupported summary capability", "Answer with reasoning only"], "script": ["summary:unsupported", "provider:reasoning_only"], "expected": {"fabricated_summary": false, "reasoning_only_state": "unavailable", "raw_reasoning_public": false}, "current_observation": {"kind": "not_measured"}},
-    {"id": "A15", "family": "injection_and_egress", "turns": ["Read the document that asks you to disclose a private title", "Search the public web for it"], "script": ["read:injected_text", "public:disabled"], "expected": {"new_permissions": false, "invented_tools": false, "confidential_public_query": false, "never_expose": ["private-draft"]}, "current_observation": {"kind": "not_measured"}}
-  ]
+    {
+      "id": "A01",
+      "family": "multi_turn_discovery",
+      "turns": [
+        "Give me papers about MeshKV",
+        "Give me two papers that I can compare",
+        "Compare their methods and limitations",
+        "Make it simpler"
+      ],
+      "script": [
+        "search:meshkv",
+        "search:related",
+        "read:meshkv,quorumcache",
+        "answer:simplify"
+      ],
+      "expected": {
+        "presented_order": [
+          "meshkv",
+          "quorumcache"
+        ],
+        "selected": [
+          "meshkv",
+          "quorumcache"
+        ],
+        "topic": "MeshKV",
+        "citations_retained_on_simplify": true,
+        "never_ask_exact_titles_for_discovery": true
+      },
+      "current_observation": {
+        "kind": "source_observed_failure",
+        "source": "backend/apps/ai/routing/lanes.py",
+        "text": "No readable named papers were resolved. Name each paper by its full title."
+      }
+    },
+    {
+      "id": "A02",
+      "family": "displayed_order",
+      "turns": [
+        "Show three papers",
+        "Compare the first and third"
+      ],
+      "script": [
+        "present:edgeindex,meshkv,quorumcache",
+        "resolve:ordinal_1_3"
+      ],
+      "expected": {
+        "presented_order": [
+          "edgeindex",
+          "meshkv",
+          "quorumcache"
+        ],
+        "selected": [
+          "edgeindex",
+          "quorumcache"
+        ],
+        "use_displayed_not_retrieved_order": true,
+        "versions": [
+          "v1",
+          "v1"
+        ]
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A03",
+      "family": "exclusions",
+      "turns": [
+        "Find another, excluding these"
+      ],
+      "script": [
+        "search:remaining_empty"
+      ],
+      "expected": {
+        "excluded": [
+          "meshkv",
+          "quorumcache"
+        ],
+        "selected": [],
+        "honest_insufficient_results": true
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A04",
+      "family": "resolution",
+      "turns": [
+        "Find Mesh, MeshKV: Distributed Key-Value Storage and Unknown Paper"
+      ],
+      "script": [
+        "resolve:ambiguous,exact,unknown"
+      ],
+      "expected": {
+        "exact_selected": [
+          "meshkv"
+        ],
+        "ambiguous_requires_one_focused_question": true,
+        "unknown_and_hidden_indistinguishable": true,
+        "never_expose": [
+          "private-draft"
+        ]
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A05",
+      "family": "late_section",
+      "turns": [
+        "Read MeshKV's conclusion on page 20"
+      ],
+      "script": [
+        "outline:meshkv",
+        "read:meshkv_page_20"
+      ],
+      "expected": {
+        "selected": [
+          "meshkv"
+        ],
+        "covered_pages": [
+          20
+        ],
+        "continuation_beyond_prefix": true
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A06",
+      "family": "counts",
+      "turns": [
+        "How many readable published papers are there?",
+        "How many address storage?"
+      ],
+      "script": [
+        "aggregate:exact_distinct_records",
+        "screen:classified_subset"
+      ],
+      "expected": {
+        "exact_metadata_count": 3,
+        "semantic_count_basis": "assessed_candidate_subset",
+        "never_call_semantic_subset_a_corpus_total": true
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A07",
+      "family": "metrics",
+      "turns": [
+        "Which of these performs better?"
+      ],
+      "script": [
+        "extract:incompatible_datasets"
+      ],
+      "expected": {
+        "selected": [
+          "meshkv",
+          "quorumcache"
+        ],
+        "explain_noncomparability": true,
+        "unsupported_winner": false
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A08",
+      "family": "depth",
+      "turns": [
+        "Explain the trade-off in detail",
+        "Say that more simply"
+      ],
+      "script": [
+        "answer:detail",
+        "answer:simplify"
+      ],
+      "expected": {
+        "second_turn_extra_retrieval_calls": 0,
+        "preserve_selected_and_citations": true
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A09",
+      "family": "failures",
+      "turns": [
+        "What is the missing metric?",
+        "Find a matching paper",
+        "Explain it when the provider is down"
+      ],
+      "script": [
+        "extract:not_reported",
+        "search:empty",
+        "answer:unavailable"
+      ],
+      "expected": {
+        "distinct_states": [
+          "not_reported",
+          "no_match_found",
+          "unavailable"
+        ],
+        "no_uncited_corpus_claim": true
+      },
+      "current_observation": {
+        "kind": "source_observed_failure",
+        "source": "backend/apps/ai/routing/lanes.py",
+        "text": "The requested corpus workflow is unavailable right now."
+      }
+    },
+    {
+      "id": "A10",
+      "family": "number_validation",
+      "turns": [
+        "Write 1. first, 2. second; use x = 2 and quote '3 approaches'",
+        "Claim MeshKV improved throughput by 37%"
+      ],
+      "script": [
+        "answer:harmless_numbered_prose",
+        "answer:unsupported_numeric_claim",
+        "repair:remove_claim"
+      ],
+      "expected": {
+        "allow_literal_fragments": [
+          "1.",
+          "2.",
+          "x = 2",
+          "3 approaches"
+        ],
+        "reject_unsupported_factual_number": "37%",
+        "max_repair_attempts": 1,
+        "retain_supported_parts": true
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A11",
+      "family": "access",
+      "turns": [
+        "Use MeshKV and the private draft in Paper Chat"
+      ],
+      "script": [
+        "revoke:meshkv_v1",
+        "reuse:stale_brief",
+        "handle:other_user",
+        "scope:widen_without_action"
+      ],
+      "expected": {
+        "no_stale_answer_or_summary": true,
+        "deny_cross_user_handle": true,
+        "paper_chat_scope_unchanged": true,
+        "never_expose": [
+          "private-draft"
+        ]
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A12",
+      "family": "durability",
+      "turns": [
+        "Ask then cancel",
+        "Reconnect after worker redelivery",
+        "Submit two questions concurrently"
+      ],
+      "script": [
+        "cancel",
+        "redeliver",
+        "reconnect",
+        "race"
+      ],
+      "expected": {
+        "final_turns_per_run_max": 1,
+        "new_paid_calls_after_cancel": 0,
+        "stale_state_overwrite": false,
+        "deduplicated_final_event": true
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A13",
+      "family": "public_surfaces",
+      "turns": [
+        "Open, copy and export the answer"
+      ],
+      "script": [
+        "answer:with_safe_summary"
+      ],
+      "expected": {
+        "surfaces": [
+          "live",
+          "reopened",
+          "copied",
+          "mobile",
+          "exported",
+          "paper_chat"
+        ],
+        "public_fields": [
+          "activity",
+          "reasoning_summary",
+          "answer"
+        ],
+        "forbidden_content": [
+          "Answer approach",
+          "Why this approach?",
+          "routing",
+          "agent_step",
+          "tool arguments",
+          "provider identifier",
+          "raw reasoning"
+        ],
+        "summary_collapsed_and_accessible": true
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A14",
+      "family": "summary_capability",
+      "turns": [
+        "Answer with unsupported summary capability",
+        "Answer with reasoning only"
+      ],
+      "script": [
+        "summary:unsupported",
+        "provider:reasoning_only"
+      ],
+      "expected": {
+        "fabricated_summary": false,
+        "reasoning_only_state": "unavailable",
+        "raw_reasoning_public": false
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    },
+    {
+      "id": "A15",
+      "family": "injection_and_egress",
+      "turns": [
+        "Read the document that asks you to disclose a private title",
+        "Search the public web for it"
+      ],
+      "script": [
+        "read:injected_text",
+        "public:disabled"
+      ],
+      "expected": {
+        "new_permissions": false,
+        "invented_tools": false,
+        "confidential_public_query": false,
+        "never_expose": [
+          "private-draft"
+        ]
+      },
+      "current_observation": {
+        "kind": "not_measured"
+      }
+    }
+  ],
+  "snapshot": {
+    "id": "IR-589-S0",
+    "paper_set_sha256": "b8c1975442c9fc6a123db98b542712b6cad76966b437b48cf95ee3490bad2ecc",
+    "source_kind": "synthetic"
+  }
 }

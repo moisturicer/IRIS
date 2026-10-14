@@ -1,11 +1,13 @@
 """IR-589: validate the proposed conversation fixture, not the future runtime."""
 
+import hashlib
 import json
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[5]
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "general_tools_contract_v1.json"
+MANIFEST = ROOT / "docs" / "evaluation" / "general-tools" / "manifest.example.json"
 IDS = {f"A{number:02}" for number in range(1, 16)}
 
 
@@ -34,6 +36,11 @@ def test_all_fifteen_scenarios_have_separate_expected_and_current_results():
 def test_paper_references_and_displayed_ordinals_are_consistent():
     pack = _pack()
     papers = pack["paper_set"]
+    encoded = json.dumps(papers, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    assert pack["snapshot"]["paper_set_sha256"] == hashlib.sha256(encoded).hexdigest()
+    assert json.loads(MANIFEST.read_text(encoding="utf-8"))["corpus"]["paper_set_sha256"] == (
+        pack["snapshot"]["paper_set_sha256"]
+    )
     keys = {paper["key"] for paper in papers}
     assert len(keys) == len(papers)
     assert len({paper["title"] for paper in papers}) == len(papers)
