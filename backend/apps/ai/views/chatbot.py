@@ -491,12 +491,21 @@ class RunCancelView(APIView):
 
     def post(self, request, pk):
         from apps.ai import durable
+        from apps.ai.models.queued import CANCELLED
 
         run = durable.cancel(pk, request.user)
         if run is None:
             raise Http404
         body = {"run_id": str(run.pk), "state": run.state}
-        return Response(body, status=200 if run.state == "cancelled" else status.HTTP_409_CONFLICT)
+        return Response(body, status=200 if run.state == CANCELLED else status.HTTP_409_CONFLICT)
+
+
+def _require_owned_run(user, pk) -> None:
+    """Someone else's run, or a missing one: the same 404."""
+    from apps.ai.models import AskRun
+
+    if not AskRun.objects.owned_by(user).filter(pk=pk).exists():
+        raise Http404
 
 
 class RunRetryView(APIView):
@@ -515,11 +524,9 @@ class RunRetryView(APIView):
 
     def post(self, request, pk):
         from apps.ai import durable
-        from apps.ai.models import AskRun
 
         if not durable.enabled():
-            if not AskRun.objects.owned_by(request.user).filter(pk=pk).exists():
-                raise Http404
+            _require_owned_run(request.user, pk)
             return Response(
                 {"detail": "Queued questions are switched off; ask the question again."},
                 status=status.HTTP_409_CONFLICT,
@@ -540,8 +547,7 @@ class RunRetryView(APIView):
                 headers={"Retry-After": "5"},
             )
         if result is None:
-            if not AskRun.objects.owned_by(request.user).filter(pk=pk).exists():
-                raise Http404
+            _require_owned_run(request.user, pk)
             return Response(
                 {"detail": "IRIS is still answering another question in this conversation."},
                 status=status.HTTP_409_CONFLICT,

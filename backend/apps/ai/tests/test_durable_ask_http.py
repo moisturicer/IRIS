@@ -492,6 +492,35 @@ class OwnedRunLifecycleTests:
         assert _retry(client, run_id).status_code == 409, "already answered"
         assert AskRun.objects.count() == 1
 
+    def test_a_partial_answer_is_not_retried_into_a_second_turn(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        with use_composition_root(scene["root"]):
+            answer_queued_question(run_id)
+        # A run cut off at its deadline ends `partial`, with its fragment as a Turn.
+        AskRun.objects.filter(pk=run_id).update(state="partial")
+
+        refused = _retry(client, run_id)
+        assert refused.status_code == 409 and refused.json()["state"] == "partial"
+        assert Turn.objects.count() == 1 and AskRun.objects.count() == 1
+
+    def test_a_stopped_run_stops_being_offered_once_a_later_answer_exists(
+        self, scene, queued, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        _cancel(client, run_id)
+        assert _latest_run(client, conversation)["state"] == "cancelled"
+
+        # The switch goes off and the reader asks again in the request.
+        queued.AI_DURABLE_ASK = False
+        with use_composition_root(scene["root"]):
+            b"".join(ask_stream(client, FLOOD_QUESTION, conversation_id=conversation.pk).streaming_content)
+        assert Turn.objects.count() == 1
+        assert _latest_run(client, conversation) is None
+
     def test_retry_waits_for_the_conversations_other_run(
         self, scene, dispatched, django_capture_on_commit_callbacks
     ):

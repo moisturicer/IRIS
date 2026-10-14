@@ -31,8 +31,10 @@ EXPIRED = "expired"
 #: The asker stopped it (IR-548). No Turn, and nothing written after.
 CANCELLED = "cancelled"
 TERMINAL_STATES = frozenset({SUCCEEDED, PARTIAL, FAILED, EXPIRED, CANCELLED})
-#: Ended without the answer it was asked for, so the asker may retry it.
-RETRYABLE_STATES = frozenset({PARTIAL, FAILED, EXPIRED, CANCELLED})
+#: Ended without an answer, so the asker may retry it. Not `partial`: that
+#: run already wrote its fragment as a Turn, and a retry would add a second
+#: Turn for the same question. The reader asks again instead.
+RETRYABLE_STATES = frozenset({FAILED, EXPIRED, CANCELLED})
 
 _RUN_STATES = [
     (s, s.title()) for s in (QUEUED, RUNNING, SUCCEEDED, PARTIAL, FAILED, EXPIRED, CANCELLED)

@@ -190,12 +190,8 @@ def retry(run_id, user):
     as any new question would. The worker prepares the request again as the
     asker, so a Conversation or override Turn they lost fails the retry.
     """
-    original = AskRun.objects.owned_by(user).filter(pk=run_id).first()
-    if original is None:
-        return None
     with transaction.atomic():
-        Conversation.objects.select_for_update().filter(pk=original.conversation_id).first()
-        original = AskRun.objects.owned_by(user).select_for_update().filter(pk=run_id).first()
+        original = _lock_owned(run_id, user)
         if original is None:
             return None
         existing = AskRun.objects.filter(retry_of=original).first()
@@ -237,12 +233,8 @@ def cancel(run_id, user):
 
     Takes the Conversation's lock and then the run's, the order a finishing
     attempt takes, so a cancel and a final Turn cannot both commit."""
-    run = AskRun.objects.owned_by(user).filter(pk=run_id).first()
-    if run is None:
-        return None
     with transaction.atomic():
-        Conversation.objects.select_for_update().filter(pk=run.conversation_id).first()
-        run = AskRun.objects.owned_by(user).select_for_update().filter(pk=run_id).first()
+        run = _lock_owned(run_id, user)
         if run is not None and not run.is_terminal:
             _end(run, CANCELLED, "cancelled", event=("run_cancelled", {
                 "run_id": str(run.pk), "state": CANCELLED, "reason": "cancelled",
@@ -250,13 +242,30 @@ def cancel(run_id, user):
     return run
 
 
+def _lock_owned(run_id, user):
+    """``user``'s run, locked after its Conversation -- the order a finishing
+    attempt takes -- or ``None`` when it is not theirs or is gone. Inside the
+    caller's transaction."""
+    conversation_id = (
+        AskRun.objects.owned_by(user).filter(pk=run_id).values_list("conversation_id", flat=True).first()
+    )
+    if conversation_id is None:
+        return None
+    Conversation.objects.select_for_update().filter(pk=conversation_id).first()
+    return AskRun.objects.owned_by(user).select_for_update().filter(pk=run_id).first()
+
+
 def latest_run_for_reader(conversation):
     """The Conversation's latest run while it has no Turn to show for it:
     unfinished, or ended without an answer. ``None`` once its Turn is in the
-    transcript. What a reader opening the Conversation needs to follow the
-    run again, or to see that it stopped and retry it."""
+    transcript, or once a later Turn answered the Conversation anyway -- an
+    old stopped run is then history, not something to retry. What a reader
+    opening the Conversation needs to follow the run again, or to see that it
+    stopped and retry it."""
     run = conversation.ask_runs.order_by("-created_at").first()
     if run is None or run.state in (SUCCEEDED, PARTIAL):
+        return None
+    if run.is_terminal and conversation.turns.filter(created_at__gt=run.created_at).exists():
         return None
     return {
         "id": str(run.pk),

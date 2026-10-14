@@ -855,7 +855,9 @@ Evidence:
   - a cancelled queued run is never started by its late delivery;
   - a cancelled run's scope admits no new provider attempt (`run_cancelled`);
   - retry is a linked run with its own deadline and a replay that starts over; a repeated retry returns the same run;
-  - only a run that ended without its answer can be retried, and not while another run in the conversation is unfinished;
+  - only a run that ended with no Turn can be retried, and not while another run in the conversation is unfinished;
+  - a `partial` run is refused, so a retry never adds a second Turn for the same question;
+  - a stopped run stops being offered once a later answer exists;
   - someone else's run cannot be cancelled or retried (404 identical to a missing one);
   - a deleted conversation's runs stay deleted.
 - `src/features/ai/hooks/useAskStream.test.tsx` (following an existing run from event 0, Stop calling cancel and
