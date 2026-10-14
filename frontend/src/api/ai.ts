@@ -25,6 +25,7 @@ interface SemanticSearchResponse {
 }
 
 interface AskOptions {
+  comparisonRecordIds?: number[];
   topK?: number;
   routeOverride?: ChatLane;
   routeOverrideTurnId?: number;
@@ -38,6 +39,23 @@ interface AskOptions {
   widen?: boolean;
 }
 
+async function checkComparisonLimit(recordIds?: number[]): Promise<void> {
+  if (recordIds === undefined) return;
+  if (recordIds.length < 2) throw new Error("Choose at least 2 papers to compare.");
+  if (recordIds.some((id) => !Number.isInteger(id) || id < 1) || new Set(recordIds).size !== recordIds.length) {
+    throw new Error("Choose distinct valid papers to compare.");
+  }
+  let limit = 6;
+  try {
+    const { data } = await apiClient.get<AIStatus>("/ai/status/");
+    const configured = data.comparison_max_records;
+    if (configured !== undefined && Number.isInteger(configured) && configured >= 2) limit = configured;
+  } catch {
+    // The server still enforces its configured limit when status is unavailable.
+  }
+  if (recordIds.length > limit) throw new Error(`Compare at most ${limit} papers at a time.`);
+}
+
 /**
  * `/ai/ask/stream/` as Server-Sent Events (IR-329). Goes through `fetch`
  * directly, not `apiClient` -- `EventSource` can't carry the auth header,
@@ -48,6 +66,7 @@ async function* streamAsk(
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
+  await checkComparisonLimit(body.comparison_record_ids as number[] | undefined);
   yield* openStream(`${API_BASE}/ai/ask/stream/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -122,24 +141,27 @@ export const aiApi = {
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
   /** Grounded answer plus the records it cites. */
-  ask: (question: string, { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId }: AskOptions = {}) =>
-    apiClient.post<AIAnswer>("/ai/ask/", {
+  ask: (question: string, { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId, comparisonRecordIds }: AskOptions = {}) => {
+    const send = () => apiClient.post<AIAnswer>("/ai/ask/", {
       question,
       top_k: topK,
       conversation_id: conversationId,
       widen,
       ...(routeOverride ? { route_override: routeOverride } : {}),
       ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}),
-    }),
+      ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}),
+    });
+    return comparisonRecordIds === undefined ? send() : checkComparisonLimit(comparisonRecordIds).then(send);
+  },
 
   /** The same question, narrated as SSE (IR-326, IR-329) -- see `streamAsk`. */
   askStream: (
     question: string,
-    { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId }: AskOptions = {},
+    { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId, comparisonRecordIds }: AskOptions = {},
     signal?: AbortSignal,
   ) =>
     streamAsk(
-      { question, top_k: topK, conversation_id: conversationId, widen, ...(routeOverride ? { route_override: routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}) },
+      { question, top_k: topK, conversation_id: conversationId, widen, ...(routeOverride ? { route_override: routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}), ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}) },
       signal,
     ),
 

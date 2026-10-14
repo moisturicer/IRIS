@@ -89,6 +89,20 @@ def test_two_processes_share_one_campaign_ceiling(settings):
     assert all(set(r["refused"]) <= {errors.CAMPAIGN_EXHAUSTED} for r in results)
 
 
+def test_two_workers_share_the_comparison_budget_instead_of_the_chat_budget(settings):
+    overrides = {
+        "PROBE_COMPARISON": "1", "PROBE_RUN_KEY": "ask:comparison-shared",
+        "AI_ADMISSION_RUN_MAX_ATTEMPTS": "1", "AI_COMPARISON_MAX_ATTEMPTS": "5",
+        "AI_COMPARISON_MAX_INPUT_TOKENS": "1000", "AI_COMPARISON_MAX_OUTPUT_TOKENS": "1000",
+        "AI_COMPARISON_MAX_COST_USD": "1",
+    }
+    enforce(settings)
+    results = _run("spend", 6, **overrides)
+    assert sum(result["admitted"] for result in results) == 5, results
+    assert _rows(run_key="ask:comparison-shared").count() == 5
+    assert all(set(result["refused"]) <= {errors.RUN_BUDGET_EXHAUSTED} for result in results)
+
+
 def test_a_crashed_worker_keeps_its_slot_until_its_lease_ends(settings):
     overrides = {
         "AI_ADMISSION_LANE_CONCURRENCY": '{"research": 1}',

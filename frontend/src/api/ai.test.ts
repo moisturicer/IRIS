@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { aiApi } from "./ai";
 
-const post = vi.hoisted(() => vi.fn());
-const get = vi.hoisted(() => vi.fn());
+const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
 vi.mock("./client", () => ({ apiClient: { post, get } }));
-
 describe("starting a conversation (IR-548)", () => {
   // The server answers POST with the summary shape, which has no `turns`.
   const created = {
@@ -58,5 +56,52 @@ describe("answer route overrides", () => {
     aiApi.ask("Ordinary question");
     expect(post.mock.calls[0][1]).not.toHaveProperty("route_override");
     expect(post.mock.calls[0][1]).not.toHaveProperty("route_override_turn_id");
+  });
+});
+
+describe("comparison paper limits", () => {
+  it("requires two distinct papers before submitting", async () => {
+    await expect(aiApi.ask("Compare", { comparisonRecordIds: [1] })).rejects.toThrow("at least 2");
+    await expect(aiApi.ask("Compare", { comparisonRecordIds: [1, 1] })).rejects.toThrow("distinct valid");
+    expect(post).not.toHaveBeenCalled();
+  });
+  it("reads the configured limit and sends selected papers to the JSON endpoint", async () => {
+    get.mockResolvedValue({ data: { comparison_max_records: 2 } });
+    await aiApi.ask("Compare these papers", { comparisonRecordIds: [7, 9] });
+    expect(get).toHaveBeenCalledWith("/ai/status/");
+    expect(post.mock.calls[0][1].comparison_record_ids).toEqual([7, 9]);
+  });
+
+  it("rejects a JSON comparison above the configured limit before submitting", async () => {
+    get.mockResolvedValue({ data: { comparison_max_records: 2 } });
+    await expect(aiApi.ask("Compare", { comparisonRecordIds: [1, 2, 3] })).rejects.toThrow("Compare at most 2 papers");
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("rejects a streamed comparison above the configured limit before submitting", async () => {
+    get.mockResolvedValue({ data: { comparison_max_records: 2 } });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(aiApi.askStream("Compare", { comparisonRecordIds: [1, 2, 3] }).next()).rejects.toThrow("Compare at most 2 papers");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends selected papers in a streamed comparison", async () => {
+    get.mockResolvedValue({ data: { comparison_max_records: 3 } });
+    const fetchMock = vi.fn().mockResolvedValue(new Response('event: done\ndata: {}\n\n'));
+    vi.stubGlobal("fetch", fetchMock);
+    for await (const event of aiApi.askStream("Compare", { comparisonRecordIds: [7, 9] })) expect(event.event).toBe("done");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).comparison_record_ids).toEqual([7, 9]);
+  });
+
+  it("uses the default six-paper limit when status cannot be read", async () => {
+    get.mockRejectedValue(new Error("offline"));
+    await expect(aiApi.ask("Compare", { comparisonRecordIds: [1, 2, 3, 4, 5, 6, 7] })).rejects.toThrow("Compare at most 6 papers");
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch comparison configuration for an ordinary question", () => {
+    aiApi.ask("What is this about?");
+    expect(get).not.toHaveBeenCalled();
   });
 });

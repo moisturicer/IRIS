@@ -890,6 +890,54 @@ is included. Existing provider contract/Overview checks also pass (60 tests).
 
 **Test.** `src/features/discover/DiscoverPage.test.tsx` › "keeps the Publish dialog open when the search debounce fires after the click" and "keeps both a just-typed search and the Publish dialog in the URL" — both failed on `main` before the fix. Evidence, 2026-10-13, local: the Discover file **21 passed**, and **0 of 20** consecutive runs failed; `npm test` **876 passed, 3 failed**, the same three failing on `main` without this change (`Sidebar.test.tsx` ×2, `PaperAiOverview.test.tsx` ×1, timing-sensitive on this machine; green in CI); lint 0 errors, build green.
 
+## IR-549: full-reading durable Record comparison
+
+**Behavior.** The disabled opt-in lane accepts 2 to configured N titles or selected
+IDs, consumes independent full-paper briefs, assembles cited dimension cells in
+code before prose, and reports per-Record reading coverage and removed claims.
+Question-specific section reads stay within that Record's verified model context.
+The existing durable run fixes a comparison deadline and explicit token/cost caps;
+campaign and concurrency limits still apply. Cache reuse, generation, publication
+and replay recheck permissions, disclosure and source versions. Stale replay
+withholds prose, table and sources. Comparison history is excluded from model reuse.
+
+**Evidence, 14 October 2026.** `apps/ai/tests/test_comparison_http.py`: **28 passed**,
+covering first use/cache, bounds/ambiguity, hidden/missing/gated Records, partial
+results, invented claims, source changes during generation and replay, independent
+sectioned long papers and question-specific rows. `admission/tests/test_shared_processes.py`
+adds a two-process test demonstrating one shared comparison ceiling distinct from
+the chat ceiling. Existing durable/scope regression tests: **22 passed**.
+Frontend comparison/API/progress/stream tests: **45 passed**, including accessible
+table ordering, exact removed-claim count, page navigation and replay.
+Frontend typecheck/build pass; lint has no errors and six existing warnings.
+The full frontend run before the final bounds test had **967 passed, 3 failed**;
+all three Sidebar failures and AbortSignal errors reproduce on an isolated,
+unchanged `origin/main` copy (**15 passed, 3 failed**).
+
+**Limitations.** IR-542 contains no labelled comparison baseline. Deterministic
+fake-provider tests establish application behavior, not semantic correctness or
+real-provider quality. Human labels and separate correctness/claim/citation review
+remain necessary. No paid evaluation, architectural acceptance or rollout occurred.
+See [Record comparison contract](../engineering/RECORD_COMPARISON.md).
+
+Final fresh isolated backend suite: **3,708 passed, 1 xpassed**, zero failures.
+The first non-isolated attempt overlapped another test process using the same
+database; it was stopped and superseded by the isolated run. The prior isolated
+run found a workflow-status literal, now replaced by the existing tool status,
+and the already documented Windows CRLF proxy-checksum mismatch. Restoring the
+unchanged committed LF bytes fixed the checksum; no fixture content changes ship.
+Both new migrations also preserved 12 populated legacy Turns and existing
+reservation charges in the isolated database. Migration consistency, Django
+configuration and backend static checks pass (the existing axes warning remains).
+Synthetic comparison layout checks at 360, 768, 1280 and 1745 px found no page-wide
+horizontal overflow; the table scrolls within its region at phone width.
+
+Independent standards/spec reviews found and resolved citation-text duplication
+in Turns, first-use brief accounting, named-route admission and incomplete detail
+reading. No material blockers remain; one nonblocking duplicated-reading-loop
+smell was noted. These reviews do not replace human approval or labelled quality
+evaluation, and the feature remains disabled by default.
+
 ## IR-548 — open, cancel and retry research from owned conversation URLs
 
 Every Ask IRIS conversation has its own address, `/ai/conversations/<id>`, under the Ask IRIS layout. `/ai` only
@@ -927,6 +975,34 @@ carries none.
 
 **Status:** implemented and tested; human review and approval remain required, as does ADR-040's acceptance.
 
+### IR-549 / PR #271: integration and CI repair — 14 October 2026
+
+Merged `main` through `ae4f794`, retaining IR-548's owned cancellation/retry
+flow and IR-549's comparison budget snapshot. Initial and retried comparisons
+use the comparison deadline; their admission scope retains both the ceiling
+and the cancellation check. Migration `0029` joins the two independent AI
+migration branches without rewriting either branch's migrations.
+
+The three proposal-visibility CI failures were reproduced with rolled-back
+vectors still occupying HNSW's search graph: the real retrieval path returned
+no passages despite readable indexed fixtures. Transactionally clearing the
+Record and chunk embedding tables before this class seeds its fixtures gives
+it fresh real indexes, following the existing index-recall tests. The same
+forced-index reproduction changed from **3 failed** to **3 passed**; all
+positive and negative authorization assertions remain intact. This is a
+fixture-isolation correction, not a retrieval-policy change.
+
+Comparison, durable-run and proposal-visibility integration tests: **69 passed**,
+including cancellation blocking new provider attempts and retry retaining the
+comparison ceiling/deadline before publishing exactly one Turn. Focused
+frontend API, table, streaming and owned-conversation tests: **64 passed**;
+build/typecheck and lint pass (six existing warnings). Static backend checks,
+Django configuration and migration consistency pass (existing axes warning).
+The joined migration graph preserves twelve populated legacy Turns, an
+existing queued run and existing reservation charges. Independent focused
+Standards and Spec reviews found no material blockers. These checks do not
+replace human approval, labelled quality evaluation or rollout approval.
+
 ## IR-550 — first fixed-workflow milestone evaluation
 
 An instrument that scores the metadata count, topic-match count and presence listing against pinned labels, each
@@ -955,4 +1031,3 @@ Not covered here: no paid run, no pilot-family labelled set on proxy or CIT-U da
 and no capacity burst. The control run's figures measure arithmetic and plumbing, not quality, latency or cost.
 
 **Status:** instrument implemented and tested; every evaluation gate is OPEN and human review remains required.
-

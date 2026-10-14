@@ -41,6 +41,7 @@ class RoutedChat:
         self.decision = None
         self.listing = None
         self.research = None
+        self.comparison = None
 
     @property
     def metadata(self):
@@ -50,6 +51,7 @@ class RoutedChat:
             "routing": self.decision,
             **({"listing": self.listing} if self.listing else {}),
             **({"research": self.research} if self.research else {}),
+            **({"comparison": self.comparison} if self.comparison else {}),
         }
 
     @property
@@ -77,7 +79,7 @@ class RoutedChat:
             lane, allowed = "landscape", ["landscape"]
         elif result.injection_flagged or asked.scope_record is not None:
             allowed = ["passage"]
-        override = asked.route_override
+        override = asked.route_override or ("comparison" if asked.comparison_record_ids else None)
         if override in allowed:
             lane = override
         decision.update(lane=lane, override=override,
@@ -117,6 +119,26 @@ class RoutedChat:
             )
             self.research = result.wire()
             return result.answer
+        if self.decision["lane"] == "comparison" and settings.AI_COMPARISON_ENABLED:
+            from apps.ai.admission.scope import current_run
+            from apps.ai.answers.citations import UNAVAILABLE
+            from apps.ai.comparison.service import comparison_events
+            from apps.ai.research.context import RunContext
+            from apps.ai.research.registry import ToolRun
+
+            current = current_run()
+            if current is None or current.ceiling is None:
+                return GroundedAnswer(
+                    text="Start this comparison in a queued Conversation so IRIS can read each paper fully.",
+                    citations=(), state=UNAVAILABLE,
+                )
+            ctx = RunContext.for_request(user=user, root=self.root, lane="comparison",
+                                         conversation=self.asked.conversation)
+            answer, self.comparison = yield from comparison_events(
+                ToolRun.start(ctx, self.root), self.asked.effective_question,
+                record_ids=self.asked.comparison_record_ids,
+            )
+            return answer
         answer, self.listing = yield from lane_events(
             self.decision["lane"], self.asked.effective_question, user,
             root=self.root, conversation=self.asked.conversation,
