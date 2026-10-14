@@ -120,8 +120,8 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
             </p>
             <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
               The answering model could not be reached, so IRIS is not summarising this paper.
-              Retrieval still works — see Related Institutional Works below, or ask a question in
-              Paper Chat.
+              Retrieval still works — see Related Institutional Works below, or put a question to
+              Ask IRIS.
             </p>
             <button
               type="button"

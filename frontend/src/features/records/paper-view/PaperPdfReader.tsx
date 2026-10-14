@@ -176,6 +176,11 @@ export interface PaperPdfReaderProps {
    * pages scroll inside it, rather than with the window.
    */
   contained?: boolean;
+  /**
+   * Paper mode's workspace (IR-569): the pane fills a fixed-height column,
+   * so it never moves and the window never scrolls to it.
+   */
+  fill?: boolean;
 }
 
 /**
@@ -202,6 +207,7 @@ export function PaperPdfReader({
   highlightRegions,
   navKey,
   contained = false,
+  fill = false,
 }: PaperPdfReaderProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
@@ -325,9 +331,9 @@ export function PaperPdfReader({
       // alike, so neither changes the other's distance.
       const paneTop = paneRef.current.getBoundingClientRect().top;
       const view = { top: toolbarRect.bottom, bottom: area.getBoundingClientRect().bottom };
-      const atRest = Math.abs(paneTop - PANE_TOP_PX) < 1;
+      const atRest = fill || Math.abs(paneTop - PANE_TOP_PX) < 1;
       if (onlyIfHidden && region && atRest && regionInView(pageBox, region, view)) return true;
-      window.scrollBy({ top: paneTop - PANE_TOP_PX, behavior });
+      if (!fill) window.scrollBy({ top: paneTop - PANE_TOP_PX, behavior });
       area.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
     } else {
       // The window scrolls, under a toolbar that sticks below the header.
@@ -414,20 +420,34 @@ export function PaperPdfReader({
       onKeyDown={find.onReaderKeyDown}
       className={cn(
         "flex flex-col",
-        READING_PANE_HEIGHT,
-        "reading-wide:rounded-2xl reading-wide:border reading-wide:border-stone-200 reading-wide:overflow-hidden",
+        fill
+          ? "flex-1 min-h-0"
+          : cn(
+              READING_PANE_HEIGHT,
+              "reading-wide:rounded-2xl reading-wide:border reading-wide:border-stone-200 reading-wide:overflow-hidden",
+            ),
       )}
     >
       <div
         ref={toolbarRef}
         className={cn(
-          "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
-          "rounded-xl bg-overlay border border-stone-200",
-          READER_TOOLBAR_TOP,
-          "reading-wide:static reading-wide:shrink-0 reading-wide:mb-0 reading-wide:rounded-none",
-          "reading-wide:border-0 reading-wide:border-b reading-wide:bg-canvas",
+          fill
+            ? "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-canvas border-b border-stone-200"
+            : cn(
+                "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
+                "rounded-xl bg-overlay border border-stone-200",
+                READER_TOOLBAR_TOP,
+                "reading-wide:static reading-wide:shrink-0 reading-wide:mb-0 reading-wide:rounded-none",
+                "reading-wide:border-0 reading-wide:border-b reading-wide:bg-canvas",
+              ),
         )}
       >
+        {fill && ready && (
+          <span className="order-first px-2 text-small text-stone-600 tabular-nums">
+            Page {currentPage} / {pages.length}
+          </span>
+        )}
+        {fill && <span aria-hidden className="w-px h-5 bg-stone-300 mx-1" />}
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -440,7 +460,7 @@ export function PaperPdfReader({
           </Button>
           {/* The percentage gives way below `sm`, so the toolbar keeps its
               44px controls on one row at 360px. */}
-          <span className="hidden sm:inline text-2xs font-semibold text-stone-500 w-10 text-center tabular-nums">
+          <span className={cn("text-2xs font-semibold text-stone-500 w-10 text-center tabular-nums", !fill && "hidden sm:inline")}>
             {Math.round(scale * 100)}%
           </span>
           <Button
@@ -477,21 +497,24 @@ export function PaperPdfReader({
           </Button>
         </div>
 
-        {ready && (
+        {!fill && ready && (
           <span className="text-xs font-semibold text-stone-600 tabular-nums">
             Page {currentPage} / {pages.length}
           </span>
         )}
+        {fill && <span aria-hidden className="flex-1" />}
 
         <Button
           variant="ghost"
-          size="icon"
+          size={fill ? "sm" : "icon"}
           onClick={handleDownload}
           disabled={!downloadBytes}
           aria-label="Download"
           title="Download the paper"
+          className={cn(fill && "min-h-11 reading-split:min-h-9 font-medium text-stone-600")}
         >
           <i className="fas fa-download" aria-hidden />
+          {fill && <span aria-hidden className="hidden reading-split:inline">Download</span>}
         </Button>
 
         {/* A row of its own inside the toolbar, so it sticks with it and a
@@ -521,8 +544,12 @@ export function PaperPdfReader({
           "rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
           // A stable gutter, so the scrollbar appearing once the pages load
           // does not narrow the pane and set off a second refit.
-          "reading-wide:flex-1 reading-wide:min-h-0 reading-wide:overflow-y-auto reading-wide:[scrollbar-gutter:stable]",
-          "reading-wide:rounded-none reading-wide:p-4 reading-wide:focus-visible:ring-inset",
+          fill
+            ? "flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] rounded-none px-3 py-4 reading-split:px-6 focus-visible:ring-inset"
+            : cn(
+                "reading-wide:flex-1 reading-wide:min-h-0 reading-wide:overflow-y-auto reading-wide:[scrollbar-gutter:stable]",
+                "reading-wide:rounded-none reading-wide:p-4 reading-wide:focus-visible:ring-inset",
+              ),
         )}
       >
         {status === "loading" && (

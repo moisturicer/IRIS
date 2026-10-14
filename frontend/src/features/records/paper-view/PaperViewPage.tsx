@@ -413,15 +413,21 @@ export default function PaperViewPage() {
   useEffect(() => {
     if (!chatModal) return;
     panelRef.current?.focus();
+    // A dialog opened on top of the panel keeps its own Escape and focus.
+    const inOtherDialog = (target: EventTarget | null) => {
+      const owner = target instanceof Element ? target.closest('[role="dialog"],[role="alertdialog"]') : null;
+      return owner != null && owner !== panelRef.current;
+    };
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented || inOtherDialog(e.target)) return;
       if (tier === "single") backToPaper();
       else closeChat();
     };
     // The sidebar is the app's, not inert here: focus reaching it comes back.
     const onFocusIn = (e: FocusEvent) => {
       const panel = panelRef.current;
-      if (panel && e.target instanceof Node && !panel.contains(e.target)) panel.focus();
+      if (!panel || !(e.target instanceof Node) || panel.contains(e.target) || inOtherDialog(e.target)) return;
+      panel.focus();
     };
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("focusin", onFocusIn);
@@ -609,6 +615,8 @@ export default function PaperViewPage() {
   // a citation lands the same way in either (IR-354).
   const reader = () => (
     <>
+      {(viewedVersion || record.manuscript_unsubmitted) && (
+      <div className={cn("space-y-3", onPaperTab && "px-4 pt-3")}>
       {viewedVersion && latestVersion && (
         <VersionBanner
           viewing={viewedVersion.number}
@@ -634,6 +642,8 @@ export default function PaperViewPage() {
           </div>
         </div>
       )}
+      </div>
+      )}
       <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
         <PaperPdfReader
           recordId={record.id}
@@ -641,7 +651,8 @@ export default function PaperViewPage() {
           scrollToPage={viewedVersion ? null : openAtPage}
           highlightRegions={highlightRegions}
           navKey={arrivalKey.current}
-          contained={tier === "wide"}
+          contained={onPaperTab || tier === "wide"}
+          fill={onPaperTab}
         />
       </Suspense>
     </>
@@ -715,35 +726,29 @@ export default function PaperViewPage() {
   };
 
   return (
-    // Centred at the app's standard width (IR-335, IR-521), with the right
-    // rail inside the same container so the two centre as a pair. The route
-    // asks AppShell for the full width because the Paper and Review sections
-    // use all of it (IR-372): the reader and the review pane get the room
-    // rather than margins. The other sections take the standard width here.
     // The `reading` container (IR-569): its width, not the window's, lays
-    // out the Paper and Review sections.
+    // out the page. Paper is a full-height workspace (record bar, then the
+    // paper beside Ask IRIS); the other sections scroll with the window,
+    // at the app's standard width except Review, which uses all of it.
     <div
       ref={observeWorkspace}
       className={cn(
-        "[container-type:inline-size] [container-name:reading]",
-        !onPaperTab && !onReviewTab && PAGE_WIDTH.standard,
+        "relative [container-type:inline-size] [container-name:reading]",
+        onPaperTab && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
       )}
     >
-      {/* Every section one click away at any depth (IR-356), and in Paper
-          mode the paper in one line instead of the editorial header. */}
       <ReadingHeader
         inert={chatModal}
+        className={cn(!onPaperTab && "sticky top-0 z-30")}
         sections={sections}
         section={section}
         onSelect={(s) => setViewParam("section", s)}
         onTabKeyDown={onTabKeyDown}
         tabId={tabId}
         panelId={arriving ? undefined : `${tabsId}-panel`}
-        identity={
-          onPaperTab
-            ? { title: arriving ? null : record.title, version: paperVersion, onBack: () => navigate(-1) }
-            : undefined
-        }
+        onBack={() => navigate(-1)}
+        title={!onPaperTab ? undefined : arriving ? null : record.title}
+        version={onPaperTab ? paperVersion : undefined}
         askIris={
           onReviewTab
             ? undefined
@@ -753,18 +758,22 @@ export default function PaperViewPage() {
       <div
         className={cn(
           onPaperTab
-            ? "reading-wide:flex reading-wide:gap-4 reading-wide:items-start"
-            : cn("lg:flex lg:gap-6 lg:items-start", dock === "left" && !onReviewTab && "lg:flex-row-reverse"),
+            ? "flex-1 min-h-0 flex"
+            : cn(
+                "px-4 sm:px-7 pt-6 pb-7 lg:flex lg:gap-6 lg:items-start",
+                !onReviewTab && PAGE_WIDTH.standard,
+                dock === "left" && !onReviewTab && "lg:flex-row-reverse",
+              ),
         )}
       >
         <div
           {...(chatModal ? { inert: "" } : {})}
-          className={cn("min-w-0", onPaperTab ? "reading-wide:flex-1" : "lg:flex-1")}
+          className={cn("min-w-0", onPaperTab ? "flex-1 flex flex-col" : "lg:flex-1")}
         >
 
           <div
             className={cn(
-              "grid gap-6 items-start",
+              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-6 items-start",
               // The rail takes some of a wide screen's extra width (IR-521);
               // the Abstract keeps its reading measure either way.
               showRail && "lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]",
@@ -776,21 +785,12 @@ export default function PaperViewPage() {
           {arriving ? (
             <MainColumnSkeleton />
           ) : (
-          <div className="min-w-0 space-y-6">
-            {/* Editorial header (IR-356): where it sits, what it is, who
-                wrote it, then what to do with it. Not in Paper mode, where
-                the reading header holds the paper in one line (IR-569). */}
+          <div className={cn("min-w-0", onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-6")}>
+            {/* Editorial header (IR-356): what it is, who wrote it, then
+                what to do with it. Not in Paper mode, where the record bar
+                holds the paper in one line (IR-569). */}
             {!onPaperTab && (
             <header className="space-y-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="inline-flex items-center gap-2 min-h-11 -my-2 text-sm font-medium text-stone-500 hover:text-brand transition-colors duration-200"
-              >
-                <i className="fas fa-arrow-left text-2xs" aria-hidden />
-                Back
-              </button>
-
               <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
                 {(record.record_type_name || record.classification_name) && (
                   <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand">
@@ -928,7 +928,7 @@ export default function PaperViewPage() {
               id={`${tabsId}-panel`}
               role="tabpanel"
               aria-labelledby={tabId(section)}
-              className="space-y-6"
+              className={onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-6"}
             >
             {section === "paper" && reader()}
 
@@ -1147,7 +1147,7 @@ export default function PaperViewPage() {
         <div
           aria-hidden
           onClick={closeChat}
-          className="hidden reading-split:block reading-wide:hidden fixed inset-y-0 right-0 left-[var(--sidebar-inset,0px)] z-30 bg-stone-900/20"
+          className="hidden reading-split:block reading-wide:hidden absolute inset-0 z-30 bg-stone-900/25"
         />
       )}
       {chat.open && (
@@ -1167,6 +1167,7 @@ export default function PaperViewPage() {
           onClose={closeChat}
           onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
           panelRef={panelRef}
+          modal={chatModal}
           draft={chat.draft}
           onDraftChange={chat.setDraft}
           canChangePosition={!onPaperTab}

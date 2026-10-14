@@ -262,7 +262,7 @@ describe("keeping the newest message in view (IR-351)", () => {
 
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
 
-    const panel = screen.getByRole("complementary", { name: "Paper Chat" });
+    const panel = screen.getByRole("complementary", { name: "Ask IRIS" });
     const scrolled = scrollTopSet.mock.contexts as Element[];
     expect(scrolled.length).toBeGreaterThan(0);
     for (const el of scrolled) {
@@ -324,7 +324,7 @@ describe("minimized to a bar while the reader reads a citation (IR-354)", () => 
   it("shows only a named bar, with the conversation and the composer out of the way", async () => {
     renderScreen(<MinimizedPanel />);
 
-    expect(await screen.findByRole("button", { name: "Show Paper Chat" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Show Ask IRIS" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(ANSWER)).not.toBeVisible());
     expect(screen.queryByRole("textbox", { name: "Ask about this paper" })).not.toBeInTheDocument();
   });
@@ -333,17 +333,17 @@ describe("minimized to a bar while the reader reads a citation (IR-354)", () => 
     renderScreen(<MinimizedPanel />);
     await waitFor(() => expect(screen.getByText(ANSWER)).not.toBeVisible());
 
-    await userEvent.click(screen.getByRole("button", { name: "Show Paper Chat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Show Ask IRIS" }));
 
     expect(screen.getByText(ANSWER)).toBeVisible();
     expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show Paper Chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show Ask IRIS" })).not.toBeInTheDocument();
     expect(findForRecord).toHaveBeenCalledTimes(1);
   });
 
   it("has no serious or critical accessibility violations while minimized", async () => {
     const { container } = renderScreen(<MinimizedPanel />);
-    await screen.findByRole("button", { name: "Show Paper Chat" });
+    await screen.findByRole("button", { name: "Show Ask IRIS" });
 
     await expectNoBlockingA11yViolations(container);
   });

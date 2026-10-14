@@ -683,7 +683,7 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
     renderPaperView();
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
-    await screen.findByRole("complementary", { name: "Paper Chat" });
+    await screen.findByRole("complementary", { name: "Ask IRIS" });
   }
 
   // Docked beside the rail, the chat squeezed the paper under it; the rail is
@@ -700,7 +700,7 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
 
   it("comes back when the docked chat is closed", async () => {
     await openChatDocked("right");
-    await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close Ask IRIS" }));
     expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
   });
 });
@@ -730,7 +730,8 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
     await screen.findByText(/paper reader open/i);
-    await screen.findByRole("complementary", { name: "Paper Chat" });
+    // A side panel or, over the paper, a dialog: named by its heading either way.
+    await screen.findByRole("heading", { name: "Ask IRIS" });
     return view;
   }
 
@@ -749,7 +750,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
   it("opens Ask IRIS on a direct Paper link too", async () => {
     renderPaper(`/records/${RECORD_ID}?section=paper`);
 
-    expect(await screen.findByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+    expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
   });
 
   it("puts the paper in one line: title, version and Back, not the editorial header", async () => {
@@ -800,8 +801,8 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     await openPaperTab();
     await userEvent.type(screen.getByRole("textbox", { name: "Ask about this paper" }), "What was measured?");
 
-    await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
-    expect(screen.queryByRole("complementary", { name: "Paper Chat" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close Ask IRIS" }));
+    expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.getByText(/paper reader open/i)).toBeInTheDocument();
     expect(screen.getByRole("button", ASK)).toHaveAttribute("aria-pressed", "false");
 
@@ -814,7 +815,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
 
     expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
-    expect(screen.getByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Panel position" })).toBeInTheDocument();
   });
 
@@ -827,12 +828,12 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     renderPaperView();
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("button", ASK));
-    await screen.findByRole("complementary", { name: "Paper Chat" });
+    await screen.findByRole("complementary", { name: "Ask IRIS" });
 
     await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
     await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
 
-    expect(screen.getByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
     expect(find).toHaveBeenCalledTimes(1);
   });
 
@@ -856,7 +857,8 @@ describe("the Paper tab (IR-372, IR-569)", () => {
       workspaceAt(924);
       await openPaperTab();
 
-      const panel = screen.getByRole("complementary", { name: "Paper Chat" });
+      const panel = screen.getByRole("dialog", { name: "Ask IRIS" });
+      expect(panel).toHaveAttribute("aria-modal", "true");
       await waitFor(() => expect(panel).toHaveFocus());
       expect(inert(screen.getByRole("tabpanel"))).toBe(true);
       expect(inert(screen.getByRole("tablist"))).toBe(true);
@@ -866,7 +868,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
 
       await userEvent.keyboard("{Escape}");
 
-      expect(screen.queryByRole("complementary", { name: "Paper Chat" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Ask IRIS" })).not.toBeInTheDocument();
       expect(inert(screen.getByRole("tabpanel"))).toBe(false);
       await waitFor(() => expect(screen.getByRole("button", ASK)).toHaveFocus());
     });
@@ -877,7 +879,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Back to paper" }));
 
-      expect(screen.getByRole("button", { name: "Show Paper Chat" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Show Ask IRIS" })).toBeInTheDocument();
       expect(inert(screen.getByRole("tabpanel"))).toBe(false);
       await waitFor(() => expect(screen.getByRole("button", ASK)).toHaveFocus());
 
@@ -982,7 +984,7 @@ describe("following a citation from Paper Chat (IR-354)", () => {
   it("minimizes the sheet below lg, and restores it with the answer still there", async () => {
     await followCitationFromChat();
 
-    const bar = await screen.findByRole("button", { name: "Show Paper Chat" });
+    const bar = await screen.findByRole("button", { name: "Show Ask IRIS" });
     expect(screen.queryByRole("textbox", { name: "Ask about this paper" })).not.toBeInTheDocument();
 
     await userEvent.click(bar);
@@ -996,7 +998,7 @@ describe("following a citation from Paper Chat (IR-354)", () => {
 
     await followCitationFromChat();
 
-    expect(screen.queryByRole("button", { name: "Show Paper Chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
   });
 
@@ -1004,11 +1006,11 @@ describe("following a citation from Paper Chat (IR-354)", () => {
     workspaceAt(1200);
     await followCitationFromChat();
 
-    await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close Ask IRIS" }));
     expect(screen.getByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
-    await screen.findByRole("complementary", { name: "Paper Chat" });
+    await screen.findByRole("complementary", { name: "Ask IRIS" });
     expect(screen.getByText(/open at page 12, 1 region\(s\)/i)).toBeInTheDocument();
   });
 });
@@ -1157,7 +1159,7 @@ describe("following a citation to another paper (IR-355)", () => {
   }
 
   function panel() {
-    return screen.getByRole("complementary", { name: "Paper Chat" });
+    return screen.getByRole("complementary", { name: "Ask IRIS" });
   }
 
   /** On X, chat open, "All papers" on, the answer citing Y on screen. */
@@ -1237,7 +1239,7 @@ describe("following a citation to another paper (IR-355)", () => {
   it("releases the pin when the panel is closed and opened again", async () => {
     await followToOtherPaper();
 
-    await userEvent.click(within(panel()).getByRole("button", { name: "Close Paper Chat" }));
+    await userEvent.click(within(panel()).getByRole("button", { name: "Close Ask IRIS" }));
     await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
 
     expect(await within(panel()).findByText(QUESTION_ON_Y)).toBeInTheDocument();
@@ -1648,13 +1650,13 @@ describe("the Review section (IR-412)", () => {
     renderWithProbe(`/records/${RECORD_ID}?section=review`);
 
     await screen.findByRole("list", { name: "Review timeline" });
-    expect(screen.queryByRole("complementary", { name: "Paper Chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
 
     expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+    expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
       `/records/${RECORD_ID}?section=paper`,
     );
@@ -1815,7 +1817,7 @@ describe("record versions (IR-416)", () => {
     renderPaper(`/records/${RECORD_ID}?section=paper&version=1`);
     await screen.findByText(/reading v1/i);
 
-    const panel = await screen.findByRole("complementary", { name: "Paper Chat" });
+    const panel = await screen.findByRole("complementary", { name: "Ask IRIS" });
     expect(within(panel).getByText("Answers are about the current version, not v1.")).toBeInTheDocument();
   });
 

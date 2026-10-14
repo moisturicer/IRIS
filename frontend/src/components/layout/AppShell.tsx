@@ -54,7 +54,9 @@ export function AppShell() {
   // Routes that paint their own page and manage their own scrolling.
   // Ask IRIS is `/ai` and every conversation address under it (IR-548).
   const isAskIris = pathname === ASK_PATH || pathname.startsWith(`${ASK_PATH}/`);
-  const isFullBleed = pathname === "/" || isAskIris;
+  // A record lays out its own bar and workspace (IR-569).
+  const isRecord = /^\/records\/\d+\/?$/.test(pathname);
+  const isFullBleed = pathname === "/" || isAskIris || isRecord;
   // Ask IRIS fills the window exactly (`h-screen`) and its toolbar carries the
   // bell on a phone, so a bar above it would push the composer off screen.
   const showPhoneBar = !isAskIris;
@@ -107,12 +109,7 @@ export function AppShell() {
   // shows them the pending screen instead (IR-537).
 
   return (
-    <div
-      className="flex min-h-screen bg-canvas font-sans"
-      // Where the content area starts, for a page's fixed layer that must
-      // cover the content but never the sidebar (IR-569).
-      style={{ ["--sidebar-inset" as string]: isPhone ? "0px" : collapsed ? "4rem" : "15rem" }}
-    >
+    <div className="flex min-h-screen bg-canvas font-sans">
       {sidebarOpen && (
         // A pointer target only: the drawer's own Close menu button and Escape
         // are the keyboard route, so this is kept out of the tab order and the

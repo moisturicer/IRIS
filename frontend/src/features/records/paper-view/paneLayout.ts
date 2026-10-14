@@ -1,15 +1,7 @@
 /**
  * The record page's sticky and pane geometry (IR-351, IR-352, IR-569).
- *
- * The page is a CSS size container named `reading`, so its width -- either
- * sidebar state included -- picks the layout, not the window's (IR-569).
- * CSS reads the thresholds through the `reading-split` and `reading-wide`
- * variants in `tailwind.config.js`; React through `readingTier`, where it
- * manages focus or panel state. `paneLayout.test.ts` keeps them equal.
- *
- * The reading header sticks at the top, 56px tall; panes sit 12px below it
- * and end at the page's 28px bottom padding. Whole class strings, because
- * Tailwind only generates classes it finds written out.
+ * The `reading` container's width picks the layout; CSS reads it through the
+ * `reading-*` variants, React through `readingTier` (kept equal by the test).
  */
 
 /** Ask IRIS beside the paper from here, leaving the paper at least 640px. */

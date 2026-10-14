@@ -13,10 +13,11 @@ The decisions behind this are [ADR-032](../adr/032-adviser-first-review-and-offi
 
 **Amended 2026-10-14 (IR-569, Paper mode):**
 
-- **One reading header** for the record page replaces the floating section switch and the floating *Ask about this paper* button (supersedes IR-527). It holds the section tabs and the tools (Ask IRIS, not in Review); in Paper mode also Back, the title in one line (full title in the heading and its tooltip) and the manuscript version. Paper mode drops the editorial header; authorship and workflow detail stay in Overview.
-- **The layout follows the content width, not the window**: the page is a CSS container named `reading`. At 1000 px and up the paper and Ask IRIS sit side by side (paper at least 640 px, panel 320–360 px); from 640 px Ask IRIS slides over the paper, with focus held in it and a close control; below 640 px it is the one view, with **Back to paper**. React reads the same thresholds (`paneLayout.readingTier`) for focus and panel state.
-- **Entering Paper opens Ask IRIS** (a first visit, a direct link, a citation arrival) and collapses the desktop sidebar to its rail for the visit without saving it; leaving restores the reader's choice. Opening finds the paper's conversation and never starts one; the first question does. Closing keeps the draft.
-- Only the PDF pages are white in Paper mode; Paper Chat sits on the canvas behind one border and is named by its heading.
+- **One record bar** replaces the floating section switch and the floating *Ask about this paper* button (supersedes IR-527): Back, the sections and Ask IRIS on every section (Ask IRIS not in Review); in Paper also the title in one line (full title in the heading and its tooltip) and the manuscript version. Overview keeps its editorial header; Paper drops it.
+- **Paper is a full-height workspace**, after the alphaXiv PDF view: the record bar, then the reader (its own flat toolbar: page, zoom, fit, find, download) beside Ask IRIS, divided by hairlines rather than cards. Only the PDF pages are white.
+- **The layout follows the content width, not the window**: the page is a CSS container named `reading`. At 1000 px and up Ask IRIS is a column beside the paper (paper at least 640 px, column 320–360 px); from 640 px it is a drawer over the paper, a modal dialog with focus held in it; below 640 px it is the whole workspace, with **Back to paper**. React reads the same thresholds (`paneLayout.readingTier`).
+- **Entering Paper opens Ask IRIS** (first visit, direct link, citation arrival) and collapses the desktop sidebar to its rail for the visit without saving it. Opening finds the paper's conversation and never starts one; the first question does. Closing keeps the draft.
+- The panel is named **Ask IRIS** throughout (it was "Paper Chat").
 
 The frontend implementation plan is [`../frontend_redesign_spec.md`](../frontend_redesign_spec.md).
 

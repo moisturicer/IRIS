@@ -5,13 +5,13 @@ import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import { CitationOriginContext } from "@/lib/citedPage";
-import { AskIrisEmblem, AskIrisMark } from "@/features/ai/components/AskIrisIcons";
+import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
 import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessageBubble";
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { PANE_HEIGHT, PANE_TOP, READING_PANE_HEIGHT, READING_PANE_TOP } from "./paneLayout";
+import { PANE_HEIGHT, PANE_TOP } from "./paneLayout";
 
 export type DockMode = "left" | "right" | "floating";
 
@@ -120,6 +120,8 @@ interface PaperChatPanelProps {
   onBackToPaper?: () => void;
   /** The panel itself, for the page to move focus into. */
   panelRef?: Ref<HTMLElement>;
+  /** Over or instead of the paper (IR-569): a modal dialog, not a side panel. */
+  modal?: boolean;
 }
 
 /** The paper a Paper Chat conversation is about. */
@@ -161,6 +163,7 @@ export function PaperChatPanel({
   onDraftChange,
   onBackToPaper,
   panelRef,
+  modal = false,
 }: PaperChatPanelProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const headingId = useId();
@@ -283,8 +286,10 @@ export function PaperChatPanel({
     <aside
       ref={panelRef}
       tabIndex={-1}
+      role={modal ? "dialog" : undefined}
+      aria-modal={modal || undefined}
       className={cn(
-        "bg-canvas border border-stone-200 flex flex-col overflow-hidden focus:outline-none",
+        "bg-canvas flex flex-col overflow-hidden focus:outline-none",
         className,
       )}
       aria-labelledby={headingId}
@@ -295,52 +300,38 @@ export function PaperChatPanel({
         <button
           type="button"
           onClick={onRestore}
-          aria-label="Show Paper Chat"
+          aria-label="Show Ask IRIS"
           className="flex items-center gap-3 w-full min-h-14 px-4 py-2 text-left hover:bg-stone-100 transition-colors duration-200"
         >
-          <span className="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0" aria-hidden>
-            <AskIrisMark className="w-5 h-5 text-brand" />
-          </span>
+          <AskIrisMark className="w-5 h-5 text-brand shrink-0" />
           <span className="min-w-0 flex-1">
-            <span className="block font-display text-md font-semibold text-stone-900 leading-tight">Paper Chat</span>
+            <span className="block font-display text-lg font-semibold text-stone-900 leading-tight">Ask IRIS</span>
             <span className="block text-2xs text-stone-500 truncate">Back to the answer</span>
           </span>
           <i className="fas fa-chevron-up text-xs text-stone-500" aria-hidden />
         </button>
       )}
 
-      {/* Header: what this is (labelled AI, always), which paper, and
-          what the answers are drawn from (IR-356). */}
-      <div className="shrink-0 border-b border-stone-200" hidden={minimized}>
+      {/* What this is (an AI, said so), which paper, and the scope (IR-356). */}
+      <div className="shrink-0 px-4 pt-3 pb-3 border-b border-stone-200" hidden={minimized}>
         {onBackToPaper && (
           // Only where the panel is the one view (below `reading-split`).
-          <div className="px-2 pt-2 reading-split:hidden">
-            <Button variant="ghost" onClick={onBackToPaper} className="min-h-11 font-semibold">
-              <i className="fas fa-arrow-left text-xs" aria-hidden />
-              Back to paper
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={onBackToPaper}
+            className="reading-split:hidden inline-flex items-center gap-1.5 min-h-11 -mt-1 mb-1 text-small font-semibold text-brand"
+          >
+            <i className="fas fa-arrow-left text-2xs" aria-hidden />
+            Back to paper
+          </button>
         )}
-        <div className="flex items-center gap-3 px-4 pt-3 pb-2">
-          <span className="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0" aria-hidden>
-            <AskIrisMark className="w-5 h-5 text-brand" />
+        <div className="flex items-center gap-2">
+          <AskIrisMark className="w-5 h-5 text-brand shrink-0" />
+          <h2 id={headingId} className="font-display text-xl font-semibold text-stone-900 leading-none">Ask IRIS</h2>
+          <span className="px-1 rounded border border-stone-300 text-3xs font-semibold uppercase tracking-wider text-stone-500">
+            AI
           </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 leading-tight">
-              <h2 id={headingId} className="font-display text-lg font-semibold text-stone-900">Paper Chat</h2>
-              <span className="px-1.5 py-0.5 rounded-full bg-brand-50 text-brand text-2xs font-semibold ring-1 ring-brand-200">
-                IRIS AI
-              </span>
-            </div>
-            <p className="text-2xs text-stone-500 truncate">
-              {pinned ? `Chatting about ${subject.title}` : record.title}
-            </p>
-            {viewingVersion != null && !pinned && (
-              <p className="text-2xs text-stone-700">
-                Answers are about the current version, not v{viewingVersion}.
-              </p>
-            )}
-          </div>
+          <span className="flex-1" />
 
           {canChangePosition && (
           <div className="relative">
@@ -355,7 +346,7 @@ export function PaperChatPanel({
               <i className="fas fa-ellipsis" aria-hidden />
             </Button>
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-card-md ring-1 ring-stone-200 py-1 z-50">
+              <div className="absolute right-0 top-full mt-1 w-44 bg-overlay rounded-xl shadow-card-md ring-1 ring-stone-200 py-1 z-50">
                 {(
                   [
                     { id: "left", label: "Dock left", icon: "fa-arrow-left" },
@@ -384,31 +375,18 @@ export function PaperChatPanel({
           </div>
           )}
 
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close Paper Chat">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close Ask IRIS" className="-mr-2">
             <i className="fas fa-xmark" aria-hidden />
           </Button>
         </div>
 
-        {/* Pinned to another paper (IR-355): one step to this one's own. */}
-        {pinned && (
-          <div className="px-4 pb-1">
-            <button
-              type="button"
-              onClick={() => setSubject(subjectOf(record))}
-              className="inline-flex items-center gap-1.5 min-h-11 lg:min-h-7 text-2xs font-semibold text-brand hover:underline"
-            >
-              <i className="fas fa-arrow-right-arrow-left text-2xs" aria-hidden />
-              Chat about this paper instead
-            </button>
-          </div>
-        )}
-
-        {/* The scope control (IR-298, ADR-026 section 9): visible, and the
-            only thing that ever widens retrieval past this paper. Resets to
-            "this paper" whenever the panel switches to a different
-            conversation, and not when only the page's paper changes. */}
-        <div className="flex items-center gap-2 px-4 pb-2.5 text-2xs text-stone-500">
-          <span>Answers from</span>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-2xs text-stone-500">
+            {pinned ? `Chatting about ${subject.title}` : record.title}
+          </p>
+          {/* The scope control (IR-298, ADR-026 section 9): visible, and the
+              only thing that ever widens retrieval past this paper. Resets
+              with the conversation, not with the page's paper. */}
           <button
             type="button"
             onClick={() => setWiden((v) => !v)}
@@ -419,21 +397,38 @@ export function PaperChatPanel({
                 : `Searching only ${pinned ? subject.title : "this paper"} — click to search every paper`
             }
             className={cn(
-              "inline-flex items-center gap-1.5 min-w-0 max-w-[16rem] font-semibold px-3 min-h-11 lg:min-h-7 rounded-full ring-1 transition-colors duration-200",
+              "shrink-0 inline-flex items-center gap-1.5 min-w-0 max-w-[12rem] min-h-11 reading-split:min-h-7 px-2",
+              "rounded-md border text-2xs font-semibold transition-colors duration-200",
               widen
-                ? "bg-brand text-white ring-brand"
-                : "text-stone-700 ring-stone-300 hover:ring-brand/40 hover:text-brand",
+                ? "bg-brand text-white border-brand"
+                : "text-stone-700 border-stone-300 hover:border-brand/40 hover:text-brand",
             )}
           >
-            <i className="fas fa-layer-group text-2xs" aria-hidden />
-            {/* While pinned, "this paper" would read as the one on screen,
-                so the pill names the conversation's own paper (IR-355).
-                Truncated on screen; the accessible name keeps it whole. */}
+            <span aria-hidden className={cn("w-1.5 h-1.5 rounded-full shrink-0", widen ? "bg-white" : "bg-brand")} />
+            {/* While pinned, "this paper" would read as the one on screen, so
+                the chip names the conversation's own paper (IR-355). */}
             <span className="truncate">
               {widen ? "All papers" : pinned ? subject.title : "This paper"}
             </span>
           </button>
         </div>
+        {viewingVersion != null && !pinned && (
+          <p className="mt-1 text-2xs text-stone-700">
+            Answers are about the current version, not v{viewingVersion}.
+          </p>
+        )}
+
+        {/* Pinned to another paper (IR-355): one step to this one's own. */}
+        {pinned && (
+          <button
+            type="button"
+            onClick={() => setSubject(subjectOf(record))}
+            className="mt-1 inline-flex items-center gap-1.5 min-h-11 reading-split:min-h-7 text-2xs font-semibold text-brand hover:underline"
+          >
+            <i className="fas fa-arrow-right-arrow-left text-2xs" aria-hidden />
+            Chat about this paper instead
+          </button>
+        )}
       </div>
 
       {/* Transcript */}
@@ -442,24 +437,23 @@ export function PaperChatPanel({
         hidden={minimized}
         // Only while shown: hiding it is not the reader scrolling it.
         onScroll={minimized ? undefined : (e) => { transcriptScrollTop.current = e.currentTarget.scrollTop; }}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-5"
+        className="flex-1 overflow-y-auto px-4 py-5 space-y-5"
       >
         {ready && messages.length === 0 && (
-          <div className="py-4 text-center">
-            <AskIrisEmblem className="w-12 h-12 mx-auto mb-3" />
-            <p className="font-display text-xl font-semibold text-stone-900">Ask about this paper</p>
-            <p className="text-sm text-stone-600 leading-relaxed mt-1 px-2">
+          <div className="pt-2">
+            <p className="font-display text-2xl font-semibold leading-tight text-stone-900">Ask about this paper.</p>
+            <p className="mt-2 text-small text-stone-600 leading-relaxed">
               {widen
                 ? "Answers come from every paper in the repository, with citations you can open."
-                : "Answers come from this paper’s own text, with citations you can open."}
+                : "Answers come from this paper’s own text, with citations that open the passage."}
             </p>
-            <div role="group" aria-label="Suggested questions" className="mt-5 flex flex-col gap-2 text-left">
+            <div role="group" aria-label="Suggested questions" className="mt-5 grid gap-2">
               {STARTER_QUESTIONS.map((question) => (
                 <button
                   key={question}
                   type="button"
                   onClick={() => chooseStarter(question)}
-                  className="min-h-11 px-3.5 py-2.5 rounded-xl ring-1 ring-stone-300 text-sm text-stone-700 hover:ring-brand/40 hover:text-brand transition-colors duration-200"
+                  className="min-h-11 px-3 py-2.5 rounded-md border border-stone-300 text-left text-small text-stone-700 hover:border-brand hover:text-brand transition-colors duration-200"
                 >
                   {question}
                 </button>
@@ -484,7 +478,7 @@ export function PaperChatPanel({
 
       {/* Composer */}
       <div className="shrink-0 border-t border-stone-200 p-3" hidden={minimized}>
-        <div className="flex items-end gap-2 rounded-2xl ring-1 ring-stone-300 focus-within:ring-2 focus-within:ring-brand/40 pl-3.5 pr-1.5 py-1.5 transition-colors duration-200">
+        <div className="flex items-end gap-2 rounded-lg border border-stone-300 focus-within:border-brand/60 focus-within:ring-2 focus-within:ring-brand/20 pl-3 pr-2 py-2 transition-colors duration-200">
           <textarea
             ref={composerRef}
             rows={2}
@@ -507,7 +501,7 @@ export function PaperChatPanel({
             onClick={send}
             disabled={!input.trim() || busy || !ready}
             aria-label="Send"
-            className="w-11 h-11 lg:w-9 lg:h-9 shrink-0 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors duration-200"
+            className="w-11 h-11 reading-split:w-8 reading-split:h-8 shrink-0 rounded-md bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors duration-200"
           >
             <i className="fas fa-arrow-up text-xs" aria-hidden />
           </button>
@@ -531,7 +525,7 @@ export function PaperChatPanel({
  * and it is exactly as tall as the reader beside it (IR-352).
  */
 const DOCKED_PANEL_BASE =
-  "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-2xl " +
+  "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-2xl border border-stone-200 " +
   `lg:sticky lg:inset-x-auto lg:bottom-auto ${PANE_TOP} lg:z-auto ` +
   `${PANE_HEIGHT} lg:shrink-0 lg:rounded-2xl`;
 
@@ -539,16 +533,16 @@ export const DOCKED_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[22rem]`;
 
 /**
  * Ask IRIS in the Paper workspace (IR-569), by the workspace's width: the
- * one view below `reading-split`, sliding over the paper below
- * `reading-wide`, and a column beside it from there, 320-360px wide and
+ * whole workspace below `reading-split`; a drawer over the paper below
+ * `reading-wide`; from there a flush column beside it, 320-360px wide and
  * never leaving the paper under 640px.
  */
 export const PAPER_WORKSPACE_PANEL_CLASS =
-  "fixed inset-y-0 right-0 left-[var(--sidebar-inset,0px)] z-40 h-dvh " +
-  "reading-split:left-auto reading-split:w-[22.5rem] reading-split:shadow-card-md " +
-  `reading-wide:sticky reading-wide:inset-auto ${READING_PANE_TOP} reading-wide:z-auto ` +
-  `${READING_PANE_HEIGHT} reading-wide:w-[clamp(20rem,calc(100cqi-656px),22.5rem)] ` +
-  "reading-wide:shrink-0 reading-wide:rounded-2xl reading-wide:shadow-none";
+  "absolute inset-0 z-40 " +
+  "reading-split:left-auto reading-split:w-[22.5rem] reading-split:border-l reading-split:border-stone-300 " +
+  "reading-split:shadow-[-12px_0_32px_rgb(41_37_36/0.12)] " +
+  "reading-wide:static reading-wide:z-auto reading-wide:shadow-none reading-wide:shrink-0 " +
+  "reading-wide:w-[clamp(20rem,calc(100cqi-656px),22.5rem)]";
 
 /**
  * A minimized bottom sheet (IR-354): a bar along the bottom of the screen,
@@ -557,8 +551,8 @@ export const PAPER_WORKSPACE_PANEL_CLASS =
  * covers nothing, and is never minimized.
  */
 export const MINIMIZED_SHEET_CLASS =
-  "fixed inset-x-0 bottom-0 z-40 rounded-t-2xl shadow-card-md";
+  "fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-stone-200 shadow-card-md";
 
 /** Positioning for the floating panel — deliberately overlays the page. */
 export const FLOATING_PANEL_CLASS =
-  "fixed bottom-6 right-6 z-40 w-[min(94vw,26rem)] h-[min(80vh,34rem)] rounded-2xl shadow-card-md";
+  "fixed bottom-6 right-6 z-40 w-[min(94vw,26rem)] h-[min(80vh,34rem)] rounded-2xl border border-stone-200 shadow-card-md";
