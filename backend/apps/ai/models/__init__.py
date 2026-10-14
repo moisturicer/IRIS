@@ -24,11 +24,14 @@ from .ingestion_job import IngestionJob
 from .shadow import ShadowEvidenceDecision, ShadowEvidenceTally
 from .research import ResearchRun, ResearchStep
 from .queued import AskRun, AskRunAttempt, AskRunEvent
+from .admission import ProviderCampaign, ProviderReservation
 
 __all__ = [
     "AskRun",
     "AskRunAttempt",
     "AskRunEvent",
+    "ProviderCampaign",
+    "ProviderReservation",
     "ResearchRun",
     "ResearchStep",
     "Conversation",

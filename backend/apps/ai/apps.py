@@ -26,9 +26,11 @@ class AiConfig(AppConfig):
             verify_bypass_configuration,
         )
 
+        from apps.ai.admission.limits import verify_admission_configuration
         from apps.ai.routing.chat import verify_research_configuration
 
         verify_research_configuration()
+        verify_admission_configuration()
         verify_bypass_configuration()
         verify_inference_configuration()
         verify_evidence_configuration()

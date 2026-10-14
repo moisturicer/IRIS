@@ -45,7 +45,7 @@ The ticket constrains the shape: reuse the existing event stream and parser, wit
 - A follower polls the database (`AI_DURABLE_ASK_POLL_SECONDS`) instead of being pushed to.
 - With the switch on, every Conversation question uses a worker.
 - A superseded attempt that is still alive keeps spending until its next write is refused.
-- No per-user fairness, queue bound or shared spend limit exists yet (IR-545).
+- No per-user fairness, queue bound or shared spend limit existed here. IR-545 adds them ([ADR-041](041-shared-provider-admission.md), Proposed), and switching this on now requires `AI_PROVIDER_ADMISSION=enforce`.
 - §5's lock ordering holds for the Conversation delete endpoint only. Deleting a Record or a user cascades to Conversations without taking the lock. If that coincides with a run's final write, the cascade's commit fails on the orphaned Turn and can be retried. It is never a resurrection.
 - Each follower holds a request thread and a database connection while it polls, and notices a departed reader only on its next write (at most `HEARTBEAT_SECONDS`).
 

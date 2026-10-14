@@ -40,12 +40,30 @@ from apps.ai.providers.ports import LLMProvider
 from apps.ai.resilience.llm import LLMProviderConfig, build_task_llm
 
 from .profiles import Profile
+from .tasks import InferenceTask
+
+#: The admission lane each task's attempts are charged to when no workload
+#: names one (IR-545). A workload -- research, ingestion -- overrides it.
+_TASK_LANES = {
+    InferenceTask.ANSWER: "chat",
+    InferenceTask.RESOLVE: "chat",
+    InferenceTask.ROUTE: "chat",
+    InferenceTask.PLAN: "research",
+    InferenceTask.SCREEN: "research",
+    InferenceTask.SUMMARY: "overview",
+    InferenceTask.DESCRIBE_FIGURE: "ingestion",
+}
+
+
+def task_lane(task: InferenceTask) -> str:
+    return _TASK_LANES[task]
 
 
 def build_profile_llm(
     profile: Profile,
     breaker_key: Optional[str] = None,
     max_tokens: Optional[int] = None,
+    lane: Optional[str] = None,
 ) -> LLMProvider:
     """The provider `profile`'s task reaches its model through.
 
@@ -81,6 +99,7 @@ def build_profile_llm(
             fallback_models=fallback_models,
             max_tokens=max_tokens,
             provider_only=pins.get(model, profile.provider_only),
+            lane=lane or task_lane(profile.task),
         )
 
     if pins:

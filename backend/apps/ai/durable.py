@@ -38,8 +38,24 @@ reopened transcript gets.
 is unfinished is refused (409) rather than answered against a history that
 lacks the earlier Turn.
 
-**Off by default** (`AI_DURABLE_ASK`). Queue sizing, fairness and shared
-spend limits are IR-545's and are not built here.
+**Off by default** (`AI_DURABLE_ASK`), and Django refuses to start with it on
+unless provider admission is enforced (IR-545, ADR-041).
+
+**Bounded and fair (IR-545).** A submission is admitted to the queue only
+while fewer than `AI_ADMISSION_QUEUE_DEPTH` questions are unfinished, and
+fewer than `AI_ADMISSION_QUEUE_PER_USER` of them are the asker's -- so one
+reader cannot fill it. Otherwise it is refused as busy, before anything is
+created or dispatched. The check and the insert are serialised across every
+process by a transaction-scoped advisory lock.
+
+**One deadline (IR-545).** Every vendor call a worker makes is bounded by the
+time left until the run's original `deadline_at`; a retry, a fallback or a
+redelivery never restarts it. Each provider attempt is admitted against the
+run's own caps (`ask:<run id>`) as well as the shared ones, and a run that met
+a refusal that cost it its answer journals `capacity_limited` before its
+terminal event, so the journal records *busy* rather than a silent gap. The
+answer itself is the explicit unavailable state; no client renders this event
+yet.
 """
 
 from __future__ import annotations
@@ -51,8 +67,11 @@ from contextlib import closing, contextmanager
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import transaction
+from django.core.exceptions import ImproperlyConfigured
+from django.db import connection, transaction
 from django.utils import timezone
+
+from apps.ai.admission import scope as admission_scope
 
 from apps.ai.answers.citations import PARTIAL as PARTIAL_ANSWER
 from apps.ai.answers.events import Done, ReasoningDelta
@@ -66,6 +85,7 @@ from apps.ai.models import (
 )
 from apps.ai.models.queued import EXPIRED, FAILED, PARTIAL, QUEUED, RUNNING, SUCCEEDED
 from apps.ai.orchestrator import ChatOrchestrator
+from apps.ai.providers.deadline import model_call_deadline
 from apps.records.models import Record
 
 logger = logging.getLogger(__name__)
@@ -91,6 +111,20 @@ _BATCH = 100
 
 class StaleAttempt(Exception):
     """This attempt no longer owns the run: superseded, finished or deleted."""
+
+
+class Busy(Exception):
+    """The queue is full, or this asker's share of it is (IR-545). Nothing
+    was created. ``reason`` is a public code."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+#: Serialises queue admission across processes, inside the submitting
+#: transaction. Any constant no other code uses.
+_QUEUE_LOCK = 545_001
 
 
 def enabled() -> bool:
@@ -130,6 +164,7 @@ def submit(prepared, user, data, *, max_sources: int):
         )
         if any(not _expire_overdue(run) for run in busy):
             return None
+        _admit_to_queue(user)
         run = AskRun.objects.create(
             user=user, conversation=prepared.conversation, request=request, deadline_at=deadline,
         )
@@ -138,6 +173,44 @@ def submit(prepared, user, data, *, max_sources: int):
         })
         transaction.on_commit(lambda: _dispatch(run.pk))
     return run
+
+
+def _admit_to_queue(user) -> None:
+    """Raise `Busy` unless the queue has room for one more of ``user``'s
+    questions. Called inside `submit`'s transaction."""
+    from apps.ai.admission.limits import NotConfigured, enforcing, read_limits
+
+    if not enforcing():
+        return
+    try:
+        limits = read_limits()
+    except (NotConfigured, ImproperlyConfigured):
+        raise Busy("not_configured") from None
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", [_QUEUE_LOCK])
+    # A run past its deadline and grace holds no place: nothing will run it.
+    cutoff = timezone.now() - timedelta(seconds=settings.AI_DURABLE_ASK_STALE_SECONDS)
+    unfinished = AskRun.objects.filter(state__in=(QUEUED, RUNNING), deadline_at__gt=cutoff)
+    if unfinished.filter(user=user).count() >= limits.queue_per_user:
+        raise Busy("user_queue_full")
+    if unfinished.count() >= limits.queue_depth:
+        raise Busy("queue_full")
+
+
+def _journal_capacity(run: AskRun, attempt, answer_state=None) -> None:
+    """Journal the refusals this run met, when they cost it its answer: the
+    run ends without one, or with one no model wrote. A refused rerank that
+    only degraded retrieval under a generated answer is not "busy". Locked
+    caller."""
+    from apps.ai.answers.citations import GENERATED
+
+    if answer_state == GENERATED:
+        return
+    scope = admission_scope.current_run()
+    if scope is not None and scope.denials:
+        _append(run, attempt, "capacity_limited", {
+            "status": "busy", "reasons": sorted(set(scope.denials)),
+        })
 
 
 def _dispatch(run_id) -> None:
@@ -279,6 +352,7 @@ class _QueuedOrchestrator(ChatOrchestrator):
                     )
                 from apps.ai.presentation import record_sources
 
+                _journal_capacity(run, self._attempt, answer.state)
                 _end(
                     run,
                     PARTIAL if answer.state == PARTIAL_ANSWER else SUCCEEDED,
@@ -327,13 +401,24 @@ def execute(run_id) -> None:
 
 
 def _answer(attempt: AskRunAttempt) -> None:
+    run = AskRun.objects.select_related("user").filter(pk=attempt.run_id).first()
+    if run is None:
+        raise StaleAttempt(str(attempt.pk))
+    left = (run.deadline_at - timezone.now()).total_seconds()
+    # Everything this delivery sends to a vendor -- the resolver included --
+    # is charged to the run's own budget and bounded by the time left until
+    # the deadline fixed at submission (IR-545). A redelivery opens the same
+    # run key and the same deadline; neither is reset.
+    with admission_scope.run(admission_scope.new_run(f"ask:{run.pk}")), \
+            model_call_deadline(max(0.0, left)):
+        _answer_run(attempt, run)
+
+
+def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
     from django.http import Http404
 
     from apps.ai.views.chatbot import prepare_ask
 
-    run = AskRun.objects.select_related("user").filter(pk=attempt.run_id).first()
-    if run is None:
-        raise StaleAttempt(str(attempt.pk))
     # Prepared again, as the asker, now: the Conversation and any override
     # Turn must still be theirs, and the resolver runs here, not in the request.
     try:
@@ -359,6 +444,8 @@ def _answer(attempt: AskRunAttempt) -> None:
             if data is not None:
                 append(attempt, event.name, data)
     if not orchestrator.finished:
+        with transaction.atomic():
+            _journal_capacity(_locked(attempt), attempt)
         if overdue:
             finish_without_turn(attempt, EXPIRED, "deadline_exceeded")
         else:

@@ -269,7 +269,7 @@ class CompositionRoot:
                 return None
             try:
                 self._shadow_llm = build_profile_llm(
-                    profile, breaker_key=SHADOW_BREAKER_KEY
+                    profile, breaker_key=SHADOW_BREAKER_KEY, lane="shadow"
                 )
             except LLMUnavailable:
                 return None

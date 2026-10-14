@@ -134,6 +134,12 @@ DATABASES = {
         "PORT": config("DB_PORT", default="5432"),
     }
 }
+# IR-545 (ADR-041): the same database on its own connection. A provider
+# reservation must commit the moment it is made -- even when its caller is
+# inside a transaction (a queued run writing its Turn embeds the answer) --
+# or no other process sees it, and the campaign row's lock is held for the
+# length of a vendor call. Only `apps.ai.admission` uses this alias.
+DATABASES["admission"] = {**DATABASES["default"], "TEST": {"MIRROR": "default"}}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -497,6 +503,46 @@ AI_DURABLE_ASK_DEADLINE_SECONDS = config("AI_DURABLE_ASK_DEADLINE_SECONDS", defa
 AI_DURABLE_ASK_STALE_SECONDS = config("AI_DURABLE_ASK_STALE_SECONDS", default=30, cast=int)
 # How often a following stream checks the journal for new events.
 AI_DURABLE_ASK_POLL_SECONDS = config("AI_DURABLE_ASK_POLL_SECONDS", default=0.25, cast=float)
+
+# IR-545 (ADR-041): every paid provider attempt is admitted against shared
+# limits held in Postgres, or refused. `off` admits nothing and checks
+# nothing (today's behaviour); `enforce` checks every attempt. Django refuses
+# to start with AI_DURABLE_ASK on and this off.
+#
+# FAIL CLOSED: none of the limits below has a default. Under `enforce`, an
+# unset limit refuses paid work rather than guessing a number. No value has
+# been approved (fixed-workflow pilot README §6); the ones in .env.example are
+# the proposed campaign's, for illustration only.
+AI_PROVIDER_ADMISSION = config("AI_PROVIDER_ADMISSION", default="off")
+AI_ADMISSION_CAMPAIGN = config("AI_ADMISSION_CAMPAIGN", default="")
+AI_ADMISSION_CAMPAIGN_MAX_ATTEMPTS = config("AI_ADMISSION_CAMPAIGN_MAX_ATTEMPTS", default="")
+AI_ADMISSION_CAMPAIGN_MAX_INPUT_TOKENS = config("AI_ADMISSION_CAMPAIGN_MAX_INPUT_TOKENS", default="")
+AI_ADMISSION_CAMPAIGN_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_CAMPAIGN_MAX_OUTPUT_TOKENS", default="")
+AI_ADMISSION_CAMPAIGN_MAX_COST_USD = config("AI_ADMISSION_CAMPAIGN_MAX_COST_USD", default="")
+AI_ADMISSION_CAMPAIGN_MAX_ACTIVE_MINUTES = config("AI_ADMISSION_CAMPAIGN_MAX_ACTIVE_MINUTES", default="")
+# The protected share of every campaign limit, kept back until the budget
+# owner releases it by setting AI_ADMISSION_RESERVE_RELEASED.
+AI_ADMISSION_RESERVE_FRACTION = config("AI_ADMISSION_RESERVE_FRACTION", default="")
+AI_ADMISSION_RESERVE_RELEASED = config("AI_ADMISSION_RESERVE_RELEASED", default=False, cast=bool)
+AI_ADMISSION_RUN_MAX_ATTEMPTS = config("AI_ADMISSION_RUN_MAX_ATTEMPTS", default="")
+AI_ADMISSION_RUN_MAX_INPUT_TOKENS = config("AI_ADMISSION_RUN_MAX_INPUT_TOKENS", default="")
+AI_ADMISSION_RUN_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_RUN_MAX_OUTPUT_TOKENS", default="")
+AI_ADMISSION_RUN_MAX_COST_USD = config("AI_ADMISSION_RUN_MAX_COST_USD", default="")
+# JSON object: lane -> attempts in flight at once, e.g. {"chat": 8, "research": 3}.
+# A lane it does not name is refused.
+AI_ADMISSION_LANE_CONCURRENCY = config("AI_ADMISSION_LANE_CONCURRENCY", default="")
+# Attempts in flight at once on any one vendor account, whatever the lane.
+AI_ADMISSION_ACCOUNT_CONCURRENCY = config("AI_ADMISSION_ACCOUNT_CONCURRENCY", default="")
+# JSON object: model -> {"input": US$ per million tokens, "output": ...}.
+# A model it does not price is refused.
+AI_ADMISSION_PRICES = config("AI_ADMISSION_PRICES", default="")
+# The completion cap sent with every chat-model attempt, and reserved for it.
+AI_ADMISSION_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_MAX_OUTPUT_TOKENS", default="")
+# Queued questions waiting or running at once, and per asker.
+AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
+AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
+# Added to an attempt's own timeout to make its lease. Not a spending limit.
+AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)

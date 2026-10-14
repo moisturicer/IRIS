@@ -404,10 +404,20 @@ class ChatStreamView(APIView):
         if queued:
             # Answered by a worker; this response only follows its journal,
             # so a disconnect unsubscribes and nothing else (IR-544).
-            run = durable.submit(
-                prepared, request.user, request.data,
-                max_sources=_parse_top_k(request.data.get("top_k")),
-            )
+            try:
+                run = durable.submit(
+                    prepared, request.user, request.data,
+                    max_sources=_parse_top_k(request.data.get("top_k")),
+                )
+            except durable.Busy as busy:
+                # Refused before anything was queued (IR-545): an explicit
+                # busy status, not a run that would wait past its deadline.
+                return Response(
+                    {"detail": "IRIS is busy answering other questions. Please try again shortly.",
+                     "status": "busy", "reason": busy.reason},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    headers={"Retry-After": "5"},
+                )
             if run is None:
                 return Response(
                     {"detail": "IRIS is still answering your previous question in this conversation."},
