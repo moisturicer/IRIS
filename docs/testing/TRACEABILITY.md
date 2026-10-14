@@ -1003,3 +1003,32 @@ The joined migration graph preserves twelve populated legacy Turns, an
 existing queued run and existing reservation charges. Independent focused
 Standards and Spec reviews found no material blockers. These checks do not
 replace human approval, labelled quality evaluation or rollout approval.
+
+## IR-550 — first fixed-workflow milestone evaluation
+
+An instrument that scores the metadata count, topic-match count and presence listing against pinned labels, each
+measure with its own denominator and ground truth, plus capacity accounting in which every submission stays in the
+denominator, and a campaign plan that refuses paid work which does not fit before the protected reserve. The
+recommendation is **do not enable**: [first-milestone report](../evaluation/fixed-workflow-pilot/first-milestone-report.md).
+
+Evidence:
+- `apps/ai/evaluation/tests/test_milestone.py`: metadata counts checked against their population, a contract count that
+  disagrees with its population refused, missing cases never counted correct, screening precision/recall over assessed
+  labelled candidates only, candidate recall owed every visible labelled-relevant Record, visibility and restriction
+  breaches, topic-count consistency, the held-out lock (mismatch, overlap, label change), exploratory standing for
+  public or unsplit data, review fraction/rubric/disagreements, judge scores never interpreted.
+- `apps/ai/evaluation/tests/test_capacity.py`: rejection, failure, timeout, cancellation and unfinished work in the
+  denominator; latency from the original submission; previews, unavailable and inconclusive never successes; the 30 s
+  deadline; only a real, cold, simultaneous, 100-distinct burst is a capacity claim; plans that would reach the reserve.
+- `apps/ai/evaluation/tests/test_http_driver.py`: SSE parsing, a simultaneous burst over a mock transport, transport
+  errors as failures, sanitized run files.
+- `apps/ai/evaluation/tests/test_pilot_commands.py`: the proposed campaign cannot fit a 100-submission burst at the
+  illustrative per-run caps; a paid burst that does not fit sends nothing; a paid run refuses without enforced
+  admission; rescoring a published run with a reviewer's verdicts.
+- `apps/ai/tests/test_pilot_milestone_http.py`: snapshot S0 through the authenticated HTTP/SSE boundary with fakes,
+  sanitized and scored end to end.
+
+Not covered here: no paid run, no pilot-family labelled set on proxy or CIT-U data, no held-out split, no human review
+and no capacity burst. The control run's figures measure arithmetic and plumbing, not quality, latency or cost.
+
+**Status:** instrument implemented and tested; every evaluation gate is OPEN and human review remains required.
