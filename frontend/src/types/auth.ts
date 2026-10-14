@@ -41,8 +41,8 @@ export interface User {
 
 export interface OwnRoleRequest {
   status:         "pending" | "declined";
-  /** The role name asked for at registration: "Student" or "Adviser". */
-  requested_role: string;
+  /** The role asked for at registration: Student or Adviser. */
+  requested_role: RoleName;
 }
 
 export interface ReviewAccess {

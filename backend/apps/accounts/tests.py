@@ -158,7 +158,7 @@ class OwnRoleRequestTests(APITestCase):
         self.url     = reverse("user-me")
         self.student = Role.objects.get_or_create(name="Student")[0]
 
-    def _request(self, user, status_=RequestStatus.PENDING, role=None):
+    def _file_request(self, user, status_=RequestStatus.PENDING, role=None):
         return RoleRequest.objects.create(
             user=user, requested_role=role or self.student, status=status_,
         )
@@ -171,7 +171,7 @@ class OwnRoleRequestTests(APITestCase):
 
     def test_pending_request_reports_pending_and_the_role(self):
         applicant = make_user("applicant@cit.edu")
-        self._request(applicant)
+        self._file_request(applicant)
 
         self.assertEqual(
             self._role_request(applicant),
@@ -180,7 +180,7 @@ class OwnRoleRequestTests(APITestCase):
 
     def test_declined_request_reports_declined(self):
         applicant = make_user("declined@cit.edu")
-        self._request(applicant, RequestStatus.DECLINED)
+        self._file_request(applicant, RequestStatus.DECLINED)
 
         self.assertEqual(
             self._role_request(applicant),
@@ -190,8 +190,8 @@ class OwnRoleRequestTests(APITestCase):
     def test_the_latest_request_is_the_one_reported(self):
         applicant = make_user("twice@cit.edu")
         adviser   = Role.objects.get_or_create(name="Adviser")[0]
-        self._request(applicant, RequestStatus.DECLINED)
-        self._request(applicant, RequestStatus.PENDING, role=adviser)
+        self._file_request(applicant, RequestStatus.DECLINED)
+        self._file_request(applicant, RequestStatus.PENDING, role=adviser)
 
         self.assertEqual(
             self._role_request(applicant),
@@ -200,13 +200,13 @@ class OwnRoleRequestTests(APITestCase):
 
     def test_user_with_an_approved_role_gets_null(self):
         member = make_user("member@cit.edu", "Student")
-        self._request(member, RequestStatus.APPROVED)
+        self._file_request(member, RequestStatus.APPROVED)
 
         self.assertIsNone(self._role_request(member))
 
     def test_user_with_a_role_gets_null_even_beside_an_older_pending_request(self):
         member = make_user("assigned@cit.edu", "Student")
-        self._request(member, RequestStatus.PENDING)
+        self._file_request(member, RequestStatus.PENDING)
 
         self.assertIsNone(self._role_request(member))
 
@@ -215,7 +215,7 @@ class OwnRoleRequestTests(APITestCase):
 
     def test_sign_in_carries_it_too(self):
         applicant = make_user("signin@cit.edu")
-        self._request(applicant)
+        self._file_request(applicant)
 
         response = self.client.post(
             reverse("auth-login"),
@@ -230,7 +230,7 @@ class OwnRoleRequestTests(APITestCase):
 
     def test_the_field_cannot_be_written(self):
         applicant = make_user("writer@cit.edu")
-        request   = self._request(applicant, RequestStatus.DECLINED)
+        request   = self._file_request(applicant, RequestStatus.DECLINED)
         self.client.force_authenticate(applicant)
 
         response = self.client.patch(

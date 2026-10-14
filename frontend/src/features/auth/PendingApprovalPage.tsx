@@ -58,39 +58,40 @@ export function PendingApprovalPage() {
     logout();
   };
 
-  const request = user?.role_request;
-  const { title, message } = standingOf(request, user?.email ?? "your registered address");
+  // The route guard renders this only for a signed-in user (IR-537).
+  if (!user) return null;
+
+  const request = user.role_request;
+  const { title, message } = standingOf(request, user.email);
 
   return (
     <AuthLayout variant="pending">
       <h2 className="text-balance text-display font-bold text-stone-900">{title}</h2>
       <p className="mt-3 text-pretty text-body text-stone-700">{message}</p>
 
-      {user && (
-        <div
-          role="group"
-          aria-labelledby={registeredId}
-          className="mt-section-lg rounded-lg border border-stone-200 border-t-2 border-t-gold bg-white px-5 py-4"
-        >
-          <p id={registeredId} className="text-label font-semibold text-stone-600">
-            Registered as
-          </p>
-          <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-small sm:grid-cols-3">
-            <dt className="text-stone-600">Name</dt>
-            <dd className="font-semibold text-stone-900 sm:col-span-2">
-              {user.first_name} {user.last_name}
-            </dd>
-            <dt className="mt-1 text-stone-600 sm:mt-0">Email</dt>
-            <dd className="break-all text-stone-900 sm:col-span-2">{user.email}</dd>
-            {request && (
-              <>
-                <dt className="mt-1 text-stone-600 sm:mt-0">Requested role</dt>
-                <dd className="text-stone-900 sm:col-span-2">{request.requested_role}</dd>
-              </>
-            )}
-          </dl>
-        </div>
-      )}
+      <div
+        role="group"
+        aria-labelledby={registeredId}
+        className="mt-section-lg border border-stone-200 border-t-2 border-t-gold bg-white px-5 py-4"
+      >
+        <p id={registeredId} className="text-label font-semibold text-stone-600">
+          Registered as
+        </p>
+        <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-small sm:grid-cols-3">
+          <dt className="text-stone-600">Name</dt>
+          <dd className="font-semibold text-stone-900 sm:col-span-2">
+            {user.first_name} {user.last_name}
+          </dd>
+          <dt className="mt-1 text-stone-600 sm:mt-0">Email</dt>
+          <dd className="break-all text-stone-900 sm:col-span-2">{user.email}</dd>
+          {request && (
+            <>
+              <dt className="mt-1 text-stone-600 sm:mt-0">Requested role</dt>
+              <dd className="text-stone-900 sm:col-span-2">{request.requested_role}</dd>
+            </>
+          )}
+        </dl>
+      </div>
 
       <div className="mt-section-lg">
         <Button type="button" variant="outline" size="full" onClick={handleLogout}>
