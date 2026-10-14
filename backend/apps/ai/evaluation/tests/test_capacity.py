@@ -17,7 +17,7 @@ from apps.ai.evaluation.capacity import (
 
 
 def _ok(i, ms):
-    return Submission(question=f"q{i}", outcome="generated", submitted_ms=0, final_ms=ms)
+    return Submission(question=f"q{i}", result="generated", submitted_ms=0, final_ms=ms)
 
 
 def _burst(submissions, **kwargs):
@@ -28,18 +28,18 @@ def _burst(submissions, **kwargs):
 
 def test_every_submission_is_in_the_denominator_whatever_happened_to_it():
     rows = [_ok(i, 2_000) for i in range(95)] + [
-        Submission("q95", "rejected", 0, None),
+        Submission("q95", "refused", 0, None),
         Submission("q96", "failed", 0, 3_000),
         Submission("q97", "timeout", 0, None),
         Submission("q98", "unfinished", 0, None),
         Submission("q99", "unavailable", 0, 1_000),
     ]
     report = summarize(_burst(rows))
-    assert report["submitted"] == 100
+    assert report["submissions"] == 100
     assert report["successes_under_goal"] == 95
     assert report["goal_rate"] == 0.95
     assert report["goal_met"] is True
-    assert report["outcomes"] == {"generated": 95, "rejected": 1, "failed": 1,
+    assert report["outcomes"] == {"generated": 95, "refused": 1, "failed": 1,
                                   "timeout": 1, "unfinished": 1, "unavailable": 1}
 
 
@@ -130,7 +130,7 @@ def test_a_limit_with_no_per_run_cap_cannot_be_planned_and_blocks():
 
 
 @pytest.mark.parametrize("status,events,expected", [
-    (503, [], "rejected"),
+    (503, [], "refused"),
     (500, [], "failed"),
     (200, [("done", {"mode": "generative", "listing": None})], "generated"),
     (200, [("done", {"mode": "generative",
@@ -147,3 +147,19 @@ def test_a_limit_with_no_per_run_cap_cannot_be_planned_and_blocks():
 ])
 def test_a_stream_is_classified_by_what_the_reader_finally_received(status, events, expected):
     assert classify_stream(status, events) == expected
+
+
+def test_a_burst_declared_cold_that_reused_verdicts_is_counted_as_warm():
+    rows = [_ok(i, 1_000) for i in range(99)] + [
+        Submission("q99", "generated", 0, 1_000, cache_hits=3)]
+    report = summarize(_burst(rows))
+    assert report["cache_contradicted"] is True
+    assert report["claim"] == "control_only"
+
+
+def test_a_throttled_submission_is_a_rejection_in_the_denominator():
+    assert classify_stream(429, []) == "refused"
+
+
+def test_the_run_names_the_path_its_submissions_took():
+    assert summarize(_burst([_ok(0, 1)], path="queued"))["path"] == "queued"

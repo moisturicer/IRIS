@@ -62,7 +62,7 @@ def test_a_paid_burst_that_does_not_fit_sends_nothing_and_stays_unverified(
                  n=100, providers="real", cache="cold", out=str(out))
     run = _written(out)
     assert run["summary"]["claim"] == "unverified"
-    assert run["summary"]["submitted"] == 0
+    assert run["summary"]["submissions"] == 0
     assert "submissions" not in run
 
 

@@ -43,25 +43,39 @@ def parse_sse(text: str) -> list[tuple[str, dict]]:
     return events
 
 
+def _cache_hits(events) -> int:
+    for name, data in reversed(events):
+        if name == "done":
+            return ((data.get("listing") or {}).get("observed") or {}).get("cache_hits", 0)
+    return 0
+
+
 async def _submit(client: httpx.AsyncClient, path: str, payload: dict,
                   clock: Callable[[], float], start: float):
     submitted = round((clock() - start) * 1000)
     try:
-        response = await client.post(path, json=payload)
+        # One bound on the whole exchange: httpx's own timeout is per read, and
+        # a stream that keeps sending keepalives would never trip it.
+        response = await asyncio.wait_for(client.post(path, json=payload), CLIENT_TIMEOUT_S)
         events = parse_sse(response.text) if response.status_code == 200 else []
         outcome = classify_stream(response.status_code, events)
-    except httpx.TimeoutException:
+    except (asyncio.TimeoutError, httpx.TimeoutException):
         return Submission(payload["question"], "timeout", submitted, None), []
     except httpx.HTTPError:
         return Submission(payload["question"], "failed", submitted, None), []
     final = round((clock() - start) * 1000)
-    return Submission(payload["question"], outcome, submitted, final), events
+    return Submission(payload["question"], outcome, submitted, final, _cache_hits(events)), events
 
 
 async def submit_all(questions: Sequence[str], *, base_url: str, path: str, token: str,
-                     extra: Optional[Mapping] = None, transport=None,
+                     extras: Optional[Sequence[Mapping]] = None, transport=None,
                      clock: Callable[[], float] = time.monotonic):
-    """Each question's `Submission` and its events, all sent at once."""
+    """Each question's `Submission` and its events, all sent at once.
+
+    ``extras`` gives each question its own payload fields, such as the
+    ``conversation_id`` that makes it a queued run.
+    """
+    extras = extras or [{}] * len(questions)
     async with httpx.AsyncClient(
         base_url=base_url, transport=transport, timeout=CLIENT_TIMEOUT_S,
         headers={"Authorization": f"Bearer {token}"},
@@ -69,8 +83,8 @@ async def submit_all(questions: Sequence[str], *, base_url: str, path: str, toke
     ) as client:
         start = clock()
         return await asyncio.gather(*(
-            _submit(client, path, {"question": q, **(extra or {})}, clock, start)
-            for q in questions))
+            _submit(client, path, {"question": q, **extra}, clock, start)
+            for q, extra in zip(questions, extras, strict=True)))
 
 
 async def burst(questions: Sequence[str], **kwargs) -> list[Submission]:

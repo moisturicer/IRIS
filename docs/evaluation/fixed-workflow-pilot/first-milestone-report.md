@@ -47,7 +47,7 @@ Every measure is reported on its own and never folded into a single score. A cas
 
 **Standing.** A report is `exploratory_inconclusive` unless the tier is CIT-U, a held-out split exists and its lock verifies, and an independent second review exists. Only then does it become `eligible_for_owner_review`. That status is not approval. A public or synthetic sample can never become CIT-U reliability evidence.
 
-**Held-out lock (AC 1).** A set may carry `split: {development, held_out, lock}`. `lock` is the SHA-256 over the held-out cases, their topic's labels and the populations, taken from parsed JSON, so a line-ending change does not alter it. A changed label, a case in both halves or a wrong lock refuses the set. Today, **held-out is empty** (README §3), so no run can be anything but development.
+**Held-out lock (AC 1).** A set may carry `split: {development, held_out, lock}`. `lock` is the SHA-256 over the held-out cases, their topic's labels and the populations, taken from parsed JSON, so a line-ending change does not alter it. A changed label, a case in both halves or a wrong lock refuses the set. When a split exists, held-out figures are reported in their own `held_out` section and never pooled into development. Today, **held-out is empty** (README §3), so no run can be anything but development.
 
 ## 3. Human review and model judges (AC 3, AC 4)
 
@@ -58,14 +58,15 @@ Every measure is reported on its own and never folded into a single score. A cas
   - *claim supported*: each factual sentence is backed by a cited passage of a readable Record;
   - *citation supported*: the cited page contains the quoted text (ADR-023 matching).
 - **Independent second reviewer: OPEN.** None is invented. Until one is named, `institutional_quality_claim` is `false` in every report.
-- **Model judges.** None was run. If judge scores are supplied, agreement with the primary reviewer is reported on the shared cases, and `interpretable` stays `false`, because the agreement threshold is the owner's decision and is not recorded.
+- **Model judges.** None was run. If judge scores are supplied, agreement is reported on the shared cases against the independent reviewer, or against the exploratory reviewer if there is no independent one, and the report says which (`against`). `interpretable` stays `false`, because the agreement threshold is the owner's decision and is not recorded.
+- **Reviewer identity is self-declared** in the review file (`reviewer`, `independent`). The instrument cannot verify that two names are two people. That is the owner's check when accepting a review.
 - **Jev calibration: inconclusive.** No suitable development data exists for an approved purpose, and that is recorded here as the finding. Upload/extraction classifier evaluation stays excluded (IR-505).
 
 ## 4. Capacity and cost (AC 5, AC 6, AC 7)
 
 **Not measured.** `eval_pilot_capacity` is the instrument. Its accounting is pinned by `test_capacity.py`:
 
-- **Denominator.** Every submission counts: rejected (`503 busy`), failed, timeout (`run_failed` with `deadline_exceeded`), cancelled, unfinished. Preview-only, unavailable, partial, no-results and inconclusive outcomes are **not** successful generated completions.
+- **Denominator.** Every submission counts: refused (`503 busy` or a `429` throttle), failed, timeout (`run_failed` with `deadline_exceeded`), cancelled, unfinished. Preview-only, unavailable, partial, no-results and inconclusive outcomes are **not** successful generated completions.
 - **Soft goal.** At least 95 of 100 submissions produce a generated final response within 10 s of the original submission, queue time included. Any final response after 30 s is listed as a deadline violation.
 - **Claims.**
   - `measured_goal_met` or `measured_goal_missed` requires real providers, a cold cache, a simultaneous burst and at least 100 distinct questions.
@@ -78,6 +79,10 @@ Every measure is reported on its own and never folded into a single score. A cas
   - More generally, a 100-submission burst fits the proposed campaign only if **each run** is capped at no more than 3 attempts, 3,750 input tokens, 600 output tokens, US$0.1125 and 27 active seconds.
 
   **Capacity therefore remains unverified.** To change that, the budget owner must set per-run caps, change the campaign or change the burst size. Any of those is a decision, not a measurement.
+- **Queue path.** `--user` gives each question its own new Conversation, so a server with `AI_DURABLE_ASK` on queues it, and latency then includes the queue wait. The run file records the path observed in the streams (`queued`, `inline` or `mixed`); the operator does not declare it. A burst without `--user` measures only the inline path.
+- **Throttle.** One identity is limited to 60 `ai_query` requests an hour. A throttled submission (`429`) counts as `refused` and stays in the denominator. A real 100-submission burst from one account would therefore fail on the throttle, not on capacity, unless the deployment owner raises that limit for the evaluation. That is an **OPEN** decision.
+- **Cache.** `--providers` and `--cache` record what the operator configured. A burst declared `cold` that reports any screening-cache hit is counted as warm (`cache_contradicted`) and can only be a control.
+- **Cost.** Per-run usage in a run file covers model calls and estimated prompt tokens only. Spend is the admission ledger's figure: read `manage.py provider_campaign` before and after a paid run and record the difference beside the run file.
 - **Shared ceiling.** Paid evaluation questions, load submissions, retries, fallbacks, probes and debugging all go through the same admission ledger (IR-545). `eval_pilot_milestone --providers real` and `eval_pilot_capacity --providers real` refuse to start unless `AI_PROVIDER_ADMISSION=enforce` and the work fits before the reserve.
 
 ## 5. Control run: snapshot S0, fake providers
@@ -93,7 +98,7 @@ Run file: [`../runs/20261014-pilot-milestone-s0-fake-control.json`](../runs/2026
 | Breaches | 0 | No invisible Record listed; no restricted Record judged or named |
 | Topic-count consistency | 0 inconsistent | The reported count equals its own included candidates |
 | Answer quality | `not_reviewed`, 0/3 | No person has reviewed |
-| Latency | p50 335 ms, p95 514 ms over 3 cases, in-process | Fake providers and the test client. **Not a latency observation** |
+| Latency | p50 309 ms, p95 456 ms over 3 cases, in-process | Fake providers and the test client. **Not a latency observation** |
 | Usage | 4 model calls, about 956 estimated prompt tokens; b01 reported none (no model, by design) | Fake providers |
 | Standing | `exploratory_inconclusive` | Synthetic; no held-out cases; no independent review |
 
@@ -110,11 +115,14 @@ Run file: [`../runs/20261014-pilot-milestone-s0-fake-control.json`](../runs/2026
 |---|---|---|---|
 | Endpoint approval for each README §5 row | Institutional authority | **OPEN** | Traffic to that endpoint |
 | Campaign and per-run values; reserve release | Budget and deployment owner | **OPEN**. No per-run cap is proposed; the illustrative test caps cannot fit a 100-submission burst (§4) | Every paid run, including this evaluation |
+| `ai_query` throttle for the evaluation account (60/hour today) | Deployment owner | **OPEN** | A real 100-submission burst from one account |
 | Pilot-family labelled set with a locked held-out split | A labeller who does not tune on it | **OPEN** | Any non-exploratory quality figure |
 | Exploratory quality review | Jive Tyler Revalde | **Not started** | The exploratory quality section |
 | Independent second review | **Not named** | **OPEN** | Any institutional quality claim |
 | Quality and error trade-offs (README §6) | Owner | **OPEN** | A pilot verdict |
 | Institutional pilot enablement | Institutional authority | **OPEN** | Switching anything on for readers |
+
+Only one gate is enforced in code: the campaign. The `--providers real` paths refuse unless admission is enforcing and the planned runs fit before the reserve. The milestone command plans only its own cases, while retries, fallbacks and probes are charged by admission as they happen. Endpoint, budget, review and enablement approvals are human records. The commands cannot see them, so the operator must confirm them before using `--providers real`.
 
 ## 7. Operation, reader feedback and rollback (proposed)
 
@@ -161,7 +169,7 @@ python manage.py eval_pilot_milestone --set <labels.json> --base-url <url> --tie
 python manage.py eval_pilot_milestone --set <labels.json> --from-run <run.json> --tier proxy --reviews <reviews.json>
 
 # Burst control (fakes on the server), then the real burst once its gates are recorded
-python manage.py eval_pilot_capacity --base-url <url> --questions <100 distinct.json> --providers fake --cache cold
+python manage.py eval_pilot_capacity --base-url <url> --questions <100 distinct.json> --providers fake --cache cold --user <token's account email>
 ```
 
 **Local note.** On a Windows checkout with `core.autocrlf=true`, `test_the_proxy_audit_pins_the_proxy_set_it_audited` fails, because CRLF conversion changes `proxy_starter.json`'s bytes. The committed bytes match the pin, and the failure predates this ticket. This report's held-out lock hashes parsed JSON, so it does not have the same problem.

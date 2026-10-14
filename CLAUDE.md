@@ -184,8 +184,9 @@ python manage.py eval_pilot_milestone --set <labels.json> --tier proxy --base-ur
                                    # --reviews <file> rescores with a person's verdicts. JWT in
                                    # IRIS_EVAL_TOKEN. --providers real refuses unless admission
                                    # enforces and the runs fit the campaign before its reserve
-python manage.py eval_pilot_capacity --base-url <url> --questions <json> --n 100 --providers fake --cache cold
-                                   # IR-550: simultaneous burst; every submission in the
+python manage.py eval_pilot_capacity --base-url <url> --questions <json> --n 100 --providers fake --cache cold --user EMAIL
+                                   # IR-550: simultaneous burst (--user queues each question in
+                                   # its own Conversation); every submission in the
                                    # denominator, latency from submission. Only real + cold +
                                    # >=100 distinct measures capacity. A paid burst that does not
                                    # fit the campaign sends nothing. Neither has run on a vendor

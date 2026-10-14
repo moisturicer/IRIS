@@ -274,6 +274,11 @@ def _topics(milestone: MilestoneSet, cases, by_case) -> dict:
     }
 
 
+def _measures(milestone: MilestoneSet, cases, by_case) -> dict:
+    return {"metadata_counts": _metadata([c for c in cases if c["family"] == METADATA], by_case),
+            **_topics(milestone, [c for c in cases if c["family"] != METADATA], by_case)}
+
+
 def _answer_quality(scored: Sequence[str], reviews: Sequence[Mapping]) -> dict:
     reviews = [r for r in reviews if r["case"] in scored]
     reviewers = list(dict.fromkeys(r["reviewer"] for r in reviews))
@@ -310,8 +315,13 @@ def _answer_quality(scored: Sequence[str], reviews: Sequence[Mapping]) -> dict:
 
 
 def _judge(judge: Sequence[Mapping], reviews: Sequence[Mapping], primary: Optional[str]) -> dict:
-    human = {r["case"]: r["answer_correct"] for r in reviews
-             if r["reviewer"] == primary and r.get("answer_correct") is not None}
+    # Validated against an independent reviewer where one exists; otherwise
+    # against the exploratory reviewer, and the report says which.
+    labelled = [r for r in reviews if r.get("answer_correct") is not None]
+    independent = [r for r in labelled if r.get("independent")]
+    rows = independent or [r for r in labelled if r["reviewer"] == primary]
+    against = "independent reviewer" if independent else "exploratory reviewer (not independent)"
+    human = {r["case"]: r["answer_correct"] for r in rows}
     shared = [j for j in judge if j["case"] in human]
     if not judge:
         return {"supplied": False, "interpretable": False, "agreement": None,
@@ -321,6 +331,7 @@ def _judge(judge: Sequence[Mapping], reviews: Sequence[Mapping], primary: Option
                 "why": "no human labels on the judged cases, so judge scores are not interpreted"}
     agree = sum(j["answer_correct"] == human[j["case"]] for j in shared)
     return {"supplied": True, "interpretable": False, "agreement": _frac(agree, len(shared)),
+            "against": against,
             "why": f"agreement measured on {len(shared)} human-labelled cases; the threshold "
                    "for interpreting judge scores is the owner's and is OPEN"}
 
@@ -347,6 +358,7 @@ def score(milestone: MilestoneSet, observations: Sequence[Observation], *, tier:
     by_case = {o.case_id: o for o in observations}
     scored = [c for c in milestone.cases if c["family"] in MILESTONE_FAMILIES]
     scored_ids = [c["id"] for c in scored]
+    held_out = [c for c in scored if c["id"] in milestone.held_out]
     answers = _answer_quality(scored_ids, reviews)
     latencies = {cid: by_case[cid].latency_ms for cid in scored_ids
                  if cid in by_case and by_case[cid].latency_ms is not None}
@@ -366,8 +378,9 @@ def score(milestone: MilestoneSet, observations: Sequence[Observation], *, tier:
                                        if c["family"] not in MILESTONE_FAMILIES}},
         "split": {"development": list(milestone.development), "held_out": list(milestone.held_out),
                   "lock_verified": milestone.lock_verified},
-        "metadata_counts": _metadata([c for c in scored if c["family"] == METADATA], by_case),
-        **_topics(milestone, [c for c in scored if c["family"] != METADATA], by_case),
+        **_measures(milestone, scored, by_case),
+        # Held-out figures on their own, never pooled into a development figure.
+        "held_out": _measures(milestone, held_out, by_case) if held_out else None,
         "answer_quality": answers,
         "judge": _judge(judge, reviews, answers["primary_reviewer"]),
         "latency_ms": {"n": len(latencies), "p50": percentile(list(latencies.values()), 0.5),

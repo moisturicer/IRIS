@@ -29,6 +29,7 @@ from apps.ai.evaluation.milestone import (
     parse_milestone_set,
     score,
 )
+from apps.ai.evaluation.runfile import file_digest, git_commit
 from apps.ai.inference import InferenceTask
 from apps.ai.models import Conversation
 from apps.ai.providers.fakes import ScriptedLLM
@@ -36,6 +37,7 @@ from apps.ai.providers.fakes import ScriptedLLM
 from .corpus import make_user
 from .test_fixed_workflow_baseline_http import (  # noqa: F401 -- fixtures
     BASELINE,
+    FIXTURE,
     OracleScreen,
     _root,
     _route,
@@ -117,6 +119,7 @@ def test_s0_scores_with_independent_denominators_and_stays_exploratory(run):
     out = os.environ.get("IRIS_PILOT_RUN_OUT")
     if out:
         Path(out).write_text(json.dumps(
-            {"set": BASELINE["name"], "snapshot": BASELINE["snapshot"]["id"], "tier": "synthetic",
+            {"commit": git_commit(), "set": BASELINE["name"], "set_sha256": file_digest(FIXTURE),
+             "snapshot": BASELINE["snapshot"]["id"], "tier": "synthetic",
              "providers": "fake (composition root; screening decides from S0's labels)",
              "runs": published, "report": report}, indent=2) + "\n")

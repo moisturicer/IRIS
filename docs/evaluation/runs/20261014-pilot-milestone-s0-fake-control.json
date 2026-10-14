@@ -1,24 +1,26 @@
 {
+  "commit": "v0.1.0-882-g516aa0a-dirty",
   "set": "fixed-workflow-baseline",
+  "set_sha256": "c732756026470e44837926d3926cf635ffd2753ef72ccec5efb8da2a254105d9",
   "snapshot": "S0",
   "tier": "synthetic",
   "providers": "fake (composition root; screening decides from S0's labels)",
   "runs": [
     {
       "case": "b01",
-      "latency_ms": 514,
+      "latency_ms": 456,
       "done": {
         "mode": "generative",
         "routing_lane": "count",
         "citation_count": 0,
         "listing": {
           "completeness": "exact_count",
-          "wording": "**5 records** match: all published records you can see. Counted at 2026-10-14T12:33:55+00:00 over the 5 records among the published records you can see. Each count is of distinct IRIS records, not of unique scholarly works: the same work can be recorded more than once. AI assessment is a separate question from this count: 4 of these can be read by AI and 1 cannot, which does not change the count.",
+          "wording": "**5 records** match: all published records you can see. Counted at 2026-10-14T13:09:47+00:00 over the 5 records among the published records you can see. Each count is of distinct IRIS records, not of unique scholarly works: the same work can be recorded more than once. AI assessment is a separate question from this count: 4 of these can be read by AI and 1 cannot, which does not change the count.",
           "count": {
             "total": 5,
             "predicate": "all published records you can see",
             "population": "published records you can see",
-            "snapshot": "2026-10-14T12:33:55+00:00",
+            "snapshot": "2026-10-14T13:09:47+00:00",
             "visible": 5,
             "ai_assessable": 4,
             "not_ai_assessable": 1,
@@ -31,7 +33,7 @@
     },
     {
       "case": "b02",
-      "latency_ms": 335,
+      "latency_ms": 309,
       "done": {
         "mode": "generative",
         "routing_lane": "count",
@@ -71,9 +73,9 @@
             "prompt_tokens_estimated": 479,
             "stage_ms": {
               "select": 22,
-              "screen": 301,
-              "finish": 3,
-              "total": 326
+              "screen": 275,
+              "finish": 4,
+              "total": 301
             },
             "note": "Observed for this run only. A run that reused earlier verdicts does not show how a fresh model call performs or what capacity exists."
           },
@@ -105,7 +107,7 @@
     },
     {
       "case": "b03",
-      "latency_ms": 48,
+      "latency_ms": 50,
       "done": {
         "mode": "generative",
         "routing_lane": "listing",
@@ -130,8 +132,8 @@
             "model_calls": 2,
             "prompt_tokens_estimated": 477,
             "stage_ms": {
-              "select": 14,
-              "screen": 24,
+              "select": 17,
+              "screen": 23,
               "finish": 3,
               "total": 42
             },
@@ -305,6 +307,7 @@
         "b02": 2
       }
     },
+    "held_out": null,
     "answer_quality": {
       "status": "not_reviewed",
       "reviewers": [],
@@ -340,8 +343,8 @@
     },
     "latency_ms": {
       "n": 3,
-      "p50": 335,
-      "p95": 514,
+      "p50": 309,
+      "p95": 456,
       "missing": []
     },
     "usage": {

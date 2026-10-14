@@ -22,10 +22,6 @@ keys by exact title; a title the database holds twice is refused.
 """
 
 import asyncio
-import json
-import os
-from datetime import datetime, timezone
-from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -39,21 +35,11 @@ from apps.ai.evaluation.milestone import (
     parse_milestone_set,
     score,
 )
-from apps.ai.management.commands.eval_retrieval import (
-    DEFAULT_OUT,
-    _git_commit,
-    _question_set_digest,
-)
+from apps.ai.evaluation.runfile import eval_token, file_digest, load_json, write_run
+from apps.ai.management.commands.eval_retrieval import DEFAULT_OUT
 from apps.records.models import Record
 
 STREAM_PATH = "/api/v1/ai/ask/stream/"
-
-
-def _load(path):
-    try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise CommandError(f"cannot read {path}: {exc}") from None
 
 
 def record_keys(records) -> dict[int, str]:
@@ -83,7 +69,7 @@ class Command(BaseCommand):
         parser.add_argument("--out", default=str(DEFAULT_OUT))
 
     def handle(self, *args, **options):
-        data = _load(options["set"])
+        data = load_json(options["set"])
         try:
             milestone = parse_milestone_set(data)
         except MilestoneSetError as exc:
@@ -92,7 +78,7 @@ class Command(BaseCommand):
             raise CommandError("give exactly one of --base-url or --from-run")
 
         if options["from_run"]:
-            previous = _load(options["from_run"])
+            previous = load_json(options["from_run"])
             runs, providers = previous["runs"], previous["providers"]
         else:
             providers = options["providers"]
@@ -103,22 +89,17 @@ class Command(BaseCommand):
         observations = [Observation(r["case"], r["done"].get("mode"), r["done"].get("listing"),
                                     r.get("latency_ms")) for r in runs]
         report = score(milestone, observations, tier=options["tier"],
-                       reviews=_load(options["reviews"]) if options["reviews"] else (),
-                       judge=_load(options["judge"]) if options["judge"] else ())
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out = Path(options["out"]) / f"{stamp}-pilot-milestone-{data['name']}.json"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps({
-            "set": data["name"], "set_sha256": _question_set_digest(options["set"]),
-            "commit": _git_commit(), "tier": options["tier"], "providers": providers,
+                       reviews=load_json(options["reviews"]) if options["reviews"] else (),
+                       judge=load_json(options["judge"]) if options["judge"] else ())
+        out = write_run(options["out"], f"pilot-milestone-{data['name']}", {
+            "set": data["name"], "set_sha256": file_digest(options["set"]),
+            "tier": options["tier"], "providers": providers,
             "rescored_from": options["from_run"], "runs": runs, "report": report,
-        }, indent=2) + "\n", encoding="utf-8")
+        })
         self._print(report, out)
 
     def _submit(self, data, base_url, providers):
-        token = os.environ.get("IRIS_EVAL_TOKEN", "").strip()
-        if not token:
-            raise CommandError("IRIS_EVAL_TOKEN must hold the evaluating user's JWT")
+        token = eval_token()
         cases = [c for c in data["cases"] if c["family"] in MILESTONE_FAMILIES]
         if providers == "real":
             try:
@@ -135,9 +116,8 @@ class Command(BaseCommand):
                 [case["question"]], base_url=base_url, path=STREAM_PATH, token=token))
             done = next((d for name, d in reversed(events) if name == "done"), None)
             runs.append({
-                "case": case["id"], "outcome": submission.outcome,
-                "latency_ms": (None if submission.final_ms is None
-                               else submission.final_ms - submission.submitted_ms),
+                "case": case["id"], "outcome": submission.result,
+                "latency_ms": submission.elapsed_ms,
                 "done": sanitize_done(done, keys=keys) if done else {},
             })
         return runs

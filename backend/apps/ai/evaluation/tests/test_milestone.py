@@ -259,3 +259,23 @@ def test_the_report_names_the_security_and_lifecycle_scenarios_and_their_tests()
             "cancel and retry of an owned run", "a foreign run is refused"} <= names
     assert all(row["status"] == "asserted by tests, not observed in this run"
                for row in report["scenarios"])
+
+
+def test_held_out_figures_are_reported_apart_from_development():
+    lock = held_out_digest(BASELINE, ["b02"])
+    milestone = _set(development=["b01", "b03"], held_out=["b02"], lock=lock)
+    report = score(milestone, _correct(), tier="proxy")
+    held_out = report["held_out"]
+    assert list(held_out["screening"]["by_case"]) == ["b02"]
+    assert held_out["metadata_counts"]["denominator"] == 0
+    assert score(_set(), _correct(), tier="proxy")["held_out"] is None
+
+
+def test_a_judge_is_validated_against_the_independent_reviewer_when_there_is_one():
+    second = {"reviewer": "Second Reviewer", "rubric": "pilot-rubric-v1", "independent": True}
+    reviews = [{**REVIEW, "case": "b02", "answer_correct": True},
+               {**second, "case": "b02", "answer_correct": False}]
+    judge = [{"case": "b02", "answer_correct": True}]
+    report = score(_set(), _correct(), tier="synthetic", reviews=reviews, judge=judge)
+    assert report["judge"]["against"] == "independent reviewer"
+    assert report["judge"]["agreement"]["numerator"] == 0

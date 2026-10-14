@@ -9,7 +9,7 @@ import json
 
 import httpx
 
-from apps.ai.evaluation.http_driver import burst, parse_sse, sanitize_done
+from apps.ai.evaluation.http_driver import burst, parse_sse, sanitize_done, submit_all
 
 
 def _sse(*events):
@@ -40,9 +40,38 @@ def test_a_burst_sends_every_question_together_and_classifies_each_from_its_stre
     ))
     assert sorted(seen) == ["a", "b", "busy"]
     by_question = {s.question: s for s in submissions}
-    assert by_question["a"].outcome == "generated"
-    assert by_question["busy"].outcome == "rejected"
+    assert by_question["a"].result == "generated"
+    assert by_question["busy"].result == "refused"
     assert all(s.final_ms is None or s.final_ms >= s.submitted_ms for s in submissions)
+
+
+def test_each_question_carries_its_own_payload_fields():
+    seen = {}
+
+    def handler(request):
+        body = json.loads(request.content)
+        seen[body["question"]] = body.get("conversation_id")
+        return httpx.Response(200, text=_sse(("run_queued", {}), ("done", {
+            "mode": "generative", "listing": {"observed": {"cache_hits": 2}}})))
+
+    results = asyncio.run(submit_all(
+        ["a", "b"], base_url="http://iris", path="/p", token="t",
+        extras=[{"conversation_id": 1}, {"conversation_id": 2}],
+        transport=httpx.MockTransport(handler)))
+    assert seen == {"a": 1, "b": 2}
+    assert [s.cache_hits for s, _ in results] == [2, 2]
+
+
+def test_a_stream_that_outlives_the_client_bound_is_a_timeout(monkeypatch):
+    monkeypatch.setattr("apps.ai.evaluation.http_driver.CLIENT_TIMEOUT_S", 0.05)
+
+    async def slow(request):
+        await asyncio.sleep(1)
+        return httpx.Response(200, text="")
+
+    submissions = asyncio.run(burst(["a"], base_url="http://iris", path="/p", token="t",
+                                    transport=httpx.MockTransport(slow)))
+    assert submissions[0].result == "timeout"
 
 
 def test_a_transport_error_or_timeout_is_a_submission_that_did_not_succeed():
@@ -55,7 +84,7 @@ def test_a_transport_error_or_timeout_is_a_submission_that_did_not_succeed():
         ["slow", "down"], base_url="http://iris", path="/p", token="t",
         transport=httpx.MockTransport(handler),
     ))
-    assert {s.question: s.outcome for s in submissions} == {"slow": "timeout", "down": "failed"}
+    assert {s.question: s.result for s in submissions} == {"slow": "timeout", "down": "failed"}
 
 
 def test_sanitize_keeps_figures_and_states_and_drops_text_quotes_and_reasoning():
