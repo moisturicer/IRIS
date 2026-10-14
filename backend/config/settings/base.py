@@ -496,7 +496,7 @@ AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS = config(
 # someone with authority enables it and sets the policy version, which belongs
 # in every key so a changed approval stops old verdicts being reused.
 AI_SCREEN_CACHE = config("AI_SCREEN_CACHE", default=False, cast=bool)
-AI_SCREEN_CACHE_POLICY = config("AI_SCREEN_CACHE_POLICY", default="unapproved")
+AI_SCREEN_CACHE_POLICY = config("AI_SCREEN_CACHE_POLICY", default="")
 
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")

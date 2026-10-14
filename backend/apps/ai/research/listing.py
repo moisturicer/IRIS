@@ -54,6 +54,9 @@ STATE_OF = {"include": INCLUDED, "exclude": EXCLUDED, "uncertain": UNCERTAIN, "u
 
 LIST_WORDING = "These are matches found, not a complete list of the papers you can see."
 
+#: What a Turn keeps of a count: the run's identity. Every figure is rebuilt from the candidates.
+TOPIC_PROVENANCE = ("criterion", "method", "version")
+
 #: What a topic count counts, said once so a reader never takes it for the other kinds.
 COUNT_BASIS = "topic_classification_of_selected_candidates"
 COUNT_SCOPE = (
@@ -263,7 +266,7 @@ def reader_view(stored: dict, visible: dict) -> dict:
         tuple(candidates), bool(coverage.get("more_available")),
         bool(coverage.get("search_degraded")), changed, coverage.get("limit", CANDIDATE_LIMIT),
         # Provenance is what ran; every figure is rebuilt from the candidates read just now.
-        {key: topic[key] for key in ("criterion", "method", "version")} if topic else None,
+        {key: topic[key] for key in TOPIC_PROVENANCE} if topic else None,
         stored.get("observed"),
     ).wire()
 
@@ -600,7 +603,9 @@ class _Screening:
 
 def _cache_for(run: ToolRun, criterion: str) -> Optional[ScreeningCache]:
     """This reader's cache, or ``None`` when it is off or the model is not identifiable."""
-    if not settings.AI_SCREEN_CACHE:
+    policy = (settings.AI_SCREEN_CACHE_POLICY or "").strip()
+    # No approval label, no cache: enabling the switch alone approves nothing.
+    if not settings.AI_SCREEN_CACHE or not policy:
         return None
     try:
         profile = profile_for(InferenceTask.SCREEN)
@@ -608,10 +613,7 @@ def _cache_for(run: ToolRun, criterion: str) -> Optional[ScreeningCache]:
         logger.warning("screening cache off: no screening profile",
                        extra={"run_id": run.ctx.run_id, "error": type(exc).__name__})
         return None
-    model = "|".join([profile.vendor.value, profile.model, *profile.fallback_models,
-                      profile.data_policy.value])
-    return ScreeningCache(run.ctx.user, criterion=criterion, model=model,
-                          policy=settings.AI_SCREEN_CACHE_POLICY)
+    return ScreeningCache.for_profile(run.ctx.user, criterion=criterion, profile=profile, policy=policy)
 
 
 def _milliseconds(start: float, end: float) -> int:

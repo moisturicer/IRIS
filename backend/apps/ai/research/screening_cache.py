@@ -51,6 +51,13 @@ def _digest(*parts: str) -> str:
 class ScreeningCache:
     """Verdicts for one reader, one criterion, one model and one approval policy."""
 
+    @classmethod
+    def for_profile(cls, user, *, criterion: str, profile, policy: str) -> "ScreeningCache":
+        """The cache for what ``profile`` would send: its vendor, model chain and data policy."""
+        model = "|".join([profile.vendor.value, profile.model, *profile.fallback_models,
+                          profile.data_policy.value])
+        return cls(user, criterion=criterion, model=model, policy=policy)
+
     def __init__(self, user, *, criterion: str, model: str, policy: str) -> None:
         self.user = user
         # Whitespace alone never makes a different criterion.
@@ -103,8 +110,13 @@ class ScreeningCache:
         with transaction.atomic():
             for pk, verdict in kept.items():
                 key = self._key(pk, *evidence[pk])
-                changed = ScreeningJudgment.objects.filter(user=self.user, key=key).update(
-                    state=verdict.state, quote=verdict.quote, source=verdict.source)
+                rows = ScreeningJudgment.objects.filter(user=self.user, key=key)
+                if verdict.state == "uncertain":
+                    # A concurrent run that decided the paper must not be downgraded to unsure.
+                    rows = rows.filter(state="uncertain")
+                    if ScreeningJudgment.objects.filter(user=self.user, key=key).exclude(state="uncertain").exists():
+                        continue
+                changed = rows.update(state=verdict.state, quote=verdict.quote, source=verdict.source)
                 if not changed:
                     ScreeningJudgment.objects.bulk_create(
                         [ScreeningJudgment(user=self.user, record_id=pk, key=key, state=verdict.state,

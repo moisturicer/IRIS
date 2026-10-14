@@ -823,7 +823,7 @@ Evidence, with deterministic fakes and real Postgres; no vendor called:
     twenty-five available (twenty selected) are worded as subsets; many chunks are one candidate;
   - a model reply carrying its own count is rejected whole; malformed, timed-out and unavailable screens are unassessed;
   - cold, warm, changed abstract, extraction, model, approval policy, criterion and prompt; one reader never reads
-    another's rows; listing and count share verdicts; the cache holds no source text and never a failure;
+    another's rows; listing and count share verdicts; the cache holds a decision and its verbatim quote, never a title, abstract or failure;
   - revoked access before, during and after a warm run, a gate that now refuses a cached paper, and a quote that no
     longer holds; hits never exceed the twenty-record allowance;
   - concurrent writers and a lost insert race leave one row; an unreadable cache never fails a count;

@@ -649,3 +649,110 @@ def test_a_queued_count_journals_its_candidates_and_replay_rechecks_access(
     final = again[-1][2]["listing"]
     assert final["topic_count"]["matches"] == 1 and final["topic_count"]["selected"] == 1
     assert final["wording"].startswith("1 match among 1 assessed of 1 selected candidate paper")
+
+
+# -- review follow-ups -------------------------------------------------------------------
+
+
+def test_the_cache_is_inert_until_an_approval_policy_is_named(embedder, space, reader, settings):
+    settings.AI_SCREEN_CACHE, settings.AI_SCREEN_CACHE_POLICY = True, ""
+    user, client = reader
+    papers(embedder, space, 3)
+    run_stream(client, root_for(embedder, Screener()))
+    screen = Screener()
+    done = done_of(run_stream(client, root_for(embedder, screen)))
+
+    assert ScreeningJudgment.objects.count() == 0 and len(screen.requests) == 1
+    assert observed(done)["cache_hits"] == 0
+
+
+def test_warm_verdicts_still_count_when_the_screening_model_is_down(embedder, space, reader, cached):
+    user, client = reader
+    papers(embedder, space, 4)
+    run_stream(client, root_for(embedder, Screener()))
+    done = done_of(run_stream(client, root_for(embedder, Down())))
+
+    assert block(done)["matches"] == 4 and block(done)["unassessed"] == 0
+    assert observed(done)["cache_hits"] == 4 and observed(done)["model_calls"] == 0
+
+
+def test_a_cached_uncertain_paper_is_rechecked_and_its_decision_replaces_it(
+    embedder, space, reader, cached, settings
+):
+    user, client = reader
+    paper, = papers(embedder, space, 1)
+
+    def passage_aware(p):
+        return "include" if p.get("passages") else "uncertain"
+
+    settings.AI_SCREEN_RECHECK_MAX_RECORDS = 0
+    run_stream(client, root_for(embedder, Screener(passage_aware)))
+    assert ScreeningJudgment.objects.get().state == "uncertain"
+
+    settings.AI_SCREEN_RECHECK_MAX_RECORDS = 5
+    screen = Screener(passage_aware,
+                      quote=lambda p: p["passages"][0]["text"][:30] if p.get("passages") else p["title"])
+    done = done_of(run_stream(client, root_for(embedder, screen)))
+
+    assert len(screen.requests) == 1 and screen.requests[0]["records"][0]["passages"], "only the recheck is sent"
+    assert (observed(done)["cache_hits"], block(done)["matches"], block(done)["uncertain"]) == (1, 1, 0)
+    row = ScreeningJudgment.objects.get()
+    assert row.state == "included" and row.source["field"] == "passage" and row.record_id == paper.pk
+
+
+def test_an_unsure_writer_never_downgrades_a_decision_already_kept(embedder, space, reader):
+    from apps.ai.research.screening_cache import ScreeningCache, Verdict
+
+    user, _ = reader
+    paper, = papers(embedder, space, 1)
+    cache = ScreeningCache(user, criterion="flooding", model="m", policy="p")
+    evidence = {paper.pk: (paper.title, paper.abstract)}
+    cache.remember({paper.pk: Verdict("included", paper.title, {"field": "title"})}, evidence)
+    cache.remember({paper.pk: Verdict("uncertain", "", None)}, evidence)
+
+    assert ScreeningJudgment.objects.get().state == "included"
+
+
+def test_paper_chat_never_routes_to_a_count_and_the_workflow_itself_stays_inside_the_scope(
+    embedder, space, reader
+):
+    from apps.ai.routing.lanes import lane_events
+
+    user, client = reader
+    scoped, other = papers(embedder, space, 2)
+    conversation = Conversation.objects.create(user=user, record=scoped)
+
+    # Over HTTP a scoped chat is held on the passage lane, whatever the override says.
+    with use_composition_root(make_root(embedder, Screener())):
+        events = list(watch(client, QUESTION, conversation_id=conversation.pk, route_override="count"))
+    assert done_of(events)["routing"]["lane"] == "passage" and "topic_count" not in json.dumps(events)
+
+    # And the workflow, called directly with a scope, can neither select nor send a second paper.
+    screen = Screener()
+    run = lane_events("count", QUESTION, user, root=root_for(embedder, screen),
+                      conversation=conversation, scope_record=scoped)
+    try:
+        while True:
+            next(run)
+    except StopIteration as stop:
+        _, listing = stop.value
+    assert (listing["topic_count"]["selected"], listing["topic_count"]["matches"]) == (1, 1)
+    assert other.title not in json.dumps(screen.requests) and other.title not in json.dumps(listing)
+
+
+def test_a_count_stops_at_the_ordinary_deadline_and_keeps_nothing_it_did_not_decide(
+    embedder, space, reader, settings
+):
+    import time
+
+    user, client = reader
+    papers(embedder, space, 3)
+
+    class Slow(Screener):
+        def before(self, payload):
+            time.sleep(1.5)
+
+    settings.AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS = 0.3
+    done = done_of(run_stream(client, root_for(embedder, Slow())))
+    assert block(done)["matches"] == 0 and block(done)["unassessed"] == 3
+    assert done["listing"]["completeness"] == "inconclusive"

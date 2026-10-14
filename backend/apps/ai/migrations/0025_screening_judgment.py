@@ -9,7 +9,9 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('ai', '0024_provider_admission'),
-        ('records', '0017_retire_fixed_pipeline_statuses'),
+        # Only the Record table is needed. An older dependency keeps this table applied
+        # while migration tests rewind `reviews` (which later `records` migrations need).
+        ('records', '0008_add_completed_status'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
