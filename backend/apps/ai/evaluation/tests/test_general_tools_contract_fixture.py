@@ -41,6 +41,9 @@ def test_paper_references_and_displayed_ordinals_are_consistent():
     assert json.loads(MANIFEST.read_text(encoding="utf-8"))["corpus"]["paper_set_sha256"] == (
         pack["snapshot"]["paper_set_sha256"]
     )
+    assert json.loads(MANIFEST.read_text(encoding="utf-8"))["fixture_sha256"] == (
+        hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
+    )
     keys = {paper["key"] for paper in papers}
     assert len(keys) == len(papers)
     assert len({paper["title"] for paper in papers}) == len(papers)

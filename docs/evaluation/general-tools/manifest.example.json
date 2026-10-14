@@ -23,20 +23,47 @@
     "family_counts": {}
   },
   "models": {
-    "controller": {"vendor": "deterministic_fake", "model": "scripted", "fallbacks": [], "reasoning": "none"},
-    "answer": {"vendor": "deterministic_fake", "model": "scripted", "fallbacks": [], "summary_capability": "none"},
-    "embedding": {"vendor": "deterministic_fake", "model": "hashed_bag_of_words"},
-    "rerank": {"vendor": "deterministic_fake", "model": "scripted"}
+    "controller": {
+      "vendor": "deterministic_fake",
+      "model": "scripted",
+      "fallbacks": [],
+      "reasoning": "none"
+    },
+    "answer": {
+      "vendor": "deterministic_fake",
+      "model": "scripted",
+      "fallbacks": [],
+      "summary_capability": "none"
+    },
+    "embedding": {
+      "vendor": "deterministic_fake",
+      "model": "hashed_bag_of_words"
+    },
+    "rerank": {
+      "vendor": "deterministic_fake",
+      "model": "scripted"
+    }
   },
   "retrieval_switches": {},
   "screening_policy_version": null,
   "brief_policy_version": null,
   "cache_policy_version": null,
-  "admission": {"mode": null, "campaign_approval_id": null, "limits": {}},
-  "run_limits": {"deadline_seconds": null, "controller_rounds": 4, "tool_calls": 6, "parallel_reads": 2, "repair_attempts": 1},
+  "admission": {
+    "mode": null,
+    "campaign_approval_id": null,
+    "limits": {}
+  },
+  "run_limits": {
+    "deadline_seconds": null,
+    "controller_rounds": 4,
+    "tool_calls": 6,
+    "parallel_reads": 2,
+    "repair_attempts": 1
+  },
   "worker_store_topology": null,
   "cache_state": null,
   "usage_and_cost": [],
   "reviewer_ids": [],
-  "redacted_failure_codes": []
+  "redacted_failure_codes": [],
+  "fixture_sha256": "69e714fff24ed8dd94d66cf20d3d0c157b73b1665b1d71842c833f0aff94e12e"
 }

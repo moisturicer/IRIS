@@ -16,6 +16,8 @@ from django.urls import reverse
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.models import Conversation
 from apps.ai.providers.fakes import ScriptedLLM, ScriptedReranker
+from apps.ai.providers.decisions import ScriptedDecisionModel
+from apps.ai.routing.router import LANES
 from apps.ai.tests.corpus import make_record, make_user
 from core.enums import PipelineStatus
 
@@ -59,6 +61,15 @@ def _done(response, endpoint):
     return next(data for name, data in events if name == "done")
 
 
+def _route(monkeypatch, lane):
+    probabilities = {name: 0.01 for name in LANES}
+    probabilities[lane] = 0.95
+    probabilities["injection"] = 0.01
+    jev = ScriptedDecisionModel(probabilities)
+    monkeypatch.setattr("apps.ai.routing.chat.configured_providers",
+                        lambda **kwargs: (jev, None))
+
+
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
 @pytest.mark.parametrize("case", PACK["cases"], ids=lambda case: case["id"])
 def test_current_boundary_replays_each_scenario_without_private_data(
@@ -89,3 +100,42 @@ def test_current_boundary_replays_each_scenario_without_private_data(
     turns = replay.json()["turns"]
     assert len(turns) == len(case["turns"])
     assert corpus["private-draft"].title not in json.dumps(turns)
+
+
+@pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
+@pytest.mark.parametrize("case_id,lane,question_index", [
+    ("A01", "comparison", 1),
+    ("A09", "listing", 1),
+])
+def test_current_fixed_lane_failure_wording_reaches_reader_and_replay(
+    case_id, lane, question_index, endpoint, settings, monkeypatch,
+    embedder, corpus, client_for
+):
+    """The two source-pinned failures also pass through the current wire."""
+    case = next(case for case in PACK["cases"] if case["id"] == case_id)
+    expected = case["current_observation"]["text"]
+    settings.AI_RESEARCH_LANE = "on"
+    settings.AI_DURABLE_ASK = False
+    _route(monkeypatch, lane)
+    if case_id == "A09":
+        def unavailable(*args, **kwargs):
+            raise RuntimeError("deterministic listing failure")
+
+        monkeypatch.setattr("apps.ai.routing.lanes.screen_listing", unavailable)
+    reader = make_user("ir589-failure-reader@cit.edu")
+    conversation = Conversation.objects.create(user=reader)
+    client = client_for(reader)
+    root = CompositionRoot(
+        embedder=embedder, reranker=ScriptedReranker(), llm=ScriptedLLM(),
+        permits=lambda record: record.pk != corpus["private-draft"].pk,
+    )
+    with use_composition_root(root):
+        response = client.post(reverse(endpoint), {
+            "question": case["turns"][question_index],
+            "conversation_id": conversation.pk,
+        }, format="json")
+        body = _done(response, endpoint)
+    assert expected in json.dumps(body)
+    replay = client.get(reverse("ai-conversation-detail", args=[conversation.pk]))
+    assert replay.status_code == 200
+    assert expected in json.dumps(replay.json()["turns"])
