@@ -13,9 +13,9 @@ export const ANSWER_MARKDOWN =
   "chat-markdown prose prose-base max-w-none prose-pre:my-2 prose-pre:bg-gray-900 prose-pre:text-gray-100";
 
 /**
- * The AI Overview is an article, not a chat bubble (IR-569): a measure instead
- * of `ANSWER_MARKDOWN`'s unbounded width, and a rhythm made for reading it
- * top to bottom.
+ * The AI Overview is an article, not a chat bubble (IR-569): a rhythm made for
+ * reading it top to bottom. It fills its column; the Overview page sets that
+ * column's width, so the text reaches the panel beside it without running long.
  *
  * - The first paragraph is the lead -- larger and darker, the plain-language
  *   account before the sections.
@@ -25,7 +25,7 @@ export const ANSWER_MARKDOWN =
  *   claims rather than a block of grey.
  */
 export const OVERVIEW_MARKDOWN = [
-  ANSWER_MARKDOWN.replace("max-w-none", "max-w-[70ch]"),
+  ANSWER_MARKDOWN,
   "prose-headings:text-stone-900 prose-h2:border-b-0 prose-h2:pb-0 prose-h2:mt-[2em] prose-h2:mb-[0.45em]",
   "prose-h3:mt-[1.5em] prose-h3:mb-[0.3em]",
   "prose-p:leading-[1.8] prose-li:leading-[1.75] prose-li:my-[0.35em] prose-li:marker:text-brand",

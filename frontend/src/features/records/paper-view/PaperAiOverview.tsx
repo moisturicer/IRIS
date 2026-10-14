@@ -7,7 +7,7 @@ import { CitationText } from "@/features/ai/components/CitationText";
 import { OVERVIEW_MARKDOWN } from "@/features/ai/components/answerLayout";
 import { DegradedNotice } from "@/features/ai/components/PassageQuote";
 import { cn } from "@/lib/utils";
-import { CONTROL_BASE, CONTROL_OUTLINE } from "./controls";
+import { CONTROL_BASE } from "./controls";
 import { SectionHeading } from "./headings";
 
 /**
@@ -102,7 +102,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
           </span>
         </SectionHeading>
         {state === "ready" && overview && (
-          <button type="button" onClick={() => void copy()} className={cn("px-3 text-stone-600", CONTROL_BASE, CONTROL_OUTLINE)}>
+          <button type="button" onClick={() => void copy()} className={cn("px-2.5 font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800", CONTROL_BASE)}>
             <i
               className={cn(
                 "fas text-2xs",

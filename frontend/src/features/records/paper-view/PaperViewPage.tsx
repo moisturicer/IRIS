@@ -803,7 +803,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:px-8 pt-8 pb-12", PAGE_WIDTH.standard),
+              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8 pb-12", PAGE_WIDTH.standard),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
@@ -827,6 +827,10 @@ export default function PaperViewPage() {
             className={cn(
               "min-w-0",
               onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
+              // The Overview reads in one column, up to 50rem, set against
+              // what is beside it (Ask IRIS, or the rail) with the room left
+              // over on its left (IR-569).
+              showRail && "w-full max-w-[50rem] justify-self-end",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
@@ -1091,7 +1095,7 @@ export default function PaperViewPage() {
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="max-w-prose text-lg text-stone-700 leading-7">
+                    <p className="text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
