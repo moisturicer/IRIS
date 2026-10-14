@@ -1,13 +1,14 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Button, Skeleton } from "@/components/ui";
+import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useElementWidth } from "@/hooks/useElementWidth";
+import { useUIStore } from "@/store/ui.store";
 import { cn, formatDate } from "@/lib/utils";
 import { citedPage, followedFromPaperChat, type CitationNavigationState } from "@/lib/citedPage";
 import type { RecordDetail, IpType } from "@/types/records";
@@ -32,14 +33,12 @@ import {
 import {
   usePaperChat,
   PaperChatPanel,
-  PaperChatLauncher,
   type DockMode,
   DOCKED_PANEL_CLASS,
   FLOATING_PANEL_CLASS,
   MINIMIZED_SHEET_CLASS,
-  PAPER_TAB_PANEL_CLASS,
+  PAPER_WORKSPACE_PANEL_CLASS,
 } from "./PaperChatDock";
-import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
@@ -49,7 +48,8 @@ import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
-import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
+import { PANE_MAX_HEIGHT, PANE_TOP, readingTier } from "./paneLayout";
+import { ReadingHeader } from "./ReadingHeader";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
@@ -278,13 +278,6 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-const SECTION_LABELS: Record<PaperSection, string> = {
-  overview: "Overview",
-  paper: "Paper",
-  review: "Review",
-  files: "Files",
-};
-
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
  *
@@ -356,15 +349,99 @@ export default function PaperViewPage() {
   };
   const setViewParam = (name: string, value: string | null) => setViewParams({ [name]: value });
 
-  // Below `lg` the docked chat is a bottom sheet over the paper; at `lg` it
-  // is a column beside it (IR-352).
-  const contained = useMediaQuery(CONTAINED_LAYOUT_QUERY);
+  // The workspace's own width picks the Paper layout (IR-569), so either
+  // sidebar state counts; null until measured.
+  const [observeWorkspace, workspaceWidth] = useElementWidth<HTMLDivElement>();
+  const tier = readingTier(workspaceWidth);
+  const enterReadingRail = useUIStore((s) => s.enterReadingRail);
+  const leaveReadingRail = useUIStore((s) => s.leaveReadingRail);
+  const panelRef = useRef<HTMLElement>(null);
+  const askButtonRef = useRef<HTMLButtonElement>(null);
+  const refocusAsk = useRef(false);
+
+  // Before the early returns below, so the hooks that follow can use them.
+  const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
+  const sections = record ? sectionsFor(record, viewer) : [];
+  // The section asked for, else the reader for a citation's page, else
+  // Overview. One the viewer may not open is Overview too.
+  const asked = asSection(searchParams.get("section")) ?? (openAtPage != null ? "paper" : "overview");
+  const section: PaperSection = sections.includes(asked) ? asked : "overview";
+  // Still on the record being left while the next one loads.
+  const arriving = loading || !record || record.id !== Number(id);
+  const onPaperTab = record != null && section === "paper";
+  const onReviewTab = section === "review";
+  const dock: DockMode = onPaperTab ? "right" : chat.dock;
+  const chatDocked = chat.open && dock !== "floating" && !onReviewTab;
+  // Never beside the paper, where there is no sheet to tuck away.
+  const chatMinimized = chat.minimized && chatDocked && tier !== "wide";
+  // Ask IRIS over the paper or instead of it: the rest waits (IR-569).
+  const chatModal = onPaperTab && chat.open && !chatMinimized && (tier === "overlay" || tier === "single");
+
+  // Entering Paper opens Ask IRIS, once per visit to the section (IR-569).
+  // Following a citation within it is not an entry.
+  const enteredPaper = useRef(false);
+  useEffect(() => {
+    if (!onPaperTab) {
+      enteredPaper.current = false;
+      chat.setMinimized(false);
+      return;
+    }
+    if (arriving || enteredPaper.current) return;
+    enteredPaper.current = true;
+    chat.setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onPaperTab, arriving]);
+
+  // Reading collapses the sidebar to its rail, for this visit only (IR-569).
+  useEffect(() => {
+    if (!onPaperTab) return;
+    enterReadingRail();
+    return leaveReadingRail;
+  }, [onPaperTab, enterReadingRail, leaveReadingRail]);
+
+  const closeChat = () => {
+    if (chatModal) refocusAsk.current = true;
+    chat.setOpen(false);
+  };
+  const backToPaper = () => {
+    refocusAsk.current = true;
+    chat.setMinimized(true);
+  };
+
+  // Over the paper, focus moves in and stays in, and Escape leaves; on
+  // leaving, focus returns to the header's Ask IRIS once it is not inert.
+  useEffect(() => {
+    if (!chatModal) return;
+    panelRef.current?.focus();
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (tier === "single") backToPaper();
+      else closeChat();
+    };
+    // The sidebar is the app's, not inert here: focus reaching it comes back.
+    const onFocusIn = (e: FocusEvent) => {
+      const panel = panelRef.current;
+      if (panel && e.target instanceof Node && !panel.contains(e.target)) panel.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocusIn);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("focusin", onFocusIn);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatModal, tier]);
+  useEffect(() => {
+    if (!refocusAsk.current || chatModal) return;
+    refocusAsk.current = false;
+    askButtonRef.current?.focus();
+  });
 
   useEffect(() => {
     if (openAtPage == null) return;
-    // A citation followed while the chat is a bottom sheet would land its
-    // passage under the sheet, so the sheet tucks away to a bar (IR-354).
-    if (chat.open && !contained) chat.setMinimized(true);
+    // A citation followed while the chat covers the paper would land its
+    // passage under it, so it tucks away to a bar (IR-354).
+    if (chat.open && tier !== "wide") chat.setMinimized(true);
     // The arrival key is unique per navigation, including a second click on
     // the very citation already open -- without it in the dependency list,
     // clicking the same marker twice would not re-fire this effect. The
@@ -467,21 +544,11 @@ export default function PaperViewPage() {
     );
   }
 
-  // Still on the record being left while the next one loads. Its own
-  // content is not shown meanwhile, only the chat beside it.
-  const arriving = loading || record.id !== Number(id);
-
-  const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
   const can = capabilitiesFor(record);
-  const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
-  // The section asked for, else the reader for a citation's page, else
-  // Overview. One the viewer may not open is Overview too.
-  const asked = asSection(searchParams.get("section")) ?? (openAtPage != null ? "paper" : "overview");
-  const section: PaperSection = sections.includes(asked) ? asked : "overview";
   const editOpen = searchParams.get("edit") === "details" && can.has("edit_details") && !arriving;
 
   const primaryOwner = record.owners.find((o) => o.is_primary) ?? record.owners[0];
@@ -496,29 +563,16 @@ export default function PaperViewPage() {
   // with nothing to highlight, which is the same graceful case a passage
   // with no recovered regions already is.
   const navCitation = (location.state as CitationNavigationState | null)?.citation;
-  // The Paper section is the paper and Ask IRIS, nothing else (IR-372):
-  // chat is always docked right there, the rail is never drawn, and the pair
-  // spans the full content width rather than a centred column. The reader's
-  // own dock choice is only overridden, never overwritten, so Overview gets
-  // it back unchanged.
-  const onPaperTab = section === "paper";
-  // The Review section puts the paper beside the review pane (IR-412), so it
-  // takes the full width the Paper tab does rather than the reading column.
-  // Ask IRIS is not part of it (spec §4.6, decided 2026-09-26): the panel
-  // stays mounted there, only hidden, so the conversation is waiting on the
-  // Paper tab.
-  const onReviewTab = section === "review";
-  const dock: DockMode = onPaperTab ? "right" : chat.dock;
-  const chatDocked = chat.open && dock !== "floating" && !onReviewTab;
-  // Never at `lg`, where there is no sheet to tuck away: widening the window
-  // brings the column back whole.
-  const chatMinimized = chat.minimized && chatDocked && !contained;
+  // The Paper section is the paper and Ask IRIS, nothing else (IR-372); the
+  // reader's own dock choice is only overridden, never overwritten, so
+  // Overview gets it back unchanged. The Review section has no Ask IRIS
+  // (spec §4.6): the panel stays mounted there, only hidden.
   const chatPanelClass = onReviewTab
     ? "hidden"
     : chatMinimized
       ? MINIMIZED_SHEET_CLASS
       : onPaperTab
-        ? PAPER_TAB_PANEL_CLASS
+        ? PAPER_WORKSPACE_PANEL_CLASS
         : chatDocked
           ? DOCKED_PANEL_CLASS
           : FLOATING_PANEL_CLASS;
@@ -553,7 +607,7 @@ export default function PaperViewPage() {
       : [];
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
-  const reader = (toolbarStart?: ReactNode) => (
+  const reader = () => (
     <>
       {viewedVersion && latestVersion && (
         <VersionBanner
@@ -587,7 +641,7 @@ export default function PaperViewPage() {
           scrollToPage={viewedVersion ? null : openAtPage}
           highlightRegions={highlightRegions}
           navKey={arrivalKey.current}
-          toolbarStart={toolbarStart}
+          contained={tier === "wide"}
         />
       </Suspense>
     </>
@@ -628,6 +682,28 @@ export default function PaperViewPage() {
     setViewParam("section", "review");
   };
 
+  // Paper mode's version: a compact picker where there is a choice, else
+  // the version's number, else nothing to a reader shown none (IR-416).
+  const paperVersion =
+    versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1) ? (
+      <VersionPicker
+        compact
+        unsubmitted={record.manuscript_unsubmitted}
+        versions={versions}
+        viewing={viewedVersion?.number ?? null}
+        onChoose={chooseVersion}
+      />
+    ) : latestVersion ? (
+      <span className="shrink-0 text-small font-semibold text-stone-500">v{latestVersion.number}</span>
+    ) : null;
+
+  /** The header's Ask IRIS: open, bring back from the bar, or close. */
+  const toggleChat = () => {
+    if (!chat.open) chat.setOpen(true);
+    else if (chatMinimized) chat.setMinimized(false);
+    else closeChat();
+  };
+
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -644,44 +720,47 @@ export default function PaperViewPage() {
     // asks AppShell for the full width because the Paper and Review sections
     // use all of it (IR-372): the reader and the review pane get the room
     // rather than margins. The other sections take the standard width here.
-    <div className={cn(!onPaperTab && !onReviewTab && PAGE_WIDTH.standard)}>
+    // The `reading` container (IR-569): its width, not the window's, lays
+    // out the Paper and Review sections.
+    <div
+      ref={observeWorkspace}
+      className={cn(
+        "[container-type:inline-size] [container-name:reading]",
+        !onPaperTab && !onReviewTab && PAGE_WIDTH.standard,
+      )}
+    >
+      {/* Every section one click away at any depth (IR-356), and in Paper
+          mode the paper in one line instead of the editorial header. */}
+      <ReadingHeader
+        inert={chatModal}
+        sections={sections}
+        section={section}
+        onSelect={(s) => setViewParam("section", s)}
+        onTabKeyDown={onTabKeyDown}
+        tabId={tabId}
+        panelId={arriving ? undefined : `${tabsId}-panel`}
+        identity={
+          onPaperTab
+            ? { title: arriving ? null : record.title, version: paperVersion, onBack: () => navigate(-1) }
+            : undefined
+        }
+        askIris={
+          onReviewTab
+            ? undefined
+            : { open: chat.open && !chatMinimized, onToggle: toggleChat, buttonRef: askButtonRef }
+        }
+      />
       <div
         className={cn(
-          "lg:flex lg:gap-6 lg:items-start",
-          dock === "left" && !onReviewTab && "lg:flex-row-reverse",
+          onPaperTab
+            ? "reading-wide:flex reading-wide:gap-4 reading-wide:items-start"
+            : cn("lg:flex lg:gap-6 lg:items-start", dock === "left" && !onReviewTab && "lg:flex-row-reverse"),
         )}
       >
-        <div className="min-w-0 lg:flex-1">
-          {/* The section switch floats at the top of the window, so every
-              section is one click away at any depth (IR-356). */}
-          <div className={cn("sticky z-30 flex justify-center mb-4 pointer-events-none", VIEW_SWITCH_TOP)}>
-            <div
-              role="tablist"
-              aria-label="Paper view"
-              onKeyDown={onTabKeyDown}
-              className="pointer-events-auto inline-flex gap-1 rounded-full bg-overlay p-0.5 shadow-card-md ring-1 ring-stone-200"
-            >
-              {sections.map((s) => (
-                <button
-                  key={s}
-                  id={tabId(s)}
-                  type="button"
-                  role="tab"
-                  aria-selected={section === s}
-                  aria-controls={arriving ? undefined : `${tabsId}-panel`}
-                  tabIndex={section === s ? 0 : -1}
-                  onClick={() => setViewParam("section", s)}
-                  className={cn(
-                    "min-h-11 px-3.5 sm:px-6 rounded-full text-small sm:text-body font-semibold transition-colors duration-200",
-                    FOCUS_RING,
-                    section === s ? "bg-brand text-white shadow-card" : "text-stone-600 hover:text-brand",
-                  )}
-                >
-                  {SECTION_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div
+          {...(chatModal ? { inert: "" } : {})}
+          className={cn("min-w-0", onPaperTab ? "reading-wide:flex-1" : "lg:flex-1")}
+        >
 
           <div
             className={cn(
@@ -699,7 +778,9 @@ export default function PaperViewPage() {
           ) : (
           <div className="min-w-0 space-y-6">
             {/* Editorial header (IR-356): where it sits, what it is, who
-                wrote it, then what to do with it. */}
+                wrote it, then what to do with it. Not in Paper mode, where
+                the reading header holds the paper in one line (IR-569). */}
+            {!onPaperTab && (
             <header className="space-y-3">
               <button
                 type="button"
@@ -841,6 +922,7 @@ export default function PaperViewPage() {
                 </div>
               )}
             </header>
+            )}
 
             <div
               id={`${tabsId}-panel`}
@@ -848,20 +930,7 @@ export default function PaperViewPage() {
               aria-labelledby={tabId(section)}
               className="space-y-6"
             >
-            {section === "paper" &&
-              reader(
-                !chat.open && (
-                  <Button
-                    variant="outline"
-                    onClick={() => chat.setOpen(true)}
-                    title="Ask IRIS about this paper"
-                    className="min-h-11 lg:min-h-8 mr-1 font-semibold"
-                  >
-                    <AskIrisMark className="w-4 h-4 text-brand" />
-                    Ask IRIS
-                  </Button>
-                ),
-              )}
+            {section === "paper" && reader()}
 
             {section === "overview" && (
               <>
@@ -1073,7 +1142,15 @@ export default function PaperViewPage() {
         )}
       </div>
 
-      {chat.open ? (
+      {/* Over the paper, the rest of the page waits behind a scrim. */}
+      {chatModal && (
+        <div
+          aria-hidden
+          onClick={closeChat}
+          className="hidden reading-split:block reading-wide:hidden fixed inset-y-0 right-0 left-[var(--sidebar-inset,0px)] z-30 bg-stone-900/20"
+        />
+      )}
+      {chat.open && (
         <PaperChatPanel
           record={record}
           // Whether a citation inside the chat brought the reader here, which
@@ -1087,18 +1164,17 @@ export default function PaperViewPage() {
           }
           dock={dock}
           onDockChange={chat.setDockMode}
-          onClose={() => chat.setOpen(false)}
+          onClose={closeChat}
+          onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
+          panelRef={panelRef}
+          draft={chat.draft}
+          onDraftChange={chat.setDraft}
           canChangePosition={!onPaperTab}
           minimized={chatMinimized}
           onRestore={() => chat.setMinimized(false)}
           viewingVersion={viewedVersion?.number ?? null}
           className={chatPanelClass}
         />
-      ) : (
-        // On the Paper tab the way back sits in the reader's toolbar instead,
-        // so nothing floats over the paper (IR-372); the Review section has
-        // no Ask IRIS at all (spec §4.6).
-        !onPaperTab && !onReviewTab && <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
       )}
       </div>
     </div>

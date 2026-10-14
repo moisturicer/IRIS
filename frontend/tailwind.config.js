@@ -36,6 +36,20 @@ const shelfRise = plugin(({ addBase, addComponents }) => {
   });
 });
 
+/**
+ * The record page's workspace tiers (IR-569): container queries on the
+ * `reading` container, so the layout follows the content width, not the
+ * window. `paneLayout.ts` holds the same numbers for React.
+ */
+export const readingVariants = {
+  "reading-split": "@container reading (min-width: 640px)",
+  "reading-wide": "@container reading (min-width: 1000px)",
+};
+
+const readingTiers = plugin(({ addVariant }) => {
+  for (const [name, query] of Object.entries(readingVariants)) addVariant(name, query);
+});
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -297,5 +311,6 @@ export default {
     // list and table. @tailwindcss/forms is still not needed.
     typography,
     shelfRise,
+    readingTiers,
   ],
 };

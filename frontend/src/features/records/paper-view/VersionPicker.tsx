@@ -22,6 +22,7 @@ export function VersionPicker({
   viewing,
   onChoose,
   unsubmitted = false,
+  compact = false,
 }: {
   versions: RecordVersion[];
   /** The version being read, or null for the current one. */
@@ -34,6 +35,8 @@ export function VersionPicker({
    * newest version is a version like any other, so it can still be read.
    */
   unsubmitted?: boolean;
+  /** In the reading header (IR-569): the label for screen readers only, and narrow. */
+  compact?: boolean;
 }) {
   const id = useId();
   const latest = versions[versions.length - 1];
@@ -42,8 +45,8 @@ export function VersionPicker({
   const currentValue = unsubmitted ? "" : String(latest.number);
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <label htmlFor={id} className="font-semibold text-stone-700">
+    <div className={cn("flex items-center gap-2 text-sm", compact && "shrink-0")}>
+      <label htmlFor={id} className={cn("font-semibold text-stone-700", compact && "sr-only")}>
         Version
       </label>
       <select
@@ -51,7 +54,8 @@ export function VersionPicker({
         value={viewing != null ? String(viewing) : currentValue}
         onChange={(e) => onChoose(e.target.value === currentValue ? null : Number(e.target.value))}
         className={cn(
-          "min-h-11 lg:min-h-9 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-800",
+          "min-h-11 rounded-lg border border-stone-300 px-2 text-sm text-stone-800",
+          compact ? "w-24 bg-transparent" : "lg:min-h-9 bg-white",
           FOCUS_RING,
         )}
       >

@@ -6,7 +6,7 @@ import { NotificationBell } from "./NotificationBell";
 import { PageContainer } from "./PageContainer";
 import { Button } from "@/components/ui/Button";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { useUIStore } from "@/store/ui.store";
+import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
@@ -48,7 +48,7 @@ const PhoneBar = forwardRef<HTMLButtonElement>(function PhoneBar(_props, menuBut
 
 export function AppShell() {
   const sidebarOpen  = useUIStore((s) => s.sidebarOpen);
-  const collapsed    = useUIStore((s) => s.sidebarCollapsed);
+  const collapsed    = useUIStore(selectSidebarCollapsed);
   const closeSidebar = useUIStore((s) => s.closeSidebar);
   const { pathname } = useLocation();
   // Routes that paint their own page and manage their own scrolling.
@@ -107,7 +107,12 @@ export function AppShell() {
   // shows them the pending screen instead (IR-537).
 
   return (
-    <div className="flex min-h-screen bg-canvas font-sans">
+    <div
+      className="flex min-h-screen bg-canvas font-sans"
+      // Where the content area starts, for a page's fixed layer that must
+      // cover the content but never the sidebar (IR-569).
+      style={{ ["--sidebar-inset" as string]: isPhone ? "0px" : collapsed ? "4rem" : "15rem" }}
+    >
       {sidebarOpen && (
         // A pointer target only: the drawer's own Close menu button and Escape
         // are the keyboard route, so this is kept out of the tab order and the

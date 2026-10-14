@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { apiClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
-import { useUIStore } from "@/store/ui.store";
+import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -146,7 +146,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const { user } = useAuth();
   const { roleName } = useRole();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  const collapsed = useUIStore(selectSidebarCollapsed);
   const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
 

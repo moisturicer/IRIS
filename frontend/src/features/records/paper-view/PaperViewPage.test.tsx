@@ -36,8 +36,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { useAuthStore } from "@/store/auth.store";
+import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import type { User } from "@/types/auth";
 import type { RecordDetail, ReviewerSeat } from "@/types/records";
 
@@ -45,7 +46,6 @@ import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 
 import { DOCK_KEY } from "./PaperChatDock";
-import { CONTAINED_LAYOUT_QUERY } from "./paneLayout";
 import PaperViewPage from "./PaperViewPage";
 
 const RECORD_ID = 7;
@@ -219,7 +219,10 @@ vi.mock("@/api/ai", () => ({
     overview: vi.fn(() => Promise.reject(new Error("not under test"))),
     // Paper Chat opens its Conversation on mount; its behaviour is
     // `PaperChatDock.test.tsx`'s. Here only where the panel sits is.
-    conversations: { findOrCreateForRecord: vi.fn(() => new Promise(() => {})) },
+    conversations: {
+      findForRecord: vi.fn(() => new Promise(() => {})),
+      create:        vi.fn(() => Promise.resolve({ data: { id: 50, turns: [] } })),
+    },
     // A follow-up asked from Paper Chat (IR-355); nothing else here asks.
     askStream:     vi.fn(),
   },
@@ -388,6 +391,27 @@ const inReview: RecordDetail = {
   versions: null,
   manuscript_unsubmitted: false,
 };
+
+/**
+ * jsdom lays nothing out, so the page's workspace is measured as `width`
+ * wide: the width the three Paper layouts are chosen by (IR-569).
+ */
+function workspaceAt(width: number) {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        this.callback(
+          [{ target, contentRect: { width } } as unknown as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+}
 
 async function waitForRecord(title: string) {
   // Assert absences only after the record renders, not against the skeleton.
@@ -658,7 +682,7 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
     localStorage.setItem(DOCK_KEY, mode);
     renderPaperView();
     await waitForRecord(record.title);
-    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
     await screen.findByRole("complementary", { name: "Paper Chat" });
   }
 
@@ -682,45 +706,89 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
 });
 
 // The Paper tab is the paper and Ask IRIS docked right, full width, nothing
-// else (IR-372, decided with the project lead 2026-09-25). Overview
-// keeps IR-351's rule above.
-describe("the Paper tab (IR-372)", () => {
+// else (IR-372). Since IR-569 entering it opens Ask IRIS, collapses the
+// sidebar for the visit, and a one-line header replaces the editorial one;
+// the workspace's width picks the layout. Overview keeps IR-351's rule above.
+describe("the Paper tab (IR-372, IR-569)", () => {
   const RAIL = { name: "Institutional Governance" };
-  const REOPEN = { name: "Ask IRIS" };
+  const ASK = { name: "Ask IRIS" };
 
   beforeEach(() => {
     shownRecord = record;
     signInAs(99, "Student");
+    useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
   });
 
-  afterEach(() => localStorage.removeItem(DOCK_KEY));
+  afterEach(() => {
+    localStorage.removeItem(DOCK_KEY);
+    vi.unstubAllGlobals();
+  });
 
   async function openPaperTab(storedDock?: "left" | "right" | "floating") {
     if (storedDock) localStorage.setItem(DOCK_KEY, storedDock);
-    renderPaperView();
+    const view = renderPaperView();
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
     await screen.findByText(/paper reader open/i);
+    await screen.findByRole("complementary", { name: "Paper Chat" });
+    return view;
   }
 
-  it("shows no rail while the chat is closed", async () => {
+  it("opens Ask IRIS on entry, from the header rather than a floating button, creating nothing", async () => {
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.conversations.create).mockClear();
+
+    await openPaperTab();
+
+    expect(screen.getByRole("button", ASK)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();
+    expect(aiApi.conversations.create).not.toHaveBeenCalled();
+    expect(aiApi.askStream).not.toHaveBeenCalled();
+  });
+
+  it("opens Ask IRIS on a direct Paper link too", async () => {
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+
+    expect(await screen.findByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
+  });
+
+  it("puts the paper in one line: title, version and Back, not the editorial header", async () => {
+    shownRecord = {
+      ...record,
+      versions: [{
+        number: 1, cause: "submission", cause_label: "Submission", created_at: "2026-09-01T08:00:00Z",
+        created_by_name: "Rhea Owner", manuscript_url: `/api/v1/records/${RECORD_ID}/versions/1/manuscript/`,
+      }],
+    };
+    await openPaperTab();
+
+    expect(screen.getByRole("heading", { level: 1, name: record.title })).toHaveAttribute("title", record.title);
+    expect(screen.getByText("v1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+  });
+
+  it("collapses the sidebar to its rail while reading, and gives the saved choice back after", async () => {
+    await openPaperTab();
+    expect(selectSidebarCollapsed(useUIStore.getState())).toBe(true);
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+
+    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
+
+    expect(selectSidebarCollapsed(useUIStore.getState())).toBe(false);
+  });
+
+  it("shows no rail", async () => {
     await openPaperTab("floating");
     expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
   });
 
-  it("offers Ask IRIS from the reader's toolbar, not a floating button over the paper", async () => {
-    await openPaperTab("floating");
-    expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", REOPEN)).toBeInTheDocument();
-  });
-
   it.each(["left", "right", "floating"] as const)(
-    "opens the chat docked, with no rail and no way to move it, whatever was stored (%s)",
+    "docks the chat with no way to move it, whatever was stored (%s)",
     async (stored) => {
       await openPaperTab(stored);
-      await userEvent.click(screen.getByRole("button", REOPEN));
 
-      expect(await screen.findByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Panel position" })).not.toBeInTheDocument();
       // The reader's own choice is left alone for Overview.
@@ -728,14 +796,17 @@ describe("the Paper tab (IR-372)", () => {
     },
   );
 
-  it("leaves the paper full width once the chat is closed, with the toolbar control back", async () => {
+  it("closes to the paper, and the header's Ask IRIS reopens it with the draft kept", async () => {
     await openPaperTab();
-    await userEvent.click(screen.getByRole("button", REOPEN));
-    await userEvent.click(await screen.findByRole("button", { name: "Close Paper Chat" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask about this paper" }), "What was measured?");
 
+    await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
     expect(screen.queryByRole("complementary", { name: "Paper Chat" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", REOPEN)).toBeInTheDocument();
+    expect(screen.getByText(/paper reader open/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", ASK)).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(screen.getByRole("button", ASK));
+    expect(await screen.findByRole("textbox", { name: "Ask about this paper" })).toHaveValue("What was measured?");
   });
 
   it("gives Overview back its own layout, rail and floating chat included", async () => {
@@ -743,41 +814,76 @@ describe("the Paper tab (IR-372)", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
 
     expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
-    await screen.findByRole("complementary", { name: "Paper Chat" });
+    expect(screen.getByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Panel position" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
   });
 
   it("keeps an open chat's conversation when the reader switches tabs", async () => {
     const { aiApi } = await import("@/api/ai");
-    const findOrCreate = vi.mocked(aiApi.conversations.findOrCreateForRecord);
-    findOrCreate.mockClear();
+    const find = vi.mocked(aiApi.conversations.findForRecord);
+    find.mockClear();
 
     localStorage.setItem(DOCK_KEY, "right");
     renderPaperView();
     await waitForRecord(record.title);
-    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
+    await userEvent.click(screen.getByRole("button", ASK));
     await screen.findByRole("complementary", { name: "Paper Chat" });
 
     await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
     await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
 
     expect(screen.getByRole("complementary", { name: "Paper Chat" })).toBeInTheDocument();
-    expect(findOrCreate).toHaveBeenCalledTimes(1);
+    expect(find).toHaveBeenCalledTimes(1);
   });
 
   it("has no serious or critical accessibility violations with the chat open", async () => {
-    const { container } = await (async () => {
-      const view = renderPaperView();
-      await waitForRecord(record.title);
-      await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
-      await screen.findByText(/paper reader open/i);
-      await userEvent.click(screen.getByRole("button", REOPEN));
-      await screen.findByRole("complementary", { name: "Paper Chat" });
-      return view;
-    })();
+    const { container } = await openPaperTab();
     await expectNoBlockingA11yViolations(container);
+  });
+
+  describe("by the workspace's width", () => {
+    const inert = (el: HTMLElement) => el.closest("[inert]") !== null;
+
+    it("sets the chat beside the paper at 1000px and up, with nothing held back", async () => {
+      workspaceAt(1200);
+      await openPaperTab();
+
+      expect(inert(screen.getByRole("tabpanel"))).toBe(false);
+      expect(screen.queryByRole("button", { name: "Back to paper" })).not.toBeInTheDocument();
+    });
+
+    it("slides the chat over the paper at 640-999px: focus moves in, the rest waits, Escape closes", async () => {
+      workspaceAt(924);
+      await openPaperTab();
+
+      const panel = screen.getByRole("complementary", { name: "Paper Chat" });
+      await waitFor(() => expect(panel).toHaveFocus());
+      expect(inert(screen.getByRole("tabpanel"))).toBe(true);
+      expect(inert(screen.getByRole("tablist"))).toBe(true);
+      // Focus that escapes (to the app's sidebar, say) is brought back.
+      act(() => screen.getByRole("button", ASK).focus());
+      expect(panel).toHaveFocus();
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("complementary", { name: "Paper Chat" })).not.toBeInTheDocument();
+      expect(inert(screen.getByRole("tabpanel"))).toBe(false);
+      await waitFor(() => expect(screen.getByRole("button", ASK)).toHaveFocus());
+    });
+
+    it("gives the chat the whole view below 640px, with Back to paper keeping the conversation", async () => {
+      workspaceAt(360);
+      await openPaperTab();
+
+      await userEvent.click(screen.getByRole("button", { name: "Back to paper" }));
+
+      expect(screen.getByRole("button", { name: "Show Paper Chat" })).toBeInTheDocument();
+      expect(inert(screen.getByRole("tabpanel"))).toBe(false);
+      await waitFor(() => expect(screen.getByRole("button", ASK)).toHaveFocus());
+
+      await userEvent.click(screen.getByRole("button", ASK));
+      expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
+    });
   });
 });
 
@@ -843,27 +949,25 @@ describe("following a citation from Paper Chat (IR-354)", () => {
     shownRecord = record;
     signInAs(99, "Student");
     const { aiApi } = await import("@/api/ai");
-    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(() =>
+    vi.mocked(aiApi.conversations.findForRecord).mockImplementation(() =>
       Promise.resolve({
-        data: {
-          id: 42, title: "", record: RECORD_ID, record_title: record.title, turn_count: 1,
-          created_at: "2026-09-20T00:00:00.000Z", updated_at: "2026-09-20T00:00:00.000Z",
-          turns: [
-            {
-              id: 1, question: "How much did the error fall?", resolved_question: null,
-              answer: "By twelve per cent [1].", message: null, state: "generative",
-              degraded: false, widened: false, created_at: "2026-09-20T00:00:00.000Z",
-              citations: [citation],
-            },
-          ],
-        },
+        id: 42, title: "", record: RECORD_ID, record_title: record.title, turn_count: 1,
+        created_at: "2026-09-20T00:00:00.000Z", updated_at: "2026-09-20T00:00:00.000Z",
+        turns: [
+          {
+            id: 1, question: "How much did the error fall?", resolved_question: null,
+            answer: "By twelve per cent [1].", message: null, state: "generative",
+            degraded: false, widened: false, created_at: "2026-09-20T00:00:00.000Z",
+            citations: [citation],
+          },
+        ],
       } as never),
     );
   });
 
   afterEach(async () => {
     const { aiApi } = await import("@/api/ai");
-    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(aiApi.conversations.findForRecord).mockImplementation(() => new Promise(() => {}));
     vi.unstubAllGlobals();
   });
 
@@ -871,7 +975,6 @@ describe("following a citation from Paper Chat (IR-354)", () => {
     renderPaperView();
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Ask IRIS" }));
     await userEvent.click(await screen.findByRole("link", CITED));
     await screen.findByText(/open at page 12, 1 region\(s\)/i);
   }
@@ -888,17 +991,8 @@ describe("following a citation from Paper Chat (IR-354)", () => {
     expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
   });
 
-  function atLg() {
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query === CONTAINED_LAYOUT_QUERY,
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }));
-  }
-
-  it("leaves the docked column as it is at lg, where it covers nothing", async () => {
-    atLg();
+  it("leaves the docked column as it is in a wide workspace, where it covers nothing", async () => {
+    workspaceAt(1200);
 
     await followCitationFromChat();
 
@@ -907,7 +1001,7 @@ describe("following a citation from Paper Chat (IR-354)", () => {
   });
 
   it("keeps the passage highlighted when the chat is closed and opened again", async () => {
-    atLg();
+    workspaceAt(1200);
     await followCitationFromChat();
 
     await userEvent.click(screen.getByRole("button", { name: "Close Paper Chat" }));
@@ -984,14 +1078,9 @@ describe("following a citation to another paper (IR-355)", () => {
   beforeEach(async () => {
     signInAs(99, "Student");
     localStorage.setItem(DOCK_KEY, "right");
-    // At `lg` the docked chat is a column and never minimizes (IR-354), so
-    // the transcript stays readable after a citation is followed.
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query === CONTAINED_LAYOUT_QUERY,
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }));
+    // In a wide workspace the docked chat is a column and never minimizes
+    // (IR-354), so the transcript stays readable after a citation is followed.
+    workspaceAt(1200);
 
     const { recordsApi } = await import("@/api/records");
     vi.mocked(recordsApi.detail).mockImplementation(((id: number) => {
@@ -1006,9 +1095,9 @@ describe("following a citation to another paper (IR-355)", () => {
     }) as never);
 
     const { aiApi } = await import("@/api/ai");
-    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockReset();
-    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(
-      ((id: number) => Promise.resolve({ data: conversations[id] })) as never,
+    vi.mocked(aiApi.conversations.findForRecord).mockReset();
+    vi.mocked(aiApi.conversations.findForRecord).mockImplementation(
+      ((id: number) => Promise.resolve(conversations[id])) as never,
     );
     vi.mocked(aiApi.askStream).mockReset();
     vi.mocked(aiApi.askStream).mockImplementation((async function* () {
@@ -1030,12 +1119,12 @@ describe("following a citation to another paper (IR-355)", () => {
     const { recordsApi } = await import("@/api/records");
     vi.mocked(recordsApi.detail).mockImplementation((() => Promise.resolve({ data: shownRecord })) as never);
     const { aiApi } = await import("@/api/ai");
-    vi.mocked(aiApi.conversations.findOrCreateForRecord).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(aiApi.conversations.findForRecord).mockImplementation(() => new Promise(() => {}));
   });
 
   async function conversationsOpened(): Promise<number[]> {
     const { aiApi } = await import("@/api/ai");
-    return vi.mocked(aiApi.conversations.findOrCreateForRecord).mock.calls.map(([id]) => id as number);
+    return vi.mocked(aiApi.conversations.findForRecord).mock.calls.map(([id]) => id as number);
   }
 
   /**
@@ -1075,7 +1164,7 @@ describe("following a citation to another paper (IR-355)", () => {
   async function openChatOnX() {
     const view = renderWithPlainLink();
     await waitForRecord(record.title);
-    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
     await screen.findByText(/Gauge density matters/);
     await userEvent.click(within(panel()).getByRole("button", { name: "This paper" }));
     return view;
@@ -1169,8 +1258,6 @@ describe("following a citation to another paper (IR-355)", () => {
     // panel that followed it is gone: there is no conversation to keep.
     renderPaper(`/records/${OTHER_ID}?page=3`, { citation: crossCitation, origin: "paper-chat" });
     await screen.findByRole("heading", { level: 1, name: other.title });
-
-    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
 
     expect(await within(panel()).findByText(QUESTION_ON_Y)).toBeInTheDocument();
     expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
@@ -1727,8 +1814,6 @@ describe("record versions (IR-416)", () => {
     shownRecord = { ...record, versions: twoVersions };
     renderPaper(`/records/${RECORD_ID}?section=paper&version=1`);
     await screen.findByText(/reading v1/i);
-
-    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
 
     const panel = await screen.findByRole("complementary", { name: "Paper Chat" });
     expect(within(panel).getByText("Answers are about the current version, not v1.")).toBeInTheDocument();

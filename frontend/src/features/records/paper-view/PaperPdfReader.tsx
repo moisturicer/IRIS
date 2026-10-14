@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { recordsApi } from "@/api/records";
 import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn, downloadBlob } from "@/lib/utils";
 import {
   loadPdfDocument,
@@ -18,11 +17,10 @@ import { paintFindHits } from "./findHighlights";
 import type { FindHit } from "./findInPaper";
 import { PaperFind } from "./PaperFind";
 import {
-  CONTAINED_LAYOUT_QUERY,
-  PANE_HEIGHT,
   PANE_TOP_PX,
   READER_TOOLBAR_TOP,
   READER_TOOLBAR_TOP_PX,
+  READING_PANE_HEIGHT,
 } from "./paneLayout";
 import {
   MAX_SCALE,
@@ -174,10 +172,10 @@ export interface PaperPdfReaderProps {
    */
   navKey: string;
   /**
-   * Rendered first in the toolbar: the Paper tab's way back to Ask IRIS
-   * while the chat is closed (IR-372), so nothing floats over the paper.
+   * The workspace is `reading-wide` (IR-569): the paper is a pane whose
+   * pages scroll inside it, rather than with the window.
    */
-  toolbarStart?: ReactNode;
+  contained?: boolean;
 }
 
 /**
@@ -185,9 +183,9 @@ export interface PaperPdfReaderProps {
  * the iframe/native-plugin viewer ADR-025 found could not be drawn on or
  * scrolled to programmatically.
  *
- * At `lg` and up it is a contained viewer (IR-352), like a document viewer's:
+ * In a `reading-wide` workspace it is a contained viewer (IR-352, IR-569), like a document viewer's:
  * a pane as tall as the viewport below the header, whose pages scroll inside
- * it under a toolbar that never leaves. Below `lg` the page itself scrolls
+ * it under a toolbar that never leaves. Narrower, the page itself scrolls
  * and the toolbar sticks under the header (IR-351), because a scroll area
  * inside a scrolling page is awkward on touch. Either way the paper opens
  * fitted to the width it has.
@@ -203,7 +201,7 @@ export function PaperPdfReader({
   scrollToPage,
   highlightRegions,
   navKey,
-  toolbarStart,
+  contained = false,
 }: PaperPdfReaderProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
@@ -215,7 +213,6 @@ export function PaperPdfReader({
   const destroyRef = useRef<(() => Promise<void>) | null>(null);
   const paneRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const contained = useMediaQuery(CONTAINED_LAYOUT_QUERY);
   // Read when a citation lands, not a reason to land again: the caller
   // builds a fresh `[]` on every render.
   const regionsRef = useRef(highlightRegions);
@@ -250,6 +247,7 @@ export function PaperPdfReader({
     pageRefs,
     toolbarRef,
     scrollAreaRef,
+    contained,
   });
 
   useEffect(() => {
@@ -416,8 +414,8 @@ export function PaperPdfReader({
       onKeyDown={find.onReaderKeyDown}
       className={cn(
         "flex flex-col",
-        PANE_HEIGHT,
-        "lg:rounded-2xl lg:border lg:border-stone-200 lg:bg-stone-100 lg:overflow-hidden",
+        READING_PANE_HEIGHT,
+        "reading-wide:rounded-2xl reading-wide:border reading-wide:border-stone-200 reading-wide:overflow-hidden",
       )}
     >
       <div
@@ -426,11 +424,11 @@ export function PaperPdfReader({
           "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
           "rounded-xl bg-overlay border border-stone-200",
           READER_TOOLBAR_TOP,
-          "lg:static lg:shrink-0 lg:mb-0 lg:rounded-none lg:border-0 lg:border-b lg:bg-white lg:backdrop-blur-none",
+          "reading-wide:static reading-wide:shrink-0 reading-wide:mb-0 reading-wide:rounded-none",
+          "reading-wide:border-0 reading-wide:border-b reading-wide:bg-canvas",
         )}
       >
         <div className="flex items-center gap-1">
-          {toolbarStart}
           <Button
             variant="ghost"
             size="icon"
@@ -511,7 +509,7 @@ export function PaperPdfReader({
         )}
       </div>
 
-      {/* The pane's scroll area at `lg` and up; below it, just the pages.
+      {/* The pane's scroll area when contained; otherwise just the pages.
           Focusable and named either way, so a keyboard user can page
           through it (axe: scrollable-region-focusable). */}
       <div
@@ -523,7 +521,8 @@ export function PaperPdfReader({
           "rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
           // A stable gutter, so the scrollbar appearing once the pages load
           // does not narrow the pane and set off a second refit.
-          "lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:[scrollbar-gutter:stable] lg:rounded-none lg:p-4 lg:focus-visible:ring-inset",
+          "reading-wide:flex-1 reading-wide:min-h-0 reading-wide:overflow-y-auto reading-wide:[scrollbar-gutter:stable]",
+          "reading-wide:rounded-none reading-wide:p-4 reading-wide:focus-visible:ring-inset",
         )}
       >
         {status === "loading" && (

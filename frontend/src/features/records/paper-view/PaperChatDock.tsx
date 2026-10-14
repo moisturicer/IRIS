@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { aiApi } from "@/api/ai";
 import type { ChatLane } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
@@ -11,7 +11,7 @@ import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessag
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { PANE_HEIGHT, PANE_TOP } from "./paneLayout";
+import { PANE_HEIGHT, PANE_TOP, READING_PANE_HEIGHT, READING_PANE_TOP } from "./paneLayout";
 
 export type DockMode = "left" | "right" | "floating";
 
@@ -40,6 +40,8 @@ export function usePaperChat() {
   // followed citation tucks it away to a bar (IR-354). Opening or closing
   // the panel always starts it unminimized.
   const [minimized, setMinimized] = useState(false);
+  // Here rather than in the panel, so closing it keeps the draft (IR-569).
+  const [draft, setDraft] = useState("");
 
   const setOpen = (next: boolean) => {
     setOpenState(next);
@@ -55,24 +57,7 @@ export function usePaperChat() {
     }
   };
 
-  return { open, setOpen, dock, setDockMode, minimized, setMinimized };
-}
-
-/** Closed-state affordance. Floats clear of the content in every dock mode. */
-export function PaperChatLauncher({ onOpen }: { onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title="Ask IRIS about this paper"
-      className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 h-14 pl-3 pr-3 sm:pr-5 rounded-full bg-white ring-1 ring-stone-200 shadow-card-md hover:ring-brand/40 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 transition-all duration-200"
-    >
-      <AskIrisEmblem className="w-8 h-8" />
-      {/* The visible label is the accessible name (WCAG 2.5.3); below `sm`
-          it stays in the tree for screen readers but not on screen. */}
-      <span className="sr-only sm:not-sr-only text-sm font-semibold text-stone-800">Ask about this paper</span>
-    </button>
-  );
+  return { open, setOpen, dock, setDockMode, minimized, setMinimized, draft, setDraft };
 }
 
 /**
@@ -128,6 +113,13 @@ interface PaperChatPanelProps {
    * so the panel says so while an earlier one is open.
    */
   viewingVersion?: number | null;
+  /** The composer's text, held by the page so a close keeps it (IR-569). */
+  draft?: string;
+  onDraftChange?: (draft: string) => void;
+  /** One view at a time (IR-569): the way back to the paper. */
+  onBackToPaper?: () => void;
+  /** The panel itself, for the page to move focus into. */
+  panelRef?: Ref<HTMLElement>;
 }
 
 /** The paper a Paper Chat conversation is about. */
@@ -165,9 +157,16 @@ export function PaperChatPanel({
   onRestore,
   className,
   viewingVersion = null,
+  draft,
+  onDraftChange,
+  onBackToPaper,
+  panelRef,
 }: PaperChatPanelProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [input, setInput] = useState("");
+  const headingId = useId();
+  const [ownInput, setOwnInput] = useState("");
+  const input = draft ?? ownInput;
+  const setInput = onDraftChange ?? setOwnInput;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [widen, setWiden] = useState(false);
@@ -195,23 +194,22 @@ export function PaperChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record.id, arrival?.key]);
 
-  // Find or start the Conversation for the subject. Re-runs when the subject
-  // changes, and resets the scope with it: the conversation owns its scope,
-  // so the page moving to another paper leaves it alone (IR-355).
+  // Find the subject's Conversation; none yet is an empty one, started by
+  // the first question (IR-569). Re-runs when the subject changes, and
+  // resets the scope with it: the conversation owns its scope, so the page
+  // moving to another paper leaves it alone (IR-355).
   useEffect(() => {
     let cancelled = false;
     setReady(false);
     setWiden(false);
-    // Until the new conversation arrives there is nowhere to send to, and
-    // nothing of the old one to show: a question typed during the switch
-    // must not land in it, nor its transcript sit under the new header.
+    // Nothing of the old conversation may receive or show anything meanwhile.
     setConversationId(null);
     setMessages([]);
 
     (async () => {
       try {
-        const { data: conversation } = await aiApi.conversations.findOrCreateForRecord(subject.id);
-        if (cancelled) return;
+        const conversation = await aiApi.conversations.findForRecord(subject.id);
+        if (cancelled || !conversation) return;
         setConversationId(conversation.id);
         setMessages(conversation.turns.flatMap(turnToMessages));
       } finally {
@@ -221,6 +219,14 @@ export function PaperChatPanel({
 
     return () => { cancelled = true; };
   }, [subject.id]);
+
+  /** The subject's Conversation, started now if this is its first question. */
+  const conversationFor = async (askedAbout: number): Promise<number> => {
+    if (conversationId != null) return conversationId;
+    const { data } = await aiApi.conversations.create({ record: askedAbout });
+    if (subjectId.current === askedAbout) setConversationId(data.id);
+    return data.id;
+  };
 
   // Scroll the transcript itself, never with `scrollIntoView` (IR-351): that
   // scrolls every scrollable ancestor too, the window included, and threw a
@@ -238,7 +244,7 @@ export function PaperChatPanel({
   }, [minimized]);
 
   const sendQuestion = async (question: string, questionWiden: boolean, routeOverride?: ChatLane, routeOverrideTurnId?: number) => {
-    if (!question || busy || !conversationId) return;
+    if (!question || busy || !ready) return;
 
     setMessages((prev) => [...prev, newChatMessage("user", question)]);
     setBusy(true);
@@ -249,6 +255,7 @@ export function PaperChatPanel({
       if (subjectId.current === askedAbout) setMessages((prev) => [...prev, reply]);
     };
     try {
+      const conversationId = await conversationFor(askedAbout);
       const { message } = await ask(question, { conversationId, widen: questionWiden, ...(routeOverride ? { routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { routeOverrideTurnId } : {}) });
       show(message);
     } catch {
@@ -260,7 +267,7 @@ export function PaperChatPanel({
 
   const send = () => {
     const question = input.trim();
-    if (!question || busy || !conversationId) return;
+    if (!question || busy || !ready) return;
     setInput("");
     return sendQuestion(question, widen);
   };
@@ -271,12 +278,16 @@ export function PaperChatPanel({
   };
 
   return (
+    // The canvas behind one border; the heading, not a white card, says what
+    // it is (IR-569). Focusable only by script, for the page's focus moves.
     <aside
+      ref={panelRef}
+      tabIndex={-1}
       className={cn(
-        "bg-white ring-1 ring-stone-200 flex flex-col overflow-hidden",
+        "bg-canvas border border-stone-200 flex flex-col overflow-hidden focus:outline-none",
         className,
       )}
-      aria-label="Paper Chat"
+      aria-labelledby={headingId}
     >
       {/* The minimized bar (IR-354): what this is, and one tap back to it.
           Its visible label is part of its accessible name (WCAG 2.5.3). */}
@@ -285,7 +296,7 @@ export function PaperChatPanel({
           type="button"
           onClick={onRestore}
           aria-label="Show Paper Chat"
-          className="flex items-center gap-3 w-full min-h-14 px-4 py-2 text-left hover:bg-stone-50 transition-colors duration-200"
+          className="flex items-center gap-3 w-full min-h-14 px-4 py-2 text-left hover:bg-stone-100 transition-colors duration-200"
         >
           <span className="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0" aria-hidden>
             <AskIrisMark className="w-5 h-5 text-brand" />
@@ -301,17 +312,26 @@ export function PaperChatPanel({
       {/* Header: what this is (labelled AI, always), which paper, and
           what the answers are drawn from (IR-356). */}
       <div className="shrink-0 border-b border-stone-200" hidden={minimized}>
+        {onBackToPaper && (
+          // Only where the panel is the one view (below `reading-split`).
+          <div className="px-2 pt-2 reading-split:hidden">
+            <Button variant="ghost" onClick={onBackToPaper} className="min-h-11 font-semibold">
+              <i className="fas fa-arrow-left text-xs" aria-hidden />
+              Back to paper
+            </Button>
+          </div>
+        )}
         <div className="flex items-center gap-3 px-4 pt-3 pb-2">
           <span className="w-9 h-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0" aria-hidden>
             <AskIrisMark className="w-5 h-5 text-brand" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 leading-tight">
-              <span className="font-display text-lg font-semibold text-stone-900">Paper Chat</span>
+            <div className="flex items-center gap-2 leading-tight">
+              <h2 id={headingId} className="font-display text-lg font-semibold text-stone-900">Paper Chat</h2>
               <span className="px-1.5 py-0.5 rounded-full bg-brand-50 text-brand text-2xs font-semibold ring-1 ring-brand-200">
                 IRIS AI
               </span>
-            </p>
+            </div>
             <p className="text-2xs text-stone-500 truncate">
               {pinned ? `Chatting about ${subject.title}` : record.title}
             </p>
@@ -402,7 +422,7 @@ export function PaperChatPanel({
               "inline-flex items-center gap-1.5 min-w-0 max-w-[16rem] font-semibold px-3 min-h-11 lg:min-h-7 rounded-full ring-1 transition-colors duration-200",
               widen
                 ? "bg-brand text-white ring-brand"
-                : "bg-white text-stone-700 ring-stone-300 hover:ring-brand/40 hover:text-brand",
+                : "text-stone-700 ring-stone-300 hover:ring-brand/40 hover:text-brand",
             )}
           >
             <i className="fas fa-layer-group text-2xs" aria-hidden />
@@ -422,7 +442,7 @@ export function PaperChatPanel({
         hidden={minimized}
         // Only while shown: hiding it is not the reader scrolling it.
         onScroll={minimized ? undefined : (e) => { transcriptScrollTop.current = e.currentTarget.scrollTop; }}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-5 bg-stone-50/60"
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-5"
       >
         {ready && messages.length === 0 && (
           <div className="py-4 text-center">
@@ -439,7 +459,7 @@ export function PaperChatPanel({
                   key={question}
                   type="button"
                   onClick={() => chooseStarter(question)}
-                  className="min-h-11 px-3.5 py-2.5 rounded-xl bg-white ring-1 ring-stone-200 text-sm text-stone-700 hover:ring-brand/40 hover:text-brand transition-colors duration-200"
+                  className="min-h-11 px-3.5 py-2.5 rounded-xl ring-1 ring-stone-300 text-sm text-stone-700 hover:ring-brand/40 hover:text-brand transition-colors duration-200"
                 >
                   {question}
                 </button>
@@ -452,7 +472,7 @@ export function PaperChatPanel({
             conversation open on the paper they lead to (IR-355). */}
         <CitationOriginContext.Provider value="paper-chat">
           {messages.map((m) => (
-            <ChatMessageBubble key={m.id} message={m} compact overrideDisabled={busy || !conversationId}
+            <ChatMessageBubble key={m.id} message={m} compact overrideDisabled={busy || !ready}
               onRouteOverride={(message, lane) => {
                 if (message.question) void sendQuestion(message.question, message.widened ?? false, lane, message.turnId);
               }} />
@@ -463,8 +483,8 @@ export function PaperChatPanel({
       </div>
 
       {/* Composer */}
-      <div className="shrink-0 border-t border-stone-200 bg-white p-3" hidden={minimized}>
-        <div className="flex items-end gap-2 rounded-2xl bg-stone-50 ring-1 ring-stone-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand/40 pl-3.5 pr-1.5 py-1.5 transition-colors duration-200">
+      <div className="shrink-0 border-t border-stone-200 p-3" hidden={minimized}>
+        <div className="flex items-end gap-2 rounded-2xl ring-1 ring-stone-300 focus-within:ring-2 focus-within:ring-brand/40 pl-3.5 pr-1.5 py-1.5 transition-colors duration-200">
           <textarea
             ref={composerRef}
             rows={2}
@@ -485,7 +505,7 @@ export function PaperChatPanel({
           <button
             type="button"
             onClick={send}
-            disabled={!input.trim() || busy || !conversationId}
+            disabled={!input.trim() || busy || !ready}
             aria-label="Send"
             className="w-11 h-11 lg:w-9 lg:h-9 shrink-0 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors duration-200"
           >
@@ -518,11 +538,17 @@ const DOCKED_PANEL_BASE =
 export const DOCKED_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[22rem]`;
 
 /**
- * The Paper tab's docked panel (IR-372): wider, because it shares the full
- * content width with the reader alone -- no rail, no centred column -- and a
- * 22rem transcript beside a full-width paper read as cramped.
+ * Ask IRIS in the Paper workspace (IR-569), by the workspace's width: the
+ * one view below `reading-split`, sliding over the paper below
+ * `reading-wide`, and a column beside it from there, 320-360px wide and
+ * never leaving the paper under 640px.
  */
-export const PAPER_TAB_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[26rem] xl:w-[30rem]`;
+export const PAPER_WORKSPACE_PANEL_CLASS =
+  "fixed inset-y-0 right-0 left-[var(--sidebar-inset,0px)] z-40 h-dvh " +
+  "reading-split:left-auto reading-split:w-[22.5rem] reading-split:shadow-card-md " +
+  `reading-wide:sticky reading-wide:inset-auto ${READING_PANE_TOP} reading-wide:z-auto ` +
+  `${READING_PANE_HEIGHT} reading-wide:w-[clamp(20rem,calc(100cqi-656px),22.5rem)] ` +
+  "reading-wide:shrink-0 reading-wide:rounded-2xl reading-wide:shadow-none";
 
 /**
  * A minimized bottom sheet (IR-354): a bar along the bottom of the screen,
