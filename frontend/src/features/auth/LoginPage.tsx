@@ -217,7 +217,8 @@ export default function LoginPage() {
           them, and a credentials message here is what IR-200 reported. */}
       {loginAlert?.kind === "unreachable" && (
         <AuthAlert variant="error" title="IRIS can't be reached right now">
-          The problem is on our side, not yours. Try again in a few minutes.
+          This is a connection or server problem, not a problem with what you typed.
+          Try again shortly.
         </AuthAlert>
       )}
 

@@ -120,7 +120,9 @@ export function LoginForm({
                 aria-expanded={forgotOpen}
                 aria-controls={forgotAnswerId}
                 onClick={() => setForgotOpen((v) => !v)}
-                className="text-sm font-semibold text-brand hover:underline"
+                // The same 44px target as the Show toggle above (2.5.5).
+                className="inline-flex items-center min-h-11 px-1 text-sm font-semibold
+                  text-brand hover:underline"
               >
                 Forgot password?
               </button>

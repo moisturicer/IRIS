@@ -43,6 +43,15 @@ export function classifyLoginFailure(error: unknown): LoginFailure {
   const detail = jsonDetail(response.data);
   if (status === 401 || detail === INVALID_CREDENTIALS_DETAIL) return { kind: "credentials" };
 
+  // The server-side lock. django-axes (AXES_FAILURE_LIMIT) replaces the login
+  // response with a plain-text 429, "Account locked: too many login
+  // attempts…", so it carries no `detail` and would otherwise read as an
+  // outage. A DRF throttle is a 429 too, but with a JSON detail, and stays
+  // "other".
+  if (status === 429 && typeof response.data === "string" && /locked/i.test(response.data)) {
+    return { kind: "locked" };
+  }
+
   // Anything below here needs the server's own words. A reply without them --
   // an HTML error page, a proxy's plain-text 404 -- came from something in
   // front of IRIS, not from IRIS.

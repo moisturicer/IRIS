@@ -344,6 +344,23 @@ describe("what a failed sign-in says", () => {
     expect(await screen.findByRole("dialog", { name: "Account Locked" })).toBeInTheDocument();
   });
 
+  it("opens the account-locked dialog on django-axes' plain-text 429", async () => {
+    // The server-side lock (AXES_FAILURE_LIMIT) answers in text, not JSON, so
+    // it has no `detail`. It must still read as a lock, not as an outage --
+    // and a fresh tab, with no client-side count, meets it first.
+    failSignInWith(
+      serverReplied(
+        429,
+        "Account locked: too many login attempts. Contact an admin to unlock your account.",
+      ),
+    );
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    expect(await screen.findByRole("dialog", { name: "Account Locked" })).toBeInTheDocument();
+  });
+
   describe.each([
     ["no response at all", noResponse()],
     ["a 502 with an HTML body", serverReplied(502, "<html><body>502 Bad Gateway</body></html>")],
