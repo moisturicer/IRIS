@@ -88,6 +88,37 @@ export interface CandidateCoverage {
   changed: boolean;
 }
 
+/**
+ * A topic-match count over a screened subset (IR-547): matches among the papers
+ * assessed of those selected, never a count of the catalogue. Every figure is
+ * derived in code from the candidates, so it moves with them on a reopened chat.
+ */
+export interface TopicCount {
+  criterion: string;
+  method: string;
+  version: string;
+  basis: "topic_classification_of_selected_candidates";
+  matches: number;
+  /** Included, excluded and uncertain; `unassessed` papers are not in it. */
+  assessed: number;
+  excluded: number;
+  uncertain: number;
+  unassessed: number;
+  selected: number;
+  limit: number;
+  more_available: boolean;
+}
+
+/** What one run observed. Not a measure of capacity: a warm run proves nothing about a fresh model. */
+export interface ObservedRun {
+  cache_hits: number;
+  cache_misses: number;
+  model_calls: number;
+  prompt_tokens_estimated: number;
+  stage_ms: { select: number; screen: number; finish: number; total: number };
+  note: string;
+}
+
 export interface AnswerListing {
   completeness: "matches_found" | "screened" | "exact_count" | "inconclusive";
   wording: string;
@@ -96,6 +127,8 @@ export interface AnswerListing {
   candidates?: CandidateRow[];
   coverage?: CandidateCoverage;
   count?: MetadataCountBasis;
+  topic_count?: TopicCount;
+  observed?: ObservedRun;
 }
 
 /**

@@ -490,6 +490,13 @@ AI_SCREEN_RECHECK_MAX_RECORDS = config("AI_SCREEN_RECHECK_MAX_RECORDS", default=
 AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS = config(
     "AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS", default=30.0, cast=float
 )
+# IR-547: remember a reader's own screening verdicts so a repeat is not sent to
+# the model again. Per reader only: cross-user sharing is a count channel
+# (ADR-027 §3, ADR-038) and is not built until a person approves it. Off until
+# someone with authority enables it and sets the policy version, which belongs
+# in every key so a changed approval stops old verdicts being reused.
+AI_SCREEN_CACHE = config("AI_SCREEN_CACHE", default=False, cast=bool)
+AI_SCREEN_CACHE_POLICY = config("AI_SCREEN_CACHE_POLICY", default="unapproved")
 
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")

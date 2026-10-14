@@ -1,9 +1,15 @@
-"""Presence and listing (IR-546): at most twenty candidates, shown pending, then screened.
+"""Presence, listing and topic-match counts (IR-546, IR-547): at most twenty
+candidates, shown pending, then screened.
 
 The application owns every identity and state; a model only answers include,
 exclude or uncertain for a handle it was issued. Anything else stays
 `unassessed`, never excluded. Access is read again before every send, update
-and the final list.
+and the final list. A topic count is the same screened subset, counted in code
+from the include decisions; no model writes or extrapolates a number.
+
+A reader's earlier verdicts are reused when `AI_SCREEN_CACHE` is on. A hit only
+supplies a verdict: the Record must still be readable, disclosable and
+unchanged, and its quote must still be in it, exactly as for a fresh verdict.
 """
 
 from __future__ import annotations
@@ -11,8 +17,9 @@ from __future__ import annotations
 import contextvars
 import json
 import logging
+import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 from django.conf import settings
@@ -23,11 +30,12 @@ from apps.ai.answers.events import (
     CandidatesSelected, CandidatesUpdated,
 )
 from apps.ai.history import estimate_tokens
-from apps.ai.inference import InferenceTask
+from apps.ai.inference import InferenceTask, profile_for
 from apps.ai.models.chunk import DocumentChunk
 from apps.ai.providers.deadline import model_call_deadline, time_left
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.registry import ToolRun
+from apps.ai.research.screening_cache import METHOD, ScreeningCache, Verdict, version
 from apps.ai.research.tools.common import QUERY, collect_record, disclosable, readable_records
 from apps.ai.research.tools.records import _relevant, rank_record_candidates
 from apps.ai.research.tools.screening import DECIDED, SYSTEM, validate_decisions
@@ -45,6 +53,18 @@ PASSAGE_CHARS = 1500
 STATE_OF = {"include": INCLUDED, "exclude": EXCLUDED, "uncertain": UNCERTAIN, "unassessed": UNASSESSED}
 
 LIST_WORDING = "These are matches found, not a complete list of the papers you can see."
+
+#: What a topic count counts, said once so a reader never takes it for the other kinds.
+COUNT_BASIS = "topic_classification_of_selected_candidates"
+COUNT_SCOPE = (
+    "This counts topic classifications among the selected candidates only. It is not a "
+    "catalogue metadata count and not a count of every paper you can see. "
+    "Other relevant papers may exist beyond the selected candidates."
+)
+OBSERVED_NOTE = (
+    "Observed for this run only. A run that reused earlier verdicts does not show how a "
+    "fresh model call performs or what capacity exists."
+)
 
 
 # ---- selection ----------------------------------------------------------------
@@ -102,6 +122,10 @@ class Outcome:
     #: Access or content changed while the run was going.
     changed: bool = False
     limit: int = CANDIDATE_LIMIT
+    #: Set for a topic count: the criterion, method and version it was made under.
+    topic: Optional[dict] = None
+    #: Cache use, stage timings and usage of the run that produced this, if known.
+    observed: Optional[dict] = None
 
     def count(self, state: str) -> int:
         return sum(c.state == state for c in self.candidates)
@@ -151,6 +175,8 @@ class Outcome:
                 f"Inconclusive: none of the {selected} candidate papers could be assessed, "
                 "so this does not show whether any match. Please try again.",
                 "Other relevant papers may exist.", *notes])
+        if self.topic:
+            return self._count_wording(notes)
         counts = (f"Screened {selected} candidate papers: {self.count(INCLUDED)} matched, "
                   f"{self.count(EXCLUDED)} did not match, {self.count(UNCERTAIN)} uncertain, "
                   f"{self.count(UNASSESSED)} could not be assessed.")
@@ -158,9 +184,31 @@ class Outcome:
                 "No matches found among the assessed candidates; other relevant papers may exist. ")
         return " ".join([lead + counts, LIST_WORDING, *notes])
 
+    def _count_wording(self, notes: list) -> str:
+        selected, matches, uncertain = len(self.candidates), self.count(INCLUDED), self.count(UNCERTAIN)
+        counted = (
+            f"{matches} {'match' if matches == 1 else 'matches'} among {self.judged} assessed of "
+            f"{selected} selected candidate {'paper' if selected == 1 else 'papers'}"
+            + (f", {uncertain} of them uncertain" if uncertain else "")
+            + f", with {self.count(UNASSESSED)} not assessed."
+        )
+        provenance = (f'Criterion: "{self.topic["criterion"]}" '
+                      f"({self.topic['method'].replace('_', ' ')}, {self.topic['version']}).")
+        return " ".join([counted, provenance, COUNT_SCOPE, *notes])
+
+    def topic_count(self) -> dict:
+        """The count's figures and provenance, always derived from the candidates."""
+        return {
+            **self.topic, "basis": COUNT_BASIS,
+            "matches": self.count(INCLUDED), "assessed": self.judged,
+            "excluded": self.count(EXCLUDED), "uncertain": self.count(UNCERTAIN),
+            "unassessed": self.count(UNASSESSED), "selected": len(self.candidates),
+            "limit": self.limit, "more_available": self.more_available,
+        }
+
     def wire(self) -> dict:
         """The listing a reader receives, and what a Turn stores (ids only)."""
-        return {
+        wire = {
             "completeness": self.completeness,
             "wording": self.wording(),
             "records": [{"record_id": c.record_id, "title": c.title}
@@ -168,6 +216,11 @@ class Outcome:
             "candidates": [c.wire() for c in self.candidates],
             "coverage": self.coverage(),
         }
+        if self.topic:
+            wire["topic_count"] = self.topic_count()
+        if self.observed:
+            wire["observed"] = self.observed
+        return wire
 
 
 def verify_quote(quote: str, source: Optional[dict], record) -> bool:
@@ -205,9 +258,13 @@ def reader_view(stored: dict, visible: dict) -> dict:
         if quote and not verify_quote(quote, source, record):
             quote, source, state, changed = "", None, UNASSESSED, True
         candidates.append(Candidate(record.pk, record.title, state, quote, source))
+    topic = stored.get("topic_count")
     return Outcome(
         tuple(candidates), bool(coverage.get("more_available")),
         bool(coverage.get("search_degraded")), changed, coverage.get("limit", CANDIDATE_LIMIT),
+        # Provenance is what ran; every figure is rebuilt from the candidates read just now.
+        {key: topic[key] for key in ("criterion", "method", "version")} if topic else None,
+        stored.get("observed"),
     ).wire()
 
 
@@ -282,9 +339,13 @@ def _dispatch(jobs, call):
 
 class _Screening:
     def __init__(self, run: ToolRun, criterion: str, ids: tuple[int, ...],
-                 restricted: frozenset = frozenset()) -> None:
+                 restricted: frozenset = frozenset(), cache: Optional[ScreeningCache] = None) -> None:
         self.run, self.criterion, self.ids, self.restricted = run, criterion, ids, restricted
+        self.cache = cache
         self.verdicts: dict[int, _Verdict] = {}
+        #: Papers whose verdict this run asked a model for, the only ones worth remembering.
+        self.asked: set[int] = set()
+        self.cache_hits = self.cache_misses = self.model_calls = self.prompt_tokens = 0
         self.announced = {pk: UNASSESSED if pk in restricted else PENDING for pk in ids}
         self.changed = False
         self.llm = None
@@ -296,8 +357,12 @@ class _Screening:
         size = max(1, settings.AI_SCREEN_BATCH_SIZE)
         jobs, never_sent = [], []
         sendable_ids = [pk for pk in self.ids if pk not in self.restricted]
-        for start in range(0, len(sendable_ids), size):
-            chunk = sendable_ids[start:start + size]
+        # Access is read here for the cache and again for every batch before it is sent.
+        remembered = self._recall(disclosable(self.run.ctx, sendable_ids))
+        yield from self._announce([(pk, self.verdicts[pk].state) for pk in remembered])
+        to_send = [pk for pk in sendable_ids if pk not in remembered]
+        for start in range(0, len(to_send), size):
+            chunk = to_send[start:start + size]
             allowed = disclosable(self.run.ctx, chunk)
             never_sent += [(pk, UNASSESSED) for pk in chunk if pk not in allowed]
             batch = tuple(collect_record(self.run.ledger, allowed[pk]) for pk in chunk if pk in allowed)
@@ -357,6 +422,44 @@ class _Screening:
 
     # -- pieces ------------------------------------------------------------
 
+    def _recall(self, allowed: dict) -> set[int]:
+        """Take a remembered verdict for each paper that is readable, disclosable and unchanged.
+
+        ``allowed`` is what the gate permits right now. A verdict whose quote is not
+        in the paper as it is now is a miss, so a stale one is asked again.
+        """
+        if self.cache is None or not allowed:
+            return set()
+        try:
+            found = self.cache.recall(allowed)
+        except Exception as exc:
+            logger.warning("screening cache unavailable to read",
+                           extra={"run_id": self.run.ctx.run_id, "error": type(exc).__name__})
+            return set()
+        taken = set()
+        for pk, verdict in found.items():
+            record = allowed[pk]
+            if verdict.quote and not verify_quote(verdict.quote, verdict.source, record):
+                continue
+            self.verdicts[pk] = _Verdict(verdict.state, verdict.quote, verdict.source,
+                                         (record.title, record.abstract))
+            taken.add(pk)
+        self.cache_hits, self.cache_misses = len(taken), len(allowed) - len(taken)
+        return taken
+
+    def remember(self, outcome: "Outcome") -> None:
+        """Keep the verdicts a model gave this run that survived to the final list."""
+        if self.cache is None:
+            return
+        kept = {c.record_id: Verdict(c.state, c.quote, c.source) for c in outcome.candidates
+                if c.record_id in self.asked and not c.restricted}
+        evidence = {pk: self.verdicts[pk].evidence for pk in kept}
+        try:
+            self.cache.remember(kept, evidence)
+        except Exception as exc:
+            logger.warning("screening cache unavailable to write",
+                           extra={"run_id": self.run.ctx.run_id, "error": type(exc).__name__})
+
     def _llm(self):
         try:
             return self.run.root.llm_for(InferenceTask.SCREEN)
@@ -380,7 +483,10 @@ class _Screening:
         """Main thread only: `Spend` is not safe to share with workers."""
         if self.run.spend.remaining_seconds <= 0:
             raise BudgetExhausted("wall_clock_seconds")
-        self.run.spend.charge_prompt_tokens(estimate_tokens(SYSTEM + job.user))
+        tokens = estimate_tokens(SYSTEM + job.user)
+        self.run.spend.charge_prompt_tokens(tokens)
+        self.model_calls += 1
+        self.prompt_tokens += tokens
 
     def _call(self, job: _Job) -> str:
         """One vendor call, on a worker. No database access but its own, closed after."""
@@ -442,6 +548,7 @@ class _Screening:
             decision = row["decision"] if same else "unassessed"
             quote = row["quote"] if same and decision in DECIDED else ""
             source = _locate(quote, item, job.passages.get(item.handle, ())) if quote else None
+            self.asked.add(item.record_id)
             self.verdicts[item.record_id] = _Verdict(
                 STATE_OF[decision], quote if source else "", source,
                 (item.record_title, item.text),
@@ -491,14 +598,59 @@ class _Screening:
         return Outcome(tuple(candidates), selection.more_available, selection.degraded, self.changed)
 
 
-def screen_listing(run: ToolRun, question: str, *, filters=None):
-    """Yield the preview and every update; return the `Outcome`."""
+def _cache_for(run: ToolRun, criterion: str) -> Optional[ScreeningCache]:
+    """This reader's cache, or ``None`` when it is off or the model is not identifiable."""
+    if not settings.AI_SCREEN_CACHE:
+        return None
+    try:
+        profile = profile_for(InferenceTask.SCREEN)
+    except Exception as exc:
+        logger.warning("screening cache off: no screening profile",
+                       extra={"run_id": run.ctx.run_id, "error": type(exc).__name__})
+        return None
+    model = "|".join([profile.vendor.value, profile.model, *profile.fallback_models,
+                      profile.data_policy.value])
+    return ScreeningCache(run.ctx.user, criterion=criterion, model=model,
+                          policy=settings.AI_SCREEN_CACHE_POLICY)
+
+
+def _milliseconds(start: float, end: float) -> int:
+    return max(0, round((end - start) * 1000))
+
+
+def screen_listing(run: ToolRun, question: str, *, filters=None, count: bool = False):
+    """Yield the preview and every update; return the `Outcome`.
+
+    ``count`` makes the outcome a topic count: the same candidates and decisions,
+    worded and structured as a count of the included ones.
+    """
+    started = marked = time.monotonic()
+    laps = {"select": 0, "screen": 0, "finish": 0}
+
+    def lap(stage: str) -> None:
+        nonlocal marked
+        now = time.monotonic()
+        laps[stage], marked = _milliseconds(marked, now), now
+
+    def observed(screening: Optional[_Screening] = None) -> dict:
+        return {
+            "cache_hits": screening.cache_hits if screening else 0,
+            "cache_misses": screening.cache_misses if screening else 0,
+            "model_calls": screening.model_calls if screening else 0,
+            "prompt_tokens_estimated": screening.prompt_tokens if screening else 0,
+            "stage_ms": {**laps, "total": _milliseconds(started, time.monotonic())},
+            "note": OBSERVED_NOTE,
+        }
+
     criterion = question.strip()[:QUERY["maxLength"]]
+    topic = {"criterion": criterion, "method": METHOD, "version": version()} if count else None
     selection = select_candidates(run, criterion, filters=filters)
     records = {r.pk: r for r in readable_records(run.ctx).filter(pk__in=selection.ids)}
     ids = tuple(pk for pk in selection.ids if pk in records)
+    lap("select")
     if not ids:
-        return Outcome((), selection.more_available, selection.degraded)
+        return Outcome((), selection.more_available, selection.degraded, topic=topic,
+                       observed=observed())
 
     # Counted among the twenty, never sent, never named.
     allowed = disclosable(run.ctx, ids)
@@ -508,14 +660,17 @@ def screen_listing(run: ToolRun, question: str, *, filters=None):
               {"record_id": pk, "title": records[pk].title, "state": PENDING} for pk in ids),
         CANDIDATE_LIMIT, selection.more_available, selection.degraded,
     )
-    screening = _Screening(run, criterion, ids, restricted)
+    screening = _Screening(run, criterion, ids, restricted, _cache_for(run, criterion))
     try:
         yield from screening.screen()
     except Exception as exc:
         # Keep what was decided; the rest stays unassessed, never excluded.
         logger.warning("listing screening stopped", extra={
             "run_id": run.ctx.run_id, "error": type(exc).__name__})
+    lap("screen")
     outcome = screening.finish(selection)
+    screening.remember(outcome)
     final = [(c.record_id, c.state) for c in outcome.candidates]
     yield from screening._announce(final)
-    return outcome
+    lap("finish")
+    return replace(outcome, topic=topic, observed=observed(screening))

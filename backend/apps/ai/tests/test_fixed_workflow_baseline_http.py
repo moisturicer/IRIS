@@ -165,7 +165,8 @@ def test_baseline_outcome_through_http_sse_and_replay(
     if expect.get("answer_is_null"):
         assert body["answer"] is None
     if "answer_contains" in expect:
-        assert expect["answer_contains"] in body["answer"]
+        # A non-answer (nothing assessed, none found) says so in `message`, not `answer`.
+        assert expect["answer_contains"] in (body["answer"] or body["message"])
 
     listing = expect["listing"]
     if listing is None:

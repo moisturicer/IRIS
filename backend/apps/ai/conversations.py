@@ -142,6 +142,9 @@ def _stored_listing(listing) -> dict:
             for row in listing["candidates"]
         ]
         stored.pop("wording", None)
+    if "topic_count" in listing:
+        # Provenance of the run only: every figure is rebuilt from the candidates.
+        stored["topic_count"] = {key: listing["topic_count"][key] for key in ("criterion", "method", "version")}
     return stored
 
 
