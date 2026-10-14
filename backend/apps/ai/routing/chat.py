@@ -107,7 +107,7 @@ class RoutedChat:
                 text="IRIS cannot provide a research landscape or gap analysis until the research-landscape capability is available. Retrieved passages cannot establish comprehensive coverage.",
                 citations=(), state=NO_SOURCES,
             )
-        from .lanes import answer_lane, research_run
+        from .lanes import lane_events, research_run
 
         if self.decision["lane"] == "research":
             result = yield from research_run(
@@ -117,7 +117,7 @@ class RoutedChat:
             )
             self.research = result.wire()
             return result.answer
-        answer, self.listing = answer_lane(
+        answer, self.listing = yield from lane_events(
             self.decision["lane"], self.asked.effective_question, user,
             root=self.root, conversation=self.asked.conversation,
             scope_record=self.asked.scope_record, max_sources=self.max_sources,

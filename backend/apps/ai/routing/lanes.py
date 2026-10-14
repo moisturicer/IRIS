@@ -1,18 +1,25 @@
 """Application-owned lane workflows; models never choose listing row identity."""
 
 from dataclasses import replace
+import logging
 import re
+import time
 
+from django.conf import settings
+
+from apps.ai.admission.scope import stepwise
 from apps.ai.answers.citations import (
     GroundedAnswer, NO_SOURCES, SYSTEM_PROMPT, UNAVAILABLE, build_prompt,
 )
+from apps.ai.answers.events import INCLUDED
 from apps.ai.answers.service import generate_cited, model_that_answered, UNAVAILABLE_TEXT
 from apps.ai.inference import InferenceTask
 from apps.ai.providers.deadline import model_call_deadline
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.research.context import RunContext
+from apps.ai.research.listing import screen_listing
 from apps.ai.research.planner import ResearchPlanner
-from apps.ai.research.registry import ToolRun, research_tools
+from apps.ai.research.registry import ToolRun
 from apps.ai.research.results import ToolStatus
 from apps.ai.research.tools.common import disclosable, readable_records
 from apps.ai.research.tools.records import _relevant
@@ -22,7 +29,7 @@ from apps.ai.research import metadata_count
 from apps.ai.research.workflows import topic_count
 from apps.ai.resilience.circuit import CircuitOpen
 
-LIST_WORDING = "These are matches found, not a complete list of the papers you can see."
+logger = logging.getLogger(__name__)
 SUCCESS = (ToolStatus.OK, ToolStatus.EMPTY, ToolStatus.DEGRADED)
 
 
@@ -52,30 +59,23 @@ def _rows(run, evidence, handles):
     return rows
 
 
-def _listing(run, question, maximum):
-    registry = research_tools()
-    found = registry.call(run, "find_records", {"topic": question, "k": min(10, maximum)})
-    if found.status not in SUCCESS:
+def _listing_events(run, question):
+    """Preview, screen and describe at most twenty candidates (IR-546).
+
+    Yields the candidate events; returns `(answer, listing)`. The answer text
+    is the listing's wording, written in code. No model writes a sentence here.
+    """
+    try:
+        outcome = yield from screen_listing(run, question)
+    except Exception as exc:
+        # Selection or the final read failed: say so, never "nothing found".
+        logger.warning("listing failed", extra={"run_id": run.ctx.run_id, "error": type(exc).__name__})
         return _unavailable(), None
-    if not found.evidence:
-        return _empty(), {"completeness": "matches_found", "wording": LIST_WORDING, "records": []}
-    ids = tuple(e.record_id for e in found.evidence)
-    screened = registry.call(replace(run, screen_candidate_ids=ids),
-                             "screen_records", {"criterion": question})
-    if screened.status not in SUCCESS:
-        return _unavailable(), None
-    included = [row["record"] for row in screened.detail.get("rows", ())
-                if row.get("decision") == "include"]
-    # A screened handle must also belong to the database finder result.
-    rows = _rows(run, found.evidence, included)[:maximum]
-    wording = LIST_WORDING
-    if screened.detail.get("unassessed", 0):
-        wording += " Some candidates could not be assessed."
-    listing = {"completeness": "matches_found", "wording": wording, "records": rows}
-    if not rows:
-        return _empty("No assessed matching papers were found. " + wording), listing
-    text = wording
-    return GroundedAnswer(text=text, citations=(), degraded=screened.status is ToolStatus.DEGRADED), listing
+    listing = outcome.wire()
+    text = listing["wording"]
+    if not any(c.state == INCLUDED for c in outcome.candidates):
+        return _empty(text), listing
+    return GroundedAnswer(text=text, citations=(), degraded=outcome.degraded), listing
 
 
 def _count(run, question):
@@ -203,18 +203,32 @@ def research_run(question, user, *, root, conversation=None, scope_record=None,
     return (yield from ResearchPlanner(root).run(question, ctx))
 
 
-def answer_lane(lane, question, user, *, root, conversation=None, scope_record=None,
-                max_sources=8, history_before_turn_id=None):
-    """Run a bounded corpus workflow; research goes through `research_run`."""
+def lane_events(lane, question, user, *, root, conversation=None, scope_record=None,
+                max_sources=8, history_before_turn_id=None, clock=time.monotonic):
+    """Run a bounded corpus workflow, yielding what a reader can watch.
+
+    Only a listing yields (its candidates, IR-546); the others return at once.
+    Returns `(answer, listing)`. Research goes through `research_run`.
+    """
     if lane not in ("listing", "count", "comparison"):
         raise ValueError(f"No application workflow for lane {lane!r}")
     ctx = _context(lane, user, root=root, conversation=conversation, scope_record=scope_record,
                    max_sources=max_sources, history_before_turn_id=history_before_turn_id)
     run = ToolRun.start(ctx, root)
+    seconds = ctx.budget.wall_clock_seconds
+    if lane == "listing":
+        seconds = min(seconds, settings.AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS)
+    end = clock() + seconds
+
+    def deadline():
+        # One end time, re-entered at every step: a generator never holds a
+        # `with` open across its yields (see `admission.scope`).
+        return model_call_deadline(max(0.0, end - clock()), clock=clock)
+
     try:
-        with model_call_deadline(ctx.budget.wall_clock_seconds):
-            if lane == "listing":
-                return _listing(run, question, max_sources)
+        if lane == "listing":
+            return (yield from stepwise(_listing_events(run, question), deadline))
+        with deadline():
             if lane == "count":
                 return _count(run, question)
             return _comparison(run, question, max_sources)

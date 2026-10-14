@@ -772,3 +772,34 @@ Evidence, with deterministic fakes and real Postgres; no vendor called:
 **Status:** implemented and tested; human review and approval remain required, as do ADR-041's acceptance and every
 limit value (pilot README §6). Nothing has measured real-provider throughput or sizing for 100 simultaneous
 submissions.
+
+## IR-546 — early candidate preview and bounded, screened listing
+
+A "which papers are about X" question in the `listing` lane selects at most twenty distinct candidate Records from
+the approved word, meaning and passage signals, shows them at once as relevance-pending, screens them in bounded
+parallel title-and-abstract checks, and returns every candidate in exactly one state (matches, does not match,
+uncertain, could not be assessed) with source-linked quotes, subset wording and explicit inconclusive, zero-match and
+degraded-search states. Access is read again before each send, update, replay and output.
+`apps/ai/research/listing.py`; contract in
+[`docs/evaluation/fixed-workflow-pilot/README.md`](../evaluation/fixed-workflow-pilot/README.md) §11.
+
+Evidence, with deterministic fakes and real Postgres; no vendor called:
+- `apps/ai/tests/test_listing_workflow_http.py`, over the JSON, SSE and conversation boundaries:
+  - preview before any decision, every state reconciled, stable ids, reopened Turn equal to the live listing;
+  - the twenty-candidate cap, including when every assessment fails and with many chunks per Record;
+  - an invented handle, title or quote cannot become a decision;
+  - a paper AI may not read is counted and never sent or named;
+  - uncertain papers rechecked with passages when limits allow, and not when they do not;
+  - a paper that loses access before sends, during a call or after the run, and one edited mid-call;
+  - no candidates, zero matches and word-matching-only search worded as subsets;
+  - batches in flight never exceed the configured bound; a stalled batch ends at the deadline with partial results;
+  - a worker carries the question's workload and admission run;
+  - the queued journal replays candidates in order and re-filters them for the reader.
+- `apps/ai/research/tests/test_listing_outcome.py` (selection cap and wording, no database).
+- The b03 `listing` baseline in `fixed_workflow_baseline.json` and `test_fixed_workflow_baseline_http.py`.
+- `src/features/ai/components/CandidateList.test.tsx` and `useAskStream.test.tsx` (pending then moved by id, status
+  announcement, axe, AI-restricted never named, inconclusive, older listings).
+
+**Status:** implemented and tested; human review and approval remain required. The `screen` endpoint is still not
+approved for pilot traffic (pilot README §5). No screening recall, latency or cost has been measured, so the
+twenty-candidate limit and the 10 s goal stay unvalidated.

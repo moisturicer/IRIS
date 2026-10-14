@@ -128,6 +128,9 @@ ALLOWED = {
     # (IR-500) A research tool call's outcome: "rejected" means a malformed
     # model call, not a clearance decision. Same shape as embedding_space.py.
     "ai/research/results.py",
+    # (IR-546) A listing candidate's state ("pending" until screened). Not a
+    # person's request awaiting a decision. Same shape as embedding_space.py.
+    "ai/answers/events.py",
 }
 
 
