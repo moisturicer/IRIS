@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from core.enums import RoleName
+from core.enums import RequestStatus, RoleName
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 
 
@@ -79,16 +79,37 @@ class MeSerializer(UserSerializer):
     after sign-in all read it. It is never on another user's payload -- the
     adviser picker and the admin list use `UserSerializer` -- so nobody learns
     who else reviews what.
+
+    `role_request` (IR-537) is the user's latest role request while they have
+    no role, so the pending screen can tell an applicant still waiting from
+    one RDCO declined: `{status: "pending" | "declined", requested_role}`, or
+    `None` once a role is held or when nothing was asked for. Computed, so it
+    is read-only and needs no migration.
     """
     review_access = serializers.SerializerMethodField()
+    role_request  = serializers.SerializerMethodField()
 
     class Meta(UserSerializer.Meta):
-        fields = [*UserSerializer.Meta.fields, "review_access"]
+        fields = [*UserSerializer.Meta.fields, "review_access", "role_request"]
 
     def get_review_access(self, obj):
         from apps.reviews.seats import review_access
 
         return review_access(obj)
+
+    def get_role_request(self, obj):
+        if obj.role_id is not None:
+            return None
+        latest = (
+            obj.role_requests.select_related("requested_role")
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        # An approved request with no role means the role was later taken
+        # away: there is no decision pending, and "declined" would be false.
+        if latest is None or latest.status == RequestStatus.APPROVED:
+            return None
+        return {"status": latest.status, "requested_role": latest.requested_role.name}
 
 
 class RegisterSerializer(serializers.ModelSerializer):

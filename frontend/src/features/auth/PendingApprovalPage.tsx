@@ -1,15 +1,53 @@
 /**
- * Shown to authenticated users whose role request has not yet been approved.
- * Replaces the full app shell — no sidebar, no navigation.
+ * Shown to a signed-in user who has no role yet. Replaces the app shell: no
+ * sidebar, no navigation, only the shared entry frame (IR-537).
+ *
+ * Every registration creates a role request that RDCO approves or declines,
+ * and `role_request` on the user's own payload says which of the two it is
+ * still waiting on, so the screen tells pending from declined. It promises no
+ * turnaround time: nothing on the server backs one.
  */
+import { useId } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/api/auth";
-import { useAuthStore } from "@/store/auth.store";
-import irisLogo from "@/assets/images/iris_logo.png";
+import { AuthLayout } from "@/components/auth/AuthLayout";
+import { Button } from "@/components/ui/Button";
+import type { OwnRoleRequest } from "@/types/auth";
+
+/** "a Student", "an Adviser". */
+function withArticle(role: string): string {
+  return `${/^[aeiou]/i.test(role) ? "an" : "a"} ${role}`;
+}
+
+interface Standing {
+  title: string;
+  message: string;
+}
+
+function standingOf(request: OwnRoleRequest | null | undefined, email: string): Standing {
+  if (request?.status === "pending") {
+    return {
+      title: "Waiting for approval",
+      message: `RDCO is reviewing your request to join as ${withArticle(request.requested_role)}. You'll get an email at ${email} when they decide.`,
+    };
+  }
+  if (request?.status === "declined") {
+    return {
+      title: "Request not approved",
+      message: `Your request to join as ${withArticle(request.requested_role)} was not approved. Contact RDCO or your department administrator if you think this is a mistake.`,
+    };
+  }
+  // No request: registered without a role, or approved and the role later
+  // taken away. Neither "reviewing" nor "declined" would be true.
+  return {
+    title: "No role assigned",
+    message: "Your account doesn't have a role yet, so there is nothing for IRIS to open. Contact RDCO or your department administrator to have one assigned.",
+  };
+}
 
 export function PendingApprovalPage() {
-  const { user, logout } = useAuth();
-  const refreshToken = useAuthStore((s) => s.refreshToken);
+  const { user, logout, refreshToken } = useAuth();
+  const registeredId = useId();
 
   const handleLogout = async () => {
     try {
@@ -20,85 +58,51 @@ export function PendingApprovalPage() {
     logout();
   };
 
+  // The route guard renders this only for a signed-in user (IR-537).
+  if (!user) return null;
+
+  const request = user.role_request;
+  const { title, message } = standingOf(request, user.email);
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-      {/* Card */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm w-full max-w-md p-8 flex flex-col items-center text-center gap-5">
+    <AuthLayout variant={request?.status === "declined" ? "declined" : "pending"}>
+      <h2 className="text-balance font-display text-display font-semibold text-stone-900">{title}</h2>
+      <p className="mt-3 text-pretty text-body text-stone-700">{message}</p>
 
-        {/* Logo + branding */}
-        <div className="flex items-center gap-3 mb-1">
-          <img src={irisLogo} alt="IRIS" className="w-10 h-10 object-contain" />
-          <div className="text-left">
-            <div className="text-[22px] font-extrabold tracking-[4px] text-[#6B0F12] leading-none">
-              IRIS
-            </div>
-            <div className="text-[9px] font-bold tracking-[2px] text-amber-600 uppercase mt-0.5">
-              CIT-U Research Hub
-            </div>
-          </div>
-        </div>
-
-        {/* Icon */}
-        <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center">
-          <i className="fas fa-hourglass-half text-[28px] text-amber-500" aria-hidden />
-        </div>
-
-        {/* Heading */}
-        <div>
-          <h1 className="text-[18px] font-bold text-gray-900">
-            Account Pending Approval
-          </h1>
-          <p className="text-[14px] text-gray-500 mt-1.5 leading-relaxed">
-            Your registration was received and your email has been verified.
-            An administrator will review and approve your account shortly.
-          </p>
-        </div>
-
-        {/* User info */}
-        {user && (
-          <div className="w-full rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-left">
-            <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              Registered as
-            </p>
-            <p className="text-[14px] font-semibold text-gray-800">
-              {user.first_name} {user.last_name}
-            </p>
-            <p className="text-[13px] text-gray-500">{user.email}</p>
-          </div>
-        )}
-
-        {/* What to expect */}
-        <div className="w-full text-left space-y-2">
-          <p className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">
-            What happens next
-          </p>
-          <div className="flex items-start gap-2.5 text-[13px] text-gray-600">
-            <i className="fas fa-envelope text-[#6B0F12] mt-0.5 w-4 flex-shrink-0" aria-hidden />
-            <span>You will receive an email notification once your account is approved.</span>
-          </div>
-          <div className="flex items-start gap-2.5 text-[13px] text-gray-600">
-            <i className="fas fa-sign-in-alt text-[#6B0F12] mt-0.5 w-4 flex-shrink-0" aria-hidden />
-            <span>After approval, log back in to access the full IRIS platform.</span>
-          </div>
-          <div className="flex items-start gap-2.5 text-[13px] text-gray-600">
-            <i className="fas fa-clock text-[#6B0F12] mt-0.5 w-4 flex-shrink-0" aria-hidden />
-            <span>Approvals are typically processed within 1–2 business days.</span>
-          </div>
-        </div>
-
-        {/* Logout */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="mt-1 w-full py-2.5 rounded-lg border border-gray-200 text-[14px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-        >
-          Sign out
-        </button>
+      <div
+        role="group"
+        aria-labelledby={registeredId}
+        className="mt-section-lg border border-stone-200 border-t-2 border-t-gold bg-surface px-5 py-4"
+      >
+        <p id={registeredId} className="text-label font-semibold text-stone-600">
+          Registered as
+        </p>
+        <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-small sm:grid-cols-3">
+          <dt className="text-stone-600">Name</dt>
+          <dd className="font-semibold text-stone-900 sm:col-span-2">
+            {user.first_name} {user.last_name}
+          </dd>
+          <dt className="mt-1 text-stone-600 sm:mt-0">Email</dt>
+          <dd className="break-all text-stone-900 sm:col-span-2">{user.email}</dd>
+          {request && (
+            <>
+              <dt className="mt-1 text-stone-600 sm:mt-0">Requested role</dt>
+              <dd className="text-stone-900 sm:col-span-2">{request.requested_role}</dd>
+            </>
+          )}
+        </dl>
       </div>
 
-      <p className="mt-5 text-[12px] text-gray-500">
-        Questions? Contact the RDCO office or your department administrator.
-      </p>
-    </div>
+      <div className="mt-section-lg">
+        <Button type="button" variant="outline" size="full" onClick={handleLogout}>
+          Sign out
+        </Button>
+        {request?.status === "pending" && (
+          <p className="mt-3 text-center text-small text-stone-600">
+            Signing out doesn&apos;t withdraw your request.
+          </p>
+        )}
+      </div>
+    </AuthLayout>
   );
 }

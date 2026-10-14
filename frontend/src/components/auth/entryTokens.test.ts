@@ -15,11 +15,12 @@ import { describe, expect, it } from "vitest";
 const ENTRY_FRAME = [
   "src/components/auth/AuthBrandPanel.tsx",
   "src/components/auth/AuthLayout.tsx",
+  "src/features/auth/PendingApprovalPage.tsx",
 ];
 
 const SOURCES: Record<string, string> = Object.fromEntries(
   Object.entries(
-    import.meta.glob<string>("/src/components/auth/*.tsx", {
+    import.meta.glob<string>(["/src/components/auth/*.tsx", "/src/features/auth/*.tsx"], {
       query: "?raw",
       import: "default",
       eager: true,

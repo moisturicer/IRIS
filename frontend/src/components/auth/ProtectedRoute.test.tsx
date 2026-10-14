@@ -170,6 +170,28 @@ describe("the route guard", () => {
     expect(screen.getByRole("heading", { name: /access denied/i })).toBeInTheDocument();
   });
 
+  it("shows a signed-in user with no role where their account stands, not a refusal", () => {
+    // Regression (IR-537): every role gate refused a role-less applicant with
+    // "Access Denied" before AppShell could show its pending screen, so after
+    // sign-in nobody awaiting RDCO ever saw it.
+    useAuthStore.setState({
+      authReady: true,
+      accessToken: validToken({ user_id: 11, role_id: null }),
+      user: makeUser({
+        id: 11,
+        role: null,
+        role_name: null,
+        role_request: { status: "pending", requested_role: "Student" },
+      }),
+      isAuthenticated: true,
+    });
+
+    renderGuardAt("/review/12/evaluate");
+
+    expect(screen.queryByRole("heading", { name: /access denied/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Waiting for approval" })).toBeInTheDocument();
+  });
+
   it("has no serious or critical accessibility violations while waiting", async () => {
     useAuthStore.setState({ authReady: false, accessToken: null });
 
