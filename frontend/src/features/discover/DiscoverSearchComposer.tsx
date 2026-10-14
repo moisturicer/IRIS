@@ -1,9 +1,5 @@
-import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useAskIrisHandoff } from "@/lib/askHandoff";
 import { RepositorySearchIcon } from "./DiscoverIcons";
-import { cn } from "@/lib/utils";
-
-type SearchMode = "keyword" | "smart";
 
 interface DiscoverSearchComposerProps {
   value: string;
@@ -11,40 +7,17 @@ interface DiscoverSearchComposerProps {
 }
 
 /**
- * The search composer. "Smart AI Search" hands the query to Ask IRIS, which is
- * a real grounded-retrieval endpoint — not a decorative label.
+ * The search composer. Typing filters the catalogue live; "Ask IRIS about
+ * this" is a separate, explicit action that hands the exact text to Ask IRIS
+ * as an editable draft. Neither runs the other (IR-559).
  */
 export function DiscoverSearchComposer({
   value,
   onChange,
 }: DiscoverSearchComposerProps) {
-  const navigate = useNavigate();
-  const [mode, setMode] = useState<SearchMode>("keyword");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const askIris = useAskIrisHandoff();
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onPointerDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
-
-  const submit = () => {
-    const query = value.trim();
-    if (!query) return;
-    // Keyword search already filters live as you type; only Smart search navigates.
-    if (mode === "smart") navigate(`/ai?q=${encodeURIComponent(query)}`);
-  };
+  const question = value.trim();
 
   return (
     <div className="bg-white border border-stone-200 rounded-2xl shadow-card px-4 pt-3.5 pb-3 focus-within:border-brand/40 transition-colors">
@@ -55,10 +28,8 @@ export function DiscoverSearchComposer({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
+            // Enter only keeps the box from growing a line; it never asks.
+            if (e.key === "Enter" && !e.shiftKey) e.preventDefault();
           }}
           aria-label="Search records"
           placeholder="Who's working on edge AI at CIT-U? Search research, authors, topics…"
@@ -77,82 +48,18 @@ export function DiscoverSearchComposer({
       </div>
 
       <div className="flex items-center gap-2 mt-2.5">
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-expanded={menuOpen}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[13px] font-semibold transition-colors",
-              mode === "smart"
-                ? "bg-brand-50 border-brand-200 text-brand"
-                : "bg-white border-stone-200 text-stone-600 hover:border-stone-300",
-            )}
-          >
-            <span>{mode === "smart" ? "Smart AI Search" : "Keyword Search"}</span>
-            <i className={cn("fas fa-chevron-down text-[8px] opacity-60 transition-transform", menuOpen && "rotate-180")} aria-hidden />
-          </button>
-
-          {menuOpen && (
-            <div className="absolute left-0 bottom-full mb-2 w-64 bg-white rounded-xl shadow-card-md border border-stone-200 py-1.5 z-40">
-              <ModeOption
-                active={mode === "keyword"}
-                title="Keyword Search"
-                detail="Filters this page as you type."
-                onClick={() => { setMode("keyword"); setMenuOpen(false); }}
-              />
-              <ModeOption
-                active={mode === "smart"}
-                title="Smart AI Search"
-                detail="Sends the question to Ask IRIS for a grounded answer."
-                onClick={() => { setMode("smart"); setMenuOpen(false); }}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="ml-auto flex items-center gap-2.5">
-          <span className="hidden sm:inline text-[12px] font-mono text-stone-400">
-            {mode === "smart" ? "Enter to ask" : "Filtering as you type"}
-          </span>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!value.trim() || mode !== "smart"}
-            aria-label="Ask IRIS"
-            title={mode === "smart" ? "Ask IRIS" : "Switch to Smart AI Search to ask"}
-            className="w-8 h-8 shrink-0 rounded-full bg-brand text-white flex items-center justify-center transition-colors hover:bg-brand-light disabled:opacity-30"
-          >
-            <i className="fas fa-arrow-up text-[13px]" aria-hidden />
-          </button>
-        </div>
+        <span className="text-[12px] font-mono text-stone-400">Filtering the catalogue as you type</span>
+        <button
+          type="button"
+          onClick={() => askIris(value)}
+          disabled={!question}
+          title="Opens Ask IRIS with this text as a draft. Nothing is sent until you press Send."
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand text-[13px] font-semibold transition-colors hover:bg-brand-100 disabled:opacity-40"
+        >
+          <i className="fas fa-brain text-[12px]" aria-hidden />
+          Ask IRIS about this
+        </button>
       </div>
     </div>
-  );
-}
-
-function ModeOption({
-  active,
-  title,
-  detail,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  detail: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left px-3 py-2 hover:bg-stone-50 transition-colors"
-    >
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-semibold text-stone-800">{title}</span>
-        {active && <i className="fas fa-check text-brand text-[12px]" aria-hidden />}
-      </span>
-      <span className="block text-[12px] text-stone-500 mt-0.5">{detail}</span>
-    </button>
   );
 }

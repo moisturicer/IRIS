@@ -12,6 +12,7 @@ import { routingFixture } from "@/test/routingFixture";
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useLocation } from "react-router-dom";
 import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
 import type { AIAnswer, AIStatus, ConversationDetail, ConversationSummary } from "@/types/ai";
 
@@ -137,26 +138,27 @@ describe("persisted conversations", () => {
     expect(options).toMatchObject({ conversationId: 9 });
   });
 
-  it("actually asks the record deep-link's prefilled question, rather than leaving it unanswered", async () => {
-    // A `?record=` link starts a Conversation scoped to that Record and
-    // used to only display the prefilled question as an inert user bubble,
-    // never asking it -- fixed alongside the rest of this ticket so the
-    // reader lands on a real answer, not a question nobody sent.
+  it("opens the record deep link as a draft scoped to that Record, asking nothing", async () => {
     create.mockResolvedValue({ data: detail({ id: 9, record: 5 }) });
-    askStream.mockImplementation(() => doneStreamOf({ conversation_id: 9 }));
 
-    renderScreen(<RAGChatPage />, { route: "/ai/ask?record=5" });
+    renderScreen(<RAGChatPage />, { route: "/ai?record=5" });
 
     await waitFor(() => expect(create).toHaveBeenCalledWith({ record: 5 }));
-    await waitFor(() => expect(askStream).toHaveBeenCalled());
-    const [question, options] = askStream.mock.calls[0];
-    expect(question).toMatch(/record #5/i);
-    expect(options).toMatchObject({ conversationId: 9 });
+    const input = await screen.findByRole("textbox", { name: /ask a follow-up/i });
+    expect((input as HTMLTextAreaElement).value).toMatch(/record #5/i);
+    expect(askStream).not.toHaveBeenCalled();
+  });
 
-    // The `[1]` marker itself renders as an inline citation chip (IR-329),
-    // not literal text -- with no citation supplied here it resolves to
-    // nothing, so only the surrounding prose is asserted.
-    expect(await screen.findByText(/Rainfall gauges predict flooding/)).toBeTruthy();
+  it("opens the record deep link on that Record's existing Conversation", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 7, record: 5 })] });
+    get.mockResolvedValue({ data: detail({ id: 7, record: 5 }) });
+
+    renderScreen(<RAGChatPage />, { route: "/ai?record=5" });
+
+    await waitFor(() => expect(list).toHaveBeenCalledWith({ record: 5 }));
+    await waitFor(() => expect(get).toHaveBeenCalledWith(7));
+    expect(create).not.toHaveBeenCalled();
+    expect(askStream).not.toHaveBeenCalled();
   });
 
   it("removes a conversation and falls back to what remains", async () => {
@@ -217,4 +219,85 @@ it("reruns an old answer using its original turn after newer discussion", async 
   await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
     conversationId: 9, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
   }));
+});
+
+
+/** Shows where the router is, so a test can read the address bar. */
+function Address() {
+  const { pathname, search } = useLocation();
+  return <output aria-label="address">{pathname + search}</output>;
+}
+
+function renderChat(route: string, state?: unknown) {
+  return renderScreen(
+    <>
+      <RAGChatPage />
+      <Address />
+    </>,
+    { route, state },
+  );
+}
+
+describe("a question handed off from Discover (IR-559)", () => {
+  const QUESTION = "Who is working on edge AI at CIT-U?";
+
+  async function draftBox() {
+    return (await screen.findByRole("textbox", { name: /ask a follow-up/i })) as HTMLTextAreaElement;
+  }
+
+  it("shows the exact question in an editable draft and sends nothing", async () => {
+    renderChat("/ai", { draft: QUESTION });
+
+    const box = await draftBox();
+    await waitFor(() => expect(box.value).toBe(QUESTION));
+    expect(askStream).not.toHaveBeenCalled();
+
+    await userEvent.type(box, " today");
+    expect(box.value).toBe(`${QUESTION} today`);
+    expect(askStream).not.toHaveBeenCalled();
+  });
+
+  it("opens a new Conversation for the handoff rather than continuing the latest", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+
+    renderChat("/ai", { draft: QUESTION });
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith());
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("creates exactly one Turn on explicit Send", async () => {
+    create.mockResolvedValue({ data: detail({ id: 3 }) });
+    renderChat("/ai", { draft: QUESTION });
+    const box = await draftBox();
+    await waitFor(() => expect(box.value).toBe(QUESTION));
+
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => expect(askStream).toHaveBeenCalledTimes(1));
+    expect(askStream.mock.calls[0][0]).toBe(QUESTION);
+    expect(askStream.mock.calls[0][1]).toMatchObject({ conversationId: 3 });
+  });
+
+  it("fills the draft from a legacy ?q= link once and removes it from the address", async () => {
+    renderChat(`/ai?q=${encodeURIComponent(QUESTION)}`);
+
+    const box = await draftBox();
+    await waitFor(() => expect(box.value).toBe(QUESTION));
+    await waitFor(() => expect(screen.getByLabelText("address").textContent).toBe("/ai"));
+    expect(askStream).not.toHaveBeenCalled();
+  });
+
+  it("does not refill a draft the reader has cleared", async () => {
+    renderChat(`/ai?q=${encodeURIComponent(QUESTION)}`);
+    const box = await draftBox();
+    await waitFor(() => expect(box.value).toBe(QUESTION));
+    await waitFor(() => expect(screen.getByLabelText("address").textContent).toBe("/ai"));
+
+    await userEvent.clear(box);
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(box.value).toBe("");
+    expect(create).toHaveBeenCalledTimes(1);
+  });
 });
