@@ -2,6 +2,8 @@
 
 ## Status
 
+> **Further change proposed — 2026-10-15 (IR-589), not accepted.** [ADR-042](042-general-tools-conversation-contract.md) requests a version-pinned conversational controller in place of exclusive fixed lanes for new runs. This does not approve this ADR or alter its existing history.
+
 **Proposed** — 2026-10-11 (IR-499). Drafted by an AI agent from [proposal 13](../architecture-review/13-bounded-research-agent-proposal.md) and the owner decisions recorded in its §Owner decisions — 2026-10-11, which **Jive Tyler Revalde** gave in a design review. **Awaiting approval by a named person.** The agent does not mark this accepted. Until a person records that approval in this file, nothing below is a decision, and **none of IR-500 (tool layer), IR-501 (screening and topic counts), IR-502 (planner, answer validation, run audit), IR-503 (Jev router and injection screen) or IR-504 (production rollout) may merge**.
 
 **Supersedes [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) §4 and §11 for the research lane only.** Everywhere else ADR-035 stands as written, including its Proposed IR-487 amendment, which this ADR neither accepts nor rejects.

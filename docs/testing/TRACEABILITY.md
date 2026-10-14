@@ -1033,3 +1033,7 @@ Not covered here: no paid run, no pilot-family labelled set on proxy or CIT-U da
 and no capacity burst. The control run's figures measure arithmetic and plumbing, not quality, latency or cost.
 
 **Status:** instrument implemented and tested; every evaluation gate is OPEN and human review remains required.
+
+## IR-589 — proposed general-tools conversation contract and regression baseline
+
+IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as **proposed**, with links from ADR-019/034/035/036/038; it does not change runtime behavior, approve those amendments or resolve the AGENTS/CLAUDE authority conflict. The [version 1 specification](../architecture-review/2026-10-15-askiris-general-tools-spec.md) §§1–2, 9, 11 owns A01–A15. The [fixture pack](../../backend/apps/ai/evaluation/fixtures/general_tools_contract_v1.json) separates proposed expectations from source-observed current failure wording and unmeasured cases; `test_general_tools_contract_fixture.py` validates scenario coverage, record and ordering consistency, literal current wording, and specific regression oracles without a vendor or database. The [evaluation protocol](../evaluation/general-tools/README.md) owns development/held-out split, human rubric, reproducibility manifest, proposed thresholds and paid-test approval boundaries. **Evidence:** fixture validation and source/contract review only; HTTP/SSE runtime parity, paid quality results, named human approval and production gates remain open for downstream tickets.

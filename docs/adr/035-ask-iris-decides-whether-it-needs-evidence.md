@@ -2,6 +2,8 @@
 
 ## Status
 
+> **Further change proposed — 2026-10-15 (IR-589), not accepted.** [ADR-042](042-general-tools-conversation-contract.md) records the unresolved direct-answer policy for a general-tools controller. The current decision and earlier proposed amendments remain distinct.
+
 **Accepted** — 2026-10-06 (IR-461). Drafted by an AI agent; reviewed and approved by **Jive Tyler Revalde**, approver of record.
 
 > **Amendment proposed — 2026-10-10 (IR-487). Not accepted.** Jev-first evidence routing: a decision sequence with two deciders (a Jev probability and an LLM route label), replacing §2's tool call as the production mechanism, and amending §1, §3, §5, §8, §9 and §11. Drafted by an AI agent; **awaiting approval by Jive Tyler Revalde**, approver of record. Until a person records that approval in this file, the text above stands unchanged. See §Amendment — 2026-10-10 below.

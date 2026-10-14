@@ -1,0 +1,28 @@
+# ADR-042: General tools conversation contract (proposed)
+
+## Status
+
+**Proposed — 2026-10-15, IR-589. No architecture approval recorded.** This is a decision request, not an amendment already in force. A named human must record approval and resolve the conflicts below before the new controller or reader protocol is enabled. The accepted text and earlier proposed amendments in ADR-019, ADR-034, ADR-035, ADR-036 and ADR-038 remain intact. Jira status and this draft confer no approval.
+
+## Context and proposed decision
+
+The [version 1 specification](../architecture-review/2026-10-15-askiris-general-tools-spec.md) §§1–2, 9 and 11 proposes one conversational controller with composable, read-only research tools. The fixed `listing`, `count`, `comparison` and `research` lanes in ADR-038 would cease to be exclusive routes **only for new, version-pinned runs behind a default-off flag**. Existing domain helpers, permissions, disclosure, citation provenance, admission and durable-run fences remain application-owned. The controller may discover a pair before comparing it and may use no tool for an eligible direct transformation; the application alone executes tools. `PLAN` chooses actions and `ANSWER` composes prose. There is no mandatory model-visible planning ceremony and no untasked model accessor.
+
+The proposed public protocol has separate `activity`, optional `reasoning_summary`, and `answer` fields. Activity contains only neutral lifecycle states such as Waiting, Thinking and Preparing your answer. An optional, collapsed summary contains validated analytical observations tied to the answer and evidence. It is not a tool trace, a citation, an authorization decision or raw chain of thought. Tool names, arguments, routing labels and probabilities, provider identifiers, raw reasoning and diagnostic events are excluded by the server serializer on live, replayed and historical reader surfaces, including Paper Chat and export. An unavailable or unsafe summary is omitted. A reasoning-only provider reply is unavailable, not a successful answer. Stored old reasoning is not deleted by this proposal.
+
+Institutional facts and paper findings require currently authorized evidence. General explanation and conversational transformation may be direct under the evidence policy, with their basis clear where confusion with corpus findings is possible. A missing or failed search cannot license an unsupported corpus assertion. Validation checks source identity/version, current access, citation bindings, numeric facts and completeness claims. One actionable repair is allowed within the same run budget. If repair fails, independently supported parts may be delivered with the unsupported claim omitted or qualified; revoked or stale content is fenced. This **proposes changing** ADR-038's whole-answer withholding rule. The legacy path retains its current behavior pending approval. The new path delivers validated final text atomically; it does not stream unvalidated factual tokens.
+
+## Reconciliation required before acceptance
+
+| Existing authority | Proposed change and conflict |
+|---|---|
+| ADR-038 §§3–5, 9, 11 | Replace exclusive lanes and fixed planner ceremony for new runs; retain bounded calls, read-only tools, application-enforced scope and admission. Its Proposed status and earlier owner-decision record are not retroactively accepted. |
+| ADR-034 §2 and ADR-035 §§3–4, 11, including proposed IR-487 and IR-499 amendments | Permit direct conversation only under an explicitly accepted evidence policy; decide whether the current direct-route union rule and later Jev proposal carry into the new controller. No implementation may silently select between these conflicting proposals. Never reveal why evidence was withheld. |
+| ADR-036 and its proposed task amendments | Confirm `PLAN` and `ANSWER` profiles, adapter summary capabilities and data handling. No new vendor or production profile is approved here. |
+| ADR-019 and its reasoning amendment | Replace reader presentation of stored raw reasoning with safe summary projection for the new protocol, without changing retention or deleting history. Decide provenance and retention of new summaries separately. |
+| ADR-040/041 (proposed) | Confirm version pinning, original deadlines, fenced writes and shared admission apply to every controller/tool/repair attempt. No production limit is inferred from the fake-test profile. |
+| Supplied AGENTS.md hierarchy vs `CLAUDE.md` and `docs/engineering/SDLC.md` | The supplied AGENTS text ranks SRS/SDD above ADRs and says to correct lower authorities. The checked-in `CLAUDE.md` says SRS/SDD are frozen, not consulted or cited for engineering; SDLC repeats that ADRs own new requirements. These instructions contradict each other. A human maintainer must choose and update the authoritative repository guidance. This draft uses the checked-in ADR/spec for its **proposed** contract without claiming the conflict resolved. |
+
+## Evaluation and gate
+
+The deterministic [A01–A15 fixture pack](../../backend/apps/ai/evaluation/fixtures/general_tools_contract_v1.json) defines expected new behavior separately from current source-observed failure wording. Its validator is a fixture integrity check, not a runtime pass. [The evaluation protocol](../evaluation/general-tools/README.md) defines development and held-out conversations, human labels, manifest, proposed thresholds and paid-test approvals. No paid call, institutional data transmission, production flag, approved threshold or named reviewer is supplied by IR-589. Until a human decides the policy rows, downstream tickets remain `not-ready`.

@@ -2,6 +2,8 @@
 
 ## Status
 
+> **Further change proposed — 2026-10-15 (IR-589), not accepted.** [ADR-042](042-general-tools-conversation-contract.md) requests PLAN/ANSWER use and a separately validated public summary capability. It grants no vendor, profile or data-handling approval.
+
 Accepted — 2026-09-15. Decided by the team; recorded here because
 `docs/adr/` is the decision authority and no ADR had ever named an inference
 vendor. The reasoning is worked through at length in

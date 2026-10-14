@@ -2,6 +2,8 @@
 
 ## Status
 
+> **Further change proposed — 2026-10-15 (IR-589), not accepted.** [ADR-042](042-general-tools-conversation-contract.md) requests reconciliation of direct conversational answers, corpus claims and bounded partial-answer repair. Existing answer-state rules remain in force.
+
 **Accepted** — 2026-10-02 (IR-453).
 
 > **Amendment to §2 — [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) (Accepted 2026-10-06, IR-461).** It makes *withheld evidence does not affect the route* a routing rule: the route, the response and the answer state are a function of whether any Passage was kept and whether the question carried an evidence requirement, **never of why nothing was kept**. This completes the §Security Impact correction IR-460 already applied below. §2's own rule that a withheld question is `no_sources` rather than `ungrounded` is unchanged.
