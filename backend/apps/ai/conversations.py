@@ -83,6 +83,7 @@ def record_turn(
     routing=None,
     listing=None,
     research=None,
+    comparison=None,
     guard=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
@@ -122,11 +123,19 @@ def record_turn(
     outcome in the same commit. The vector still waits until after.
     """
     with (guard if guard is not None else nullcontext()) as written:
-        turn = _write_turn(
-            conversation, question, answer, resolved_question, widened, routing, listing, research
-        )
-        if written is not None:
-            written(turn)
+        with transaction.atomic():
+            if comparison:
+                from apps.ai.comparison.service import reader_view
+
+                ids = [row["record_id"] for row in comparison["source_versions"]]
+                list(Record.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
+                if reader_view(comparison, conversation.user) is None:
+                    raise ValueError("comparison_sources_changed")
+            turn = _write_turn(
+                conversation, question, answer, resolved_question, widened, routing, listing, research, comparison
+            )
+            if written is not None:
+                written(turn)
     _store_answer_vector(turn, answer, embedder)
     return turn
 
@@ -160,6 +169,7 @@ def _write_turn(
     routing=None,
     listing=None,
     research=None,
+    comparison=None,
 ) -> Turn:
     """The Turn, its citations and its free question vector, all or nothing.
 
@@ -177,6 +187,7 @@ def _write_turn(
         reasoning=answer.reasoning,
         routing=routing or {},
         research=research or {},
+        comparison=comparison or {},
         listing=_stored_listing(listing),
     )
     TurnCitation.objects.bulk_create(
@@ -347,7 +358,7 @@ def _for_reader(turns: list, user) -> list[dict]:
               "chunk_set__page_sizes")
     }
 
-    return [
+    bodies = [
         {
             **_listing_answer(
                 answer_body(answer_mode(turn.state), turn.answer, preserve_no_results=bool(turn.routing)),
@@ -382,6 +393,18 @@ def _for_reader(turns: list, user) -> list[dict]:
         }
         for turn in turns
     ]
+    for turn, body in zip(turns, bodies):
+        if not turn.comparison:
+            continue
+        from apps.ai.comparison.service import reader_view
+
+        comparison = reader_view(turn.comparison, user)
+        if comparison is None:
+            body.update(answer=None, message="The comparison sources changed or are no longer readable. Please compare again.",
+                        citations=[], reasoning=None, state="unavailable", degraded=True)
+        else:
+            body["comparison"] = comparison
+    return bodies
 
 
 def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:

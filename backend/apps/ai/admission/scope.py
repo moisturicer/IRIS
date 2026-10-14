@@ -36,6 +36,7 @@ _usage_observer: ContextVar[Optional[list]] = ContextVar("provider_usage_observe
 @dataclass
 class RunScope:
     key: str
+    ceiling: object = None
     #: Reason codes, in the order they were met.
     denials: list = field(default_factory=list)
 
@@ -87,8 +88,8 @@ def lane_for(default: str) -> str:
 # -- run ----------------------------------------------------------------------
 
 
-def new_run(key: Optional[str] = None) -> RunScope:
-    return RunScope(key or f"req:{uuid.uuid4().hex}")
+def new_run(key: Optional[str] = None, *, ceiling=None) -> RunScope:
+    return RunScope(key or f"req:{uuid.uuid4().hex}", ceiling=ceiling)
 
 
 @contextmanager

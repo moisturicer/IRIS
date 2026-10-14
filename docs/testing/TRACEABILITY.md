@@ -888,3 +888,33 @@ is included. Existing provider contract/Overview checks also pass (60 tests).
 **Fix.** `DiscoverPage` keeps the latest `setSearchParams` in a ref and the timer calls that, so it builds from the current URL.
 
 **Test.** `src/features/discover/DiscoverPage.test.tsx` › "keeps the Publish dialog open when the search debounce fires after the click" and "keeps both a just-typed search and the Publish dialog in the URL" — both failed on `main` before the fix. Evidence, 2026-10-13, local: the Discover file **21 passed**, and **0 of 20** consecutive runs failed; `npm test` **876 passed, 3 failed**, the same three failing on `main` without this change (`Sidebar.test.tsx` ×2, `PaperAiOverview.test.tsx` ×1, timing-sensitive on this machine; green in CI); lint 0 errors, build green.
+
+## IR-549: full-reading durable Record comparison
+
+**Behavior.** The disabled opt-in lane accepts 2 to configured N titles or selected
+IDs, consumes independent full-paper briefs, assembles cited dimension cells in
+code before prose, and reports per-Record reading coverage and removed claims.
+Question-specific section reads stay within that Record's verified model context.
+The existing durable run fixes a comparison deadline and explicit token/cost caps;
+campaign and concurrency limits still apply. Cache reuse, generation, publication
+and replay recheck permissions, disclosure and source versions. Stale replay
+withholds prose, table and sources. Comparison history is excluded from model reuse.
+
+**Evidence, 14 October 2026.** `apps/ai/tests/test_comparison_http.py`: **25 passed**,
+covering first use/cache, bounds/ambiguity, hidden/missing/gated Records, partial
+results, invented claims, source changes during generation and replay, independent
+sectioned long papers and question-specific rows. `admission/tests/test_shared_processes.py`
+adds a two-process test demonstrating one shared comparison ceiling distinct from
+the chat ceiling. Existing durable/scope regression tests: **22 passed**.
+Frontend comparison/API/progress/stream tests: **45 passed**, including accessible
+table ordering, exact removed-claim count, page navigation and replay.
+Frontend typecheck/build pass; lint has no errors and six existing warnings.
+The full frontend run before the final bounds test had **967 passed, 3 failed**;
+all three Sidebar failures and AbortSignal errors reproduce on an isolated,
+unchanged `origin/main` copy (**15 passed, 3 failed**).
+
+**Limitations.** IR-542 contains no labelled comparison baseline. Deterministic
+fake-provider tests establish application behavior, not semantic correctness or
+real-provider quality. Human labels and separate correctness/claim/citation review
+remain necessary. No paid evaluation, architectural acceptance or rollout occurred.
+See [Record comparison contract](../engineering/RECORD_COMPARISON.md).

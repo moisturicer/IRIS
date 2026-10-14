@@ -27,6 +27,8 @@ const OK = new Set(["ok", "empty", "degraded", "generated", "fallback"]);
 
 export function stepLabel(step: AgentStepEvent): string {
   const running = step.status === "running";
+  if (/^Reading paper [1-9]\d* of [1-9]\d*$/.test(step.kind)) return step.kind;
+  if (step.kind === "Building comparison" || step.kind === "Checking citations") return step.kind;
   if (step.kind === "plan") {
     if (running) return "Deciding the next step";
     return step.status === "unavailable" ? "The planner was unavailable" : "Planning failed";

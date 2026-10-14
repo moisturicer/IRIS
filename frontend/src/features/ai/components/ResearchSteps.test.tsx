@@ -32,6 +32,12 @@ const FINISHED = [
 ];
 
 describe("the live step trail", () => {
+  it.each(["Reading paper 2 of 3", "Building comparison", "Checking citations"])("names the comparison phase %s in the progress line", (kind) => {
+    expect(statusLineText({
+      stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [],
+      steps: [step(0, { kind, status: "running" })],
+    })).toBe(`${kind}…`);
+  });
   it("lists each step as it happens, naming the one running", () => {
     renderScreen(
       <ResearchSteps live steps={[...FINISHED.slice(0, 3), step(3, { tool: "search_passages", status: "running" })]} />,
