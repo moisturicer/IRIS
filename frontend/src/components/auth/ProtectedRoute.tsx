@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { decodeJwtPayload, isJwtExpired } from "@/lib/jwt";
 import { wholePath } from "@/lib/redirectTarget";
 import { ForbiddenScreen } from "./ForbiddenScreen";
+import { PendingApprovalPage } from "@/features/auth/PendingApprovalPage";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface ProtectedRouteProps {
@@ -115,6 +116,14 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
 
   if (isDjangoStaff(user)) {
     return <Outlet />;
+  }
+
+  // No role yet: an applicant RDCO has not approved, or one it declined. That
+  // is where their account stands, not a page they may not open, so every
+  // gate shows the pending screen rather than "Access Denied" (IR-537). It
+  // lived in AppShell before, behind this guard, where it never rendered.
+  if (user && user.role == null && !user.role_name) {
+    return <PendingApprovalPage />;
   }
 
   const roleName = resolveRoleName(accessToken, user);

@@ -7,9 +7,7 @@ import { PageContainer } from "./PageContainer";
 import { Button } from "@/components/ui/Button";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useUIStore } from "@/store/ui.store";
-import { useAuth } from "@/hooks/useAuth";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { PendingApprovalPage } from "@/features/auth/PendingApprovalPage";
 import { cn } from "@/lib/utils";
 
 /**
@@ -102,11 +100,8 @@ export function AppShell() {
     if (!isPhone && sidebarOpen) closeSidebar();
   }, [isPhone, sidebarOpen, closeSidebar]);
 
-  const { user } = useAuth();
-  // Block users who are logged in but whose role request hasn't been approved yet.
-  // Django staff/superuser accounts (no role) are exempt.
-  const isPending = user && !user.role && !user.is_staff && !user.is_superuser;
-  if (isPending) return <PendingApprovalPage />;
+  // A signed-in user with no role never reaches this shell: the route guard
+  // shows them the pending screen instead (IR-537).
 
   return (
     <div className="flex min-h-screen bg-stone-100 font-sans">

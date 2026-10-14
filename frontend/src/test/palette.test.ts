@@ -33,7 +33,6 @@ const NOT_YET_CONVERTED: readonly string[] = [
   "src/features/requests/AccessRequestsPage.tsx",
   // IR-364 -- sign-up, account and error screens
   "src/features/auth/EmailVerifyPage.tsx",
-  "src/features/auth/PendingApprovalPage.tsx",
   "src/features/auth/SignupPage.tsx",
   "src/features/errors/ForbiddenPage.tsx",
   "src/features/settings/SettingsPage.tsx",
