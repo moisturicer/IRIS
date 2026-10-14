@@ -115,8 +115,8 @@ export function Modal({
         tabIndex={-1}
         className={
           sheet
-            ? `relative bg-white shadow-xl w-full h-full md:h-auto md:rounded-xl ${size} md:max-h-[90vh] flex flex-col outline-none`
-            : `relative bg-white rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`
+            ? `relative bg-overlay shadow-xl w-full h-full md:h-auto md:rounded-xl ${size} md:max-h-[90vh] flex flex-col outline-none`
+            : `relative bg-overlay rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`
         }
         role="dialog"
         aria-modal="true"

@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useConsumeHandoff } from "@/lib/askHandoff";
 import { aiApi } from "@/api/ai";
 import { useUIStore } from "@/store/ui.store";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
@@ -65,8 +66,10 @@ function useLegacyConversationsNotice() {
 
 export default function RAGChatPage() {
   const [searchParams] = useSearchParams();
+  const recordParam = searchParams.get("record");
   const addToast       = useUIStore((s) => s.addToast);
   const legacyNotice    = useLegacyConversationsNotice();
+  const handoff         = useConsumeHandoff();
 
   const [conversations, setConversations]   = useState<ConversationSummary[]>([]);
   const [activeId, setActiveId]             = useState<number | null>(null);
@@ -76,6 +79,7 @@ export default function RAGChatPage() {
   const [sourcesOpen, setSourcesOpen]       = useState(false);
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
+  const [draft, setDraft]                   = useState<string | null>(handoff);
   const { streaming, ask }                  = useAskStream();
 
   // Read off the reply itself, so the panel cannot show one conversation's
@@ -105,9 +109,7 @@ export default function RAGChatPage() {
   /**
    * Asks `question` on Conversation `conversationId` and appends both sides
    * of the exchange, starting from `priorMessages` rather than always
-   * reading `messages` off state — the `?record=` deep link asks its
-   * question before `activeId`/`messages` have committed from `setState`,
-   * so it cannot go through `handleSend`'s read of that state.
+   * reading `messages` off state.
    */
   const sendQuestion = useCallback(
     async (conversationId: number, question: string, priorMessages: ChatMessage[], routeOverride?: ChatLane, widen?: boolean, routeOverrideTurnId?: number) => {
@@ -137,7 +139,7 @@ export default function RAGChatPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const recordId = searchParams.get("record");
+    const recordId = recordParam;
 
     (async () => {
       try {
@@ -145,11 +147,27 @@ export default function RAGChatPage() {
         if (cancelled) return;
 
         if (recordId) {
-          const prefill = `Tell me about research record #${recordId} and summarize its key contributions.`;
-          const { data } = await aiApi.conversations.create({ record: Number(recordId) });
+          // A draft scoped to the Record, never an ask: the reader sends it.
+          const { data: scoped } = await aiApi.conversations.list({ record: Number(recordId) });
+          if (cancelled) return;
+          if (scoped.length > 0) {
+            await loadConversation(scoped[0].id);
+          } else {
+            const { data } = await aiApi.conversations.create({ record: Number(recordId) });
+            if (cancelled) return;
+            setActiveId(data.id);
+            setMessages([]);
+          }
+          setDraft(`Tell me about research record #${recordId} and summarize its key contributions.`);
+          return;
+        }
+
+        if (handoff) {
+          // A handed-off question opens a new Conversation as an editable draft.
+          const { data } = await aiApi.conversations.create();
           if (cancelled) return;
           setActiveId(data.id);
-          await sendQuestion(data.id, prefill, []);
+          setMessages([]);
           return;
         }
 
@@ -172,10 +190,11 @@ export default function RAGChatPage() {
     })();
 
     return () => { cancelled = true; };
-    // refreshList / loadConversation / sendQuestion are stable across
-    // renders — only a change to the `record` query param should re-run this.
+    // refreshList / loadConversation are stable across renders and `handoff`
+    // is read once on arrival — only a change to the `record` query param
+    // should re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [recordParam]);
 
   useEffect(() => {
     let cancelled = false;
@@ -240,6 +259,7 @@ export default function RAGChatPage() {
 
   const handleSend = (text: string) => {
     if (!activeId) return;
+    setDraft(null);
     return sendQuestion(activeId, text, messages);
   };
 
@@ -328,6 +348,7 @@ export default function RAGChatPage() {
           />
           <ChatInput
             onSend={handleSend}
+            draft={draft}
             disabled={loading || !activeId}
             placeholder="Ask a follow-up about the research corpus…"
           />

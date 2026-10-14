@@ -131,6 +131,25 @@ def record_turn(
     return turn
 
 
+def _stored_listing(listing) -> dict:
+    """A listing as a Turn keeps it: ids, states and quotes, never titles or wording."""
+    if not listing:
+        return {}
+    stored = {**listing, "records": [{"record_id": row["record_id"]} for row in listing["records"]]}
+    if "candidates" in listing:
+        stored["candidates"] = [
+            {key: row[key] for key in ("record_id", "state", "quote", "source", "restricted") if key in row}
+            for row in listing["candidates"]
+        ]
+        stored.pop("wording", None)
+    if "topic_count" in listing:
+        # Provenance of the run only: every figure is rebuilt from the candidates.
+        from apps.ai.research.listing import TOPIC_PROVENANCE
+
+        stored["topic_count"] = {key: listing["topic_count"][key] for key in TOPIC_PROVENANCE}
+    return stored
+
+
 @transaction.atomic
 def _write_turn(
     conversation: Conversation,
@@ -158,7 +177,7 @@ def _write_turn(
         reasoning=answer.reasoning,
         routing=routing or {},
         research=research or {},
-        listing=({**listing, "records": [{"record_id": row["record_id"]} for row in listing["records"]]} if listing else {}),
+        listing=_stored_listing(listing),
     )
     TurnCitation.objects.bulk_create(
         TurnCitation(
@@ -293,13 +312,20 @@ def _for_reader(turns: list, user) -> list[dict]:
         citation for turn in turns for citation in turn.citations.all()
     ]
 
+    listed = {
+        row["record_id"] for turn in turns
+        for row in (*turn.listing.get("records", []), *turn.listing.get("candidates", []))
+    }
     visible_titles = dict(
         Record.objects.visible_to(user)
-        .filter(pk__in={citation.record_id for citation in all_citations} | {
-            row["record_id"] for turn in turns for row in turn.listing.get("records", [])
-        })
+        .filter(pk__in={citation.record_id for citation in all_citations} | listed)
         .values_list("pk", "title")
     )
+    # A candidate listing's quotes are checked against the text as it is now.
+    listing_records = {
+        record.pk: record
+        for record in Record.objects.visible_to(user).filter(pk__in=listed).only("title", "abstract")
+    } if any("candidates" in turn.listing for turn in turns) else {}
     live_chunks = {
         chunk.pk: chunk
         for chunk in DocumentChunk.objects.filter(
@@ -323,9 +349,12 @@ def _for_reader(turns: list, user) -> list[dict]:
 
     return [
         {
-            **answer_body(answer_mode(turn.state), turn.answer, preserve_no_results=bool(turn.routing)),
+            **_listing_answer(
+                answer_body(answer_mode(turn.state), turn.answer, preserve_no_results=bool(turn.routing)),
+                turn, listing_records,
+            ),
             "id": turn.pk,
-            **_route_for_reader(turn, visible_titles),
+            **_route_for_reader(turn, visible_titles, listing_records),
             "question": turn.question,
             "resolved_question": turn.resolved_question or None,
             "state": answer_mode(turn.state),
@@ -391,12 +420,27 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
     }
 
 
-def _route_for_reader(turn, titles):
+def _listing_answer(body: dict, turn, records) -> dict:
+    """A candidate listing's answer is its wording, rebuilt so it counts only what this reader sees."""
+    if "candidates" not in turn.listing:
+        return body
+    from apps.ai.research.listing import reader_view
+
+    wording = reader_view(turn.listing, records)["wording"]
+    # The sentence is `answer` when something matched and `message` when not.
+    return {key: wording if value == turn.answer else value for key, value in body.items()}
+
+
+def _route_for_reader(turn, titles, records=None):
     metadata = {"routing": turn.routing} if turn.routing else {}
     if turn.research:
         # Steps and notes carry codes and counts only, so nothing to re-gate.
         metadata["research"] = turn.research
-    if turn.listing:
+    if "candidates" in turn.listing:
+        from apps.ai.research.listing import reader_view
+
+        metadata["listing"] = reader_view(turn.listing, records or {})
+    elif turn.listing:
         metadata["listing"] = {**turn.listing, "records": [
             {"record_id": row["record_id"], "title": titles[row["record_id"]]}
             for row in turn.listing["records"] if row["record_id"] in titles

@@ -14,7 +14,7 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-canvas text-stone-900;
   }
 
   /* Replace default focus outline with brand ring */

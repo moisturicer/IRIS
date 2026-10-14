@@ -330,7 +330,7 @@ export default function DiscoverPage() {
   );
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col">
+    <div className="min-h-screen bg-canvas flex flex-col">
       {/* Discover paints its own background, so AppShell draws it full-bleed;
           the width is still the app's standard one (IR-521). Its private bar
           (menu button and bell) is gone: the bell is in the sidebar, and

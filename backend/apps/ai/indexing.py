@@ -37,6 +37,7 @@ from typing import Any, Callable, Optional, Sequence
 
 from django.core.exceptions import ImproperlyConfigured
 
+from apps.ai.admission.scope import charged_to
 from apps.ai.policy.disclosure import Decision
 from apps.ai.providers.batching import window_for_embedding
 from apps.ai.providers.ports import EmbeddingProvider
@@ -209,6 +210,7 @@ def _require_disclosure(record, permits: DisclosurePredicate) -> None:
         raise EmbeddingRefused(decision.explain())
 
 
+@charged_to("ingestion")
 def embed_record_summary(
     record_id: int,
     *,
@@ -298,6 +300,7 @@ def pending_chunks(record_id: int, space_id: int, *, force: bool = False) -> lis
     return list(chunks)
 
 
+@charged_to("ingestion")
 def embed_active_chunk_set(
     record_id: int,
     *,

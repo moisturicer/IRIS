@@ -98,6 +98,51 @@ class Done(AnswerEvent):
     name: ClassVar[str] = "done"
 
 
+#: A candidate's state in a listing. `pending` is only ever a preview: it
+#: establishes no match and counts as none (IR-546).
+PENDING, INCLUDED, EXCLUDED, UNCERTAIN, UNASSESSED = (
+    "pending", "included", "excluded", "uncertain", "unassessed",
+)
+CANDIDATE_STATES = (PENDING, INCLUDED, EXCLUDED, UNCERTAIN, UNASSESSED)
+
+
+@dataclass(frozen=True)
+class CandidatesSelected(AnswerEvent):
+    """The candidates a listing will screen, before any is judged (IR-546).
+
+    Each row is `{record_id, title, state: "pending"}` and names a Record the
+    reader may see. `more_available` is true only when retrieval found more
+    than `limit`; false never means nothing else exists.
+    """
+
+    candidates: tuple[dict, ...]
+    limit: int
+    more_available: bool
+    degraded: bool
+    name: ClassVar[str] = "candidates_selected"
+
+    def wire(self) -> dict:
+        return {
+            "candidates": list(self.candidates), "limit": self.limit,
+            "more_available": self.more_available, "degraded": self.degraded,
+        }
+
+
+@dataclass(frozen=True)
+class CandidatesUpdated(AnswerEvent):
+    """New states for candidates already announced, by stable `record_id`.
+
+    Rows carry a state and nothing else: no quote, no model text. The quoted
+    support is in the final listing, after access is checked once more.
+    """
+
+    candidates: tuple[dict, ...]
+    name: ClassVar[str] = "candidates_updated"
+
+    def wire(self) -> dict:
+        return {"candidates": list(self.candidates)}
+
+
 @dataclass(frozen=True)
 class AgentStep(AnswerEvent):
     """One research-planner step (IR-504): names, codes and counts, no content.

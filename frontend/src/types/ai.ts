@@ -59,11 +59,76 @@ export interface MetadataCountBasis {
   unit: string;
 }
 
+/**
+ * A candidate's state in a listing (IR-546). `pending` is only a preview and is
+ * never a match; `unassessed` is a paper that was not judged, never a rejection.
+ */
+export type CandidateState = "pending" | "included" | "excluded" | "uncertain" | "unassessed";
+
+export interface CandidateRow {
+  record_id: number;
+  /** Absent for a paper IRIS may not read: it is counted, never named. */
+  title?: string;
+  state: CandidateState;
+  restricted?: boolean;
+  /** Verbatim text that decided it, and where it came from (final listing only). */
+  quote?: string;
+  source?: { field: "title" | "abstract" | "passage"; page?: number | null; chunk_id?: number };
+}
+
+export interface CandidateCoverage {
+  limit: number;
+  selected: number;
+  included: number;
+  excluded: number;
+  uncertain: number;
+  unassessed: number;
+  more_available: boolean;
+  search_degraded: boolean;
+  changed: boolean;
+}
+
+/**
+ * A topic-match count over a screened subset (IR-547): matches among the papers
+ * assessed of those selected, never a count of the catalogue. Every figure is
+ * derived in code from the candidates, so it moves with them on a reopened chat.
+ */
+export interface TopicCount {
+  criterion: string;
+  method: string;
+  version: string;
+  basis: "topic_classification_of_selected_candidates";
+  matches: number;
+  /** Included, excluded and uncertain; `unassessed` papers are not in it. */
+  assessed: number;
+  excluded: number;
+  uncertain: number;
+  unassessed: number;
+  selected: number;
+  limit: number;
+  more_available: boolean;
+}
+
+/** What one run observed. Not a measure of capacity: a warm run proves nothing about a fresh model. */
+export interface ObservedRun {
+  cache_hits: number;
+  cache_misses: number;
+  model_calls: number;
+  prompt_tokens_estimated: number;
+  stage_ms: { select: number; screen: number; finish: number; total: number };
+  note: string;
+}
+
 export interface AnswerListing {
-  completeness: "matches_found" | "screened" | "exact_count";
+  completeness: "matches_found" | "screened" | "exact_count" | "inconclusive";
   wording: string;
   records: { record_id: number; title: string }[];
+  /** Every selected candidate in one state each (IR-546). */
+  candidates?: CandidateRow[];
+  coverage?: CandidateCoverage;
   count?: MetadataCountBasis;
+  topic_count?: TopicCount;
+  observed?: ObservedRun;
 }
 
 /**

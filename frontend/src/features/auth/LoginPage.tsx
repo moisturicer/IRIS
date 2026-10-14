@@ -19,13 +19,12 @@ import {
 } from "@/lib/authSession";
 import { getRoleDashboardPath } from "@/lib/roleDashboard";
 import { safeRedirectPath } from "@/lib/redirectTarget";
+import { classifyLoginFailure, type LoginFailure } from "./loginFailure";
 
 const LOCKOUT_MS = 15 * 60 * 1000;
 
-type LoginAlert =
-  | { kind: "credentials" }
-  | { kind: "unverified" }
-  | { kind: "generic"; message: string };
+/** Every failure but a lock, which opens its own dialog instead. */
+type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
 
 export default function LoginPage() {
   const navigate       = useNavigate();
@@ -136,24 +135,18 @@ export default function LoginPage() {
       // page their role has always had.
       navigate(redirectTo ?? getRoleDashboardPath(res.data.user.role_name), { replace: true });
     } catch (err: unknown) {
-      const res = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
-      const detail = res?.data?.detail ?? "Invalid email or password.";
-      const status = res?.status;
-      const detailLower = detail.toLowerCase();
+      const failure = classifyLoginFailure(err);
 
-      const locked =
-        status === 403 &&
-        (detailLower.includes("locked") || detailLower.includes("locked out"));
-
-      if (locked) {
+      if (failure.kind === "locked") {
         openLockout(loginId, Date.now() + LOCKOUT_MS);
-        setSubmitting(false);
         return;
       }
 
-      if (status === 403 && detailLower.includes("not verified")) {
-        setLoginAlert({ kind: "unverified" });
-        setSubmitting(false);
+      // Neither of these judged the password, so neither counts towards the
+      // lock: an unverified account is not a wrong guess, and a server that
+      // could not be reached rejected nothing (IR-536).
+      if (failure.kind === "unverified" || failure.kind === "unreachable") {
+        setLoginAlert(failure);
         return;
       }
 
@@ -162,15 +155,10 @@ export default function LoginPage() {
 
       if (attempts >= LOGIN_FAILURE_LIMIT) {
         openLockout(loginId, Date.now() + LOCKOUT_MS);
-        setSubmitting(false);
         return;
       }
 
-      if (detail === "Invalid credentials." || status === 401) {
-        setLoginAlert({ kind: "credentials" });
-      } else {
-        setLoginAlert({ kind: "generic", message: detail });
-      }
+      setLoginAlert(failure);
     } finally {
       setSubmitting(false);
     }
@@ -181,6 +169,7 @@ export default function LoginPage() {
   // invalid for those now announces a wrong claim to a screen reader rather
   // than just tinting a border, as it did before IR-204.
   const showFieldError = loginAlert?.kind === "credentials" && !lockoutOpen;
+  const attemptsLeft = LOGIN_FAILURE_LIMIT - failedAttempts;
 
   return (
     <AuthLayout
@@ -212,13 +201,24 @@ export default function LoginPage() {
       {loginAlert?.kind === "credentials" && (
         <AuthAlert variant="error" title="Invalid email or password">
           Please check your credentials and try again.
-          {failedAttempts > 0 && failedAttempts < LOGIN_FAILURE_LIMIT && (
+          {attemptsLeft > 0 && attemptsLeft < LOGIN_FAILURE_LIMIT && (
             <>
               {" "}
-              One more failed attempt will lock your account.{" "}
+              {attemptsLeft === 1
+                ? "One more failed attempt will lock your account."
+                : `${attemptsLeft} more failed attempts will lock your account.`}{" "}
               <strong>Attempt {failedAttempts} of {LOGIN_FAILURE_LIMIT}</strong>
             </>
           )}
+        </AuthAlert>
+      )}
+
+      {/* Says nothing about the fields on purpose: the server never judged
+          them, and a credentials message here is what IR-200 reported. */}
+      {loginAlert?.kind === "unreachable" && (
+        <AuthAlert variant="error" title="IRIS can't be reached right now">
+          This is a connection or server problem, not a problem with what you typed.
+          Try again shortly.
         </AuthAlert>
       )}
 
@@ -228,9 +228,9 @@ export default function LoginPage() {
         </AuthAlert>
       )}
 
-      {loginAlert?.kind === "generic" && (
+      {loginAlert?.kind === "other" && (
         <AuthAlert variant="error" title="Unable to sign in">
-          {loginAlert.message}
+          {loginAlert.detail}
         </AuthAlert>
       )}
 

@@ -33,6 +33,8 @@ from rest_framework.views import APIView
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
     AgentStep,
+    CandidatesSelected,
+    CandidatesUpdated,
     CitationsResolved,
     Done,
     ReasoningDelta,
@@ -319,7 +321,7 @@ def event_payload(event) -> dict:
 
     if isinstance(event, RoutingDecided):
         return {"routing": event.routing}
-    if isinstance(event, AgentStep):
+    if isinstance(event, (AgentStep, CandidatesSelected, CandidatesUpdated)):
         return event.wire()
     if isinstance(event, RetrievalFinished):
         return {
@@ -376,6 +378,9 @@ class ChatStreamView(APIView):
     memory recall and persistence are the exact same synchronous calls
     `ChatQueryView` makes; `EventStreamResponse` streams it under ASGI.
     The research lane adds `agent_step` events and `done.research` (IR-504).
+    A listing adds `candidates_selected` (every candidate, relevance pending,
+    as soon as chosen) and `candidates_updated` (new states by record id),
+    then `done.listing` with every candidate in one state (IR-546).
 
     **With `AI_DURABLE_ASK` on, a question inside a Conversation is queued
     instead (IR-544).** The same response then follows the run's journal:
@@ -404,10 +409,20 @@ class ChatStreamView(APIView):
         if queued:
             # Answered by a worker; this response only follows its journal,
             # so a disconnect unsubscribes and nothing else (IR-544).
-            run = durable.submit(
-                prepared, request.user, request.data,
-                max_sources=_parse_top_k(request.data.get("top_k")),
-            )
+            try:
+                run = durable.submit(
+                    prepared, request.user, request.data,
+                    max_sources=_parse_top_k(request.data.get("top_k")),
+                )
+            except durable.Busy as busy:
+                # Refused before anything was queued (IR-545): an explicit
+                # busy status, not a run that would wait past its deadline.
+                return Response(
+                    {"detail": "IRIS is busy answering other questions. Please try again shortly.",
+                     "status": "busy", "reason": busy.reason},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    headers={"Retry-After": "5"},
+                )
             if run is None:
                 return Response(
                     {"detail": "IRIS is still answering your previous question in this conversation."},

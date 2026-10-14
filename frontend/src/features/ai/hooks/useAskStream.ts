@@ -2,7 +2,9 @@ import { useCallback, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage } from "@/lib/chatMessages";
 import type { SSEEvent } from "@/lib/sse";
-import type { AgentStepEvent, ChatCitation, ChatLane, RoutingDecision } from "@/types/ai";
+import type {
+  AgentStepEvent, CandidateRow, CandidateState, ChatCitation, ChatLane, RoutingDecision,
+} from "@/types/ai";
 import type { ChatMessage } from "@/types/chat";
 
 /**
@@ -17,6 +19,8 @@ export interface StreamingState {
   routing?: RoutingDecision;
   /** The research planner's steps so far, one per position (IR-504). */
   steps?:   AgentStepEvent[];
+  /** A listing's candidates, in rank order, one row per paper (IR-546). */
+  candidates?: CandidateRow[];
   stage:     StreamStage;
   foundInfo: { passageCount: number; recordCount: number } | null;
   /** The raw, still-unresolved answer text accumulated so far. */
@@ -112,7 +116,12 @@ export function useAskStream() {
           reasoning = "";
           citations = [];
           setStreaming((s) =>
-            s ? { ...s, stage: "searching", steps: undefined, foundInfo: null, text: "", reasoning: "", citations: [] } : s,
+            s
+              ? {
+                  ...s, stage: "searching", steps: undefined, candidates: undefined,
+                  foundInfo: null, text: "", reasoning: "", citations: [],
+                }
+              : s,
           );
         } else if (event === "run_failed") {
           setStreaming(null);
@@ -137,6 +146,21 @@ export function useAskStream() {
                   steps: [...(s.steps ?? []).filter((known) => known.position !== step.position), step]
                     .sort((a, b) => a.position - b.position),
                 }
+              : s,
+          );
+        } else if (event === "candidates_selected") {
+          // The preview: shown as pending, and a replayed one replaces it.
+          const rows = (payload.candidates as CandidateRow[]) ?? [];
+          setStreaming((s) => (s ? { ...s, candidates: rows } : s));
+        } else if (event === "candidates_updated") {
+          // By stable record id, so a repeat or a replay never adds a card.
+          const next = new Map(
+            ((payload.candidates as { record_id: number; state: CandidateState }[]) ?? [])
+              .map((row) => [row.record_id, row.state]),
+          );
+          setStreaming((s) =>
+            s?.candidates
+              ? { ...s, candidates: s.candidates.map((row) => (next.has(row.record_id) ? { ...row, state: next.get(row.record_id)! } : row)) }
               : s,
           );
         } else if (event === "retrieval_started") {

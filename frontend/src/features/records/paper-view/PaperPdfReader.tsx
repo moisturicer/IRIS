@@ -424,7 +424,7 @@ export function PaperPdfReader({
         ref={toolbarRef}
         className={cn(
           "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
-          "rounded-xl bg-white/90 backdrop-blur border border-stone-200",
+          "rounded-xl bg-overlay border border-stone-200",
           READER_TOOLBAR_TOP,
           "lg:static lg:shrink-0 lg:mb-0 lg:rounded-none lg:border-0 lg:border-b lg:bg-white lg:backdrop-blur-none",
         )}

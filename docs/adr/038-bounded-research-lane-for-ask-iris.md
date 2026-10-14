@@ -346,6 +346,19 @@ and cannot be overridden into an evidence workflow while the capability is absen
 This records the contradiction; it does not accept this Proposed ADR or authorize
 merge. The flag remains off and cannot be enabled with `DEBUG=False` until IR-504.
 
+### IR-547 implementation divergence — 2026-10-14
+
+IR-547 (Jira, under IR-551) changes two things §6 describes. A reader's topic count now
+screens at most **twenty** distinct candidates and says so ("N matches among M assessed
+of S selected candidate papers"), instead of screening every visible record and
+labelling the count `exhaustive`, `screened`, `matches_found` or `sample`. And a
+per-reader store of screening verdicts (`ScreeningJudgment`, off by default, inert
+without a named approval policy) now exists. The store is per reader only; the
+"cached or cross-user aggregate is not [safe]" rule in §Counts still stands and no
+cross-reader sharing is authorised or built. This records the contradiction and the
+new store; it does not accept this Proposed ADR or authorize merge. Contract:
+[pilot README §12](../evaluation/fixed-workflow-pilot/README.md).
+
 ### IR-504 implementation record — 2026-10-12
 
 Records proposal 13 D8 as built; it does not accept this ADR. **D8: ASGI**, which

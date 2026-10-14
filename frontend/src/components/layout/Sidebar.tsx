@@ -188,7 +188,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       className={cn(
         // Below md: a 240px drawer over the page. From md: 240px, or a 64px
         // rail when collapsed. AppShell's left margin follows the same widths.
-        "fixed left-0 top-0 z-50 flex h-screen w-60 flex-col border-r border-stone-200 bg-white",
+        "fixed left-0 top-0 z-50 flex h-screen w-60 flex-col border-r border-stone-200 bg-surface",
         // `shell` carries transform (the drawer's slide) and width (the rail)
         // together; AppShell sets the translate classes, not a transition.
         "transition-shell duration-200 ease-out motion-reduce:transition-none",

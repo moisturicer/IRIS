@@ -1,14 +1,20 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
 import { CHAT_COLUMN } from "./answerLayout";
 
 interface ChatInputProps {
   onSend:    (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Text to place in the box for the reader to edit; never sent on its own. */
+  draft?: string | null;
 }
 
-export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
-  const [text, setText] = useState("");
+export function ChatInput({ onSend, disabled, placeholder, draft }: ChatInputProps) {
+  const [text, setText] = useState(draft ?? "");
+
+  useEffect(() => {
+    if (draft) setText(draft);
+  }, [draft]);
 
   const submit = () => {
     const trimmed = text.trim();

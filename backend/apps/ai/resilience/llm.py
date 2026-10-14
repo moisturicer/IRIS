@@ -586,6 +586,9 @@ class LLMProviderConfig:
     max_tokens: Optional[int] = None
     #: OpenRouter providers this config may reach, or empty for any (IR-489).
     provider_only: tuple[str, ...] = ()
+    #: The admission lane an attempt is charged to when no workload names
+    #: one (IR-545). Read only under `AI_PROVIDER_ADMISSION=enforce`.
+    lane: str = "chat"
 
     @property
     def key(self) -> str:
@@ -600,9 +603,19 @@ def _build_retrying(config: LLMProviderConfig) -> LLMProvider:
     left, now that the flat-settings path that used to give each config its
     own breaker is gone (IR-388).
     """
+    from apps.ai.admission.limits import enforcing, output_cap
     from apps.ai.providers.dialects import dialect_for
     from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
 
+    # IR-545: under provider admission the adapter sits behind its own
+    # admission decorator, *inside* the retry, so the retry and every
+    # fallback model are admitted as attempts of their own; and every
+    # request carries a completion cap no larger than the admitted one.
+    admitted = enforcing()
+    max_tokens = config.max_tokens
+    if admitted:
+        cap = output_cap()
+        max_tokens = cap if not max_tokens or cap is None else min(max_tokens, cap)
     adapter = OpenAICompatibleAdapter(
         base_url=config.base_url or None,
         api_key=config.api_key or None,
@@ -610,8 +623,13 @@ def _build_retrying(config: LLMProviderConfig) -> LLMProvider:
         reasoning_effort=config.reasoning_effort,
         dialect=dialect_for(config.vendor, config.provider_only),
         fallback_models=config.fallback_models,
-        max_tokens=config.max_tokens,
+        max_tokens=max_tokens,
+        bounded_attempts=admitted,
     )
+    if admitted:
+        from apps.ai.admission.llm import AdmittedLLMProvider
+
+        return RetryingLLMProvider(AdmittedLLMProvider(adapter, lane=config.lane))
     return RetryingLLMProvider(adapter)
 
 

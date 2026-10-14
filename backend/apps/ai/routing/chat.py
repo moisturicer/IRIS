@@ -5,6 +5,7 @@ from typing import ClassVar
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
+from apps.ai.admission.scope import stepwise, workload
 from apps.ai.answers.citations import GroundedAnswer, NO_SOURCES
 from apps.ai.answers.events import AnswerEvent
 from core.permissions import is_office_staff
@@ -96,12 +97,17 @@ class RoutedChat:
         self.decide(user)
         if not self.nonpassage:
             return None
+        # Every non-passage lane is a research workflow; its provider
+        # attempts are charged to the research lane (IR-545).
+        return (yield from stepwise(self._lane_events(user), lambda: workload("research")))
+
+    def _lane_events(self, user):
         if self.decision["lane"] == "landscape":
             return GroundedAnswer(
                 text="IRIS cannot provide a research landscape or gap analysis until the research-landscape capability is available. Retrieved passages cannot establish comprehensive coverage.",
                 citations=(), state=NO_SOURCES,
             )
-        from .lanes import answer_lane, research_run
+        from .lanes import lane_events, research_run
 
         if self.decision["lane"] == "research":
             result = yield from research_run(
@@ -111,7 +117,7 @@ class RoutedChat:
             )
             self.research = result.wire()
             return result.answer
-        answer, self.listing = answer_lane(
+        answer, self.listing = yield from lane_events(
             self.decision["lane"], self.asked.effective_question, user,
             root=self.root, conversation=self.asked.conversation,
             scope_record=self.asked.scope_record, max_sources=self.max_sources,
