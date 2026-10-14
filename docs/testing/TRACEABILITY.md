@@ -975,6 +975,7 @@ carries none.
 
 **Status:** implemented and tested; human review and approval remain required, as does ADR-040's acceptance.
 
+
 ### IR-549 / PR #271: integration and CI repair — 14 October 2026
 
 Merged `main` through `ae4f794`, retaining IR-548's owned cancellation/retry
