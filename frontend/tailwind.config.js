@@ -9,6 +9,12 @@ export default {
 
   theme: {
     extend: {
+      // A window too short for the entry panel's shelf to carry its spine
+      // titles clear of their gold bands (IR-535). Height, not width.
+      screens: {
+        short: { raw: "(max-height: 680px)" },
+      },
+
       // The one cap for an app page (IR-519): PageContainer's "standard" width.
       maxWidth: {
         page: "90rem",
