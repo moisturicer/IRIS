@@ -33,11 +33,19 @@ _send_guard: ContextVar[Optional[Callable]] = ContextVar("provider_send_guard", 
 _usage_observer: ContextVar[Optional[list]] = ContextVar("provider_usage_observer", default=None)
 
 
+def _never() -> bool:
+    return False
+
+
 @dataclass
 class RunScope:
     key: str
     #: Reason codes, in the order they were met.
     denials: list = field(default_factory=list)
+    #: Asked before every admission: true once the run's owner has stopped
+    #: it, so no new physical attempt starts (IR-548). One already sent is
+    #: left to finish and is charged as usual.
+    halted: Callable[[], bool] = _never
 
 
 @dataclass

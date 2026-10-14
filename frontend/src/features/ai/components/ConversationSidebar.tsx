@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import { conversationPath } from "@/lib/askHandoff";
 import { cn, formatDate } from "@/lib/utils";
 import type { ConversationSummary } from "@/types/ai";
 
@@ -5,7 +7,6 @@ interface ConversationSidebarProps {
   conversations:  ConversationSummary[];
   activeId:         number | null;
   open:             boolean;
-  onSelect:         (id: number) => void;
   onDelete:         (id: number) => void;
 }
 
@@ -13,7 +14,6 @@ export function ConversationSidebar({
   conversations,
   activeId,
   open,
-  onSelect,
   onDelete,
 }: ConversationSidebarProps) {
   return (
@@ -55,10 +55,12 @@ export function ConversationSidebar({
             const active = c.id === activeId;
             return (
               <div key={c.id} className="group relative">
-                <button
-                  type="button"
-                  onClick={() => onSelect(c.id)}
-                  className={`w-full text-left rounded-xl px-3 py-2.5 transition-all
+                {/* A link to the conversation's own address (IR-548), so it
+                    opens in a new tab, survives a refresh and joins history. */}
+                <Link
+                  to={conversationPath(c.id)}
+                  aria-current={active ? "page" : undefined}
+                  className={`block w-full text-left rounded-xl px-3 py-2.5 transition-all
                     ${active
                       ? "bg-brand-50 ring-1 ring-brand-200 text-brand"
                       : "text-stone-700 hover:bg-stone-50"
@@ -70,7 +72,7 @@ export function ConversationSidebar({
                   <span className="block text-[12px] text-stone-400 mt-0.5">
                     {formatDate(c.updated_at, "MMM d · h:mm a")}
                   </span>
-                </button>
+                </Link>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}

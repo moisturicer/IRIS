@@ -349,5 +349,5 @@ it("reruns with the original answer scope even when the composer scope differs",
   await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
   await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
     conversationId: 42, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
-  }));
+  }, expect.any(AbortSignal)));
 });

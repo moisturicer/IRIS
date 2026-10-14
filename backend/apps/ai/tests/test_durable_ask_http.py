@@ -332,6 +332,233 @@ class QueuedQuestionTests:
         assert AskRun.objects.get(pk=run_id).state == "expired"
 
 
+def _cancel(client, run_id):
+    return client.post(reverse("ai-ask-run-cancel", args=[run_id]))
+
+
+def _retry(client, run_id, dispatched=None, capture=None):
+    if capture is None:
+        return client.post(reverse("ai-ask-run-retry", args=[run_id]))
+    with capture(execute=True):
+        return client.post(reverse("ai-ask-run-retry", args=[run_id]))
+
+
+def _latest_run(client, conversation):
+    return client.get(reverse("ai-conversation-detail", args=[conversation.pk])).json()["latest_run"]
+
+
+class OwnedRunLifecycleTests:
+    """IR-548: open, cancel and retry a run from its owned Conversation."""
+
+    def test_an_opened_conversation_names_its_unfinished_run(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        assert _latest_run(client, conversation) is None
+
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        latest = _latest_run(client, conversation)
+        assert latest == {
+            "id": run_id, "state": "queued", "end_reason": "", "question": FLOOD_QUESTION,
+            "retry_of": None, "last_sequence": 1,
+        }
+
+        with use_composition_root(scene["root"]):
+            answer_queued_question(run_id)
+        assert _latest_run(client, conversation) is None, "an answered run is its Turn"
+
+    def test_cancel_commits_one_terminal_state_and_suppresses_the_late_answer(
+        self, scene, embedder, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        cancelled = {}
+
+        class _CancelledMidAnswer(ScriptedLLM):
+            def stream(self, system, user):
+                yield StreamDelta(text="Rainfall ")
+                cancelled["response"] = _cancel(client, run_id)
+                # The in-flight call finishes; nobody hears it.
+                yield StreamDelta(text="gauges [1].")
+
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        with use_composition_root(root_with(embedder=embedder, llm=_CancelledMidAnswer())):
+            answer_queued_question(run_id)
+
+        response = cancelled["response"]
+        assert response.status_code == 200
+        assert response.json() == {"run_id": run_id, "state": "cancelled"}
+        assert not Turn.objects.exists(), "no late answer, partial or whole"
+        run = AskRun.objects.get(pk=run_id)
+        assert (run.state, run.end_reason, run.current_attempt_id) == ("cancelled", "cancelled", None)
+
+        _, frames = _follow(client, run_id)
+        names = [name for _, name, _ in frames]
+        assert names[-1] == "run_cancelled" and "done" not in names
+        assert frames[-1][2] == {"run_id": run_id, "state": "cancelled", "reason": "cancelled"}
+        assert sum(name in ("done", "run_failed", "run_cancelled") for name in names) == 1
+
+        # Cancelling again changes nothing and says what happened.
+        again = _cancel(client, run_id)
+        assert again.status_code == 200 and again.json()["state"] == "cancelled"
+        assert AskRunEvent.objects.filter(run_id=run_id).count() == len(frames)
+        latest = _latest_run(client, conversation)
+        assert (latest["id"], latest["state"]) == (run_id, "cancelled")
+
+    def test_cancel_after_completion_keeps_the_answer(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        run_id, _ = _submit(scene["client"], scene["conversation"], dispatched,
+                            django_capture_on_commit_callbacks)
+        with use_composition_root(scene["root"]):
+            answer_queued_question(run_id)
+
+        refused = _cancel(scene["client"], run_id)
+        assert refused.status_code == 409
+        assert refused.json() == {"run_id": run_id, "state": "succeeded"}
+        assert AskRun.objects.get(pk=run_id).state == "succeeded"
+        assert Turn.objects.count() == 1
+
+    def test_a_cancelled_queued_run_is_never_started(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        run_id, _ = _submit(scene["client"], scene["conversation"], dispatched,
+                            django_capture_on_commit_callbacks)
+        assert _cancel(scene["client"], run_id).status_code == 200
+        with use_composition_root(scene["root"]):
+            answer_queued_question(run_id)  # the message arrives anyway
+
+        run = AskRun.objects.get(pk=run_id)
+        assert run.state == "cancelled" and not run.attempts.exists()
+        assert not Turn.objects.exists()
+
+    def test_a_cancelled_run_admits_no_new_provider_attempt(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        from apps.ai.admission import errors, scope
+        from apps.ai.admission.ledger import Request, admit
+
+        run_id, _ = _submit(scene["client"], scene["conversation"], dispatched,
+                            django_capture_on_commit_callbacks)
+        request = Request(
+            operation="llm", default_lane="chat", account="test", models=("m",),
+            input_tokens=1, output_tokens=1, timeout_seconds=1,
+        )
+        _cancel(scene["client"], run_id)
+        with scope.run(durable.run_scope(AskRun.objects.get(pk=run_id))):
+            with pytest.raises(errors.AdmissionDenied) as denied:
+                admit(request)
+        assert denied.value.reason == errors.RUN_CANCELLED
+
+    def test_retry_is_a_linked_run_with_its_own_deadline_and_reset_progress(
+        self, scene, queued, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        _cancel(client, run_id)
+
+        response = _retry(client, run_id, capture=django_capture_on_commit_callbacks)
+        assert response.status_code == 201
+        retry_id = response.json()["run_id"]
+        assert response.json() == {"run_id": retry_id, "retry_of": run_id, "state": "queued"}
+        assert dispatched[-1][0] == retry_id
+
+        original, retry = AskRun.objects.get(pk=run_id), AskRun.objects.get(pk=retry_id)
+        assert retry.retry_of_id == original.pk and retry.request == original.request
+        assert retry.deadline_at > original.deadline_at, "a new run, a new deadline"
+        assert original.state == "cancelled", "the original keeps its terminal state"
+
+        # A double-click, or the same request redelivered, is not a new run.
+        again = _retry(client, run_id, capture=django_capture_on_commit_callbacks)
+        assert again.status_code == 200 and again.json()["run_id"] == retry_id
+        assert AskRun.objects.count() == 2 and len(dispatched) == 2
+
+        with use_composition_root(scene["root"]):
+            answer_queued_question(retry_id)
+        _, frames = _follow(client, retry_id)
+        assert [name for _, name, _ in frames][:2] == ["run_queued", "run_started"]
+        assert frames[0][2]["retry_of"] == run_id
+        assert frames[-1][1] == "done" and Turn.objects.count() == 1
+        assert _latest_run(client, conversation) is None
+
+    def test_only_a_run_that_ended_without_its_answer_can_be_retried(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        assert _retry(client, run_id).status_code == 409, "still running"
+
+        with use_composition_root(scene["root"]):
+            answer_queued_question(run_id)
+        assert _retry(client, run_id).status_code == 409, "already answered"
+        assert AskRun.objects.count() == 1
+
+    def test_a_partial_answer_is_not_retried_into_a_second_turn(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        with use_composition_root(scene["root"]):
+            answer_queued_question(run_id)
+        # A run cut off at its deadline ends `partial`, with its fragment as a Turn.
+        AskRun.objects.filter(pk=run_id).update(state="partial")
+
+        refused = _retry(client, run_id)
+        assert refused.status_code == 409 and refused.json()["state"] == "partial"
+        assert Turn.objects.count() == 1 and AskRun.objects.count() == 1
+
+    def test_a_stopped_run_stops_being_offered_once_a_later_answer_exists(
+        self, scene, queued, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        _cancel(client, run_id)
+        assert _latest_run(client, conversation)["state"] == "cancelled"
+
+        # The switch goes off and the reader asks again in the request.
+        queued.AI_DURABLE_ASK = False
+        with use_composition_root(scene["root"]):
+            b"".join(ask_stream(client, FLOOD_QUESTION, conversation_id=conversation.pk).streaming_content)
+        assert Turn.objects.count() == 1
+        assert _latest_run(client, conversation) is None
+
+    def test_retry_waits_for_the_conversations_other_run(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        first, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        _cancel(client, first)
+        _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+
+        assert _retry(client, first).status_code == 409
+        assert AskRun.objects.count() == 2
+
+    def test_someone_elses_run_cannot_be_cancelled_or_retried(
+        self, scene, client_for, dispatched, django_capture_on_commit_callbacks
+    ):
+        run_id, _ = _submit(scene["client"], scene["conversation"], dispatched,
+                            django_capture_on_commit_callbacks)
+        stranger = client_for(make_user("stranger@cit.edu"))
+        missing = str(uuid.uuid4())
+
+        for act in (_cancel, _retry):
+            foreign, absent = act(stranger, run_id), act(stranger, missing)
+            assert foreign.status_code == absent.status_code == 404
+            assert foreign.json() == absent.json()
+        assert AskRun.objects.get(pk=run_id).state == "queued"
+
+    def test_a_deleted_conversations_runs_stay_deleted(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        client, conversation = scene["client"], scene["conversation"]
+        run_id, _ = _submit(client, conversation, dispatched, django_capture_on_commit_callbacks)
+        _cancel(client, run_id)
+        client.delete(reverse("ai-conversation-detail", args=[conversation.pk]))
+
+        assert _retry(client, run_id).status_code == 404
+        assert _cancel(client, run_id).status_code == 404
+        assert not AskRun.objects.exists() and not Conversation.objects.exists()
+
+
 class NotQueuedTests:
     def test_with_the_switch_off_nothing_is_queued(self, scene, queued):
         queued.AI_DURABLE_ASK = False

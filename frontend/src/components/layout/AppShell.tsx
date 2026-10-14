@@ -9,6 +9,7 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { useUIStore } from "@/store/ui.store";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { ASK_PATH } from "@/lib/askHandoff";
 
 /**
  * The menu button and the bell, for phones (IR-519).
@@ -51,10 +52,12 @@ export function AppShell() {
   const closeSidebar = useUIStore((s) => s.closeSidebar);
   const { pathname } = useLocation();
   // Routes that paint their own page and manage their own scrolling.
-  const isFullBleed = pathname === "/" || pathname === "/ai";
+  // Ask IRIS is `/ai` and every conversation address under it (IR-548).
+  const isAskIris = pathname === ASK_PATH || pathname.startsWith(`${ASK_PATH}/`);
+  const isFullBleed = pathname === "/" || isAskIris;
   // Ask IRIS fills the window exactly (`h-screen`) and its toolbar carries the
   // bell on a phone, so a bar above it would push the composer off screen.
-  const showPhoneBar = pathname !== "/ai";
+  const showPhoneBar = !isAskIris;
   // The deepest route that names a width wins; a page is standard otherwise.
   const matches = useMatches();
   const width = [...matches].reverse()

@@ -889,3 +889,40 @@ is included. Existing provider contract/Overview checks also pass (60 tests).
 **Fix.** `DiscoverPage` keeps the latest `setSearchParams` in a ref and the timer calls that, so it builds from the current URL.
 
 **Test.** `src/features/discover/DiscoverPage.test.tsx` › "keeps the Publish dialog open when the search debounce fires after the click" and "keeps both a just-typed search and the Publish dialog in the URL" — both failed on `main` before the fix. Evidence, 2026-10-13, local: the Discover file **21 passed**, and **0 of 20** consecutive runs failed; `npm test` **876 passed, 3 failed**, the same three failing on `main` without this change (`Sidebar.test.tsx` ×2, `PaperAiOverview.test.tsx` ×1, timing-sensitive on this machine; green in CI); lint 0 errors, build green.
+
+## IR-548 — open, cancel and retry research from owned conversation URLs
+
+Every Ask IRIS conversation has its own address, `/ai/conversations/<id>`, under the Ask IRIS layout. `/ai` only
+chooses one (the latest, a new one, a Record's or a handed-off draft's) and replaces itself with that address. The
+address grants nothing: the page loads through the owner-scoped Conversation API, so someone else's conversation reads
+exactly like a missing one, and a deleted one stays deleted. Opening, refreshing, Back and Forward reload the
+transcript; a queued run still answering is followed again from its first event, replayed through the existing
+re-authorising journal. With `AI_DURABLE_ASK` on, the asker can cancel a run
+(`POST /ask/runs/<uuid>/cancel/`) and retry one that ended without its answer (`POST /ask/runs/<uuid>/retry/`). Design:
+[ADR-040](../adr/040-durable-queued-ask-iris-questions.md) §Amendment — IR-548 (**Proposed**).
+
+Evidence:
+- `apps/ai/tests/test_durable_ask_http.py::OwnedRunLifecycleTests`, deterministic providers only:
+  - an opened conversation names its unfinished run (`latest_run`) and stops once its Turn exists;
+  - cancel mid-answer commits one terminal `cancelled` state, writes no Turn (partial or whole) and journals one terminal
+    event; cancelling again changes nothing; cancelling a finished run is a 409 that keeps the answer;
+  - a cancelled queued run is never started by its late delivery;
+  - a cancelled run's scope admits no new provider attempt (`run_cancelled`);
+  - retry is a linked run with its own deadline and a replay that starts over; a repeated retry returns the same run;
+  - only a run that ended with no Turn can be retried, and not while another run in the conversation is unfinished;
+  - a `partial` run is refused, so a retry never adds a second Turn for the same question;
+  - a stopped run stops being offered once a later answer exists;
+  - someone else's run cannot be cancelled or retried (404 identical to a missing one);
+  - a deleted conversation's runs stay deleted.
+- `src/features/ai/hooks/useAskStream.test.tsx` (following an existing run from event 0, Stop calling cancel and
+  ending on `run_cancelled`, detaching without cancelling).
+- `src/features/ai/RAGChatPage.test.tsx` §owned conversation URLs (the address, opening a named conversation, moving
+  between conversations and back, an unavailable conversation, following a running run, Stop, Retry, a Record's
+  conversation keeping its draft).
+
+Not covered here: Paper Chat does not yet re-attach to a run that is still answering when its panel opens; it stays
+bound to its Record's conversation, and that conversation opened at its Ask IRIS address follows the run. Real-provider
+behaviour is unmeasured. `Turn.reasoning` keeps IR-381's policy and no historical reasoning is deleted; replay still
+carries none.
+
+**Status:** implemented and tested; human review and approval remain required, as does ADR-040's acceptance.
