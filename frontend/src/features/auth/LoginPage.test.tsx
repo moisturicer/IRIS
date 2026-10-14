@@ -17,6 +17,7 @@ import { Route, Routes, useLocation } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth.store";
+import { useUIStore } from "@/store/ui.store";
 import { getRoleDashboardPath } from "@/lib/roleDashboard";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -239,5 +240,227 @@ describe("where the login screen sends you", () => {
         screen.getByRole("heading", { name: "landed on /review/12/evaluate" }),
       ).toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * What a failed sign-in says (IR-536, IR-200 defect 2).
+ *
+ * Before this, any failure without a JSON `detail` -- an nginx 502, a 500, a
+ * dropped connection -- fell back to "Invalid email or password", and people
+ * re-checked a password that was never wrong. One case per row of IR-536's
+ * table, and the "can't be reached" cases are pinned to say nothing about the
+ * email or password at all.
+ */
+describe("what a failed sign-in says", () => {
+  /** The shape axios rejects with when the server answered. */
+  function serverReplied(status: number, data: unknown) {
+    return Object.assign(new Error(`Request failed with status code ${status}`), {
+      isAxiosError: true,
+      response: { status, data, headers: {} },
+    });
+  }
+
+  /** The shape axios rejects with when nothing came back: offline, DNS, CORS. */
+  function noResponse() {
+    return Object.assign(new Error("Network Error"), { isAxiosError: true, request: {} });
+  }
+
+  function failSignInWith(...errors: unknown[]) {
+    const spy = vi.spyOn(authApi, "login");
+    for (const error of errors) spy.mockRejectedValueOnce(error);
+    return spy;
+  }
+
+  async function signIn(user = userEvent.setup()) {
+    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "student@cit.edu");
+    await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    return user;
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    sessionStorage.clear();
+  });
+
+  it("says the credentials did not match on a 401", async () => {
+    failSignInWith(serverReplied(401, { detail: "Invalid credentials." }));
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+    expect(screen.getByRole("textbox", { name: "Email Address" })).toBeInvalid();
+  });
+
+  it("says the credentials did not match when the server's detail says so", async () => {
+    failSignInWith(serverReplied(400, { detail: "Invalid credentials." }));
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+  });
+
+  it("counts down truthfully to the lock", async () => {
+    // LOGIN_FAILURE_LIMIT is 3, so the first miss leaves two, not "one more".
+    failSignInWith(
+      serverReplied(401, { detail: "Invalid credentials." }),
+      serverReplied(401, { detail: "Invalid credentials." }),
+    );
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const user = await signIn();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "2 more failed attempts will lock your account.",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "One more failed attempt will lock your account.",
+      );
+    });
+  });
+
+  it("asks for the email to be verified on a 403 'not verified'", async () => {
+    failSignInWith(serverReplied(403, { detail: "Email not verified." }));
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Email not verified");
+    expect(alert).not.toHaveTextContent(/password/i);
+  });
+
+  it("opens the account-locked dialog on a 403 'locked', as before", async () => {
+    failSignInWith(serverReplied(403, { detail: "Account is locked." }));
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    expect(await screen.findByRole("dialog", { name: "Account Locked" })).toBeInTheDocument();
+  });
+
+  it("opens the account-locked dialog on django-axes' plain-text 429", async () => {
+    // The server-side lock (AXES_FAILURE_LIMIT) answers in text, not JSON, so
+    // it has no `detail`. It must still read as a lock, not as an outage --
+    // and a fresh tab, with no client-side count, meets it first.
+    failSignInWith(
+      serverReplied(
+        429,
+        "Account locked: too many login attempts. Contact an admin to unlock your account.",
+      ),
+    );
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    expect(await screen.findByRole("dialog", { name: "Account Locked" })).toBeInTheDocument();
+  });
+
+  describe.each([
+    ["no response at all", noResponse()],
+    ["a 502 with an HTML body", serverReplied(502, "<html><body>502 Bad Gateway</body></html>")],
+    ["a 500 with a JSON body that has no detail", serverReplied(500, { error: "boom" })],
+    ["a 503 that does carry a detail", serverReplied(503, { detail: "Service unavailable." })],
+    ["a 404 from the proxy with no JSON detail", serverReplied(404, "Not Found")],
+  ])("on %s", (_label, error) => {
+    it("says IRIS can't be reached, and nothing about the email or password", async () => {
+      failSignInWith(error);
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("IRIS can't be reached right now");
+      expect(alert).not.toHaveTextContent(/email|password|credential/i);
+      // The fields were never judged, so they are not marked wrong either.
+      expect(screen.getByRole("textbox", { name: "Email Address" })).not.toBeInvalid();
+      expect(screen.getByLabelText("Password")).not.toBeInvalid();
+    });
+  });
+
+  it("never locks the account because the server was down", async () => {
+    // The lock counts rejected credentials. An outage rejected nothing.
+    failSignInWith(noResponse(), noResponse(), noResponse());
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const user = await signIn();
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await waitFor(() => {
+      expect(authApi.login).toHaveBeenCalledTimes(3);
+    });
+    expect(screen.queryByRole("dialog", { name: "Account Locked" })).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("IRIS can't be reached right now");
+  });
+
+  it("says 'Unable to sign in' with the server's detail for anything else", async () => {
+    failSignInWith(
+      serverReplied(429, { detail: "Request was throttled. Expected available in 30 seconds." }),
+    );
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Unable to sign in");
+    expect(alert).toHaveTextContent("Request was throttled. Expected available in 30 seconds.");
+  });
+
+  it("has no serious or critical accessibility violations while an error shows", async () => {
+    failSignInWith(noResponse());
+    const { container } = renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+    await screen.findByRole("alert");
+
+    await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * "Forgot password?" (IR-536). It was a toast-only dead end; IRIS has no
+ * self-service reset, so it now says so, in place, and says who resets one.
+ */
+describe("forgot password", () => {
+  afterEach(() => {
+    useUIStore.setState({ toasts: [] });
+  });
+
+  it("is a disclosure that answers in place, without a toast", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const trigger = screen.getByRole("button", { name: "Forgot password?" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/no self-service password reset/i)).not.toBeInTheDocument();
+
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const answer = screen.getByRole("region", { name: "Forgot password?" });
+    expect(answer).toHaveTextContent(/no self-service password reset/i);
+    expect(answer).toHaveTextContent("RDCO");
+    expect(trigger).toHaveAttribute("aria-controls", answer.id);
+    expect(useUIStore.getState().toasts).toHaveLength(0);
+
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("has no serious or critical accessibility violations when open", async () => {
+    const user = userEvent.setup();
+    const { container } = renderScreen(<LoginPage />, { route: "/login" });
+
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    await expectNoBlockingA11yViolations(container);
   });
 });
