@@ -182,6 +182,14 @@ describe("the AI overview on a paper", () => {
     expect(screen.getByRole("button", { name: /Try again/i })).toBeTruthy();
   });
 
+  it("says it is busy, not down, when the request limit is reached", async () => {
+    overview.mockRejectedValue({ response: { status: 429 } });
+    renderScreen(<PaperAiOverview record={record} />);
+
+    expect(await screen.findByText("AI overview is busy")).toBeTruthy();
+    expect(screen.queryByText(/could not reach the answering service/i)).toBeNull();
+  });
+
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(<PaperAiOverview record={record} />);
 

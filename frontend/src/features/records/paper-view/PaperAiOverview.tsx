@@ -33,6 +33,12 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   const [response, setResponse] = useState<RecordOverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  // Told apart from an outage, so a reader waits rather than assuming it is down.
+  const [throttled, setThrottled] = useState(false);
+  const fail = useCallback((error: unknown) => {
+    setFailed(true);
+    setThrottled((error as { response?: { status?: number } })?.response?.status === 429);
+  }, []);
 
   const load = useCallback(async (retry = false) => {
     setLoading(true);
@@ -40,12 +46,12 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
     try {
       const { data } = await (retry ? aiApi.overview(record.id, true) : aiApi.overview(record.id));
       setResponse(data);
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      fail(error);
     } finally {
       setLoading(false);
     }
-  }, [record.id]);
+  }, [record.id, fail]);
 
   useEffect(() => {
     void load();
@@ -57,12 +63,12 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
     const timeout = window.setTimeout(() => {
       void aiApi.overview(record.id).then(
         ({ data }) => setResponse(data),
-        () => setFailed(true),
+        fail,
       );
     }, 2500);
 
     return () => window.clearTimeout(timeout);
-  }, [failed, record.id, response]);
+  }, [failed, fail, record.id, response]);
 
   const state = response?.state;
   const overview = response?.overview ?? null;
@@ -127,10 +133,13 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
         <div className="flex items-start gap-3">
           <i className="fas fa-plug-circle-xmark text-sm text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-stone-700">AI overview unavailable</p>
+            <p className="text-sm font-semibold text-stone-700">
+              {throttled ? "AI overview is busy" : "AI overview unavailable"}
+            </p>
             <p className="text-xs text-stone-500 mt-0.5">
-              IRIS could not reach the answering service. Nothing is summarised here rather than
-              guessed.
+              {throttled
+                ? "Too many requests in a short time. Wait a few minutes, then try again."
+                : "IRIS could not reach the answering service. Nothing is summarised here rather than guessed."}
             </p>
             <button
               type="button"

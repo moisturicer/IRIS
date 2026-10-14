@@ -301,7 +301,7 @@ export function PaperChatPanel({
       role={modal ? "dialog" : undefined}
       aria-modal={modal || undefined}
       className={cn(
-        "bg-canvas flex flex-col overflow-hidden focus:outline-none",
+        "bg-canvas flex flex-col overflow-hidden focus:outline-none motion-safe:animate-panel-in",
         className,
       )}
       aria-labelledby={headingId}

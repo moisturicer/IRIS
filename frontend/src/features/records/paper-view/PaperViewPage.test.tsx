@@ -685,7 +685,7 @@ describe("Ask IRIS on Overview (IR-569)", () => {
     signInAs(99, "Student");
   });
 
-  it("opens from the round icon at the bottom right, with the rail where it was", async () => {
+  it("opens from the round icon at the bottom right", async () => {
     workspaceAt(1400);
     renderPaperView();
     await waitForRecord(record.title);
@@ -693,8 +693,25 @@ describe("Ask IRIS on Overview (IR-569)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
 
     expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Panel position" })).not.toBeInTheDocument();
+  });
+
+  it("folds Record details away while it is open, and brings them back when it closes (IR-569)", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+    await screen.findByRole("complementary", { name: "Ask IRIS" });
+
+    expect(screen.queryByRole("complementary", { name: "Record details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Close Ask IRIS" }));
+
+    expect(await screen.findByRole("complementary", { name: "Record details" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
   });
 
   it("is a column beside the page, 450px wide, not a layer over it", async () => {
@@ -2002,6 +2019,17 @@ describe("the Overview's header (IR-569)", () => {
     const details = screen.getByRole("complementary", { name: "Record details" });
     expect(within(details).getByRole("heading", { name: "Institutional Governance" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Record details" })).not.toBeInTheDocument();
+  });
+
+  it("sets the reading sections apart with hairlines, and draws Comments last (IR-569)", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const abstract = screen.getByRole("heading", { level: 2, name: "Abstract" }).closest("section");
+    const group = abstract?.parentElement;
+    expect(group).toHaveClass("divide-y", "divide-stone-200");
+    const sections = within(group as HTMLElement).getAllByRole("heading", { level: 2 });
+    expect(sections[sections.length - 1]).toHaveTextContent("Comments");
   });
 });
 

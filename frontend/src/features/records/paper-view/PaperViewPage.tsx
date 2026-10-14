@@ -40,6 +40,7 @@ import {
   fitPanelWidth,
 } from "./PaperChatDock";
 import { AskIrisFab } from "./AskIrisFab";
+import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
@@ -696,6 +697,8 @@ export default function PaperViewPage() {
   // there.
   const hasPaper = sections.includes("paper");
   const showRail = section === "overview" && !arriving;
+  // Ask IRIS open beside the page leaves no room for the rail (IR-569).
+  const railHidden = showRail && chat.open && !chatMinimized;
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
@@ -803,8 +806,15 @@ export default function PaperViewPage() {
               !onPaperTab && !onReviewTab && cn("px-4 sm:px-8 pt-8 pb-12", PAGE_WIDTH.standard),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
-              // the panel or the sidebar leave none (IR-569).
-              showRail && "overview-wide:grid-cols-[minmax(0,1fr)_22rem] overview-wide:gap-12",
+              // the panel or the sidebar leave none (IR-569). Ask IRIS open
+              // takes its place: the rail folds away and the page widens into it.
+              showRail &&
+                cn(
+                  "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  railHidden
+                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,1fr)_0rem] overview-wide:gap-x-0"
+                    : "overview-wide:grid-cols-[minmax(0,1fr)_22rem] overview-wide:gap-x-12",
+                ),
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -1074,6 +1084,8 @@ export default function PaperViewPage() {
                   </div>
                 )}
 
+                {/* The reading sections, each under a hairline (IR-569). */}
+                <div className="border-t border-stone-200 divide-y divide-stone-200 [&>*]:py-8 [&>:last-child]:pb-0">
                 {/* Abstract, as a reading column: a measure of ~65 characters
                     and relaxed leading, not justified text (IR-356). */}
                 <section>
@@ -1091,7 +1103,6 @@ export default function PaperViewPage() {
 
                 <PaperAiOverview record={record} />
 
-
                 {can.has("tag_ip") && (
                   <IpTagger
                     recordId={record.id}
@@ -1100,10 +1111,13 @@ export default function PaperViewPage() {
                   />
                 )}
 
-                {/* Public discussion (IR-420) renders here, on its own
-                    surface, once it exists (spec §4.11). */}
-
                 <SimilarPapers recordId={record.id} />
+
+                {/* Public discussion (IR-420, spec §8): drawn, not yet open. */}
+                <CommentsSection
+                  viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null}
+                />
+                </div>
               </>
             )}
 
@@ -1144,20 +1158,34 @@ export default function PaperViewPage() {
               Beside the page while it is wide, sticky under the record bar;
               under it otherwise. The party status strip is for participants. */}
           {showRail && (
-            <aside
-              aria-labelledby={`${tabsId}-details`}
-              className={cn("space-y-4 overview-wide:sticky overview-wide:overflow-y-auto", OVERVIEW_ASIDE_TOP, OVERVIEW_ASIDE_MAX_HEIGHT)}
+            // Folds away while Ask IRIS is open (rows when it sits under the
+            // page, the column when it sits beside), and is inert meanwhile.
+            <div
+              aria-hidden={railHidden || undefined}
+              {...(railHidden ? { inert: "" } : {})}
+              className={cn(
+                "grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
+                OVERVIEW_ASIDE_TOP,
+                OVERVIEW_ASIDE_MAX_HEIGHT,
+                railHidden ? "grid-rows-[0fr] opacity-0 invisible" : "grid-rows-[1fr] opacity-100",
+              )}
             >
-              <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
-                Record details
-              </h2>
-              {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
-              <PaperGovernance record={record} />
-              <PaperDocuments
-                files={record.files}
-                manageHref={participant ? `/records/${record.id}?section=files` : null}
-              />
-            </aside>
+              <aside
+                aria-labelledby={`${tabsId}-details`}
+                className="min-h-0 space-y-4 overflow-hidden border-t border-stone-200 pt-8 overview-wide:w-[22rem] overview-wide:overflow-visible overview-wide:border-t-0 overview-wide:pt-0"
+              >
+                <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
+                  Record details
+                </h2>
+                {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
+                <PaperGovernance record={record} />
+                <PaperDocuments
+                  files={record.files}
+                  manageHref={participant ? `/records/${record.id}?section=files` : null}
+                />
+              </aside>
+            </div>
           )}
           </div>
 
