@@ -1,11 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage } from "@/lib/chatMessages";
 import type { SSEEvent } from "@/lib/sse";
 import type {
   AgentStepEvent, CandidateRow, CandidateState, ChatCitation, ChatLane, RoutingDecision,
 } from "@/types/ai";
-import type { ChatMessage } from "@/types/chat";
+import type { ChatMessage, EndedRunState } from "@/types/chat";
 
 /**
  * The reader-visible phase of an in-flight answer (IR-329). Deliberately
@@ -16,6 +16,8 @@ import type { ChatMessage } from "@/types/chat";
 export type StreamStage = "queued" | "searching" | "found" | "thinking" | "answering";
 
 export interface StreamingState {
+  /** The queued run being followed, once known (IR-544) -- what Stop cancels. */
+  runId?:   string;
   routing?: RoutingDecision;
   /** The research planner's steps so far, one per position (IR-504). */
   steps?:   AgentStepEvent[];
@@ -51,10 +53,23 @@ export interface AskStreamResult {
 }
 
 const INTERRUPTED_TEXT = "The answer was interrupted before it finished.";
-const RUN_FAILED_TEXT: Record<string, string> = {
-  expired: "IRIS ran out of time before it could answer. Please ask again.",
-  failed:  "IRIS could not finish this answer. Please ask again.",
+/** What a queued run that ended without its answer says, live or reopened. */
+export const ENDED_RUN_TEXT: Record<EndedRunState, string> = {
+  expired:   "IRIS ran out of time before it could answer. Please ask again.",
+  failed:    "IRIS could not finish this answer. Please ask again.",
+  cancelled: "You stopped this question before IRIS answered it.",
 };
+
+/**
+ * Raised by `ask`/`follow` when `detach` stopped following -- the reader
+ * moved to another conversation. The run itself carries on server-side.
+ */
+export class StreamDetached extends Error {
+  constructor() {
+    super("Stopped following the answer.");
+    this.name = "StreamDetached";
+  }
+}
 
 /** Reconnections to a queued run in a row that bring no event (IR-544). */
 const RECONNECT_LIMIT = 3;
@@ -70,21 +85,55 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
  * When the server queues the question (IR-544) the first event is
  * `run_queued`, and a dropped connection reconnects from the last event `id`
  * instead of ending the answer. When it does not, nothing here differs.
+ *
+ * `follow` attaches to a run already submitted -- a reopened or refreshed
+ * Conversation, or a retry -- replaying it from its first event (IR-548).
+ * `cancel` asks the server to stop the run being followed; its terminal
+ * `run_cancelled` ends the answer. `detach` only stops listening: the
+ * pending call rejects with `StreamDetached` and the run carries on.
  */
 export function useAskStream() {
   const [streaming, setStreaming] = useState<StreamingState | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  const followed = useRef<string | null>(null);
 
-  const ask = useCallback(
-    async (question: string, options: AskStreamOptions = {}): Promise<AskStreamResult> => {
+  const drive = useCallback(
+    async (
+      question: string,
+      options: AskStreamOptions,
+      open: (signal: AbortSignal) => AsyncGenerator<SSEEvent>,
+      knownRunId: string | null = null,
+    ): Promise<AskStreamResult> => {
+      // One answer is followed at a time; starting another stops the last.
+      controller.current?.abort();
+      const abort = new AbortController();
+      controller.current = abort;
+      followed.current = knownRunId;
+
       let text = "";
       let reasoning = "";
       let citations: ChatCitation[] = [];
       let routing: RoutingDecision | undefined;
       let sawAnyEvent = false;
-      let runId: string | null = null;
+      let runId: string | null = knownRunId;
       let cursor = 0;
 
-      setStreaming({ stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [] });
+      setStreaming({
+        stage: knownRunId ? "queued" : "searching", ...(knownRunId ? { runId: knownRunId } : {}),
+        foundInfo: null, text: "", reasoning: "", citations: [],
+      });
+
+      const ended = (state: EndedRunState, content: string, partial: boolean): AskStreamResult => {
+        setStreaming(null);
+        return {
+          message: newChatMessage("assistant", content, {
+            ...(partial ? { partial: true } : {}),
+            ...(runId ? { endedRun: { id: runId, state } } : {}),
+            routing, question, widened: options.widen,
+          }),
+          conversationId: options.conversationId ?? null,
+        };
+      };
 
       const finishPartial = (): AskStreamResult => {
         setStreaming(null);
@@ -109,7 +158,9 @@ export function useAskStream() {
 
         if (event === "run_queued") {
           runId = payload.run_id as string;
-          setStreaming((s) => (s ? { ...s, stage: "queued" } : s));
+          followed.current = runId;
+          const queuedRun = runId;
+          setStreaming((s) => (s ? { ...s, stage: "queued", runId: queuedRun } : s));
         } else if (event === "run_started") {
           // A new attempt answers from the beginning; drop what an earlier,
           // lost attempt had written so far.
@@ -125,15 +176,11 @@ export function useAskStream() {
               : s,
           );
         } else if (event === "run_failed") {
-          setStreaming(null);
-          return {
-            message: newChatMessage(
-              "assistant",
-              RUN_FAILED_TEXT[payload.state as string] ?? RUN_FAILED_TEXT.failed,
-              { partial: true, routing, question, widened: options.widen },
-            ),
-            conversationId: options.conversationId ?? null,
-          };
+          const state: EndedRunState = payload.state === "expired" ? "expired" : "failed";
+          return ended(state, ENDED_RUN_TEXT[state], true);
+        } else if (event === "run_cancelled") {
+          // The reader's own choice, not an interrupted answer.
+          return ended("cancelled", ENDED_RUN_TEXT.cancelled, false);
         } else if (event === "routing_decided") {
           routing = payload.routing as RoutingDecision;
           setStreaming((s) => (s ? { ...s, routing } : s));
@@ -234,36 +281,86 @@ export function useAskStream() {
         return null;
       };
 
-      let source = aiApi.askStream(question, options);
-      let quietReconnects = 0;
-      for (;;) {
-        let sawEventHere = false;
-        try {
-          for await (const record of source) {
-            sawAnyEvent = true;
-            sawEventHere = true;
-            if (record.id !== undefined) cursor = Number(record.id);
-            const result = handle(record);
-            if (result) return result;
-          }
-        } catch (err) {
-          if (!sawAnyEvent) {
-            setStreaming(null);
-            throw err;
-          }
-        }
+      // Whoever detached has already cleared the screen; touch nothing.
+      const detached = () => abort.signal.aborted;
 
-        // The connection ended with no final event. A request-bound answer
-        // is over (the server stored it as `partial`); a queued one is not.
-        if (sawEventHere) quietReconnects = 0;
-        if (runId === null || quietReconnects >= RECONNECT_LIMIT) return finishPartial();
-        await wait(RECONNECT_BACKOFF_MS * quietReconnects);
-        quietReconnects += 1;
-        source = aiApi.resumeAskRun(runId, cursor);
+      try {
+        let source = open(abort.signal);
+        let quietReconnects = 0;
+        for (;;) {
+          let sawEventHere = false;
+          try {
+            for await (const record of source) {
+              if (detached()) throw new StreamDetached();
+              sawAnyEvent = true;
+              sawEventHere = true;
+              if (record.id !== undefined) cursor = Number(record.id);
+              const result = handle(record);
+              if (result) return result;
+            }
+          } catch (err) {
+            if (detached()) throw new StreamDetached();
+            if (!sawAnyEvent) {
+              setStreaming(null);
+              throw err;
+            }
+          }
+          if (detached()) throw new StreamDetached();
+
+          // The connection ended with no final event. A request-bound answer
+          // is over (the server stored it as `partial`); a queued one is not.
+          if (sawEventHere) quietReconnects = 0;
+          if (runId === null || quietReconnects >= RECONNECT_LIMIT) return finishPartial();
+          await wait(RECONNECT_BACKOFF_MS * quietReconnects);
+          if (detached()) throw new StreamDetached();
+          quietReconnects += 1;
+          source = aiApi.resumeAskRun(runId, cursor, abort.signal);
+        }
+      } finally {
+        if (controller.current === abort) {
+          controller.current = null;
+          followed.current = null;
+        }
       }
     },
     [],
   );
 
-  return { streaming, ask };
+  const ask = useCallback(
+    (question: string, options: AskStreamOptions = {}) =>
+      drive(question, options, (signal) => aiApi.askStream(question, options, signal)),
+    [drive],
+  );
+
+  /** Follow run `runId`, already submitted, from its first event (IR-548). */
+  const follow = useCallback(
+    (runId: string, question: string, options: AskStreamOptions = {}) =>
+      drive(question, options, (signal) => aiApi.resumeAskRun(runId, 0, signal), runId),
+    [drive],
+  );
+
+  /** Stop listening; the run carries on and its Turn is stored as usual. */
+  const detach = useCallback(() => {
+    const current = controller.current;
+    controller.current = null;
+    followed.current = null;
+    if (current) {
+      current.abort();
+      setStreaming(null);
+    }
+  }, []);
+
+  /** Ask the server to stop the run being followed. Its `run_cancelled`
+   *  -- or, if it finished first, its `done` -- ends the answer. */
+  const cancel = useCallback(async () => {
+    const runId = followed.current;
+    if (!runId) return;
+    try {
+      await aiApi.cancelRun(runId);
+    } catch {
+      // Already over: its own terminal event is on its way.
+    }
+  }, []);
+
+  return { streaming, ask, follow, cancel, detach };
 }

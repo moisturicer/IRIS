@@ -248,6 +248,47 @@ def test_explicit_comparison_budget_and_deadline_survive_submission(comparison_s
     assert not Turn.objects.in_model_history().exists()
 
 
+def test_cancelled_comparison_retry_keeps_its_budget_and_deadline(
+    comparison_scene, django_capture_on_commit_callbacks,
+):
+    from apps.ai import durable
+    from apps.ai.admission import errors, scope
+    from apps.ai.admission.ledger import Request, admit
+
+    client, conversation, records = comparison_scene
+    with use_composition_root(CompositionRoot(llm=ComparisonLLM(), permits=lambda r: True)):
+        with django_capture_on_commit_callbacks(execute=True):
+            response = client.post(reverse("ai-ask-stream"), {
+                "question": 'Compare "Rice Prediction" and "Flood Prediction"',
+                "conversation_id": conversation.pk,
+                "comparison_record_ids": [r.pk for r in records],
+            }, format="json")
+    assert response.status_code == 200
+    next(iter(response.streaming_content))
+    response._iterator.close()
+    original = AskRun.objects.get()
+    assert client.post(reverse("ai-ask-run-cancel", args=[original.pk])).status_code == 200
+    with scope.run(durable.run_scope(original)) as cancelled_scope:
+        assert cancelled_scope.ceiling.input_tokens == 500000
+        with pytest.raises(errors.AdmissionDenied) as denied:
+            admit(Request(operation="llm", default_lane="chat", account="test",
+                          models=("cheap",), input_tokens=1, output_tokens=1, timeout_seconds=1))
+    assert denied.value.reason == errors.RUN_CANCELLED
+
+    with django_capture_on_commit_callbacks(execute=True):
+        retried = client.post(reverse("ai-ask-run-retry", args=[original.pk]))
+    assert retried.status_code == 201
+    run = AskRun.objects.get(pk=retried.json()["run_id"])
+    assert run.retry_of_id == original.pk and run.request == original.request
+    assert (run.deadline_at - run.created_at).total_seconds() == pytest.approx(300, abs=1)
+    assert durable.run_scope(run).ceiling.input_tokens == 500000
+    with use_composition_root(CompositionRoot(llm=ComparisonLLM(), permits=lambda r: True)):
+        answer_queued_question(str(run.pk))
+    run.refresh_from_db()
+    assert run.state == "succeeded"
+    assert Turn.objects.count() == 1
+
+
 def test_router_selected_named_comparison_gets_its_own_budget(comparison_scene, django_capture_on_commit_callbacks):
     client, conversation, records = comparison_scene
     with use_composition_root(CompositionRoot(llm=ComparisonLLM(), permits=lambda r: True)):

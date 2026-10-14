@@ -15,7 +15,9 @@ import { describe, expect, it } from "vitest";
 const ENTRY_FRAME = [
   "src/components/auth/AuthBrandPanel.tsx",
   "src/components/auth/AuthLayout.tsx",
+  "src/features/auth/LoginPage.tsx",
   "src/features/auth/PendingApprovalPage.tsx",
+  "src/features/auth/SignupPage.tsx",
 ];
 
 const SOURCES: Record<string, string> = Object.fromEntries(

@@ -9,15 +9,17 @@ import { routingFixture } from "@/test/routingFixture";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { useAskStream } from "./useAskStream";
+import { StreamDetached, useAskStream } from "./useAskStream";
 
 const askStream = vi.fn();
 const resumeAskRun = vi.fn();
+const cancelRun = vi.fn();
 
 vi.mock("@/api/ai", () => ({
   aiApi: {
     askStream: (...args: unknown[]) => askStream(...args),
     resumeAskRun: (...args: unknown[]) => resumeAskRun(...args),
+    cancelRun: (...args: unknown[]) => cancelRun(...args),
   },
 }));
 
@@ -32,7 +34,7 @@ it("keeps the checked comparison on the finished answer and forwards explicit pa
   const { result } = renderHook(() => useAskStream());
   const outcome = await act(() => result.current.ask("Compare", { comparisonRecordIds: [7, 9] }));
   expect(outcome.message.comparison).toEqual(comparison);
-  expect(askStream).toHaveBeenCalledWith("Compare", { comparisonRecordIds: [7, 9] });
+  expect(askStream).toHaveBeenCalledWith("Compare", { comparisonRecordIds: [7, 9] }, expect.any(AbortSignal));
 });
 
 describe("a complete stream", () => {
@@ -306,7 +308,7 @@ it("keeps the live routing event and carries terminal listing rows into the answ
   expect(outcome.message.listing).toEqual(listing);
   expect(outcome.message.question).toBe("Find flooding papers");
   expect(outcome.message.turnId).toBe(5);
-  expect(askStream).toHaveBeenCalledWith("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 });
+  expect(askStream).toHaveBeenCalledWith("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 }, expect.any(AbortSignal));
 });
 
 describe("the research lane (IR-504)", () => {
@@ -458,7 +460,7 @@ describe("a queued run (IR-544)", () => {
     const { result } = renderHook(() => useAskStream());
     const outcome = await act(() => result.current.ask("What predicts flooding?", { conversationId: 9 }));
 
-    expect(resumeAskRun).toHaveBeenCalledWith("r-1", 2);
+    expect(resumeAskRun).toHaveBeenCalledWith("r-1", 2, expect.any(AbortSignal));
     expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
     expect(outcome.message.turnId).toBe(41);
     expect(outcome.message.partial).toBeFalsy();
@@ -507,6 +509,7 @@ describe("a queued run (IR-544)", () => {
 
     expect(outcome.message.content).toMatch(/ran out of time/);
     expect(outcome.message.partial).toBe(true);
+    expect(outcome.message.endedRun).toEqual({ id: "r-3", state: "expired" });
   });
 
   it("gives up after repeated reconnections bring nothing", async () => {
@@ -527,5 +530,83 @@ describe("a queued run (IR-544)", () => {
     const outcome = await act(() => result.current.ask("q"));
 
     expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
+  });
+});
+
+describe("an owned run, opened, cancelled and retried (IR-548)", () => {
+  const done = {
+    event: "done", id: "5",
+    data: {
+      answer: "Rainfall gauges feed the model.", citations: [], sources: [], message: null,
+      mode: "generative", degraded: false, conversation_id: 9, resolved_question: null,
+      widened: false, had_reasoning: false, turn_id: 41,
+    },
+  };
+
+  it("follows an existing run from its first event, replaying its progress", async () => {
+    resumeAskRun.mockReturnValue(
+      eventsOf(
+        { event: "run_queued", id: "1", data: { run_id: "r-7", state: "queued" } },
+        { event: "run_started", id: "2", data: { attempt: 1 } },
+        done,
+      ),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+    const outcome = await act(() => result.current.follow("r-7", "What predicts flooding?"));
+
+    expect(resumeAskRun).toHaveBeenCalledWith("r-7", 0, expect.any(AbortSignal));
+    expect(askStream).not.toHaveBeenCalledWith("What predicts flooding?", expect.anything(), expect.anything());
+    expect(outcome.message.turnId).toBe(41);
+    expect(outcome.message.question).toBe("What predicts flooding?");
+  });
+
+  it("names the run it is following, so it can be stopped", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    cancelRun.mockResolvedValue({ data: { run_id: "r-8", state: "cancelled" } });
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "run_queued", id: "1", data: { run_id: "r-8", state: "queued" } };
+        await gate;
+        yield { event: "run_cancelled", id: "2", data: { run_id: "r-8", state: "cancelled", reason: "cancelled" } };
+      })(),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+    let pending!: Promise<{ message: { content: string; partial?: boolean; endedRun?: unknown } }>;
+    act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
+
+    await waitFor(() => expect(result.current.streaming?.runId).toBe("r-8"));
+    await act(() => result.current.cancel());
+    expect(cancelRun).toHaveBeenCalledWith("r-8");
+
+    release();
+    const outcome = await pending;
+    expect(outcome.message.content).toMatch(/you stopped this question/i);
+    expect(outcome.message.partial).toBeFalsy();
+    expect(outcome.message.endedRun).toEqual({ id: "r-8", state: "cancelled" });
+    await waitFor(() => expect(result.current.streaming).toBeNull());
+  });
+
+  it("stops following when detached, leaving the run to finish on the server", async () => {
+    askStream.mockImplementation((_q: string, _o: unknown, signal: AbortSignal) =>
+      (async function* () {
+        yield { event: "run_queued", id: "1", data: { run_id: "r-9", state: "queued" } };
+        await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+      })(),
+    );
+
+    const { result } = renderHook(() => useAskStream());
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
+    await waitFor(() => expect(result.current.streaming?.runId).toBe("r-9"));
+
+    act(() => result.current.detach());
+
+    await expect(pending).rejects.toBeInstanceOf(StreamDetached);
+    expect(result.current.streaming).toBeNull();
+    expect(resumeAskRun).not.toHaveBeenCalledWith("r-9", expect.anything(), expect.anything());
+    expect(cancelRun).not.toHaveBeenCalledWith("r-9");
   });
 });

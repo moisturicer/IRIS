@@ -10,6 +10,9 @@ import type { ChatCitation, SemanticSearchResult, RoutingDecision, AnswerListing
 
 export type ChatRole = "user" | "assistant";
 
+/** How a queued run ended without its answer (IR-548). */
+export type EndedRunState = "cancelled" | "failed" | "expired";
+
 export interface ChatMessage {
   turnId?: number;
   routing?: RoutingDecision;
@@ -66,5 +69,11 @@ export interface ChatMessage {
    * has reasoning switched off in its Profile.
    */
   reasoning?: string | null;
+  /**
+   * The queued run this reply stands for when it ended without an answer
+   * (IR-548): stopped by the reader, failed or out of time. What a Retry
+   * acts on. Undefined for every reply that carries an answer.
+   */
+  endedRun?:  { id: string; state: EndedRunState };
   createdAt:  string;
 }

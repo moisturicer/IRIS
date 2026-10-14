@@ -3,6 +3,31 @@ import { aiApi } from "./ai";
 
 const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
 vi.mock("./client", () => ({ apiClient: { post, get } }));
+describe("starting a conversation (IR-548)", () => {
+  // The server answers POST with the summary shape, which has no `turns`.
+  const created = {
+    id: 4, title: "", record: 5, record_title: "Flooding", turn_count: 0,
+    created_at: "2026-10-14", updated_at: "2026-10-14",
+  };
+
+  it("gives a new conversation an empty transcript and no run", async () => {
+    post.mockResolvedValue({ data: created });
+
+    const { data } = await aiApi.conversations.create({ record: 5 });
+
+    expect(post).toHaveBeenCalledWith("/ai/conversations/", { record: 5 });
+    expect(data).toEqual({ ...created, turns: [], latest_run: null });
+  });
+
+  it("does the same when Paper Chat starts its Record's first conversation", async () => {
+    get.mockResolvedValue({ data: [] });
+    post.mockResolvedValue({ data: created });
+
+    const { data } = await aiApi.conversations.findOrCreateForRecord(5);
+
+    expect(data.turns).toEqual([]);
+  });
+});
 
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 

@@ -54,7 +54,16 @@ export const router = createBrowserRouter([
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
           { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
-          { path: "ai",                    element: <RAGChatPage />,     handle: { crumb: "Ask IRIS" } },
+          {
+            // `/ai` picks a conversation and replaces itself with that
+            // conversation's own address (IR-548). Both render the same page,
+            // in the same position, so moving between them keeps its state.
+            path: "ai", handle: { crumb: "Ask IRIS" },
+            children: [
+              { index: true,                          element: <RAGChatPage /> },
+              { path: "conversations/:conversationId", element: <RAGChatPage /> },
+            ],
+          },
           { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
           { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings & Profile" } },
 

@@ -18,9 +18,12 @@ import { ResearchSteps } from "./ResearchSteps";
 export function StreamingMessageBubble({
   state,
   compact = false,
+  onStop,
 }: {
   state: StreamingState;
   compact?: boolean;
+  /** Cancel the queued run being followed (IR-548); offered only for one. */
+  onStop?: () => void;
 }) {
   return (
     <div className={cn("flex animate-fade-in motion-reduce:animate-none", compact ? "gap-2.5" : "gap-3")} aria-busy="true">
@@ -35,6 +38,17 @@ export function StreamingMessageBubble({
 
       <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
         <StreamStatusLine state={state} />
+        {onStop && state.runId && (
+          <button
+            type="button"
+            onClick={onStop}
+            className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5
+              text-[13px] font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
+          >
+            <i className="fas fa-stop text-[10px]" aria-hidden />
+            Stop answering
+          </button>
+        )}
         {state.routing && <RoutingDecisionPanel decision={state.routing} />}
         {state.steps && <ResearchSteps steps={state.steps} live compact={compact} />}
         {state.candidates && <LiveCandidates candidates={state.candidates} compact={compact} />}

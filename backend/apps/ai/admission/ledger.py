@@ -164,6 +164,8 @@ def admit(request: Request) -> "Ticket":
     """Reserve ``request``'s worst case, or raise `AdmissionDenied`."""
     lane = scope.lane_for(request.default_lane)
     run = scope.current_run()
+    if run is not None and errors.RUN_CANCELLED not in run.denials and run.halted():
+        raise _deny(errors.RUN_CANCELLED, lane)
     if run is not None:
         sticky = next((reason for reason in run.denials if reason in errors.STICKY), None)
         if sticky is not None:

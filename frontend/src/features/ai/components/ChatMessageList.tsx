@@ -24,6 +24,10 @@ interface ChatMessageListProps {
   onSuggestion?:      (prompt: string) => void;
   /** How many readable records retrieval can draw on. */
   indexedRecords?:    number | null;
+  /** Retry a queued question that ended unanswered (IR-548). */
+  onRetry?:           (message: ChatMessage) => void;
+  /** Cancel the queued run in flight (IR-548). */
+  onStop?:            () => void;
 }
 
 export function ChatMessageList({
@@ -34,6 +38,8 @@ export function ChatMessageList({
   suggestions = [],
   onSuggestion,
   indexedRecords = null,
+  onRetry,
+  onStop,
 }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -82,9 +88,9 @@ export function ChatMessageList({
       {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
       <div className={`${CHAT_COLUMN} space-y-6`}>
         {messages.map((m) => (
-          <ChatMessageBubble key={m.id} message={m} onRouteOverride={onRouteOverride} overrideDisabled={isLoading} />
+          <ChatMessageBubble key={m.id} message={m} onRouteOverride={onRouteOverride} overrideDisabled={isLoading} onRetry={onRetry} />
         ))}
-        {isLoading && (streaming ? <StreamingMessageBubble state={streaming} /> : <AssistantMessageSkeleton />)}
+        {isLoading && (streaming ? <StreamingMessageBubble state={streaming} onStop={onStop} /> : <AssistantMessageSkeleton />)}
         <div ref={bottomRef} />
       </div>
     </div>

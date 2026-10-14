@@ -61,12 +61,20 @@ class ConversationDetailSerializer(ConversationSerializer):
     """
 
     turns = serializers.SerializerMethodField()
+    #: The latest queued run while no Turn shows for it (IR-548), so a reader
+    #: opening the Conversation can follow it again or retry it.
+    latest_run = serializers.SerializerMethodField()
 
     class Meta(ConversationSerializer.Meta):
-        fields = ConversationSerializer.Meta.fields + ["turns"]
+        fields = ConversationSerializer.Meta.fields + ["turns", "latest_run"]
 
     def get_turns(self, conversation):
         return turns_for_reader(conversation, self.context["request"].user)
+
+    def get_latest_run(self, conversation):
+        from apps.ai.durable import latest_run_for_reader
+
+        return latest_run_for_reader(conversation)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

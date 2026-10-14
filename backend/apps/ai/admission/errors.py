@@ -18,12 +18,14 @@ ACCOUNT_BUSY = "account_busy"
 CAMPAIGN_EXHAUSTED = "campaign_exhausted"
 RUN_BUDGET_EXHAUSTED = "run_budget_exhausted"
 LEASE_LOST = "lease_lost"
+#: The run's asker cancelled it (IR-548): nothing new is sent on its behalf.
+RUN_CANCELLED = "run_cancelled"
 
 #: Denials that hold for every later attempt in the run, whatever its lane
 #: or model: the budget is spent, or nothing is configured. The run stops
 #: asking. A refusal tied to one lane, one model or one transient error is not
 #: here -- an unpriced rerank must not stop the answer that follows it.
-STICKY = frozenset({NOT_CONFIGURED, CAMPAIGN_EXHAUSTED, RUN_BUDGET_EXHAUSTED})
+STICKY = frozenset({NOT_CONFIGURED, CAMPAIGN_EXHAUSTED, RUN_BUDGET_EXHAUSTED, RUN_CANCELLED})
 
 
 class AdmissionDenied(LLMUnavailable, RateLimited):

@@ -385,8 +385,23 @@ export interface ConversationSummary {
 }
 
 /** One Conversation with its full transcript (IR-295). */
+/**
+ * A Conversation's latest queued run while no Turn shows for it (IR-548):
+ * still `queued`/`running`, so an opened page follows it again, or ended
+ * without an answer, so the page says so and offers Retry.
+ */
+export interface LatestAskRun {
+  id:            string;
+  state:         "queued" | "running" | "failed" | "expired" | "cancelled";
+  end_reason:    string;
+  question:      string;
+  retry_of:      string | null;
+  last_sequence: number;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   turns: ConversationTurn[];
+  latest_run?: LatestAskRun | null;
 }
 
 export interface EmbeddingJobStatus {

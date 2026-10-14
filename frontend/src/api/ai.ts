@@ -111,6 +111,18 @@ async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEv
   yield* readSSE(response);
 }
 
+/**
+ * Start a Conversation. The server answers with the summary shape (no
+ * `turns`); a new conversation has no Turns and no run, so that is filled in
+ * here, once, rather than read as `undefined` by each caller (IR-548).
+ */
+async function createConversation(
+  body: { record?: number; title?: string } = {},
+): Promise<{ data: ConversationDetail }> {
+  const { data } = await apiClient.post<ConversationSummary>("/ai/conversations/", body);
+  return { data: { ...data, turns: [], latest_run: null } };
+}
+
 export const aiApi = {
   /** Whether answers will be generated or retrieval-only, and how many records are indexed. */
   status: () => apiClient.get<AIStatus>("/ai/status/"),
@@ -156,6 +168,21 @@ export const aiApi = {
   /** Reconnect to a queued run after event `after` (IR-544) -- see `resumeAskRun`. */
   resumeAskRun,
 
+  /** Stop the reader's own queued run (IR-548). 409 once it has already ended. */
+  cancelRun: (runId: string) =>
+    apiClient.post<{ run_id: string; state: string }>(
+      `/ai/ask/runs/${encodeURIComponent(runId)}/cancel/`,
+    ),
+
+  /**
+   * Ask a run that ended without its answer again, as a new linked run
+   * (IR-548). Repeating it returns the same retry, never a second one.
+   */
+  retryRun: (runId: string) =>
+    apiClient.post<{ run_id: string; retry_of: string; state: string }>(
+      `/ai/ask/runs/${encodeURIComponent(runId)}/retry/`,
+    ),
+
   conversations: {
     /** The caller's own Conversations, most recent first — optionally the
      * one(s) scoped to a single Record, for Paper Chat to continue (IR-298). */
@@ -163,8 +190,7 @@ export const aiApi = {
       apiClient.get<ConversationSummary[]>("/ai/conversations/", { params }),
 
     /** Start a Conversation, optionally scoped to a Record. */
-    create: (body: { record?: number; title?: string } = {}) =>
-      apiClient.post<ConversationDetail>("/ai/conversations/", body),
+    create: createConversation,
 
     get: (id: number) =>
       apiClient.get<ConversationDetail>(`/ai/conversations/${id}/`),
@@ -184,7 +210,7 @@ export const aiApi = {
       );
       return existing[0]
         ? apiClient.get<ConversationDetail>(`/ai/conversations/${existing[0].id}/`)
-        : apiClient.post<ConversationDetail>("/ai/conversations/", { record: recordId });
+        : createConversation({ record: recordId });
     },
   },
 };
