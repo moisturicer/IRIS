@@ -120,7 +120,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         <div
           id={menuId}
           className={cn(
-            "absolute bottom-full left-0 right-0 z-50 mb-2 rounded-lg border border-stone-200 bg-white p-1.5 shadow-card-md animate-fade-in motion-reduce:animate-none",
+            "absolute bottom-full left-0 right-0 z-50 mb-2 rounded-lg border border-stone-200 bg-overlay p-1.5 shadow-card-md animate-fade-in motion-reduce:animate-none",
             collapsed && "md:bottom-0 md:left-full md:right-auto md:mb-0 md:ml-3 md:w-60",
           )}
         >

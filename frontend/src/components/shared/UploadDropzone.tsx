@@ -275,7 +275,7 @@ const ProgressPanel = forwardRef<HTMLDivElement, ProgressPanelProps>(function Pr
       role="group"
       aria-label="Upload in progress"
       tabIndex={-1}
-      className={cn("rounded-xl border border-stone-200 bg-white px-5 py-4", FOCUS_RING)}
+      className={cn("rounded-xl border border-stone-200 bg-surface px-5 py-4", FOCUS_RING)}
     >
       <div className="flex items-center justify-between gap-3 text-small" aria-hidden="true">
         <span className="font-medium text-stone-800 truncate">{name}</span>

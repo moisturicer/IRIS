@@ -659,7 +659,7 @@ export default function PaperViewPage() {
               role="tablist"
               aria-label="Paper view"
               onKeyDown={onTabKeyDown}
-              className="pointer-events-auto inline-flex gap-1 rounded-full bg-white/90 backdrop-blur p-0.5 shadow-card-md ring-1 ring-stone-200"
+              className="pointer-events-auto inline-flex gap-1 rounded-full bg-overlay p-0.5 shadow-card-md ring-1 ring-stone-200"
             >
               {sections.map((s) => (
                 <button

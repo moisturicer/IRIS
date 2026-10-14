@@ -8,7 +8,7 @@
  */
 export const TONES = {
   /** Not yet with a reviewer. */
-  quiet:     "bg-stone-100 text-stone-700 ring-1 ring-stone-200",
+  quiet:     "bg-transparent text-stone-700 ring-1 ring-stone-300",
   /** With a reviewer, or recoverable. */
   active:    "bg-brand-50 text-brand ring-1 ring-brand-200",
   /** Terminal or blocking: someone must act. */

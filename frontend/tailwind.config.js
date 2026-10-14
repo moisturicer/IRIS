@@ -1,4 +1,5 @@
 import typography from "@tailwindcss/typography";
+import defaultColors from "tailwindcss/colors";
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -20,6 +21,17 @@ export default {
         page: "90rem",
       },
       colors: {
+        // Surface roles (IR-558; 01-design-system.md section 0). Three
+        // backgrounds, named for what they are for, so a screen asks for the
+        // role and never picks a near-white by hand: `canvas` is the ground
+        // every screen sits on, `surface` is content (a card, a panel, a
+        // field), `overlay` is anything that floats over content (a toast, a
+        // menu, the reading toolbar). `surface` and `overlay` are both opaque
+        // white today; they are two names so that one can change alone.
+        canvas:  defaultColors.stone[50],
+        surface: "#ffffff",
+        overlay: "#ffffff",
+
         // Primary brand color -- deep maroon
         gold: {
           DEFAULT: "#C59334",

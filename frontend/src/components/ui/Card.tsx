@@ -8,7 +8,7 @@ interface CardProps {
 
 export function Card({ children, className = "", padding = true }: CardProps) {
   return (
-    <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden ${padding ? "p-5" : ""} ${className}`}>
+    <div className={`bg-surface rounded-xl border border-stone-200 overflow-hidden ${padding ? "p-5" : ""} ${className}`}>
       {children}
     </div>
   );
@@ -17,8 +17,8 @@ export function Card({ children, className = "", padding = true }: CardProps) {
 export function CardHeader({ title, description }: { title: string; description?: string }) {
   return (
     <div className="mb-4">
-      <h3 className="text-[16px] font-semibold text-gray-900">{title}</h3>
-      {description && <p className="text-[14px] text-gray-500 mt-0.5">{description}</p>}
+      <h3 className="text-[16px] font-semibold text-stone-900">{title}</h3>
+      {description && <p className="text-[14px] text-stone-500 mt-0.5">{description}</p>}
     </div>
   );
 }

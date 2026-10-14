@@ -6,6 +6,12 @@ type Kind = Toast["type"];
 // A kind is carried three ways (IR-359): its tone, its glyph, and a word a
 // screen reader hears before the message. Success and error are both dark in
 // this palette, so the tone alone would not tell them apart.
+//
+// A toast floats over whatever is on the page, so its tone must be opaque
+// (IR-558): the quiet tone has no fill of its own, and an outline over page
+// text would let that text show through. `info` takes the `overlay` role and
+// the quiet tone's text and outline.
+const INFO_TONE = "bg-overlay text-stone-700 ring-1 ring-stone-300";
 const KIND: Record<Kind, { tone: string; icon: string; word: string; dismiss: string }> = {
   success: {
     tone: TONES.settled, icon: "fa-circle-check", word: "Success:",
@@ -16,7 +22,7 @@ const KIND: Record<Kind, { tone: string; icon: string; word: string; dismiss: st
     dismiss: "text-white/70 hover:text-white",
   },
   info: {
-    tone: TONES.quiet, icon: "fa-circle-info", word: "Notice:",
+    tone: INFO_TONE, icon: "fa-circle-info", word: "Notice:",
     dismiss: "text-stone-600 hover:text-stone-900",
   },
 };
