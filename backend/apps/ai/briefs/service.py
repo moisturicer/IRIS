@@ -10,7 +10,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from apps.ai.admission import scope
@@ -166,7 +166,9 @@ def _current(stored, profile):
 
 
 def _usage(run_key):
-    rows = ProviderReservation.objects.using("admission").filter(run_key=run_key)
+    rows = ProviderReservation.objects.using("admission").filter(
+        Q(work_key=run_key) | Q(work_key="", run_key=run_key),
+    )
     totals = rows.aggregate(input_tokens=Sum("charge_input_tokens"), output_tokens=Sum("charge_output_tokens"))
     # Deterministic unmetered fakes have no reservations; missing usage is unknown.
     if not rows.exists():
@@ -206,7 +208,7 @@ def generate_brief(brief_id, claim):
         stored_text = dict(stored.chunk_set.chunks.values_list("pk", "text"))
         batches = reading_sections(stored.record.title, sources, _window(profile), BRIEF_OUTPUT_TOKENS)
         llm = composition_root().llm_for(InferenceTask.BRIEF)
-        with scope.run(scope.new_run(run_key)), scope.workload("research"):
+        with scope.run(scope.new_run(run_key)), scope.work_item(run_key), scope.workload("research"):
             for batch in batches:
                 # Access, disclosure, version and profile are rechecked before every send.
                 if not _current(stored, profile_for(InferenceTask.BRIEF)):

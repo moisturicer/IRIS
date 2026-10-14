@@ -233,6 +233,7 @@ def _reserve(limits, request, lane, run, wanted, lease) -> tuple[int, int]:
         operation=request.operation,
         model=request.models[0][:128],
         run_key="" if run is None else run.key[:64],
+        work_key=(scope.current_work_item() or ("" if run is None else run.key))[:64],
         created_at=now,
         lease_expires_at=now + lease,
         reserved_input_tokens=wanted["input_tokens"],

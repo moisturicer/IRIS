@@ -24,19 +24,23 @@ import uuid
 from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Callable, ContextManager, Iterator, Optional
+from typing import TYPE_CHECKING, Callable, ContextManager, Iterator, Optional
+
+if TYPE_CHECKING:
+    from .limits import Ceiling
 
 _workload: ContextVar[Optional[str]] = ContextVar("admission_workload", default=None)
 _run: ContextVar[Optional["RunScope"]] = ContextVar("admission_run", default=None)
 _attempt: ContextVar[Optional["AttemptUsage"]] = ContextVar("admission_attempt", default=None)
 _send_guard: ContextVar[Optional[Callable]] = ContextVar("provider_send_guard", default=None)
 _usage_observer: ContextVar[Optional[list]] = ContextVar("provider_usage_observer", default=None)
+_work_item: ContextVar[Optional[str]] = ContextVar("provider_work_item", default=None)
 
 
 @dataclass
 class RunScope:
     key: str
-    ceiling: object = None
+    ceiling: Optional["Ceiling"] = None
     #: Reason codes, in the order they were met.
     denials: list = field(default_factory=list)
 
@@ -88,7 +92,7 @@ def lane_for(default: str) -> str:
 # -- run ----------------------------------------------------------------------
 
 
-def new_run(key: Optional[str] = None, *, ceiling=None) -> RunScope:
+def new_run(key: Optional[str] = None, *, ceiling: Optional["Ceiling"] = None) -> RunScope:
     return RunScope(key or f"req:{uuid.uuid4().hex}", ceiling=ceiling)
 
 
@@ -112,6 +116,20 @@ def run(scope: Optional[RunScope] = None) -> Iterator[RunScope]:
 
 def current_run() -> Optional[RunScope]:
     return _run.get()
+
+
+@contextmanager
+def work_item(key: str) -> Iterator[None]:
+    """Attribute a sub-operation while retaining the encompassing run's ceiling."""
+    token = _work_item.set(key)
+    try:
+        yield
+    finally:
+        _work_item.reset(token)
+
+
+def current_work_item() -> Optional[str]:
+    return _work_item.get()
 
 
 def note_denial(reason: str) -> None:

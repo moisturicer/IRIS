@@ -7,6 +7,8 @@ import pytest
 from django.urls import reverse
 
 from apps.ai.admission.tests.support import enforce
+from apps.ai.admission.llm import AdmittedLLMProvider
+from apps.ai.admission.tests.support import MeteredAdapter
 from apps.ai.briefs.reading import FIELDS
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.models import AskRun, ChunkSet, Conversation, DocumentChunk, PaperBrief, Turn
@@ -97,6 +99,8 @@ def test_first_comparison_reads_each_paper_and_reopens_same_table(comparison_sce
     assert [cell["values"][0]["value"] for cell in finding["cells"]] == ["Accuracy was 92%."] * 2
     assert reopened["turns"][0]["comparison"] == table
     assert "source_versions" not in table
+    stored = Turn.objects.get().comparison
+    assert "quote" not in stored["rows"][4]["cells"][0]["values"][0]["citations"][0]
     assert len(llm.calls) == 3
     assert [data["kind"] for _, name, data in frames if name == "agent_step"][:2] == ["Reading paper 1 of 2"] * 2
 
@@ -242,6 +246,48 @@ def test_explicit_comparison_budget_and_deadline_survive_submission(comparison_s
     assert run.request["comparison_ceiling"]["input_tokens"] == 500000
     assert run.request["comparison_record_ids"] == [r.pk for r in records]
     assert not Turn.objects.in_model_history().exists()
+
+
+def test_router_selected_named_comparison_gets_its_own_budget(comparison_scene, django_capture_on_commit_callbacks):
+    client, conversation, records = comparison_scene
+    with use_composition_root(CompositionRoot(llm=ComparisonLLM(), permits=lambda r: True)):
+        done, _ = completed(client, conversation, records, django_capture_on_commit_callbacks,
+                            '"Rice Prediction" versus "Flood Prediction"', selected=False)
+    assert "comparison" in done
+    run = AskRun.objects.get()
+    assert (run.deadline_at - run.created_at).total_seconds() == pytest.approx(300, abs=1)
+
+
+def test_metered_briefs_keep_individual_usage_under_comparison_ceiling(comparison_scene, django_capture_on_commit_callbacks):
+    client, conversation, records = comparison_scene
+    class MeteredComparison(MeteredAdapter):
+        def generate(self, system, user):
+            self._text = ComparisonLLM().generate(system, user)
+            return super().generate(system, user)
+    adapter = MeteredComparison()
+    with use_composition_root(CompositionRoot(llm=AdmittedLLMProvider(adapter), permits=lambda r: True)):
+        done, _ = completed(client, conversation, records, django_capture_on_commit_callbacks)
+    assert len(done["comparison"]["records"]) == 2
+    assert [brief.usage for brief in PaperBrief.objects.order_by("pk")] == [
+        {"input_tokens": 120, "output_tokens": 30, "complete": True},
+        {"input_tokens": 120, "output_tokens": 30, "complete": True},
+    ]
+
+
+def test_exhausted_comparison_preserves_the_checked_table(comparison_scene, settings, django_capture_on_commit_callbacks):
+    client, conversation, records = comparison_scene
+    settings.AI_COMPARISON_MAX_ATTEMPTS = 2
+    class MeteredComparison(MeteredAdapter):
+        def generate(self, system, user):
+            self._text = ComparisonLLM().generate(system, user)
+            return super().generate(system, user)
+    adapter = MeteredComparison()
+    with use_composition_root(CompositionRoot(llm=AdmittedLLMProvider(adapter), permits=lambda r: True)):
+        done, frames = completed(client, conversation, records, django_capture_on_commit_callbacks)
+    assert done["mode"] == "unavailable"
+    assert len(done["comparison"]["records"]) == 2 and len(done["citations"]) == 2
+    assert adapter.sent == 2
+    assert any(name == "capacity_limited" for _, name, _ in frames)
 
 
 def test_missing_comparison_budget_refuses_before_dispatch(comparison_scene, settings):

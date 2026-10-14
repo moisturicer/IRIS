@@ -165,7 +165,17 @@ def submit(prepared, user, data, *, max_sources: int):
             prepared.effective_question, paper_chat=prepared.scope_record is not None,
             widened=prepared.widened,
         )
-        if prepared.comparison_record_ids or lane == "comparison":
+        named_comparison = False
+        if prepared.scope_record is None and lane != "comparison":
+            from apps.ai.composition import composition_root
+            from apps.ai.research.context import RunContext
+            from apps.ai.routing.lanes import _named_records
+
+            context = RunContext.for_request(user=user, root=composition_root(), lane="comparison",
+                                             conversation=prepared.conversation)
+            named, _ = _named_records(context, prepared.effective_question)
+            named_comparison = len(named) >= 2
+        if prepared.comparison_record_ids or lane == "comparison" or named_comparison:
             from apps.ai.comparison_configuration import comparison_ceiling
             from apps.ai.admission.limits import NotConfigured
             try:

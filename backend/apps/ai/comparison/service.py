@@ -14,7 +14,7 @@ from apps.ai.admission import scope
 from apps.ai.admission.errors import AdmissionDenied
 from apps.ai.admission.ledger import estimate_tokens
 from apps.ai.citation_markers import MARKER, numbers_in
-from apps.ai.answers.citations import GroundedAnswer, NO_SOURCES, PARTIAL, UNAVAILABLE, parse_citations
+from apps.ai.answers.citations import GENERATED, GroundedAnswer, NO_SOURCES, PARTIAL, UNAVAILABLE, parse_citations
 from apps.ai.answers.events import AgentStep
 from apps.ai.answers.service import model_that_answered
 from apps.ai.briefs.reading import FIELDS
@@ -28,9 +28,12 @@ from apps.ai.overview.assembly import whole_paper
 from apps.ai.overview.pages import build_page_prompt
 from apps.ai.providers.deadline import bounded
 from apps.ai.research.ledger import Ledger
+from apps.ai.research.results import ToolStatus
 from apps.ai.research.validation import validate_answer
 from apps.ai.retrieval.ports import RetrievedChunk
 from apps.records.models import Record
+
+from .storage import resolved_quote
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +80,7 @@ def reader_view(comparison, user):
     """Withhold all comparison content if one supplied paper is no longer safe."""
     if not isinstance(comparison, dict):
         return None
+    comparison = copy.deepcopy(comparison)
     versions = comparison.get("source_versions")
     if not isinstance(versions, list):
         return None
@@ -111,12 +115,14 @@ def reader_view(comparison, user):
                     chunk = DocumentChunk.objects.filter(pk=citation.get("chunk_id"),
                         record_id=cell["record_id"], chunk_set_id=version["chunk_set_id"],
                         source_page=citation.get("page"), deleted_at__isnull=True).first()
-                    quote = citation.get("quote")
+                    quote = resolved_quote(citation, chunk) if chunk else None
                     if chunk is None or not isinstance(quote, str) or _normalized(quote) not in _normalized(chunk.text):
                         return None
-    result = copy.deepcopy(comparison)
-    result.pop("source_versions", None)
-    return result
+                    citation["quote"] = quote
+                    citation.pop("span", None)
+                    citation.pop("quote_hash", None)
+    comparison.pop("source_versions", None)
+    return comparison
 
 
 def _ready_brief(record, user):
@@ -179,9 +185,13 @@ def _depth(run, criterion, record, brief, comparison):
     chunk_set = ChunkSet.objects.get(pk=brief["chunk_set_id"])
     sources = whole_paper(chunk_set)
     words = {word.casefold() for word in re.findall(r"[A-Za-z]{4,}", criterion)}
-    selected = tuple(source for source in sources if any(
-        word in " ".join(source.context_path).casefold() for word in words
-    )) or sources
+    # Every requested detail must have a heading match before narrowing. A
+    # partial heading match cannot establish coverage of the other details.
+    heading = lambda source: " ".join(source.context_path).casefold()
+    meaningful = words - {"with", "terms", "their", "handling", "missing"}
+    matched = tuple(source for source in sources if any(word in heading(source) for word in meaningful))
+    selected = matched if meaningful and all(any(word in heading(source) for source in matched)
+                                            for word in meaningful) else sources
     profile = profile_for(InferenceTask.ANSWER)
     window = dict(profile.model_context_windows).get(profile.model)
     if window is None:
@@ -209,8 +219,19 @@ def _depth(run, criterion, record, brief, comparison):
         wrapped["method"] = raw.get("question_specific", {})
         sections.append(verify_fields(json.dumps(wrapped), batch, stored_text))
     field = combine(sections)["method"]
-    if selected != sources and field["state"] == "not_reported":
-        field = {"state": "unsupported", "values": []}
+    if selected != sources and field["state"] != "reported":
+        # Expand the read through this Record's complete remaining text.
+        remainder = tuple(source for source in sources if source not in selected)
+        for batch in reading_sections(title, remainder, window - estimate_tokens(depth_system), BRIEF_OUTPUT_TOKENS):
+            prompt = build_page_prompt(f"Read {title} fully into the required paper brief.", batch)
+            with scope.before_send(check):
+                check()
+                reply = llm.generate(depth_system, prompt)
+            raw = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", reply.strip()))
+            wrapped = {name: {"state": "not_reported", "values": []} for name in FIELDS}
+            wrapped["method"] = raw.get("question_specific", {})
+            sections.append(verify_fields(json.dumps(wrapped), batch, stored_text))
+        field = combine(sections)["method"]
     return field
 
 
@@ -281,11 +302,11 @@ def comparison_events(run, question, record_ids=()):
         yield AgentStep(index, label, "running")
         if record is None:
             comparison["coverage"].append({"state": "not_permitted", "reason": "disclosure_or_access"})
-            yield AgentStep(index, label, "completed")
+            yield AgentStep(index, label, ToolStatus.OK.value)
             continue
         if not run.ctx.permits(record):
             comparison["coverage"].append({"state": "not_permitted", "reason": "disclosure_or_access"})
-            yield AgentStep(index, label, "completed")
+            yield AgentStep(index, label, ToolStatus.OK.value)
             continue
         comparison["records"].append({"record_id": record.pk, "title": record.title})
         active = ChunkSet.objects.filter(record=record, is_active=True).first()
@@ -325,7 +346,7 @@ def comparison_events(run, question, record_ids=()):
         except Exception:
             logger.exception("comparison reading failed for record %s", record.pk)
             coverage["reason"] = "reading_unavailable"
-        yield AgentStep(index, label, "completed")
+        yield AgentStep(index, label, ToolStatus.OK.value)
     yield AgentStep(len(records) + 1, "Building comparison", "running")
     for dimension in (*FIELDS, *(("question_specific",) if criterion else ())):
         comparison["rows"].append({"dimension": dimension, "label": LABELS.get(dimension, criterion), "cells": [
@@ -333,7 +354,7 @@ def comparison_events(run, question, record_ids=()):
                 dimension, {"state": "unsupported", "values": []})}
             for item in comparison["records"]
         ]})
-    yield AgentStep(len(records) + 1, "Building comparison", "completed")
+    yield AgentStep(len(records) + 1, "Building comparison", ToolStatus.OK.value)
     if reader_view(comparison, run.ctx.user) is None:
         return _answer("The readable papers changed during comparison. Please try again.", unavailable=True), None
     sources = tuple(sources_by_quote.values())
@@ -372,12 +393,12 @@ def comparison_events(run, question, record_ids=()):
         if reader_view(comparison, run.ctx.user) is None:
             return _answer("The readable papers changed during comparison. Please try again.", unavailable=True), None
         return _answer("The comparison table is available; its description could not be verified.", unavailable=True, sources=sources), comparison
-    yield AgentStep(len(records) + 2, "Checking citations", "completed")
+    yield AgentStep(len(records) + 2, "Checking citations", ToolStatus.OK.value)
     if not text.strip():
         return _answer("The comparison table is available; its description could not be verified.", unavailable=True, sources=sources), comparison
     partial = any(c["state"] in ("could_not_read", "not_permitted") for c in comparison["coverage"])
     return GroundedAnswer(text=text, citations=citations, sources=sources,
-                          state=PARTIAL if partial else "generated",
+                          state=PARTIAL if partial else GENERATED,
                           degraded=bool(comparison["removed_claims"]) or any(
                               c["state"] != "read_fully" for c in comparison["coverage"]),
                           model=model_that_answered(llm)), comparison

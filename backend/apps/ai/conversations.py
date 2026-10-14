@@ -175,6 +175,10 @@ def _write_turn(
 
     Everything here is local: no vendor call belongs inside this transaction.
     """
+    stored_comparison = {}
+    if comparison:
+        from apps.ai.comparison.storage import comparison_pointers
+        stored_comparison = comparison_pointers(comparison)
     turn = Turn.objects.create(
         conversation=conversation,
         question=question,
@@ -187,7 +191,7 @@ def _write_turn(
         reasoning=answer.reasoning,
         routing=routing or {},
         research=research or {},
-        comparison=comparison or {},
+        comparison=stored_comparison,
         listing=_stored_listing(listing),
     )
     TurnCitation.objects.bulk_create(

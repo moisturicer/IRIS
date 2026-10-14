@@ -29,6 +29,10 @@ refuse submission, without dispatching provider work. They are not budget
 approvals. The run snapshots its comparison ceilings and fixes its deadline at
 submission; retrying a worker never resets either. Shared campaign limits still
 apply if the comparison ceilings are higher than ordinary chat's.
+Each brief also has a stable reservation `work_key`, so its reported usage is
+attributed independently while the encompassing comparison retains all charges
+against its run ceiling. Older standalone reservations resolve through their
+original brief run key.
 
 ## Request and answer contract
 
@@ -62,7 +66,9 @@ precedes prose, and narrow screens scroll within the table region.
 
 Visibility, disclosure eligibility, active ChunkSet identity and quote support
 are checked before generation and before output. The stored comparison retains
-source identities privately; these are removed from its public shape. Replay
+source identities privately; these are removed from its public shape. Citation
+quotes are stored only as chunk/page/span/hash pointers on the Turn and are
+resolved from the current chunk on read, following ADR-026's storage rule. Replay
 checks current access and versions again. A changed or restricted source
 withholds the comparison's content instead of exposing an obsolete table or
 description. Comparison Turns are excluded from model history until their full
