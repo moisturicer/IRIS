@@ -42,10 +42,13 @@ from apps.ai.resilience.llm import LLMProviderConfig, build_task_llm
 from .profiles import Profile
 from .tasks import InferenceTask
 
+BRIEF_OUTPUT_TOKENS = 4096
+
 #: The admission lane each task's attempts are charged to when no workload
 #: names one (IR-545). A workload -- research, ingestion -- overrides it.
 _TASK_LANES = {
     InferenceTask.ANSWER: "chat",
+    InferenceTask.BRIEF: "research",
     InferenceTask.RESOLVE: "chat",
     InferenceTask.ROUTE: "chat",
     InferenceTask.PLAN: "research",
@@ -69,13 +72,26 @@ def build_profile_llm(
 
     `breaker_key` defaults to the task's own. The evidence shadow passes its
     own key (IR-466), so its failures never open the reader's breaker.
-    `max_tokens` caps each completion (IR-481); `None` sends no cap.
+    `max_tokens` caps each completion (IR-481); `None` sends no cap except
+    for brief, whose completion is always bounded by BRIEF_OUTPUT_TOKENS.
     """
     if not profile.is_configured:
+        prefix = (
+            InferenceTask.ANSWER.settings_prefix
+            if profile.task is InferenceTask.BRIEF
+            else profile.task.settings_prefix
+        )
         raise LLMUnavailable(
             f"the {profile.task.value!r} Inference task has no model. Set "
-            f"{profile.task.settings_prefix}_MODEL, or leave the task off; "
+            f"{prefix}_MODEL, or leave the task off; "
             "there is no shared default to fall through to (ADR-036)."
+        )
+
+    if profile.task is InferenceTask.BRIEF:
+        max_tokens = (
+            BRIEF_OUTPUT_TOKENS
+            if max_tokens is None
+            else min(max_tokens, BRIEF_OUTPUT_TOKENS)
         )
 
     # A task whose Reasoning is not shown sends no reasoning configuration at
@@ -102,7 +118,7 @@ def build_profile_llm(
             lane=lane or task_lane(profile.task),
         )
 
-    if pins:
+    if pins or profile.task is InferenceTask.BRIEF:
         configs = [config(model) for model in profile.models]
     elif dialect_for(profile.vendor.value).resolves_fallback:
         configs = [config(profile.model, profile.fallback_models)]

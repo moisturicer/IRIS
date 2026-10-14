@@ -10,6 +10,7 @@ from .conversation import (
     model_history_q,
 )
 from .summary import RecordOverview
+from .brief import PaperBrief
 from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, EmbeddingJob
 from .embedding_space import (
@@ -46,6 +47,7 @@ __all__ = [
     "TURN_QUESTION_VECTOR",
     "VECTORS_PER_TURN",
     "RecordOverview",
+    "PaperBrief",
     "DocumentMetadata",
     "RecordEmbedding",
     "EmbeddingJob",

@@ -114,6 +114,14 @@ def generate_record_overview(
         raise self.retry(exc=exc, countdown=60)
 
 
+@shared_task
+def generate_paper_brief(brief_id: int, claim: str):
+    """Read a claimed paper on the Overview's existing background queue."""
+    from apps.ai.briefs.service import generate_brief
+
+    generate_brief(brief_id, claim)
+
+
 @shared_task(bind=True, max_retries=3)
 def index_record(self, record_id: int, *, force: bool = False):
     """Both halves of one record's indexing, under one job (IR-282).

@@ -836,6 +836,50 @@ Evidence, with deterministic fakes and real Postgres; no vendor called:
 approved for pilot traffic (pilot README §5), enabling `AI_SCREEN_CACHE` needs the policy label set by someone with
 authority, and no screening recall, latency or cost has been measured.
 
+## IR-556 — on-demand, cited whole-paper briefs
+
+**Contract:** [proposed ADR-036 amendment](../adr/proposals/ir-556-paper-brief-task.md).
+The new inference task and runtime feature are implemented; architectural
+acceptance remains a separate human decision, and the feature defaults off.
+
+`apps/ai/briefs/` reads every active undeleted chunk in sequence with page
+markers, using the explicitly recorded main-model context window minus bounded
+completion and instruction reserves; each fallback must fit before sending. Oversized papers
+are read in section briefs and combined without losing verified values or
+citations. All seven fields distinguish reported, not reported and unsupported.
+Quotes must match stored chunk text at their cited page before saving.
+
+`PaperBrief` and migration `0026` retain content/prompt/Profile versions,
+generating models and token accounting. The authorized HTTP endpoint and
+`brief_for(..., user=...)` queue first use only, share atomic claims across
+readers, suppress duplicate worker delivery and fence stale writes. Generation
+uses the Overview's existing queue and IR-545's research/account admission,
+with a stable spending run across explicit retries. Disclosure and current
+access are checked for cached uses, every generation call and final writes.
+
+**Tests:** `apps/ai/tests/test_paper_brief_http.py` exercises first use/reuse,
+content/prompt/model/fallback invalidation, long-paper order and subdivision,
+not-reported fields, invalid quotes/pages, denied or revoked access/disclosure,
+concurrent first requests, duplicate delivery, stale claim fencing, shared
+admission exhaustion and usage, retry totals and fallback model provenance.
+The inference Profile/startup and admission wiring suites cover inheritance,
+explicit context-window parsing, output cap and the named task/lane.
+
+**Local evidence, 14 October 2026:** focused HTTP/worker, inference and admission
+checks after review fixes: 124 passed, including revocation between physical
+retries/fallbacks and current-response provenance when usage is missing. Migration
+applied to an isolated copy of the local database; all 60 Records and 42
+ChunkSets preserved. Django system check passes with the existing django-axes
+deprecation warning; migration drift check finds no changes. All providers are
+deterministic fakes; no paid evaluation or institutional transmission occurred.
+Final fresh-database backend suite: **3,671 passed, 1 xpassed**, zero failures.
+The historical backfill test's cleanup now uses its existing historical-model
+helper when rewinding past the new brief table; backfill assertions are
+unchanged. A clean-main reproduction identified the proxy checksum mismatch
+as Windows CRLF checkout conversion. Restoring the exact committed LF bytes
+locally makes the unchanged checksum assertion pass; no fixture content change
+is included. Existing provider contract/Overview checks also pass (60 tests).
+
 ## IR-554: a Publish click survives Discover's search debounce
 
 **Defect.** Discover's search box writes `q` to the URL 300ms after the last keystroke, and once on load. The timer called the `setSearchParams` of the render that armed it, and react-router-dom 6.30's functional form builds from that render's URL, so a Publish click inside the window was written back out and the dialog closed. It surfaced as a flaky page-head test (5 of 12 runs failed on `main`, 2026-10-13) and failed PR #249's Frontend job once.
