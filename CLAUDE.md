@@ -177,6 +177,18 @@ python manage.py promote_embedding_space --space N --check   # is this space rea
                                    # Drop --check to promote. Refuses while any active chunk lacks a
                                    # vector in that space and names the short records. Nothing
                                    # promotes automatically
+python manage.py eval_pilot_milestone --set <labels.json> --tier proxy --base-url <url> --providers fake
+                                   # IR-550: score the first fixed-workflow milestone (metadata
+                                   # count, topic count, listing) against pinned labels, each
+                                   # measure with its own denominator. --from-run <run.json>
+                                   # --reviews <file> rescores with a person's verdicts. JWT in
+                                   # IRIS_EVAL_TOKEN. --providers real refuses unless admission
+                                   # enforces and the runs fit the campaign before its reserve
+python manage.py eval_pilot_capacity --base-url <url> --questions <json> --n 100 --providers fake --cache cold
+                                   # IR-550: simultaneous burst; every submission in the
+                                   # denominator, latency from submission. Only real + cold +
+                                   # >=100 distinct measures capacity. A paid burst that does not
+                                   # fit the campaign sends nothing. Neither has run on a vendor
 python manage.py provider_campaign                       # provider spend against the campaign
                                    # ceiling, core and whole, plus attempts in flight per lane
                                    # (IR-545). Reads only; calls no vendor. Charges are an upper

@@ -1,0 +1,404 @@
+{
+  "set": "fixed-workflow-baseline",
+  "snapshot": "S0",
+  "tier": "synthetic",
+  "providers": "fake (composition root; screening decides from S0's labels)",
+  "runs": [
+    {
+      "case": "b01",
+      "latency_ms": 514,
+      "done": {
+        "mode": "generative",
+        "routing_lane": "count",
+        "citation_count": 0,
+        "listing": {
+          "completeness": "exact_count",
+          "wording": "**5 records** match: all published records you can see. Counted at 2026-10-14T12:33:55+00:00 over the 5 records among the published records you can see. Each count is of distinct IRIS records, not of unique scholarly works: the same work can be recorded more than once. AI assessment is a separate question from this count: 4 of these can be read by AI and 1 cannot, which does not change the count.",
+          "count": {
+            "total": 5,
+            "predicate": "all published records you can see",
+            "population": "published records you can see",
+            "snapshot": "2026-10-14T12:33:55+00:00",
+            "visible": 5,
+            "ai_assessable": 4,
+            "not_ai_assessable": 1,
+            "possible_duplicate_titles": 0,
+            "undated": null,
+            "unit": "distinct IRIS records, not unique scholarly works"
+          }
+        }
+      }
+    },
+    {
+      "case": "b02",
+      "latency_ms": 335,
+      "done": {
+        "mode": "generative",
+        "routing_lane": "count",
+        "citation_count": 0,
+        "listing": {
+          "completeness": "matches_found",
+          "wording": "2 matches among 4 assessed of 5 selected candidate papers, 1 of them uncertain, with 1 not assessed. Criterion: \"How many papers are about flooding?\" (title and abstract screening, screen-34569d54). This counts topic classifications among the selected candidates only. It is not a catalogue metadata count and not a count of every paper you can see. Other relevant papers may exist beyond the selected candidates.",
+          "coverage": {
+            "limit": 20,
+            "selected": 5,
+            "included": 2,
+            "excluded": 1,
+            "uncertain": 1,
+            "unassessed": 1,
+            "more_available": false,
+            "search_degraded": false,
+            "changed": false
+          },
+          "topic_count": {
+            "criterion": "How many papers are about flooding?",
+            "method": "title_and_abstract_screening",
+            "version": "screen-34569d54",
+            "basis": "topic_classification_of_selected_candidates",
+            "matches": 2,
+            "assessed": 4,
+            "excluded": 1,
+            "uncertain": 1,
+            "unassessed": 1,
+            "selected": 5,
+            "limit": 20,
+            "more_available": false
+          },
+          "observed": {
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "model_calls": 2,
+            "prompt_tokens_estimated": 479,
+            "stage_ms": {
+              "select": 22,
+              "screen": 301,
+              "finish": 3,
+              "total": 326
+            },
+            "note": "Observed for this run only. A run that reused earlier verdicts does not show how a fresh model call performs or what capacity exists."
+          },
+          "candidates": [
+            {
+              "record_key": "rainfall-note",
+              "state": "uncertain"
+            },
+            {
+              "record_key": "flood-gauges",
+              "state": "included"
+            },
+            {
+              "record_key": "flood-hazard",
+              "state": "included"
+            },
+            {
+              "record_key": "tilapia",
+              "state": "excluded"
+            },
+            {
+              "record_key": "flood-warning",
+              "state": "unassessed",
+              "restricted": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case": "b03",
+      "latency_ms": 48,
+      "done": {
+        "mode": "generative",
+        "routing_lane": "listing",
+        "citation_count": 0,
+        "listing": {
+          "completeness": "matches_found",
+          "wording": "Screened 5 candidate papers: 2 matched, 1 did not match, 1 uncertain, 1 could not be assessed. These are matches found, not a complete list of the papers you can see.",
+          "coverage": {
+            "limit": 20,
+            "selected": 5,
+            "included": 2,
+            "excluded": 1,
+            "uncertain": 1,
+            "unassessed": 1,
+            "more_available": false,
+            "search_degraded": false,
+            "changed": false
+          },
+          "observed": {
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "model_calls": 2,
+            "prompt_tokens_estimated": 477,
+            "stage_ms": {
+              "select": 14,
+              "screen": 24,
+              "finish": 3,
+              "total": 42
+            },
+            "note": "Observed for this run only. A run that reused earlier verdicts does not show how a fresh model call performs or what capacity exists."
+          },
+          "candidates": [
+            {
+              "record_key": "flood-hazard",
+              "state": "included"
+            },
+            {
+              "record_key": "flood-gauges",
+              "state": "included"
+            },
+            {
+              "record_key": "rainfall-note",
+              "state": "uncertain"
+            },
+            {
+              "record_key": "tilapia",
+              "state": "excluded"
+            },
+            {
+              "record_key": "flood-warning",
+              "state": "unassessed",
+              "restricted": true
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "report": {
+    "tier": "synthetic",
+    "scope": {
+      "scored_cases": [
+        "b01",
+        "b02",
+        "b03"
+      ],
+      "out_of_milestone": {
+        "b04": "paper_chat_scope",
+        "b05": "passage_citation",
+        "b06": "failure_generation_unavailable",
+        "b07": "failure_screening_unavailable"
+      }
+    },
+    "split": {
+      "development": [
+        "b01",
+        "b02",
+        "b03",
+        "b04",
+        "b05",
+        "b06",
+        "b07"
+      ],
+      "held_out": [],
+      "lock_verified": null
+    },
+    "metadata_counts": {
+      "denominator": 1,
+      "exact": 1,
+      "wrong": [],
+      "missing": [],
+      "ground_truth": "the contract count, checked against its population's record keys"
+    },
+    "breaches": [],
+    "screening": {
+      "by_case": {
+        "b02": {
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "outside_denominators": {
+            "label_uncertain": 0,
+            "unlabelled": 0,
+            "screener_uncertain": 1,
+            "not_assessed": 1
+          }
+        },
+        "b03": {
+          "precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "recall": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0
+          },
+          "outside_denominators": {
+            "label_uncertain": 0,
+            "unlabelled": 0,
+            "screener_uncertain": 1,
+            "not_assessed": 1
+          }
+        }
+      },
+      "precision": {
+        "numerator": 4,
+        "denominator": 4,
+        "value": 1.0
+      },
+      "recall": {
+        "numerator": 4,
+        "denominator": 4,
+        "value": 1.0
+      },
+      "ground_truth": "human relevance labels over assessed candidates only"
+    },
+    "candidate_recall": {
+      "by_case": {
+        "b02": {
+          "numerator": 3,
+          "denominator": 3,
+          "value": 1.0,
+          "missed": []
+        },
+        "b03": {
+          "numerator": 3,
+          "denominator": 3,
+          "value": 1.0,
+          "missed": []
+        }
+      },
+      "ai_eligible_by_case": {
+        "b02": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "missed": []
+        },
+        "b03": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1.0,
+          "missed": []
+        }
+      },
+      "overall": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1.0
+      },
+      "ground_truth": "every labelled-relevant Record in the asker's metadata population"
+    },
+    "coverage": {
+      "selected": 10,
+      "unassessed": 2,
+      "restricted": 2,
+      "unassessed_rate": {
+        "numerator": 2,
+        "denominator": 10,
+        "value": 0.2
+      },
+      "inconclusive_cases": [],
+      "missing": []
+    },
+    "topic_counts": {
+      "inconsistent": [],
+      "labelled_relevant_among_included": {
+        "b02": 2
+      }
+    },
+    "answer_quality": {
+      "status": "not_reviewed",
+      "reviewers": [],
+      "primary_reviewer": null,
+      "rubrics": [],
+      "reviewed_fraction": {
+        "numerator": 0,
+        "denominator": 3,
+        "value": 0.0
+      },
+      "answer_correct": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "claim_support": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "citation_support": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "disagreements": []
+    },
+    "judge": {
+      "supplied": false,
+      "interpretable": false,
+      "agreement": null,
+      "why": "no judge scores supplied"
+    },
+    "latency_ms": {
+      "n": 3,
+      "p50": 335,
+      "p95": 514,
+      "missing": []
+    },
+    "usage": {
+      "model_calls": 4,
+      "prompt_tokens_estimated": 956,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "unreported": [
+        "b01"
+      ]
+    },
+    "scenarios": [
+      {
+        "scenario": "invisible records never appear",
+        "test": "apps/ai/tests/test_fixed_workflow_baseline_http.py::test_baseline_outcome_through_http_sse_and_replay",
+        "status": "asserted by tests, not observed in this run"
+      },
+      {
+        "scenario": "AI-restricted records are never named or sent",
+        "test": "apps/ai/tests/test_listing_workflow_http.py::test_content_a_model_may_not_read_is_counted_but_never_sent_or_named",
+        "status": "asserted by tests, not observed in this run"
+      },
+      {
+        "scenario": "access revoked mid-run is re-checked",
+        "test": "apps/ai/tests/test_listing_workflow_http.py::test_a_paper_that_becomes_unreadable_after_the_preview_is_never_sent_or_shown_again",
+        "status": "asserted by tests, not observed in this run"
+      },
+      {
+        "scenario": "cancel and retry of an owned run",
+        "test": "apps/ai/tests/test_durable_ask_http.py::OwnedRunLifecycleTests::test_cancel_commits_one_terminal_state_and_suppresses_the_late_answer",
+        "status": "asserted by tests, not observed in this run"
+      },
+      {
+        "scenario": "a foreign run is refused",
+        "test": "apps/ai/tests/test_durable_ask_http.py::OwnedRunLifecycleTests::test_someone_elses_run_cannot_be_cancelled_or_retried",
+        "status": "asserted by tests, not observed in this run"
+      },
+      {
+        "scenario": "a deleted conversation stays deleted",
+        "test": "apps/ai/tests/test_durable_ask_http.py::QueuedQuestionTests::test_a_conversation_deleted_mid_answer_stays_deleted",
+        "status": "asserted by tests, not observed in this run"
+      },
+      {
+        "scenario": "the original deadline bounds every attempt",
+        "test": "apps/ai/tests/test_admission_http.py::test_every_vendor_call_is_bounded_by_the_original_deadline",
+        "status": "asserted by tests, not observed in this run"
+      },
+      {
+        "scenario": "an exhausted campaign refuses paid work",
+        "test": "apps/ai/tests/test_admission_http.py::test_an_exhausted_campaign_says_busy_and_keeps_the_sources",
+        "status": "asserted by tests, not observed in this run"
+      }
+    ],
+    "standing": {
+      "evidence": "exploratory_inconclusive",
+      "why": "synthetic data is not CIT-U reliability evidence; no held-out questions: every case is development; no independent second review",
+      "institutional_quality_claim": false
+    }
+  }
+}
