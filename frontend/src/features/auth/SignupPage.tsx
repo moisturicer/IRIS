@@ -1,9 +1,10 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { accountsApi } from "@/api/accounts";
 import { useUIStore } from "@/store/ui.store";
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { Button, Input, Select } from "@/components/ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Role = "Student" | "Adviser";
@@ -33,8 +34,10 @@ const EMPTY: FormState = {
   college_id: "", course_id: "", dept_id: "",
 };
 
-const INPUT_BASE =
-  "w-full rounded-lg px-4 py-3 text-[15px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-500 text-gray-900 border font-[inherit]";
+const ROLES: { value: Role; label: string }[] = [
+  { value: "Student", label: "Student" },
+  { value: "Adviser", label: "Faculty / Adviser" },
+];
 
 // ── Validation ─────────────────────────────────────────────────────────────
 function validateAll(f: FormState, role: Role): FieldErrors {
@@ -194,264 +197,200 @@ export default function SignupPage() {
     setTouched((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
   };
 
-  const cls = (name: keyof FormState) => {
-    const isError = touched[name] && errors[name];
-    const isValid = touched[name] && !errors[name] && form[name];
-    return [
-      INPUT_BASE,
-      isError
-        ? "border-brand bg-red-50/50 focus:border-brand focus:bg-white"
-        : isValid
-          ? "border-green-400/60 bg-white focus:border-brand"
-          : "border-transparent focus:border-brand focus:bg-white",
-    ].join(" ");
-  };
+  // An error shows once its field has been touched, as before IR-539; the
+  // primitives then make it the field's description and mark it invalid.
+  const field = (name: keyof FormState) => ({
+    value:    form[name],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      handleChange(name, e.target.value),
+    onBlur:   () => handleBlur(name),
+    error:    touched[name] && errors[name] ? errors[name] : undefined,
+    size:     "lg" as const,
+  });
 
-  const errMsg = (name: keyof FormState) =>
-    touched[name] && errors[name]
-      ? <p className="text-[13px] text-red-600 mt-1.5">{errors[name]}</p>
-      : null;
-
-  const labelCls = "block text-[14px] font-semibold text-gray-900 mb-2";
+  // Feedback in words, with the check as decoration (IR-539): the hint says
+  // the same thing whether or not its colour or its glyph is seen.
+  const passwordHint = form.password.length >= 8
+    ? <><i className="fas fa-check mr-1.5" aria-hidden />At least 8 characters</>
+    : "At least 8 characters";
+  const password2Hint = form.password2 && form.password2 === form.password
+    ? <><i className="fas fa-check mr-1.5" aria-hidden />Passwords match</>
+    : undefined;
 
   return (
     <AuthLayout variant="signup" wide>
-      <h2 className="text-[28px] font-bold text-gray-900">Create an Account</h2>
-      <p className="mt-2 text-[15px] text-gray-500 mb-6">
+      <h2 className="text-balance font-display text-display font-semibold text-stone-900">
+        Create an Account
+      </h2>
+      <p className="mt-2 mb-section text-body text-stone-600">
         Enter your details to register for IRIS.
       </p>
 
-      {/* Role tabs */}
-      <div className="flex gap-2 mb-6">
-        {(["Student", "Adviser"] as Role[]).map((r) => (
-          <button
-            key={r}
-            type="button"
-            onClick={() => switchRole(r)}
-            className={`flex-1 py-2.5 rounded-lg text-[14px] font-semibold transition-all border ${
-              role === r
-                ? "border-brand text-brand bg-cream"
-                : "border-gray-200 text-gray-500 bg-[#F3F3F3] hover:border-brand/40 hover:text-brand"
-            }`}
-          >
-            {r === "Adviser" ? "Faculty / Adviser" : r}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_76px]">
-          <div>
-            <label className={labelCls}>
-              First Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={form.first_name}
-              onChange={(e) => handleChange("first_name", e.target.value)}
-              onBlur={() => handleBlur("first_name")}
-              placeholder="Juan"
-              className={cls("first_name")}
-            />
-            {errMsg("first_name")}
-          </div>
-          <div>
-            <label className={labelCls}>
-              Last Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={form.last_name}
-              onChange={(e) => handleChange("last_name", e.target.value)}
-              onBlur={() => handleBlur("last_name")}
-              placeholder="Dela Cruz"
-              className={cls("last_name")}
-            />
-            {errMsg("last_name")}
-          </div>
-          <div>
-            <label className={labelCls}>M.I.</label>
-            <input
-              value={form.middle_initial}
-              onChange={(e) => handleChange("middle_initial", e.target.value)}
-              onBlur={() => handleBlur("middle_initial")}
-              placeholder="S."
-              maxLength={10}
-              className={cls("middle_initial")}
-            />
-            {errMsg("middle_initial")}
-          </div>
-        </div>
-
-        <div>
-          <label className={labelCls}>
-            CIT-U Email <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            value={form.email}
-            onChange={(e) => handleChange("email", e.target.value)}
-            onBlur={() => handleBlur("email")}
-            placeholder="you@cit.edu"
-            className={cls("email")}
-          />
-          {errMsg("email")}
-        </div>
-
-        <div>
-          <label className={labelCls}>
-            College <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={form.college_id}
-            onChange={(e) => handleChange("college_id", e.target.value)}
-            onBlur={() => handleBlur("college_id")}
-            disabled={loadingRef}
-            className={`${cls("college_id")} appearance-none disabled:opacity-50`}
-          >
-            <option value="">{loadingRef ? "Loading…" : "Select college"}</option>
-            {colleges.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+        {/* A real radio group (IR-539): it announces its question, both
+            choices and which one is chosen, and the arrow keys move between
+            them. The two buttons it replaces announced no state at all. */}
+        <fieldset role="radiogroup">
+          <legend className="mb-1 text-sm font-medium text-stone-700">I am registering as</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {ROLES.map(({ value, label }) => (
+              <label
+                key={value}
+                className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-4 py-2.5
+                  text-sm font-semibold transition-colors
+                  ${role === value
+                    ? "border-brand bg-brand-50 text-brand"
+                    : "border-stone-300 bg-surface text-stone-700 hover:border-stone-400"}`}
+              >
+                <input
+                  type="radio"
+                  name="register-role"
+                  value={value}
+                  checked={role === value}
+                  onChange={() => switchRole(value)}
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-brand"
+                />
+                {label}
+              </label>
             ))}
-          </select>
-          {errMsg("college_id")}
+          </div>
+        </fieldset>
+
+        <div className="grid gap-5 sm:grid-cols-5 sm:gap-3">
+          <div className="sm:col-span-2">
+            <Input id="signup-first-name" label="First Name" required placeholder="Juan"
+              autoComplete="given-name" {...field("first_name")} />
+          </div>
+          <div className="sm:col-span-2">
+            <Input id="signup-last-name" label="Last Name" required placeholder="Dela Cruz"
+              autoComplete="family-name" {...field("last_name")} />
+          </div>
+          <Input id="signup-middle-initial" label="M.I." placeholder="S." maxLength={10}
+            {...field("middle_initial")} />
         </div>
+
+        <Input id="signup-email" label="CIT-U Email" required type="email" placeholder="you@cit.edu"
+          autoComplete="email" {...field("email")} />
+
+        <Select id="signup-college" label="College" required disabled={loadingRef} {...field("college_id")}>
+          <option value="">{loadingRef ? "Loading…" : "Select college"}</option>
+          {colleges.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </Select>
 
         {role === "Student" && (
-          <div>
-            <label className={labelCls}>
-              Program <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.course_id}
-              onChange={(e) => handleChange("course_id", e.target.value)}
-              onBlur={() => handleBlur("course_id")}
-              disabled={!form.college_id}
-              className={`${cls("course_id")} appearance-none disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <option value="">
-                {!form.college_id ? "Select college first" : filteredCourses.length === 0 ? "No programs available" : "Select program"}
-              </option>
-              {courseGroups.map(({ deptName, courses }) => (
-                <optgroup key={deptName} label={deptName}>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            {errMsg("course_id")}
-          </div>
+          <Select id="signup-program" label="Program" required disabled={!form.college_id} {...field("course_id")}>
+            <option value="">
+              {!form.college_id ? "Select college first" : filteredCourses.length === 0 ? "No programs available" : "Select program"}
+            </option>
+            {courseGroups.map(({ deptName, courses }) => (
+              <optgroup key={deptName} label={deptName}>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
         )}
 
         {role === "Adviser" && (
-          <div>
-            <label className={labelCls}>
-              Department <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.dept_id}
-              onChange={(e) => handleChange("dept_id", e.target.value)}
-              onBlur={() => handleBlur("dept_id")}
-              disabled={!form.college_id}
-              className={`${cls("dept_id")} appearance-none disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <option value="">
-                {!form.college_id ? "Select college first" : filteredDepts.length === 0 ? "No departments available" : "Select department"}
-              </option>
-              {filteredDepts.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            {errMsg("dept_id")}
-          </div>
+          <Select id="signup-department" label="Department" required disabled={!form.college_id} {...field("dept_id")}>
+            <option value="">
+              {!form.college_id ? "Select college first" : filteredDepts.length === 0 ? "No departments available" : "Select department"}
+            </option>
+            {filteredDepts.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
         )}
 
-        <div>
-          <label className={labelCls}>
-            Password <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              value={form.password}
-              onChange={(e) => handleChange("password", e.target.value)}
-              onBlur={() => handleBlur("password")}
-              placeholder="At least 8 characters"
-              className={`${cls("password")} pr-16`}
+        <Input
+          id="signup-password"
+          label="Password"
+          required
+          type={showPassword ? "text" : "password"}
+          autoComplete="new-password"
+          // No placeholder: the hint below already says it, and says it while typing.
+          hint={passwordHint}
+          {...field("password")}
+          trailing={
+            <PasswordToggle
+              shown={showPassword}
+              onToggle={() => setShowPassword((v) => !v)}
+              what="password"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-brand hover:underline"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-          {form.password && !errors.password && (
-            <p className="text-[12px] text-green-600 mt-1.5">Password looks good.</p>
-          )}
-          {errMsg("password")}
-        </div>
+          }
+        />
 
-        <div>
-          <label className={labelCls}>
-            Confirm Password <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword2 ? "text" : "password"}
-              value={form.password2}
-              onChange={(e) => handleChange("password2", e.target.value)}
-              onBlur={() => handleBlur("password2")}
-              placeholder="Re-enter password"
-              className={`${cls("password2")} pr-16`}
+        <Input
+          id="signup-password2"
+          label="Confirm Password"
+          required
+          type={showPassword2 ? "text" : "password"}
+          autoComplete="new-password"
+          placeholder="Re-enter password"
+          hint={password2Hint}
+          {...field("password2")}
+          trailing={
+            <PasswordToggle
+              shown={showPassword2}
+              onToggle={() => setShowPassword2((v) => !v)}
+              what="confirmed password"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword2((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-brand hover:underline"
-            >
-              {showPassword2 ? "Hide" : "Show"}
-            </button>
-          </div>
-          {form.password2 && !errors.password2 && (
-            <p className="text-[12px] text-green-600 mt-1.5">Passwords match.</p>
-          )}
-          {errMsg("password2")}
-        </div>
+          }
+        />
 
+        {/* The consent line's wording and links are IR-540's to replace. */}
         <div className="flex items-start gap-2.5 pt-1">
           <input
             type="checkbox"
             id="terms"
             checked={terms}
             onChange={(e) => setTerms(e.target.checked)}
-            className="mt-0.5 w-4 h-4 shrink-0 accent-brand cursor-pointer"
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
           />
-          <label htmlFor="terms" className="text-[13px] text-gray-500 leading-relaxed cursor-pointer">
+          <label htmlFor="terms" className="cursor-pointer text-small text-stone-600">
             I agree to the IRIS{" "}
-            <a href="#" className="text-brand font-semibold hover:underline">Terms of Service</a>
+            <a href="#" className="font-semibold text-brand hover:underline">Terms of Service</a>
             {" "}and{" "}
-            <a href="#" className="text-brand font-semibold hover:underline">Data Privacy Policy</a>.
+            <a href="#" className="font-semibold text-brand hover:underline">Data Privacy Policy</a>.
           </label>
         </div>
 
-        <button
-          type="submit"
-          disabled={submitting || !terms}
-          className="w-full py-3.5 rounded-lg text-[16px] font-semibold text-white transition-colors bg-gold hover:bg-gold-dark disabled:bg-gray-300 disabled:cursor-not-allowed mt-1"
-        >
+        {/* `size="full"` carries the width and the 44px step. Maroon under
+            white is 12.3:1 at rest and 9.5:1 on hover; gold was 2.76:1. */}
+        <Button type="submit" variant="primary" size="full" loading={submitting} disabled={!terms}>
           {submitting ? "Creating account…" : "Register"}
-        </button>
+        </Button>
       </form>
 
-      <div className="mt-8 pt-6 border-t border-gray-100">
-        <p className="text-[14px] text-gray-500 text-center">
+      <div className="mt-section-lg border-t border-stone-200 pt-section">
+        <p className="text-center text-sm text-stone-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-brand font-semibold hover:underline">
+          <Link to="/login" className="font-semibold text-brand hover:underline">
             Sign in
           </Link>
         </p>
       </div>
     </AuthLayout>
+  );
+}
+
+/**
+ * The show/hide toggle in a password field's trailing slot, as on sign in
+ * (IR-204). Its accessible name begins with the word it shows, so "click Show"
+ * still matches for a voice user (2.5.3), and its box is 44 by 44 (2.5.5).
+ */
+function PasswordToggle({ shown, onToggle, what }: { shown: boolean; onToggle: () => void; what: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={`${shown ? "Hide" : "Show"} ${what}`}
+      className="flex min-h-11 min-w-11 items-center justify-center px-1 text-sm font-semibold text-brand hover:underline"
+    >
+      {shown ? "Hide" : "Show"}
+    </button>
   );
 }

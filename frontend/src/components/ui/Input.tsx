@@ -1,4 +1,6 @@
-import { forwardRef, useId, type InputHTMLAttributes } from "react";
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from "react";
+
+import { FieldLabel } from "./FieldLabel";
 
 // "lg" is the entry-screen step: a 44px-tall control, per 12-accessibility.md
 // section 4, which adopts 2.5.5 because the product is used on phones. Like
@@ -18,8 +20,15 @@ const SIZE_CLASSES: Record<Size, string> = {
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label?:   string;
   error?:   string;
-  hint?:    string;
+  /** Text, or text with a decorative glyph -- "At least 8 characters" with a check. */
+  hint?:    ReactNode;
   size?:    Size;
+  /**
+   * Marks the field required in words beside its label and as `aria-required`
+   * (IR-539). Not the native `required`: that would make an empty field
+   * `:invalid`, and announced invalid, before anyone has typed in it.
+   */
+  required?: boolean;
   leading?: React.ReactNode;
   /**
    * Interactive affordance pinned inside the field's trailing edge -- a
@@ -39,6 +48,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       size = "md",
       leading,
       trailing,
+      required,
       className = "",
       id,
       "aria-describedby": describedBy,
@@ -74,11 +84,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className="flex flex-col gap-1">
-        {label && (
-          <label htmlFor={inputId} className="text-[14px] font-medium text-stone-700">
-            {label}
-          </label>
-        )}
+        {label && <FieldLabel htmlFor={inputId} label={label} required={required} />}
         <div className="relative">
           {leading && (
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-500">
@@ -90,6 +96,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             aria-invalid={invalid ? true : undefined}
             aria-describedby={describedByIds || undefined}
+            aria-required={required || undefined}
             className={`w-full border rounded-lg outline-none transition-colors
               placeholder:text-stone-500 text-stone-900
               ${SIZE_CLASSES[size]}

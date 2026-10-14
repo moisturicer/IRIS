@@ -33,7 +33,6 @@ const NOT_YET_CONVERTED: readonly string[] = [
   "src/features/requests/AccessRequestsPage.tsx",
   // IR-364 -- sign-up, account and error screens
   "src/features/auth/EmailVerifyPage.tsx",
-  "src/features/auth/SignupPage.tsx",
   "src/features/errors/ForbiddenPage.tsx",
   "src/features/settings/SettingsPage.tsx",
   // IR-365 -- the Ask IRIS hub and chat page
@@ -67,8 +66,6 @@ const GREY_NOT_YET_CONVERTED: readonly string[] = [
   // IR-364 -- sign-up, account and error screens
   "src/components/auth/AuthBootstrap.tsx",
   "src/features/auth/EmailVerifyPage.tsx",
-  "src/features/auth/LoginPage.tsx",
-  "src/features/auth/SignupPage.tsx",
   "src/features/errors/ForbiddenPage.tsx",
   // Shared pieces no subtask names yet
   "src/components/compliance/DpaConsentModal.tsx",
