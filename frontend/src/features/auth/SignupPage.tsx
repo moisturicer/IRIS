@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useId, useRef, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { accountsApi } from "@/api/accounts";
-import { useUIStore } from "@/store/ui.store";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { Button, Input, Select } from "@/components/ui";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { DataNotice } from "./DataNotice";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Role = "Student" | "Adviser";
@@ -33,6 +35,37 @@ const EMPTY: FormState = {
   password: "", password2: "",
   college_id: "", course_id: "", dept_id: "",
 };
+
+/**
+ * The register serializer's error keys, onto the fields they mean (IR-540). Two
+ * are named differently on the server; `consent_given` belongs to the consent
+ * box. Anything else -- `non_field_errors`, `detail`, `role_name` -- is shown
+ * as an alert, because no field here can own it.
+ */
+const SERVER_FIELD: Record<string, keyof FormState> = {
+  email:            "email",
+  first_name:       "first_name",
+  last_name:        "last_name",
+  middle_initial:   "middle_initial",
+  password:         "password",
+  confirm_password: "password2",
+  college_id:       "college_id",
+  course_id:        "course_id",
+  department_id:    "dept_id",
+};
+
+interface FormAlert { title: string; message: string; }
+
+/** A reply with nothing to say about the fields: none came, or the server failed. */
+const UNREACHABLE: FormAlert = {
+  title:   "IRIS can't be reached right now",
+  message: "This is a connection or server problem, not a problem with what you typed. Try again shortly.",
+};
+
+const firstMessage = (val: unknown) => (Array.isArray(val) ? String(val[0]) : String(val));
+
+/** The consent box's own error, shown on it when a submit arrives without it (IR-540). */
+const CONSENT_REQUIRED = "Agree to the data notice to register.";
 
 const ROLES: { value: Role; label: string }[] = [
   { value: "Student", label: "Student" },
@@ -78,14 +111,24 @@ function validateLive(f: FormState, role: Role): FieldErrors {
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function SignupPage() {
-  const navigate     = useNavigate();
-  const { addToast } = useUIStore();
 
   const [role, setRole]             = useState<Role>("Student");
   const [form, setForm]             = useState<FormState>(EMPTY);
   const [errors, setErrors]         = useState<FieldErrors>({});
   const [touched, setTouched]       = useState<Partial<Record<keyof FormState, boolean>>>({});
-  const [terms, setTerms]           = useState(false);
+  const [consented, setConsented]   = useState(false);
+  const [consentError, setConsentError] = useState<string>();
+  const [formAlert, setFormAlert]   = useState<FormAlert | null>(null);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const noticeTriggerId = useId();
+  const noticeId        = useId();
+  const consentErrorId  = useId();
+  const nextStepsId     = useId();
+  // Set once the account exists: the screen then confirms in place instead of
+  // leaving on a toast (IR-540), naming the address exactly as it was entered.
+  const [registered, setRegistered] = useState<{ email: string; role: Role } | null>(null);
+  const confirmationRef = useRef<HTMLHeadingElement>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword]   = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
@@ -94,8 +137,13 @@ export default function SignupPage() {
   const [allDepts,   setAllDepts]   = useState<Department[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [loadingRef, setLoadingRef] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  // A failure is said inside the form, with a retry that keeps what was typed
+  // (IR-540), in place of a toast that left three empty selects behind it.
+  const loadOptions = useCallback(() => {
+    setLoadingRef(true);
+    setLoadFailed(false);
     Promise.all([
       accountsApi.colleges(),
       accountsApi.departments(),
@@ -105,9 +153,16 @@ export default function SignupPage() {
       setAllDepts(deptRes.data.results);
       setAllCourses(courseRes.data.results);
     }).catch(() => {
-      addToast({ type: "error", message: "Failed to load form options. Please refresh." });
+      setLoadFailed(true);
     }).finally(() => setLoadingRef(false));
-  }, [addToast]);
+  }, []);
+
+  useEffect(loadOptions, [loadOptions]);
+  // The form a screen-reader user was in has just gone, so their focus goes
+  // to what replaced it.
+  useEffect(() => {
+    if (registered) confirmationRef.current?.focus();
+  }, [registered]);
 
   const collegeNum = Number(form.college_id);
   const filteredDepts = allDepts.filter((d) => d.college === collegeNum);
@@ -150,12 +205,12 @@ export default function SignupPage() {
     setTouched(allKeys.reduce((acc, k) => ({ ...acc, [k]: true }), {}));
     const errs = validateAll(form, role);
     setErrors(errs);
-    if (Object.values(errs).some(Boolean)) return;
-    if (!terms) {
-      addToast({ type: "error", message: "Please agree to the Terms of Service." });
-      return;
-    }
+    // Consent is checked with the fields, not after them, so one press of
+    // Register shows everything that is missing at once (IR-540).
+    setConsentError(consented ? undefined : CONSENT_REQUIRED);
+    if (Object.values(errs).some(Boolean) || !consented) return;
 
+    setFormAlert(null);
     setSubmitting(true);
     try {
       await authApi.register({
@@ -165,26 +220,31 @@ export default function SignupPage() {
         last_name:        form.last_name.trim(),
         password:         form.password,
         confirm_password: form.password2,
+        // Required by the register serializer, and never sent before IR-540:
+        // every registration from this screen was refused until it was.
+        consent_given:    true,
         role_name:        role,
         ...(role === "Student"
           ? { course_id: Number(form.course_id) }
           : { college_id: Number(form.college_id), department_id: Number(form.dept_id) }),
       });
-      addToast({ type: "success", message: "Account created! Check your email to verify your account." });
-      navigate("/login");
+      setRegistered({ email: form.email.trim(), role });
     } catch (err: unknown) {
-      const data = (err as { response?: { data?: Record<string, unknown> } }).response?.data;
-      if (data && typeof data === "object") {
-        const mapped: FieldErrors = {};
-        for (const [key, val] of Object.entries(data)) {
-          mapped[key as keyof FormState] = Array.isArray(val) ? (val[0] as string) : String(val);
-        }
-        setErrors((prev) => ({ ...prev, ...mapped }));
-        const first = Object.values(mapped)[0];
-        if (first) addToast({ type: "error", message: first });
-      } else {
-        addToast({ type: "error", message: "Registration failed. Please try again." });
+      const response = (err as { response?: { status?: number; data?: unknown } }).response;
+      const data = response?.data;
+      if (!response || (response.status ?? 0) >= 500 || !data || typeof data !== "object") {
+        setFormAlert(UNREACHABLE);
+        return;
       }
+      const onFields: FieldErrors = {};
+      const elsewhere: string[] = [];
+      for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
+        if (key === "consent_given") setConsentError(firstMessage(val));
+        else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = firstMessage(val);
+        else elsewhere.push(firstMessage(val));
+      }
+      setErrors((prev) => ({ ...prev, ...onFields }));
+      if (elsewhere.length) setFormAlert({ title: "Registration failed", message: elsewhere.join(" ") });
     } finally {
       setSubmitting(false);
     }
@@ -217,6 +277,45 @@ export default function SignupPage() {
     ? <><i className="fas fa-check mr-1.5" aria-hidden />Passwords match</>
     : undefined;
 
+  if (registered) {
+    return (
+      <AuthLayout variant="signup" wide>
+        <h2
+          ref={confirmationRef}
+          tabIndex={-1}
+          className="text-balance font-display text-display font-semibold text-stone-900 outline-none"
+        >
+          Check your email
+        </h2>
+        <p className="mt-3 text-pretty text-body text-stone-700">
+          Your account was created. We sent a verification link to{" "}
+          <strong className="font-semibold text-stone-900">{registered.email}</strong>.
+        </p>
+        <ol className="mt-section list-decimal space-y-2 pl-5 text-body text-stone-700">
+          <li>Open the link in that email to verify your address.</li>
+          <li>
+            RDCO reviews your request to join as {registered.role === "Adviser" ? "an Adviser" : "a Student"}, and
+            emails you when they decide.
+          </li>
+        </ol>
+        {/* Not "contact RDCO": an email is read-only to every IRIS screen,
+            RDCO's included, so the only fix IRIS offers is a fresh registration. */}
+        <p className="mt-section text-small text-stone-600">
+          If that address is wrong, register again with the right one.
+        </p>
+        <Link
+          to="/login"
+          // Drawn as the primary action, since it is the only one left. Button
+          // cannot render as a link yet (IR-538 adds that); until then this
+          // copies its `primary` + `full` look, in type-role sizes.
+          className={`mt-section-lg flex min-h-11 w-full items-center justify-center rounded-lg bg-brand px-5 py-3.5 text-heading font-medium text-white transition-colors hover:bg-brand-light ${FOCUS_RING}`}
+        >
+          Go to sign in
+        </Link>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout variant="signup" wide>
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">
@@ -227,6 +326,17 @@ export default function SignupPage() {
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+        {loadFailed && (
+          <AuthAlert variant="error" title="Some of this form didn't load">
+            IRIS couldn&apos;t load the colleges, programs and departments to choose from.
+            <div className="mt-3">
+              <Button type="button" variant="outline" size="full" onClick={loadOptions}>
+                Try again
+              </Button>
+            </div>
+          </AuthAlert>
+        )}
+
         {/* A real radio group (IR-539): it announces its question, both
             choices and which one is chosen, and the arrow keys move between
             them. The two buttons it replaces announced no state at all. */}
@@ -341,26 +451,75 @@ export default function SignupPage() {
           }
         />
 
-        {/* The consent line's wording and links are IR-540's to replace. */}
-        <div className="flex items-start gap-2.5 pt-1">
-          <input
-            type="checkbox"
-            id="terms"
-            checked={terms}
-            onChange={(e) => setTerms(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
-          />
-          <label htmlFor="terms" className="cursor-pointer text-small text-stone-600">
-            I agree to the IRIS{" "}
-            <a href="#" className="font-semibold text-brand hover:underline">Terms of Service</a>
-            {" "}and{" "}
-            <a href="#" className="font-semibold text-brand hover:underline">Data Privacy Policy</a>.
-          </label>
+        {/* Consent against a notice on this page (IR-540), in place of links to
+            a Terms of Service and a Data Privacy Policy that do not exist yet
+            (IR-214). The notice opens in place, so reading it clears nothing. */}
+        <div className="pt-1">
+          <div className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="signup-consent"
+              checked={consented}
+              onChange={(e) => {
+                setConsented(e.target.checked);
+                if (e.target.checked) setConsentError(undefined);
+              }}
+              aria-invalid={consentError ? true : undefined}
+              aria-describedby={consentError ? consentErrorId : undefined}
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
+            />
+            <label htmlFor="signup-consent" className="cursor-pointer text-small text-stone-600">
+              I have read the data notice and agree to IRIS using my details as it describes.
+            </label>
+          </div>
+          {consentError && (
+            <p id={consentErrorId} className="mt-1.5 flex items-start gap-1.5 text-small text-brand">
+              <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+              {consentError}
+            </p>
+          )}
+          <button
+            type="button"
+            id={noticeTriggerId}
+            aria-expanded={noticeOpen}
+            aria-controls={noticeId}
+            onClick={() => setNoticeOpen((v) => !v)}
+            // 44px tall, as sign-in's "Forgot password?" is (2.5.5).
+            className={`mt-1 inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
+          >
+            <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-label`} aria-hidden />
+            Read the data notice
+          </button>
+          {noticeOpen && (
+            <div
+              id={noticeId}
+              role="region"
+              aria-labelledby={noticeTriggerId}
+              className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3"
+            >
+              <DataNotice />
+            </div>
+          )}
+        </div>
+
+        {formAlert && (
+          <AuthAlert variant="error" title={formAlert.title}>
+            {formAlert.message}
+          </AuthAlert>
+        )}
+
+        {/* Said before anything is sent, so the wait after it surprises no one (IR-533). */}
+        <div>
+          <p id={nextStepsId} className="text-small font-semibold text-stone-700">What happens next</p>
+          <ol aria-labelledby={nextStepsId} className="mt-1 list-decimal space-y-0.5 pl-5 text-small text-stone-600">
+            <li>You verify your email with the link we send you.</li>
+            <li>RDCO reviews your request, and emails you when they decide.</li>
+          </ol>
         </div>
 
         {/* `size="full"` carries the width and the 44px step. Maroon under
             white is 12.3:1 at rest and 9.5:1 on hover; gold was 2.76:1. */}
-        <Button type="submit" variant="primary" size="full" loading={submitting} disabled={!terms}>
+        <Button type="submit" variant="primary" size="full" loading={submitting}>
           {submitting ? "Creating account…" : "Register"}
         </Button>
       </form>

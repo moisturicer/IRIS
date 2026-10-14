@@ -72,6 +72,8 @@ export interface RegisterPayload {
   last_name:        string;
   password:         string;
   confirm_password: string;
+  /** Required by the register serializer: the registrant agreed to the data notice (IR-540). */
+  consent_given:    true;
   /** "Student" or "Adviser" */
   role_name?:       string;
   /** Student: course FK id */
