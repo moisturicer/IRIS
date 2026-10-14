@@ -193,8 +193,8 @@ export default function LoginPage() {
         </AuthAlert>
       )}
 
-      <h2 className="text-[28px] font-bold text-gray-900">Welcome Back</h2>
-      <p className="mt-2 text-[15px] text-gray-500 mb-6">
+      <h2 className="text-balance font-display text-display font-semibold text-stone-900">Welcome Back</h2>
+      <p className="mt-2 mb-section text-body text-stone-600">
         Please enter your credentials to access your records.
       </p>
 
@@ -241,7 +241,7 @@ export default function LoginPage() {
         onIdentifierChange={setIdentifier}
       />
 
-      <p className="text-[14px] text-gray-500 text-center mt-5">
+      <p className="mt-5 text-center text-sm text-stone-600">
         No account?{" "}
         <Link to="/signup" className="text-brand font-semibold hover:underline">
           Sign up
