@@ -94,6 +94,14 @@ describe("a declined request", () => {
     expect(screen.queryByText(/reviewing/i)).not.toBeInTheDocument();
   });
 
+  it("does not let the brand panel promise the account will open", () => {
+    signInAs(DECLINED);
+
+    const panel = screen.getByRole("complementary", { name: "About IRIS" });
+    expect(panel).toHaveTextContent("Your account is registered, but RDCO did not approve it.");
+    expect(panel).not.toHaveTextContent(/opens once RDCO approves/);
+  });
+
   it("still shows who the person registered as", () => {
     signInAs(DECLINED);
 

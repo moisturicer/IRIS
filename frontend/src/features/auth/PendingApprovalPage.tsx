@@ -65,14 +65,14 @@ export function PendingApprovalPage() {
   const { title, message } = standingOf(request, user.email);
 
   return (
-    <AuthLayout variant="pending">
-      <h2 className="text-balance text-display font-bold text-stone-900">{title}</h2>
+    <AuthLayout variant={request?.status === "declined" ? "declined" : "pending"}>
+      <h2 className="text-balance font-display text-display font-semibold text-stone-900">{title}</h2>
       <p className="mt-3 text-pretty text-body text-stone-700">{message}</p>
 
       <div
         role="group"
         aria-labelledby={registeredId}
-        className="mt-section-lg border border-stone-200 border-t-2 border-t-gold bg-white px-5 py-4"
+        className="mt-section-lg border border-stone-200 border-t-2 border-t-gold bg-surface px-5 py-4"
       >
         <p id={registeredId} className="text-label font-semibold text-stone-600">
           Registered as

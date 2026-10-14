@@ -23,6 +23,7 @@ const CASES: Array<{ variant: AuthPanelVariant; purpose: RegExp }> = [
   { variant: "signup", purpose: /^Register as a student or as faculty\. Once you verify your email, RDCO approves/ },
   { variant: "verify", purpose: /^This page confirms the email address .* RDCO then approves/ },
   { variant: "pending", purpose: /^Your account is registered\. It opens once RDCO approves it\.$/ },
+  { variant: "declined", purpose: /^Your account is registered, but RDCO did not approve it\.$/ },
 ];
 
 function renderPanel(variant: AuthPanelVariant) {

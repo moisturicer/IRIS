@@ -68,7 +68,6 @@ const GREY_NOT_YET_CONVERTED: readonly string[] = [
   "src/components/auth/AuthBootstrap.tsx",
   "src/features/auth/EmailVerifyPage.tsx",
   "src/features/auth/LoginPage.tsx",
-  "src/features/auth/PendingApprovalPage.tsx",
   "src/features/auth/SignupPage.tsx",
   "src/features/errors/ForbiddenPage.tsx",
   // Shared pieces no subtask names yet

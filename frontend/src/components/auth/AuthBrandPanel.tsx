@@ -1,8 +1,12 @@
 import irisLogo from "@/assets/images/iris_logo.png";
 import { cn } from "@/lib/utils";
 
-/** One per entry screen: sign in, register, verify email, await approval. */
-export type AuthPanelVariant = "login" | "signup" | "verify" | "pending";
+/**
+ * One per entry screen: sign in, register, verify email, await approval -- and
+ * the pending screen's declined state (IR-537), where "it opens once RDCO
+ * approves it" would sit beside "your request was not approved".
+ */
+export type AuthPanelVariant = "login" | "signup" | "verify" | "pending" | "declined";
 
 interface AuthBrandPanelProps {
   variant: AuthPanelVariant;
@@ -21,6 +25,7 @@ const PURPOSE: Record<AuthPanelVariant, string> = {
   verify:
     "This page confirms the email address you registered with. RDCO then approves your account.",
   pending: "Your account is registered. It opens once RDCO approves it.",
+  declined: "Your account is registered, but RDCO did not approve it.",
 };
 
 type Binding = "brand" | "brandDark" | "brandLight" | "white";
