@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { aiApi } from "@/api/ai";
 import type { RecordOverviewResponse } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
@@ -6,6 +6,8 @@ import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcon
 import { CitationText } from "@/features/ai/components/CitationText";
 import { OVERVIEW_MARKDOWN } from "@/features/ai/components/answerLayout";
 import { DegradedNotice } from "@/features/ai/components/PassageQuote";
+import { cn } from "@/lib/utils";
+import { CONTROL_BASE, CONTROL_OUTLINE } from "./controls";
 import { SectionHeading } from "./headings";
 
 /**
@@ -65,6 +67,23 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   const state = response?.state;
   const overview = response?.overview ?? null;
 
+  // Copy the text without its markers, so it pastes as prose.
+  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
+  const copyTimer = useRef<number>();
+  useEffect(() => () => window.clearTimeout(copyTimer.current), []);
+  const copy = async () => {
+    if (!overview) return;
+    let outcome: "copied" | "failed" = "copied";
+    try {
+      await navigator.clipboard.writeText(overview.text.replace(/\s?\[\d+\]/g, ""));
+    } catch {
+      outcome = "failed";
+    }
+    setCopied(outcome);
+    window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => setCopied("idle"), 2500);
+  };
+
   return (
     // On the page, like the Abstract above it: a heading and the text, with no
     // card around it (IR-569).
@@ -76,8 +95,17 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
             AI Overview
           </span>
         </SectionHeading>
-        {state === "ready" && (
-          <span className="text-2xs text-stone-500">RAG-indexed paper synthesis</span>
+        {state === "ready" && overview && (
+          <button type="button" onClick={() => void copy()} className={cn("px-3 text-stone-600", CONTROL_BASE, CONTROL_OUTLINE)}>
+            <i
+              className={cn(
+                "fas text-2xs",
+                copied === "copied" ? "fa-check text-brand" : copied === "failed" ? "fa-circle-exclamation" : "fa-copy",
+              )}
+              aria-hidden
+            />
+            {copied === "copied" ? "Copied" : copied === "failed" ? "Couldn’t copy" : "Copy"}
+          </button>
         )}
       </div>
 
@@ -167,6 +195,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
           <CitationText
             text={overview.text}
             citations={overview.citations}
+            pageMarkers
             className={OVERVIEW_MARKDOWN}
           />
 
