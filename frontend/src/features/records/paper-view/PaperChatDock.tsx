@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from "react";
 import { aiApi } from "@/api/ai";
 import type { ChatLane } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
@@ -11,53 +11,61 @@ import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessag
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { PANE_HEIGHT, PANE_TOP } from "./paneLayout";
 
-export type DockMode = "left" | "right" | "floating";
+export const PANEL_WIDTH_KEY = "iris_ask_iris_width";
 
-export const DOCK_KEY = "iris_paper_chat_dock";
+/** 360px, the first width, and a quarter more (IR-569). */
+export const PANEL_WIDTH_DEFAULT = 450;
+export const PANEL_WIDTH_MIN = 320;
 
-function readDock(): DockMode {
+function readWidth(): number {
   try {
-    const v = localStorage.getItem(DOCK_KEY);
-    return v === "left" || v === "right" || v === "floating" ? v : "floating";
+    const n = Number(localStorage.getItem(PANEL_WIDTH_KEY));
+    return n >= PANEL_WIDTH_MIN ? n : PANEL_WIDTH_DEFAULT;
   } catch {
-    return "floating";
+    return PANEL_WIDTH_DEFAULT;
   }
 }
 
 /**
- * Open/position state for Paper Chat.
+ * The reader's width, held to what the layout can spare: at most half the
+ * workspace, and in the Paper workspace what leaves the paper 640px. Never
+ * under the minimum.
+ */
+export function fitPanelWidth(preferred: number, room: number): number {
+  return Math.round(Math.max(PANEL_WIDTH_MIN, Math.min(preferred, room)));
+}
+
+/**
+ * Open and size state for Ask IRIS beside a paper.
  *
- * This lives in the page rather than the panel because a *docked* panel takes
- * part in the page layout — the page has to know the mode in order to make room
- * for it. Only the floating mode overlays.
+ * Held by the page, not the panel: the page lays out around it, and closing
+ * the panel must keep the draft and the width the reader chose.
  */
 export function usePaperChat() {
   const [open, setOpenState] = useState(false);
-  const [dock, setDock] = useState<DockMode>(readDock);
-  // Below `lg`, where the docked panel is a bottom sheet over the paper, a
-  // followed citation tucks it away to a bar (IR-354). Opening or closing
-  // the panel always starts it unminimized.
+  // A followed citation tucks the panel away to a bar when it would cover the
+  // passage (IR-354). Opening or closing always starts it unminimized.
   const [minimized, setMinimized] = useState(false);
-  // Here rather than in the panel, so closing it keeps the draft (IR-569).
   const [draft, setDraft] = useState("");
+  const [width, setWidthState] = useState(readWidth);
 
   const setOpen = (next: boolean) => {
     setOpenState(next);
     setMinimized(false);
   };
 
-  const setDockMode = (mode: DockMode) => {
-    setDock(mode);
+  const setWidth = (next: number) => {
+    const clamped = Math.round(Math.max(PANEL_WIDTH_MIN, next));
+    setWidthState(clamped);
     try {
-      localStorage.setItem(DOCK_KEY, mode);
+      localStorage.setItem(PANEL_WIDTH_KEY, String(clamped));
     } catch {
       /* per-browser convenience only */
     }
   };
 
-  return { open, setOpen, dock, setDockMode, minimized, setMinimized, draft, setDraft };
+  return { open, setOpen, minimized, setMinimized, draft, setDraft, width, setWidth };
 }
 
 /**
@@ -88,14 +96,7 @@ interface PaperChatPanelProps {
    * Absent, the panel stays on the paper it opened on.
    */
   arrival?: PaperChatArrival | null;
-  dock: DockMode;
-  onDockChange: (mode: DockMode) => void;
   onClose: () => void;
-  /**
-   * Whether the reader may move the panel. Off on the Paper tab, where Ask
-   * IRIS is always docked left (IR-372); a menu with one choice is no menu.
-   */
-  canChangePosition?: boolean;
   /**
    * Tucked away to a bar, so the paper under the bottom sheet can be read
    * (IR-354). The conversation stays mounted, and where the transcript was
@@ -122,6 +123,10 @@ interface PaperChatPanelProps {
   panelRef?: Ref<HTMLElement>;
   /** Over or instead of the paper (IR-569): a modal dialog, not a side panel. */
   modal?: boolean;
+  /** Set by the page where the panel has a width of its own. */
+  style?: CSSProperties;
+  /** Where the reader drags the panel's edge; absent where it is not a column. */
+  resize?: { width: number; max: number; onChange: (width: number) => void };
 }
 
 /** The paper a Paper Chat conversation is about. */
@@ -151,10 +156,7 @@ function subjectOf(record: RecordDetail): ChatSubject {
 export function PaperChatPanel({
   record,
   arrival,
-  dock,
-  onDockChange,
   onClose,
-  canChangePosition = true,
   minimized = false,
   onRestore,
   className,
@@ -164,8 +166,9 @@ export function PaperChatPanel({
   onBackToPaper,
   panelRef,
   modal = false,
+  style,
+  resize,
 }: PaperChatPanelProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const headingId = useId();
   const [ownInput, setOwnInput] = useState("");
   const input = draft ?? ownInput;
@@ -285,6 +288,7 @@ export function PaperChatPanel({
     // it is (IR-569). Focusable only by script, for the page's focus moves.
     <aside
       ref={panelRef}
+      style={style}
       tabIndex={-1}
       role={modal ? "dialog" : undefined}
       aria-modal={modal || undefined}
@@ -294,6 +298,8 @@ export function PaperChatPanel({
       )}
       aria-labelledby={headingId}
     >
+      {resize && !minimized && <ResizeEdge {...resize} />}
+
       {/* The minimized bar (IR-354): what this is, and one tap back to it.
           Its visible label is part of its accessible name (WCAG 2.5.3). */}
       {minimized && (
@@ -313,7 +319,7 @@ export function PaperChatPanel({
       )}
 
       {/* What this is (an AI, said so), which paper, and the scope (IR-356). */}
-      <div className="shrink-0 px-4 pt-3 pb-3 border-b border-stone-200" hidden={minimized}>
+      <div className="shrink-0 px-4 pt-3 pb-3 border-b border-stone-200 bg-stone-100" hidden={minimized}>
         {onBackToPaper && (
           // Only where the panel is the one view (below `reading-split`).
           <button
@@ -333,85 +339,14 @@ export function PaperChatPanel({
           </span>
           <span className="flex-1" />
 
-          {canChangePosition && (
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Panel position"
-              aria-expanded={menuOpen}
-              title="Panel position"
-            >
-              <i className="fas fa-ellipsis" aria-hidden />
-            </Button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-overlay rounded-xl shadow-card-md ring-1 ring-stone-200 py-1 z-50">
-                {(
-                  [
-                    { id: "left", label: "Dock left", icon: "fa-arrow-left" },
-                    { id: "right", label: "Dock right", icon: "fa-arrow-right" },
-                    { id: "floating", label: "Floating", icon: "fa-window-restore" },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => {
-                      onDockChange(opt.id);
-                      setMenuOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between gap-2 px-3 min-h-11 text-sm text-stone-700 hover:bg-stone-50"
-                  >
-                    <span className="flex items-center gap-2">
-                      <i className={cn("fas", opt.icon, "text-2xs text-stone-500")} aria-hidden />
-                      {opt.label}
-                    </span>
-                    {dock === opt.id && <i className="fas fa-check text-brand text-2xs" aria-hidden />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          )}
-
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close Ask IRIS" className="-mr-2">
             <i className="fas fa-xmark" aria-hidden />
           </Button>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-2xs text-stone-500">
-            {pinned ? `Chatting about ${subject.title}` : record.title}
-          </p>
-          {/* The scope control (IR-298, ADR-026 section 9): visible, and the
-              only thing that ever widens retrieval past this paper. Resets
-              with the conversation, not with the page's paper. */}
-          <button
-            type="button"
-            onClick={() => setWiden((v) => !v)}
-            aria-pressed={widen}
-            title={
-              widen
-                ? `Searching every paper — click to search only ${pinned ? subject.title : "this one"}`
-                : `Searching only ${pinned ? subject.title : "this paper"} — click to search every paper`
-            }
-            className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 min-w-0 max-w-[12rem] min-h-11 reading-split:min-h-7 px-2",
-              "rounded-md border text-2xs font-semibold transition-colors duration-200",
-              widen
-                ? "bg-brand text-white border-brand"
-                : "text-stone-700 border-stone-300 hover:border-brand/40 hover:text-brand",
-            )}
-          >
-            <span aria-hidden className={cn("w-1.5 h-1.5 rounded-full shrink-0", widen ? "bg-white" : "bg-brand")} />
-            {/* While pinned, "this paper" would read as the one on screen, so
-                the chip names the conversation's own paper (IR-355). */}
-            <span className="truncate">
-              {widen ? "All papers" : pinned ? subject.title : "This paper"}
-            </span>
-          </button>
-        </div>
+        <p className="mt-2 truncate text-2xs text-stone-500">
+          {pinned ? `Chatting about ${subject.title}` : record.title}
+        </p>
         {viewingVersion != null && !pinned && (
           <p className="mt-1 text-2xs text-stone-700">
             Answers are about the current version, not v{viewingVersion}.
@@ -453,7 +388,7 @@ export function PaperChatPanel({
                   key={question}
                   type="button"
                   onClick={() => chooseStarter(question)}
-                  className="min-h-11 px-3 py-2.5 rounded-md border border-stone-300 text-left text-small text-stone-700 hover:border-brand hover:text-brand transition-colors duration-200"
+                  className="min-h-11 px-3 py-2.5 rounded-md border border-stone-300 text-left text-small text-stone-700 hover:border-brand hover:bg-brand-50 hover:text-brand transition-colors duration-200"
                 >
                   {question}
                 </button>
@@ -476,9 +411,9 @@ export function PaperChatPanel({
         </CitationOriginContext.Provider>
       </div>
 
-      {/* Composer */}
+      {/* Composer: the question, then its scope and Send (IR-569). */}
       <div className="shrink-0 border-t border-stone-200 p-3" hidden={minimized}>
-        <div className="flex items-end gap-2 rounded-lg border border-stone-300 focus-within:border-brand/60 focus-within:ring-2 focus-within:ring-brand/20 pl-3 pr-2 py-2 transition-colors duration-200">
+        <div className="rounded-lg border border-stone-300 focus-within:border-brand/60 focus-within:ring-2 focus-within:ring-brand/20 transition-colors duration-200">
           <textarea
             ref={composerRef}
             rows={2}
@@ -494,17 +429,46 @@ export function PaperChatPanel({
             // a screen reader on Y must not hear "this paper" and mean X.
             aria-label={pinned ? `Ask about ${subject.title}` : "Ask about this paper"}
             placeholder="Ask about methodology, findings, datasets…"
-            className="flex-1 resize-none bg-transparent py-1.5 text-sm text-stone-800 placeholder-stone-500 outline-none"
+            className="block w-full resize-none bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 outline-none"
           />
-          <button
-            type="button"
-            onClick={send}
-            disabled={!input.trim() || busy || !ready}
-            aria-label="Send"
-            className="w-11 h-11 reading-split:w-8 reading-split:h-8 shrink-0 rounded-md bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors duration-200"
-          >
-            <i className="fas fa-arrow-up text-xs" aria-hidden />
-          </button>
+          <div className="flex items-center justify-between gap-2 px-2 pb-2">
+            {/* The scope control (IR-298, ADR-026 section 9): visible, and the
+                only thing that ever widens retrieval past this paper. Resets
+                with the conversation, not with the page's paper. */}
+            <button
+              type="button"
+              onClick={() => setWiden((v) => !v)}
+              aria-pressed={widen}
+              title={
+                widen
+                  ? `Searching every paper — click to search only ${pinned ? subject.title : "this one"}`
+                  : `Searching only ${pinned ? subject.title : "this paper"} — click to search every paper`
+              }
+              className={cn(
+                "inline-flex items-center gap-1.5 min-w-0 max-w-[14rem] min-h-11 reading-split:min-h-8 px-2.5",
+                "rounded-md border text-2xs font-semibold transition-colors duration-200",
+                widen
+                  ? "bg-brand text-white border-brand"
+                  : "bg-brand-50 text-brand border-brand-200 hover:border-brand/50",
+              )}
+            >
+              <span aria-hidden className={cn("w-1.5 h-1.5 rounded-full shrink-0", widen ? "bg-white" : "bg-brand")} />
+              {/* While pinned, "this paper" would read as the one on screen, so
+                  the chip names the conversation's own paper (IR-355). */}
+              <span className="truncate">
+                {widen ? "All papers" : pinned ? subject.title : "This paper"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={send}
+              disabled={!input.trim() || busy || !ready}
+              aria-label="Send"
+              className="w-11 h-11 reading-split:w-8 reading-split:h-8 shrink-0 rounded-md bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors duration-200"
+            >
+              <i className="fas fa-arrow-up text-xs" aria-hidden />
+            </button>
+          </div>
         </div>
         <p className="mt-1.5 px-1 text-2xs text-stone-500">Enter to send · Shift+Enter for a new line</p>
       </div>
@@ -513,46 +477,78 @@ export function PaperChatPanel({
 }
 
 /**
- * Positioning for a docked panel.
- *
- * Docked means *in flow*: at `lg` and up the panel becomes a sticky column
- * beside the page content, so it can never cover the app sidebar, the header,
- * or the record's own rail. Below `lg` there is no room for a second column,
- * so it falls back to a bottom sheet.
- *
- * It shares the reader pane's offsets (`paneLayout.ts`): it sits below the
- * fixed header, so its own header and composer are never hidden (IR-351),
- * and it is exactly as tall as the reader beside it (IR-352).
+ * The panel's left edge, which the reader drags (or arrows) to size it
+ * (IR-569). The panel is anchored to the right, so its width is how far the
+ * pointer is from the right edge.
  */
-const DOCKED_PANEL_BASE =
-  "fixed inset-x-0 bottom-0 z-40 h-[70vh] rounded-t-2xl border border-stone-200 " +
-  `lg:sticky lg:inset-x-auto lg:bottom-auto ${PANE_TOP} lg:z-auto ` +
-  `${PANE_HEIGHT} lg:shrink-0 lg:rounded-2xl`;
-
-export const DOCKED_PANEL_CLASS = `${DOCKED_PANEL_BASE} lg:w-[22rem]`;
+function ResizeEdge({
+  width,
+  max,
+  onChange,
+}: {
+  width: number;
+  max: number;
+  onChange: (width: number) => void;
+}) {
+  const clampTo = (n: number) => Math.max(PANEL_WIDTH_MIN, Math.min(n, max));
+  const drag = (e: PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const right = e.currentTarget.parentElement?.getBoundingClientRect().right ?? 0;
+    onChange(clampTo(right - e.clientX));
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 80 : 24;
+    if (e.key === "ArrowLeft") onChange(clampTo(width + step));
+    else if (e.key === "ArrowRight") onChange(clampTo(width - step));
+    else if (e.key === "Home") onChange(PANEL_WIDTH_MIN);
+    else if (e.key === "End") onChange(max);
+    else return;
+    e.preventDefault();
+  };
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize Ask IRIS"
+      aria-valuemin={PANEL_WIDTH_MIN}
+      aria-valuemax={max}
+      aria-valuenow={width}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+      onPointerMove={drag}
+      onDoubleClick={() => onChange(clampTo(PANEL_WIDTH_DEFAULT))}
+      className="hidden reading-split:block absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none transition-colors hover:bg-brand/30 focus-visible:bg-brand/40 focus:outline-none"
+    />
+  );
+}
 
 /**
  * Ask IRIS in the Paper workspace (IR-569), by the workspace's width: the
  * whole workspace below `reading-split`; a drawer over the paper below
- * `reading-wide`; from there a flush column beside it, 320-360px wide and
- * never leaving the paper under 640px.
+ * `reading-wide`; from there a flush column beside it. The page sets the
+ * width of the last two (the reader's choice, held to leave the paper 640px).
  */
 export const PAPER_WORKSPACE_PANEL_CLASS =
   "absolute inset-0 z-40 " +
-  "reading-split:left-auto reading-split:w-[22.5rem] reading-split:border-l reading-split:border-stone-300 " +
+  "reading-split:left-auto reading-split:border-l reading-split:border-stone-300 " +
   "reading-split:shadow-[-12px_0_32px_rgb(41_37_36/0.12)] " +
-  "reading-wide:static reading-wide:z-auto reading-wide:shadow-none reading-wide:shrink-0 " +
-  "reading-wide:w-[clamp(20rem,calc(100cqi-656px),22.5rem)]";
+  "reading-wide:relative reading-wide:z-auto reading-wide:shadow-none reading-wide:shrink-0";
 
 /**
- * A minimized bottom sheet (IR-354): a bar along the bottom of the screen,
- * no taller than it needs, so a followed citation's passage is not under
- * it. Only ever below `lg`; at `lg` the docked panel is a column that
- * covers nothing, and is never minimized.
+ * Everywhere else on the record page: the same panel as a column the page
+ * makes room for, so it never covers what it sits beside. Stuck below the
+ * record bar and as tall as what is left of the window.
+ */
+export const DOCKED_PANEL_CLASS =
+  "fixed inset-0 z-40 " +
+  "reading-split:sticky reading-split:inset-auto reading-split:top-14 reading-split:z-20 reading-split:self-start " +
+  "reading-split:h-[calc(100dvh-3.5rem)] reading-split:shrink-0 reading-split:border-l reading-split:border-stone-300";
+
+/**
+ * A minimized panel (IR-354): a bar along the bottom of the screen, no taller
+ * than it needs, so a followed citation's passage is not under it. Only where
+ * the panel would cover the paper; a column beside it is never minimized.
  */
 export const MINIMIZED_SHEET_CLASS =
   "fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-stone-200 shadow-card-md";
-
-/** Positioning for the floating panel — deliberately overlays the page. */
-export const FLOATING_PANEL_CLASS =
-  "fixed bottom-6 right-6 z-40 w-[min(94vw,26rem)] h-[min(80vh,34rem)] rounded-2xl border border-stone-200 shadow-card-md";

@@ -26,10 +26,9 @@ export const READING_HEADER_PX = 56;
 /** Panes: 12px below the header. */
 export const PANE_TOP_PX = READING_HEADER_PX + 12;
 
-/** Overview's rail and docked chat, which still follow the window (`lg`). */
-export const PANE_TOP = "lg:top-[68px]";
-export const PANE_HEIGHT = "lg:h-[calc(100vh-96px)]";
-export const PANE_MAX_HEIGHT = "lg:max-h-[calc(100vh-96px)]";
+/** Overview's rail, which follows the Overview column's width, not the window's. */
+export const OVERVIEW_RAIL_TOP = "overview-rail:top-[68px]";
+export const OVERVIEW_RAIL_MAX_HEIGHT = "overview-rail:max-h-[calc(100vh-96px)]";
 
 /** The reader and the Review pane, which follow the workspace. */
 export const READING_PANE_TOP = "reading-wide:top-[68px]";

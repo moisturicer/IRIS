@@ -21,6 +21,7 @@ import {
   READER_TOOLBAR_TOP,
   READER_TOOLBAR_TOP_PX,
   READING_PANE_HEIGHT,
+  READING_SPLIT_PX,
 } from "./paneLayout";
 import {
   MAX_SCALE,
@@ -35,8 +36,12 @@ import { usePaperFind } from "./usePaperFind";
 import { useReadingPosition } from "./useReadingPosition";
 
 const SCALE_STEP = 0.2;
-/** Used only until the pane has been measured, or where it cannot be. */
-const DEFAULT_SCALE = 1.3;
+/**
+ * The zoom a paper opens at (IR-569), and what an unmeasured pane uses. A
+ * pane narrower than `READING_SPLIT_PX` -- a phone -- opens fitted instead,
+ * since 140% would run well past its edge.
+ */
+const DEFAULT_SCALE = 1.4;
 /**
  * A window drag reports a new width every frame, and each refit repaints
  * every page. The first measurement applies at once, so the paper opens
@@ -212,7 +217,7 @@ export function PaperPdfReader({
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const [pages, setPages] = useState<PdfPage[]>([]);
-  const [zoom, setZoom] = useState<number | "fit">("fit");
+  const [zoom, setZoom] = useState<number | "fit" | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadBytes, setDownloadBytes] = useState<Blob | null>(null);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
@@ -244,7 +249,8 @@ export function PaperPdfReader({
     [pages],
   );
   const fitted = fitScale(baseWidth, paneWidth);
-  const scale = zoom === "fit" ? (fitted ?? DEFAULT_SCALE) : zoom;
+  const fitting = zoom === "fit" || (zoom === null && paneWidth > 0 && paneWidth < READING_SPLIT_PX);
+  const scale = fitting ? (fitted ?? DEFAULT_SCALE) : (zoom ?? DEFAULT_SCALE);
 
   const currentPage = useReadingPosition({
     ready: status === "ready",
@@ -432,7 +438,7 @@ export function PaperPdfReader({
         ref={toolbarRef}
         className={cn(
           fill
-            ? "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-canvas border-b border-stone-200"
+            ? "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-stone-100 border-b border-stone-200"
             : cn(
                 "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
                 "rounded-xl bg-overlay border border-stone-200",
@@ -478,7 +484,7 @@ export function PaperPdfReader({
             onClick={() => setZoom("fit")}
             disabled={!ready}
             aria-label="Fit to width"
-            aria-pressed={zoom === "fit"}
+            aria-pressed={fitting}
             title="Fit to width"
           >
             <i className="fas fa-arrows-left-right-to-line" aria-hidden />
@@ -545,7 +551,7 @@ export function PaperPdfReader({
           // A stable gutter, so the scrollbar appearing once the pages load
           // does not narrow the pane and set off a second refit.
           fill
-            ? "flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] rounded-none px-3 py-4 reading-split:px-6 focus-visible:ring-inset"
+            ? "flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] rounded-none bg-stone-200 px-3 py-4 reading-split:px-6 focus-visible:ring-inset"
             : cn(
                 "reading-wide:flex-1 reading-wide:min-h-0 reading-wide:overflow-y-auto reading-wide:[scrollbar-gutter:stable]",
                 "reading-wide:rounded-none reading-wide:p-4 reading-wide:focus-visible:ring-inset",

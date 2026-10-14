@@ -373,14 +373,14 @@ describe("zoom controls", () => {
     );
     await screen.findByText("Page 1 / 3");
 
-    expect(screen.getByText("130%")).toBeInTheDocument();
+    expect(screen.getByText("140%")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /zoom in/i }));
-    expect(screen.getByText("150%")).toBeInTheDocument();
+    expect(screen.getByText("160%")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /zoom out/i }));
     await userEvent.click(screen.getByRole("button", { name: /zoom out/i }));
-    expect(screen.getByText("110%")).toBeInTheDocument();
+    expect(screen.getByText("120%")).toBeInTheDocument();
   });
 });
 
@@ -543,13 +543,38 @@ describe("fitting the paper to its pane (IR-352)", () => {
     expect(screen.getByText("200%")).toBeInTheDocument();
   });
 
-  it("keeps the default zoom when the pane cannot be measured", async () => {
+  it("keeps the default zoom, 140%, when the pane cannot be measured", async () => {
     render(
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
     );
 
     await screen.findByText("Page 1 / 3");
-    expect(screen.getByText("130%")).toBeInTheDocument();
+    expect(screen.getByText("140%")).toBeInTheDocument();
+  });
+
+  it("opens at 140% in a pane wide enough for it, with Fit one press away (IR-569)", async () => {
+    // (782 - the page's 2px border) / 300px at scale 1 = 2.6, held to the 240% maximum.
+    measurePaneAs(782);
+    render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+
+    await screen.findByText("Page 1 / 3");
+    expect(screen.getByText("140%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fit to width" })).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Fit to width" }));
+    expect(screen.getByText("240%")).toBeInTheDocument();
+  });
+
+  it("opens fitted in a pane narrower than 640px, where 140% would run past its edge (IR-569)", async () => {
+    measurePaneAs(602);
+    render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+
+    await screen.findByText("Page 1 / 3");
+    expect(screen.getByText("200%")).toBeInTheDocument();
   });
 
   it("sizes each page from its own dimensions at the current zoom", async () => {

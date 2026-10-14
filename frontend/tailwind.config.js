@@ -44,6 +44,9 @@ const shelfRise = plugin(({ addBase, addComponents }) => {
 export const readingVariants = {
   "reading-split": "@container reading (min-width: 640px)",
   "reading-wide": "@container reading (min-width: 1000px)",
+  // The Overview's own column, which Ask IRIS narrows when it sits beside it:
+  // the rail goes beside the abstract only while there is room for both.
+  "overview-rail": "@container overview (min-width: 60rem)",
 };
 
 const readingTiers = plugin(({ addVariant }) => {

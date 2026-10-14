@@ -45,7 +45,7 @@ import type { RecordDetail, ReviewerSeat } from "@/types/records";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 
-import { DOCK_KEY } from "./PaperChatDock";
+import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
 
 const RECORD_ID = 7;
@@ -397,20 +397,25 @@ const inReview: RecordDetail = {
  * wide: the width the three Paper layouts are chosen by (IR-569).
  */
 function workspaceAt(width: number) {
+  const watching = new Set<{ target: Element; callback: ResizeObserverCallback; observer: ResizeObserver }>();
+  const report = (target: Element, callback: ResizeObserverCallback, observer: ResizeObserver, w: number) =>
+    callback([{ target, contentRect: { width: w } } as unknown as ResizeObserverEntry], observer);
   vi.stubGlobal(
     "ResizeObserver",
     class {
       constructor(private readonly callback: ResizeObserverCallback) {}
       observe(target: Element) {
-        this.callback(
-          [{ target, contentRect: { width } } as unknown as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
+        const entry = { target, callback: this.callback, observer: this as unknown as ResizeObserver };
+        watching.add(entry);
+        report(target, this.callback, entry.observer, width);
       }
       unobserve() {}
       disconnect() {}
     },
   );
+  return {
+    resizeTo: (next: number) => watching.forEach((w) => report(w.target, w.callback, w.observer, next)),
+  };
 }
 
 async function waitForRecord(title: string) {
@@ -668,7 +673,10 @@ describe("document requests (IR-262)", () => {
   });
 });
 
-describe("the rail while Paper Chat is docked (IR-351)", () => {
+// Ask IRIS on the Overview is the Paper workspace's panel, as a column the
+// page makes room for (IR-569): the same heading, composer and width, beside
+// a page that narrows to fit rather than sitting under it.
+describe("Ask IRIS on Overview (IR-569)", () => {
   const RAIL = { name: "Institutional Governance" };
 
   beforeEach(() => {
@@ -676,39 +684,92 @@ describe("the rail while Paper Chat is docked (IR-351)", () => {
     signInAs(99, "Student");
   });
 
-  afterEach(() => localStorage.removeItem(DOCK_KEY));
+  it("opens from the round icon at the bottom right, with the rail where it was", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
 
-  async function openChatDocked(mode: "left" | "right" | "floating") {
-    localStorage.setItem(DOCK_KEY, mode);
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Panel position" })).not.toBeInTheDocument();
+  });
+
+  it("is a column beside the page, 450px wide, not a layer over it", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    const panel = await screen.findByRole("complementary", { name: "Ask IRIS" });
+    expect(panel.style.width).toBe("450px");
+    expect(panel).toHaveClass("reading-split:sticky");
+    expect(panel).not.toHaveClass("reading-split:fixed");
+    // The page it sits beside is its own container, so it reads what is left.
+    expect(screen.getByRole("heading", { level: 1 }).closest("[class*=container-name]")).not.toBeNull();
+    expect(panel.closest("[inert]")).toBeNull();
+    expect(screen.getByRole("tablist").closest("[inert]")).toBeNull();
+  });
+
+  it("is never more than half the workspace, whatever width was chosen", async () => {
+    localStorage.setItem(PANEL_WIDTH_KEY, "900");
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    expect((await screen.findByRole("complementary", { name: "Ask IRIS" })).style.width).toBe("700px");
+    localStorage.removeItem(PANEL_WIDTH_KEY);
+  });
+
+  it("steps aside when the sidebar narrows the page to a phone's width, leaving the page", async () => {
+    const workspace = workspaceAt(900);
     renderPaperView();
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
     await screen.findByRole("complementary", { name: "Ask IRIS" });
-  }
 
-  // Docked beside the rail, the chat squeezed the paper under it; the rail is
-  // not shown at all while docked. It is back as soon as the chat floats.
-  it.each(["left", "right"] as const)("is not shown while docked %s", async (mode) => {
-    await openChatDocked(mode);
-    expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
+    act(() => workspace.resizeTo(700));
+    expect(screen.getByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
+
+    act(() => workspace.resizeTo(613));
+    expect(screen.queryByRole("heading", { name: "Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 
-  it("is shown while the chat floats", async () => {
-    await openChatDocked("floating");
-    expect(screen.getByRole("heading", RAIL)).toBeInTheDocument();
+  it("closes back to the icon", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Close Ask IRIS" }));
+
+    expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask IRIS" })).toBeInTheDocument();
   });
 
-  it("comes back when the docked chat is closed", async () => {
-    await openChatDocked("right");
-    await userEvent.click(screen.getByRole("button", { name: "Close Ask IRIS" }));
-    expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
+  it("is one dialog over the whole page on a phone, which waits behind it", async () => {
+    workspaceAt(360);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS" }));
+
+    const panel = await screen.findByRole("dialog", { name: "Ask IRIS" });
+    expect(panel.closest("[inert]")).toBeNull();
+    expect(screen.getByRole("tablist").closest("[inert]")).not.toBeNull();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Ask IRIS" })).not.toBeInTheDocument();
   });
 });
 
-// The Paper tab is the paper and Ask IRIS docked right, full width, nothing
-// else (IR-372). Since IR-569 entering it opens Ask IRIS, collapses the
-// sidebar for the visit, and a one-line header replaces the editorial one;
-// the workspace's width picks the layout. Overview keeps IR-351's rule above.
+// The Paper tab is the paper and Ask IRIS, nothing else (IR-372). Since IR-569
+// entering it opens Ask IRIS, collapses the sidebar for the visit, and a
+// one-line record bar replaces the editorial header; the workspace's width
+// picks the layout, and the reader sizes the panel.
 describe("the Paper tab (IR-372, IR-569)", () => {
   const RAIL = { name: "Institutional Governance" };
   const ASK = { name: "Ask IRIS" };
@@ -720,12 +781,11 @@ describe("the Paper tab (IR-372, IR-569)", () => {
   });
 
   afterEach(() => {
-    localStorage.removeItem(DOCK_KEY);
+    localStorage.removeItem(PANEL_WIDTH_KEY);
     vi.unstubAllGlobals();
   });
 
-  async function openPaperTab(storedDock?: "left" | "right" | "floating") {
-    if (storedDock) localStorage.setItem(DOCK_KEY, storedDock);
+  async function openPaperTab() {
     const view = renderPaperView();
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
@@ -735,13 +795,13 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     return view;
   }
 
-  it("opens Ask IRIS on entry, from the header rather than a floating button, creating nothing", async () => {
+  it("opens Ask IRIS on entry, with the icon only once it is closed, creating nothing", async () => {
     const { aiApi } = await import("@/api/ai");
     vi.mocked(aiApi.conversations.create).mockClear();
 
     await openPaperTab();
 
-    expect(screen.getByRole("button", ASK)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", ASK)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();
     expect(aiApi.conversations.create).not.toHaveBeenCalled();
     expect(aiApi.askStream).not.toHaveBeenCalled();
@@ -770,6 +830,15 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
   });
 
+  it("has Ask IRIS as an icon, not a button in the record bar", async () => {
+    await openPaperTab();
+    await userEvent.click(screen.getByRole("button", { name: "Close Ask IRIS" }));
+
+    const icon = screen.getByRole("button", ASK);
+    expect(icon.closest("header, [role=tablist]")).toBeNull();
+    expect(icon).toHaveClass("fixed", "bottom-5");
+  });
+
   it("collapses the sidebar to its rail while reading, and gives the saved choice back after", async () => {
     await openPaperTab();
     expect(selectSidebarCollapsed(useUIStore.getState())).toBe(true);
@@ -781,50 +850,27 @@ describe("the Paper tab (IR-372, IR-569)", () => {
   });
 
   it("shows no rail", async () => {
-    await openPaperTab("floating");
+    await openPaperTab();
     expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
   });
 
-  it.each(["left", "right", "floating"] as const)(
-    "docks the chat with no way to move it, whatever was stored (%s)",
-    async (stored) => {
-      await openPaperTab(stored);
-
-      expect(screen.queryByRole("heading", RAIL)).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Panel position" })).not.toBeInTheDocument();
-      // The reader's own choice is left alone for Overview.
-      expect(localStorage.getItem(DOCK_KEY)).toBe(stored);
-    },
-  );
-
-  it("closes to the paper, and the header's Ask IRIS reopens it with the draft kept", async () => {
+  it("closes to the paper, and the icon reopens it with the draft kept", async () => {
     await openPaperTab();
     await userEvent.type(screen.getByRole("textbox", { name: "Ask about this paper" }), "What was measured?");
 
     await userEvent.click(screen.getByRole("button", { name: "Close Ask IRIS" }));
     expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.getByText(/paper reader open/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", ASK)).toHaveAttribute("aria-pressed", "false");
 
     await userEvent.click(screen.getByRole("button", ASK));
     expect(await screen.findByRole("textbox", { name: "Ask about this paper" })).toHaveValue("What was measured?");
   });
 
-  it("gives Overview back its own layout, rail and floating chat included", async () => {
-    await openPaperTab("floating");
-    await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
-
-    expect(await screen.findByRole("heading", RAIL)).toBeInTheDocument();
-    expect(screen.getByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Panel position" })).toBeInTheDocument();
-  });
-
-  it("keeps an open chat's conversation when the reader switches tabs", async () => {
+  it("keeps an open chat's conversation when the reader switches sections", async () => {
     const { aiApi } = await import("@/api/ai");
     const find = vi.mocked(aiApi.conversations.findForRecord);
     find.mockClear();
 
-    localStorage.setItem(DOCK_KEY, "right");
     renderPaperView();
     await waitForRecord(record.title);
     await userEvent.click(screen.getByRole("button", ASK));
@@ -863,7 +909,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
       expect(inert(screen.getByRole("tabpanel"))).toBe(true);
       expect(inert(screen.getByRole("tablist"))).toBe(true);
       // Focus that escapes (to the app's sidebar, say) is brought back.
-      act(() => screen.getByRole("button", ASK).focus());
+      act(() => screen.getByRole("tab", { name: "Overview" }).focus());
       expect(panel).toHaveFocus();
 
       await userEvent.keyboard("{Escape}");
@@ -879,12 +925,83 @@ describe("the Paper tab (IR-372, IR-569)", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Back to paper" }));
 
-      expect(screen.getByRole("button", { name: "Show Ask IRIS" })).toBeInTheDocument();
+      const bar = screen.getByRole("button", { name: "Show Ask IRIS" });
       expect(inert(screen.getByRole("tabpanel"))).toBe(false);
-      await waitFor(() => expect(screen.getByRole("button", ASK)).toHaveFocus());
+      await waitFor(() => expect(bar).toHaveFocus());
 
-      await userEvent.click(screen.getByRole("button", ASK));
+      await userEvent.click(bar);
       expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
+    });
+
+    it("steps aside when the sidebar opens and narrows the workspace, leaving the paper in view", async () => {
+      const workspace = workspaceAt(1200);
+      await openPaperTab();
+      expect(screen.getByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
+
+      act(() => workspace.resizeTo(613));
+
+      expect(screen.queryByRole("heading", { name: "Ask IRIS" })).not.toBeInTheDocument();
+      expect(screen.getByText(/paper reader open/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", ASK)).toBeInTheDocument();
+    });
+
+    it("leaves the chat open when the workspace widens", async () => {
+      const workspace = workspaceAt(613);
+      await openPaperTab();
+
+      act(() => workspace.resizeTo(1200));
+
+      expect(screen.getByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
+    });
+  });
+
+  describe("the panel's width", () => {
+    const panelWidth = () => screen.getByRole("complementary", { name: "Ask IRIS" }).style.width;
+    const edge = () => screen.getByRole("separator", { name: "Resize Ask IRIS" });
+
+    it("starts at 450px, a quarter wider than the 360px it was", async () => {
+      workspaceAt(1400);
+      await openPaperTab();
+
+      expect(panelWidth()).toBe("450px");
+    });
+
+    it("is never more than half the workspace, the half the reader asked for included", async () => {
+      localStorage.setItem(PANEL_WIDTH_KEY, "900");
+      workspaceAt(1400);
+      await openPaperTab();
+
+      expect(panelWidth()).toBe("700px");
+    });
+
+    it("is held to leave the paper 640px, never under 320px", async () => {
+      workspaceAt(1000);
+      await openPaperTab();
+
+      expect(panelWidth()).toBe("344px");
+    });
+
+    it("is resized from its edge with the arrow keys, and remembered", async () => {
+      workspaceAt(1400);
+      await openPaperTab();
+
+      edge().focus();
+      await userEvent.keyboard("{ArrowLeft}{ArrowLeft}");
+
+      expect(panelWidth()).toBe("498px");
+      expect(edge()).toHaveAttribute("aria-valuenow", "498");
+      expect(localStorage.getItem(PANEL_WIDTH_KEY)).toBe("498");
+    });
+
+    it("keeps what the reader chose, and goes back to 450px on a double click", async () => {
+      localStorage.setItem(PANEL_WIDTH_KEY, "600");
+      workspaceAt(1500);
+      await openPaperTab();
+      expect(panelWidth()).toBe("600px");
+
+      await userEvent.dblClick(edge());
+
+      expect(panelWidth()).toBe("450px");
     });
   });
 });
@@ -1079,8 +1196,7 @@ describe("following a citation to another paper (IR-355)", () => {
 
   beforeEach(async () => {
     signInAs(99, "Student");
-    localStorage.setItem(DOCK_KEY, "right");
-    // In a wide workspace the docked chat is a column and never minimizes
+    // In a wide workspace the chat is a column and never minimizes
     // (IR-354), so the transcript stays readable after a citation is followed.
     workspaceAt(1200);
 
@@ -1116,7 +1232,6 @@ describe("following a citation to another paper (IR-355)", () => {
 
   afterEach(async () => {
     heldBack = null;
-    localStorage.removeItem(DOCK_KEY);
     vi.unstubAllGlobals();
     const { recordsApi } = await import("@/api/records");
     vi.mocked(recordsApi.detail).mockImplementation((() => Promise.resolve({ data: shownRecord })) as never);
@@ -1276,13 +1391,10 @@ describe("following a citation to another paper (IR-355)", () => {
     expect(await conversationsOpened()).toEqual([RECORD_ID]);
   });
 
-  it("keeps the pin when the panel changes position", async () => {
+  it("keeps the pin when the reader moves between sections", async () => {
     await followToOtherPaper();
 
-    // The Paper tab fixes the dock (IR-372); Overview offers it.
     await userEvent.click(screen.getByRole("tab", { name: "Overview" }));
-    await userEvent.click(within(panel()).getByRole("button", { name: "Panel position" }));
-    await userEvent.click(within(panel()).getByRole("button", { name: /Floating/ }));
 
     expect(within(panel()).getByText(PINNED_HEADER)).toHaveTextContent(`Chatting about ${record.title}`);
     expect(within(panel()).getByText(/Gauge density matters/)).toBeVisible();
@@ -1580,7 +1692,6 @@ describe("the Review section (IR-412)", () => {
 
   afterEach(() => {
     vi.mocked(recordsApi.tracker).mockImplementation(() => Promise.reject(new Error("not under test")));
-    localStorage.removeItem(DOCK_KEY);
   });
 
   const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
@@ -1729,8 +1840,6 @@ describe("record versions (IR-416)", () => {
   beforeEach(() => {
     signInAs(99, "Student");
   });
-
-  afterEach(() => localStorage.removeItem(DOCK_KEY));
 
   it("offers no picker with one version, or with none disclosed", async () => {
     for (const versions of [[version(1, "submission")], null]) {

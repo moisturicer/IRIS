@@ -33,12 +33,13 @@ import {
 import {
   usePaperChat,
   PaperChatPanel,
-  type DockMode,
   DOCKED_PANEL_CLASS,
-  FLOATING_PANEL_CLASS,
   MINIMIZED_SHEET_CLASS,
+  PANEL_WIDTH_MIN,
   PAPER_WORKSPACE_PANEL_CLASS,
+  fitPanelWidth,
 } from "./PaperChatDock";
+import { AskIrisFab } from "./AskIrisFab";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
@@ -48,7 +49,7 @@ import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
-import { PANE_MAX_HEIGHT, PANE_TOP, readingTier } from "./paneLayout";
+import { OVERVIEW_RAIL_MAX_HEIGHT, OVERVIEW_RAIL_TOP, readingTier, type ReadingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -292,6 +293,8 @@ function initials(name: string): string {
  * is not an arrival: Back still leaves the paper, and Paper Chat keeps the
  * conversation it is on, pinned or not (IR-355).
  */
+const TIER_RANK: Record<ReadingTier, number> = { single: 0, overlay: 1, wide: 2 };
+
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -370,12 +373,34 @@ export default function PaperViewPage() {
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
   const onReviewTab = section === "review";
-  const dock: DockMode = onPaperTab ? "right" : chat.dock;
-  const chatDocked = chat.open && dock !== "floating" && !onReviewTab;
   // Never beside the paper, where there is no sheet to tuck away.
-  const chatMinimized = chat.minimized && chatDocked && tier !== "wide";
-  // Ask IRIS over the paper or instead of it: the rest waits (IR-569).
-  const chatModal = onPaperTab && chat.open && !chatMinimized && (tier === "overlay" || tier === "single");
+  const chatMinimized = chat.minimized && chat.open && !onReviewTab && tier !== "wide";
+  // Ask IRIS over the paper, or instead of the page: the rest waits (IR-569).
+  const chatModal =
+    chat.open &&
+    !chatMinimized &&
+    !onReviewTab &&
+    (tier === "single" || (onPaperTab && tier === "overlay"));
+  // The reader's width, held to half the workspace, and beside the paper to
+  // what leaves it 640px.
+  const half = Math.floor(workspaceWidth / 2);
+  const panelRoom = tier === "wide" && onPaperTab ? Math.min(half, workspaceWidth - 656) : half;
+  const panelWidth =
+    tier === "wide" || tier === "overlay" ? fitPanelWidth(chat.width, panelRoom) : undefined;
+
+  // Opening the sidebar narrows the workspace; Ask IRIS steps aside rather than
+  // taking over the page (IR-569): over the paper at any narrowing, and on the
+  // other sections only where it would become the whole view. Widening leaves
+  // it as it was.
+  const lastTier = useRef<ReadingTier | null>(null);
+  useEffect(() => {
+    const before = lastTier.current;
+    lastTier.current = tier;
+    if (onReviewTab || !chat.open || before == null || tier == null) return;
+    const narrowed = TIER_RANK[tier] < TIER_RANK[before];
+    if (narrowed && (onPaperTab || tier === "single")) chat.setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier]);
 
   // Entering Paper opens Ask IRIS, once per visit to the section (IR-569).
   // Following a citation within it is not an entry.
@@ -420,7 +445,7 @@ export default function PaperViewPage() {
     };
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || inOtherDialog(e.target)) return;
-      if (tier === "single") backToPaper();
+      if (tier === "single" && onPaperTab) backToPaper();
       else closeChat();
     };
     // The sidebar is the app's, not inert here: focus reaching it comes back.
@@ -436,11 +461,12 @@ export default function PaperViewPage() {
       document.removeEventListener("focusin", onFocusIn);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatModal, tier]);
+  }, [chatModal, tier, onPaperTab]);
   useEffect(() => {
     if (!refocusAsk.current || chatModal) return;
     refocusAsk.current = false;
-    askButtonRef.current?.focus();
+    const bar = panelRef.current?.querySelector<HTMLElement>('button[aria-label="Show Ask IRIS"]');
+    (bar ?? askButtonRef.current)?.focus();
   });
 
   useEffect(() => {
@@ -569,9 +595,8 @@ export default function PaperViewPage() {
   // with nothing to highlight, which is the same graceful case a passage
   // with no recovered regions already is.
   const navCitation = (location.state as CitationNavigationState | null)?.citation;
-  // The Paper section is the paper and Ask IRIS, nothing else (IR-372); the
-  // reader's own dock choice is only overridden, never overwritten, so
-  // Overview gets it back unchanged. The Review section has no Ask IRIS
+  // One Ask IRIS everywhere (IR-569): a column or drawer in the Paper
+  // workspace, a column beside the page on the other sections. The Review section has none
   // (spec §4.6): the panel stays mounted there, only hidden.
   const chatPanelClass = onReviewTab
     ? "hidden"
@@ -579,10 +604,8 @@ export default function PaperViewPage() {
       ? MINIMIZED_SHEET_CLASS
       : onPaperTab
         ? PAPER_WORKSPACE_PANEL_CLASS
-        : chatDocked
-          ? DOCKED_PANEL_CLASS
-          : FLOATING_PANEL_CLASS;
-  const showRail = section === "overview" && !chatDocked && !arriving;
+        : DOCKED_PANEL_CLASS;
+  const showRail = section === "overview" && !arriving;
   // Versions (IR-416). Null to a viewer who may not read the review, so a
   // reader of a published paper has none, and `?version=` means nothing to
   // them. An earlier version is open only while it is asked for, exists and
@@ -708,13 +731,6 @@ export default function PaperViewPage() {
       <span className="shrink-0 text-small font-semibold text-stone-500">v{latestVersion.number}</span>
     ) : null;
 
-  /** The header's Ask IRIS: open, bring back from the bar, or close. */
-  const toggleChat = () => {
-    if (!chat.open) chat.setOpen(true);
-    else if (chatMinimized) chat.setMinimized(false);
-    else closeChat();
-  };
-
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -749,34 +765,34 @@ export default function PaperViewPage() {
         onBack={() => navigate(-1)}
         title={!onPaperTab ? undefined : arriving ? null : record.title}
         version={onPaperTab ? paperVersion : undefined}
-        askIris={
-          onReviewTab
-            ? undefined
-            : { open: chat.open && !chatMinimized, onToggle: toggleChat, buttonRef: askButtonRef }
-        }
       />
       <div
         className={cn(
           onPaperTab
             ? "flex-1 min-h-0 flex"
-            : cn(
-                "px-4 sm:px-7 pt-6 pb-7 lg:flex lg:gap-6 lg:items-start",
-                !onReviewTab && PAGE_WIDTH.standard,
-                dock === "left" && !onReviewTab && "lg:flex-row-reverse",
-              ),
+            : onReviewTab
+              ? "px-4 sm:px-7 pt-6 pb-7"
+              : "flex items-start",
         )}
       >
         <div
           {...(chatModal ? { inert: "" } : {})}
-          className={cn("min-w-0", onPaperTab ? "flex-1 flex flex-col" : "lg:flex-1")}
+          className={cn(
+            "min-w-0",
+            onPaperTab && "flex-1 flex flex-col",
+            // Its own container, so the rail and the page read the room the
+            // panel leaves them (IR-569), as the reader reads the paper's.
+            !onPaperTab && !onReviewTab && "flex-1 [container-type:inline-size] [container-name:overview]",
+          )}
         >
 
           <div
             className={cn(
               onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-6 items-start",
-              // The rail takes some of a wide screen's extra width (IR-521);
-              // the Abstract keeps its reading measure either way.
-              showRail && "lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]",
+              !onPaperTab && !onReviewTab && cn("px-4 sm:px-7 pt-6 pb-7", PAGE_WIDTH.standard),
+              // The rail sits beside the page while the column has room for
+              // both, and under it otherwise; the Abstract keeps its measure.
+              showRail && "overview-rail:grid-cols-[minmax(0,1fr)_20rem]",
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -1109,15 +1125,13 @@ export default function PaperViewPage() {
           {/* ------------------------------------------------------------- */}
           {/* Right rail                                                     */}
           {/* ------------------------------------------------------------- */}
-          {/* Overview only (IR-372 keeps it off the Paper tab). Not shown
-              while chat is docked (IR-351): a docked chat beside the rail
-              squeezed the paper under it. Floating or closing the chat brings
-              it back. Sticky under the section switch, capped to the
-              viewport and scrollable, because a sticky rail taller than the
-              window would hide its lower cards until the paper ended. The
-              party status strip is for participants only (spec §4.6). */}
+          {/* Overview only (IR-372 keeps it off the Paper tab). Sticky under
+              the record bar, capped to the viewport and scrollable, because a
+              sticky rail taller than the window would hide its lower cards
+              until the paper ended. The party status strip is for
+              participants only (spec §4.6). */}
           {showRail && (
-            <aside className={cn("space-y-4 lg:sticky lg:overflow-y-auto", PANE_TOP, PANE_MAX_HEIGHT)}>
+            <aside className={cn("space-y-4 overview-rail:sticky overview-rail:overflow-y-auto", OVERVIEW_RAIL_TOP, OVERVIEW_RAIL_MAX_HEIGHT)}>
               {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
               <PaperGovernance record={record} />
               <PaperDocuments
@@ -1162,20 +1176,32 @@ export default function PaperViewPage() {
               ? null
               : { key: arrivalKey.current, fromPaperChat: followedFromPaperChat(location.state) }
           }
-          dock={dock}
-          onDockChange={chat.setDockMode}
           onClose={closeChat}
           onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
           panelRef={panelRef}
           modal={chatModal}
           draft={chat.draft}
           onDraftChange={chat.setDraft}
-          canChangePosition={!onPaperTab}
+          resize={
+            panelWidth && !chatMinimized
+              ? {
+                  width: panelWidth,
+                  max: Math.max(PANEL_WIDTH_MIN, panelRoom),
+                  onChange: chat.setWidth,
+                }
+              : undefined
+          }
+          style={panelWidth && !chatMinimized ? { width: panelWidth } : undefined}
           minimized={chatMinimized}
           onRestore={() => chat.setMinimized(false)}
           viewingVersion={viewedVersion?.number ?? null}
           className={chatPanelClass}
         />
+      )}
+      {/* Closed: one round icon at the bottom right (IR-569). On the bar
+          while minimized, which is its way back. */}
+      {!chat.open && !onReviewTab && (
+        <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />
       )}
       </div>
     </div>

@@ -86,7 +86,7 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
   it("opens on no Conversation, and starts one scoped to the Record only with the first question (IR-569)", async () => {
     findForRecord.mockResolvedValue(null);
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
 
     await waitFor(() => expect(findForRecord).toHaveBeenCalledWith(record.id));
@@ -116,7 +116,7 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
     );
 
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
 
     expect(await screen.findByText("What does this paper conclude?")).toBeTruthy();
@@ -127,7 +127,7 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
 
   it("never prefixes the question with the paper's title", async () => {
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
     await waitFor(() => expect(findForRecord).toHaveBeenCalled());
 
@@ -142,7 +142,7 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
 
   it("sends the Conversation id so the question is stored as a Turn", async () => {
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
     await waitFor(() => expect(findForRecord).toHaveBeenCalled());
 
@@ -161,7 +161,7 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
 describe("the widen control", () => {
   it("defaults to searching only this paper", async () => {
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
 
     const toggle = await screen.findByRole("button", { name: "This paper" });
@@ -170,7 +170,7 @@ describe("the widen control", () => {
 
   it("widens the search only once the reader turns it on, never on its own", async () => {
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
     await waitFor(() => expect(findForRecord).toHaveBeenCalled());
 
@@ -189,7 +189,7 @@ describe("the widen control", () => {
   it("says when an answer left this paper's scope", async () => {
     askStream.mockImplementation(() => doneStreamOf({ widened: true }));
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
     await waitFor(() => expect(findForRecord).toHaveBeenCalled());
 
@@ -206,7 +206,7 @@ describe("the widen control", () => {
 describe("starter questions (IR-356)", () => {
   it("fill the composer with a suggested question, without sending it", async () => {
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
 
     const suggestions = await screen.findByRole("group", { name: /suggested questions/i });
@@ -234,7 +234,7 @@ describe("starter questions (IR-356)", () => {
       }),
     );
     renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
 
     await screen.findByText("What does this paper conclude?");
@@ -249,7 +249,7 @@ describe("keeping the newest message in view (IR-351)", () => {
   it("scrolls its own transcript, never an ancestor, as messages arrive", async () => {
     const scrollTopSet = vi.spyOn(Element.prototype, "scrollTop", "set");
     renderScreen(
-      <PaperChatPanel record={record} dock="right" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
     await waitFor(() => expect(findForRecord).toHaveBeenCalled());
 
@@ -275,7 +275,7 @@ describe("keeping the newest message in view (IR-351)", () => {
 describe("accessibility", () => {
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(
-      <PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />,
+      <PaperChatPanel record={record} onClose={noop} />,
     );
     await waitFor(() => expect(findForRecord).toHaveBeenCalled());
 
@@ -312,8 +312,6 @@ describe("minimized to a bar while the reader reads a citation (IR-354)", () => 
     return (
       <PaperChatPanel
         record={record}
-        dock="right"
-        onDockChange={noop}
         onClose={noop}
         minimized={minimized}
         onRestore={() => setMinimized(false)}
@@ -355,7 +353,7 @@ it("reruns with the original answer scope even when the composer scope differs",
     answer: "Prior answer", message: null, state: "generative", degraded: false,
     widened: true, created_at: "2026-10-11", citations: [], routing: routingFixture,
   }] }));
-  renderScreen(<PaperChatPanel record={record} dock="floating" onDockChange={noop} onClose={noop} />);
+  renderScreen(<PaperChatPanel record={record} onClose={noop} />);
   await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
   await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
     conversationId: 42, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
