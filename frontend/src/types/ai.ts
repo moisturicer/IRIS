@@ -131,6 +131,32 @@ export interface AnswerListing {
   observed?: ObservedRun;
 }
 
+export interface ComparisonCitation {
+  page: number | null;
+  quote: string;
+  chunk_id: number;
+  marker?: number;
+}
+
+export interface ComparisonCell {
+  record_id: number;
+  state: "reported" | "not_reported" | "unsupported";
+  values: { value: string; citations: ComparisonCitation[] }[];
+}
+
+/** A comparison built from checked paper facts, separate from answer prose. */
+export interface AnswerComparison {
+  records: { record_id: number; title: string }[];
+  rows: { dimension: string; label: string; cells: ComparisonCell[] }[];
+  coverage: {
+    record_id?: number;
+    title?: string;
+    state: "read_fully" | "read_by_section" | "could_not_read" | "not_permitted";
+    reason?: string;
+  }[];
+  removed_claims: number;
+}
+
 /**
  * One highlightable rectangle on a page, as a fraction of it (0–1), left/top
  * origin (IR-334). Fractions rather than pixels or PDF points: a reader's PDF
@@ -218,6 +244,7 @@ export interface EmbeddingSpaceInfo {
 }
 
 export interface AIStatus {
+  comparison_max_records?: number;
   embedding_space:  EmbeddingSpaceInfo | null;
   generative:       boolean;
   /** Records with indexed passages that the asker may read. */
@@ -258,6 +285,7 @@ export interface RecordOverview {
 }
 
 export interface AIAnswer {
+  comparison?: AnswerComparison;
   turn_id?: number;
   routing?: RoutingDecision;
   listing?: AnswerListing;
@@ -313,6 +341,7 @@ export type ChatCitation = Citation | ReplayedCitation;
 
 /** One question-and-answer pair in a persisted Conversation (IR-295). */
 export interface ConversationTurn {
+  comparison?: AnswerComparison;
   routing?: RoutingDecision;
   listing?: AnswerListing;
   research?: ResearchTrace;

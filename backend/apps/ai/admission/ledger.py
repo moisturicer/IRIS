@@ -223,7 +223,9 @@ def _reserve(limits, request, lane, run, wanted, lease) -> tuple[int, int]:
     }
     if _over(charged, limits.spendable, {**wanted, "active_ms": active_ms}):
         raise _Refused(errors.CAMPAIGN_EXHAUSTED)
-    if run is not None and _over(_charged(reservations.filter(run_key=run.key)), limits.run, wanted):
+    if run is not None and _over(
+        _charged(reservations.filter(run_key=run.key)), run.ceiling or limits.run, wanted,
+    ):
         raise _Refused(errors.RUN_BUDGET_EXHAUSTED)
 
     reservation = ProviderReservation.objects.using(ALIAS).create(
@@ -233,6 +235,7 @@ def _reserve(limits, request, lane, run, wanted, lease) -> tuple[int, int]:
         operation=request.operation,
         model=request.models[0][:128],
         run_key="" if run is None else run.key[:64],
+        work_key=(scope.current_work_item() or ("" if run is None else run.key))[:64],
         created_at=now,
         lease_expires_at=now + lease,
         reserved_input_tokens=wanted["input_tokens"],

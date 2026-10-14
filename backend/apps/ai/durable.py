@@ -72,8 +72,10 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 from contextlib import closing, contextmanager
+from dataclasses import asdict
 from datetime import timedelta
 
 from django.conf import settings
@@ -105,6 +107,7 @@ logger = logging.getLogger(__name__)
 #: The request fields a worker needs to prepare the question again.
 REQUEST_FIELDS = (
     "question", "conversation_id", "top_k", "widen", "route_override", "route_override_turn_id",
+    "comparison_record_ids",
 )
 
 #: The routing fields a reader acts on. The router's per-lane probabilities
@@ -175,6 +178,29 @@ def submit(prepared, user, data, *, max_sources: int):
     """
     request = {key: data[key] for key in REQUEST_FIELDS if key in data}
     request.update(conversation_id=prepared.conversation.pk, top_k=max_sources)
+    if settings.AI_COMPARISON_ENABLED:
+        from apps.ai.routing.router import _fixed_lane
+        lane = prepared.route_override or _fixed_lane(
+            prepared.effective_question, paper_chat=prepared.scope_record is not None,
+            widened=prepared.widened,
+        )
+        named_comparison = False
+        if prepared.scope_record is None and lane != "comparison":
+            from apps.ai.composition import composition_root
+            from apps.ai.research.context import RunContext
+            from apps.ai.routing.lanes import _named_records
+
+            context = RunContext.for_request(user=user, root=composition_root(), lane="comparison",
+                                             conversation=prepared.conversation)
+            named, _ = _named_records(context, prepared.effective_question)
+            named_comparison = len(named) >= 2
+        if prepared.comparison_record_ids or lane == "comparison" or named_comparison:
+            from apps.ai.comparison_configuration import comparison_ceiling
+            from apps.ai.admission.limits import NotConfigured
+            try:
+                request["comparison_ceiling"] = asdict(comparison_ceiling())
+            except (NotConfigured, ImproperlyConfigured):
+                raise Busy("comparison_not_configured") from None
     with transaction.atomic():
         # The Conversation, then its runs: the order finishing a run takes.
         Conversation.objects.select_for_update().filter(pk=prepared.conversation.pk).first()
@@ -213,7 +239,9 @@ def _queue(user, conversation_id, request: dict, *, retry_of=None):
     if any(not _expire_overdue(run) for run in busy):
         return None
     _admit_to_queue(user)
-    deadline = timezone.now() + timedelta(seconds=settings.AI_DURABLE_ASK_DEADLINE_SECONDS)
+    seconds = (settings.AI_COMPARISON_DEADLINE_SECONDS if request.get("comparison_ceiling")
+               else settings.AI_DURABLE_ASK_DEADLINE_SECONDS)
+    deadline = timezone.now() + timedelta(seconds=seconds)
     run = AskRun.objects.create(
         user=user, conversation_id=conversation_id, request=request, deadline_at=deadline,
         retry_of=retry_of,
@@ -320,7 +348,10 @@ def _dispatch(run_id) -> None:
 
     # Celery stops the worker where the reader-side expiry would have fenced
     # it anyway, so a stalled vendor call holds a `default` worker no longer.
-    limit = settings.AI_DURABLE_ASK_DEADLINE_SECONDS + settings.AI_DURABLE_ASK_STALE_SECONDS
+    run = AskRun.objects.filter(pk=run_id).first()
+    if run is None:
+        return
+    limit = max(1, math.ceil((run.deadline_at - timezone.now()).total_seconds())) + settings.AI_DURABLE_ASK_STALE_SECONDS
     try:
         answer_queued_question.apply_async(
             args=[str(run_id)], soft_time_limit=limit, time_limit=limit + 15,
@@ -519,9 +550,12 @@ def _answer(attempt: AskRunAttempt) -> None:
 def run_scope(run: AskRun) -> admission_scope.RunScope:
     """The admission scope a run's provider attempts are charged to, halted
     once the run is cancelled (IR-548)."""
+    from apps.ai.admission.limits import Ceiling
+
     pk = run.pk
+    ceiling = Ceiling(**run.request["comparison_ceiling"]) if run.request.get("comparison_ceiling") else None
     return admission_scope.RunScope(
-        f"ask:{pk}", halted=lambda: AskRun.objects.filter(pk=pk, state=CANCELLED).exists(),
+        f"ask:{pk}", ceiling=ceiling, halted=lambda: AskRun.objects.filter(pk=pk, state=CANCELLED).exists(),
     )
 
 
@@ -646,6 +680,8 @@ def _done(event: AskRunEvent, user):
         return None
     reader = turn_for_reader(turn, user)
     sources = event.data.get("sources", [])
+    if turn.comparison and "comparison" not in reader:
+        sources = []
     visible = _visible_ids(user, [source["id"] for source in sources])
     body = {
         key: value

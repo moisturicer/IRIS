@@ -39,6 +39,7 @@ export interface StreamingState {
 }
 
 interface AskStreamOptions {
+  comparisonRecordIds?: number[];
   conversationId?: number;
   topK?:           number;
   widen?:          boolean;
@@ -256,6 +257,7 @@ export function useAskStream() {
             turnId: payload.turn_id as number | undefined,
             routing: (payload.routing as RoutingDecision | undefined) ?? routing,
             listing: payload.listing as ChatMessage["listing"],
+            comparison: payload.comparison as ChatMessage["comparison"],
             research: payload.research as ChatMessage["research"],
             question,
             sources:   payload.sources as ChatMessage["sources"],

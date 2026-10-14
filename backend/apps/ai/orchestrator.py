@@ -33,6 +33,7 @@ class ChatQuestion:
     scope_record: object
     route_override: Optional[str] = None
     override_turn_id: Optional[int] = None
+    comparison_record_ids: tuple[int, ...] = ()
 
 
 class ChatOrchestrator:
@@ -131,6 +132,7 @@ class ChatOrchestrator:
             routing=self._routing.decision,
             listing=self._routing.listing,
             research=self._routing.research,
+            comparison=self._routing.comparison,
             guard=self._record_guard(answer),
         )
         self._turn_id = turn.pk

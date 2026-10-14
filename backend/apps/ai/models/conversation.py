@@ -73,7 +73,7 @@ def model_history_q(prefix: str = "") -> models.Q:
     # Aggregate Turns lack full permission provenance for model-history reuse.
     return models.Q(**{f"{prefix}state__in": MODEL_HISTORY_STATES}) & (
         models.Q(**{f"{prefix}routing__lane__isnull": True})
-        | ~models.Q(**{f"{prefix}routing__lane__in": ["listing", "count"]})
+        | ~models.Q(**{f"{prefix}routing__lane__in": ["listing", "count", "comparison"]})
     )
 
 
@@ -212,6 +212,7 @@ class Turn(models.Model):
     reasoning = models.TextField(blank=True)
     routing = models.JSONField(default=dict, blank=True)
     listing = models.JSONField(default=dict, blank=True)
+    comparison = models.JSONField(default=dict, blank=True)
     #: The research planner's steps and coverage notes (IR-504), never content.
     research = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

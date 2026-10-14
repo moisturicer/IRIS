@@ -27,6 +27,16 @@ async function* eventsOf(...events: { event: string; data: unknown; id?: string 
   for (const event of events) yield event;
 }
 
+it("keeps the checked comparison on the finished answer and forwards explicit paper selection", async () => {
+  const comparison = { records: [{ record_id: 7, title: "Flood Prediction" }], rows: [],
+    coverage: [{ record_id: 7, state: "read_fully" }], removed_claims: 0 };
+  askStream.mockReturnValue(eventsOf({ event: "done", data: { answer: "Compared papers.", comparison } }));
+  const { result } = renderHook(() => useAskStream());
+  const outcome = await act(() => result.current.ask("Compare", { comparisonRecordIds: [7, 9] }));
+  expect(outcome.message.comparison).toEqual(comparison);
+  expect(askStream).toHaveBeenCalledWith("Compare", { comparisonRecordIds: [7, 9] }, expect.any(AbortSignal));
+});
+
 describe("a complete stream", () => {
   it("moves through every pipeline stage in order", async () => {
     let release: () => void = () => {};

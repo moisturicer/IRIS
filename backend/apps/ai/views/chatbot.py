@@ -22,6 +22,7 @@ whole path drivable from a test with deterministic fakes.
 import json
 from contextlib import closing
 
+from django.conf import settings
 from django.http import Http404
 
 from rest_framework import status
@@ -166,6 +167,13 @@ def prepare_ask(data, user, *, resolve: bool = True):
     if route_override is not None and (not isinstance(route_override, str) or route_override not in LANES):
         return None, Response({"detail": "route_override must name a supported lane."}, status=400)
     conversation = _conversation_for(data, user)
+    record_ids = data.get("comparison_record_ids", [])
+    if not isinstance(record_ids, list) or any(type(pk) is not int or pk < 1 for pk in record_ids):
+        return None, Response({"detail": "comparison_record_ids must be positive integer IDs."}, status=400)
+    if record_ids and not 2 <= len(record_ids) <= settings.AI_COMPARISON_MAX_RECORDS:
+        return None, Response({"detail": f"Choose 2 to {settings.AI_COMPARISON_MAX_RECORDS} Records; narrow the list."}, status=400)
+    if len(set(record_ids)) != len(record_ids):
+        return None, Response({"detail": "Choose distinct Records to compare."}, status=400)
     question = (data.get("question") or "").strip()
     if not question:
         return None, Response(
@@ -218,6 +226,7 @@ def prepare_ask(data, user, *, resolve: bool = True):
             scope_record=scope_record,
             route_override=route_override,
             override_turn_id=override_turn.pk if override_turn else None,
+            comparison_record_ids=tuple(record_ids),
         ),
         None,
     )
@@ -654,6 +663,7 @@ class AIStatusView(APIView):
                     }
                 ),
                 "generative": composition_root().generation_configured(),
+                "comparison_max_records": settings.AI_COMPARISON_MAX_RECORDS,
                 # Counted through `visible_to`, like everything else on this
                 # path: a raw corpus total would tell an asker how many
                 # records exist that they cannot see.

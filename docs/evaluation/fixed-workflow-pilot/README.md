@@ -249,3 +249,7 @@ IR-547 extends §11's workflow to **"how many papers match a topic"** in the `co
 - **Observed, not claimed.** `done.listing.observed` reports cache hits and misses, model calls, estimated prompt tokens and select/screen/finish/total milliseconds for that run, with a note that a warm run does not show fresh-model capacity. These are this run's observations, not a measure of the 10 s goal or of capacity.
 - **Not added.** No automatic full-catalogue topic scan, no scholarly-work de-duplication (a record is still the unit), and no real-provider run.
 - **Measured with fakes only.** `apps/ai/tests/test_topic_count_http.py` drives cold, warm, changed content, extraction, model, policy, criterion and prompt, revoked access (before, during and after), concurrent writers, zero, inconclusive, malformed, timed-out and unavailable screens, the queued journal and the reopened transcript with deterministic providers and real Postgres.
+
+## 13. First-milestone evaluation (IR-550)
+
+The instrument, the S0 fake-provider control run, the capacity accounting, the gates and the operation/feedback/rollback plan are in [`first-milestone-report.md`](first-milestone-report.md). Its recommendation is **do not enable**: no paid run, no pilot-family labelled set, no held-out split and no human review exist yet, and at the only per-run caps in the repository a 100-submission uncached burst does not fit the proposed campaign.
