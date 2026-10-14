@@ -11,6 +11,14 @@ import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessag
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import {
+  CONTROL_BASE,
+  CONTROL_FILLED,
+  CONTROL_ON,
+  CONTROL_OUTLINE,
+  CONTROL_SHAPE,
+  CONTROL_SQUARE,
+} from "./controls";
 
 export const PANEL_WIDTH_KEY = "iris_ask_iris_width";
 
@@ -325,7 +333,7 @@ export function PaperChatPanel({
           <button
             type="button"
             onClick={onBackToPaper}
-            className="reading-split:hidden inline-flex items-center gap-1.5 min-h-11 -mt-1 mb-1 text-small font-semibold text-brand"
+            className={cn("reading-split:hidden -ml-2 mb-1 px-2 text-brand", CONTROL_BASE)}
           >
             <i className="fas fa-arrow-left text-2xs" aria-hidden />
             Back to paper
@@ -358,7 +366,7 @@ export function PaperChatPanel({
           <button
             type="button"
             onClick={() => setSubject(subjectOf(record))}
-            className="mt-1 inline-flex items-center gap-1.5 min-h-11 reading-split:min-h-7 text-2xs font-semibold text-brand hover:underline"
+            className={cn("mt-1 -ml-2 px-2 text-brand hover:bg-brand-50", CONTROL_BASE)}
           >
             <i className="fas fa-arrow-right-arrow-left text-2xs" aria-hidden />
             Chat about this paper instead
@@ -388,7 +396,7 @@ export function PaperChatPanel({
                   key={question}
                   type="button"
                   onClick={() => chooseStarter(question)}
-                  className="min-h-11 px-3 py-2.5 rounded-md border border-stone-300 text-left text-small text-stone-700 hover:border-brand hover:bg-brand-50 hover:text-brand transition-colors duration-200"
+                  className={cn("px-3 text-left font-normal hover:bg-brand-50", CONTROL_BASE, CONTROL_OUTLINE)}
                 >
                   {question}
                 </button>
@@ -445,11 +453,9 @@ export function PaperChatPanel({
                   : `Searching only ${pinned ? subject.title : "this paper"} — click to search every paper`
               }
               className={cn(
-                "inline-flex items-center gap-1.5 min-w-0 max-w-[14rem] min-h-11 reading-split:min-h-8 px-2.5",
-                "rounded-md border text-2xs font-semibold transition-colors duration-200",
-                widen
-                  ? "bg-brand text-white border-brand"
-                  : "bg-brand-50 text-brand border-brand-200 hover:border-brand/50",
+                "min-w-0 max-w-[14rem] px-3",
+                CONTROL_BASE,
+                widen ? CONTROL_FILLED : CONTROL_ON,
               )}
             >
               <span aria-hidden className={cn("w-1.5 h-1.5 rounded-full shrink-0", widen ? "bg-white" : "bg-brand")} />
@@ -464,7 +470,7 @@ export function PaperChatPanel({
               onClick={send}
               disabled={!input.trim() || busy || !ready}
               aria-label="Send"
-              className="w-11 h-11 reading-split:w-8 reading-split:h-8 shrink-0 rounded-md bg-brand text-white flex items-center justify-center hover:bg-brand-light disabled:opacity-30 transition-colors duration-200"
+              className={cn("shrink-0 inline-flex items-center justify-center transition-colors duration-200", CONTROL_SQUARE, CONTROL_SHAPE, CONTROL_FILLED)}
             >
               <i className="fas fa-arrow-up text-xs" aria-hidden />
             </button>

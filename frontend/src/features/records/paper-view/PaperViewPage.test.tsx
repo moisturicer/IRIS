@@ -1995,13 +1995,13 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.getAllByText("Applied Research").length).toBeGreaterThan(0);
   });
 
-  it("holds governance and documents in a Record details section, not a rail", async () => {
+  it("holds governance and documents in Record details, beside the page", async () => {
     renderPaperView();
     await waitForRecord(record.title);
 
-    const details = screen.getByRole("region", { name: "Record details" });
+    const details = screen.getByRole("complementary", { name: "Record details" });
     expect(within(details).getByRole("heading", { name: "Institutional Governance" })).toBeInTheDocument();
-    expect(screen.queryByRole("complementary", { name: "Institutional Governance" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Record details" })).not.toBeInTheDocument();
   });
 });
 

@@ -45,8 +45,8 @@ export const readingVariants = {
   "reading-split": "@container reading (min-width: 640px)",
   "reading-wide": "@container reading (min-width: 1000px)",
   // The Overview's own column, which Ask IRIS narrows when it sits beside it:
-  // the record details go two to a row only while there is room for it.
-  "overview-wide": "@container overview (min-width: 44rem)",
+  // the record details sit beside the page only while there is room for both.
+  "overview-wide": "@container overview (min-width: 64rem)",
 };
 
 const readingTiers = plugin(({ addVariant }) => {

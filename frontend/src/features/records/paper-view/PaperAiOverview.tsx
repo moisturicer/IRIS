@@ -6,7 +6,7 @@ import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcon
 import { CitationText } from "@/features/ai/components/CitationText";
 import { OVERVIEW_MARKDOWN } from "@/features/ai/components/answerLayout";
 import { DegradedNotice } from "@/features/ai/components/PassageQuote";
-import { RailHeading } from "./headings";
+import { SectionHeading } from "./headings";
 
 /**
  * AI Overview — a grounded summary of the record being viewed.
@@ -66,12 +66,16 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   const overview = response?.overview ?? null;
 
   return (
-    <section className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card border-t-2 border-t-brand/70">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <RailHeading className="flex items-center gap-2">
-          <AskIrisMark className="w-3.5 h-3.5 text-brand" />
-          AI Overview
-        </RailHeading>
+    // On the page, like the Abstract above it: a heading and the text, with no
+    // card around it (IR-569).
+    <section>
+      <div className="flex items-baseline justify-between gap-3">
+        <SectionHeading>
+          <span className="inline-flex items-center gap-2">
+            <AskIrisMark className="w-4 h-4 text-brand" />
+            AI Overview
+          </span>
+        </SectionHeading>
         {state === "ready" && (
           <span className="text-2xs text-stone-500">RAG-indexed paper synthesis</span>
         )}

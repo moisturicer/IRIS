@@ -54,8 +54,8 @@ export function VersionPicker({
         value={viewing != null ? String(viewing) : currentValue}
         onChange={(e) => onChoose(e.target.value === currentValue ? null : Number(e.target.value))}
         className={cn(
-          "min-h-11 rounded-lg border border-stone-300 px-2 text-sm text-stone-800",
-          compact ? "w-24 bg-transparent" : "lg:min-h-9 bg-white",
+          "min-h-11 reading-split:min-h-9 rounded-lg border border-stone-300 px-2 text-sm text-stone-800",
+          compact ? "w-24 bg-transparent" : "bg-white",
           FOCUS_RING,
         )}
       >
@@ -106,7 +106,7 @@ export function VersionBanner({
       <button
         type="button"
         onClick={onBack}
-        className={cn("min-h-11 lg:min-h-8 text-sm font-semibold text-brand hover:underline", FOCUS_RING)}
+        className={cn("min-h-11 reading-split:min-h-9 text-sm font-semibold text-brand hover:underline", FOCUS_RING)}
       >
         Back to current
       </button>

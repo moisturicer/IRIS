@@ -23,6 +23,7 @@ import {
   READING_PANE_HEIGHT,
   READING_SPLIT_PX,
 } from "./paneLayout";
+import { CONTROL_SIZE } from "./controls";
 import {
   MAX_SCALE,
   MIN_SCALE,
@@ -517,7 +518,7 @@ export function PaperPdfReader({
           disabled={!downloadBytes}
           aria-label="Download"
           title="Download the paper"
-          className={cn(fill && "min-h-11 reading-split:min-h-9 font-medium text-stone-600")}
+          className={cn(fill && "text-stone-600", fill && CONTROL_SIZE)}
         >
           <i className="fas fa-download" aria-hidden />
           {fill && <span aria-hidden className="hidden reading-split:inline">Download</span>}

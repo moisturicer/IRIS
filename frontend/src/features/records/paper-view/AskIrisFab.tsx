@@ -19,7 +19,7 @@ export function AskIrisFab({ onOpen, buttonRef }: { onOpen: () => void; buttonRe
       title="Ask IRIS about this paper"
       className={cn(
         "fixed z-30 bottom-5 right-5 reading-split:right-8 w-14 h-14 rounded-full flex items-center justify-center",
-        "bg-brand text-white shadow-[0_6px_18px_rgb(107_15_18/0.35)]",
+        "bg-brand text-white shadow-card-md",
         "hover:bg-brand-light hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 transition-all duration-200",
         FOCUS_RING,
       )}

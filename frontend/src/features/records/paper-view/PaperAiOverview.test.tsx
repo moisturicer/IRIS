@@ -97,6 +97,17 @@ describe("the AI overview on a paper", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Methodology" })).toBeTruthy();
   });
 
+  it("sits on the page under a heading, with no card around it (IR-569)", async () => {
+    renderScreen(<PaperAiOverview record={record} />);
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "AI Overview" });
+    const section = heading.closest("section");
+    expect(section).not.toBeNull();
+    for (const card of ["bg-white", "ring-1", "rounded-2xl", "shadow-card", "border-t-2"]) {
+      expect(section).not.toHaveClass(card);
+    }
+  });
+
   it("offers the cited passage as a link into the paper at that page", async () => {
     renderScreen(<PaperAiOverview record={record} />);
 

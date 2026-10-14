@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error -- the config is plain JS and ships no declaration file
 import { readingVariants } from "../../../../tailwind.config.js";
 import {
+  OVERVIEW_ASIDE_MAX_HEIGHT,
+  OVERVIEW_ASIDE_TOP,
   PANE_TOP_PX,
   READER_TOOLBAR_TOP,
   READER_TOOLBAR_TOP_PX,
@@ -25,10 +27,12 @@ describe("pane offsets", () => {
   it("puts the panes 12px under the reading header", () => {
     expect(PANE_TOP_PX).toBe(READING_HEADER_PX + 12);
     expect(READING_PANE_TOP).toBe(`reading-wide:top-[${PANE_TOP_PX}px]`);
+    expect(OVERVIEW_ASIDE_TOP).toBe(`overview-wide:top-[${PANE_TOP_PX}px]`);
   });
 
   it("ends the panes at the page's 28px bottom padding", () => {
     expect(READING_PANE_HEIGHT).toBe(`reading-wide:h-[calc(100vh-${PANE_TOP_PX + 28}px)]`);
+    expect(OVERVIEW_ASIDE_MAX_HEIGHT).toBe(`overview-wide:max-h-[calc(100vh-${PANE_TOP_PX + 28}px)]`);
   });
 
   it("lands a citation under where the reader's toolbar sticks, 8px under the header", () => {

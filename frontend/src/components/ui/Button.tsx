@@ -47,9 +47,9 @@ const SIZE_CLASSES: Record<Size, string> = {
   md:   "px-4 py-2 text-[14px]",
   lg:   "px-5 py-2.5 text-[15px]",
   full: "w-full justify-center min-h-11 px-5 py-3.5 text-md",
-  // 44px square on touch-sized screens (12-accessibility.md section 4), a
-  // compact 32px beside a desktop pointer.
-  icon: "w-11 h-11 lg:w-8 lg:h-8 justify-center text-xs",
+  // 44px square on touch-sized screens (12-accessibility.md section 4), 36px
+  // beside a desktop pointer: the height of every other control (IR-569).
+  icon: "w-11 h-11 lg:w-9 lg:h-9 justify-center text-xs",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

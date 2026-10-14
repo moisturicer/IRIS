@@ -26,6 +26,10 @@ export const READING_HEADER_PX = 56;
 /** Panes: 12px below the header. */
 export const PANE_TOP_PX = READING_HEADER_PX + 12;
 
+/** The Overview's record details, which follow the Overview column's width. */
+export const OVERVIEW_ASIDE_TOP = "overview-wide:top-[68px]";
+export const OVERVIEW_ASIDE_MAX_HEIGHT = "overview-wide:max-h-[calc(100vh-96px)]";
+
 /** The reader and the Review pane, which follow the workspace. */
 export const READING_PANE_TOP = "reading-wide:top-[68px]";
 export const READING_PANE_HEIGHT = "reading-wide:h-[calc(100vh-96px)]";

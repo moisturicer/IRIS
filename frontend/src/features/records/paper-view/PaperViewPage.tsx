@@ -49,7 +49,7 @@ import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
-import { readingTier, type ReadingTier } from "./paneLayout";
+import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -695,6 +695,7 @@ export default function PaperViewPage() {
   // its first granted action, so any granted review action puts the primary
   // there.
   const hasPaper = sections.includes("paper");
+  const showRail = section === "overview" && !arriving;
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
@@ -798,8 +799,12 @@ export default function PaperViewPage() {
 
           <div
             className={cn(
-              onPaperTab && "flex-1 min-h-0 flex flex-col",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:px-7 pt-8 pb-12", PAGE_WIDTH.standard),
+              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
+              !onPaperTab && !onReviewTab && cn("px-4 sm:px-8 pt-8 pb-12", PAGE_WIDTH.standard),
+              // Wide: the page takes the width it has, with what the record is
+              // held under beside it while there is room, and under it when
+              // the panel or the sidebar leave none (IR-569).
+              showRail && "overview-wide:grid-cols-[minmax(0,1fr)_22rem] overview-wide:gap-12",
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -812,9 +817,6 @@ export default function PaperViewPage() {
             className={cn(
               "min-w-0",
               onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
-              // A reading column, like a paper's page: the Overview is one
-              // measure, centred in whatever room the panel leaves (IR-569).
-              section === "overview" && "mx-auto w-full max-w-3xl",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
@@ -1089,26 +1091,6 @@ export default function PaperViewPage() {
 
                 <PaperAiOverview record={record} />
 
-                {/* What the record is held under, and what is attached (spec
-                    §4.6): the old right rail, as a section the column owns.
-                    The party status strip is for participants only. */}
-                <section aria-labelledby={`${tabsId}-details`}>
-                  <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900 mb-3">
-                    Record details
-                  </h2>
-                  <div className="grid gap-4 items-start overview-wide:grid-cols-2">
-                    {participant && (
-                      <div className="overview-wide:col-span-2">
-                        <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />
-                      </div>
-                    )}
-                    <PaperGovernance record={record} />
-                    <PaperDocuments
-                      files={record.files}
-                      manageHref={participant ? `/records/${record.id}?section=files` : null}
-                    />
-                  </div>
-                </section>
 
                 {can.has("tag_ip") && (
                   <IpTagger
@@ -1156,6 +1138,26 @@ export default function PaperViewPage() {
             )}
             </div>
           </div>
+          )}
+
+          {/* What the record is held under, and what is attached (spec §4.6).
+              Beside the page while it is wide, sticky under the record bar;
+              under it otherwise. The party status strip is for participants. */}
+          {showRail && (
+            <aside
+              aria-labelledby={`${tabsId}-details`}
+              className={cn("space-y-4 overview-wide:sticky overview-wide:overflow-y-auto", OVERVIEW_ASIDE_TOP, OVERVIEW_ASIDE_MAX_HEIGHT)}
+            >
+              <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
+                Record details
+              </h2>
+              {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
+              <PaperGovernance record={record} />
+              <PaperDocuments
+                files={record.files}
+                manageHref={participant ? `/records/${record.id}?section=files` : null}
+              />
+            </aside>
           )}
           </div>
 
