@@ -12,7 +12,7 @@ from apps.ai.providers.deadline import model_call_deadline, time_left
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.duplicates import possible_duplicates
 from apps.ai.research.registry import Tool, ToolRun
-from apps.ai.research.results import Completeness, Coverage, ToolResult, status_for
+from apps.ai.research.results import Completeness, Coverage, CoverageSubject, ToolResult, status_for
 
 from .common import QUERY, collect_record, disclosable, readable_records, visible_record_ids
 
@@ -153,5 +153,6 @@ SCREEN_RECORDS = Tool(
     parameters={"type": "object", "properties": {"criterion": QUERY},
                 "required": ["criterion"], "additionalProperties": False},
     execute=screen_records,
+    subject=CoverageSubject.SCREENED_SUBSET,
     cache_context=_cache_context,
 )

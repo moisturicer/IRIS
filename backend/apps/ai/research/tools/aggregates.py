@@ -6,7 +6,9 @@ from django.conf import settings
 from django.db.models import Count
 
 from apps.ai.research.registry import Tool, ToolRun
-from apps.ai.research.results import Completeness, Coverage, ToolResult, ToolStatus, status_for
+from apps.ai.research.results import (
+    Completeness, Coverage, CoverageSubject, ToolResult, ToolStatus, status_for,
+)
 
 from .common import FILTER_PROPERTIES, apply_filters, readable_records, visible_record_ids
 
@@ -127,6 +129,7 @@ COUNT_RECORDS = Tool(
         "additionalProperties": False,
     },
     execute=count_records,
+    subject=CoverageSubject.METADATA_POPULATION,
     cache_context=_visibility_cache_context,
 )
 
@@ -144,5 +147,6 @@ CORPUS_FACETS = Tool(
         "additionalProperties": False,
     },
     execute=corpus_facets,
+    subject=CoverageSubject.METADATA_POPULATION,
     cache_context=_visibility_cache_context,
 )

@@ -57,6 +57,11 @@ class RunContext:
     history_before_turn_id: Optional[int] = None
     run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
+    @property
+    def caller(self) -> str:
+        """Who a cursor is bound to."""
+        return str(getattr(self.user, "pk", ""))
+
     @classmethod
     def for_request(
         cls,

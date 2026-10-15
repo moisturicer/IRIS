@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from apps.ai.models.chunk import DocumentChunk
-from apps.ai.research.ledger import PASSAGE
+from apps.ai.research.ledger import HANDLE_SCHEMA, PASSAGE
 from apps.ai.research.registry import Tool, ToolRun
-from apps.ai.research.results import Completeness, Coverage, ToolResult, ToolStatus, status_for
+from apps.ai.research.results import (
+    Completeness, Coverage, CoverageSubject, ToolResult, ToolStatus, status_for,
+)
 from apps.ai.research.schema import ArgumentsRejected
 from apps.records.models import Record
 
@@ -89,7 +91,7 @@ READ_RECORD_SECTIONS = Tool(
     parameters={
         "type": "object",
         "properties": {
-            "record": {"type": "string", "minLength": 1, "maxLength": 12},
+            "record": HANDLE_SCHEMA,
             "sections": {
                 "type": "array", "maxItems": 10,
                 "items": {"type": "string", "minLength": 1, "maxLength": 200},
@@ -103,4 +105,5 @@ READ_RECORD_SECTIONS = Tool(
         "additionalProperties": False,
     },
     execute=read_record_sections,
+    subject=CoverageSubject.REQUESTED_SELECTION,
 )
