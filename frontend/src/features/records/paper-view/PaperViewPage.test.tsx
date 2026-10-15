@@ -1416,8 +1416,10 @@ describe("following a citation to another paper (IR-355)", () => {
     // panel that followed it is gone: there is no conversation to keep.
     renderPaper(`/records/${OTHER_ID}?page=3`, { citation: crossCitation, origin: "paper-chat" });
     await screen.findByRole("heading", { level: 1, name: other.title });
+    // Ask IRIS opens on entry, a render after the record arrives.
+    const opened = await screen.findByRole("complementary", { name: "Ask IRIS" });
 
-    expect(await within(panel()).findByText(QUESTION_ON_Y)).toBeInTheDocument();
+    expect(await within(opened).findByText(QUESTION_ON_Y)).toBeInTheDocument();
     expect(within(panel()).queryByText(PINNED_HEADER)).not.toBeInTheDocument();
   });
 
