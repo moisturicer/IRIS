@@ -20,7 +20,7 @@ from apps.ai.comparison.service import table_fields
 from apps.ai.history import estimate_tokens
 from apps.ai.inference import InferenceTask, profile_for
 from apps.ai.inference.providers import BRIEF_OUTPUT_TOKENS
-from apps.ai.models.chunk import ChunkSet, DocumentChunk
+from apps.ai.models.chunk import ChunkSet
 from apps.ai.overview.assembly import whole_paper
 from apps.ai.overview.pages import build_page_prompt
 from apps.ai.providers.deadline import model_call_deadline
