@@ -13,6 +13,7 @@ from apps.ai.composition import use_composition_root
 from apps.ai.inference import InferenceTask
 from apps.ai.models import Conversation
 from apps.ai.providers.fakes import ScriptedToolCallingLLM
+from apps.ai.research.tests.conftest import fresh_vector_indexes
 from core.enums import PipelineStatus
 
 from .corpus import FLOOD_QUESTION, FLOOD_TEXT, make_record, make_user, root_with
@@ -44,6 +45,7 @@ def sent(planner):
 def test_malformed_and_foreign_calls_are_rejected_and_nothing_hidden_reaches_the_vendor(
     settings, monkeypatch, embedder, space, client_for,
 ):
+    fresh_vector_indexes()
     settings.AI_RESEARCH_LANE = "on"
     settings.AI_RESEARCH_MAX_TOOL_CALLS = 10
     route(monkeypatch, "research")

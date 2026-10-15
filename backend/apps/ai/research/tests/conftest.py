@@ -1,6 +1,9 @@
 import pytest
+from django.db import connection
 
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+from apps.ai.models.chunk import ChunkEmbedding
+from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.tests.corpus import FLOOD_TEXT, POND_TEXT, make_record, make_user
@@ -8,8 +11,15 @@ from apps.records.models import Classification
 from core.enums import PipelineStatus
 
 
+def fresh_vector_indexes():
+    # Rolled back with the test, so its vectors leave no dead HNSW entries.
+    with connection.cursor() as cursor:
+        cursor.execute(f"TRUNCATE {RecordEmbedding._meta.db_table}, {ChunkEmbedding._meta.db_table}")
+
+
 @pytest.fixture
 def space(db):
+    fresh_vector_indexes()
     existing = EmbeddingSpace.objects.filter(state="active").first()
     if existing is not None:
         return existing
