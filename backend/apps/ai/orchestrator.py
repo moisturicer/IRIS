@@ -34,6 +34,8 @@ class ChatQuestion:
     route_override: Optional[str] = None
     override_turn_id: Optional[int] = None
     comparison_record_ids: tuple[int, ...] = ()
+    #: The conversation state revision read before any model call (IR-592).
+    context_revision: Optional[int] = None
 
 
 class ChatOrchestrator:
@@ -134,6 +136,7 @@ class ChatOrchestrator:
             research=self._routing.research,
             comparison=self._routing.comparison,
             guard=self._record_guard(answer),
+            expected_revision=asked.context_revision,
         )
         self._turn_id = turn.pk
         return turn

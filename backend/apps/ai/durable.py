@@ -178,6 +178,8 @@ def submit(prepared, user, data, *, max_sources: int):
     """
     request = {key: data[key] for key in REQUEST_FIELDS if key in data}
     request.update(conversation_id=prepared.conversation.pk, top_k=max_sources)
+    # A retry copies this, so it answers against the context it was asked in.
+    request["context_revision"] = prepared.context_revision
     if settings.AI_COMPARISON_ENABLED:
         from apps.ai.routing.router import _fixed_lane
         lane = prepared.route_override or _fixed_lane(
@@ -567,7 +569,9 @@ def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
     # Prepared again, as the asker, now: the Conversation and any override
     # Turn must still be theirs, and the resolver runs here, not in the request.
     try:
-        prepared, error = prepare_ask(run.request, run.user)
+        prepared, error = prepare_ask(
+            run.request, run.user, context_revision=run.request.get("context_revision"),
+        )
     except Http404:
         prepared, error = None, True
     if error is not None:

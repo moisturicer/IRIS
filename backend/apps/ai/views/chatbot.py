@@ -31,6 +31,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+from apps.ai.conversation_state import current_revision
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
     AgentStep,
@@ -145,10 +146,10 @@ def _recent_turns(conversation: Conversation) -> list:
     Both bounds apply *after* the exclusion, so a run of failures does not eat
     the window and leave the model with less real history than it has.
     """
-    return recent_window(conversation.turns.all())
+    return recent_window(conversation.turns.all(), user=conversation.user)
 
 
-def prepare_ask(data, user, *, resolve: bool = True):
+def prepare_ask(data, user, *, resolve: bool = True, context_revision=None):
     """Parse and validate one question, resolve it and its scope.
 
     Returns ``(prepared, None)`` on success or ``(None, error_response)`` on
@@ -160,6 +161,9 @@ def prepare_ask(data, user, *, resolve: bool = True):
     question (IR-544) is validated that way at submission and prepared again,
     resolution included, by the worker -- which re-checks the Conversation
     and any override Turn against the asker at the same time.
+
+    ``context_revision`` pins the conversation state the answer builds on
+    (IR-592); a queued run passes the one read at submission.
     """
     from apps.ai.routing.router import LANES
 
@@ -196,7 +200,9 @@ def prepare_ask(data, user, *, resolve: bool = True):
         if override_turn is None:
             raise Http404
         question = override_turn.question
-        history = recent_window(conversation.turns.filter(pk__lt=override_turn.pk))
+        history = recent_window(
+            conversation.turns.filter(pk__lt=override_turn.pk), user=conversation.user
+        )
         resolved_question = override_turn.resolved_question or None
     else:
         # Only resolution and the answer read history; a queued submission
@@ -227,6 +233,10 @@ def prepare_ask(data, user, *, resolve: bool = True):
             route_override=route_override,
             override_turn_id=override_turn.pk if override_turn else None,
             comparison_record_ids=tuple(record_ids),
+            context_revision=(
+                context_revision if context_revision is not None
+                else current_revision(conversation)
+            ),
         ),
         None,
     )
