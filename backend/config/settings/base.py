@@ -724,6 +724,8 @@ AI_MEMORY_ANSWER_VECTOR_ENABLED = config(
 # owns reconciling the sources half against that total, and bounding the
 # recall half if it chooses to.
 AI_HISTORY_TOKEN_BUDGET = config("AI_HISTORY_TOKEN_BUDGET", default=3000, cast=int)
+# Older questions listed beside the verbatim window, with their cited ids (IR-592).
+AI_HISTORY_EARLIER_TOKEN_BUDGET = config("AI_HISTORY_EARLIER_TOKEN_BUDGET", default=500, cast=int)
 
 # Safety margin on every count made against the budget above. Mirrored by
 # apps.ai.history.DEFAULT_TOKEN_MARGIN.

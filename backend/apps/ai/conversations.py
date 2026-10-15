@@ -85,6 +85,8 @@ def record_turn(
     research=None,
     comparison=None,
     guard=None,
+    context=None,
+    expected_revision=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -121,6 +123,11 @@ def record_turn(
     yields a callback that receives the new Turn before the transaction
     commits, so a queued run can lock and fence itself first and record its
     outcome in the same commit. The vector still waits until after.
+
+    ``context`` and ``expected_revision`` (IR-592) advance the Conversation's
+    state in that same commit, after the guard, so a fenced attempt changes
+    nothing. Without ``context`` it is derived from the listing, comparison
+    or citations; see `apps.ai.conversation_state.commit`.
     """
     with (guard if guard is not None else nullcontext()) as written:
         with transaction.atomic():
@@ -136,6 +143,13 @@ def record_turn(
             )
             if written is not None:
                 written(turn)
+            from apps.ai.conversation_state import commit
+
+            commit(
+                conversation, turn, context=context, expected_revision=expected_revision,
+                cited=[citation.record_id for citation in answer.citations],
+                listing=listing, comparison=comparison,
+            )
     _store_answer_vector(turn, answer, embedder)
     return turn
 

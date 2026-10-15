@@ -183,13 +183,53 @@ def _cut(text: str, estimated_budget: int) -> str:
     return cut.rstrip() + TRUNCATION_MARKER
 
 
-def recent_window(turns) -> list["Turn"]:
+def readable_record_ids(user, record_ids) -> set:
+    """The ids among ``record_ids`` that ``user`` may read now."""
+    from apps.records.models import Record
+
+    if not record_ids:
+        return set()
+    return set(
+        Record.objects.visible_to(user).filter(pk__in=record_ids).values_list("pk", flat=True)
+    )
+
+
+def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
+    """``turns`` minus any citing a Record no longer readable (IR-592).
+
+    ``allowed`` maps cited ids to the permitted ones; it defaults to
+    ``visible_to(user)``. A Turn built on a revoked source is dropped whole,
+    so nothing derived from it reaches a prompt or a cache key.
+    """
+    from apps.ai.models import TurnCitation
+
+    if user is None and allowed is None:
+        raise ValueError("readable_turns needs a user or an allowed function")
+    turns = list(turns)
+    cited: dict[int, set] = {}
+    for turn_id, record_id in TurnCitation.objects.filter(
+        turn_id__in=[turn.pk for turn in turns]
+    ).values_list("turn_id", "record_id"):
+        cited.setdefault(turn_id, set()).add(record_id)
+    every = set().union(*cited.values()) if cited else set()
+    if not every:
+        return turns
+    permitted = readable_record_ids(user, every) if allowed is None else set(allowed(every))
+    return [turn for turn in turns if cited.get(turn.pk, set()) <= permitted]
+
+
+def recent_window(turns, user=None, *, allowed=None) -> list["Turn"]:
     """The verbatim window over a Turn queryset: the newest model-history
     candidates, oldest first, then the budget. One shape for the chat views
-    and the evidence shadow's parity check (IR-466)."""
+    and the evidence shadow's parity check (IR-466).
+
+    With ``user`` or ``allowed``, Turns citing a now-unreadable Record are
+    dropped before the budget is spent (IR-592)."""
     candidates = list(
         turns.in_model_history().order_by("-id")[:HISTORY_CANDIDATE_LIMIT]
     )[::-1]
+    if user is not None or allowed is not None:
+        candidates = readable_turns(candidates, user, allowed=allowed)
     return history_window(candidates)
 
 
