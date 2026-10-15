@@ -42,9 +42,12 @@ describe("the live candidates", () => {
     expect(screen.getByRole("link", { name: "A paper IRIS may not read" })).toHaveAttribute("href", "/records/3");
   });
 
-  it("announces progress once, in a status region, not a line per paper", () => {
+  // IR-570 moved the announcement: the stream's one live line already says
+  // "Screening 2 candidate papers (1 checked)…" (below), and a second status
+  // region here made a screen reader hear the progress twice.
+  it("leaves announcing progress to the stream's status line, so it is said once", () => {
     renderScreen(<LiveCandidates candidates={[{ ...PENDING[0], state: "included" }, PENDING[1]]} />);
-    expect(screen.getByRole("status").textContent).toBe("1 of 2 candidate papers checked");
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("renders nothing for an empty preview", () => {

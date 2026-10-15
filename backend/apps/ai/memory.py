@@ -89,6 +89,18 @@ class ConversationMemory:
             .select_related("turn")
             .annotate(distance=CosineDistance("embedding", query_vector))
         )
+        # A Turn built on a source the owner can no longer read is never
+        # recalled (IR-592).
+        from apps.ai.history import readable_record_ids
+        from apps.ai.models import TurnCitation
+
+        cited = set(
+            TurnCitation.objects.filter(turn__conversation=conversation)
+            .values_list("record_id", flat=True)
+        )
+        hidden = cited - readable_record_ids(conversation.user, cited)
+        if hidden:
+            rows = rows.exclude(turn__citations__record_id__in=hidden)
         cut_off = _max_distance()
         if cut_off > 0:
             rows = rows.filter(distance__lt=cut_off)

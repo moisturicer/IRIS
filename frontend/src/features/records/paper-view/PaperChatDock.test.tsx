@@ -322,7 +322,7 @@ describe("minimized to a bar while the reader reads a citation (IR-354)", () => 
   it("shows only a named bar, with the conversation and the composer out of the way", async () => {
     renderScreen(<MinimizedPanel />);
 
-    expect(await screen.findByRole("button", { name: "Show Ask IRIS" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Ask IRIS: back to the answer" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(ANSWER)).not.toBeVisible());
     expect(screen.queryByRole("textbox", { name: "Ask about this paper" })).not.toBeInTheDocument();
   });
@@ -331,17 +331,17 @@ describe("minimized to a bar while the reader reads a citation (IR-354)", () => 
     renderScreen(<MinimizedPanel />);
     await waitFor(() => expect(screen.getByText(ANSWER)).not.toBeVisible());
 
-    await userEvent.click(screen.getByRole("button", { name: "Show Ask IRIS" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ask IRIS: back to the answer" }));
 
     expect(screen.getByText(ANSWER)).toBeVisible();
     expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask IRIS: back to the answer" })).not.toBeInTheDocument();
     expect(findForRecord).toHaveBeenCalledTimes(1);
   });
 
   it("has no serious or critical accessibility violations while minimized", async () => {
     const { container } = renderScreen(<MinimizedPanel />);
-    await screen.findByRole("button", { name: "Show Ask IRIS" });
+    await screen.findByRole("button", { name: "Ask IRIS: back to the answer" });
 
     await expectNoBlockingA11yViolations(container);
   });

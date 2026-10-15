@@ -1,4 +1,5 @@
 import type { StreamingState } from "../hooks/useAskStream";
+import { cn } from "@/lib/utils";
 import { stepLabel } from "./ResearchSteps";
 
 /** Honest progress copy (IR-329) -- one deterministic pipeline stage per
@@ -34,17 +35,25 @@ export function statusLineText(state: StreamingState): string | null {
   }
 }
 
-export function StreamStatusLine({ state }: { state: StreamingState }) {
+/**
+ * The stream's one live line (IR-570). It stays mounted while it has nothing
+ * to say: a live region added at the moment its text changes is often not
+ * announced at all, so an empty one waits for the next stage.
+ */
+export function StreamStatusLine({ state, className }: { state: StreamingState; className?: string }) {
   const text = statusLineText(state);
-  if (!text) return null;
 
   return (
-    <p aria-live="polite" className="flex items-center gap-2 text-[14px] font-medium text-stone-500 mb-2">
-      <span
-        aria-hidden
-        className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse motion-reduce:animate-none"
-      />
-      {text}
+    <p aria-live="polite" className={cn("flex items-center gap-2 text-[14px] font-medium text-stone-500", className)}>
+      {text && (
+        <>
+          <span
+            aria-hidden
+            className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse motion-reduce:animate-none"
+          />
+          {text}
+        </>
+      )}
     </p>
   );
 }

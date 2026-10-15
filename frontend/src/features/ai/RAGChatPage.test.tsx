@@ -10,11 +10,11 @@ import { routingFixture } from "@/test/routingFixture";
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
-import type { AIAnswer, AIStatus, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
+import { act, renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import type { AIAnswer, AIStatus, Citation, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
 
 import RAGChatPage from "./RAGChatPage";
 
@@ -465,5 +465,158 @@ describe("owned conversation URLs (IR-548)", () => {
     const box = (await screen.findByRole("textbox", { name: /ask a follow-up/i })) as HTMLTextAreaElement;
     await waitFor(() => expect(box.value).toMatch(/record #5/i));
     expect(askStream).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * jsdom lays nothing out, so the page is measured as `width` wide: the width
+ * that decides whether history and sources sit beside the answer or open as
+ * drawers over it (IR-570).
+ */
+function pageAt(width: number) {
+  const watching = new Set<{ target: Element; callback: ResizeObserverCallback; observer: ResizeObserver }>();
+  const report = (target: Element, callback: ResizeObserverCallback, observer: ResizeObserver, w: number) =>
+    callback([{ target, contentRect: { width: w } } as unknown as ResizeObserverEntry], observer);
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        const entry = { target, callback: this.callback, observer: this as unknown as ResizeObserver };
+        watching.add(entry);
+        report(target, this.callback, entry.observer, width);
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  return {
+    resizeTo: (next: number) =>
+      act(() => watching.forEach((w) => report(w.target, w.callback, w.observer, next))),
+  };
+}
+
+/** Whether `el` sits inside an inert subtree, which a reader cannot reach. */
+function inert(el: Element): boolean {
+  return el.closest("[inert]") !== null;
+}
+
+describe("Ask IRIS on a phone (IR-570)", () => {
+  const citation: Citation = {
+    marker: 1, chunk_id: 11, record_id: 7, record_title: "Flood Prediction", page: 4,
+    text: "gauges predicted flooding a day ahead", context_path: ["Flood Prediction"], regions: [],
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function openAt360() {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Prior chat" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    pageAt(360);
+    renderScreen(<RAGChatPage />);
+    return (await screen.findByRole("textbox", { name: /ask a follow-up/i })) as HTMLTextAreaElement;
+  }
+
+  it("gives the answer the whole width, with history and sources closed", async () => {
+    const composer = await openAt360();
+
+    expect(screen.queryByRole("complementary", { name: "Chat history" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(inert(composer)).toBe(false);
+    composer.focus();
+    expect(composer).toHaveFocus();
+    // One line on a phone; its accessible name keeps the whole phrase.
+    expect(composer).toHaveAttribute("placeholder", "Ask a follow-up…");
+  });
+
+  it("opens history as a labelled drawer, keeps focus in it and gives it back on close", async () => {
+    await openAt360();
+    const opener = screen.getByRole("button", { name: "Show chat history" });
+
+    await userEvent.click(opener);
+
+    const drawer = screen.getByRole("dialog", { name: "Chat history" });
+    expect(drawer).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.getByRole("link", { name: /Prior chat/ })).toBeInTheDocument();
+    // Everything behind the drawer waits, so focus cannot wander out to it.
+    expect(inert(screen.getByRole("textbox", { name: /ask a follow-up/i }))).toBe(true);
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Chat history" })).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
+    expect(inert(screen.getByRole("textbox", { name: /ask a follow-up/i }))).toBe(false);
+  });
+
+  it("closes the history drawer from its own close button", async () => {
+    await openAt360();
+    const opener = screen.getByRole("button", { name: "Show chat history" });
+    await userEvent.click(opener);
+
+    await userEvent.click(screen.getByRole("button", { name: "Close chat history" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("offers New chat inside the history drawer, where a phone has room for it", async () => {
+    await openAt360();
+    create.mockResolvedValue({ data: detail({ id: 12 }) });
+    await userEvent.click(screen.getByRole("button", { name: "Show chat history" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("keeps an answer's sources closed until asked for, then opens them as a drawer", async () => {
+    const composer = await openAt360();
+    askStream.mockImplementation(() => doneStreamOf({ citations: [citation] }));
+
+    await userEvent.type(composer, "What predicts flooding?");
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByText(/Rainfall gauges predict flooding/);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const opener = screen.getByRole("button", { name: "Show sources" });
+    await userEvent.click(opener);
+
+    const drawer = screen.getByRole("dialog", { name: "Referenced passages" });
+    expect(drawer).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.getByText(/gauges predicted flooding a day ahead/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide sources panel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("closes a drawer and returns to the columns when the page widens", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Prior chat" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    const page = pageAt(360);
+    renderScreen(<RAGChatPage />);
+    await screen.findByRole("textbox", { name: /ask a follow-up/i });
+    await userEvent.click(screen.getByRole("button", { name: "Show chat history" }));
+
+    page.resizeTo(1100);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Chat history" })).toBeInTheDocument();
+  });
+
+  it("keeps history beside the answer on a desktop, as before", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Prior chat" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    pageAt(1100);
+    renderScreen(<RAGChatPage />);
+
+    await screen.findByRole("textbox", { name: /ask a follow-up/i });
+
+    expect(screen.getByRole("complementary", { name: "Chat history" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
