@@ -101,3 +101,22 @@ def test_a_summary_with_tool_narration_markers_or_new_numbers_is_omitted():
     assert safe_summary("I called search_research twice.", answer) == ""
     assert safe_summary("Accuracy is high [1].", answer) == ""
     assert safe_summary("It reached 99% accuracy.", answer) == ""
+
+
+def test_a_year_or_an_abbreviation_in_a_cited_sentence_is_not_a_failure():
+    assert codes("Since 2023, Zhang et al. Reported 92.4% accuracy [1].") == set()
+
+
+def test_removing_sentences_leaves_no_orphan_markers_or_empty_tables():
+    from apps.ai.answers.assurance import without_units
+
+    text = "## Results\n- Bad claim.\n- Kept claim.\n\n| A | B |\n|---|---|\n| x | y |\n\nEnd."
+    parts = [u.text for u in units_of(text)]
+    drop = {parts.index("Results"), parts.index("Bad claim."), parts.index("| x | y |")}
+    assert without_units(text, drop) == "- Kept claim.\n\nEnd."
+
+
+def units_of(text):
+    from apps.ai.answers.assurance import units
+
+    return units(text)

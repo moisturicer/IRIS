@@ -145,16 +145,15 @@ class AnswerComposer:
         raw = _draft(llm, system, prompt)
         if raw is None:
             return _unavailable(_live(ready, sources))
-        draft, issues = self._checked(ready, raw, sources)
+        draft, issues, live = self._checked(ready, raw, sources)
         repaired = False
         repairable = [i for i in issues if i.code not in FENCED]
         if (repairable and not any(i.code in FENCED for i in issues)
-                and ready.repair_attempts > 0 and not _cancelled()):
+                and ready.repair_attempts > 0 and not cancelled()):
             again = _draft(llm, system, prompt + _feedback(draft, issues))
             if again is not None:
-                draft, issues = self._checked(ready, again, sources)
+                draft, issues, live = self._checked(ready, again, sources)
                 repaired = True
-        live = _live(ready, sources)
         drop = {i.unit for i in issues if i.unit is not None}
         text = without_units(draft.text, drop)
         if not text:
@@ -172,10 +171,10 @@ class AnswerComposer:
         )
 
     def _checked(self, ready, raw, sources):
-        draft = parse_draft(raw)
-        live = {s.chunk_id for s in _live(ready, sources)}
-        return draft, check(draft, sources, facts=ready.facts,
-                            limitations=ready.limitations, live=live)
+        draft, live = parse_draft(raw), _live(ready, sources)
+        issues = check(draft, sources, facts=ready.facts, limitations=ready.limitations,
+                       live={s.chunk_id for s in live})
+        return draft, issues, live
 
 
 def _prompt(ready: ReadyToCompose, sources) -> tuple[str, str]:
@@ -232,7 +231,7 @@ def _codes(issues, repaired) -> tuple[str, ...]:
     return tuple((["repaired"] if repaired else []) + codes)
 
 
-def _cancelled() -> bool:
+def cancelled() -> bool:
     current = admission_scope.current_run()
     return current is not None and current.halted()
 

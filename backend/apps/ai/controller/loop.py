@@ -14,7 +14,6 @@ from typing import Optional
 
 from django.conf import settings
 
-from apps.ai.admission import scope as admission_scope
 from apps.ai.answers.citations import GroundedAnswer, UNAVAILABLE
 from apps.ai.answers.events import RetrievalStarted
 from apps.ai.answers.service import UNAVAILABLE_TEXT
@@ -39,7 +38,7 @@ from apps.ai.resilience.circuit import CircuitOpen
 
 from . import prompts
 from .budget import ControllerBudget, NotConfigured
-from .compose import CLARIFY, EVIDENCE, AnswerComposer, ReadyToCompose
+from .compose import CLARIFY, EVIDENCE, AnswerComposer, ReadyToCompose, cancelled
 from .versions import CONTROLLER_ENGINE, pin
 
 logger = logging.getLogger(__name__)
@@ -128,7 +127,7 @@ class Controller:
         previous: list = []
         seen_ids: set = set()
         while True:
-            if _cancelled():
+            if cancelled():
                 return prompts.Decision(), "cancelled"
             try:
                 run.spend.begin_round()
@@ -186,7 +185,7 @@ class Controller:
         known = _known(run, gathered)
         for wave in _waves(calls, budget.max_concurrent_reads):
             for call in wave:
-                if _cancelled():
+                if cancelled():
                     return replies, "cancelled"
                 if run.spend.remaining_seconds <= budget.reserved_seconds:
                     return replies, "answer_reserve"
@@ -341,11 +340,6 @@ def _still_current(run):
         ).values_list("pk", flat=True))
         return {s.chunk_id for s in sources if s.record_id in allowed and s.chunk_id in active}
     return current
-
-
-def _cancelled() -> bool:
-    current = admission_scope.current_run()
-    return current is not None and current.halted()
 
 
 def _unavailable() -> GroundedAnswer:

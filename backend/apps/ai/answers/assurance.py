@@ -41,6 +41,10 @@ _HARMLESS = re.compile(
     r"\s*\(?\d+(?:\.\d+)*\)?", re.I)
 _PREFIX = re.compile(r"\s*(?:#{1,6}\s+(?:\d+(?:\.\d+)*\.?\s+)?|[-*+]\s+|\d+[.)]\s+|>\s+)?")
 _STOP = re.compile(r"[.!?](?:\s*\[[^\]\n]{1,24}\])*(?=\s+[A-Z*_\"“«(])")
+_ABBREVIATION = re.compile(r"(?:\bet al|\be\.g|\bi\.e|\bvs|\bcf|\bFig|\bNo|\bEq)\.$", re.I)
+_YEAR = re.compile(r"(?:19|20)\d{2}")
+_BARE_PREFIX = re.compile(r"\s*(?:#{1,6}|[-*+]|\d+[.)]|>)?\s*")
+_TABLE_RULE = re.compile(r"\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*")
 _INTERNAL = re.compile(
     r"\b[a-z]+_[a-z_]+\b|\b(?:tools?|tool calls?|planner|lanes?|routing|router|route|classifier"
     r"|prompt|function calls?)\b|\bI (?:searched|called|ran|used|invoked|queried)\b", re.I)
@@ -114,7 +118,8 @@ def units(text: str) -> list[Unit]:
             out.append(Unit(start, start + len(body), body))
             continue
         cursor = _PREFIX.match(body).end()
-        bounds = [m.end() for m in _STOP.finditer(body, cursor)] + [len(body)]
+        bounds = [m.end() for m in _STOP.finditer(body, cursor)
+                  if not _ABBREVIATION.search(body[:m.start() + 1])] + [len(body)]
         for end in bounds:
             piece = body[cursor:end]
             lead = len(piece) - len(piece.lstrip())
@@ -228,7 +233,8 @@ def check(draft: Draft, sources: Sequence, *, facts=(), limitations=(), live=Non
         for match in _NUMBER.finditer(clean):
             if any(a <= match.start() < b for a, b in counted):
                 continue
-            factual = valid or "." in match.group() or _PERCENT.match(clean, match.end())
+            year = _YEAR.fullmatch(match.group())
+            factual = (valid and not year) or "." in match.group() or _PERCENT.match(clean, match.end())
             if factual and Decimal(match.group().replace(",", "")) not in pool:
                 issues.append(Issue("unsupported_number", index))
         if _EXHAUSTIVE.search(clean) and not exact:
@@ -243,7 +249,12 @@ def without_units(text: str, drop: set[int]) -> str:
         unit = parts[index]
         text = text[:unit.start] + text[unit.end:]
     lines = [line.rstrip() for line in text.splitlines()]
-    lines = [line for line in lines if line.strip() and _PREFIX.fullmatch(line) is None or not line.strip()]
+    lines = [line for line in lines if not line or not _BARE_PREFIX.fullmatch(line)]
+    # A table left with no data rows loses its header too.
+    for i in range(len(lines) - 1, 0, -1):
+        rows_after = i + 1 < len(lines) and lines[i + 1].lstrip().startswith("|")
+        if _TABLE_RULE.fullmatch(lines[i]) and not rows_after:
+            del lines[i - 1:i + 1]
     text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines))
     return re.sub(r"(?<=\S) {2,}", " ", text).strip()
 
