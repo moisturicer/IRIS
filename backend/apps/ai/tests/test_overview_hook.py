@@ -87,6 +87,11 @@ class SplitHookTests:
 
         assert hook == "Cuts landfill use by 30%."
 
+    def test_symbols_that_belong_to_the_claim_are_kept(self):
+        _body, hook = split_hook("An account.\nHOOK: Cuts cost by >30% and ranks #1 in snake_case tests.")
+
+        assert hook == "Cuts cost by >30% and ranks #1 in snake_case tests."
+
     def test_a_blank_hook_line_is_no_hook(self):
         assert split_hook("An account.\nHOOK:   ") == ("An account.", "")
 
@@ -215,14 +220,25 @@ class ServedOnTheRecordListTests:
         with use_composition_root(_root(ScriptedLLM(), permits=lambda r: False)):
             assert _listed(reader, record)["ai_hook"] is None
 
-    def test_the_list_does_not_query_per_card(self, reader, django_assert_max_num_queries):
-        records = [_record(title=f"Paper {i}") for i in range(5)]
-        for record in records:
-            _ready(record)
+    @pytest.mark.parametrize("path", ["/api/v1/records/", "/api/v1/records/for-you/"])
+    def test_queries_do_not_grow_with_the_number_of_cards(self, client_for, path):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
 
-        with django_assert_max_num_queries(25):
-            response = reader.get("/api/v1/records/")
-        assert response.status_code == 200
+        # A fresh reader each time: the feed keeps a per-reader snapshot.
+        def count(email):
+            client = client_for(make_user(email))
+            with CaptureQueriesContext(connection) as queries:
+                response = client.get(path)
+            assert response.status_code == 200
+            return len(queries)
+
+        _ready(_record(title="Paper 0"))
+        one = count("first@cit.edu")
+        for i in range(1, 6):
+            _ready(_record(title=f"Paper {i}"))
+
+        assert count("second@cit.edu") == one
 
 
 class HiddenRecordTests:

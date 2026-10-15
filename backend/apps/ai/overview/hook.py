@@ -22,7 +22,7 @@ HOOK_INSTRUCTION = (
 )
 
 _HOOK_LINE = re.compile(r"^[ \t]*HOOK:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
-_MARKUP = re.compile(r"[*_`#>]+")
+_MARKUP = re.compile(r"[*`]+")
 
 
 def _clean(raw: str) -> str:

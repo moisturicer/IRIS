@@ -259,12 +259,9 @@ def _generate(chunk_set: ChunkSet):
 
 
 def hook_for(record: Record) -> str | None:
-    """The record's stored catalogue hook, or ``None`` (IR-604).
+    """The stored catalogue hook for a record the reader may see (IR-604).
 
-    The caller has already limited the record to what the reader may see. The
-    disclosure gate applies here as it does to the overview itself, and only a
-    ready row from the current prompt version counts. Reads a row the list
-    queryset joined in; never generates.
+    Reads the joined row and never generates; same disclosure gate as the overview.
     """
     try:
         stored = record.ai_overview
