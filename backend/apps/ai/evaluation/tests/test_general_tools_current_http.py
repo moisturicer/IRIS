@@ -1,6 +1,6 @@
-"""IR-589: execute every proposed conversation against the current reader boundary.
+"""IR-589: execute every approved conversation against the current reader boundary.
 
-This is a current-system control, not a test that the proposed controller exists.
+This is a current-system control, not a test that the new controller exists.
 The deterministic vendors and snapshot keep it free of paid calls. The richer
 expected outcomes in general_tools_contract_v1.json are intentionally scored
 only after the corresponding runtime tickets land.
