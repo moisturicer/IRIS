@@ -89,7 +89,7 @@ export function ManuscriptCover({ recordId, available }: ManuscriptCoverProps) {
         </div>
       )}
       {status === "ready" && (
-        <span className="absolute bottom-2 left-2 rounded bg-white/95 px-2 py-1 text-[11px] font-semibold text-stone-700 shadow-sm">
+        <span className="absolute bottom-2 left-2 rounded bg-overlay px-2 py-1 text-[11px] font-semibold text-stone-700 shadow-sm">
           First page
         </span>
       )}

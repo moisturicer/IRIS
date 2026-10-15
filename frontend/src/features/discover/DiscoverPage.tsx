@@ -463,7 +463,7 @@ export default function DiscoverPage() {
                 updateQuery((current) => ({ ...current, feed: value, q: value === "for_you" ? "" : current.q }));
                 if (value === "for_you") setSearchInput("");
               }}
-               className={cn("h-full rounded-md px-1.5 text-[11px] sm:px-3 sm:text-small font-semibold", COLOUR_TRANSITION, FOCUS_RING, feed === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-white/70")}>{label}</button>
+               className={cn("h-full rounded-md px-1.5 text-[11px] sm:px-3 sm:text-small font-semibold", COLOUR_TRANSITION, FOCUS_RING, feed === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-surface")}>{label}</button>
           ))}
         </div>
         <button type="button" onClick={() => setInterestOpen(true)}
