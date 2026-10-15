@@ -10,8 +10,8 @@
  * and never calls a Proposal "ongoing research" -- Proposals are not in the
  * public catalogue (ADR-021 §13).
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLocation } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
@@ -65,6 +65,7 @@ const page = <T,>(results: T[], count = results.length) =>
 vi.mock("@/api/records", () => ({
   recordsApi: {
     list: vi.fn(() => page(listed, total ?? listed.length)),
+    facets: vi.fn(() => Promise.resolve({ data: { years: [2026, 2009] } })),
     classifications: vi.fn(() => page([{ id: 7, name: "Applied Research" }])),
     recordTypes: vi.fn(() =>
       page([
@@ -132,6 +133,7 @@ async function choose(control: RegExp, option: RegExp, scope = filterRow()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   listed = [publishedThesis];
   total = null;
   signInAs("Student");
@@ -384,5 +386,214 @@ describe("states", () => {
 
     await screen.findByText(approvedProposal.title);
     expect(screen.queryByText(/research ongoing/i)).not.toBeInTheDocument();
+  });
+});
+
+/* ── IR-560: the query survives Back, reload and Load more ─────────────── */
+
+/** A Record page that only offers Back, so a test can leave Discover and return. */
+function RecordStub() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(-1)}>
+      Back to Discover
+    </button>
+  );
+}
+
+function renderDiscoverWithRecords(route = "/") {
+  return renderScreen(
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <>
+            <DiscoverPage />
+            <LocationProbe />
+          </>
+        }
+      />
+      <Route path="/records/:id" element={<RecordStub />} />
+    </Routes>,
+    { route },
+  );
+}
+
+/** The list mock, typed loosely: these fixtures return `{ data }`, not a full response. */
+const listMock = () =>
+  vi.mocked(recordsApi.list) as unknown as MockInstance<(params?: Record<string, unknown>) => Promise<unknown>>;
+
+const secondPagePaper = listItem({ id: 3, title: "Bamboo Truss Load Testing" });
+
+/** page 1 is `listed`; page 2 is the second-page paper. */
+function twoPages() {
+  total = 2;
+  listMock().mockImplementation((params) => {
+    const { page: n, page_size: size } = (params ?? {}) as { page?: number; page_size?: number };
+    if (n === 2) return page([secondPagePaper], 2);
+    // A restored depth asks for both pages at once.
+    return page(size && size > 12 ? [publishedThesis, secondPagePaper] : [publishedThesis], 2);
+  });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+describe("continuity", () => {
+  afterEach(() => {
+    listMock().mockImplementation(() => page(listed, total ?? listed.length));
+  });
+
+  it("restores the search, filters and sort from the URL", async () => {
+    renderDiscover("/?q=rain&type=2&year=2019&sort=viewed");
+
+    await waitFor(() =>
+      expect(lastListParams()).toMatchObject({
+        search: "rain",
+        record_type: "2",
+        year_from: "2019",
+        year_to: "2019",
+        ordering: "-access_count",
+      }),
+    );
+    expect(screen.getByRole("textbox", { name: "Search records" })).toHaveValue("rain");
+    const chips = await screen.findByRole("list", { name: "Active filters" });
+    expect(within(chips).getByRole("button", { name: "Remove filter: Project" })).toBeInTheDocument();
+  });
+
+  it("writes each filter and sort change into the URL", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    await choose(/^type/i, /^project$/i);
+    await userEvent.click(screen.getByRole("button", { name: /^sort/i }));
+    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Most viewed" }));
+
+    const query = screen.getByRole("status", { name: "Current query" });
+    await waitFor(() => expect(query).toHaveTextContent("type=2"));
+    expect(query).toHaveTextContent("sort=viewed");
+  });
+
+  it("falls back to safe defaults for values it does not recognise, and corrects the URL", async () => {
+    renderDiscover("/?sort=bogus&year=19&type=thesis&college=4,x");
+
+    await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at", college: "4" }));
+    expect(lastListParams()).not.toHaveProperty("year_from");
+    expect(lastListParams()).not.toHaveProperty("record_type");
+    await waitFor(() =>
+      expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?college=4$/),
+    );
+  });
+
+  it("brings back the query and every loaded result after opening a Record and going Back", async () => {
+    twoPages();
+    renderDiscoverWithRecords("/?type=2");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Load more (1 left)" }));
+    await screen.findByText(secondPagePaper.title);
+
+    await userEvent.click(screen.getByRole("link", { name: publishedThesis.title }));
+    await userEvent.click(await screen.findByRole("button", { name: "Back to Discover" }));
+
+    expect(await screen.findByText(secondPagePaper.title)).toBeInTheDocument();
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+    expect(lastListParams()).toMatchObject({ record_type: "2", page: 1, page_size: 24 });
+    expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it("never appends an older page after the filters change", async () => {
+    total = 2;
+    const oldPageTwo = deferred<{ data: { results: RecordListItem[]; count: number } }>();
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    listMock().mockImplementationOnce(() => oldPageTwo.promise);
+    await userEvent.click(screen.getByRole("button", { name: "Load more (1 left)" }));
+
+    const projectPaper = listItem({ id: 8, title: "Solar Dryer for Copra" });
+    listed = [projectPaper];
+    total = 1;
+    await choose(/^type/i, /^project$/i);
+    await screen.findByText(projectPaper.title);
+
+    oldPageTwo.resolve({ data: { results: [listItem({ id: 9, title: "Stale Second Page" })], count: 2 } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText("Stale Second Page")).not.toBeInTheDocument();
+    expect(screen.getByText(projectPaper.title)).toBeInTheDocument();
+  });
+
+  it("offers every year in the catalogue, not only the years of the loaded cards", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    await userEvent.click(within(filterRow()).getByRole("button", { name: /^year/i }));
+    const options = await screen.findByRole("listbox");
+    expect(within(options).getByRole("option", { name: "2009" })).toBeInTheDocument();
+  });
+
+  it("recovers the filter choices on their own when they fail to load", async () => {
+    vi.mocked(recordsApi.facets).mockImplementationOnce(() => Promise.reject(new Error("down")));
+    renderDiscover();
+
+    // The results still load: only the filter choices failed.
+    expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Some filters couldn't load");
+
+    await userEvent.click(within(alert).getByRole("button", { name: "Retry filters" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(recordsApi.facets).toHaveBeenCalledTimes(2);
+  });
+
+  it("recovers a failed Load more on its own, keeping the first page", async () => {
+    total = 2;
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    listMock().mockImplementationOnce(() => Promise.reject(new Error("down")));
+    await userEvent.click(screen.getByRole("button", { name: "Load more (1 left)" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("More results didn't load.");
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+
+    listMock().mockImplementationOnce(() => page([secondPagePaper], 2));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText(secondPagePaper.title)).toBeInTheDocument();
+  });
+});
+
+describe("continuity: the search box follows the URL", () => {
+  /** What the sidebar's Discover link does: go to "/" while Discover is open. */
+  function DiscoverLink() {
+    const navigate = useNavigate();
+    return (
+      <button type="button" onClick={() => navigate("/")}>
+        Discover home
+      </button>
+    );
+  }
+
+  it("empties the search box when the URL drops the search", async () => {
+    renderScreen(
+      <>
+        <DiscoverPage />
+        <DiscoverLink />
+      </>,
+      { route: "/?q=robotics" },
+    );
+    const box = screen.getByRole("textbox", { name: "Search records" });
+    expect(box).toHaveValue("robotics");
+
+    await userEvent.click(screen.getByRole("button", { name: "Discover home" }));
+
+    await waitFor(() => expect(box).toHaveValue(""));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(lastListParams()).not.toHaveProperty("search");
   });
 });

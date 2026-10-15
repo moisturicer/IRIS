@@ -20,6 +20,9 @@ export const recordsApi = {
   list:           (params?: Record<string, unknown>) =>
     apiClient.get<PaginatedResponse<RecordListItem>>("/records/", { params }),
 
+  // Discover's filter choices over the whole catalogue `list` serves (IR-560).
+  facets:         () => apiClient.get<{ years: number[] }>("/records/facets/"),
+
   // My Library's *My research* list -- a plain array, not paginated, of
   // the narrow rows `MyResearchSerializer` returns (IR-410).
   mine:           (params?: Record<string, unknown>) =>

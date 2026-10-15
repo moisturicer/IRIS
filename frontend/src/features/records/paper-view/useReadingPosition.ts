@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { CONTAINED_LAYOUT_QUERY } from "./paneLayout";
 import { anchorDelta, readingAnchor, type ReadingAnchor } from "./readerGeometry";
 
 interface ReadingPositionOptions {
@@ -12,8 +10,10 @@ interface ReadingPositionOptions {
   pageRefs: MutableRefObject<Map<number, HTMLDivElement>>;
   /** The reader's toolbar: its bottom edge is the top of what can be read. */
   toolbarRef: RefObject<HTMLElement>;
-  /** The pane's scroll area, which scrolls the pages at `lg` and up. */
+  /** The pane's scroll area, which scrolls the pages when contained. */
   scrollAreaRef: MutableRefObject<HTMLElement | null>;
+  /** The reader is a contained pane (IR-569); a change swaps the scroller. */
+  contained: boolean;
 }
 
 /** Throttles to the next frame where the browser offers one. */
@@ -30,8 +30,8 @@ function nextFrame(callback: () => void): () => void {
  * Where the reader is in the paper, and keeping them there (IR-352).
  *
  * Tracks the page under the toolbar as either scroller moves -- the pane at
- * `lg` and up, the window below it -- and returns its number for
- * "Page n / N". When the zoom changes, or the window crosses into or out of
+ * when contained, the window otherwise -- and returns its number for
+ * "Page n / N". When the zoom changes, or the workspace crosses into or out of
  * the contained layout (which swaps the scroller), it puts the same point of
  * the same page back under the toolbar before the browser paints.
  */
@@ -42,10 +42,10 @@ export function useReadingPosition({
   pageRefs,
   toolbarRef,
   scrollAreaRef,
+  contained,
 }: ReadingPositionOptions): number {
   const [currentPage, setCurrentPage] = useState(1);
   const anchorRef = useRef<ReadingAnchor | null>(null);
-  const contained = useMediaQuery(CONTAINED_LAYOUT_QUERY);
 
   const viewTop = useCallback(
     () => toolbarRef.current?.getBoundingClientRect().bottom ?? 0,

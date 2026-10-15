@@ -50,7 +50,8 @@ export const router = createBrowserRouter([
           // Retired URLs (spec §4.1). Outside the role gates: a redirect only
           // moves the address, and the page it lands on applies its own.
           ...redirectRoutes,
-          { path: "records/:id",           element: <PaperViewPage />,   handle: { crumb: "Paper", width: "full" } },
+          // No crumb: the reading header is this page's navigation (IR-569).
+          { path: "records/:id",           element: <PaperViewPage />,   handle: { width: "full" } },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
           { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },

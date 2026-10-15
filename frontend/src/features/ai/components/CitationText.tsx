@@ -60,8 +60,14 @@ function CitationPlaceholder() {
   );
 }
 
-/** A resolved citation, as a small clickable pill sitting inline in the text. */
-function CitationChip({ citation }: { citation: ChatCitation }) {
+/**
+ * A resolved citation, as a small clickable pill sitting inline in the text.
+ *
+ * `page` is the AI Overview's form (IR-434, IR-569): its marker is a page
+ * number, so it reads as one -- "p8", at the size of the type around it -- the
+ * way a reader would cite a page, instead of an 8px digit in a dot.
+ */
+function CitationChip({ citation, page = false }: { citation: ChatCitation; page?: boolean }) {
   const origin = useContext(CitationOriginContext);
   const label = openCitationLabel(
     citation,
@@ -77,12 +83,17 @@ function CitationChip({ citation }: { citation: ChatCitation }) {
       state={citationNavigationState(citation, origin)}
       title={label}
       aria-label={label}
-      // min-w: an overview chip is a page number, which can run to three digits (IR-434).
-      className="inline-flex items-center justify-center min-w-[15px] px-[2px] h-[15px] rounded-full
-        bg-[#6B0F12]/10 text-[8px] font-bold text-[#6B0F12] align-super leading-none
-        no-underline hover:bg-[#6B0F12]/20 mx-px"
+      className={
+        page
+          ? "inline-flex items-center px-1 mx-0.5 rounded-md text-2xs font-semibold tabular-nums " +
+            "text-brand leading-5 align-baseline no-underline hover:bg-brand-50 hover:underline transition-colors duration-150"
+          : // min-w: a marker can run to three digits.
+            "inline-flex items-center justify-center min-w-[15px] px-[2px] h-[15px] rounded-full " +
+            "bg-[#6B0F12]/10 text-[8px] font-bold text-[#6B0F12] align-super leading-none " +
+            "no-underline hover:bg-[#6B0F12]/20 mx-px"
+      }
     >
-      {citation.marker}
+      {page ? `p${citation.marker}` : citation.marker}
     </Link>
   );
 }
@@ -92,10 +103,12 @@ interface CitationTextProps {
   citations: ChatCitation[];
   /** True while this message is still streaming in -- see the module doc. */
   streaming?: boolean;
+  /** Markers are page numbers (the AI Overview): show them as "p8". */
+  pageMarkers?: boolean;
   className?: string;
 }
 
-export function CitationText({ text, citations, streaming = false, className }: CitationTextProps) {
+export function CitationText({ text, citations, streaming = false, pageMarkers = false, className }: CitationTextProps) {
   const byMarker = new Map(citations.map((citation) => [citation.marker, citation]));
 
   function CitationLink({ href, children }: ComponentPropsWithoutRef<"a">) {
@@ -115,7 +128,7 @@ export function CitationText({ text, citations, streaming = false, className }: 
     // gap, no dangling chip (IR-329).
     if (!citation) return null;
 
-    return <CitationChip citation={citation} />;
+    return <CitationChip citation={citation} page={pageMarkers} />;
   }
 
   return (

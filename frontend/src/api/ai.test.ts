@@ -19,13 +19,23 @@ describe("starting a conversation (IR-548)", () => {
     expect(data).toEqual({ ...created, turns: [], latest_run: null });
   });
 
-  it("does the same when Paper Chat starts its Record's first conversation", async () => {
+});
+
+describe("finding a Record's conversation (IR-569)", () => {
+  it("finds none without starting one, so opening Paper Chat creates nothing", async () => {
     get.mockResolvedValue({ data: [] });
-    post.mockResolvedValue({ data: created });
 
-    const { data } = await aiApi.conversations.findOrCreateForRecord(5);
+    expect(await aiApi.conversations.findForRecord(5)).toBeNull();
+    expect(get).toHaveBeenCalledWith("/ai/conversations/", { params: { record: 5 } });
+    expect(post).not.toHaveBeenCalled();
+  });
 
-    expect(data.turns).toEqual([]);
+  it("reads the existing one in full", async () => {
+    const detail = { id: 4, turns: [], latest_run: null };
+    get.mockResolvedValueOnce({ data: [{ id: 4 }] }).mockResolvedValueOnce({ data: detail });
+
+    expect(await aiApi.conversations.findForRecord(5)).toEqual(detail);
+    expect(get).toHaveBeenLastCalledWith("/ai/conversations/4/");
   });
 });
 

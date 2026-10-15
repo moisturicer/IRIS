@@ -1,40 +1,41 @@
 /**
- * The Paper View's sticky and pane geometry (IR-351, IR-352, IR-356).
- *
- * Top to bottom: nothing -- there is no app header since IR-519 -- then 8px
- * down the floating section switch, 48px tall; 12px below that the panes --
- * the reader, the docked Paper Chat and the rail -- which share one height so
- * their tops and bottoms line up, ending at the page's 28px bottom padding.
- * Below `md` a phone bar sits above the page, but it scrolls away rather than
- * sticking, so nothing here is measured from it.
- *
- * Whole class strings, because Tailwind only generates classes it finds
- * written out in source. There are no spacing tokens for these offsets; they
- * live here once. Change the switch or the `icon` Button's 44px, and these
- * change with it. `paneLayout.test.ts` pins the arithmetic.
+ * The record page's sticky and pane geometry (IR-351, IR-352, IR-569).
+ * The `reading` container's width picks the layout; CSS reads it through the
+ * `reading-*` variants, React through `readingTier` (kept equal by the test).
  */
 
-/** Where the reader becomes a contained pane: Tailwind's `lg`, 1024px. */
-export const CONTAINED_LAYOUT_QUERY = "(min-width: 1024px)";
+/** Ask IRIS beside the paper from here, leaving the paper at least 640px. */
+export const READING_WIDE_PX = 1000;
 
-/** The floating view switch: 8px from the top of the window. */
-export const VIEW_SWITCH_TOP = "top-[8px]";
+/** Ask IRIS over the paper from here; one view at a time below it. */
+export const READING_SPLIT_PX = 640;
 
-/** Panes: 12px below the switch (8 + 48 + 12). */
-export const PANE_TOP = "lg:top-[68px]";
+export type ReadingTier = "wide" | "overlay" | "single";
 
-/** `PANE_TOP` as a number, for the reader to scroll its pane to (IR-354). */
-export const PANE_TOP_PX = 68;
+/** The tier for a measured width, or null before there is one (and in jsdom). */
+export function readingTier(width: number): ReadingTier | null {
+  if (width <= 0) return null;
+  if (width >= READING_WIDE_PX) return "wide";
+  if (width >= READING_SPLIT_PX) return "overlay";
+  return "single";
+}
 
-/** The viewport less everything above a pane and the 28px bottom padding. */
-export const PANE_HEIGHT = "lg:h-[calc(100vh-96px)]";
-export const PANE_MAX_HEIGHT = "lg:max-h-[calc(100vh-96px)]";
+/** The sticky part of the reading header: all of it, or its tab row. */
+export const READING_HEADER_PX = 56;
 
-/** Below `lg` the reader's toolbar sticks 8px under the switch instead (8 + 48 + 8). */
+/** Panes: 12px below the header. */
+export const PANE_TOP_PX = READING_HEADER_PX + 12;
+
+/** The Overview's record details, which follow the Overview column's width. */
+export const OVERVIEW_ASIDE_TOP = "overview-wide:top-[68px]";
+export const OVERVIEW_ASIDE_MAX_HEIGHT = "overview-wide:max-h-[calc(100vh-96px)]";
+
+/** The reader and the Review pane, which follow the workspace. */
+export const READING_PANE_TOP = "reading-wide:top-[68px]";
+export const READING_PANE_HEIGHT = "reading-wide:h-[calc(100vh-96px)]";
+
+/** Below `reading-wide` the reader's toolbar sticks 8px under the header. */
 export const READER_TOOLBAR_TOP = "top-[64px]";
 
-/**
- * `READER_TOOLBAR_TOP` as a number: below `lg`, a citation lands under
- * where the toolbar rests once stuck, not where it happens to be (IR-354).
- */
-export const READER_TOOLBAR_TOP_PX = 64;
+/** Where the toolbar rests once stuck: a citation lands under that (IR-354). */
+export const READER_TOOLBAR_TOP_PX = READING_HEADER_PX + 8;

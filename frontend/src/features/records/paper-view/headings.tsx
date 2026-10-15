@@ -7,8 +7,12 @@ import { cn } from "@/lib/utils";
  */
 
 /** A section of the reading column: serif, like a printed paper's. */
-export function SectionHeading({ children }: { children: ReactNode }) {
-  return <h2 className="font-display text-xl font-semibold text-stone-900 mb-2">{children}</h2>;
+export function SectionHeading({ children, id }: { children: ReactNode; id?: string }) {
+  return (
+    <h2 id={id} className="font-display text-xl font-semibold text-stone-900 mb-2">
+      {children}
+    </h2>
+  );
 }
 
 /** A side card's label: small tracked capitals, quieter than the paper. */

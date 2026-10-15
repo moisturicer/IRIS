@@ -1,13 +1,14 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Button, Skeleton } from "@/components/ui";
+import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useElementWidth } from "@/hooks/useElementWidth";
+import { useUIStore } from "@/store/ui.store";
 import { cn, formatDate } from "@/lib/utils";
 import { citedPage, followedFromPaperChat, type CitationNavigationState } from "@/lib/citedPage";
 import type { RecordDetail, IpType } from "@/types/records";
@@ -32,14 +33,14 @@ import {
 import {
   usePaperChat,
   PaperChatPanel,
-  PaperChatLauncher,
-  type DockMode,
   DOCKED_PANEL_CLASS,
-  FLOATING_PANEL_CLASS,
   MINIMIZED_SHEET_CLASS,
-  PAPER_TAB_PANEL_CLASS,
+  PANEL_WIDTH_MIN,
+  PAPER_WORKSPACE_PANEL_CLASS,
+  fitPanelWidth,
 } from "./PaperChatDock";
-import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
+import { AskIrisFab } from "./AskIrisFab";
+import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
@@ -49,7 +50,8 @@ import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
-import { CONTAINED_LAYOUT_QUERY, PANE_MAX_HEIGHT, PANE_TOP, VIEW_SWITCH_TOP } from "./paneLayout";
+import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
+import { ReadingHeader } from "./ReadingHeader";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
@@ -216,7 +218,7 @@ function SimilarPapers({ recordId }: { recordId: number }) {
           <Link
             key={item.id}
             to={`/records/${item.id}`}
-            className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 border-t-2 border-t-brand/70 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
+            className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
           >
             <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
               CIT-U #{item.id}
@@ -267,6 +269,10 @@ function LoadingSkeleton() {
   );
 }
 
+/** An outlined fact about the record: its type, classification, programme flags. */
+const META_CHIP =
+  "px-2.5 py-1 rounded-full ring-1 ring-stone-300 text-xs font-semibold text-stone-700";
+
 /** Initials for the byline's mark. */
 function initials(name: string): string {
   return name
@@ -277,13 +283,6 @@ function initials(name: string): string {
     .join("")
     .toUpperCase();
 }
-
-const SECTION_LABELS: Record<PaperSection, string> = {
-  overview: "Overview",
-  paper: "Paper",
-  review: "Review",
-  files: "Files",
-};
 
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
@@ -299,6 +298,8 @@ const SECTION_LABELS: Record<PaperSection, string> = {
  * is not an arrival: Back still leaves the paper, and Paper Chat keeps the
  * conversation it is on, pinned or not (IR-355).
  */
+const TIER_RANK: Record<ReadingTier, number> = { single: 0, overlay: 1, wide: 2 };
+
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -356,15 +357,128 @@ export default function PaperViewPage() {
   };
   const setViewParam = (name: string, value: string | null) => setViewParams({ [name]: value });
 
-  // Below `lg` the docked chat is a bottom sheet over the paper; at `lg` it
-  // is a column beside it (IR-352).
-  const contained = useMediaQuery(CONTAINED_LAYOUT_QUERY);
+  // The workspace's own width picks the Paper layout (IR-569), so either
+  // sidebar state counts; null until measured.
+  const [observeWorkspace, workspaceWidth] = useElementWidth<HTMLDivElement>();
+  const tier = readingTier(workspaceWidth);
+  const enterReadingRail = useUIStore((s) => s.enterReadingRail);
+  const leaveReadingRail = useUIStore((s) => s.leaveReadingRail);
+  const panelRef = useRef<HTMLElement>(null);
+  const askButtonRef = useRef<HTMLButtonElement>(null);
+  const refocusAsk = useRef(false);
+
+  // Before the early returns below, so the hooks that follow can use them.
+  const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
+  const sections = record ? sectionsFor(record, viewer) : [];
+  // The section asked for, else the reader for a citation's page, else
+  // Overview. One the viewer may not open is Overview too.
+  const asked = asSection(searchParams.get("section")) ?? (openAtPage != null ? "paper" : "overview");
+  const section: PaperSection = sections.includes(asked) ? asked : "overview";
+  // Still on the record being left while the next one loads.
+  const arriving = loading || !record || record.id !== Number(id);
+  const onPaperTab = record != null && section === "paper";
+  const onReviewTab = section === "review";
+  // Never beside the paper, where there is no sheet to tuck away.
+  const chatMinimized = chat.minimized && chat.open && !onReviewTab && tier !== "wide";
+  // Ask IRIS over the paper, or instead of the page: the rest waits (IR-569).
+  const chatModal =
+    chat.open &&
+    !chatMinimized &&
+    !onReviewTab &&
+    (tier === "single" || (onPaperTab && tier === "overlay"));
+  // The reader's width, held to half the workspace, and beside the paper to
+  // what leaves it 640px.
+  const half = Math.floor(workspaceWidth / 2);
+  const panelRoom = tier === "wide" && onPaperTab ? Math.min(half, workspaceWidth - 656) : half;
+  const panelWidth =
+    tier === "wide" || tier === "overlay" ? fitPanelWidth(chat.width, panelRoom) : undefined;
+
+  // Opening the sidebar narrows the workspace; Ask IRIS steps aside rather than
+  // taking over the page (IR-569): over the paper at any narrowing, and on the
+  // other sections only where it would become the whole view. Widening leaves
+  // it as it was.
+  const lastTier = useRef<ReadingTier | null>(null);
+  useEffect(() => {
+    const before = lastTier.current;
+    lastTier.current = tier;
+    if (onReviewTab || !chat.open || before == null || tier == null) return;
+    const narrowed = TIER_RANK[tier] < TIER_RANK[before];
+    if (narrowed && (onPaperTab || tier === "single")) chat.setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier]);
+
+  // Entering Paper opens Ask IRIS, once per visit to the section (IR-569).
+  // Following a citation within it is not an entry.
+  const enteredPaper = useRef(false);
+  useEffect(() => {
+    if (!onPaperTab) {
+      enteredPaper.current = false;
+      chat.setMinimized(false);
+      return;
+    }
+    if (arriving || enteredPaper.current) return;
+    enteredPaper.current = true;
+    chat.setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onPaperTab, arriving]);
+
+  // Reading collapses the sidebar to its rail, for this visit only (IR-569).
+  useEffect(() => {
+    if (!onPaperTab) return;
+    enterReadingRail();
+    return leaveReadingRail;
+  }, [onPaperTab, enterReadingRail, leaveReadingRail]);
+
+  const closeChat = () => {
+    if (chatModal) refocusAsk.current = true;
+    chat.setOpen(false);
+  };
+  const backToPaper = () => {
+    refocusAsk.current = true;
+    chat.setMinimized(true);
+  };
+
+  // Over the paper, focus moves in and stays in, and Escape leaves; on
+  // leaving, focus returns to the header's Ask IRIS once it is not inert.
+  useEffect(() => {
+    if (!chatModal) return;
+    panelRef.current?.focus();
+    // A dialog opened on top of the panel keeps its own Escape and focus.
+    const inOtherDialog = (target: EventTarget | null) => {
+      const owner = target instanceof Element ? target.closest('[role="dialog"],[role="alertdialog"]') : null;
+      return owner != null && owner !== panelRef.current;
+    };
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || inOtherDialog(e.target)) return;
+      if (tier === "single" && onPaperTab) backToPaper();
+      else closeChat();
+    };
+    // The sidebar is the app's, not inert here: focus reaching it comes back.
+    const onFocusIn = (e: FocusEvent) => {
+      const panel = panelRef.current;
+      if (!panel || !(e.target instanceof Node) || panel.contains(e.target) || inOtherDialog(e.target)) return;
+      panel.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocusIn);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("focusin", onFocusIn);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatModal, tier, onPaperTab]);
+  useEffect(() => {
+    if (!refocusAsk.current || chatModal) return;
+    refocusAsk.current = false;
+    const bar = panelRef.current?.querySelector<HTMLElement>('button[aria-label="Show Ask IRIS"]');
+    (bar ?? askButtonRef.current)?.focus();
+  });
 
   useEffect(() => {
     if (openAtPage == null) return;
-    // A citation followed while the chat is a bottom sheet would land its
-    // passage under the sheet, so the sheet tucks away to a bar (IR-354).
-    if (chat.open && !contained) chat.setMinimized(true);
+    // A citation followed while the chat covers the paper would land its
+    // passage under it, so it tucks away to a bar (IR-354).
+    if (chat.open && tier !== "wide") chat.setMinimized(true);
     // The arrival key is unique per navigation, including a second click on
     // the very citation already open -- without it in the dependency list,
     // clicking the same marker twice would not re-fire this effect. The
@@ -467,27 +581,20 @@ export default function PaperViewPage() {
     );
   }
 
-  // Still on the record being left while the next one loads. Its own
-  // content is not shown meanwhile, only the chat beside it.
-  const arriving = loading || record.id !== Number(id);
-
-  const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
   const can = capabilitiesFor(record);
-  const sections = sectionsFor(record, viewer);
   const userIsOwner = isOwner(record, viewer);
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
-  // The section asked for, else the reader for a citation's page, else
-  // Overview. One the viewer may not open is Overview too.
-  const asked = asSection(searchParams.get("section")) ?? (openAtPage != null ? "paper" : "overview");
-  const section: PaperSection = sections.includes(asked) ? asked : "overview";
   const editOpen = searchParams.get("edit") === "details" && can.has("edit_details") && !arriving;
 
   const primaryOwner = record.owners.find((o) => o.is_primary) ?? record.owners[0];
-  const byline = record.authors.length > 0
-    ? record.authors.map((a) => a.name).join(", ")
-    : primaryOwner?.full_name ?? null;
+  const authorNames =
+    record.authors.length > 0
+      ? record.authors.map((a) => a.name)
+      : primaryOwner?.full_name
+        ? [primaryOwner.full_name]
+        : [];
 
   // A citation carries the exact chunk it points at as router `state`
   // (IR-335), so the reader draws its highlight with no second fetch. A
@@ -496,33 +603,16 @@ export default function PaperViewPage() {
   // with nothing to highlight, which is the same graceful case a passage
   // with no recovered regions already is.
   const navCitation = (location.state as CitationNavigationState | null)?.citation;
-  // The Paper section is the paper and Ask IRIS, nothing else (IR-372):
-  // chat is always docked right there, the rail is never drawn, and the pair
-  // spans the full content width rather than a centred column. The reader's
-  // own dock choice is only overridden, never overwritten, so Overview gets
-  // it back unchanged.
-  const onPaperTab = section === "paper";
-  // The Review section puts the paper beside the review pane (IR-412), so it
-  // takes the full width the Paper tab does rather than the reading column.
-  // Ask IRIS is not part of it (spec §4.6, decided 2026-09-26): the panel
-  // stays mounted there, only hidden, so the conversation is waiting on the
-  // Paper tab.
-  const onReviewTab = section === "review";
-  const dock: DockMode = onPaperTab ? "right" : chat.dock;
-  const chatDocked = chat.open && dock !== "floating" && !onReviewTab;
-  // Never at `lg`, where there is no sheet to tuck away: widening the window
-  // brings the column back whole.
-  const chatMinimized = chat.minimized && chatDocked && !contained;
+  // One Ask IRIS everywhere (IR-569): a column or drawer in the Paper
+  // workspace, a column beside the page on the other sections. The Review section has none
+  // (spec §4.6): the panel stays mounted there, only hidden.
   const chatPanelClass = onReviewTab
     ? "hidden"
     : chatMinimized
       ? MINIMIZED_SHEET_CLASS
       : onPaperTab
-        ? PAPER_TAB_PANEL_CLASS
-        : chatDocked
-          ? DOCKED_PANEL_CLASS
-          : FLOATING_PANEL_CLASS;
-  const showRail = section === "overview" && !chatDocked && !arriving;
+        ? PAPER_WORKSPACE_PANEL_CLASS
+        : DOCKED_PANEL_CLASS;
   // Versions (IR-416). Null to a viewer who may not read the review, so a
   // reader of a published paper has none, and `?version=` means nothing to
   // them. An earlier version is open only while it is asked for, exists and
@@ -553,8 +643,10 @@ export default function PaperViewPage() {
       : [];
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
-  const reader = (toolbarStart?: ReactNode) => (
+  const reader = () => (
     <>
+      {(viewedVersion || record.manuscript_unsubmitted) && (
+      <div className={cn("space-y-3", onPaperTab && "px-4 pt-3")}>
       {viewedVersion && latestVersion && (
         <VersionBanner
           viewing={viewedVersion.number}
@@ -580,6 +672,8 @@ export default function PaperViewPage() {
           </div>
         </div>
       )}
+      </div>
+      )}
       <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
         <PaperPdfReader
           recordId={record.id}
@@ -587,18 +681,24 @@ export default function PaperViewPage() {
           scrollToPage={viewedVersion ? null : openAtPage}
           highlightRegions={highlightRegions}
           navKey={arrivalKey.current}
-          toolbarStart={toolbarStart}
+          contained={onPaperTab || tier === "wide"}
+          fill={onPaperTab}
         />
       </Suspense>
     </>
   );
 
   // One filled action per region (spec §4.6, 01-design-system §0): the
-  // owner's pending action, else the reviewer's Open review, else Save. When
+  // owner's pending action, else the reviewer's Open review, else View (Save
+  // where there is no paper to view, IR-569). When
   // the pending action has its own region -- the revision banner, the
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
   // there.
+  const hasPaper = sections.includes("paper");
+  const showRail = section === "overview" && !arriving;
+  // Ask IRIS open beside the page leaves no room for the rail (IR-569).
+  const railHidden = showRail && chat.open && !chatMinimized;
   const primary = can.has("continue_draft")
     ? "continue"
     : can.has("create_version")
@@ -607,7 +707,9 @@ export default function PaperViewPage() {
         ? "open_review"
         : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
           ? "elsewhere"
-          : "save";
+          : hasPaper
+            ? "view"
+            : "save";
 
   // *Open review* (ADR-032 §4) records when this reviewer started -- the
   // seat moves to `in_review` and the server stamps `opened_at` -- then moves
@@ -628,6 +730,21 @@ export default function PaperViewPage() {
     setViewParam("section", "review");
   };
 
+  // Paper mode's version: a compact picker where there is a choice, else
+  // the version's number, else nothing to a reader shown none (IR-416).
+  const paperVersion =
+    versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1) ? (
+      <VersionPicker
+        compact
+        unsubmitted={record.manuscript_unsubmitted}
+        versions={versions}
+        viewing={viewedVersion?.number ?? null}
+        onChoose={chooseVersion}
+      />
+    ) : latestVersion ? (
+      <span className="shrink-0 text-small font-semibold text-stone-500">v{latestVersion.number}</span>
+    ) : null;
+
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -639,56 +756,65 @@ export default function PaperViewPage() {
   };
 
   return (
-    // Centred at the app's standard width (IR-335, IR-521), with the right
-    // rail inside the same container so the two centre as a pair. The route
-    // asks AppShell for the full width because the Paper and Review sections
-    // use all of it (IR-372): the reader and the review pane get the room
-    // rather than margins. The other sections take the standard width here.
-    <div className={cn(!onPaperTab && !onReviewTab && PAGE_WIDTH.standard)}>
+    // The `reading` container (IR-569): its width, not the window's, lays
+    // out the page. Paper is a full-height workspace (record bar, then the
+    // paper beside Ask IRIS); the other sections scroll with the window,
+    // at the app's standard width except Review, which uses all of it.
+    <div
+      ref={observeWorkspace}
+      className={cn(
+        "relative [container-type:inline-size] [container-name:reading]",
+        onPaperTab && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
+      )}
+    >
+      <ReadingHeader
+        inert={chatModal}
+        className={cn(!onPaperTab && "sticky top-0 z-30")}
+        sections={sections}
+        section={section}
+        onSelect={(s) => setViewParam("section", s)}
+        onTabKeyDown={onTabKeyDown}
+        tabId={tabId}
+        panelId={arriving ? undefined : `${tabsId}-panel`}
+        onBack={() => navigate(-1)}
+        title={!onPaperTab ? undefined : arriving ? null : record.title}
+        version={onPaperTab ? paperVersion : undefined}
+      />
       <div
         className={cn(
-          "lg:flex lg:gap-6 lg:items-start",
-          dock === "left" && !onReviewTab && "lg:flex-row-reverse",
+          onPaperTab
+            ? "flex-1 min-h-0 flex"
+            : onReviewTab
+              ? "px-4 sm:px-7 pt-6 pb-7"
+              : "flex items-start",
         )}
       >
-        <div className="min-w-0 lg:flex-1">
-          {/* The section switch floats at the top of the window, so every
-              section is one click away at any depth (IR-356). */}
-          <div className={cn("sticky z-30 flex justify-center mb-4 pointer-events-none", VIEW_SWITCH_TOP)}>
-            <div
-              role="tablist"
-              aria-label="Paper view"
-              onKeyDown={onTabKeyDown}
-              className="pointer-events-auto inline-flex gap-1 rounded-full bg-overlay p-0.5 shadow-card-md ring-1 ring-stone-200"
-            >
-              {sections.map((s) => (
-                <button
-                  key={s}
-                  id={tabId(s)}
-                  type="button"
-                  role="tab"
-                  aria-selected={section === s}
-                  aria-controls={arriving ? undefined : `${tabsId}-panel`}
-                  tabIndex={section === s ? 0 : -1}
-                  onClick={() => setViewParam("section", s)}
-                  className={cn(
-                    "min-h-11 px-3.5 sm:px-6 rounded-full text-small sm:text-body font-semibold transition-colors duration-200",
-                    FOCUS_RING,
-                    section === s ? "bg-brand text-white shadow-card" : "text-stone-600 hover:text-brand",
-                  )}
-                >
-                  {SECTION_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div
+          {...(chatModal ? { inert: "" } : {})}
+          className={cn(
+            "min-w-0",
+            onPaperTab && "flex-1 flex flex-col",
+            // Its own container, so the rail and the page read the room the
+            // panel leaves them (IR-569), as the reader reads the paper's.
+            !onPaperTab && !onReviewTab && "flex-1 [container-type:inline-size] [container-name:overview]",
+          )}
+        >
 
           <div
             className={cn(
-              "grid gap-6 items-start",
-              // The rail takes some of a wide screen's extra width (IR-521);
-              // the Abstract keeps its reading measure either way.
-              showRail && "lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]",
+              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
+              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8 pb-12", PAGE_WIDTH.standard),
+              // Wide: the page takes the width it has, with what the record is
+              // held under beside it while there is room, and under it when
+              // the panel or the sidebar leave none (IR-569). Ask IRIS open
+              // takes its place: the rail folds away and the page widens into it.
+              showRail &&
+                cn(
+                  "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                  railHidden
+                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,1fr)_0rem] overview-wide:gap-x-0"
+                    : "overview-wide:grid-cols-[minmax(0,1fr)_22rem] overview-wide:gap-x-12",
+                ),
             )}
           >
           {/* ------------------------------------------------------------- */}
@@ -697,46 +823,71 @@ export default function PaperViewPage() {
           {arriving ? (
             <MainColumnSkeleton />
           ) : (
-          <div className="min-w-0 space-y-6">
-            {/* Editorial header (IR-356): where it sits, what it is, who
-                wrote it, then what to do with it. */}
-            <header className="space-y-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="inline-flex items-center gap-2 min-h-11 -my-2 text-sm font-medium text-stone-500 hover:text-brand transition-colors duration-200"
-              >
-                <i className="fas fa-arrow-left text-2xs" aria-hidden />
-                Back
-              </button>
+          <div
+            className={cn(
+              "min-w-0",
+              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
+              // The Overview reads in one column, up to 60rem, set against
+              // what is beside it (Ask IRIS, or the rail) with the room left
+              // over on its left (IR-569).
+              showRail && "w-full max-w-[60rem] justify-self-end",
+            )}
+          >
+            {/* Editorial header (IR-356): what it is, who wrote it, then
+                what to do with it. Not in Paper mode, where the record bar
+                holds the paper in one line (IR-569). */}
+            {!onPaperTab && (
+            <header className="space-y-5">
+              <p className="flex items-center gap-x-2 text-small text-stone-500">
+                <span>Added {formatDate(record.created_at)}</span>
+                <span aria-hidden className="text-stone-300">·</span>
+                <span>
+                  {record.access_count} view{record.access_count === 1 ? "" : "s"}
+                </span>
+              </p>
 
-              <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
-                {(record.record_type_name || record.classification_name) && (
-                  <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand">
-                    {[record.record_type_name, record.classification_name].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
-              </div>
-
-              <h1 className="font-display font-semibold text-3xl sm:text-4xl leading-tight text-stone-900 text-balance">
+              <h1 className="font-display font-semibold text-4xl sm:text-5xl leading-[1.08] tracking-tight text-stone-900 text-balance">
                 {record.title}
               </h1>
 
-              {/* Byline: authors · adviser · college · year (spec §4.6).
-                  No adviser line when the record names none (IR-472). */}
-              <div className="flex items-center gap-x-3 gap-y-2 flex-wrap text-sm text-stone-600">
-                {byline && (
-                  <span className="inline-flex items-center gap-2 min-w-0">
-                    <span className="w-7 h-7 shrink-0 rounded-full bg-brand text-white text-2xs font-bold flex items-center justify-center" aria-hidden>
-                      {initials(record.authors[0]?.name ?? byline)}
-                    </span>
-                    <span className="font-semibold text-stone-800">{byline}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
+                {record.record_type_name && <span className={META_CHIP}>{record.record_type_name}</span>}
+                {record.classification_name && <span className={META_CHIP}>{record.classification_name}</span>}
+                {record.is_ip && (
+                  <span className="px-2.5 py-1 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 text-xs font-semibold inline-flex items-center gap-1.5">
+                    <i className="fas fa-shield-halved text-2xs" aria-hidden />
+                    Intellectual Property
                   </span>
                 )}
-                {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
-                <span>Cebu Institute of Technology – University</span>
-                {record.year_accomplished && <span>{record.year_accomplished}</span>}
+                {record.ip_type && <span className={META_CHIP}>{IP_TYPE_LABELS[record.ip_type]}</span>}
+                {record.for_commercialization && <span className={META_CHIP}>For Commercialization</span>}
+                {record.community_extension && <span className={META_CHIP}>Community Extension</span>}
+              </div>
+
+              {/* Byline: authors, then adviser, college and year (spec §4.6).
+                  No adviser line when the record names none (IR-472). */}
+              <div className="space-y-2">
+                {authorNames.length > 0 && (
+                  <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
+                    {authorNames.map((name) => (
+                      <li
+                        key={name}
+                        className="inline-flex items-center gap-2 rounded-full bg-white pl-1 pr-3.5 py-1 ring-1 ring-stone-200 text-small font-semibold text-stone-800"
+                      >
+                        <span className="w-6 h-6 shrink-0 rounded-full bg-brand text-white text-3xs font-bold flex items-center justify-center" aria-hidden>
+                          {initials(name)}
+                        </span>
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
+                  {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
+                  <span>Cebu Institute of Technology – University</span>
+                  {record.year_accomplished && <span>{record.year_accomplished}</span>}
+                </div>
               </div>
 
               {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
@@ -753,115 +904,80 @@ export default function PaperViewPage() {
                 />
               )}
 
-              <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-stone-500">
-                <span className="inline-flex items-center gap-1.5">
-                  <i className="fas fa-calendar text-2xs" aria-hidden />
-                  Added {formatDate(record.created_at)}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <i className="fas fa-eye text-2xs" aria-hidden />
-                  {record.access_count} view{record.access_count === 1 ? "" : "s"}
-                </span>
-                {record.is_ip && (
-                  <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 font-semibold inline-flex items-center gap-1">
-                    <i className="fas fa-shield-halved text-2xs" aria-hidden />
-                    Intellectual Property
-                  </span>
+              {/* View · Save · Cite · Share, plus what the capabilities add.
+                  One filled pill (IR-356): see `primary` above. */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {primary === "continue" && (
+                  <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
+                    <i className="fas fa-pen-to-square text-xs" aria-hidden />
+                    Continue
+                  </Link>
                 )}
-                {record.ip_type && (
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
-                    {IP_TYPE_LABELS[record.ip_type]}
-                  </span>
+
+                {primary === "open_review" && (
+                  <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
+                    <i className="fas fa-clipboard-check text-xs" aria-hidden />
+                    Open review
+                  </button>
                 )}
-                {record.for_commercialization && (
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
-                    For Commercialization
-                  </span>
+
+                {hasPaper && (
+                  <button
+                    type="button"
+                    onClick={() => setViewParam("section", "paper")}
+                    className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
+                  >
+                    <i className="fas fa-book-open text-xs" aria-hidden />
+                    View
+                  </button>
                 )}
-                {record.community_extension && (
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 font-semibold">
-                    Community Extension
-                  </span>
+
+                {can.has("edit_details") && (
+                  <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
+                    <i className="fas fa-pen text-2xs" aria-hidden />
+                    Edit details
+                  </button>
                 )}
-              </div>
 
-              {!onPaperTab && (
-                // Cite · Save · Share, plus what the capabilities add. One
-                // filled pill (IR-356): see `primary` above.
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  {primary === "continue" && (
-                    <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
-                      <i className="fas fa-pen-to-square text-xs" aria-hidden />
-                      Continue
-                    </Link>
-                  )}
+                <PaperSaveDropdown
+                  record={record}
+                  variant="pill"
+                  emphasis={primary === "save" ? "primary" : "secondary"}
+                />
 
-                  {primary === "open_review" && (
-                    <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
-                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                      Open review
-                    </button>
-                  )}
+                <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
+                  <i className="fas fa-quote-right text-2xs" aria-hidden />
+                  Cite
+                </button>
 
-                  {can.has("edit_details") && (
-                    <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
-                      <i className="fas fa-pen text-2xs" aria-hidden />
-                      Edit details
-                    </button>
-                  )}
-
-                  <PaperSaveDropdown
-                    record={record}
-                    variant="pill"
-                    emphasis={primary === "save" ? "primary" : "secondary"}
+                <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
+                  <i
+                    className={cn(
+                      "fas text-2xs",
+                      shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
+                    )}
+                    aria-hidden
                   />
-
-                  <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
-                    <i className="fas fa-quote-right text-2xs" aria-hidden />
-                    Cite
-                  </button>
-
-                  <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
-                    <i
-                      className={cn(
-                        "fas text-2xs",
-                        shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
-                      )}
-                      aria-hidden
-                    />
-                    {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
-                  </button>
-                  <span className="sr-only" role="status" aria-live="polite">
-                    {shareState === "copied"
-                      ? "Link to this paper copied"
-                      : shareState === "failed"
-                        ? "Couldn’t copy the link. Copy it from the address bar."
-                        : ""}
-                  </span>
-                </div>
-              )}
+                  {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
+                </button>
+                <span className="sr-only" role="status" aria-live="polite">
+                  {shareState === "copied"
+                    ? "Link to this paper copied"
+                    : shareState === "failed"
+                      ? "Couldn’t copy the link. Copy it from the address bar."
+                      : ""}
+                </span>
+              </div>
             </header>
+            )}
 
             <div
               id={`${tabsId}-panel`}
               role="tabpanel"
               aria-labelledby={tabId(section)}
-              className="space-y-6"
+              className={onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
             >
-            {section === "paper" &&
-              reader(
-                !chat.open && (
-                  <Button
-                    variant="outline"
-                    onClick={() => chat.setOpen(true)}
-                    title="Ask IRIS about this paper"
-                    className="min-h-11 lg:min-h-8 mr-1 font-semibold"
-                  >
-                    <AskIrisMark className="w-4 h-4 text-brand" />
-                    Ask IRIS
-                  </Button>
-                ),
-              )}
+            {section === "paper" && reader()}
 
             {section === "overview" && (
               <>
@@ -972,12 +1088,14 @@ export default function PaperViewPage() {
                   </div>
                 )}
 
+                {/* The reading sections, each under a hairline (IR-569). */}
+                <div className="border-t border-stone-200 divide-y divide-stone-200 [&>*]:py-8 [&>:last-child]:pb-0">
                 {/* Abstract, as a reading column: a measure of ~65 characters
                     and relaxed leading, not justified text (IR-356). */}
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="max-w-prose text-lg text-stone-700 leading-7">
+                    <p className="text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
@@ -997,10 +1115,13 @@ export default function PaperViewPage() {
                   />
                 )}
 
-                {/* Public discussion (IR-420) renders here, on its own
-                    surface, once it exists (spec §4.11). */}
-
                 <SimilarPapers recordId={record.id} />
+
+                {/* Public discussion (IR-420, spec §8): drawn, not yet open. */}
+                <CommentsSection
+                  viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null}
+                />
+                </div>
               </>
             )}
 
@@ -1037,27 +1158,40 @@ export default function PaperViewPage() {
           </div>
           )}
 
-          {/* ------------------------------------------------------------- */}
-          {/* Right rail                                                     */}
-          {/* ------------------------------------------------------------- */}
-          {/* Overview only (IR-372 keeps it off the Paper tab). Not shown
-              while chat is docked (IR-351): a docked chat beside the rail
-              squeezed the paper under it. Floating or closing the chat brings
-              it back. Sticky under the section switch, capped to the
-              viewport and scrollable, because a sticky rail taller than the
-              window would hide its lower cards until the paper ended. The
-              party status strip is for participants only (spec §4.6). */}
+          {/* What the record is held under, and what is attached (spec §4.6).
+              Beside the page while it is wide, sticky under the record bar;
+              under it otherwise. The party status strip is for participants. */}
           {showRail && (
-            <aside className={cn("space-y-4 lg:sticky lg:overflow-y-auto", PANE_TOP, PANE_MAX_HEIGHT)}>
-              {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
-              <PaperGovernance record={record} />
-              <PaperDocuments
-                files={record.files}
-                manageHref={participant ? `/records/${record.id}?section=files` : null}
-              />
-            </aside>
+            // Folds away while Ask IRIS is open (rows when it sits under the
+            // page, the column when it sits beside), and is inert meanwhile.
+            <div
+              aria-hidden={railHidden || undefined}
+              {...(railHidden ? { inert: "" } : {})}
+              className={cn(
+                "grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
+                OVERVIEW_ASIDE_TOP,
+                OVERVIEW_ASIDE_MAX_HEIGHT,
+                railHidden ? "grid-rows-[0fr] opacity-0 invisible" : "grid-rows-[1fr] opacity-100",
+              )}
+            >
+              <aside
+                aria-labelledby={`${tabsId}-details`}
+                className="min-h-0 space-y-4 overflow-hidden border-t border-stone-200 pt-8 overview-wide:w-[22rem] overview-wide:overflow-visible overview-wide:border-t-0 overview-wide:pt-0"
+              >
+                <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
+                  Record details
+                </h2>
+                {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
+                <PaperGovernance record={record} />
+                <PaperDocuments
+                  files={record.files}
+                  manageHref={participant ? `/records/${record.id}?section=files` : null}
+                />
+              </aside>
+            </div>
           )}
-        </div>
+          </div>
 
         <PaperCiteModal record={record} isOpen={citeOpen} onClose={() => setCiteOpen(false)} />
         {editOpen && (
@@ -1073,7 +1207,15 @@ export default function PaperViewPage() {
         )}
       </div>
 
-      {chat.open ? (
+      {/* Over the paper, the rest of the page waits behind a scrim. */}
+      {chatModal && (
+        <div
+          aria-hidden
+          onClick={closeChat}
+          className="hidden reading-split:block reading-wide:hidden absolute inset-0 z-30 bg-stone-900/25"
+        />
+      )}
+      {chat.open && (
         <PaperChatPanel
           record={record}
           // Whether a citation inside the chat brought the reader here, which
@@ -1085,20 +1227,32 @@ export default function PaperViewPage() {
               ? null
               : { key: arrivalKey.current, fromPaperChat: followedFromPaperChat(location.state) }
           }
-          dock={dock}
-          onDockChange={chat.setDockMode}
-          onClose={() => chat.setOpen(false)}
-          canChangePosition={!onPaperTab}
+          onClose={closeChat}
+          onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
+          panelRef={panelRef}
+          modal={chatModal}
+          draft={chat.draft}
+          onDraftChange={chat.setDraft}
+          resize={
+            panelWidth && !chatMinimized
+              ? {
+                  width: panelWidth,
+                  max: Math.max(PANEL_WIDTH_MIN, panelRoom),
+                  onChange: chat.setWidth,
+                }
+              : undefined
+          }
+          style={panelWidth && !chatMinimized ? { width: panelWidth } : undefined}
           minimized={chatMinimized}
           onRestore={() => chat.setMinimized(false)}
           viewingVersion={viewedVersion?.number ?? null}
           className={chatPanelClass}
         />
-      ) : (
-        // On the Paper tab the way back sits in the reader's toolbar instead,
-        // so nothing floats over the paper (IR-372); the Review section has
-        // no Ask IRIS at all (spec §4.6).
-        !onPaperTab && !onReviewTab && <PaperChatLauncher onOpen={() => chat.setOpen(true)} />
+      )}
+      {/* Closed: one round icon at the bottom right (IR-569). On the bar
+          while minimized, which is its way back. */}
+      {!chat.open && !onReviewTab && (
+        <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />
       )}
       </div>
     </div>

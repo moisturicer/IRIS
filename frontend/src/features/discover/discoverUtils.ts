@@ -89,21 +89,6 @@ export function indexedOnLabel(record: RecordListItem): string {
   return isValid(created) ? `Indexed ${format(created, "MMM d, yyyy")}` : "Recently indexed";
 }
 
-/**
- * Descending year options derived from the records actually loaded, so the
- * dropdown never offers a year with zero results. Falls back to the current
- * year when the feed is empty.
- */
-export function buildYearOptions(records: RecordListItem[]): string[] {
-  const years = new Set<number>();
-  for (const record of records) {
-    const year = recordYear(record);
-    if (year) years.add(year);
-  }
-  if (years.size === 0) years.add(new Date().getFullYear());
-  return [...years].sort((a, b) => b - a).map(String);
-}
-
 /* ────────────────────────────────────────────────────────────────────────────
  * Badges
  * ──────────────────────────────────────────────────────────────────────────*/

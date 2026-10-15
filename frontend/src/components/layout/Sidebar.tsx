@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { apiClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
-import { useUIStore } from "@/store/ui.store";
+import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -146,7 +146,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const { user } = useAuth();
   const { roleName } = useRole();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  const collapsed = useUIStore(selectSidebarCollapsed);
   const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
 
@@ -201,7 +201,24 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       {/* ── Brand ──────────────────────────────────────────────────────── */}
       <div className={cn("px-4 pb-4 pt-5", collapsed && "md:px-0 md:pb-3")}>
         <div className={cn("flex items-center gap-3", collapsed && "md:justify-center")}>
-          <img src={irisLogo} alt="" className="h-9 w-9 flex-shrink-0 object-contain" />
+          {collapsed ? (
+            // On the rail the mark opens it: the first thing a reader presses
+            // on a closed sidebar must not be a link that leaves the page.
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Open sidebar"
+              title="Open sidebar"
+              className={cn("hidden h-9 w-9 flex-shrink-0 rounded-lg md:block", FOCUS_RING)}
+            >
+              <img src={irisLogo} alt="" className="h-9 w-9 object-contain" />
+            </button>
+          ) : null}
+          <img
+            src={irisLogo}
+            alt=""
+            className={cn("h-9 w-9 flex-shrink-0 object-contain", collapsed && "md:hidden")}
+          />
           <p
             className={cn(
               "min-w-0 flex-1 font-display text-title font-semibold leading-none tracking-widest text-brand",
