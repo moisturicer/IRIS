@@ -904,6 +904,22 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         return Response({"years": list(years)})
 
+    @action(detail=False, methods=["get", "put"], url_path="interests")
+    def interests(self, request):
+        """The signed-in reader's optional Classification and PSCED Areas."""
+        from .discovery import get_interests, put_interests
+
+        if request.method == "PUT":
+            return put_interests(request.user, request.data)
+        return get_interests(request.user)
+
+    @action(detail=False, methods=["get"], url_path="for-you")
+    def for_you(self, request):
+        """One owner-scoped, stable metadata feed with current visibility."""
+        from .discovery import get_feed
+
+        return get_feed(request)
+
     @action(detail=False, methods=["get"])
     def mine(self, request):
         """GET /records/mine/ -- records the current user owns, newest change

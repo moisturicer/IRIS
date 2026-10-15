@@ -33,12 +33,20 @@ interface ResearchCardProps {
   byline?:   ReactNode;
   /** The abstract or a summary, clamped. */
   summary?:  ReactNode;
+  summaryClassName?: string;
+  /** A companion reading pane for a full-width card. */
+  preview?:  ReactNode;
+  previewLabel?: string;
+  /** Keep the facts and actions below the left half of a full-width card. */
+  splitFooter?: boolean;
   /** The status line: typically a `StatusBadge` and where the record is. */
   status?:   ReactNode;
   /** What happens next, for whoever is looking. Prefixed "Next step:". */
   nextStep?: ReactNode;
   /** Passive facts in the footer: views, files, dates. */
   footer?:   ReactNode;
+  /** Optional tone for the footer on a particular surface. */
+  footerClassName?: string;
   /** Buttons and menus in the footer: Save, Cite, Continue. */
   actions?:  ReactNode;
   /** The title's heading level; 2 under a page's `h1`, 3 inside a section. */
@@ -59,9 +67,14 @@ export function ResearchCard({
   meta,
   byline,
   summary,
+  summaryClassName,
+  preview,
+  previewLabel = "Abstract preview",
+  splitFooter = false,
   status,
   nextStep,
   footer,
+  footerClassName,
   actions,
   headingLevel = 2,
   compact = false,
@@ -70,6 +83,62 @@ export function ResearchCard({
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const grid = layout === "grid";
   const hasFooter = Boolean(footer || actions);
+  const footerContent = <>
+    {footer && <div className="flex flex-wrap items-center gap-4 text-small text-stone-600">{footer}</div>}
+    {actions && <div className="relative z-10 ml-auto flex items-center gap-1.5">{actions}</div>}
+  </>;
+
+  const content = <>
+    {(eyebrow || meta) && (
+      <div className="flex items-start justify-between gap-3 mb-1.5 text-label font-medium text-stone-600">
+        {eyebrow && <span className="min-w-0">{eyebrow}</span>}
+        {meta && <span className="shrink-0 whitespace-nowrap ml-auto">{meta}</span>}
+      </div>
+    )}
+
+    <Heading
+      id={titleId}
+      className={cn(
+        "font-display font-semibold text-stone-900",
+        grid ? "text-title line-clamp-3" : compact ? "text-title" : "text-title md:text-display",
+        preview && "xl:text-[1.75rem] xl:leading-tight",
+      )}
+    >
+      <Link
+        to={href}
+        className={cn(
+          "rounded-sm hover:text-brand",
+          COLOUR_TRANSITION,
+          FOCUS_RING,
+          "after:absolute after:inset-0 after:rounded-xl after:content-['']",
+        )}
+      >
+        {title}
+      </Link>
+    </Heading>
+
+    {byline && <p className="mt-1 text-small font-medium text-brand truncate">{byline}</p>}
+
+    {summary && (
+      <p className={cn("mt-2 text-body text-stone-600", grid ? "line-clamp-4" : "line-clamp-3", summaryClassName)}>
+        {summary}
+      </p>
+    )}
+
+    {(status || nextStep) && (
+      <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small", grid ? "mt-auto pt-4" : "mt-3")}>
+        {status && <span className="relative z-10 inline-flex flex-wrap items-center gap-2">{status}</span>}
+        {nextStep && (
+          <p className="inline-flex items-start gap-1.5 text-stone-700">
+            <i className="fas fa-arrow-right mt-1 text-stone-500" aria-hidden="true" />
+            <span>
+              <span className="font-semibold">Next step:</span> {nextStep}
+            </span>
+          </p>
+        )}
+      </div>
+    )}
+  </>;
 
   return (
     <article
@@ -82,62 +151,23 @@ export function ResearchCard({
         grid && "h-full",
       )}
     >
-      <div className={cn("flex-1 p-card-compact", !compact && "md:p-card", grid && "flex flex-col")}>
-        {(eyebrow || meta) && (
-          <div className="flex items-start justify-between gap-3 mb-1.5 text-label font-medium text-stone-600">
-            {eyebrow && <span className="min-w-0">{eyebrow}</span>}
-            {meta && <span className="shrink-0 whitespace-nowrap ml-auto">{meta}</span>}
-          </div>
-        )}
-
-        <Heading
-          id={titleId}
-          className={cn(
-            "font-display font-semibold text-stone-900",
-            grid ? "text-title line-clamp-3" : compact ? "text-title" : "text-title md:text-display",
+      <div className={cn("flex-1 p-card-compact", !compact && "md:p-card", grid && "flex flex-col", preview && "xl:grid xl:grid-cols-2 xl:min-h-[22rem]", preview && !splitFooter && "xl:gap-6", preview && splitFooter && "xl:p-0")}>
+        {preview ? <div className={cn("flex min-w-0 flex-col", splitFooter && "xl:p-card")}>
+          {content}
+          {splitFooter && hasFooter && (
+            <div className="hidden xl:flex mt-auto flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-4">
+              {footerContent}
+            </div>
           )}
-        >
-          <Link
-            to={href}
-            className={cn(
-              "rounded-sm hover:text-brand",
-              COLOUR_TRANSITION,
-              FOCUS_RING,
-              // The stretched target: the whole card follows the title link.
-              "after:absolute after:inset-0 after:rounded-xl after:content-['']",
-            )}
-          >
-            {title}
-          </Link>
-        </Heading>
-
-        {byline && <p className="mt-1 text-small font-medium text-brand truncate">{byline}</p>}
-
-        {summary && (
-          <p className={cn("mt-2 text-body text-stone-600", grid ? "line-clamp-4" : "line-clamp-3")}>
-            {summary}
-          </p>
-        )}
-
-        {(status || nextStep) && (
-          <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small", grid ? "mt-auto pt-4" : "mt-3")}>
-            {status && <span className="relative z-10 inline-flex flex-wrap items-center gap-2">{status}</span>}
-            {nextStep && (
-              <p className="inline-flex items-start gap-1.5 text-stone-700">
-                <i className="fas fa-arrow-right mt-1 text-stone-500" aria-hidden="true" />
-                <span>
-                  <span className="font-semibold">Next step:</span> {nextStep}
-                </span>
-              </p>
-            )}
-          </div>
-        )}
+        </div> : content}
+        {preview && <aside aria-label={previewLabel} className={cn("hidden border-l border-stone-200 xl:flex xl:flex-col", splitFooter ? "xl:pl-0" : "pl-6")}>
+          {preview}
+        </aside>}
       </div>
 
       {hasFooter && (
-        <div className={cn("flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-card-compact py-3", !compact && "md:px-card")}>
-          {footer && <div className="flex flex-wrap items-center gap-4 text-small text-stone-600">{footer}</div>}
-          {actions && <div className="relative z-10 ml-auto flex items-center gap-1.5">{actions}</div>}
+        <div className={cn("flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-card-compact py-3", !compact && "md:px-card", splitFooter && preview && "xl:hidden", footerClassName)}>
+          {footerContent}
         </div>
       )}
     </article>

@@ -33,6 +33,10 @@ class RecordListSerializer(serializers.ModelSerializer):
     authors             = AuthorSerializer(many=True, read_only=True)
     # Annotated by RecordViewSet.get_queryset; 0 when the queryset omits it.
     file_count          = serializers.IntegerField(read_only=True, default=0)
+    has_manuscript      = serializers.SerializerMethodField()
+
+    def get_has_manuscript(self, obj):
+        return bool(obj.abstract_file or getattr(obj, "file_count", 0))
 
     class Meta:
         model  = Record
@@ -40,7 +44,7 @@ class RecordListSerializer(serializers.ModelSerializer):
             "id", "title", "abstract", "year_accomplished", "classification_name",
             "record_type_name", "pipeline_status", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
-            "access_count", "file_count", "created_at", "authors",
+            "access_count", "file_count", "has_manuscript", "created_at", "authors",
         ]
 
 
@@ -112,6 +116,13 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     classification_name = serializers.CharField(source="classification.name", read_only=True)
     record_type_name    = serializers.CharField(source="record_type.name", read_only=True)
     file_count          = serializers.SerializerMethodField()
+    has_manuscript      = serializers.SerializerMethodField()
+
+    def get_has_manuscript(self, obj):
+        from .download_service import has_record_download_file
+
+        return has_record_download_file(obj)
+
     # Paper View's byline credits the adviser by name (IR-472). It rides on
     # the record's own visibility: whoever may read the record may read this.
     adviser_name   = serializers.SerializerMethodField()
@@ -395,7 +406,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "id", "title", "abstract", "abstract_file",
             "year_accomplished", "year_completed",
             "classification", "psced", "record_type",
-            "classification_name", "record_type_name", "file_count",
+            "classification_name", "record_type_name", "file_count", "has_manuscript",
             "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
