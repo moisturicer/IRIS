@@ -8,6 +8,7 @@ covers the issued records only. Cross-paper synthesis is the answer model's.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import replace
 
 from django.conf import settings
@@ -27,14 +28,16 @@ from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.registry import Tool, ToolRun
 from apps.ai.research.results import (
     Completeness, Coverage, CoverageSubject, Shaped, Status, SubjectCoverage, ToolResult,
-    _coverage, status_for,
+    coverage_for, status_for,
 )
 from apps.ai.research.schema import ArgumentsRejected
 
 from .common import QUERY, collect_record, disclosable
 from .passages import RECORD_HANDLES
-from .read import brief_facts, passage
+from .read import brief_facts, cited_facts
 from .screening import screen_records
+
+logger = logging.getLogger(__name__)
 
 #: Papers one describe or compare call extracts from.
 MAX_RECORDS = 5
@@ -100,13 +103,18 @@ def extract_evidence(run: ToolRun, args: dict) -> ToolResult:
             except BudgetExhausted:
                 limitations.add("budget_exhausted")
                 extracted, partial = None, False
-            except Exception:
-                # A vendor can echo input in its exception; keep no message.
+            except Exception as exc:
+                # A vendor can echo input in its exception; log the type only.
+                logger.warning("evidence extraction failed", extra={
+                    "run_id": run.ctx.run_id, "error": type(exc).__name__})
                 extracted, partial = None, False
             if extracted is None:
                 state = "extraction_unavailable"
             else:
-                rows, cited = _extracted_facts(run, record, handle, chunk_set, extracted)
+                rows, cited = cited_facts(
+                    run, record, handle, extracted, chunk_set.content_hash,
+                    {"kind": "extraction", "source_version": chunk_set.content_hash[:12],
+                     "cached": False})
                 facts.extend(rows)
                 evidence.extend(cited)
                 state = "partial" if partial else state
@@ -171,6 +179,9 @@ def _extract(run: ToolRun, record, chunk_set, fields):
     for batch in batches[:MAX_BATCHES]:
         if run.spend.remaining_seconds <= 0:
             raise BudgetExhausted("wall_clock_seconds")
+        # Rechecked before every paid read, not only after.
+        if record.pk not in disclosable(run.ctx, [record.pk]):
+            raise PermissionError("withheld")
         prompt = build_page_prompt(request, batch)
         run.spend.charge_prompt_tokens(estimate_tokens(SYSTEM + prompt))
         with model_call_deadline(run.spend.remaining_seconds):
@@ -186,35 +197,12 @@ def _extract(run: ToolRun, record, chunk_set, fields):
     return {keys[key]: field for key, field in combined.items()}, partial
 
 
-def _extracted_facts(run: ToolRun, record, handle: str, chunk_set, extracted: dict):
-    chunks = DocumentChunk.objects.in_bulk({
-        c["chunk_id"] for field in extracted.values() for v in field["values"]
-        for c in v["citations"]})
-    provenance = {"kind": "extraction", "source_version": chunk_set.content_hash[:12],
-                  "cached": False}
-    facts, evidence = [], []
-    for name, field in extracted.items():
-        values = []
-        for value in field["values"]:
-            citations = []
-            for citation in value["citations"]:
-                item = passage(run, record, chunks[citation["chunk_id"]], chunk_set.content_hash)
-                evidence.append(item)
-                citations.append({"ref": item.handle, "page": citation["page"],
-                                  "quote": citation["quote"]})
-            values.append({k: v for k, v in value.items() if k != "citations"}
-                          | {"citations": citations})
-        facts.append({"name": name, "record": handle, "state": field["state"],
-                      "values": values, "provenance": provenance})
-    return facts, evidence
-
-
 def _screen(run: ToolRun, args: dict, ids: list[int]) -> ToolResult:
     if len(ids) > max(1, settings.AI_SCREEN_MAX_RECORDS):
         raise ArgumentsRejected("too_many_records")
     result = screen_records(replace(run, screen_candidate_ids=tuple(ids)),
                             {"criterion": args["criterion"]})
-    coverage = _coverage(result, CoverageSubject.SCREENED_SUBSET)
+    coverage = coverage_for(result, CoverageSubject.SCREENED_SUBSET)
     rows = tuple(result.detail.get("rows", ()))
     if not result.evidence:
         status = Status.EMPTY

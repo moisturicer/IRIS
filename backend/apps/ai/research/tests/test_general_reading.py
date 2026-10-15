@@ -77,7 +77,7 @@ def test_an_outline_lists_actual_section_identifiers_and_pages(corpus, embedder)
     result = invoke(run, "read_papers", records=[resolve(run, "Long survey")], view="outline")
     sections = result.items[0]["sections"]
     assert [s["heading"] for s in sections] == list(SECTIONS)
-    assert sections[4] == {"section": section_id("Results"), "heading": "Results",
+    assert sections[4] == {"section": section_id(("Results",)), "heading": "Results",
                            "level": 1, "first_page": 9, "last_page": 10}
     assert result.items[0]["pages"] == [1, 12]
     assert result.evidence[0]["content_kind"] == "abstract"
@@ -88,12 +88,12 @@ def test_a_late_section_is_read_directly_not_after_the_prefix(corpus, embedder):
     run, _ = read_run(corpus, embedder, read_token_cap=70)
     handle = resolve(run, "Long survey")
     result = invoke(run, "read_papers", records=[handle], view="sections",
-                    sections=[section_id("Results")])
+                    sections=[section_id(("Results",))])
     passages = [e for e in result.evidence if e["content_kind"] == "passage"]
     assert passages[0]["page"] == 9 and passages[0]["section"].endswith("Results")
     assert result.items[0]["state"] == "partial"
     following = invoke(run, "read_papers", records=[handle], view="sections",
-                       sections=[section_id("Results")], cursor=result.continuation)
+                       sections=[section_id(("Results",))], cursor=result.continuation)
     assert [e["page"] for e in following.evidence if e["content_kind"] == "passage"] == [10]
     assert following.status is Status.OK and following.continuation is None
 
@@ -376,3 +376,40 @@ def test_describe_rejects_too_many_records_and_missing_fields(corpus, embedder, 
                   purpose="describe").status is Status.UNAVAILABLE
     assert invoke(run, "extract_evidence", records=[pond, resolve(run, "Flood forecasting")],
                   purpose="describe", fields=["x"]).status is Status.UNAVAILABLE
+
+
+def test_repeated_headings_under_different_parents_get_distinct_ids(corpus, embedder):
+    record = Record.objects.create(title="Two studies", pipeline_status=PipelineStatus.PUBLISHED)
+    chunk_set = ChunkSet.objects.create(record=record, extraction_hash="e", strategy_id="s",
+                                        options={}, content_hash="two-v1", is_active=True)
+    for index, parent in enumerate(("Study A", "Study B")):
+        DocumentChunk.objects.create(
+            chunk_set=chunk_set, record=record, sequence=index, max_sequence=index,
+            text=f"{parent} results", content=f"{parent} results", token_count=2,
+            context_path=["Two studies", parent, "Results"], text_hash=f"t{index}",
+            source_page=index + 1)
+    run, _ = read_run(corpus, embedder)
+    handle = resolve(run, "Two studies")
+    outline = invoke(run, "read_papers", records=[handle], view="outline").items[0]["sections"]
+    results = [s for s in outline if s["heading"] == "Results"]
+    assert len({s["section"] for s in results}) == 2
+    read = invoke(run, "read_papers", records=[handle], view="sections",
+                  sections=[section_id(("Study B", "Results"))])
+    assert [e["text"] for e in read.evidence if e["content_kind"] == "passage"] == [
+        "Study B results"]
+    empty = invoke(run, "read_papers", records=[handle], view="sections", sections=[])
+    assert empty.status is Status.UNAVAILABLE
+
+
+def test_no_paid_read_is_sent_for_a_paper_withheld_before_extraction(corpus, embedder):
+    long_paper()
+    llm = Extractor({})
+    withheld = {"on": False}
+    run, _ = read_run(corpus, embedder, llm=llm,
+                      permits=lambda r: not (withheld["on"] and r.title == "Long survey"))
+    handle = resolve(run, "Long survey")
+    withheld["on"] = True
+    result = invoke(run, "extract_evidence", records=[handle], purpose="describe",
+                    fields=["dataset"])
+    assert llm.requests == []
+    assert result.items == ({"record": handle, "state": "unavailable"},)

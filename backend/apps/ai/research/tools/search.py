@@ -20,7 +20,7 @@ from .common import (
     FILTER_PROPERTIES, QUERY, apply_filters, collect_record, disclosable,
     readable_records, scoped_ids, visible_record_ids,
 )
-from .passages import RECALL_DEPTH, RECORD_HANDLES, _chunk_set_hashes
+from .passages import RECALL_DEPTH, RECORD_HANDLES, chunk_set_hashes
 from .records import rank_record_candidates
 
 
@@ -109,7 +109,7 @@ def _passages(run: ToolRun, args: dict, requested):
     result = run.root.retriever(records=records).retrieve(
         args["query"], run.ctx.user, limit=RECALL_DEPTH)
     allowed = disclosable(run.ctx, (p.record_id for p in result.passages))
-    hashes = _chunk_set_hashes(p.chunk_id for p in result.passages)
+    hashes = chunk_set_hashes(p.chunk_id for p in result.passages)
     permitted = [p for p in result.passages if p.record_id in allowed and p.chunk_id in hashes]
 
     # Each paper's best passage before any paper's second (document diversity).

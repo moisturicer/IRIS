@@ -19,7 +19,7 @@ RECORD_HANDLES = {"type": "array", "items": HANDLE_SCHEMA, "maxItems": 10}
 RECALL_DEPTH = 40
 
 
-def _chunk_set_hashes(chunk_ids: Iterable[int]) -> dict[int, str]:
+def chunk_set_hashes(chunk_ids: Iterable[int]) -> dict[int, str]:
     return dict(
         DocumentChunk.objects.filter(pk__in=set(chunk_ids)).values_list(
             "pk", "chunk_set__content_hash"
@@ -41,7 +41,7 @@ def search_passages(run: ToolRun, args: dict) -> ToolResult:
         args["query"], run.ctx.user, limit=RECALL_DEPTH
     )
     allowed = disclosable(run.ctx, (p.record_id for p in result.passages))
-    hashes = _chunk_set_hashes(p.chunk_id for p in result.passages)
+    hashes = chunk_set_hashes(p.chunk_id for p in result.passages)
     permitted = [
         p for p in result.passages
         if p.record_id in allowed and p.chunk_id in hashes

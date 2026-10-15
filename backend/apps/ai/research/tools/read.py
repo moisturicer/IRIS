@@ -28,17 +28,28 @@ VIEWS = ("outline", "sections", "pages", "brief")
 SECTION_ID = {"type": "string", "minLength": 9, "maxLength": 9}
 
 
-def section_id(heading: str) -> str:
-    return "S" + hashlib.sha256(heading.casefold().encode()).hexdigest()[:8]
+def section_id(path: tuple[str, ...]) -> str:
+    """Keyed by the whole heading path, so repeated headings stay distinct."""
+    key = "\x1f".join(part.casefold() for part in path)
+    return "S" + hashlib.sha256(key.encode()).hexdigest()[:8]
+
+
+def _headings(record, chunk) -> list[str]:
+    return [part for part in chunk.context_path or () if part != record.title]
+
+
+def _section_ids(record, chunk) -> list[str]:
+    path = _headings(record, chunk)
+    return [section_id(tuple(path[:level])) for level in range(1, len(path) + 1)]
 
 
 def _outline(record, chunks) -> list[dict]:
     sections: dict[str, dict] = {}
     for chunk in chunks:
-        path = [part for part in chunk.context_path or () if part != record.title]
-        for level, heading in enumerate(path, 1):
-            entry = sections.setdefault(section_id(heading), {
-                "section": section_id(heading), "heading": heading, "level": level,
+        path = _headings(record, chunk)
+        for level, ident in enumerate(_section_ids(record, chunk), 1):
+            entry = sections.setdefault(ident, {
+                "section": ident, "heading": path[level - 1], "level": level,
                 "first_page": chunk.source_page, "last_page": chunk.source_page,
             })
             entry["last_page"] = chunk.source_page
@@ -51,6 +62,8 @@ def _check(args: dict) -> None:
         raise ArgumentsRejected("selector_view_mismatch")
     if "pages" in args and view != "pages":
         raise ArgumentsRejected("selector_view_mismatch")
+    if "sections" in args and not args["sections"]:
+        raise ArgumentsRejected("missing_argument")
     if view == "pages" and not args.get("pages"):
         raise ArgumentsRejected("missing_argument")
     if "cursor" in args and (len(args["records"]) != 1 or view not in ("sections", "pages")):
@@ -132,8 +145,7 @@ def read_papers(run: ToolRun, args: dict) -> ToolResult:
             "record": handle, "state": "partial" if following else "read",
             "source_version": version[:12],
             "sections": list(dict.fromkeys(
-                section_id(part) for c in read for part in c.context_path or ()
-                if part != record.title)),
+                ident for c in read for ident in _section_ids(record, c))),
             "pages": [min(pages), max(pages)] if pages else None,
             "continuation": following,
         })
@@ -175,8 +187,7 @@ def _selected(record, chunks, args) -> list:
     known = {entry["section"] for entry in _outline(record, chunks)}
     if wanted - known:
         raise ArgumentsRejected("unknown_section")
-    return [c for c in chunks
-            if wanted & {section_id(p) for p in c.context_path or () if p != record.title}]
+    return [c for c in chunks if wanted & set(_section_ids(record, c))]
 
 
 def _brief(run: ToolRun, handle: str, record):
@@ -193,23 +204,29 @@ def _brief(run: ToolRun, handle: str, record):
 
 
 def brief_facts(run: ToolRun, record, handle: str, brief: dict, fields: dict):
-    """Verified brief fields as facts whose citations are passage handles."""
+    provenance = {"kind": "paper_brief", "source_version": brief["content_hash"][:12],
+                  "prompt_version": brief["prompt_version"], "cached": True}
+    return cited_facts(run, record, handle, fields, brief["content_hash"], provenance)
+
+
+def cited_facts(run: ToolRun, record, handle: str, fields: dict, version: str,
+                provenance: dict):
+    """Verified fields as facts whose citations are passage handles."""
     chunks = DocumentChunk.objects.in_bulk({
         c["chunk_id"] for field in fields.values() for v in field["values"]
         for c in v["citations"]})
-    provenance = {"kind": "paper_brief", "source_version": brief["content_hash"][:12],
-                  "prompt_version": brief["prompt_version"], "cached": True}
     facts, evidence = [], []
     for name, field in fields.items():
         values = []
         for value in field["values"]:
             citations = []
             for citation in value["citations"]:
-                item = passage(run, record, chunks[citation["chunk_id"]], brief["content_hash"])
+                item = passage(run, record, chunks[citation["chunk_id"]], version)
                 evidence.append(item)
                 citations.append({"ref": item.handle, "page": citation["page"],
                                   "quote": citation["quote"]})
-            values.append({"value": value["value"], "citations": citations})
+            values.append({k: v for k, v in value.items() if k != "citations"}
+                          | {"citations": citations})
         facts.append({"name": name, "record": handle, "state": field["state"],
                       "values": values, "provenance": provenance})
     return facts, evidence

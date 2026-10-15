@@ -11,8 +11,11 @@ It prints what a planner would be sent, plus the stored pointer behind each
 handle. `--general` runs the general-tools contract (IR-591) instead and prints
 each call's model-visible envelope:
 
-    manage.py run_research_tool --user student@cit.edu --general         --call search_research='{"query": "flooding", "target": "papers"}'         --call read_papers='{"records": ["R1-..."], "view": "outline"}'
- The disclosure gate in force applies: until IR-250 that withholds all
+    manage.py run_research_tool --user student@cit.edu --general \
+        --call search_research='{"query": "flooding", "target": "papers"}' \
+        --call read_papers='{"records": ["R1-..."], "view": "outline"}'
+
+The disclosure gate in force applies: until IR-250 that withholds all
 content unless IR-317's development bypass is on.
 """
 

@@ -320,7 +320,7 @@ def envelope_of(
         status = Status.PARTIAL
     items, evidence = _items_and_evidence(result)
     return Envelope(
-        status, _coverage(result, subject), trace,
+        status, coverage_for(result, subject), trace,
         items=items, evidence=evidence, facts=_facts(result, subject, predicate),
         limitations=tuple(limitations),
     )
@@ -347,7 +347,7 @@ def _items_and_evidence(result: ToolResult):
     return tuple(items), tuple(evidence)
 
 
-def _coverage(result: ToolResult, subject: CoverageSubject) -> SubjectCoverage:
+def coverage_for(result: ToolResult, subject: CoverageSubject) -> SubjectCoverage:
     legacy = result.coverage
     if subject is CoverageSubject.REQUESTED_SELECTION:
         return SubjectCoverage(subject, returned=legacy.returned, complete=(

@@ -11,7 +11,7 @@ from apps.ai.research.registry import Tool, ToolRun
 from apps.ai.research.results import CoverageSubject, ToolResult
 from apps.ai.research.schema import ArgumentsRejected
 
-from .aggregates import _AREAS, _GROUPS, corpus_facets, count_records
+from .aggregates import AREAS, GROUPS, corpus_facets, count_records
 from .common import FILTER_PROPERTIES, apply_filters, readable_records, visible_record_ids
 
 
@@ -58,8 +58,8 @@ AGGREGATE_RECORDS = Tool(
             "operation": {"type": "string", "enum": ["count", "facets"]},
             **FILTER_PROPERTIES,
             "is_ip": {"type": "boolean"},
-            "group_by": {"type": "string", "enum": list(_GROUPS)},
-            "dimension": {"type": "string", "enum": list(_AREAS)},
+            "group_by": {"type": "string", "enum": list(GROUPS)},
+            "dimension": {"type": "string", "enum": list(AREAS)},
         },
         "required": ["operation"],
         "additionalProperties": False,
