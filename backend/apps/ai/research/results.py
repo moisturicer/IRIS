@@ -66,6 +66,8 @@ class ToolResult:
     duplicate: bool = False
     # Private provenance for metadata aggregates, never rendered for a vendor.
     visible_record_ids: frozenset[int] | None = None
+    #: An envelope-native result from a general tool (IR-591).
+    shaped: Optional["Shaped"] = None
 
     @classmethod
     def rejected(cls, reason: str) -> "ToolResult":
@@ -235,6 +237,18 @@ class Envelope:
         }
 
 
+@dataclass(frozen=True)
+class Shaped:
+    """What a general tool (IR-591) states directly; evidence stays in the result."""
+
+    status: Status
+    coverage: SubjectCoverage
+    items: tuple[Mapping[str, Any], ...] = ()
+    facts: tuple[Mapping[str, Any], ...] = ()
+    continuation: Optional[str] = None
+    limitations: tuple[str, ...] = ()
+
+
 def _normal(key: object) -> str:
     return re.sub(r"[_\-\s]", "", str(key)).casefold()
 
@@ -287,6 +301,13 @@ def envelope_of(
         return Envelope(Status.UNAVAILABLE, empty, trace, limitations=(note,))
     if result.status is ToolStatus.FAILED:
         return Envelope(Status.UNAVAILABLE, empty, trace, limitations=("tool_unavailable",))
+    if result.shaped is not None:
+        shaped = result.shaped
+        return Envelope(
+            shaped.status, shaped.coverage, trace, items=shaped.items,
+            evidence=_items_and_evidence(result)[1], facts=shaped.facts,
+            continuation=shaped.continuation, limitations=shaped.limitations,
+        )
 
     limitations = []
     if result.status is ToolStatus.DEGRADED:

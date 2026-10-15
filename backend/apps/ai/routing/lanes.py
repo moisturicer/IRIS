@@ -20,6 +20,7 @@ from apps.ai.research.context import RunContext
 from apps.ai.research.listing import screen_listing
 from apps.ai.research.planner import ResearchPlanner
 from apps.ai.research.registry import ToolRun
+from apps.ai.research.titles import exact_title_matches, title_key
 from apps.ai.research.tools.common import disclosable, readable_records
 from apps.ai.research.tools.records import _relevant
 from apps.ai.research.schema import ArgumentsRejected
@@ -77,12 +78,13 @@ def _named_records(ctx, question):
     quoted = [match[0] or match[1] for match in re.findall(r'"([^"\n]+)"|“([^”\n]+)”', question)]
     records = list(readable_records(ctx).only("pk", "title"))
     lowered = question.casefold()
+    exact = {r.pk for title in quoted for r in exact_title_matches(records, title)}
     matched = [record for record in records if record.title and (
-        record.title.casefold() in {title.casefold() for title in quoted}
+        record.pk in exact
         or re.search(r"(?<!\w)" + re.escape(record.title.casefold()) + r"(?!\w)", lowered)
     )]
-    known = {record.title.casefold() for record in matched}
-    missing = [title for title in quoted if title.casefold() not in known]
+    known = {title_key(record.title) for record in matched}
+    missing = [title for title in quoted if title_key(title) not in known]
     remainder = re.sub(r'"[^"\n]+"|“[^”\n]+”', "", question)
     for record in sorted(matched, key=lambda record: len(record.title), reverse=True):
         remainder = re.sub(re.escape(record.title), "", remainder, flags=re.IGNORECASE)

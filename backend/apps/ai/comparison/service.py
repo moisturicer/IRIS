@@ -133,8 +133,11 @@ def _ready_brief(record, user):
     return result
 
 
-def _table_fields(brief, record):
-    """Rebind every quote to this paper, page and live chunk version."""
+def table_fields(brief, record):
+    """Rebind every quote to this paper, page and live chunk version.
+
+    Also how a research tool reuses a cached brief (IR-591).
+    """
     sources = {}
     chunks = {chunk.pk: chunk for chunk in DocumentChunk.objects.filter(
         chunk_set_id=brief["chunk_set_id"], record=record, deleted_at__isnull=True,
@@ -326,7 +329,7 @@ def comparison_events(run, question, record_ids=()):
                 brief = result["brief"]
                 if brief["chunk_set_id"] != version["chunk_set_id"] or brief["content_hash"] != version["content_hash"]:
                     raise ValueError("stale_or_forbidden")
-                fields, sources = _table_fields(brief, record)
+                fields, sources = table_fields(brief, record)
                 fields_by_record[record.pk] = fields
                 sources_by_quote.update(sources)
                 coverage["state"] = "read_by_section" if brief.get("section_count", 1) > 1 else "read_fully"
@@ -335,7 +338,7 @@ def comparison_events(run, question, record_ids=()):
                     try:
                         specific = _depth(run, criterion, record, brief, comparison)
                         synthetic = {**brief, "fields": {"method": specific}}
-                        checked, extra_sources = _table_fields(synthetic, record)
+                        checked, extra_sources = table_fields(synthetic, record)
                         fields["question_specific"] = checked["method"]
                         sources_by_quote.update(extra_sources)
                     except Exception:

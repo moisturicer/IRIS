@@ -139,6 +139,28 @@ def brief_for(record, *, user, retry=False, dispatch=True):
     return result
 
 
+def cached_brief(record, *, user):
+    """The ready brief for the active version and profile; never a new reading.
+
+    A research tool reuses briefs only (IR-591), so it queues no paid work.
+    """
+    if not getattr(settings, "AI_PAPER_BRIEFS_ENABLED", False):
+        return _unavailable("not_enabled")
+    if _authorized(record.pk, user.pk) is None:
+        return _unavailable("disclosure_or_access")
+    chunk_set = ChunkSet.objects.filter(record=record, is_active=True).first()
+    if chunk_set is None:
+        return {"state": "not_indexed", "brief": None}
+    stored = PaperBrief.objects.filter(
+        record=record, chunk_set=chunk_set, content_hash=chunk_set.content_hash,
+        prompt_version=PROMPT_VERSION, state="ready",
+        profile_hash=_profile_hash(profile_for(InferenceTask.BRIEF)),
+    ).first()
+    if stored is None:
+        return _unavailable("not_generated")
+    return {"state": "ready", "brief": _wire(stored), "cached": True}
+
+
 def _enqueue(brief_id, claim):
     from apps.ai.tasks import generate_paper_brief
 

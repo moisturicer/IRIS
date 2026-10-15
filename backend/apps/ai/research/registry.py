@@ -29,6 +29,18 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class Presentation:
+    """Records last shown to the reader, in display order (IR-591).
+
+    Supplied by the application from committed conversation state; a model
+    names one only by its ordinal.
+    """
+
+    revision: int
+    record_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
 class ToolRun:
     """One run's fixed context, ledger, spend and stack, handed to every tool."""
 
@@ -39,6 +51,7 @@ class ToolRun:
     cache: dict[tuple[str, str], ToolResult] = field(default_factory=dict)
     # Workflow-owned candidate IDs; never a tool argument or vendor payload.
     screen_candidate_ids: tuple[int, ...] | None = None
+    presented: Presentation | None = None
 
     @classmethod
     def start(
@@ -228,3 +241,10 @@ def research_tools() -> ToolRegistry:
     from .tools import TOOLS
 
     return ToolRegistry(TOOLS)
+
+
+def general_tools() -> ToolRegistry:
+    """The five general research tools (general-tools spec §3.2, IR-591)."""
+    from .tools import GENERAL_TOOLS
+
+    return ToolRegistry(GENERAL_TOOLS)

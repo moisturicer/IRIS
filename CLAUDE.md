@@ -136,7 +136,13 @@ python manage.py run_research_tool --user EMAIL --call TOOL='{json}' [--call ...
                                    # payload and each handle's stored pointer.
                                    # search_passages/find_records embed the query
                                    # (Voyage). Verified on the dev database
-                                   # 2026-10-11 with count_records and corpus_facets
+                                   # 2026-10-11 with count_records and corpus_facets.
+                                   # --general runs IR-591's five general tools
+                                   # (resolve_papers, search_research, read_papers,
+                                   # aggregate_records, extract_evidence) with
+                                   # run-scoped handles and prints each envelope.
+                                   # Verified on the dev database 2026-10-15 with
+                                   # aggregate_records and resolve_papers
 python manage.py backfill_embeddings --dry-run           # what indexing the corpus would cost (IR-282).
                                    # Prints records/chunks/tokens and an approximate cost, then stops.
                                    # Drop --dry-run to run it inline; --queue hands each record to a
