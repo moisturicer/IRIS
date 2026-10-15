@@ -8,6 +8,9 @@ from dataclasses import replace
 
 import pytest
 
+from apps.ai.answers.citations import GroundedAnswer
+from apps.ai.conversation_state import current_revision
+from apps.ai.conversations import record_turn
 from apps.ai.models.conversation import Conversation
 from apps.ai.research.context import Budget, RunContext
 from apps.ai.research.registry import Presentation, ToolRun, general_tools
@@ -22,13 +25,15 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 TOOLS = general_tools()
 
 
-def general_run(user, stack, conversation=None, presented=None, **limits):
+def general_run(user, stack, conversation=None, presented=None, context_revision=None,
+                **limits):
     limits = {"max_calls_per_subtask": 100, "max_tool_calls": 100, **limits}
     ctx = RunContext.for_request(
         user=user, root=stack, lane="research", conversation=conversation,
-        budget=replace(Budget.from_settings(), **limits),
+        budget=replace(Budget.from_settings(), **limits), context_revision=context_revision,
     )
-    return replace(ToolRun.start(ctx, stack, scoped_handles=True), presented=presented)
+    run = ToolRun.start(ctx, stack, scoped_handles=True)
+    return run if presented is None else replace(run, presented=presented)
 
 
 def invoke(run, name, **arguments):
@@ -123,7 +128,7 @@ def test_ordinals_resolve_only_against_the_presented_list(corpus, embedder):
     stack = root(embedder)
     shown = Presentation(revision=3, record_ids=(corpus["pond"].pk, corpus["draft"].pk,
                                                   corpus["public"].pk))
-    result = invoke(general_run(corpus["student"], stack, presented=shown),
+    result = invoke(general_run(corpus["student"], stack, presented=shown, context_revision=3),
                     "resolve_papers", ordinals=[1, 2, 3, 4])
     first, hidden, third, beyond = result.items
     assert (first["match"], first["title"]) == ("presented_order", "Tilapia ponds")
@@ -135,6 +140,54 @@ def test_ordinals_resolve_only_against_the_presented_list(corpus, embedder):
     none = invoke(general_run(corpus["student"], stack), "resolve_papers", ordinals=[1])
     assert none.items[0]["match"] == "none"
     assert none.limitations == ("no_presented_list",)
+
+
+def _show(conversation, *records):
+    answer = GroundedAnswer(text="Some papers.", citations=(), degraded=False)
+    listing = {"completeness": "complete", "records": [{"record_id": r.pk} for r in records]}
+    record_turn(conversation, "suggest papers", answer, listing=listing)
+
+
+def test_ordinals_resolve_from_stored_conversation_state(corpus, embedder):
+    reader = corpus["student"]
+    conversation = Conversation.objects.create(user=reader)
+    _show(conversation, corpus["pond"], corpus["draft"], corpus["public"])
+
+    run = general_run(reader, root(embedder), conversation=conversation,
+                      context_revision=current_revision(conversation))
+    assert run.presented.revision == 1
+    result = invoke(run, "resolve_papers", ordinals=[3, 1, 2])
+    third, first, hidden = result.items
+    assert (third["match"], third["title"]) == ("presented_order", "Flood forecasting")
+    assert first["title"] == "Tilapia ponds"
+    # resolve_papers is still the only visibility check: the draft stays hidden.
+    assert hidden["match"] == "none"
+
+
+def test_a_stale_state_revision_resolves_no_ordinal(corpus, embedder):
+    reader = corpus["student"]
+    conversation = Conversation.objects.create(user=reader)
+    _show(conversation, corpus["pond"], corpus["public"])
+    asked_at = current_revision(conversation)
+    # Another tab's answer commits a new displayed set before this run starts.
+    _show(conversation, corpus["public"], corpus["pond"])
+
+    run = general_run(reader, root(embedder), conversation=conversation,
+                      context_revision=asked_at)
+    assert run.presented.revision == asked_at + 1
+    result = invoke(run, "resolve_papers", ordinals=[1, 2])
+    assert [item["match"] for item in result.items] == ["none", "none"]
+    assert result.status is Status.EMPTY
+    assert result.limitations == ("stale_presentation",)
+
+
+def test_another_readers_conversation_presents_nothing(corpus, embedder):
+    conversation = Conversation.objects.create(user=corpus["other"])
+    _show(conversation, corpus["pond"])
+
+    run = general_run(corpus["student"], root(embedder), conversation=conversation,
+                      context_revision=1)
+    assert run.presented is None
 
 
 def test_resolution_needs_a_reference(corpus, embedder):

@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.composition import composition_root
+from apps.ai.conversation_state import current_revision
 from apps.ai.models import Conversation
 from apps.ai.research.context import RunContext
 from apps.ai.research.planner import ResearchPlanner
@@ -27,7 +28,9 @@ class Command(BaseCommand):
             if conversation is None:
                 raise CommandError("No such Conversation for this user.")
         root = composition_root()
-        ctx = RunContext.for_request(user=user, root=root, conversation=conversation, lane="research")
+        # An operator asks against the state as it stands now.
+        ctx = RunContext.for_request(user=user, root=root, conversation=conversation, lane="research",
+                                     context_revision=current_revision(conversation))
         result = ResearchPlanner(root).answer(options["question"], ctx)
         self.stdout.write(f"Run {result.run_id}: {result.stop_reason}")
         for index, step in enumerate(result.steps, 1):

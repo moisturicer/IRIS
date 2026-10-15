@@ -34,7 +34,8 @@ def resolve_papers(run: ToolRun, args: dict) -> ToolResult:
         raise ArgumentsRejected("missing_argument")
     titled = list(readable_records(run.ctx).only("pk", "title"))
     matches = [title_matches(titled, reference) for reference in references]
-    presented = run.presented.record_ids if run.presented is not None else ()
+    current = run.current_presentation
+    presented = current.record_ids if current is not None else ()
     wanted = {r.pk for _, found in matches for r in found}
     wanted |= {presented[n - 1] for n in ordinals if n <= len(presented)}
     # Withheld from a vendor is indistinguishable from unknown.
@@ -70,6 +71,8 @@ def resolve_papers(run: ToolRun, args: dict) -> ToolResult:
 
     if ordinals and run.presented is None:
         limitations.add("no_presented_list")
+    elif ordinals and current is None:
+        limitations.add("stale_presentation")
     for offset, ordinal in enumerate(ordinals, len(references) + 1):
         pk = presented[ordinal - 1] if ordinal <= len(presented) else None
         if pk is None or pk not in allowed:
@@ -101,7 +104,7 @@ def resolve_papers(run: ToolRun, args: dict) -> ToolResult:
 
 
 def _presentation(run: ToolRun):
-    p = run.presented
+    p = run.current_presentation
     return None if p is None else [p.revision, list(p.record_ids)]
 
 

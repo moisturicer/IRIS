@@ -245,17 +245,16 @@ def commit(conversation: Conversation, turn: Turn, *, context: Optional[ContextS
     return row.revision
 
 
-def snapshot(conversation: Conversation, user) -> Snapshot:
-    """The state as ``user`` may see it now. Reads never write."""
+def _committed(conversation: Conversation):
     row = ConversationState.objects.filter(conversation=conversation).first()
     if row is None:
-        state, revision, basis, answer_turn_id, versions = (
-            reconstruct(conversation), 0, RECONSTRUCTED, None, {}
-        )
-    else:
-        state, revision, basis, answer_turn_id, versions = (
-            _from_row(row), row.revision, row.basis, row.answer_turn_id, row.source_versions
-        )
+        return reconstruct(conversation), 0, RECONSTRUCTED, None, {}
+    return _from_row(row), row.revision, row.basis, row.answer_turn_id, row.source_versions
+
+
+def snapshot(conversation: Conversation, user) -> Snapshot:
+    """The state as ``user`` may see it now. Reads never write."""
+    state, revision, basis, answer_turn_id, versions = _committed(conversation)
 
     visible = readable_record_ids(user, state.record_ids())
     pending = state.pending_clarification
@@ -275,6 +274,23 @@ def snapshot(conversation: Conversation, user) -> Snapshot:
         stale = frozenset(pk for pk in shown
                           if str(pk) in versions and versions[str(pk)] != current.get(pk))
     return Snapshot(revision, basis, state, answer_turn_id, stale)
+
+
+def presentation(ctx):
+    """The papers last shown in ``ctx``'s Conversation, for ordinals (IR-603).
+
+    Committed ids in display order; no visibility check here, because
+    `resolve_papers` reauthorizes every id it resolves.
+    """
+    from apps.ai.research.registry import Presentation
+
+    if ctx.conversation_id is None:
+        return None
+    conversation = Conversation.objects.filter(pk=ctx.conversation_id, user=ctx.user).first()
+    if conversation is None:
+        return None
+    state, revision, *_ = _committed(conversation)
+    return Presentation(revision=revision, record_ids=state.presented)
 
 
 def reissue_handles(run, snap: Snapshot) -> dict:

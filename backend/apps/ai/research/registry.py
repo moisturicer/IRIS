@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 class Presentation:
     """Records last shown to the reader, in display order (IR-591).
 
-    Supplied by the application from committed conversation state; a model
-    names one only by its ordinal.
+    Built by `conversation_state.presentation` (IR-603); a model names one
+    only by its ordinal.
     """
 
     revision: int
@@ -53,15 +53,24 @@ class ToolRun:
     screen_candidate_ids: tuple[int, ...] | None = None
     presented: Presentation | None = None
 
+    @property
+    def current_presentation(self) -> Presentation | None:
+        """`presented`, only at the revision the question was asked against
+        (spec §3.2); any other revision resolves no ordinal."""
+        p = self.presented
+        return p if p is not None and p.revision == self.ctx.context_revision else None
+
     @classmethod
     def start(
         cls, ctx: RunContext, root: "CompositionRoot", *, scoped_handles: bool = False,
     ) -> "ToolRun":
         """`scoped_handles` tags every handle with this run (IR-590)."""
+        from apps.ai.conversation_state import presentation
+
         tag = hashlib.sha256(ctx.run_id.encode()).hexdigest()[:6] if scoped_handles else ""
         return cls(
             ctx=ctx, ledger=Ledger(ctx.budget.max_ledger_passages, tag=tag),
-            root=root, spend=Spend(ctx.budget),
+            root=root, spend=Spend(ctx.budget), presented=presentation(ctx),
         )
 
     def issue_cursor(

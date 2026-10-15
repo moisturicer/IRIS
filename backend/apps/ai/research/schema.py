@@ -17,7 +17,7 @@ _SUPPORTED = {
 RESERVED = frozenset({
     "user", "identity", "scope", "scope_record_id", "conversation_id",
     "history_before_turn_id", "permits", "lane", "budget", "deadline", "spend",
-    "run_id", "source_policy",
+    "run_id", "source_policy", "context_revision",
 })
 #: A raw database id or SQL; a model names records by issued handle only.
 _RAW = re.compile(r"(?:^|_)(?:id|ids|pk|uuid|sql|identifier)$|[a-z](?:Id|Ids|Uuid)$")
