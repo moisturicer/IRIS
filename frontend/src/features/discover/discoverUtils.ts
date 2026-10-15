@@ -266,3 +266,22 @@ export function buildCitation(record: RecordListItem, style: CitationStyle): str
     `}`,
   ].join("\n");
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Card hook
+ * ──────────────────────────────────────────────────────────────────────────*/
+
+export const CARD_HOOK_MAX = 145;
+
+/**
+ * The one-line hook on a Discover card: the AI Overview's generated hook, or
+ * the abstract's first sentence until one exists (IR-604).
+ */
+export function cardHook(record: Pick<RecordListItem, "abstract"> & { ai_hook?: string | null }): string {
+  const generated = record.ai_hook?.trim();
+  if (generated) return generated;
+
+  const abstract = record.abstract?.trim() ?? "";
+  const first = abstract.match(/^.*?[.!?](?=\s|$)/s)?.[0] ?? abstract;
+  return first.length <= CARD_HOOK_MAX ? first : `${first.slice(0, CARD_HOOK_MAX - 1).replace(/\s+\S*$/, "")}…`;
+}

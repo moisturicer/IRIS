@@ -3,6 +3,10 @@
 import { recordsApi } from "@/api/records";
 import type { LoadedPdf } from "@/lib/pdf";
 
+/** Share of the page's height the cover shows, from the top. */
+const VISIBLE_PAGE_SHARE = 0.6;
+const RENDER_SCALE = 1.5;
+
 interface ManuscriptCoverProps {
   recordId: number;
   available: boolean;
@@ -49,7 +53,7 @@ export function ManuscriptCover({ recordId, available }: ManuscriptCoverProps) {
         const page = await loaded.document.getPage(1);
         const canvas = canvasRef.current;
         if (!canvas || cancelled) return;
-        const rendered = renderPageToCanvas(page, canvas, 0.8);
+        const rendered = renderPageToCanvas(page, canvas, RENDER_SCALE);
         cancelRender = rendered.cancel;
         await rendered.promise;
         if (!cancelled) setStatus("ready");
@@ -67,13 +71,15 @@ export function ManuscriptCover({ recordId, available }: ManuscriptCoverProps) {
   }, [available, recordId, visible]);
 
   return (
-    <div ref={hostRef} className="relative min-h-56 flex-1 overflow-hidden rounded-lg border border-stone-200 bg-stone-100 xl:rounded-none xl:rounded-tr-xl xl:border-0">
+    <div ref={hostRef} style={{ containerType: "size" }}
+      className="relative min-h-56 flex-1 overflow-hidden rounded-lg border border-stone-200 bg-stone-100 xl:rounded-none xl:rounded-tr-xl xl:border-0">
       {status !== "unavailable" && (
         <canvas
           ref={canvasRef}
           aria-label="First page of manuscript"
           role="img"
-          className={`absolute inset-0 h-full w-full object-cover object-top ${status === "ready" ? "block" : "hidden"}`}
+          style={{ height: `calc(100cqh / ${VISIBLE_PAGE_SHARE})` }}
+          className={`absolute left-1/2 top-0 w-auto max-w-none -translate-x-1/2 ${status === "ready" ? "block" : "hidden"}`}
         />
       )}
       {status === "loading" && (

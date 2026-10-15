@@ -22,6 +22,7 @@ from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.records.models import Record
 
 from .assembly import whole_paper
+from .hook import HOOK_INSTRUCTION, split_hook
 from .pages import SYSTEM_PROMPT, build_page_prompt, parse_page_citations
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,8 @@ logger = logging.getLogger(__name__)
 #: 2: grounded in the whole paper, not six retrieved passages (IR-431).
 #: 3: cites pages, not chunk numbers (IR-434).
 #: 4: the comprehensive skeleton replaces two paragraphs of prose (IR-433).
-PROMPT_VERSION = 4
+#: 5: the same completion also writes a catalogue hook (IR-604).
+PROMPT_VERSION = 5
 
 # Formatting rules come from SYSTEM_PROMPT (IR-424); only structure lives here.
 # The omission rule matters most: a filled-in Limitations section the paper
@@ -47,7 +49,8 @@ _QUESTION = (
     "Where a figure or table carries a finding, name it in the sentence and "
     "cite it.\n"
     "Close with one paragraph separating what the work demonstrates from what "
-    "it only suggests."
+    "it only suggests.\n"
+    f"{HOOK_INSTRUCTION}"
 )
 
 
@@ -146,6 +149,7 @@ def _claim_generation(
         stored.state = "generating"
         stored.text = ""
         stored.citations = []
+        stored.hook = ""
         stored.degraded = False
         stored.model_id = ""
         stored.content_hash = content_hash
@@ -207,10 +211,11 @@ def generate_overview(record_id: int, chunk_set_id: int, content_hash: str, prom
         claimed.update(state="unavailable")
         return
 
-    text, wire_citations, model = generated
+    text, wire_citations, model, hook = generated
     claimed.update(
         state="ready",
         text=text,
+        hook=hook,
         citations=wire_citations,
         degraded=False,
         model_id=model or "",
@@ -219,7 +224,7 @@ def generate_overview(record_id: int, chunk_set_id: int, content_hash: str, prom
 
 
 def _generate(chunk_set: ChunkSet):
-    """``(text, citations, model)``, or ``None`` when nothing was generated."""
+    """``(text, citations, model, hook)``, or ``None`` when nothing was generated."""
     record = chunk_set.record
     root = composition_root()
 
@@ -239,13 +244,37 @@ def _generate(chunk_set: ChunkSet):
         return None
 
     prompt = build_page_prompt(f"{record.title}. {_QUESTION}", sources)
-    generated = generate_cited(
-        llm, prompt, sources, system=SYSTEM_PROMPT, parse=parse_page_citations
-    )
+    hook = ""
+
+    def parse(raw, chunks):
+        nonlocal hook
+        body, hook = split_hook(raw)
+        return parse_page_citations(body, chunks)
+
+    generated = generate_cited(llm, prompt, sources, system=SYSTEM_PROMPT, parse=parse)
     if generated is None:
         return None
     text, citations = generated
-    return text, citations_wire(citations), model_that_answered(llm)
+    return text, citations_wire(citations), model_that_answered(llm), hook
+
+
+def hook_for(record: Record) -> str | None:
+    """The record's stored catalogue hook, or ``None`` (IR-604).
+
+    The caller has already limited the record to what the reader may see. The
+    disclosure gate applies here as it does to the overview itself, and only a
+    ready row from the current prompt version counts. Reads a row the list
+    queryset joined in; never generates.
+    """
+    try:
+        stored = record.ai_overview
+    except RecordOverview.DoesNotExist:
+        return None
+    if stored.state != "ready" or stored.prompt_version != PROMPT_VERSION or not stored.hook:
+        return None
+    if not composition_root().vendor_permits()(record):
+        return None
+    return stored.hook
 
 
 def _wire(stored: RecordOverview) -> dict:
