@@ -1046,3 +1046,15 @@ Not covered here: no paid run, no pilot-family labelled set on proxy or CIT-U da
 and no capacity burst. The control run's figures measure arithmetic and plumbing, not quality, latency or cost.
 
 **Status:** instrument implemented and tested; every evaluation gate is OPEN and human review remains required.
+
+## IR-601: the AI Overview polling test no longer races its own timer
+
+**Defect.** `PaperAiOverview.test.tsx` › "explains that generation is pending and polls until the overview is ready" advanced the fake clock by 2500ms once. The component's poll timer is set by an effect that React runs on a faked timer after "being prepared" is on screen. A single advance could therefore run that effect partway through and leave the new 2500ms timer beyond the advance, so the poll never happened in time. It is a test bug; in a browser the timer simply fires.
+
+**Measured, 2026-10-15, local:**
+- Run alone, the test failed **30 of 30**, and in every failure the poll timer did not yet exist when the clock moved. In its whole file it failed 2 runs in 5. It also failed PR #276's Frontend job once.
+- Waiting for the timer before advancing: **0 of 15** failed, which confirms the cause.
+
+**Fix.** The test advances in steps, at most three, until the poll has happened. It does not use `waitFor`, because its own timeout is a faked timer too. The assertions are unchanged: the pending state is announced, exactly one poll follows, and the overview renders. A deliberately broken poll (a 60s interval) still fails the test.
+
+**Evidence:** alone, **0 of 30** failed; in its file, **0 of 10**. `npm test` **1071 passed, 3 failed**, the three `Sidebar.test.tsx` tests that fail identically on `main` locally and pass in CI.
