@@ -183,6 +183,17 @@ def _cut(text: str, estimated_budget: int) -> str:
     return cut.rstrip() + TRUNCATION_MARKER
 
 
+def readable_record_ids(user, record_ids) -> set:
+    """The ids among ``record_ids`` that ``user`` may read now."""
+    from apps.records.models import Record
+
+    if not record_ids:
+        return set()
+    return set(
+        Record.objects.visible_to(user).filter(pk__in=record_ids).values_list("pk", flat=True)
+    )
+
+
 def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
     """``turns`` minus any citing a Record no longer readable (IR-592).
 
@@ -191,8 +202,9 @@ def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
     so nothing derived from it reaches a prompt or a cache key.
     """
     from apps.ai.models import TurnCitation
-    from apps.records.models import Record
 
+    if user is None and allowed is None:
+        raise ValueError("readable_turns needs a user or an allowed function")
     turns = list(turns)
     cited: dict[int, set] = {}
     for turn_id, record_id in TurnCitation.objects.filter(
@@ -202,12 +214,7 @@ def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
     every = set().union(*cited.values()) if cited else set()
     if not every:
         return turns
-    if allowed is None:
-        permitted = set(
-            Record.objects.visible_to(user).filter(pk__in=every).values_list("pk", flat=True)
-        )
-    else:
-        permitted = set(allowed(every))
+    permitted = readable_record_ids(user, every) if allowed is None else set(allowed(every))
     return [turn for turn in turns if cited.get(turn.pk, set()) <= permitted]
 
 

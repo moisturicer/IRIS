@@ -23,10 +23,10 @@ from apps.ai.history import (
     HISTORY_CANDIDATE_LIMIT,
     estimate_tokens,
     history_window,
+    readable_record_ids,
     readable_turns,
 )
 from apps.ai.models import ChunkSet, Conversation, ConversationState, Turn, TurnCitation
-from apps.records.models import Record
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +204,9 @@ def commit(conversation: Conversation, turn: Turn, *, context: Optional[ContextS
     """
     if turn.state != GENERATED:
         return None
-    Conversation.objects.select_for_update().filter(pk=conversation.pk).first()
+    # NO KEY UPDATE: the Turn insert already holds KEY SHARE on this row, and
+    # FOR UPDATE would deadlock against a concurrent insert.
+    Conversation.objects.select_for_update(no_key=True).filter(pk=conversation.pk).first()
     row = ConversationState.objects.filter(conversation=conversation).first()
     if row is None:
         row = ConversationState(conversation=conversation)
@@ -243,13 +245,6 @@ def commit(conversation: Conversation, turn: Turn, *, context: Optional[ContextS
     return row.revision
 
 
-def _visible(user, record_ids) -> set:
-    if not record_ids:
-        return set()
-    return set(Record.objects.visible_to(user).filter(pk__in=record_ids)
-               .values_list("pk", flat=True))
-
-
 def snapshot(conversation: Conversation, user) -> Snapshot:
     """The state as ``user`` may see it now. Reads never write."""
     row = ConversationState.objects.filter(conversation=conversation).first()
@@ -262,7 +257,7 @@ def snapshot(conversation: Conversation, user) -> Snapshot:
             _from_row(row), row.revision, row.basis, row.answer_turn_id, row.source_versions
         )
 
-    visible = _visible(user, state.record_ids())
+    visible = readable_record_ids(user, state.record_ids())
     pending = state.pending_clarification
     if pending is not None:
         pending = {**pending, "options": [pk for pk in pending.get("options", []) if pk in visible]}
