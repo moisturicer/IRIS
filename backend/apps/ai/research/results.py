@@ -369,12 +369,17 @@ def coverage_for(result: ToolResult, subject: CoverageSubject) -> SubjectCoverag
     return SubjectCoverage(subject, returned=legacy.returned)
 
 
+def population_snapshot(record_ids) -> str:
+    """A metadata fact's population, as a digest (IR-590, IR-593)."""
+    ids = ",".join(str(pk) for pk in sorted(record_ids))
+    return hashlib.sha256(ids.encode()).hexdigest()[:12]
+
+
 def _facts(result: ToolResult, subject: CoverageSubject, predicate) -> tuple[dict, ...]:
     if subject is CoverageSubject.METADATA_POPULATION:
         snapshot = None
         if result.visible_record_ids is not None:
-            ids = ",".join(str(pk) for pk in sorted(result.visible_record_ids))
-            snapshot = hashlib.sha256(ids.encode()).hexdigest()[:12]
+            snapshot = population_snapshot(result.visible_record_ids)
         provenance = {"kind": "metadata", "population": "records_visible_to_reader",
                       "predicate": dict(predicate or {}), "snapshot": snapshot}
     elif subject is CoverageSubject.SCREENED_SUBSET:

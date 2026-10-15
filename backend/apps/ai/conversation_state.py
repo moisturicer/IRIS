@@ -252,6 +252,15 @@ def _committed(conversation: Conversation):
     return _from_row(row), row.revision, row.basis, row.answer_turn_id, row.source_versions
 
 
+def committed_state(conversation: Conversation) -> ContextState:
+    """The last committed value, for a caller naming the next one (IR-593).
+
+    Unfiltered on purpose: an exclusion of a paper unreadable today must
+    survive the commit. Never show it to a reader; `snapshot` is for that.
+    """
+    return _committed(conversation)[0]
+
+
 def snapshot(conversation: Conversation, user) -> Snapshot:
     """The state as ``user`` may see it now. Reads never write."""
     state, revision, basis, answer_turn_id, versions = _committed(conversation)

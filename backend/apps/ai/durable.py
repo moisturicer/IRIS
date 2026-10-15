@@ -75,7 +75,7 @@ import logging
 import math
 import time
 from contextlib import closing, contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import timedelta
 
 from django.conf import settings
@@ -87,6 +87,8 @@ from apps.ai.admission import scope as admission_scope
 
 from apps.ai.answers.citations import PARTIAL as PARTIAL_ANSWER
 from apps.ai.answers.events import Done, ReasoningDelta
+from apps.ai.composition import composition_root
+from apps.ai.controller.versions import ENGINES, LEGACY_ENGINE, pin
 from apps.ai.models import (
     AskRun,
     AskRunAttempt,
@@ -180,6 +182,8 @@ def submit(prepared, user, data, *, max_sources: int):
     request.update(conversation_id=prepared.conversation.pk, top_k=max_sources)
     # A retry copies this, so it answers against the context it was asked in.
     request["context_revision"] = prepared.context_revision
+    # The engine is pinned at submission; a later rollback changes new runs only.
+    request["pin"] = pin(composition_root().engine)
     if settings.AI_COMPARISON_ENABLED:
         from apps.ai.routing.router import _fixed_lane
         lane = prepared.route_override or _fixed_lane(
@@ -188,7 +192,6 @@ def submit(prepared, user, data, *, max_sources: int):
         )
         named_comparison = False
         if prepared.scope_record is None and lane != "comparison":
-            from apps.ai.composition import composition_root
             from apps.ai.research.context import RunContext
             from apps.ai.routing.lanes import _named_records
 
@@ -481,7 +484,7 @@ class _QueuedOrchestrator(ChatOrchestrator):
             run = _locked(self._attempt)
 
             def written(turn: Turn) -> None:
-                research_id = (self._routing.research or {}).get("run_id")
+                research_id = self.research_run_id
                 if research_id and ResearchRun.objects.filter(pk=research_id).exists():
                     AskRunAttempt.objects.filter(pk=self._attempt.pk).update(
                         research_run_id=research_id,
@@ -578,6 +581,12 @@ def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
     if error is not None:
         finish_without_turn(attempt, FAILED, "not_answerable")
         return
+    # A run queued before pins existed is a legacy run.
+    engine = (run.request.get("pin") or {}).get("engine", LEGACY_ENGINE)
+    if engine not in ENGINES:
+        finish_without_turn(attempt, FAILED, "engine_unavailable")
+        return
+    prepared = replace(prepared, engine=engine)
 
     orchestrator = _QueuedOrchestrator(
         prepared, max_sources=run.request["top_k"], attempt=attempt,
