@@ -133,7 +133,7 @@ class SubmitDocumentView(APIView):
         # --- Basic presence check ---
         if not all([record_id, slot_id or item_id, file]):
             return Response(
-                {"detail": "record, slot, and file are required."},
+                {"detail": "record, file, and one of slot or request_item are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
