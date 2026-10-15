@@ -156,10 +156,10 @@ describe("the sidebar's list", () => {
       expect(label).toHaveClass("md:sr-only");
       expect(label).not.toHaveClass("md:hidden");
     }
-    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
   });
 
-  it("collapses and expands from one control", async () => {
+  it("collapses and expands from the logo without a footer control", async () => {
     const user = userEvent.setup();
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
@@ -167,8 +167,9 @@ describe("the sidebar's list", () => {
     await screen.findByRole("heading", { name: "My Library" });
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(useUIStore.getState().sidebarCollapsed).toBe(true);
-    await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
     expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+    expect(screen.queryByText("Collapse")).not.toBeInTheDocument();
   });
 
   it("has no serious or critical accessibility violations", async () => {

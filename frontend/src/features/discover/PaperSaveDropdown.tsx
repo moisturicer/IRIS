@@ -86,10 +86,10 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                 ? PILL_PRIMARY
                 : PILL_SECONDARY
             : cn(
-                "w-[30px] h-[30px] rounded-lg border",
+                "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border",
                 isSaved
-                  ? "border-brand-200 bg-brand-50 text-brand"
-                  : "border-stone-200 text-stone-400 hover:text-brand hover:border-brand-200",
+                  ? "border-stone-300 bg-stone-100 text-brand"
+                  : "border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50",
               ),
         )}
       >

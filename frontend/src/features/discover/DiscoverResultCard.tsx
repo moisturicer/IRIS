@@ -3,8 +3,9 @@ import { useState } from "react";
 import { ResearchCard } from "@/components/shared/ResearchCard";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
-import type { RecordListItem } from "@/types/records";
+import type { ForYouItem, RecordListItem } from "@/types/records";
 import { CitationIcon } from "./DiscoverIcons";
+import { ManuscriptCover } from "./ManuscriptCover";
 import { PaperSaveDropdown } from "./PaperSaveDropdown";
 import {
   formatAuthorList,
@@ -19,6 +20,8 @@ interface DiscoverResultCardProps {
   record:          RecordListItem;
   searchHighlight: string;
   onCite:          () => void;
+  reason?:         ForYouItem["reason"];
+  expanded?:       boolean;
 }
 
 /**
@@ -29,9 +32,13 @@ interface DiscoverResultCardProps {
  * so the card names none rather than guessing one; citation and download
  * counts do not exist, so views are the only figure.
  */
-export function DiscoverResultCard({ record, searchHighlight, onCite }: DiscoverResultCardProps) {
+export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false }: DiscoverResultCardProps) {
   const [starred, setStarred] = useState(() => isStarred(record.id));
   const abstract = record.abstract?.trim() ?? "";
+  const firstSentence = abstract.replace(/\s+/g, " ").match(/^(.+?[.!?])(?:\s|$)/)?.[1] ?? abstract;
+  const hook = firstSentence.length > 145
+    ? `${firstSentence.slice(0, 145).replace(/\s+\S*$/, "")}…`
+    : firstSentence;
 
   const flags = [
     record.is_ip && { key: "ip", icon: "fa-shield-halved", label: ipTypeLabel(record.ip_type) },
@@ -45,23 +52,42 @@ export function DiscoverResultCard({ record, searchHighlight, onCite }: Discover
       href={`/records/${record.id}`}
       title={record.title}
       eyebrow={
-        <span className="flex flex-wrap items-center gap-x-1.5">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {record.classification_name && <span className="text-brand">{record.classification_name}</span>}
           {record.classification_name && record.record_type_name && (
             <span aria-hidden="true" className="text-stone-400">·</span>
           )}
           {record.record_type_name && <span>{record.record_type_name}</span>}
+          {reason && <span aria-label="Why this was suggested" className="inline-flex rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-700">
+            {reason.kind === "selected_area" && reason.area
+              ? `Because you chose ${reason.area}`
+              : "Latest research"}
+          </span>}
         </span>
       }
       meta={recordYearLabel(record)}
       byline={highlightMatch(formatAuthorList(record.authors), searchHighlight)}
-      summary={
-        abstract ? highlightMatch(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>
-      }
+      summary={abstract ? highlightMatch(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
+      summaryClassName={expanded ? "xl:line-clamp-5" : undefined}
+      splitFooter={expanded}
+      previewLabel="Manuscript and abstract preview"
+      preview={expanded && <>
+        <ManuscriptCover recordId={record.id} available={record.has_manuscript ?? record.file_count > 0} />
+        <div className="mt-auto border-t border-stone-200 px-5 pb-5 pt-4">
+          <div className="flex items-center gap-2">
+            <span aria-hidden className="h-0.5 w-4 rounded-full bg-brand" />
+            <span className="text-label font-semibold uppercase tracking-wide text-stone-700">From the abstract</span>
+          </div>
+          <p className="mt-2 line-clamp-3 font-display text-[1.13rem] leading-snug text-stone-800">
+            {abstract ? highlightMatch(hook, searchHighlight) : "No abstract has been added yet."}
+          </p>
+        </div>
+      </>}
+      footerClassName="rounded-b-xl border-stone-200 bg-white"
       footer={
         <>
-          <span className="inline-flex items-center gap-1.5" title="Times this record has been opened">
-            <i className="fas fa-eye text-[12px] text-stone-500" aria-hidden />
+          <span className="inline-flex items-center gap-1.5 text-stone-700" title="Times this record has been opened">
+            <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
             {record.access_count} {record.access_count === 1 ? "view" : "views"}
           </span>
           {flags.map((flag) => (
@@ -81,12 +107,12 @@ export function DiscoverResultCard({ record, searchHighlight, onCite }: Discover
             aria-label={starred ? "Starred" : "Star paper"}
             title={starred ? "Starred" : "Star paper"}
             className={cn(
-              "w-9 h-9 rounded-lg border flex items-center justify-center",
+              "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border bg-white flex items-center justify-center",
               COLOUR_TRANSITION,
               FOCUS_RING,
               starred
-                ? "border-brand-100 bg-brand-50 text-brand"
-                : "border-stone-200 text-stone-600 hover:text-brand hover:border-stone-400",
+                ? "border-stone-300 bg-stone-100 text-brand"
+                : "border-stone-200 text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50",
             )}
           >
             <i className={cn(starred ? "fas" : "far", "fa-star text-[13px]")} aria-hidden />
@@ -98,7 +124,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite }: Discover
             aria-label="Cite this paper"
             title="Cite this paper"
             className={cn(
-              "w-9 h-9 rounded-lg border border-stone-200 text-stone-600 hover:text-brand hover:border-stone-400 flex items-center justify-center",
+              "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50 flex items-center justify-center",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}

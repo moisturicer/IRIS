@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
@@ -56,6 +56,8 @@ export const ALL_VALUE = "all";
 export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
   const { name, options, loading = false, emptyHint, inline = false, neutral = false, block = false } = props;
   const [open, setOpen] = useState(false);
+  const listId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
       if (e.key === "Escape") {
         e.stopPropagation();
         setOpen(false);
+        triggerRef.current?.focus();
       }
     }
 
@@ -96,10 +99,12 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        ref={triggerRef}
+        aria-controls={open ? listId : undefined}
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 rounded-full border text-small font-medium",
+          "inline-flex items-center gap-1.5 min-h-11 px-3.5 py-1.5 rounded-lg border text-small font-medium",
           COLOUR_TRANSITION,
           FOCUS_RING,
           block ? "w-full justify-between" : "max-w-[18rem]",
@@ -126,6 +131,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
 
       {open && (
         <div
+          id={listId}
           role="listbox"
           // A listbox needs its own accessible name (axe: aria-input-field-name).
           aria-label={name}
@@ -161,10 +167,11 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
                     } else {
                       props.onChange(option.value);
                       setOpen(false);
+                      triggerRef.current?.focus();
                     }
                   }}
                   className={cn(
-                    "w-full flex items-center justify-between gap-2 px-3 py-2 text-small text-stone-800 text-left hover:bg-stone-50",
+                    "min-h-11 [@media(pointer:fine)]:min-h-9 w-full flex items-center justify-between gap-2 px-3 py-2 text-small text-stone-800 text-left hover:bg-stone-50",
                     COLOUR_TRANSITION,
                     FOCUS_RING,
                   )}
@@ -182,7 +189,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
                 type="button"
                 onClick={() => props.onChange([])}
                 className={cn(
-                  "w-full px-3 py-2 text-left text-small font-medium text-stone-600 hover:text-brand",
+                  "min-h-11 [@media(pointer:fine)]:min-h-9 w-full px-3 py-2 text-left text-small font-medium text-stone-600 hover:text-brand",
                   COLOUR_TRANSITION,
                   FOCUS_RING,
                 )}

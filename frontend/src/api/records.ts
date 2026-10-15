@@ -5,6 +5,7 @@ import type {
   DownloadRequest, DeleteRequest, RecordTracker,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
+  DiscoverInterests, ForYouPage,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -22,6 +23,11 @@ export const recordsApi = {
 
   // Discover's filter choices over the whole catalogue `list` serves (IR-560).
   facets:         () => apiClient.get<{ years: number[] }>("/records/facets/"),
+  interests:      () => apiClient.get<DiscoverInterests>("/records/interests/"),
+  updateInterests:(body: { classification_ids: number[]; psced_ids: number[] }) =>
+    apiClient.put<DiscoverInterests>("/records/interests/", body),
+  forYou:         (cursor?: string, params?: Record<string, unknown>) =>
+    apiClient.get<ForYouPage>("/records/for-you/", { params: { ...params, ...(cursor ? { cursor } : {}) } }),
 
   // My Library's *My research* list -- a plain array, not paginated, of
   // the narrow rows `MyResearchSerializer` returns (IR-410).
