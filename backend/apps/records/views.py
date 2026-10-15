@@ -97,19 +97,20 @@ class RecordViewSet(viewsets.ModelViewSet):
             # their refusal the same 404 as a missing record.
             qs = qs.filter(owners__user=self.request.user)
 
-        if self.action == "list":
+        if self.action in ("list", "facets"):
             # Discover is a public catalogue, not an authorization boundary, so
             # it narrows further. visible_to() is wider than the catalogue --
             # it also admits your own drafts and, for staff, everything -- and
             # browse must not surface either. Own records live at
             # /records/mine/ (MyRecordsViewSet). This filter only ever removes
-            # rows from what visible_to() already allowed.
-            #
+            # rows from what visible_to() already allowed. `facets` offers the
+            # filter choices for exactly this catalogue (IR-560).
+            qs = qs.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
+
+        if self.action == "list":
             # distinct=True on the count: the college/department filters join
             # through owners.
-            qs = qs.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).annotate(
-                file_count=Count("files", distinct=True)
-            )
+            qs = qs.annotate(file_count=Count("files", distinct=True))
         return qs
 
     def get_serializer_class(self):
@@ -884,6 +885,24 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
 
         return Response(RecordDetailSerializer(record, context={"request": request}).data)
+
+    @action(detail=False, methods=["get"])
+    def facets(self, request):
+        """GET /records/facets/ -- the filter choices Discover offers (IR-560).
+
+        Drawn from the whole catalogue `list` serves, so a year held only by
+        Records beyond the first page is still offered. `year_accomplished`
+        is what `year_from`/`year_to` filter on, so every year returns a
+        Record. Distinct values only: no count of anything is exposed.
+        """
+        years = (
+            self.get_queryset()
+            .exclude(year_accomplished__isnull=True)
+            .order_by("-year_accomplished")
+            .values_list("year_accomplished", flat=True)
+            .distinct()
+        )
+        return Response({"years": list(years)})
 
     @action(detail=False, methods=["get"])
     def mine(self, request):
