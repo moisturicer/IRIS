@@ -1,6 +1,6 @@
-# Proposed specification: Ask IRIS general tools and conversational answers
+# Product specification: Ask IRIS general tools and conversational answers
 
-**Version 1 · 15 October 2026 · PROPOSED.** Jira parent: [IR-588](https://citiris.atlassian.net/browse/IR-588), with child issues IR-589–IR-599 and their dependencies. The [final proposal](2026-10-15-askiris-final-proposal.md) explains the product decision; this specification defines testable behavior. Creating tickets does not accept an ADR, approve vendor use, fund evaluation or enable production.
+**Version 1 · 15 October 2026 · product contract approved by Jive Tyler Revalde in IR-589 review; implementation pending.** Jira parent: [IR-588](https://citiris.atlassian.net/browse/IR-588), with child issues IR-589–IR-599 and their dependencies. The [final proposal](2026-10-15-askiris-final-proposal.md) explains the product decision; this specification defines testable behavior. Approval does not approve vendor use, fund evaluation or enable production before the separate release gates.
 
 ## 1. Scope and non-negotiable behavior
 
@@ -18,6 +18,10 @@
 
 **G7 — Institutional first.** Web capability is absent unless enabled for the deployment and opted into for the request/conversation. Local failure alone does not enable it.
 
+**G8 — Useful despite tool failures.** Answer at the depth the reader requests, using every currently authorized and supported finding already obtained. A failed tool may narrow the answer and require a clear limitation; it does not automatically erase independent supported findings. Never fill the gap with an invented paper claim or present an incomplete search as exhaustive.
+
+**G9 — Reader notice.** Show “Ask IRIS can make mistakes. Check important details against the cited papers.” directly below both Ask IRIS and Paper Chat prompt boxes before submission. It is persistent and accessible; it does not replace evidence checks or citations.
+
 Out of scope: autonomous writes to records, browser automation with user credentials, arbitrary SQL/code execution, new vector database, multi-agent orchestration, wholesale gateway migration, upload classifier replacement, or training a foundation model.
 
 ## 2. Runtime architecture
@@ -28,7 +32,9 @@ The controller sees the original message, conversation state, recent authorized 
 
 For a simple question, one search and one answer may suffice. For discovery plus comparison, the model may search, inspect candidates, choose a pair, read/extract evidence and compose. Independent reads may run concurrently only under the same admission and scope controls. Tool order is evidence-driven, not fixed by verbs such as “compare.”
 
-Keep direct conversational transformations and approved general explanations available. Institution-specific facts and paper findings require evidence. A failed search never becomes an uncited assertion about the corpus. General explanation is labeled by its basis where it could be confused with paper findings; do not label every sentence mechanically.
+The controller is the normal reader path when released, with no controller on/off switch, opt-in, or choice of fixed lane. New runs pin the controller and public-protocol version. Runs already in flight finish under their pinned version; old transcripts use the safe projection. Rollback is a code/deployment rollback, not a reader-facing toggle. Optional public search keeps its separate opt-in and approval gates.
+
+Keep direct conversational transformations and approved general explanations available, including a general explanation requested inside Paper Chat. Paper Chat still limits any search to its selected paper. Institution-specific facts and paper findings require evidence. A failed search never becomes an uncited assertion about the corpus. General explanation is labeled by its basis where it could be confused with paper findings; do not label every sentence mechanically. Once a question requires evidence, empty, withheld and irrelevant results must not expose different public clues about withheld material. The older direct-route union and proposed Jev router are not mandatory gates in the new controller.
 
 ## 3. Tool contract
 
@@ -84,7 +90,7 @@ Context assembly prioritizes the original request, explicit preferences, current
 
 The answer policy instructs the model to:
 
-1. Answer the actual request first, at an appropriate depth.
+1. Answer the actual request first, at the depth the reader asks for. A request for detail deserves a detailed, structured answer, not a fixed short summary.
 2. Make reasonable research choices from the conversation instead of demanding exact titles unnecessarily.
 3. Explain relevance and comparison choices using evidence. This is an explanation of the conclusion, not narration of tools.
 4. Separate findings, interpretation and general background when their distinction matters.
@@ -96,7 +102,9 @@ Use prose, bullets or tables according to the task. Two-paper comparisons may us
 
 The model returns draft Markdown plus explicit source bindings and any typed computed/numeric claims. Validate citation identity, current access, source version, numeric fact bindings and unsupported completeness claims. Presentation numbers, equations and quoted explanatory phrases must not be treated indiscriminately as research counts or paper titles. Literal word/number membership is insufficient evidence of semantic correctness.
 
-Allow one bounded revision after actionable validation feedback, using the same evidence or a remaining-budget targeted retrieval. Do not keep generating until a judge approves. If the revision cannot establish a claim, omit/qualify that claim where independently supported parts remain useful. Security/version failures fence affected content. This is a proposed change to the earlier whole-answer-withholding rule and must be explicitly reconciled before enablement. Until approved, legacy behavior stays in the legacy path.
+Allow one bounded revision after actionable validation feedback, using the same evidence or a remaining-budget targeted retrieval. Do not keep generating until a judge approves. If the revision cannot establish a claim, omit/qualify that claim where independently supported parts remain useful. Security/version failures fence affected content. ADR-042 accepts this change to the earlier whole-answer-withholding rule for the new controller; the legacy path keeps its existing behavior until replaced.
+
+If a tool fails, use another permitted path when the remaining budget and source policy allow it. Then compose a complete answer from independently supported findings already available and name the material gap. Distinguish a field absent from a paper, no match found in a bounded search, and a service that could not be used. Do not make the reader start over merely because one subtask failed. If nothing supports the requested paper/corpus claim, report insufficient evidence or unavailable service; general background may be offered separately and labelled as such, never as the missing finding. The visible prompt notice does not relax these checks.
 
 First release: neutral progress streams, final validated answer delivered atomically. Do not stream unvalidated factual tokens and then pretend a later validation withheld them. Validated block streaming is a separate future optimization. If generation fails, return an honest unavailable state with safe source cards, not code-written “research findings.”
 
@@ -108,11 +116,13 @@ During work, show one compact status row: `Waiting…`, `Thinking…`, or `Prepa
 
 After completion, show the final answer and citations. Optionally show a collapsed **Reasoning summary** above the answer; omit it when empty, unavailable or unnecessary. On expansion, provide a short analytical account of assumptions and evidence limitations, not an execution log. Example: “These papers address the same research problem, but their evaluation settings differ, so their reported performance should not be treated as a direct ranking.” Only show that statement if supported by the evidence and answer.
 
+Below the prompt box in both Ask IRIS and Paper Chat, show the persistent notice: **“Ask IRIS can make mistakes. Check important details against the cited papers.”** It is visible before a question is submitted, readable at narrow widths and by assistive technology, and does not imply that the application may knowingly publish unsupported claims. The reader checks important details against the papers; the system still supplies citations and honest limitations.
+
 Disallowed everywhere in reader UI: `Answer approach`, `Why this approach?`, `Try instead: Passages/List papers`, raw tool identifiers/arguments, classifier probabilities, rejected-call events, routing justification and provider model traces. Suggested follow-ups, if any, express user goals such as “Explain the limitations,” never internal lanes.
 
 ### 6.2 Data separation
 
-Define distinct internal fields: provider continuation artifacts, private diagnostics, approved display summary, and answer. Native provider summary availability is an adapter capability; arbitrary `reasoning` text or `<think>` content is not presumed display-safe. Never ask for hidden chain of thought to fill the summary panel.
+Define distinct internal fields: provider continuation artifacts, private diagnostics, approved display summary, and answer. A display summary carries its source/answer provenance and follows the Turn's ownership and deletion lifecycle. Native provider summary availability is an adapter capability; arbitrary `reasoning` text or `<think>` content is not presumed display-safe. Never ask for hidden chain of thought to fill the summary panel.
 
 For this release, build the display summary from approved analytical observations tied to the evidence/answer, preferably in the existing answer response with a separately validated field. A provider-supported summary may inform internal processing but is not forwarded verbatim if it contains tool narration or unsafe content. If a safe summary cannot be produced, omit it; no additional summarization call is required just to fill UI chrome.
 
@@ -154,11 +164,11 @@ Use existing HTTP/SSE/Conversation test boundaries with deterministic fakes for 
 | A06 | Exact metadata count vs semantic topic count | Correct distinct-Record count vs explicit classified-subset basis |
 | A07 | Two-paper metrics with different datasets | Explains non-comparability; no unsupported winner |
 | A08 | User requests more detail or simpler wording | Adapts depth without unnecessary retrieval or lost context |
-| A09 | Missing field, weak retrieval, provider outage | Distinguishes missing evidence, no found match and unavailable service |
+| A09 | Missing field, weak retrieval, provider outage | Distinguishes missing evidence, no found match and unavailable service; preserves independently supported answer parts after a tool failure |
 | A10 | Numbered prose, equations, quoted phrase, invalid factual number | Harmless formatting passes; unsupported fact fails/repairs |
-| A11 | Revocation mid-run, stale brief, cross-user handle, Paper Chat widening | Denies/leaks nothing; no stale-source answer or summary |
+| A11 | Revocation mid-run, stale brief, cross-user handle, Paper Chat widening and a general explanation | Denies/leaks nothing; no stale-source answer or summary; gives the general explanation without attributing it to the paper and makes no unsupported paper claim |
 | A12 | Cancel, redelivery, reconnect, concurrent questions | No duplicate final Turn, new paid call after cancel or stale state overwrite |
-| A13 | Live/reopened/copied/mobile/exported response | No tool/routing narration; optional safe collapsed summary; accessible controls |
+| A13 | Live/reopened/copied/mobile/exported response and both prompt boxes | No tool/routing narration; optional safe collapsed summary; accessible controls and persistent mistake notice below Ask IRIS and Paper Chat prompts |
 | A14 | Unsupported summary capability or reasoning-only output | No fabricated summary; reasoning-only is unavailable |
 | A15 | Malicious document and optional public query | No expanded permissions, invented tools or confidential egress |
 
@@ -177,20 +187,20 @@ Each ticket owns a bounded slice; later tickets adapt earlier contracts rather t
 5. **T05 adaptive controller:** orchestrator composition, PLAN contract, tool loop, answer reservation, stop/repair signals and legacy flag.
 6. **T06 synthesis and assurance:** answer policy, source bindings, typed facts, bounded repair, common answer DTO and summary validation.
 7. **T07 provider and public event separation:** summary capability/opaque continuation, activity events, public serializers and legacy replay projection.
-8. **T08 reader UI:** replace routing/steps/raw-reasoning surfaces in shared chat/Paper Chat; copy/export/accessibility and goal-based follow-ups.
+8. **T08 reader UI:** replace routing/steps/raw-reasoning surfaces in shared chat/Paper Chat; add the persistent notice below both prompt boxes; verify copy/export/accessibility and goal-based follow-ups.
 9. **T09 runtime/security integration:** durable workers, admission, cache authorization, race/failure tests and operational controls.
 10. **T10 quality/pilot report:** extend harness, controlled comparisons, review results, capacity/cost and rollback recommendation.
 11. **T11 optional public adapters:** implement only after institutional contracts stabilize and separate policy gates are satisfied; does not block institutional release.
 
 Relevant existing paths: `backend/apps/ai/{orchestrator.py,composition.py,resolution.py,history.py,memory.py,durable.py,inference/,providers/,research/,comparison/,briefs/,models/,views/,evaluation/}`. Frontend: `frontend/src/features/ai/`, shared conversation client, types and Paper Chat consumers. Do not duplicate active UI tickets IR-562, IR-571 or IR-584: coordinate public protocol adoption and reuse their shared-client/continuity work. No task in this pack implements those tickets' unrelated UI scope.
 
-Stage code behind a new default-off controller setting. New runs pin controller/protocol/prompt versions. Rollback changes new runs only; running jobs finish or cancel under their pinned version. Old transcripts remain readable through a safe projection. Retire lane dispatch from the new path after parity/invariant tests; retain domain helpers. No schema deletion in the rollout migration.
+The controller becomes the default reader path at release without an on/off switch or reader lane override. New runs pin controller/protocol/prompt versions. A code/deployment rollback changes new runs only; running jobs finish or cancel under their pinned version. Old transcripts remain readable through a safe projection. Retire lane dispatch from the reader path after parity/invariant tests; retain domain helpers. No schema deletion in the rollout migration.
 
 ## 11. Policy reconciliation and completion
 
-T01 records amendments for ADR-038 fixed lanes/planning ceremony, ADR-034/035 direct answer policy, ADR-036 inference/summary capabilities, ADR-019 reasoning storage/public presentation, and relevant durable/admission contracts. It also records the supplied AGENTS hierarchy versus CLAUDE's frozen-SRS rule. Do not silently overwrite accepted decisions, sign an ADR as AI, or use Jira to override requirements authority.
+ADR-042 records Jive Tyler Revalde's approved product decisions: default controller with no switch; direct general explanations including Paper Chat under scoped evidence rules; one repair and supported partial answers despite tool failure; safe summary/public presentation plus the persistent prompt notice; shared durability/admission invariants; and the ADR-led engineering hierarchy. T01 keeps the separate provider, numeric limit and rollout gates explicit. SRS/SDD are outdated thesis documents and will be removed in a separate repository change. Do not silently overwrite accepted decisions or use Jira to override requirements authority.
 
-Proposed tickets carry `not-ready`, remain unassigned, and do not imply deployment approval. Definition of Ready requires resolved decision dependencies; Definition of Done remains the repository's human-review/CI/merge contract. No automatic Done transition, no paid evaluation, no external corpus transmission or deployment from this specification alone.
+Unresolved provider, budget, data and implementation dependencies keep affected downstream tickets `not-ready`; this document alone does not imply deployment approval. Definition of Ready requires each remaining dependency to be resolved; Definition of Done remains the repository's human-review/CI/merge contract. No automatic Done transition, paid evaluation, external corpus transmission or deployment follows from this specification alone.
 
 ## 12. Source evidence
 

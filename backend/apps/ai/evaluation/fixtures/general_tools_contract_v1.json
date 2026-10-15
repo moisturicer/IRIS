@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "ticket": "IR-589",
-  "status": "proposed_contract_not_runtime_baseline",
+  "status": "approved_contract_not_runtime_baseline",
   "source": "docs/architecture-review/2026-10-15-askiris-general-tools-spec.md §9",
   "provider": "deterministic_script_only_no_vendor_calls",
-  "notes": "Expected describes the proposed new protocol. Current_observation is source-inspected wording or an explicit unmeasured gap, never a claim that the new controller currently passes.",
+  "notes": "Expected describes the approved, unimplemented protocol. Current_observation is source-inspected wording or an explicit unmeasured gap, never a claim that the new controller currently passes.",
   "paper_set": [
     {
       "key": "meshkv",
@@ -251,12 +251,14 @@
       "turns": [
         "What is the missing metric?",
         "Find a matching paper",
-        "Explain it when the provider is down"
+        "Explain the available MeshKV method even if another paper's read tool is down"
       ],
       "script": [
         "extract:not_reported",
         "search:empty",
-        "answer:unavailable"
+        "read:meshkv_supported",
+        "read:other_paper_unavailable",
+        "answer:supported_partial"
       ],
       "expected": {
         "distinct_states": [
@@ -264,7 +266,9 @@
           "no_match_found",
           "unavailable"
         ],
-        "no_uncited_corpus_claim": true
+        "no_uncited_corpus_claim": true,
+        "retain_supported_after_tool_failure": true,
+        "disclose_material_limit": true
       },
       "current_observation": {
         "kind": "source_observed_failure",
@@ -303,18 +307,24 @@
       "id": "A11",
       "family": "access",
       "turns": [
-        "Use MeshKV and the private draft in Paper Chat"
+        "Use MeshKV and the private draft in Paper Chat",
+        "In MeshKV Paper Chat, explain what a key-value store is generally, then tell me what MeshKV reports"
       ],
       "script": [
         "revoke:meshkv_v1",
         "reuse:stale_brief",
         "handle:other_user",
-        "scope:widen_without_action"
+        "scope:widen_without_action",
+        "answer:direct_general_explanation",
+        "paper_claim:requires_current_selected_paper_evidence"
       ],
       "expected": {
         "no_stale_answer_or_summary": true,
         "deny_cross_user_handle": true,
         "paper_chat_scope_unchanged": true,
+        "direct_general_explanation_allowed": true,
+        "general_explanation_not_attributed_to_paper": true,
+        "paper_specific_claim_without_current_evidence": false,
         "never_expose": [
           "private-draft"
         ]
@@ -379,7 +389,10 @@
           "provider identifier",
           "raw reasoning"
         ],
-        "summary_collapsed_and_accessible": true
+        "summary_collapsed_and_accessible": true,
+        "default_reader_controller_without_toggle": true,
+        "prompt_warning": "Ask IRIS can make mistakes. Check important details against the cited papers.",
+        "warning_visible_before_submit": true
       },
       "current_observation": {
         "kind": "not_measured"

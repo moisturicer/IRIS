@@ -12,15 +12,4 @@ An agent reading the stale copy would have branched from a dead ref and been tol
 
 `CLAUDE.md` is the single copy. If something belongs in agent guidance, it belongs there.
 
-## The hierarchy this sits under
-
-`CLAUDE.md` is itself downstream of the real authorities. In order:
-
-1. [`docs/SRS.md`](docs/SRS.md) — requirements
-2. [`docs/SDD.md`](docs/SDD.md) — system and design
-3. [`docs/adr/`](docs/adr/) — architectural decisions and rationale
-4. [`docs/engineering/`](docs/engineering/) — how the team builds, tests, reviews, releases
-5. Code and tests — actual behaviour
-6. Jira — planning and tracking, **never a requirements authority**
-
-When these conflict, the higher one wins **and the lower one is corrected**. Do not silently reconcile — record the contradiction. That rule is why this file is now four paragraphs instead of a hundred lines.
+The current engineering authority and conflict rule are in `CLAUDE.md`. Keep them there so this pointer cannot drift again.

@@ -1,8 +1,8 @@
 # Final proposal: conversational Ask IRIS over general research tools
 
-**Final proposal for review; architecture and implementation remain PROPOSED.** 15 October 2026. Jira parent: [IR-588](https://citiris.atlassian.net/browse/IR-588); implementation subtasks: IR-589–IR-599.
+**Product and architecture contract approved by Jive Tyler Revalde in the IR-589 review on 15 October 2026; implementation and rollout remain pending.** Jira parent: [IR-588](https://citiris.atlassian.net/browse/IR-588); implementation subtasks: IR-589–IR-599. [ADR-042](../adr/042-general-tools-conversation-contract.md) records the accepted boundaries.
 
-The detailed [proposed specification](2026-10-15-askiris-general-tools-spec.md) is the implementation contract for this proposal. [IR-588](https://citiris.atlassian.net/browse/IR-588) holds the child tickets and dependency order. This proposal records the product choice for this effort without rewriting accepted ADRs or completed work; the specification's source-evidence section points to the implementation it proposes changing.
+The detailed [approved product specification](2026-10-15-askiris-general-tools-spec.md) is the implementation contract for this proposal. [IR-588](https://citiris.atlassian.net/browse/IR-588) holds the child tickets and dependency order. This proposal records the product choice for this effort without rewriting accepted ADRs or completed work; the specification's source-evidence section points to the implementation it proposes changing.
 
 ## Outcome
 
@@ -12,11 +12,13 @@ Use institutional papers first. Public research is optional and separately enabl
 
 ## Architectural decision
 
-Replace exclusive answer lanes with **one conversational controller and a small set of composable, read-only research tools**. Keep the existing Django runtime and domain controls.
+Replace exclusive answer lanes with **one conversational controller and a small set of composable, read-only research tools**. It is the default reader experience when released, with no controller on/off switch or reader lane choice. Keep the existing Django runtime and domain controls.
 
 The controller interprets the original request with conversation state, chooses tools, adjusts after results, and asks the answer model to produce a coherent reply. It may answer a conversational transformation without a new search. It may discover papers before comparing them. It need not run every request through a fixed planning ceremony.
 
 The application still owns authorization, disclosure, source identities, typed counts, scope, cost admission, cancellation and persistence. Models choose research actions and write prose; they do not authorize data access or calculate authoritative catalogue totals.
+
+Answers should be high quality and detailed when the reader asks for detail. A failed tool does not erase independently supported work: Ask IRIS may use another permitted path within budget, then explain what it can support and what it could not check. It never invents a paper finding, exposes restricted material, or claims an incomplete search was comprehensive. One bounded repair may remove an unsupported claim while preserving a useful supported answer.
 
 ## Generalize, do not rename the lanes
 
@@ -29,6 +31,8 @@ Each tool returns structured data, source references, coverage and recoverable s
 The final answer contains the answer, appropriate citations and material limitations. It contains **no** “Answer approach,” “Why this approach?”, route override buttons, tool calls, arguments, or tool-selection narration. The same rule applies to reopened chats, copied answers, Paper Chat and exported transcripts.
 
 While work runs, show a compact neutral status such as “Thinking…” or “Preparing your answer…” and elapsed time when useful. Provide Stop. On completion, an optional collapsed **Reasoning summary** can explain the analytical basis at a high level—for example, that two papers address the same problem but use different evaluation settings. It must not become a disguised tool trace. It is not required on short answers and is never fabricated when unavailable.
+
+Show “Ask IRIS can make mistakes. Check important details against the cited papers.” directly below the prompt box in Ask IRIS and Paper Chat. The reader should verify important details against the paper; the notice does not excuse unsupported or inaccessible claims from Ask IRIS.
 
 Do not display raw provider reasoning or historic raw reasoning. New reasoning summaries have explicit provenance and are separated from answer text and citation parsing. Hide legacy raw reasoning in the new reader surface without deleting stored history as a side effect. Any retention change is a separate approved migration.
 
@@ -48,6 +52,6 @@ Compared with only improving prompts, this costs more controller, state and eval
 
 ## Delivery
 
-Publish one proposed parent Story under IR-146 with independently reviewable subtasks. Start with policy reconciliation and fixtures, then general tool contracts and conversation state, controller and synthesis, summary/UI behavior, durability/security, and evaluation. Keep optional web work disabled and separate from the institutional release gate.
+Use the IR-588 parent Story under IR-146 with independently reviewable subtasks. Start with policy reconciliation and fixtures, then general tool contracts and conversation state, controller and synthesis, summary/UI behavior, durability/security, and evaluation. Keep optional web work disabled and separate from the institutional release gate.
 
-No runtime code or production setting changes are part of this documentation task. Proposed tickets remain unassigned and not-ready until the recorded decisions and dependencies are satisfied. Do not reopen or rewrite completed IR-551 work; this effort reuses its delivered capabilities and changes their orchestration.
+No runtime code or production setting changes are part of this documentation task. Provider, budget, data-policy, database-verification and rollout dependencies remain open for affected downstream tickets. SRS and SDD are outdated thesis documents; their removal is separate from this PR. Do not reopen or rewrite completed IR-551 work; this effort reuses its delivered capabilities and changes their orchestration.

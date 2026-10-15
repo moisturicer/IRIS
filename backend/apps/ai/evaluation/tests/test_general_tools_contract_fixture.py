@@ -1,4 +1,4 @@
-"""IR-589: validate the proposed conversation fixture, not the future runtime."""
+"""IR-589: validate the approved conversation contract, not the future runtime."""
 
 import hashlib
 import json
@@ -18,7 +18,7 @@ def _pack():
 def test_all_fifteen_scenarios_have_separate_expected_and_current_results():
     pack = _pack()
     assert pack["schema_version"] == 1
-    assert pack["status"] == "proposed_contract_not_runtime_baseline"
+    assert pack["status"] == "approved_contract_not_runtime_baseline"
     assert pack["provider"] == "deterministic_script_only_no_vendor_calls"
     cases = pack["cases"]
     assert len(cases) == len(IDS)
@@ -64,14 +64,24 @@ def test_known_regressions_have_specific_independent_oracles():
     assert cases["A09"]["expected"]["distinct_states"] == [
         "not_reported", "no_match_found", "unavailable"
     ]
+    assert cases["A09"]["expected"]["retain_supported_after_tool_failure"]
+    assert cases["A09"]["expected"]["disclose_material_limit"]
     assert cases["A10"]["expected"]["allow_literal_fragments"] == [
         "1.", "2.", "x = 2", "3 approaches"
     ]
     assert cases["A10"]["expected"]["reject_unsupported_factual_number"] == "37%"
     assert cases["A10"]["expected"]["max_repair_attempts"] == 1
+    assert cases["A11"]["expected"]["direct_general_explanation_allowed"]
+    assert cases["A11"]["expected"]["general_explanation_not_attributed_to_paper"]
+    assert not cases["A11"]["expected"]["paper_specific_claim_without_current_evidence"]
     assert cases["A12"]["expected"]["new_paid_calls_after_cancel"] == 0
     assert cases["A13"]["expected"]["public_fields"] == [
         "activity", "reasoning_summary", "answer"
     ]
+    assert cases["A13"]["expected"]["default_reader_controller_without_toggle"]
+    assert cases["A13"]["expected"]["prompt_warning"] == (
+        "Ask IRIS can make mistakes. Check important details against the cited papers."
+    )
+    assert cases["A13"]["expected"]["warning_visible_before_submit"]
     assert cases["A14"]["expected"]["reasoning_only_state"] == "unavailable"
     assert cases["A15"]["expected"]["confidential_public_query"] is False

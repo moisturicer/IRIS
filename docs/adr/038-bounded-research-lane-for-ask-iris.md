@@ -2,7 +2,7 @@
 
 ## Status
 
-> **Further change proposed — 2026-10-15 (IR-589), not accepted.** [ADR-042](042-general-tools-conversation-contract.md) requests a version-pinned conversational controller in place of exclusive fixed lanes for new runs. This does not approve this ADR or alter its existing history.
+> **Later decision accepted — 2026-10-15 (IR-589).** [ADR-042](042-general-tools-conversation-contract.md) makes a conversational controller the default reader path when delivered, without a controller on/off switch or reader lane choice. It supersedes exclusive fixed lanes and the proposed whole-answer-withholding rule for that new path. This pointer does not approve this ADR or alter its earlier history; the legacy implementation still follows its own behavior until replaced.
 
 **Proposed** — 2026-10-11 (IR-499). Drafted by an AI agent from [proposal 13](../architecture-review/13-bounded-research-agent-proposal.md) and the owner decisions recorded in its §Owner decisions — 2026-10-11, which **Jive Tyler Revalde** gave in a design review. **Awaiting approval by a named person.** The agent does not mark this accepted. Until a person records that approval in this file, nothing below is a decision, and **none of IR-500 (tool layer), IR-501 (screening and topic counts), IR-502 (planner, answer validation, run audit), IR-503 (Jev router and injection screen) or IR-504 (production rollout) may merge**.
 
