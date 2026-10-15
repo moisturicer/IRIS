@@ -470,7 +470,7 @@ export default function PaperViewPage() {
   useEffect(() => {
     if (!refocusAsk.current || chatModal) return;
     refocusAsk.current = false;
-    const bar = panelRef.current?.querySelector<HTMLElement>('button[aria-label="Show Ask IRIS"]');
+    const bar = panelRef.current?.querySelector<HTMLElement>('button[aria-label="Ask IRIS: back to the answer"]');
     (bar ?? askButtonRef.current)?.focus();
   });
 

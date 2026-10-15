@@ -309,12 +309,13 @@ export function PaperChatPanel({
       {resize && !minimized && <ResizeEdge {...resize} />}
 
       {/* The minimized bar (IR-354): what this is, and one tap back to it.
-          Its visible label is part of its accessible name (WCAG 2.5.3). */}
+          Its name is its two visible lines, so it is heard as Back to the
+          answer (IR-570) and its visible label is in it (WCAG 2.5.3). */}
       {minimized && (
         <button
           type="button"
           onClick={onRestore}
-          aria-label="Show Ask IRIS"
+          aria-label="Ask IRIS: back to the answer"
           className="flex items-center gap-3 w-full min-h-14 px-4 py-2 text-left hover:bg-stone-100 transition-colors duration-200"
         >
           <AskIrisMark className="w-5 h-5 text-brand shrink-0" />

@@ -124,7 +124,7 @@ export function ResearchSteps({
             const detail = stepDetail(step);
             return (
               <li key={step.position} className="relative flex items-baseline gap-2 text-xs">
-                <span className="absolute -left-[22px] top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white">
+                <span className="absolute -left-[22px] top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface">
                   <StepIcon status={step.status} />
                 </span>
                 <span className={step.status === "running" ? "text-stone-800 font-medium" : "text-stone-600"}>

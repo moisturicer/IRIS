@@ -1064,3 +1064,56 @@ and no capacity burst. The control run's figures measure arithmetic and plumbing
 - `src/features/discover/DiscoverPage.test.tsx` › "continuity": 9 accessible page tests, covering URL restore, the search box following a URL change, URL writes, correction of invalid values, Back from a Record restoring both pages, a delayed old Load more discarded after a filter change, catalogue-wide years, and separate recovery for filters and for Load more.
 
 **Evidence, 2026-10-15, local against a pgvector Postgres:** `test_catalogue_facets.py` **5 passed**; the Discover test files **45 passed**. Full runs: `npm test` **1090 passed, 4 failed**, and `pytest` **3799 passed, 5 failed**; none of the failures is in a file this change touches. Three of the frontend failures (`Sidebar.test.tsx`) fail identically on `main` without this change, and the fourth (`PaperAiOverview` polling) is a timing test that has failed on `main` before. Four backend failures are known (the IR-202 chunker flake, two `test_complete_authority` subtests and the proxy-audit hash pin). The fifth is `test_enum_vocabulary`, which `main` fails too: IR-347 made `open` and `missing` governed while IR-549's code uses them for other concepts. Lint 0 errors; build green. Scroll restoration is not exercised under jsdom, which has no layout.
+
+## IR-570: Ask IRIS on a phone: a full-width answer, with history and sources in drawers
+
+**Requirement.** IR-552 user story 11: a phone reader gets one usable view, and history or tools never squeeze the answer. Paper entry keeps IR-569's default (Ask IRIS opens first), and this ticket owns the phone presentation and the drawers.
+
+**Implementation.**
+- `RAGChatPage` measures its own width (`useElementWidth`). From 900 px (`ASK_PANELS_INLINE_PX`: the 640 px reading minimum plus the 260 px history), history and sources sit beside the answer as before. Below that, both are closed by default and open one at a time as `ChatDrawer` dialogs. History comes from the start edge and sources from the end.
+- While a drawer is open, the page behind it is `inert`. Focus moves into the drawer, Tab stays inside, Escape or the scrim closes it, and focus returns to the toggle that opened it. Widening the page or changing conversation closes the drawer.
+- New chat moves into the history drawer, and the toggles become 44 px with `aria-haspopup="dialog"`. The delete control shows without hover on touch.
+- Answers are not followed by a sources drawer opening on its own.
+- `ConversationHistoryList` and `SourcePassages` are extracted, so the side panels and the drawers render the same lists.
+- `useDialogFocus` is extracted from `Modal`, which now uses it, and it takes the opener explicitly: in Chrome, focus has already left a control that turns inert before the dialog's effect can read it.
+- Surface roles (IR-558): the answer column is the page's one `surface`, and history and sources are `canvas`. `#FBFCFD` and the white toolbar, composer and sources header are gone.
+- The page is `h-dvh` rather than `h-screen` with a 480 px floor, and `index.html` declares `interactive-widget=resizes-content`, so the composer stays above a software keyboard. Keyboard hints are hidden on coarse pointers, and the placeholder shortens to "Ask a follow-up…" below 900 px while the accessible name stays whole.
+- The empty state centres with `m-auto`, so on a short screen it scrolls rather than clipping its top.
+- Activity (IR-504's status line and research steps): `StreamStatusLine` is one polite live region placed under the answer text, with Stop beside it. It stays mounted while empty, so the next stage is announced.
+- `LiveCandidates` drops its own `role=status`, because the status line already says "Screening N candidate papers (k checked)…".
+- **Desktop also changes here, deliberately:** the status line and Stop now sit under the answer at every width, as the criterion asks.
+- Paper (IR-569 delivered entry, Back to paper and the citation bar): the minimized bar's accessible name changes from "Show Ask IRIS" to "Ask IRIS: back to the answer", its two visible lines. A followed citation is now announced as Back to the answer.
+- The spec's "header launcher" is, since IR-569, the round Ask IRIS icon or this bar. The test drives the bar.
+
+**Tests.**
+- `RAGChatPage.test.tsx` › "Ask IRIS on a phone (IR-570)": 7 page tests at a measured 360 px:
+  - the answer is full width with nothing open and the composer reachable, with the short placeholder;
+  - the history drawer is labelled, keeps focus, makes the page inert, and gives focus back on Escape;
+  - the history drawer's close button returns focus;
+  - New chat works inside the drawer;
+  - sources stay closed after a cited answer, then open as a drawer and return focus on close;
+  - widening closes the drawer and restores the column;
+  - at 1100 px, history sits beside the answer as before.
+- `StreamingMessageBubble.test.tsx`: one polite live line, after the answer text, carrying the screening count; the live region persists while empty.
+- `PaperViewPage.test.tsx`: at 360 px, entry closes the navigation drawer, and an unsent draft survives Back to paper and the bar without creating a Conversation. The reader is the same element throughout, so its page and scroll position are kept rather than rebuilt; jsdom cannot scroll, so the position itself is not asserted. This characterises IR-569's behaviour and passed on first run.
+
+**Deliberate test changes.**
+- `CandidateList.test.tsx` "announces progress once, in a status region" became "leaves announcing progress to the stream's status line, so it is said once". The count's text is pinned in `CandidateList.test.tsx` (`statusLineText`), and the single announcement in `StreamingMessageBubble.test.tsx`.
+- Queries for the button named "Show Ask IRIS" in `PaperChatDock.test.tsx` and `PaperViewPage.test.tsx` now ask for "Ask IRIS: back to the answer", following the rename above.
+
+**Evidence, 2026-10-15.**
+- `npm test`: **1101 passed, 3 failed**, the same 3 `Sidebar.test.tsx` failures as unmodified `main`.
+- After the browser-driven fixes, the touched files: **184 passed**.
+- `tsc --noEmit` clean; lint 0 errors (6 warnings, none in touched files); the impeccable design detector reports no findings.
+- Recorded browser checks: headless Chrome against Django and Vite on a throwaway pgvector database seeded by `seed_demo`, signed in as `student@cit.edu`.
+  - At **360×780** there is no horizontal scroll, history is not beside the answer, and the composer is visible (top 716, bottom 764).
+  - The history drawer takes focus on "Close chat history", and 12 Tabs leave focus in it. Escape returns focus to "Show chat history".
+  - With the viewport shrunk to 360×420 as a keyboard would, the composer stays visible (bottom 404).
+  - **768×1024** gives the same drawer results.
+  - **1280×900** keeps history beside the answer.
+- Two defects found in the browser were fixed before commit: focus fell to `<body>` on close, and at 360 px the empty state clipped its top while the placeholder wrapped.
+- A two-axis review (standards and spec) followed. It moved the drawer to the type scale and the Paper drawer's shadow, made the delete control 44 px on touch, and dropped `aria-pressed` from toggles that open a dialog. After those fixes: `npm test` **1101 passed, 3 failed** (the same `Sidebar.test.tsx`); `npm run build` passes.
+- Not checked:
+  - a real phone keyboard: Chromium emulation only, so composer reachability is shown for Chromium, and Safari ignores `interactive-widget`;
+  - the sources drawer in a browser: the dev corpus has no indexed records, so no answer carries citations;
+  - browser zoom and reduced motion.
