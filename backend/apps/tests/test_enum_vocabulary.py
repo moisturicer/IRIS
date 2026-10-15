@@ -156,6 +156,21 @@ ALLOWED = {
     # IR-347's scope. This is a workflow module, so the cost is real: a bare
     # governed value added here later goes unseen. Renaming the key is the fix.
     "reviews/revisions.py",
+    # (IR-600) Four more files that IR-549's work added while IR-347 was in
+    # review, so IR-347's own list could not include them. Same shape as
+    # embedding_space.py: each is another concept spelled the same way.
+    #
+    # `OPEN`: a paid provider reservation not yet settled (IR-545, ADR-041),
+    # a spending record's state, not a request awaiting documents.
+    "ai/models/admission.py",
+    # "missing" is a stop-word dropped from a comparison heading match, not
+    # an item's state.
+    "ai/comparison/service.py",
+    # "missing" is a report key, three times: cases with no reported count,
+    # no assessment and no latency. A list, not an item's state.
+    "ai/evaluation/milestone.py",
+    # "missing" reads that report key from milestone.py to print it.
+    "ai/management/commands/eval_pilot_milestone.py",
     # (IR-500) A research tool call's outcome: "rejected" means a malformed
     # model call, not a clearance decision. Same shape as embedding_space.py.
     "ai/research/results.py",
