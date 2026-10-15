@@ -12,7 +12,7 @@ web
 
 - **Students** author research (Thesis / Research, Project, Proposal), publish it through the Publish dialog, and answer the reviewers who ask them for revisions or documents.
 - **Advisers** review their advisees' records first, route them to the specialist offices, decide Theses and Projects, and also author research of their own.
-- **Office reviewers** (ITSO, IERC, KTTO, RDCO) review what is routed to their office and clear it or record a finding.
+- **Office reviewers** (ITSO, IERC, KTTO, RDCO) review what is routed to their office and clear it or record a finding. RDCO also administers the system.
 - **Every signed-in user** reads the catalogue, saves papers, and asks Ask IRIS questions.
 
 ## Product Purpose
@@ -32,12 +32,14 @@ IRIS has two mechanisms a neighbouring product could not truthfully claim:
 - **Built by a four-person team.** Requirements and decisions live in `docs/adr/`. Work is tracked in Jira project `IR`.
 - **The workflow is the record of truth.** Workflow state is derived on the server; the client never derives a stage.
 - **Visibility is one predicate.** A record a viewer may not read never appears, including in citations and saved lists.
+- **Surface modes:** Operate for the application, Persuade only for sign-in, registration and public-facing pages, and Read for help.
 
 ## Capabilities and Constraints
 
 - **CIT-U only.** There is no multi-institution or SaaS feature, even where older docs say otherwise.
 - **Saved papers, folders, likes and reading history are stored in this browser only,** and the interface says so. Owned research is account-backed (`/records/mine/`).
 - **Status uses the server's wording** (`workflow_state_label`), never a client mapping.
+- **Honest copy:** never invent a metric, count, status or capability that the API cannot supply. Mockup-only fields do not enter the interface.
 - **Fixed vocabulary.** *Archived* is a rejected record. *Unlisted* is a Thesis or Project kept out of the catalogue. *Accepted* is a Proposal its Adviser accepted.
 - **Not built yet:** Proposal continuation ("Continue as Thesis / Project") and lineage. Leave a slot for them; do not show them as working.
 
@@ -46,6 +48,8 @@ IRIS has two mechanisms a neighbouring product could not truthfully claim:
 - **The maroon brand (`#6B0F12`) is the institution's identity** and stays. The interface uses white, black, grey (`stone`) and maroon only.
 - **Type:** Inter for the interface, EB Garamond for titles.
 - **The project lead's direction:** user-friendly, modern, artistic yet simple, like other education institutions' websites.
+- **Pinned redesign brief:** refine the existing IRIS interface within its fixed tokens; do not replace its visual identity or introduce a new palette, type scale or webfont.
+- **Gold is decorative only.** Its contrast is about 2.8:1 on white, so it is never text or the only status signal.
 - **Design system changes are recorded in `docs/ui-ux/01-design-system.md`** in the same change.
 
 ## Evidence on Hand

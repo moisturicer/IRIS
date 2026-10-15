@@ -127,7 +127,7 @@ components:
 
 # Design System: IRIS
 
-> **Authority.** `docs/ui-ux/01-design-system.md` is the project's design-system record, and an ADR outranks both. This file distils it for design work, mostly from the record page (Paper and Overview, IR-569). Where the two disagree, that document wins, and this one is corrected.
+> **Authority.** `docs/adr/` and `docs/ui-ux/01-design-system.md` govern design decisions; `frontend/tailwind.config.js` defines the implemented tokens. This file is a derived summary, mostly of the record page (Paper and Overview, IR-569). Correct the design-system document and token source first, then update this summary and `.impeccable/design.json` when they disagree. A redesign refines this system; it does not replace its palette, type scale or webfont.
 
 ## Overview
 
@@ -174,6 +174,8 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 
 **The Four Inks Rule.** The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).
 
+Gold (`gold.DEFAULT`, about 2.8:1 on white) stays decorative, as on the logo. It is never text or the only status signal.
+
 **The One Bright Object Rule.** On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.
 
 ## Typography
@@ -184,6 +186,7 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 **Character:** Garamond gives the title and section heads the voice of a printed thesis; Inter keeps every control, label and number plain and legible. Only Garamond 600 is loaded, so it never appears at another weight.
 
 ### Hierarchy
+- **Shared app roles:** `text-display` 28/34, `text-title` 20/28, `text-heading` 16/24, `text-body` 15/24, `text-small` 13/20 and `text-label` 12/16 come from `frontend/tailwind.config.js`. Display and title use EB Garamond 600; the other roles use Inter. The record page below has documented reading-specific sizes.
 - **Display** (EB Garamond 600, 36 px on a phone and 48 px from `sm`, line-height 1.08, tight tracking, balanced wrap): a record's title on the Overview. The one line the page exists to name.
 - **Headline** (EB Garamond 600, 20/28 px): section headings on the Overview (Abstract, AI Overview, Related works, Comments) and the Ask IRIS heading. Ink, never maroon.
 - **Title** (EB Garamond 600, 20/28 px): the paper's title in the record bar, on one truncated line; dialog and card titles.
@@ -213,7 +216,7 @@ The record page is a container named `reading`, and the Overview column is its o
 
 ## Elevation & Depth
 
-Flat. Depth comes from tonal layering: Endpaper ground, stone bars, white pages. Regions are divided by one-pixel stone hairlines, not by shadow or gaps. Resting cards have no shadow. Shadow is kept for what floats or is pressed:
+Flat. Depth comes from tonal layering: Endpaper ground, stone bars, white pages. Reading regions are divided by one-pixel stone hairlines, not by shadow or gaps. Elsewhere, a card is white with a one-pixel `stone-200` border and no resting shadow. Shadow is kept for what floats or is pressed:
 
 - **Card lift** (`box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08)`): the Ask IRIS icon, and a record card on hover.
 - **Drawer edge** (`box-shadow: -12px 0 32px rgb(41 37 36 / 0.12)`): Ask IRIS as a drawer over the paper, one soft leftward shadow.
@@ -231,9 +234,10 @@ Gently rounded and consistent. Controls and fields take one radius (0.75 rem); p
 ### Buttons
 Quiet and exact.
 - **Page actions** (View, Save, Cite, Share, Edit details): 44 px full pills, 20 px side padding, 14 px semibold. **One** Binding Maroon fill per row (View where there is a paper, otherwise Save; Continue or Open review when those are the viewer's job); the rest have no fill and a Rule Stone outline that turns maroon on hover.
+- The shared implementations are `PILL_PRIMARY` and `PILL_SECONDARY` in `frontend/src/components/ui/pillStyles.ts`; Danger uses `brand-dark` with a warning glyph.
 - **Reading controls** (record bar, reader toolbar, Ask IRIS): 44 px on touch and 36 px beside a pointer, 0.75 rem radius, 13 px semibold. Three states: outlined at rest, Maroon Wash when on, and the one filled control (Send).
 - **Ghost** (Copy on the AI Overview, Close): no outline, Faint Ink, a Bar Stone wash and Ink text on hover.
-- **Focus:** a 2 px Binding Maroon ring with an offset on every interactive element.
+- **Focus:** a 2 px Binding Maroon ring with an offset on every interactive element (`FOCUS_RING` in `frontend/src/components/ui/interaction.ts`). That file also defines `COLOUR_TRANSITION` for the 150 ms hover/focus fade.
 
 ### Section tabs
 The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone track in the record bar, with a Binding Maroon thumb that slides to the current one over 300 ms. The current label is white; the others are Quiet Ink and turn maroon on hover.
@@ -241,7 +245,7 @@ The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone
 ### Chips
 - **Meta chips** (record type, classification, flags): full pills, no fill, Rule Stone outline, 13 px semibold Body Ink.
 - **Author chips:** white pills with a Desk Stone outline and a 24 px maroon initials disc.
-- **Status:** four tones only. *Quiet* outlined, *active* Maroon Wash, *attention* solid maroon, *settled* solid Ink. Each carries its word, and the stopping states also carry an icon.
+- **Status:** `TONES` in `frontend/src/components/ui/statusTones.ts` defines four tones only. *Quiet* is unfilled with a stone outline, *active* uses Maroon Wash, *attention* is solid maroon, and *settled* is solid Ink. Each carries its word, and stopping states also carry an icon.
 - **Scope chip** ("This paper" / "All papers") in the composer: Maroon Wash with a maroon dot; filled maroon when widened to all papers.
 
 ### Citations

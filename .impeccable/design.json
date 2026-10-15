@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-15T12:00:00Z",
+  "generatedAt": "2026-10-15T16:17:21Z",
   "title": "Design System: IRIS",
   "extensions": {
     "colorMeta": {
@@ -131,7 +131,8 @@
     ],
     "rules": [
       { "name": "The Binding Rule", "body": "Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong.", "section": "colors" },
-      { "name": "The Four Inks Rule", "body": "The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).", "section": "colors" },
+      { "name": "The Four Inks Rule", "body": "The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Gold is decorative only: never text or the sole status signal. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).", "section": "colors" },
+      { "name": "The Token Authority Rule", "body": "`docs/adr/` and `docs/ui-ux/01-design-system.md` govern design decisions; `frontend/tailwind.config.js` defines the implemented tokens. This sidecar follows DESIGN.md after those sources are corrected.", "section": "overview" },
       { "name": "The One Bright Object Rule", "body": "On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.", "section": "colors" },
       { "name": "The Typeset Title Rule", "body": "Garamond is for what you read the title of (a paper, a section, a dialog). It never sets a control, a chip or a number.", "section": "typography" },
       { "name": "The Named Size Rule", "body": "A size is asked for by role (`text-title`, `text-small`), never by pixel (`text-[13px]`). Nothing goes below 11 px, and labels are sentence case, never small tracked capitals.", "section": "typography" },
@@ -141,7 +142,7 @@
     ],
     "dos": [
       "**Do** keep exactly one filled Binding Maroon action per row, and make it the viewer's next step.",
-      "**Do** separate regions with one Desk Stone (#e7e5e4) or Rule Stone (#d6d3d1) hairline.",
+      "**Do** separate reading regions with one Desk Stone (#e7e5e4) or Rule Stone (#d6d3d1) hairline; elsewhere use white cards with a one-pixel stone-200 border and no resting shadow.",
       "**Do** keep the paper the only white thing on the Paper view; bars and headers are Bar Stone (#f5f5f4).",
       "**Do** take control sizes from the reading scale (44 px touch, 36 px pointer) and read the `reading` or `overview` container for every layout change.",
       "**Do** set titles and section headings in EB Garamond 600 and everything operable in Inter.",
