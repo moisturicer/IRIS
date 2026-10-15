@@ -9,8 +9,9 @@ import { StreamStatusLine } from "./StreamStatusLine";
 import { LiveCandidates } from "./CandidateList";
 import { ResearchSteps } from "./ResearchSteps";
 
-/** The reply while still streaming (IR-329) -- status line, the collapsed
- *  reasoning panel (IR-381), then text rendering progressively. Swapped for
+/** The reply while still streaming (IR-329) -- the collapsed reasoning panel
+ *  (IR-381), then text rendering progressively, then the status line under it
+ *  (IR-570). Swapped for
  *  `ChatMessageBubble` on finish, which renders the same panel from the
  *  stored text, so the swap is not where the panel disappears.
  *  No card/border -- matches the finished bubble's plain-text flow.
@@ -37,18 +38,6 @@ export function StreamingMessageBubble({
       </div>
 
       <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
-        <StreamStatusLine state={state} />
-        {onStop && state.runId && (
-          <button
-            type="button"
-            onClick={onStop}
-            className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5
-              text-[13px] font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
-          >
-            <i className="fas fa-stop text-[10px]" aria-hidden />
-            Stop answering
-          </button>
-        )}
         {state.routing && <RoutingDecisionPanel decision={state.routing} />}
         {state.steps && <ResearchSteps steps={state.steps} live compact={compact} />}
         {state.candidates && <LiveCandidates candidates={state.candidates} compact={compact} />}
@@ -63,6 +52,23 @@ export function StreamingMessageBubble({
             className={ANSWER_MARKDOWN}
           />
         )}
+
+        {/* What it is doing now, in one polite live line under the answer
+            (IR-570), with Stop beside it while a queued run is followed. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2">
+          <StreamStatusLine state={state} />
+          {onStop && state.runId && (
+            <button
+              type="button"
+              onClick={onStop}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5
+                text-[13px] font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
+            >
+              <i className="fas fa-stop text-[10px]" aria-hidden />
+              Stop answering
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

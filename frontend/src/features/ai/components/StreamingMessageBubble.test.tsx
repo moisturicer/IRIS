@@ -73,6 +73,42 @@ describe("a still-streaming reply", () => {
     expect(screen.queryByRole("button", { name: /reasoning/i })).toBeNull();
   });
 
+  it("says what it is doing in one polite live line, under the answer (IR-570)", () => {
+    const { container } = renderScreen(
+      <StreamingMessageBubble
+        state={state({
+          stage: "searching",
+          text: "Two of the papers so far use rainfall gauges.",
+          candidates: [
+            { record_id: 1, title: "Flood Prediction", state: "included" },
+            { record_id: 2, title: "Tilapia Ponds", state: "pending" },
+          ],
+        })}
+      />,
+    );
+
+    const live = container.querySelectorAll("[aria-live], [role=status], [role=log], [role=alert]");
+    expect(live).toHaveLength(1);
+    expect(live[0]).toHaveAttribute("aria-live", "polite");
+    expect(live[0].textContent).toBe("Screening 2 candidate papers (1 checked)…");
+
+    const answer = screen.getByText(/use rainfall gauges/);
+    expect(answer.compareDocumentPosition(live[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps the live line in place while it has nothing to say, so the next stage is announced", () => {
+    const { container, rerender } = renderScreen(
+      <StreamingMessageBubble state={state({ stage: "found", foundInfo: null })} />,
+    );
+    const live = container.querySelector("[aria-live]");
+    expect(live?.textContent).toBe("");
+
+    rerender(<StreamingMessageBubble state={state({ stage: "thinking" })} />);
+
+    expect(container.querySelector("[aria-live]")).toBe(live);
+    expect(live?.textContent).toBe("Thinking…");
+  });
+
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(
       <StreamingMessageBubble state={state({ stage: "thinking" })} />,

@@ -49,8 +49,10 @@ export function ChatMessageList({
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8 text-center bg-[#FBFCFD]">
-        <div className="max-w-xl w-full animate-fade-in-up motion-reduce:animate-none">
+      // `m-auto`, not `justify-center`: centred content taller than a phone's
+      // screen would overflow upward and clip its top; this scrolls (IR-570).
+      <div className="flex-1 overflow-y-auto flex flex-col p-8 text-center">
+        <div className="m-auto max-w-xl w-full animate-fade-in-up motion-reduce:animate-none">
           <AskIrisEmblem className="w-16 h-16 mx-auto mb-5" />
           <h2 className="text-[26px] font-bold text-stone-900 mb-2">What do you want to ask?</h2>
           <p className="text-[15px] text-stone-500 leading-relaxed">
@@ -69,7 +71,7 @@ export function ChatMessageList({
                   type="button"
                   onClick={() => onSuggestion?.(prompt)}
                   style={{ animationDelay: `${i * 60}ms` }}
-                  className="px-4 py-3.5 rounded-xl border border-stone-200 bg-white text-[14px] text-stone-700
+                  className="px-4 py-3.5 rounded-xl border border-stone-200 text-[14px] text-stone-700
                     hover:border-brand/40 hover:text-brand hover:shadow-sm transition-all duration-200
                     animate-fade-in-up motion-reduce:animate-none [animation-fill-mode:backwards]"
                 >
@@ -84,7 +86,7 @@ export function ChatMessageList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-6 bg-[#FBFCFD]">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin px-4 sm:px-6 py-6">
       {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
       <div className={`${CHAT_COLUMN} space-y-6`}>
         {messages.map((m) => (

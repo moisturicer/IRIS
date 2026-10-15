@@ -41,3 +41,12 @@ export const OVERVIEW_MARKDOWN = [
  * the old `max-w-3xl` (48rem) plus two inches at 96px/in.
  */
 export const CHAT_COLUMN = "w-full max-w-[min(92vw,60rem)] mx-auto";
+
+/**
+ * Ask IRIS's history and sources sit beside the answer from this page width,
+ * and open as drawers over it below (IR-570). It is the width at which the
+ * answer column keeps 640px -- the reading minimum IR-569 holds the paper to
+ * -- with the 260px history beside it. Read off the page's own measured width,
+ * not the window's, so the app sidebar's state counts.
+ */
+export const ASK_PANELS_INLINE_PX = 900;

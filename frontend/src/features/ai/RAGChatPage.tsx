@@ -30,9 +30,18 @@ import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
 import { ChatInput } from "./components/ChatInput";
 import { ChatToolbar } from "./components/ChatToolbar";
-import { ConversationSidebar } from "./components/ConversationSidebar";
-import { SourceContextPanel } from "./components/SourceContextPanel";
+import { ChatDrawer } from "./components/ChatDrawer";
+import { ConversationHistoryList, ConversationSidebar } from "./components/ConversationSidebar";
+import { SourceContextPanel, SourcePassages } from "./components/SourceContextPanel";
+import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
+import { useElementWidth } from "@/hooks/useElementWidth";
 import { ENDED_RUN_TEXT, StreamDetached, useAskStream, type AskStreamResult } from "./hooks/useAskStream";
+
+/** History or sources: the two panels that sit beside the answer, or open over it (IR-570). */
+type AskPanel = "history" | "sources";
+
+/** The composer's accessible name, and its placeholder where there is room. */
+const FOLLOW_UP_LABEL = "Ask a follow-up about the research corpus…";
 
 /** The address's conversation id: `undefined` at `/ai`, `null` if malformed. */
 function parseConversationParam(raw: string | undefined): number | null | undefined {
@@ -124,6 +133,27 @@ export default function RAGChatPage() {
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
   const [draft, setDraft]                   = useState<string | null>(handoff);
+  // Too narrow to hold history and sources beside the answer, they open one at
+  // a time as drawers over it, closed until asked for (IR-570). Unmeasured
+  // (jsdom, the first paint) counts as wide: the layout this page always had.
+  const [observePage, pageWidth]            = useElementWidth<HTMLDivElement>();
+  const panelsAsDrawers = pageWidth > 0 && pageWidth < ASK_PANELS_INLINE_PX;
+  const [drawer, setDrawer]                 = useState<AskPanel | null>(null);
+  // The toggle that opened the drawer, read as it is activated: once the page
+  // behind goes inert the browser has already taken focus off it.
+  const drawerOpener                        = useRef<HTMLElement | null>(null);
+  /** Whether `panel` is showing: in its drawer, or as its column. */
+  const panelShown = (panel: AskPanel) =>
+    panelsAsDrawers ? drawer === panel : panel === "history" ? historyOpen : sourcesOpen;
+  /** The toolbar's toggle: opens `panel`'s drawer, or shows or hides its column. */
+  const togglePanel = (panel: AskPanel) => {
+    if (!panelsAsDrawers) {
+      (panel === "history" ? setHistoryOpen : setSourcesOpen)((v) => !v);
+      return;
+    }
+    drawerOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setDrawer(panel);
+  };
   const { streaming, ask, follow, cancel, detach } = useAskStream();
   // The conversation on screen, and the one being opened, read after an
   // await: an answer or a load that arrives late belongs to the one it was
@@ -329,6 +359,13 @@ export default function RAGChatPage() {
     });
   }, [routeId, openConversation, showUnavailable, addToast]);
 
+  // A drawer belongs to the layout that opened it, and to the conversation it
+  // was opened over: widening the page or moving to another conversation (a
+  // link in history, New chat) puts the answer back in front.
+  useEffect(() => {
+    setDrawer(null);
+  }, [panelsAsDrawers, activeId]);
+
   // Stop following an answer when the page goes away; the run carries on.
   useEffect(() => detach, [detach]);
 
@@ -407,25 +444,34 @@ export default function RAGChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen min-h-[480px] bg-[#FBFCFD]">
-      <div className="flex flex-1 min-h-0 relative">
-        <ConversationSidebar
-          conversations={conversations}
-          activeId={activeId}
-          open={historyOpen}
-          onDelete={handleDelete}
-        />
+    // `dvh`, not `vh`: the page is the height of what a phone shows, so the
+    // composer stays above the software keyboard rather than under it (IR-570).
+    <div ref={observePage} className="relative flex flex-col h-dvh bg-canvas overflow-hidden">
+      <div
+        className="flex flex-1 min-h-0 min-w-0 relative"
+        // Behind an open drawer the page waits, so focus cannot wander to it.
+        {...(drawer ? { inert: "" } : {})}
+      >
+        {!panelsAsDrawers && (
+          <ConversationSidebar
+            conversations={conversations}
+            activeId={activeId}
+            open={historyOpen}
+            onDelete={handleDelete}
+          />
+        )}
 
-        {/* Center: chat */}
-        <div className="flex flex-col flex-1 min-w-0 relative">
+        {/* Center: chat. The only `surface` white on the page (IR-570). */}
+        <div className="flex flex-col flex-1 min-w-0 relative bg-surface">
           <ChatToolbar
             sessionTitle={activeTitle}
-            historyOpen={historyOpen}
-            sourcesOpen={sourcesOpen}
+            historyOpen={panelShown("history")}
+            sourcesOpen={panelShown("sources")}
             sourcesAvailable={sourcesAvailable}
-            onToggleHistory={() => setHistoryOpen((v) => !v)}
-            onToggleSources={() => setSourcesOpen((v) => !v)}
+            onToggleHistory={() => togglePanel("history")}
+            onToggleSources={() => togglePanel("sources")}
             onNewChat={handleNewChat}
+            asDrawers={panelsAsDrawers}
           />
 
           {legacyNotice.visible && (
@@ -476,7 +522,7 @@ export default function RAGChatPage() {
           )}
 
           {unavailable ? (
-            <div role="status" className="flex-1 flex items-center justify-center p-8 text-center bg-[#FBFCFD]">
+            <div role="status" className="flex-1 flex items-center justify-center p-8 text-center">
               <div className="max-w-md">
                 <h2 className="text-[20px] font-bold text-stone-900 mb-2">This conversation is not available.</h2>
                 <p className="text-[15px] text-stone-500 leading-relaxed mb-5">
@@ -512,17 +558,57 @@ export default function RAGChatPage() {
             onSend={handleSend}
             draft={draft}
             disabled={loading || !activeId}
-            placeholder="Ask a follow-up about the research corpus…"
+            label={FOLLOW_UP_LABEL}
+            // One line in a phone's composer; the name above stays whole.
+            placeholder={panelsAsDrawers ? "Ask a follow-up…" : FOLLOW_UP_LABEL}
           />
         </div>
 
-        <SourceContextPanel
-          open={sourcesOpen}
-          citations={citations}
-          sources={sources}
-          onClose={() => setSourcesOpen(false)}
-        />
+        {!panelsAsDrawers && (
+          <SourceContextPanel
+            open={sourcesOpen}
+            citations={citations}
+            sources={sources}
+            onClose={() => setSourcesOpen(false)}
+          />
+        )}
       </div>
+
+      {drawer === "history" && (
+        <ChatDrawer
+          title="Chat history"
+          side="start"
+          closeLabel="Close chat history"
+          onClose={() => setDrawer(null)}
+          returnTo={drawerOpener.current}
+        >
+          {/* The toolbar has no room for New chat on a phone; this is its place. */}
+          <div className="shrink-0 px-3 pt-3">
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="w-full inline-flex items-center justify-center gap-2 min-h-11 px-3 rounded-lg border border-stone-200
+                text-[14px] font-semibold text-stone-700 hover:bg-stone-50 hover:text-stone-900 transition-colors"
+            >
+              <i className="fas fa-plus text-[11px]" aria-hidden />
+              New chat
+            </button>
+          </div>
+          <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={handleDelete} />
+        </ChatDrawer>
+      )}
+      {drawer === "sources" && (
+        <ChatDrawer
+          title="Referenced passages"
+          description="The exact text behind the latest answer"
+          side="end"
+          closeLabel="Hide sources panel"
+          onClose={() => setDrawer(null)}
+          returnTo={drawerOpener.current}
+        >
+          <SourcePassages citations={citations} sources={sources} />
+        </ChatDrawer>
+      )}
     </div>
   );
 }

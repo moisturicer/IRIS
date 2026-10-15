@@ -45,18 +45,14 @@ function Item({ row }: { row: CandidateRow }) {
 /**
  * The candidates while they are screened (IR-546): each paper appears at once
  * as "Relevance pending" and moves to its state by record id, so a repeat or a
- * reconnect never adds a card. Names and states only -- no model text.
+ * reconnect never adds a card. Names and states only -- no model text. How
+ * many are checked is said by the stream's one live line, not here (IR-570).
  */
 export function LiveCandidates({ candidates, compact = false }: { candidates: CandidateRow[]; compact?: boolean }) {
   if (candidates.length === 0) return null;
-  const checked = candidates.filter((row) => row.state !== "pending").length;
   return (
     <section aria-label="Candidate papers" className={compact ? "mt-1 mb-2" : "mt-1 mb-3"}>
       <p className="text-xs font-medium text-stone-500">Candidate papers</p>
-      {/* One short announcement, not a line per paper. */}
-      <p role="status" className="sr-only">
-        {`${checked} of ${candidates.length} candidate papers checked`}
-      </p>
       <ul aria-label="Candidates" className="mt-1.5 space-y-1">
         {candidates.map((row) => (
           <Item key={row.record_id} row={row} />
