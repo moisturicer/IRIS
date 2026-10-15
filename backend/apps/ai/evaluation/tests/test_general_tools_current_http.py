@@ -103,18 +103,17 @@ def test_current_boundary_replays_each_scenario_without_private_data(
 
 
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
-@pytest.mark.parametrize("case_id,lane,question_index", [
-    ("A01", "comparison", 1),
-    ("A09", "listing", 1),
+@pytest.mark.parametrize("case_id,lane,failure_indices", [
+    ("A01", "comparison", (1, 2)),
+    ("A09", "listing", (2,)),
 ])
 def test_current_fixed_lane_failure_wording_reaches_reader_and_replay(
-    case_id, lane, question_index, endpoint, settings, monkeypatch,
+    case_id, lane, failure_indices, endpoint, settings, monkeypatch,
     embedder, corpus, client_for
 ):
     """The two source-pinned failures also pass through the current wire."""
     case = next(case for case in PACK["cases"] if case["id"] == case_id)
     expected = case["current_observation"]["text"]
-    settings.AI_RESEARCH_LANE = "on"
     settings.AI_DURABLE_ASK = False
     _route(monkeypatch, lane)
     if case_id == "A09":
@@ -129,13 +128,19 @@ def test_current_fixed_lane_failure_wording_reaches_reader_and_replay(
         embedder=embedder, reranker=ScriptedReranker(), llm=ScriptedLLM(),
         permits=lambda record: record.pk != corpus["private-draft"].pk,
     )
+    bodies = []
     with use_composition_root(root):
-        response = client.post(reverse(endpoint), {
-            "question": case["turns"][question_index],
-            "conversation_id": conversation.pk,
-        }, format="json")
-        body = _done(response, endpoint)
-    assert expected in json.dumps(body)
+        for index, question in enumerate(case["turns"]):
+            settings.AI_RESEARCH_LANE = "on" if index in failure_indices else "off"
+            response = client.post(reverse(endpoint), {
+                "question": question, "conversation_id": conversation.pk,
+            }, format="json")
+            bodies.append(_done(response, endpoint))
+    for index in failure_indices:
+        assert expected in json.dumps(bodies[index])
+        assert not bodies[index]["citations"]
     replay = client.get(reverse("ai-conversation-detail", args=[conversation.pk]))
     assert replay.status_code == 200
-    assert expected in json.dumps(replay.json()["turns"])
+    turns = replay.json()["turns"]
+    assert len(turns) == len(case["turns"])
+    assert expected in json.dumps(turns)

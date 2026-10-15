@@ -2,7 +2,7 @@
 
 **Final proposal for review; architecture and implementation remain PROPOSED.** 15 October 2026. Jira parent: [IR-588](https://citiris.atlassian.net/browse/IR-588); implementation subtasks: IR-589–IR-599.
 
-The detailed [proposed specification](2026-10-15-askiris-general-tools-spec.md) is the implementation contract for this proposal. The [Jira delivery pack](../jira-sync/drafts/askiris-general-tools/README.md) contains the tickets and dependency order. The earlier [architecture investigation](2026-10-15-askiris-conversational-agent-proposal.md) and [reference repository analysis](2026-10-15-askiris-reference-repositories.md) remain supporting evidence. This document replaces their tentative product choices for this effort, without rewriting accepted ADRs or completed work.
+The detailed [proposed specification](2026-10-15-askiris-general-tools-spec.md) is the implementation contract for this proposal. [IR-588](https://citiris.atlassian.net/browse/IR-588) holds the child tickets and dependency order. This proposal records the product choice for this effort without rewriting accepted ADRs or completed work; the specification's source-evidence section points to the implementation it proposes changing.
 
 ## Outcome
 

@@ -1,6 +1,6 @@
 # Proposed specification: Ask IRIS general tools and conversational answers
 
-**Version 1 · 15 October 2026 · PROPOSED.** Jira parent: [IR-588](https://citiris.atlassian.net/browse/IR-588). Child keys IR-589–IR-599 and dependencies are recorded in the [delivery pack](../jira-sync/drafts/askiris-general-tools/README.md). The [final proposal](2026-10-15-askiris-final-proposal.md) explains the product decision; this specification defines testable behavior. Creating tickets does not accept an ADR, approve vendor use, fund evaluation or enable production.
+**Version 1 · 15 October 2026 · PROPOSED.** Jira parent: [IR-588](https://citiris.atlassian.net/browse/IR-588), with child issues IR-589–IR-599 and their dependencies. The [final proposal](2026-10-15-askiris-final-proposal.md) explains the product decision; this specification defines testable behavior. Creating tickets does not accept an ADR, approve vendor use, fund evaluation or enable production.
 
 ## 1. Scope and non-negotiable behavior
 
@@ -194,4 +194,4 @@ Proposed tickets carry `not-ready`, remain unassigned, and do not imply deployme
 
 ## 12. Source evidence
 
-The diagnosis and source links are retained in the [architecture investigation](2026-10-15-askiris-conversational-agent-proposal.md). In particular: `routing/lanes.py` currently publishes listing wording and parses comparison titles; `research/tools/__init__.py` exposes six existing tools; `research/tools/sections.py` reads a capped prefix; `ResearchSteps.tsx`, `RoutingDecisionPanel.tsx` and `ReasoningPanel.tsx` expose current process/working details. This proposal replaces those product contracts, while preserving the useful retrieval and evidence machinery underneath.
+The current implementation shows the product gap: [`routing/lanes.py`](../../backend/apps/ai/routing/lanes.py) publishes listing wording and parses comparison titles; [`research/tools/__init__.py`](../../backend/apps/ai/research/tools/__init__.py) exposes six existing tools; [`research/tools/sections.py`](../../backend/apps/ai/research/tools/sections.py) reads a capped prefix. The reader surfaces [`ResearchSteps.tsx`](../../frontend/src/features/ai/components/ResearchSteps.tsx), [`RoutingDecisionPanel.tsx`](../../frontend/src/features/ai/components/RoutingDecisionPanel.tsx) and [`ReasoningPanel.tsx`](../../frontend/src/features/ai/components/ReasoningPanel.tsx) expose current process or working details. This proposal replaces those product contracts while preserving retrieval and evidence machinery underneath.
