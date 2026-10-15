@@ -11,7 +11,7 @@ from apps.ai.keyword_index import CONFIG
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
 from apps.ai.research.registry import Tool, ToolRun
-from apps.ai.research.results import Completeness, Coverage, ToolResult, status_for
+from apps.ai.research.results import Completeness, Coverage, CoverageSubject, ToolResult, status_for
 from apps.ai.retrieval.fusion import fuse_by_rank
 
 from .common import (
@@ -138,4 +138,5 @@ FIND_RECORDS = Tool(
         "additionalProperties": False,
     },
     execute=find_records,
+    subject=CoverageSubject.SEARCH_CANDIDATES,
 )

@@ -5,13 +5,15 @@ from __future__ import annotations
 from typing import Iterable
 
 from apps.ai.models.chunk import DocumentChunk
-from apps.ai.research.ledger import PASSAGE, EvidenceItem
+from apps.ai.research.ledger import HANDLE_SCHEMA, PASSAGE, EvidenceItem
 from apps.ai.research.registry import Tool, ToolRun
-from apps.ai.research.results import Completeness, Coverage, ToolResult, ToolStatus, status_for
+from apps.ai.research.results import (
+    Completeness, Coverage, CoverageSubject, ToolResult, ToolStatus, status_for,
+)
 
 from .common import QUERY, collect_record, disclosable, scoped_ids
 
-RECORD_HANDLES = {"type": "array", "items": {"type": "string"}, "maxItems": 10}
+RECORD_HANDLES = {"type": "array", "items": HANDLE_SCHEMA, "maxItems": 10}
 
 #: How many passages are recalled before the gate and the trim to `k`.
 RECALL_DEPTH = 40
@@ -91,4 +93,5 @@ SEARCH_PASSAGES = Tool(
         "additionalProperties": False,
     },
     execute=search_passages,
+    subject=CoverageSubject.SEARCH_CANDIDATES,
 )
