@@ -30,13 +30,6 @@ GENERAL = {"resolve_papers", "search_research", "read_papers", "aggregate_record
 CEREMONY = {"plan_research", "continue_plan", "subtask_done", "finish"}
 
 
-@pytest.fixture
-def budget(settings):
-    for name, value in FAKE_TEST_PROFILE.items():
-        setattr(settings, name, value)
-    return FAKE_TEST_PROFILE
-
-
 def controller_root(monkeypatch, *, embedder=None, planner, reply="Composed answer.", writer=None):
     root = CompositionRoot(
         embedder=embedder, reranker=ScriptedReranker(), llm=writer or ScriptedLLM(reply=reply),
@@ -121,16 +114,6 @@ def test_discovery_then_a_simpler_rewording_keeps_the_papers_shown(
 def asked_flood(client, conversation, endpoint="ai-ask-stream"):
     return answer(client, endpoint, "What do papers say about flood prediction?",
                   conversation_id=conversation.pk)
-
-
-@pytest.fixture
-def flood_scene(budget, embedder, space, client_for):
-    fresh_vector_indexes()
-    reader = make_user("scene@cit.edu")
-    flood = make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
-    pond = make_record(title="Tilapia ponds", text=POND_TEXT, embedder=embedder, space=space)
-    return {"reader": reader, "flood": flood, "pond": pond, "client": client_for(reader),
-            "conversation": Conversation.objects.create(user=reader)}
 
 
 def test_a_ceremony_tool_and_a_malformed_call_are_rejected_and_stop_the_run(
