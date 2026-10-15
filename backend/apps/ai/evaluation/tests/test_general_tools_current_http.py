@@ -61,11 +61,11 @@ def _done(response, endpoint):
     return next(data for name, data in events if name == "done")
 
 
-def _route(monkeypatch, lane):
+def _route(monkeypatch, lane, turns):
     probabilities = {name: 0.01 for name in LANES}
     probabilities[lane] = 0.95
     probabilities["injection"] = 0.01
-    jev = ScriptedDecisionModel(probabilities)
+    jev = ScriptedDecisionModel(*(probabilities.copy() for _ in range(turns)))
     monkeypatch.setattr("apps.ai.routing.chat.configured_providers",
                         lambda **kwargs: (jev, None))
 
@@ -115,7 +115,7 @@ def test_current_fixed_lane_failure_wording_reaches_reader_and_replay(
     case = next(case for case in PACK["cases"] if case["id"] == case_id)
     expected = case["current_observation"]["text"]
     settings.AI_DURABLE_ASK = False
-    _route(monkeypatch, lane)
+    _route(monkeypatch, lane, len(case["turns"]))
     if case_id == "A09":
         def unavailable(*args, **kwargs):
             raise RuntimeError("deterministic listing failure")
