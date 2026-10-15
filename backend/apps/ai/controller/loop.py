@@ -21,6 +21,7 @@ from apps.ai.answers.service import UNAVAILABLE_TEXT
 from apps.ai.conversation_state import ContextState, committed_state
 from apps.ai.history import estimate_tokens
 from apps.ai.inference import InferenceTask
+from apps.ai.models import DocumentChunk
 from apps.ai.providers.deadline import bounded, model_call_deadline
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.tool_calling import (
@@ -103,7 +104,8 @@ class Controller:
             audit.finish(status="failed", reason="failed", prompt_tokens=run.spend.prompt_tokens)
             raise
         audit.append(Step("answer", answer.state))
-        audit.finish(status=answer.state, reason=reason, prompt_tokens=run.spend.prompt_tokens)
+        audit.finish(status=answer.state, reason=reason, prompt_tokens=run.spend.prompt_tokens,
+                     validation_codes=answer.validation)
         logger.info("controller run finished run_id=%s stop_reason=%s tool_calls=%s",
                     ctx.run_id, reason, run.spend.tool_calls)
         return Outcome(answer, reason, self._next_state(asked, decision, answer), ctx.run_id)
@@ -255,6 +257,7 @@ class Controller:
             passages=passages, facts=facts, limitations=tuple(limitations),
             stop_reason=reason, history=list(asked.history), clarify_about=decision.about,
             repair_attempts=budget.repair_attempts, pins=pin(CONTROLLER_ENGINE),
+            current=_still_current(run),
         )
 
     @staticmethod
@@ -326,6 +329,18 @@ def _handles(envelope):
         for key in ("record", "ref"):
             if isinstance(entry.get(key), str):
                 yield entry[key]
+
+
+def _still_current(run):
+    """Chunk ids still readable, disclosable and in an active chunk set."""
+    def current(sources) -> set:
+        allowed = disclosable(run.ctx, {s.record_id for s in sources})
+        active = set(DocumentChunk.objects.filter(
+            pk__in=[s.chunk_id for s in sources], chunk_set__is_active=True,
+            deleted_at__isnull=True,
+        ).values_list("pk", flat=True))
+        return {s.chunk_id for s in sources if s.record_id in allowed and s.chunk_id in active}
+    return current
 
 
 def _cancelled() -> bool:

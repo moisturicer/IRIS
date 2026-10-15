@@ -177,6 +177,14 @@ class GroundedAnswer:
     #: any task whose Profile has reasoning switched off.
     reasoning: str = ""
 
+    #: A validated analytical summary from the answer itself (IR-594, spec
+    #: §6.2). Never evidence and never raw reasoning; "" when unsafe or absent.
+    reasoning_summary: str = ""
+
+    #: Validation reason codes left after composing, plus "repaired" when the
+    #: one repair was spent. Codes only, never content (IR-594).
+    validation: tuple[str, ...] = ()
+
     @property
     def is_grounded(self) -> bool:
         """Whether the answer actually cited anything.

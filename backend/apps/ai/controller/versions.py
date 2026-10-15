@@ -14,6 +14,7 @@ NEW_RUN_ENGINE = LEGACY_ENGINE
 
 PROTOCOL_VERSION = "1"
 PLAN_PROMPT_VERSION = "plan-1"
+ANSWER_PROMPT_VERSION = "answer-1"
 
 
 def pin(engine: str) -> dict:
@@ -22,4 +23,5 @@ def pin(engine: str) -> dict:
         raise ValueError(f"unknown engine {engine!r}")
     if engine == LEGACY_ENGINE:
         return {"engine": engine}
-    return {"engine": engine, "protocol": PROTOCOL_VERSION, "prompt": PLAN_PROMPT_VERSION}
+    return {"engine": engine, "protocol": PROTOCOL_VERSION, "prompt": PLAN_PROMPT_VERSION,
+            "answer_prompt": ANSWER_PROMPT_VERSION}
