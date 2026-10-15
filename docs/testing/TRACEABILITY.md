@@ -1046,3 +1046,21 @@ Not covered here: no paid run, no pilot-family labelled set on proxy or CIT-U da
 and no capacity burst. The control run's figures measure arithmetic and plumbing, not quality, latency or cost.
 
 **Status:** instrument implemented and tested; every evaluation gate is OPEN and human review remains required.
+
+## IR-560: Discover keeps its query, results and facets across Back, reload and Load more
+
+**Requirement.** IR-552 user stories 3–5: Back and reload restore the query, filters and results; facets cover the whole catalogue; an obsolete page request never mixes into newer results.
+
+**Implementation.**
+- `frontend/src/features/discover/discoverQuery.ts` is the one parsed query (search text, filters, sort). It round-trips through the URL, which is now the only copy, and unrecognised values fall back to their defaults; the page corrects the URL to match.
+- Every page fetch, including Load more, carries the generation it was requested in, and a response from an older query or retry is dropped.
+- How many pages a reader loaded, and their scroll position, are kept in `sessionStorage` for that query only. Returning asks for all of them in one request, at most 8 pages (the list endpoint's `max_page_size` is 100).
+- `GET /records/facets/` returns the distinct `year_accomplished` values from the same queryset `list` serves (`visible_to(user)` narrowed to `PUBLICLY_VISIBLE_STATUSES`), with no counts. The Year menu used to be built from the cards loaded so far, using `created_at` as a fallback, so it could miss years beyond the first page and offer years the `year_accomplished` filter never matched.
+- A failed first load, a failed Load more and failed filter data each have their own retry.
+
+**Tests.**
+- `apps/records/test_catalogue_facets.py`: 5 tests through the API, covering a year only beyond the first page, no-year Records, unpublished statuses never contributing even for the owner or RDCO, an empty catalogue and an anonymous refusal.
+- `src/features/discover/discoverQuery.test.ts`: 11 tests on parsing, round-tripping and defaults.
+- `src/features/discover/DiscoverPage.test.tsx` › "continuity": 9 accessible page tests, covering URL restore, the search box following a URL change, URL writes, correction of invalid values, Back from a Record restoring both pages, a delayed old Load more discarded after a filter change, catalogue-wide years, and separate recovery for filters and for Load more.
+
+**Evidence, 2026-10-15, local against a pgvector Postgres:** `test_catalogue_facets.py` **5 passed**; the Discover test files **45 passed**. Full runs: `npm test` **1090 passed, 4 failed**, and `pytest` **3799 passed, 5 failed**; none of the failures is in a file this change touches. Three of the frontend failures (`Sidebar.test.tsx`) fail identically on `main` without this change, and the fourth (`PaperAiOverview` polling) is a timing test that has failed on `main` before. Four backend failures are known (the IR-202 chunker flake, two `test_complete_authority` subtests and the proxy-audit hash pin). The fifth is `test_enum_vocabulary`, which `main` fails too: IR-347 made `open` and `missing` governed while IR-549's code uses them for other concepts. Lint 0 errors; build green. Scroll restoration is not exercised under jsdom, which has no layout.

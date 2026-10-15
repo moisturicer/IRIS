@@ -18,7 +18,6 @@ import { ALL_VALUE, type FilterOption } from "./DiscoverFilterDropdown";
 import {
   activeFilterCount,
   DiscoverFilterBar,
-  EMPTY_FILTERS,
   HAS_IP,
   type DiscoverFilters,
   type DiscoverSort,
@@ -27,14 +26,50 @@ import { DiscoverResultCard } from "./DiscoverResultCard";
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 import { DiscoverTabs } from "./DiscoverTabs";
 import { PaperCiteModal } from "./PaperCiteModal";
-import { buildYearOptions } from "./discoverUtils";
+import {
+  DEFAULT_QUERY,
+  discoverQueryKey,
+  listParams,
+  parseDiscoverQuery,
+  writeDiscoverQuery,
+  type DiscoverQuery,
+} from "./discoverQuery";
 
 const PAGE_SIZE = 12;
 
-const ORDERING: Record<DiscoverSort, string> = {
-  newest: "-created_at",
-  viewed: "-access_count",
-};
+/** The list endpoint's `max_page_size` is 100, so at most this many pages
+ *  come back in one request when a reader returns. */
+const MAX_RESTORED_PAGES = Math.floor(100 / PAGE_SIZE);
+
+/**
+ * Where a reader was in a query: how many pages they had loaded and how far
+ * they had scrolled. Kept for this tab only, and only for the query it was
+ * taken in, so Back or reload brings the same results back (IR-560).
+ */
+const POSITION_KEY = "iris.discover.position";
+
+interface Position {
+  key: string;
+  pages: number;
+  scrollY: number;
+}
+
+function readPosition(key: string): Position | null {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(POSITION_KEY) ?? "null") as Position | null;
+    return stored && stored.key === key ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePosition(position: Position) {
+  try {
+    sessionStorage.setItem(POSITION_KEY, JSON.stringify(position));
+  } catch {
+    // Storage unavailable: Back starts at the first page, which is still correct.
+  }
+}
 
 /**
  * Discover: find published research, and start a submission (IR-407, F2;
@@ -42,7 +77,8 @@ const ORDERING: Record<DiscoverSort, string> = {
  *
  * Every control maps to a query param the list endpoint already understands,
  * and filtering is server-side, so a match beyond the first page is never
- * missed. The old saved views are gone: Latest and Most viewed are Sort, IP &
+ * missed. The URL holds the query (`discoverQuery.ts`), so Back, reload and a
+ * copied link restore it, and every page fetch is fenced by it (IR-560). The old saved views are gone: Latest and Most viewed are Sort, IP &
  * Patents and Theses are filters, and "For you" -- which had no personalisation
  * signal to rank on -- is removed rather than kept as a relabelled recency feed.
  */
@@ -66,28 +102,70 @@ export default function DiscoverPage() {
   const [loadMoreFailed, setLoadMoreFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  const [searchInput, setSearchInput] = useState(searchParams.get("q") ?? "");
-  const [activeQuery, setActiveQuery] = useState(searchParams.get("q") ?? "");
+  /* ── The query lives in the URL; this is its one parsed form ────────── */
+  const query = useMemo(() => parseDiscoverQuery(searchParams), [searchParams]);
+  const queryKey = discoverQueryKey(query);
+  const { q: activeQuery, filters, sort } = query;
 
-  const [filters, setFilters] = useState<DiscoverFilters>(EMPTY_FILTERS);
-  const [sort, setSort] = useState<DiscoverSort>("newest");
+  const [searchInput, setSearchInput] = useState(query.q);
+
+  /* The box follows the URL when it changes underneath it -- the sidebar's
+     Discover link, or Clear filters -- but never while the reader is typing,
+     since only a change to `q` itself runs this. */
+  useEffect(() => {
+    setSearchInput((typed) => (typed.trim() === query.q ? typed : query.q));
+  }, [query.q]);
+
   const [tab, setTab] = useState("research");
 
   const [classifications, setClassifications] = useState<FilterOption[]>([]);
   const [colleges, setColleges] = useState<FilterOption[]>([]);
   const [recordTypes, setRecordTypes] = useState<FilterOption[]>([]);
+  const [years, setYears] = useState<string[]>([]);
   const [refLoading, setRefLoading] = useState(true);
+  const [refFailed, setRefFailed] = useState(false);
+  const [refAttempt, setRefAttempt] = useState(0);
 
   const [citeRecord, setCiteRecord] = useState<RecordListItem | null>(null);
-  const [yearPool, setYearPool] = useState<RecordListItem[]>([]);
+
+  /* A hand-edited or stale URL is corrected to what was understood. */
+  useEffect(() => {
+    const canonical = writeDiscoverQuery(searchParams, query);
+    if (canonical.toString() !== searchParams.toString()) {
+      setSearchParams(canonical, { replace: true });
+    }
+  }, [searchParams, query, setSearchParams]);
+
+  /** Every query change goes through here, applied to the URL as it is when
+   *  the change lands, so two changes in one tick both survive. */
+  const updateQuery = useCallback(
+    (change: (current: DiscoverQuery) => DiscoverQuery) =>
+      latestSetSearchParams.current(
+        (prev) => writeDiscoverQuery(prev, change(parseDiscoverQuery(prev))),
+        { replace: true },
+      ),
+    [],
+  );
+  const setFilters = (next: DiscoverFilters) => updateQuery((current) => ({ ...current, filters: next }));
+  const setSort = (next: DiscoverSort) => updateQuery((current) => ({ ...current, sort: next }));
 
   /* ── Reference data drives every filter list ────────────────────────── */
   useEffect(() => {
     let cancelled = false;
+    setRefLoading(true);
+    setRefFailed(false);
 
-    Promise.allSettled([recordsApi.classifications(), accountsApi.colleges(), recordsApi.recordTypes()])
-      .then(([classRes, collegeRes, typeRes]) => {
+    Promise.allSettled([
+      recordsApi.classifications(),
+      accountsApi.colleges(),
+      recordsApi.recordTypes(),
+      // Years come from the whole catalogue, not the cards loaded so far, so a
+      // Record beyond the first page can still be filtered to (IR-560).
+      recordsApi.facets(),
+    ])
+      .then(([classRes, collegeRes, typeRes, facetRes]) => {
         if (cancelled) return;
+        setRefFailed([classRes, collegeRes, typeRes, facetRes].some((r) => r.status === "rejected"));
         if (classRes.status === "fulfilled") {
           setClassifications(
             (classRes.value.data.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
@@ -107,6 +185,9 @@ export default function DiscoverPage() {
               .map((t) => ({ value: String(t.id), label: t.name })),
           );
         }
+        if (facetRes.status === "fulfilled") {
+          setYears((facetRes.value.data.years ?? []).map(String));
+        }
       })
       .finally(() => {
         if (!cancelled) setRefLoading(false);
@@ -115,93 +196,114 @@ export default function DiscoverPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refAttempt]);
 
   /* ── Debounce the search box into the query + the URL ───────────────── */
   useEffect(() => {
     const handle = setTimeout(() => {
-      setActiveQuery(searchInput.trim());
-      latestSetSearchParams.current(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (searchInput.trim()) next.set("q", searchInput.trim());
-          else next.delete("q");
-          return next;
-        },
-        { replace: true },
-      );
+      updateQuery((current) => ({ ...current, q: searchInput.trim() }));
     }, 300);
 
     return () => clearTimeout(handle);
-    // Only the typed text starts the debounce; the setter is read through the
-    // ref, so it is the current one when the timer fires.
-  }, [searchInput]);
+    // Only the typed text starts the debounce; `updateQuery` reads the setter
+    // through a ref, so it is the current one when the timer fires (IR-554).
+  }, [searchInput, updateQuery]);
 
-  /* ── The query the API actually understands ─────────────────────────── */
-  const queryParams = useMemo(() => {
-    const params: Record<string, unknown> = { page_size: PAGE_SIZE, ordering: ORDERING[sort] };
-
-    if (activeQuery) params.search = activeQuery;
-    if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;
-    if (filters.colleges.length > 0) params.college = filters.colleges.join(",");
-    if (filters.classifications.length > 0) params.classification = filters.classifications.join(",");
-    if (filters.year !== ALL_VALUE) {
-      params.year_from = filters.year;
-      params.year_to = filters.year;
-    }
-    if (filters.ip === HAS_IP) params.is_ip = true;
-    else if (filters.ip !== ALL_VALUE) params.ip_type = filters.ip;
-
-    return params;
-  }, [sort, activeQuery, filters]);
-
-  /* Guard against a slow early request overwriting a newer one. */
-  const requestSeq = useRef(0);
+  /* ── Results, fenced by the query they were asked for ───────────────── */
+  // Every response carries the generation it was requested in; a newer query
+  // (or a retry) starts a new one, and anything older is dropped, Load more
+  // included, so results from two queries can never mix.
+  const generation = useRef(0);
+  const restoreScrollTo = useRef<number | null>(null);
+  /** Where the reader is, set only once this query's results are on screen:
+   *  until then there is nothing of this query to return to. */
+  const position = useRef<Omit<Position, "scrollY"> | null>(null);
 
   useEffect(() => {
-    const seq = ++requestSeq.current;
+    const current = ++generation.current;
+    position.current = null;
+    const restored = readPosition(queryKey);
+    const pages = Math.min(Math.max(restored?.pages ?? 1, 1), MAX_RESTORED_PAGES);
+    // A depth past the cap comes back shorter, so its scroll offset would land
+    // somewhere the reader never was; start at the top instead.
+    restoreScrollTo.current = restored && restored.pages <= MAX_RESTORED_PAGES ? restored.scrollY : null;
+
     setLoading(true);
     setFailed(false);
+    setLoadingMore(false);
     setLoadMoreFailed(false);
 
     recordsApi
-      .list({ ...queryParams, page: 1 })
+      // A returning reader gets every page they had, in one request.
+      .list({ ...listParams(query), page: 1, page_size: PAGE_SIZE * pages })
       .then(({ data }) => {
-        if (seq !== requestSeq.current) return;
+        if (current !== generation.current) return;
         const results = data.results ?? [];
         setRecords(results);
         setTotalCount(data.count ?? results.length);
-        setPage(1);
-        setYearPool((prev) => {
-          const seen = new Set(prev.map((r) => r.id));
-          const added = results.filter((r) => !seen.has(r.id));
-          return added.length > 0 ? [...prev, ...added] : prev;
-        });
+        // Whole pages only: if the server returned fewer rows than asked, the
+        // next Load more re-reads the partial page and duplicates are dropped.
+        const loaded = Math.max(1, Math.floor(results.length / PAGE_SIZE));
+        setPage(loaded);
+        position.current = { key: queryKey, pages: loaded };
       })
       .catch(() => {
-        if (seq !== requestSeq.current) return;
+        if (current !== generation.current) return;
         setRecords([]);
         setTotalCount(null);
         setFailed(true);
       })
       .finally(() => {
-        if (seq === requestSeq.current) setLoading(false);
+        if (current === generation.current) setLoading(false);
       });
-  }, [queryParams, attempt]);
+    // `query` is fully described by `queryKey`; keying on the string keeps an
+    // unrelated URL change (the Publish dialog) from refetching.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey, attempt]);
 
   const loadMore = useCallback(() => {
+    const current = generation.current;
     const nextPage = page + 1;
     setLoadingMore(true);
     setLoadMoreFailed(false);
     recordsApi
-      .list({ ...queryParams, page: nextPage })
+      .list({ ...listParams(query), page: nextPage, page_size: PAGE_SIZE })
       .then(({ data }) => {
-        setRecords((prev) => [...prev, ...(data.results ?? [])]);
+        if (current !== generation.current) return;
+        setRecords((prev) => {
+          const seen = new Set(prev.map((r) => r.id));
+          return [...prev, ...(data.results ?? []).filter((r) => !seen.has(r.id))];
+        });
         setPage(nextPage);
+        position.current = { key: queryKey, pages: nextPage };
       })
-      .catch(() => setLoadMoreFailed(true))
-      .finally(() => setLoadingMore(false));
-  }, [page, queryParams]);
+      .catch(() => {
+        if (current === generation.current) setLoadMoreFailed(true);
+      })
+      .finally(() => {
+        if (current === generation.current) setLoadingMore(false);
+      });
+  }, [page, query, queryKey]);
+
+  /* ── Remember where the reader is, for Back and reload ──────────────── */
+  useEffect(() => {
+    if (loading || restoreScrollTo.current === null) return;
+    window.scrollTo(0, restoreScrollTo.current);
+    restoreScrollTo.current = null;
+  }, [loading]);
+
+  // Saved when the reader leaves -- for a Record (unmount) or by reloading
+  // (pagehide) -- with the scroll position as it is at that moment.
+  useEffect(() => {
+    const save = () => {
+      if (position.current) writePosition({ ...position.current, scrollY: window.scrollY });
+    };
+    window.addEventListener("pagehide", save);
+    return () => {
+      window.removeEventListener("pagehide", save);
+      save();
+    };
+  }, []);
 
   const filterOptions = useMemo(
     () => ({
@@ -210,7 +312,9 @@ export default function DiscoverPage() {
       classifications,
       years: [
         { value: ALL_VALUE, label: "Any year" },
-        ...buildYearOptions(yearPool).map((y) => ({ value: y, label: y })),
+        ...(filters.year !== ALL_VALUE && !years.includes(filters.year) ? [filters.year] : [])
+          .concat(years)
+          .map((y) => ({ value: y, label: y })),
       ],
       ip: [
         { value: ALL_VALUE, label: "Any" },
@@ -218,7 +322,7 @@ export default function DiscoverPage() {
         ...Object.entries(IP_TYPE_LABELS).map(([value, label]) => ({ value, label })),
       ],
     }),
-    [recordTypes, colleges, classifications, yearPool],
+    [recordTypes, colleges, classifications, years, filters.year],
   );
 
   const openPublish = () =>
@@ -232,14 +336,22 @@ export default function DiscoverPage() {
 
   const clearFilters = () => {
     setSearchInput("");
-    setActiveQuery("");
-    setFilters(EMPTY_FILTERS);
+    updateQuery((current) => ({ ...DEFAULT_QUERY, sort: current.sort }));
   };
 
   const remaining = totalCount === null ? 0 : totalCount - records.length;
 
   const research = (
     <>
+      {refFailed && (
+        <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
+          Some filters couldn&apos;t load, so their lists may be incomplete.
+          <button type="button" onClick={() => setRefAttempt((n) => n + 1)} className={PILL_SECONDARY}>
+            Retry filters
+          </button>
+        </div>
+      )}
+
       <DiscoverFilterBar
         filters={filters}
         onChange={setFilters}
