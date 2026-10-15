@@ -3,15 +3,20 @@ Notification service -- creates Notification rows and fires emails.
 
 Design rules:
   - Functions must NEVER raise. A notification failure must not break the
-    caller's request/response path.
+    caller's request/response path. It is logged at ERROR instead, naming
+    the function and the record (IR-300), so a dropped notice is visible.
   - All DB writes happen first; email is sent after so a failed email
     does not roll back an already-persisted notification.
   - Use send_email_async from core.utils for all outbound mail.
 """
+import logging
+
 from django.conf import settings
 from core.enums import Party, RecordTypeName, RoleName
 from core.utils import send_email_async
 from .models import Notification, NotificationType
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -36,6 +41,27 @@ def _record_notif_type(record) -> NotificationType:
 
 def _record_url(record) -> str:
     return f"{settings.FRONTEND_URL}/records/{record.pk}"
+
+
+def _log_failure(event: str, *, record=None, request=None, user=None):
+    """
+    Log a notify function's swallowed exception, with its traceback (IR-300).
+
+    Called from inside an `except` block. Names the event and what it was
+    about: the record, a request and the record it belongs to, or the user
+    for a notice that has no record. Reads only ids already on the objects,
+    so the logging itself cannot fail on a query.
+    """
+    if request is not None:
+        about = (
+            f"{type(request).__name__} {getattr(request, 'pk', None)} "
+            f"on record {getattr(request, 'record_id', None)}"
+        )
+    elif user is not None:
+        about = f"user {getattr(user, 'pk', None)}"
+    else:
+        about = f"record {getattr(record, 'pk', None)}"
+    logger.exception("Notification %s failed for %s", event, about)
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +104,7 @@ def notify_new_record(record, submitted_by):
             recipient_list=[adviser.email],
         )
     except Exception:
-        pass
+        _log_failure("notify_new_record", record=record)
 
 
 def _role_for_party(party: str):
@@ -161,7 +187,7 @@ def notify_routed(
                     notif_type=notif_type, message=message,
                 )
     except Exception:
-        pass
+        _log_failure("notify_routed", record=record)
 
 
 def notify_office_completed(
@@ -234,7 +260,7 @@ def notify_office_completed(
                 recipient_list=emails,
             )
     except Exception:
-        pass
+        _log_failure("notify_office_completed", record=record)
 
 
 def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off):
@@ -299,7 +325,7 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
                 recipient_list=[primary.email],
             )
     except Exception:
-        pass
+        _log_failure("notify_decided", record=record)
 
 
 def notify_revision_requested(revision_request, *, party_label: str):
@@ -337,7 +363,7 @@ def notify_revision_requested(revision_request, *, party_label: str):
                 recipient_list=[primary.email],
             )
     except Exception:
-        pass
+        _log_failure("notify_revision_requested", request=revision_request)
 
 
 def notify_revision_withdrawn(revision_request, *, party_label: str, withdrawn_by):
@@ -355,7 +381,7 @@ def notify_revision_withdrawn(revision_request, *, party_label: str, withdrawn_b
                 message=message,
             )
     except Exception:
-        pass
+        _log_failure("notify_revision_withdrawn", request=revision_request)
 
 
 def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: str):
@@ -379,7 +405,7 @@ def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: st
                 message=message,
             )
     except Exception:
-        pass
+        _log_failure("notify_new_version", record=record)
 
 
 def notify_document_requested(document_request, *, party_label: str):
@@ -419,7 +445,7 @@ def notify_document_requested(document_request, *, party_label: str):
                 recipient_list=[primary.email],
             )
     except Exception:
-        pass
+        _log_failure("notify_document_requested", request=document_request)
 
 
 def notify_document_request_fulfilled(document_request, *, uploaded_by):
@@ -467,7 +493,7 @@ def notify_document_request_fulfilled(document_request, *, uploaded_by):
             body=f"{message}\n\n{_record_url(record)}",
         )
     except Exception:
-        pass
+        _log_failure("notify_document_request_fulfilled", request=document_request)
 
 
 def notify_document_rejected(document_request, item, *, rejected_by):
@@ -508,7 +534,7 @@ def notify_document_rejected(document_request, item, *, rejected_by):
                 recipient_list=[primary.email],
             )
     except Exception:
-        pass
+        _log_failure("notify_document_rejected", request=document_request)
 
 
 def notify_role_request(user, requested_role):
@@ -532,7 +558,7 @@ def notify_role_request(user, requested_role):
                 message=f"{user.get_full_name()} requested the {requested_role.name} role.",
             )
     except Exception:
-        pass
+        _log_failure("notify_role_request", user=user)
 
 
 def notify_download_request(record, requested_by):
@@ -553,7 +579,7 @@ def notify_download_request(record, requested_by):
                     ),
                 )
     except Exception:
-        pass
+        _log_failure("notify_download_request", record=record)
 
 
 def notify_download_reviewed(download_request, reviewed_by, approved: bool):
@@ -593,7 +619,7 @@ def notify_download_reviewed(download_request, reviewed_by, approved: bool):
                 message=f'Your download request for "{record.title}" has been declined.',
             )
     except Exception:
-        pass
+        _log_failure("notify_download_reviewed", request=download_request)
 
 
 def notify_delete_approved(delete_request, reviewed_by):
@@ -613,7 +639,7 @@ def notify_delete_approved(delete_request, reviewed_by):
             ),
         )
     except Exception:
-        pass
+        _log_failure("notify_delete_approved", request=delete_request)
 
 
 def notify_delete_declined(delete_request, reviewed_by):
@@ -633,7 +659,7 @@ def notify_delete_declined(delete_request, reviewed_by):
             ),
         )
     except Exception:
-        pass
+        _log_failure("notify_delete_declined", request=delete_request)
 
 
 # ---------------------------------------------------------------------------
@@ -711,7 +737,7 @@ def notify_record_withdrawn(record, *, withdrawn_by, seats, requesting_parties):
             subject=f"[IRIS] Withdrawn: {title[:60]}",
         )
     except Exception:
-        pass
+        _log_failure("notify_record_withdrawn", record=record)
 
 
 def notify_record_deleted(record, *, deleted_by):
@@ -726,7 +752,7 @@ def notify_record_deleted(record, *, deleted_by):
             subject=f"[IRIS] Deleted: {title[:60]}",
         )
     except Exception:
-        pass
+        _log_failure("notify_record_deleted", record=record)
 
 
 def notify_delete_requested(delete_request, *, requested_by):
@@ -768,7 +794,7 @@ def notify_delete_requested(delete_request, *, requested_by):
             subject=f"[IRIS] Delete requested: {title[:60]}",
         )
     except Exception:
-        pass
+        _log_failure("notify_delete_requested", request=delete_request)
 
 
 # ---------------------------------------------------------------------------
