@@ -27,6 +27,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.composition import composition_root
+from apps.ai.conversation_state import current_revision
 from apps.ai.models.conversation import Conversation
 from apps.ai.research.context import RunContext
 from apps.ai.research.registry import ToolRun, general_tools, research_tools
@@ -66,7 +67,8 @@ class Command(BaseCommand):
         calls = [_parse(call) for call in options["call"]]
         root = composition_root()
         ctx = RunContext.for_request(
-            user=user, root=root, lane="research", conversation=conversation
+            user=user, root=root, lane="research", conversation=conversation,
+            context_revision=current_revision(conversation),
         )
         general = options["general"]
         run = ToolRun.start(ctx, root, scoped_handles=general)

@@ -116,6 +116,7 @@ class RoutedChat:
                 self.asked.effective_question, user, root=self.root,
                 conversation=self.asked.conversation, scope_record=self.asked.scope_record,
                 max_sources=self.max_sources, history_before_turn_id=self.asked.override_turn_id,
+                context_revision=self.asked.context_revision,
             )
             self.research = result.wire()
             return result.answer
@@ -133,7 +134,8 @@ class RoutedChat:
                     citations=(), state=UNAVAILABLE,
                 )
             ctx = RunContext.for_request(user=user, root=self.root, lane="comparison",
-                                         conversation=self.asked.conversation)
+                                         conversation=self.asked.conversation,
+                                         context_revision=self.asked.context_revision)
             answer, self.comparison = yield from comparison_events(
                 ToolRun.start(ctx, self.root), self.asked.effective_question,
                 record_ids=self.asked.comparison_record_ids,
@@ -144,5 +146,6 @@ class RoutedChat:
             root=self.root, conversation=self.asked.conversation,
             scope_record=self.asked.scope_record, max_sources=self.max_sources,
             history_before_turn_id=self.asked.override_turn_id,
+            context_revision=self.asked.context_revision,
         )
         return answer

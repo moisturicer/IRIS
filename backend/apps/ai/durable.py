@@ -193,7 +193,8 @@ def submit(prepared, user, data, *, max_sources: int):
             from apps.ai.routing.lanes import _named_records
 
             context = RunContext.for_request(user=user, root=composition_root(), lane="comparison",
-                                             conversation=prepared.conversation)
+                                             conversation=prepared.conversation,
+                                             context_revision=prepared.context_revision)
             named, _ = _named_records(context, prepared.effective_question)
             named_comparison = len(named) >= 2
         if prepared.comparison_record_ids or lane == "comparison" or named_comparison:

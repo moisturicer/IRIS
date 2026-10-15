@@ -160,27 +160,31 @@ def _comparison(run, question, maximum):
                           degraded=degraded or bool(missing), model=model_that_answered(llm)), None
 
 
-def _context(lane, user, *, root, conversation, scope_record, max_sources, history_before_turn_id):
+def _context(lane, user, *, root, conversation, scope_record, max_sources, history_before_turn_id,
+             context_revision=None):
     if max_sources < 1:
         raise ValueError("max_sources must be positive")
-    ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation)
+    ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation,
+                                 context_revision=context_revision)
     return replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None,
                    history_before_turn_id=history_before_turn_id)
 
 
 def research_run(question, user, *, root, conversation=None, scope_record=None,
-                 max_sources=8, history_before_turn_id=None):
+                 max_sources=8, history_before_turn_id=None, context_revision=None):
     """Yield the planner's steps; return its `ResearchAnswer` (IR-504)."""
     ctx = _context("research", user, root=root, conversation=conversation,
                    scope_record=scope_record, max_sources=max_sources,
-                   history_before_turn_id=history_before_turn_id)
+                   history_before_turn_id=history_before_turn_id,
+                   context_revision=context_revision)
     ctx = replace(ctx, budget=replace(ctx.budget,
         max_ledger_passages=min(ctx.budget.max_ledger_passages, max_sources)))
     return (yield from ResearchPlanner(root).run(question, ctx))
 
 
 def lane_events(lane, question, user, *, root, conversation=None, scope_record=None,
-                max_sources=8, history_before_turn_id=None, clock=time.monotonic):
+                max_sources=8, history_before_turn_id=None, context_revision=None,
+                clock=time.monotonic):
     """Run a bounded corpus workflow, yielding what a reader can watch.
 
     A listing and a topic count yield their candidates (IR-546, IR-547); a
@@ -190,7 +194,8 @@ def lane_events(lane, question, user, *, root, conversation=None, scope_record=N
     if lane not in ("listing", "count", "comparison"):
         raise ValueError(f"No application workflow for lane {lane!r}")
     ctx = _context(lane, user, root=root, conversation=conversation, scope_record=scope_record,
-                   max_sources=max_sources, history_before_turn_id=history_before_turn_id)
+                   max_sources=max_sources, history_before_turn_id=history_before_turn_id,
+                   context_revision=context_revision)
     run = ToolRun.start(ctx, root)
     seconds = ctx.budget.wall_clock_seconds
     if lane in ("listing", "count"):

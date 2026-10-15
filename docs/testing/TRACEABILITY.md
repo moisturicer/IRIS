@@ -1081,6 +1081,16 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
 
 **Evidence (2026-10-16).** `apps/ai/tests/test_conversation_state.py` (31 cases), including a two-thread real-transaction race (`ConcurrencyTests`) and two HTTP cases; `pytest apps/ai/research apps/ai/evidence` and the conversation, memory, history and durable suites pass with `AI_RESEARCH_LANE=off AI_JEV_ROUTING_ENABLED=False`, except `test_plan_profile.py` and `test_screen_profile.py`, which read this machine's `backend/.env` model settings.
 
+## IR-603 — the tool run's Presentation comes from committed conversation state
+
+**Requirement.** [General-tools spec](../architecture-review/2026-10-15-askiris-general-tools-spec.md) §3.2: "An ordinal is valid only against the relevant displayed set and state revision." Connects IR-591's `Presentation` seam to IR-592's `ConversationState`.
+
+**Built.** `conversation_state.presentation(ctx)` is the one builder: the owned Conversation's committed displayed order (or its reconstruction at revision 0) as `Presentation(revision, record_ids)`, with no visibility check of its own — `resolve_papers` still reauthorizes every id through `disclosable`. `ToolRun.start` calls it, so every run constructed for a Conversation (research, listing, count, comparison, both management commands) carries it. `RunContext.context_revision` holds the revision the question was pinned to (`ChatQuestion.context_revision`, threaded through `RoutedChat`, `research_run`, `lane_events` and durable submission; the two operator commands pin `current_revision` at start). `ToolRun.current_presentation` returns the presentation only when its revision equals that pin; otherwise every ordinal is `match: none` with the limitation `stale_presentation`, and the resolver cache key carries no stale list. Another reader's Conversation presents nothing.
+
+**Not built here.** No controller calls `resolve_papers` yet (IR-593), so no HTTP path exercises the ordinal. An unpinned run with a Conversation (`context_revision=None`) resolves no ordinal by design.
+
+**Evidence (2026-10-16).** `apps/ai/research/tests/test_general_tools.py`: `test_ordinals_resolve_from_stored_conversation_state` (a listing committed through `record_turn`, ordinals resolved out of order, a hidden draft still `none`), `test_a_stale_state_revision_resolves_no_ordinal` (a second commit after pinning leaves both ordinals `none`, status `empty`, `stale_presentation`) and `test_another_readers_conversation_presents_nothing`. The IR-591 seam test now pins its revision explicitly, because an unpinned presentation no longer resolves. `test_general_tools.py` and `test_schema.py` pass. The full `apps/ai` suite fails the same tests as the IR-591 head (eb65ac7) with the same `.env`, except the IR-202 chunker property flake and `test_the_refusal_reaches_neither_prompt`, which passes 3 of 3 when its file runs alone with this change, so its full-suite failure is order-dependent.
+
 ## IR-560: Discover keeps its query, results and facets across Back, reload and Load more
 
 **Requirement.** IR-552 user stories 3–5: Back and reload restore the query, filters and results; facets cover the whole catalogue; an obsolete page request never mixes into newer results.

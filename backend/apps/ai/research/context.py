@@ -55,6 +55,8 @@ class RunContext:
     lane: str
     budget: Budget
     history_before_turn_id: Optional[int] = None
+    #: The state revision the question was asked against (IR-592, IR-603).
+    context_revision: Optional[int] = None
     run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     @property
@@ -71,6 +73,7 @@ class RunContext:
         lane: str,
         conversation: Optional["Conversation"] = None,
         budget: Optional[Budget] = None,
+        context_revision: Optional[int] = None,
     ) -> "RunContext":
         if lane not in LANES:
             raise ValueError(f"unknown lane {lane!r}")
@@ -81,4 +84,5 @@ class RunContext:
             permits=root.vendor_permits(),
             lane=lane,
             budget=budget or Budget.from_settings(),
+            context_revision=context_revision,
         )
