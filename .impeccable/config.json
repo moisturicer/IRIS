@@ -8,6 +8,15 @@
         "value": "inter",
         "createdAt": "2026-10-11T07:21:30.127Z",
         "reason": "IRIS design system: Inter is the committed interface face, self-hosted (docs/ui-ux/01-design-system.md section 0, IR-356)"
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "frontend/src/features/records/paper-view/PaperAiOverview.test.tsx"
+        ],
+        "createdAt": "2026-10-14T18:18:22.721Z",
+        "reason": "Assistant triage: false positive. The class names are a list of classes the test asserts are absent from the AI Overview; no element is rendered with them."
       }
     ]
   }
