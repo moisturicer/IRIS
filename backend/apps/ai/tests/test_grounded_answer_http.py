@@ -11,7 +11,7 @@ from apps.ai.composition import use_composition_root
 from apps.ai.models import ResearchRun, Turn
 from apps.ai.providers.fakes import ScriptedLLM, ScriptedToolCallingLLM
 
-from .test_controller_http import asked_flood, budget, call, compose, controller_root, flood_scene  # noqa: F401
+from .test_controller_http import asked_flood, call, compose, controller_root
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
