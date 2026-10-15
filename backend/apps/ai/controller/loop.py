@@ -31,7 +31,7 @@ from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.context import RunContext
 from apps.ai.research.prompts import conversation_state, planner_history
 from apps.ai.research.registry import ToolRun, general_tools
-from apps.ai.research.results import Status, population_snapshot
+from apps.ai.research.results import Status, ToolStatus, population_snapshot
 from apps.ai.research.synthesis import LedgerRetriever
 from apps.ai.research.tools.common import disclosable, visible_record_ids
 from apps.ai.resilience.circuit import CircuitOpen
@@ -166,7 +166,7 @@ class Controller:
                          for c in calls) and len({c.id for c in calls}) == len(calls)
             if not ids_ok:
                 gathered.malformed += 1
-                audit.append(Step("tool", "rejected", tool="invalid"))
+                audit.append(Step("tool", ToolStatus.REJECTED.value, tool="invalid"))
                 if gathered.malformed >= 2:
                     return prompts.Decision(), "malformed_call"
                 previous = [UserMessage(_CORRECTION)]
