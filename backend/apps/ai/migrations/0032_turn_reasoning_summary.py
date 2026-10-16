@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ai', '0030_conversation_state'),
+        ('ai', '0031_record_overview_hook'),
     ]
 
     operations = [
