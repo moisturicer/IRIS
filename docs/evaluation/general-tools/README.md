@@ -27,3 +27,13 @@ Every executed run writes a manifest containing: run ID and timestamp; contract 
 ## Approval boundary
 
 Fixture validation and local fake runs are free and authorized by IR-589. Paid model runs require a recorded funding/campaign owner approval, approved provider data retention and hosting policy, and authorization for the specific dataset before any request. Sending institutional content externally needs a separate explicit approval and disclosure check. Production limits, optional capability switches, thresholds, vendor choices, public web access and rollout require named decisions; this document supplies none. A passing fake suite cannot be used as a production-readiness claim. ADR-042 records the product approval; a human still reviews the implementation before a downstream ticket can be called ready.
+
+## IR-598 conversation set, scorer and pilot documents
+
+- [`conversation_set_v1.json`](conversation_set_v1.json): 105 draft conversations over the 40-paper arXiv proxy corpus (not CIT-U research), all of A01–A15, seven per family, split 60 development and 45 held out by paper and topic. **`label_status` is `draft_unreviewed` and `labelled_by` is empty**: an AI agent drafted every label and a named person must review them before any score counts.
+- [`conversation_set_v1.lock.json`](conversation_set_v1.lock.json): one SHA-256 per split. Rewrite it after label review.
+- Command: `python manage.py eval_conversations --set ../docs/evaluation/general-tools/conversation_set_v1.json --validate [--lock ...]` from `backend/`. It is free; `--score` reads collected runs and human reviews and calls no model.
+- [`pilot-report.md`](pilot-report.md): what was and was not measured, denominators, proposed (unapproved) targets and open gates.
+- [`rollout-runbook.md`](rollout-runbook.md): cohort reading, rollback, monitoring and the separate approvals. It records one conflict with the ticket wording for a human to settle.
+
+Nothing in this section is a quality result. No arm was run and no person has reviewed anything.

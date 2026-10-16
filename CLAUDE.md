@@ -257,6 +257,22 @@ python manage.py eval_evidence --questions <set.json> --chain --from-run jev=<ru
                                    # Verified 2026-10-10 on the stored IR-481/482 runs: the
                                    # band and rescue tables of proposal 12 §4 reproduce, except
                                    # that "missed by all" at cutoff 0.5 is 3, not the 4 printed
+python manage.py eval_conversations --set <set.json> --validate [--lock <lock.json>] [--write-lock <lock.json>]
+                                   # validate a multi-turn conversation set (IR-598): schema,
+                                   # per-turn labels, the 100-conversation minimum, per-family
+                                   # coverage of A01-A15 and development/held-out leakage by paper
+                                   # title and topic. --write-lock records one SHA-256 per split;
+                                   # --lock re-checks the set against it. Free: no database, no
+                                   # vendor. --score reads collected runs and named human reviews
+                                   # per arm and family (Wilson intervals, own denominators, any
+                                   # access breach sets enablement_blocked); it collects nothing
+                                   # and calls no model. Verified 2026-10-16 on
+                                   # docs/evaluation/general-tools/conversation_set_v1.json: 105
+                                   # draft conversations (60 development, 45 held out, seven per
+                                   # family), 36 supported and unambiguous, zero leakage, `valid`,
+                                   # lock written and re-checked. Labels are AI-drafted
+                                   # (`draft_unreviewed`, `labelled_by` empty), so no score on it
+                                   # counts until a named person reviews it. No arm has been run
 python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)
                                    # The retrieval eval harness. --dry-run costs nothing and calls no
                                    # vendor: it checks that every label resolves against this database,

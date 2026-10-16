@@ -1240,3 +1240,14 @@ Missing/versionless citation rejection remains explicitly covered by new tests. 
 found source/metadata/history and recovery-evidence gaps; fixes and regressions were reviewed again with
 no outstanding findings. Full final-commit CI status is recorded in the PR. No model-quality,
 paid-capacity or production-readiness claim.
+
+## IR-598 — conversation set, scorer and controlled-pilot documents
+
+Authority: ADR-042 and general-tools specification §9–§11 (scenarios A01–A15).
+
+**Built.** `apps/ai/evaluation/conversations.py` validates a conversation set (schema, per-turn labels, 100-conversation minimum, per-family coverage, development/held-out leakage by paper title and topic, a named reason for any shared item) and computes per-split lock digests. `conversation_scoring.py` scores human reviews per arm and family with Wilson intervals and separate denominators, refuses arm comparisons whose corpus, models, data policy or limits differ, and sets `enablement_blocked` on any access breach. `manage.py eval_conversations` exposes `--validate`, `--lock`, `--write-lock` and `--score`; it collects nothing and calls no model. `docs/evaluation/general-tools/conversation_set_v1.json` holds 105 draft conversations (60 development, 45 held out, seven per family A01–A15) over the 40-paper arXiv proxy corpus, with `conversation_set_v1.lock.json`. The [pilot report](../evaluation/general-tools/pilot-report.md) and [rollout runbook](../evaluation/general-tools/rollout-runbook.md) record what was and was not measured and the open approvals.
+
+**Not built, not measured.** `label_status` is `draft_unreviewed` and `labelled_by` is empty: an AI agent drafted every label, so no score on this set counts until a named person reviews it and the lock is rewritten. No arm was run, no human review, judge calibration, blind preference, latency, cost or capacity measurement exists (capacity unverified). The proposed targets (90% completion, 95% claim and citation support, zero breaches, blind preference) are owner-review proposals, not approved gates. The runbook records one conflict between the ticket's "cohort" wording and spec §10's no-switch rule for Jive Tyler Revalde to settle. No deployment, vendor, data-retention, institutional-transmission or paid-campaign approval is granted.
+
+**Evidence (2026-10-16).** `eval_conversations --validate` on the set: 105 conversations, 36 supported and unambiguous, no coverage gap, zero leakage, `valid`; `--write-lock` then `--validate --lock` both `valid`. The three new test files pass (24 tests). `python -m pytest apps/ai/evaluation`: 299 passed, 1 failed; the failure is the known Windows-only `test_the_proxy_audit_pins_the_proxy_set_it_audited` (CRLF checkout changes the proxy file digest) and predates this ticket. The scorer has only seen invented reviews.
+
