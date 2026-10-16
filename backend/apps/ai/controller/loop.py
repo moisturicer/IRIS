@@ -14,6 +14,7 @@ from typing import Optional
 
 from django.conf import settings
 
+from apps.ai.admission import scope as admission_scope
 from apps.ai.answers.citations import GroundedAnswer, UNAVAILABLE
 from apps.ai.answers.events import RetrievalStarted
 from apps.ai.answers.service import UNAVAILABLE_TEXT
@@ -30,7 +31,7 @@ from apps.ai.research.audit import RunAudit, Step, argument_digest
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.context import RunContext
 from apps.ai.research.prompts import conversation_state, planner_history
-from apps.ai.research.registry import ToolRun, general_tools
+from apps.ai.research.registry import ToolRun, general_tools, sources_current
 from apps.ai.research.results import Status, ToolStatus, population_snapshot
 from apps.ai.research.synthesis import LedgerRetriever
 from apps.ai.research.tools.common import disclosable, visible_record_ids
@@ -38,6 +39,7 @@ from apps.ai.resilience.circuit import CircuitOpen
 
 from . import prompts
 from .budget import ControllerBudget, NotConfigured
+from .durable_budget import pinned, restore
 from .compose import CLARIFY, EVIDENCE, AnswerComposer, ReadyToCompose, cancelled
 from .versions import CONTROLLER_ENGINE, pin
 
@@ -69,6 +71,8 @@ class _Gathered:
     revoked: bool = False
     malformed: int = 0
     stalls: int = 0
+    history_ids: Optional[frozenset] = None
+    context_changed: bool = False
 
 
 class Controller:
@@ -81,18 +85,22 @@ class Controller:
         """Yield neutral progress; return an `Outcome`."""
         yield RetrievalStarted()
         try:
-            budget = ControllerBudget.from_settings()
+            budget = pinned("controller", ControllerBudget.from_settings, ControllerBudget)
         except NotConfigured as exc:
             logger.warning("controller not configured: %s", exc)
             return Outcome(_unavailable(), "not_configured")
         ctx = self._context(asked, user, budget)
         run = ToolRun.start(ctx, self.root, scoped_handles=True)
+        run = replace(run, spend=restore(run.spend, protected_tokens=budget.reserved_tokens))
         audit = RunAudit(ctx, self.clock)
         registry = general_tools()
-        gathered = _Gathered([], set(), [])
+        gathered = _Gathered([], set(), [], history_ids=frozenset(t.pk for t in asked.history))
         try:
             with model_call_deadline(ctx.budget.wall_clock_seconds, clock=self.clock):
-                decision, reason = self._gather(asked, run, registry, budget, audit, gathered)
+                with admission_scope.answer_allowance(
+                    tokens=budget.reserved_tokens, attempts=budget.answer_attempts,
+                ):
+                    decision, reason = self._gather(asked, run, registry, budget, audit, gathered)
                 if reason == "cancelled":
                     audit.finish(status=UNAVAILABLE, reason=reason,
                                  prompt_tokens=run.spend.prompt_tokens)
@@ -160,6 +168,12 @@ class Controller:
             audit.append(Step("plan", "ok", latency_ms=self._ms(started),
                               input_tokens=completion.input_tokens,
                               output_tokens=completion.output_tokens))
+            # A completion may have copied material revoked while PLAN ran.
+            # Recheck before any derived query/tool is sent or reused.
+            self._body(asked, run, budget, gathered)
+            if gathered.revoked:
+                previous, gathered.revoked = [], False
+                continue
             calls = completion.tool_calls
             if not calls:
                 return prompts.decision_from(completion.text, gathered=bool(gathered.envelopes)), "ready"
@@ -222,18 +236,25 @@ class Controller:
         if len(current) != len(gathered.envelopes):
             gathered.envelopes[:] = current
             gathered.revoked = True
+        history = list(planner_history(run.ctx))
+        history_ids = frozenset(t.pk for t in history)
+        if gathered.history_ids is not None and not gathered.history_ids <= history_ids:
+            gathered.revoked = True
+            gathered.context_changed = True
+        gathered.history_ids = history_ids
         payload = {
             "request": asked.question,
             "scope": "paper" if run.ctx.scope_record_id is not None else "corpus",
             "recent_history": [{"question": t.question, "answer": t.answer}
-                               for t in planner_history(run.ctx)],
+                               for t in history],
             "results": [e.public() for e in current],
             "remaining": {
                 "rounds": budget.max_rounds - run.spend.rounds,
                 "tool_calls": budget.max_tool_calls - run.spend.tool_calls,
             },
         }
-        if asked.resolved_question and asked.resolved_question != asked.question:
+        if (not gathered.context_changed and asked.resolved_question
+                and asked.resolved_question != asked.question):
             payload["request_in_context"] = asked.resolved_question
         state = conversation_state(run)
         if state is not None:
@@ -250,11 +271,16 @@ class Controller:
         if reason != "ready":
             limitations.append(f"stopped_{reason}")
         facts = tuple(dict(f) for e in envelopes for f in e.facts)
+        history = list(planner_history(run.ctx))
         return ReadyToCompose(
-            question=asked.question, resolved_question=asked.resolved_question,
+            question=asked.question,
+            resolved_question=None if gathered.context_changed else asked.resolved_question,
             intent=decision.intent, basis=EVIDENCE if envelopes else decision.basis,
             passages=passages, facts=facts, limitations=tuple(limitations),
-            stop_reason=reason, history=list(asked.history), clarify_about=decision.about,
+            spend=run.spend, answer_input_limit=budget.answer_reserve_tokens,
+            context_current=lambda: {t.pk for t in history} <= {t.pk for t in planner_history(run.ctx)},
+            current_facts=lambda: tuple(dict(f) for e in _current(run, envelopes) for f in e.facts),
+            stop_reason=reason, history=history, clarify_about=decision.about,
             repair_attempts=budget.repair_attempts, pins=pin(CONTROLLER_ENGINE),
             current=_still_current(run),
         )
@@ -311,11 +337,16 @@ def _current(run, envelopes) -> list:
               for item in (*run.ledger.records(), *run.ledger.passages())}
     named = [{owners[h] for h in _handles(e) if h in owners} for e in envelopes]
     allowed = disclosable(run.ctx, set().union(*named)) if named else {}
+    from apps.ai.research.tools.common import metadata_version
+
+    version = metadata_version(run.ctx) if any(e.metadata_version for e in envelopes) else None
     snapshot = None
     if any(_snapshots(e) for e in envelopes):
         snapshot = population_snapshot(visible_record_ids(run.ctx))
     return [e for e, ids in zip(envelopes, named)
-            if ids <= allowed.keys() and _snapshots(e) <= {snapshot}]
+            if ids <= allowed.keys() and _snapshots(e) <= {snapshot}
+            and (e.metadata_version is None or e.metadata_version == version)
+            and sources_current(run, e.source_items)]
 
 
 def _snapshots(envelope) -> set:
@@ -334,11 +365,15 @@ def _still_current(run):
     """Chunk ids still readable, disclosable and in an active chunk set."""
     def current(sources) -> set:
         allowed = disclosable(run.ctx, {s.record_id for s in sources})
-        active = set(DocumentChunk.objects.filter(
+        active = dict(DocumentChunk.objects.filter(
             pk__in=[s.chunk_id for s in sources], chunk_set__is_active=True,
             deleted_at__isnull=True,
-        ).values_list("pk", flat=True))
-        return {s.chunk_id for s in sources if s.record_id in allowed and s.chunk_id in active}
+        ).values_list("pk", "chunk_set__content_hash"))
+        original = {p.chunk_id: p for p in run.ledger.passages()}
+        return {s.chunk_id for s in sources if s.record_id in allowed
+                and s.record_title == allowed[s.record_id].title
+                and s.chunk_id in original
+                and original[s.chunk_id].chunk_set_hash == active.get(s.chunk_id)}
     return current
 
 

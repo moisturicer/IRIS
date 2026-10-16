@@ -194,12 +194,27 @@ def readable_record_ids(user, record_ids) -> set:
     )
 
 
+def stale_citation_turn_ids(citations):
+    """Turns derived from a missing, tombstoned or superseded chunk version.
+
+    A readable Record is not proof that its old findings remain current.
+    Legacy record-only citations carry no version, so also fail closed for
+    model reuse. Transcript readers may still receive a record-level pointer.
+    """
+    from django.db.models import Q
+
+    return citations.filter(
+        Q(chunk__isnull=True) | Q(chunk__deleted_at__isnull=False)
+        | Q(chunk__chunk_set__is_active=False)
+    ).values_list("turn_id", flat=True)
+
+
 def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
-    """``turns`` minus any citing a Record no longer readable (IR-592).
+    """``turns`` minus any citing unreadable or stale sources (IR-592/597).
 
     ``allowed`` maps cited ids to the permitted ones; it defaults to
-    ``visible_to(user)``. A Turn built on a revoked source is dropped whole,
-    so nothing derived from it reaches a prompt or a cache key.
+    ``visible_to(user)``. A Turn built on a revoked or superseded source is
+    dropped whole, so nothing derived from it reaches a prompt or cache key.
     """
     from apps.ai.models import TurnCitation
 
@@ -207,15 +222,16 @@ def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
         raise ValueError("readable_turns needs a user or an allowed function")
     turns = list(turns)
     cited: dict[int, set] = {}
-    for turn_id, record_id in TurnCitation.objects.filter(
-        turn_id__in=[turn.pk for turn in turns]
-    ).values_list("turn_id", "record_id"):
+    citations = TurnCitation.objects.filter(turn_id__in=[turn.pk for turn in turns])
+    stale = set(stale_citation_turn_ids(citations))
+    for turn_id, record_id in citations.values_list("turn_id", "record_id"):
         cited.setdefault(turn_id, set()).add(record_id)
     every = set().union(*cited.values()) if cited else set()
     if not every:
         return turns
     permitted = readable_record_ids(user, every) if allowed is None else set(allowed(every))
-    return [turn for turn in turns if cited.get(turn.pk, set()) <= permitted]
+    return [turn for turn in turns
+            if turn.pk not in stale and cited.get(turn.pk, set()) <= permitted]
 
 
 def recent_window(turns, user=None, *, allowed=None) -> list["Turn"]:

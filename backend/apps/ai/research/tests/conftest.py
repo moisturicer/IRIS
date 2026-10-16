@@ -52,3 +52,24 @@ def corpus(space, embedder):
     pond = make_record(title="Tilapia ponds", text=POND_TEXT, embedder=embedder, space=space)
     return {"student": student, "other": other, "public": public,
             "draft": draft, "pond": pond}
+
+
+@pytest.fixture
+def ledger_passage():
+    """A real current chunk behind synthetic synthesis passages (IR-597)."""
+    import hashlib
+    from apps.ai.models import DocumentChunk
+
+    def add(run, record, text, score):
+        chunk_set = record.chunk_sets.get(is_active=True)
+        sequence = chunk_set.chunks.count()
+        chunk = DocumentChunk.objects.create(
+            chunk_set=chunk_set, record=record, sequence=sequence, max_sequence=sequence,
+            text=text, content=text, text_hash=hashlib.sha256(text.encode()).hexdigest(),
+            token_count=1, source_page=1,
+        )
+        return run.ledger.add_passage(
+            record_id=record.pk, chunk_id=chunk.pk, chunk_set_hash=chunk_set.content_hash,
+            record_title=record.title, text=text, page=1, context_path=(), score=score,
+        )
+    return add

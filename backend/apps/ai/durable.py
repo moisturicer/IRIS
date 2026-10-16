@@ -89,7 +89,7 @@ from apps.ai.admission import scope as admission_scope
 from apps.ai.answers.citations import PARTIAL as PARTIAL_ANSWER
 from apps.ai.answers.events import Done, ReasoningDelta
 from apps.ai.composition import composition_root
-from apps.ai.controller.versions import ENGINES, LEGACY_ENGINE, pin
+from apps.ai.controller.versions import pin, supported_engine
 from apps.ai.models import (
     AskRun,
     AskRunAttempt,
@@ -129,6 +129,10 @@ _BATCH = 100
 
 class StaleAttempt(Exception):
     """This attempt no longer owns the run: superseded, finished or deleted."""
+
+
+class RunExpired(StaleAttempt):
+    """The current attempt reached its original deadline before a write."""
 
 
 class NotRetryable(Exception):
@@ -246,6 +250,13 @@ def _queue(user, conversation_id, request: dict, *, retry_of=None):
     if any(not _expire_overdue(run) for run in busy):
         return None
     _admit_to_queue(user)
+    from apps.ai.controller.budget import NotConfigured as ControllerNotConfigured
+    from apps.ai.controller.durable_budget import prepare_request
+
+    try:
+        request = prepare_request(request, retry=retry_of is not None)
+    except ControllerNotConfigured:
+        raise Busy("controller_not_configured") from None
     seconds = (settings.AI_COMPARISON_DEADLINE_SECONDS if request.get("comparison_ceiling")
                else settings.AI_DURABLE_ASK_DEADLINE_SECONDS)
     deadline = timezone.now() + timedelta(seconds=seconds)
@@ -381,11 +392,13 @@ def _append(run: AskRun, attempt, name: str, data: dict) -> None:
     )
 
 
-def _locked(attempt: AskRunAttempt) -> AskRun:
+def _locked(attempt: AskRunAttempt, *, allow_overdue=False) -> AskRun:
     """The run, locked, if ``attempt`` still owns it; otherwise `StaleAttempt`."""
     run = AskRun.objects.select_for_update().filter(pk=attempt.run_id).first()
     if run is None or run.is_terminal or run.current_attempt_id != attempt.pk:
         raise StaleAttempt(str(attempt.pk))
+    if not allow_overdue and timezone.now() >= run.deadline_at:
+        raise RunExpired(str(attempt.pk))
     return run
 
 
@@ -410,7 +423,7 @@ def _end(run: AskRun, state: str, reason: str, *, attempt=None, turn=None, event
 
 def finish_without_turn(attempt: AskRunAttempt, state: str, reason: str) -> None:
     with transaction.atomic():
-        _end(_locked(attempt), state, reason, attempt=attempt)
+        _end(_locked(attempt, allow_overdue=True), state, reason, attempt=attempt)
 
 
 def claim(run_id):
@@ -470,6 +483,14 @@ class _QueuedOrchestrator(ChatOrchestrator):
     def _record_guard(self, answer):
         return self._finishing(answer)
 
+    def _record_partial(self, answer):
+        # A closing vendor generator may offer a fragment after its owner was
+        # fenced. Discard it quietly; it cannot revive stopped work.
+        try:
+            super()._record_partial(answer)
+        except StaleAttempt:
+            pass
+
     @contextmanager
     def _finishing(self, answer):
         with transaction.atomic():
@@ -526,6 +547,11 @@ def execute(run_id) -> None:
         return
     try:
         _answer(attempt)
+    except RunExpired:
+        try:
+            finish_without_turn(attempt, EXPIRED, "deadline_exceeded")
+        except StaleAttempt:
+            pass
     except StaleAttempt:
         logger.info("Queued question %s: attempt %s was fenced out", run_id, attempt.pk)
     except Exception:
@@ -549,27 +575,44 @@ def _answer(attempt: AskRunAttempt) -> None:
     # is charged to the run's own budget and bounded by the time left until
     # the deadline fixed at submission (IR-545). A redelivery opens the same
     # run key and the same deadline; neither is reset.
-    with admission_scope.run(run_scope(run)), \
+    from apps.ai.controller.durable_budget import bind
+
+    with bind(attempt), admission_scope.run(run_scope(run, attempt)), \
             model_call_deadline(max(0.0, left)):
         _answer_run(attempt, run)
 
 
-def run_scope(run: AskRun) -> admission_scope.RunScope:
-    """The admission scope a run's provider attempts are charged to, halted
-    once the run is cancelled (IR-548)."""
+def run_scope(run: AskRun, attempt: AskRunAttempt | None = None) -> admission_scope.RunScope:
+    """Halt new provider attempts when work expires or loses its live owner."""
     from apps.ai.admission.limits import Ceiling
 
     pk = run.pk
-    ceiling = Ceiling(**run.request["comparison_ceiling"]) if run.request.get("comparison_ceiling") else None
-    return admission_scope.RunScope(
-        f"ask:{pk}", ceiling=ceiling, halted=lambda: AskRun.objects.filter(pk=pk, state=CANCELLED).exists(),
-    )
+    declared = run.request.get("comparison_ceiling") or run.request.get("admission_ceiling")
+    ceiling = Ceiling(**declared) if declared else None
+
+    def halted():
+        live = AskRun.objects.filter(
+            pk=pk, state__in=(QUEUED, RUNNING), deadline_at__gt=timezone.now(),
+        )
+        if attempt is not None:
+            live = live.filter(current_attempt_id=attempt.pk)
+        return not live.exists()
+
+    return admission_scope.RunScope(f"ask:{pk}", ceiling=ceiling, halted=halted)
 
 
 def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
     from django.http import Http404
 
     from apps.ai.views.chatbot import prepare_ask
+
+    # Refuse unsupported pins before preparation can call the resolver. A
+    # rollback must never execute new prompts under an older pinned version.
+    try:
+        engine = supported_engine(run.request.get("pin"))
+    except ValueError:
+        finish_without_turn(attempt, FAILED, "engine_unavailable")
+        return
 
     # Prepared again, as the asker, now: the Conversation and any override
     # Turn must still be theirs, and the resolver runs here, not in the request.
@@ -582,11 +625,6 @@ def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
     if error is not None:
         finish_without_turn(attempt, FAILED, "not_answerable")
         return
-    # A run queued before pins existed is a legacy run.
-    engine = (run.request.get("pin") or {}).get("engine", LEGACY_ENGINE)
-    if engine not in ENGINES:
-        finish_without_turn(attempt, FAILED, "engine_unavailable")
-        return
     prepared = replace(prepared, engine=engine)
 
     orchestrator = _QueuedOrchestrator(
@@ -594,7 +632,8 @@ def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
     )
     overdue = False
     events = orchestrator.answer_stream(run.user)
-    # Closing records whatever answer text arrived as a `partial` Turn (IR-328).
+    # Closing may preserve a fragment (IR-328); the write guard still fences
+    # it at the original deadline and against cancellation or supersession.
     with closing(events):
         for event in events:
             if timezone.now() >= run.deadline_at and not orchestrator.finished:

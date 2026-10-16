@@ -25,3 +25,19 @@ def pin(engine: str) -> dict:
         return {"engine": engine}
     return {"engine": engine, "protocol": PROTOCOL_VERSION, "prompt": PLAN_PROMPT_VERSION,
             "answer_prompt": ANSWER_PROMPT_VERSION}
+
+
+def supported_engine(versions) -> str:
+    """Resolve only pins this release can execute; absent pins predate the controller."""
+    if versions is None:
+        return LEGACY_ENGINE
+    if not isinstance(versions, dict):
+        raise ValueError("invalid run pin")
+    engine = versions.get("engine", LEGACY_ENGINE)
+    if engine not in ENGINES:
+        raise ValueError("unsupported engine")
+    if engine == CONTROLLER_ENGINE and any(
+        versions.get(key) != value for key, value in pin(engine).items()
+    ):
+        raise ValueError("unsupported controller versions")
+    return engine

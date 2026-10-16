@@ -17,6 +17,8 @@ LANE_BUSY = "lane_busy"
 ACCOUNT_BUSY = "account_busy"
 CAMPAIGN_EXHAUSTED = "campaign_exhausted"
 RUN_BUDGET_EXHAUSTED = "run_budget_exhausted"
+#: Research must leave capacity for final answer and its bounded repair.
+ANSWER_RESERVED = "answer_reserved"
 LEASE_LOST = "lease_lost"
 #: The run's asker cancelled it (IR-548): nothing new is sent on its behalf.
 RUN_CANCELLED = "run_cancelled"
