@@ -17,12 +17,11 @@
  * page opens is followed again from its first event; one that ended without
  * its answer says so and offers Retry.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { conversationPath, useConsumeHandoff } from "@/lib/askHandoff";
 import { aiApi } from "@/api/ai";
 import { useUIStore } from "@/store/ui.store";
-import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import type { ChatMessage } from "@/types/chat";
 import type { AIStatus, ConversationDetail, ConversationSummary } from "@/types/ai";
 import { recordsApi } from "@/api/records";
@@ -35,7 +34,7 @@ import { ConversationHistoryList, ConversationSidebar } from "./components/Conve
 import { SourceContextPanel, SourcePassages } from "./components/SourceContextPanel";
 import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
 import { useElementWidth } from "@/hooks/useElementWidth";
-import { ENDED_RUN_TEXT, StreamDetached, useAskStream, type AskStreamResult } from "./hooks/useAskStream";
+import { useConversationClient } from "./conversation/useConversationClient";
 
 /** History or sources: the two panels that sit beside the answer, or open over it (IR-570). */
 type AskPanel = "history" | "sources";
@@ -47,41 +46,6 @@ const FOLLOW_UP_LABEL = "Ask a follow-up about the research corpus…";
 function parseConversationParam(raw: string | undefined): number | null | undefined {
   if (raw === undefined) return undefined;
   return /^[1-9]\d*$/.test(raw) ? Number(raw) : null;
-}
-
-function isNotFound(err: unknown): boolean {
-  return (err as { response?: { status?: number } })?.response?.status === 404;
-}
-
-/**
- * The transcript a reader opening `conversation` sees: its Turns, then its
- * latest run when no Turn shows for it yet -- the question, and for a run
- * that ended unanswered, why (IR-548).
- */
-function transcriptOf(conversation: ConversationDetail): ChatMessage[] {
-  const messages = conversation.turns.flatMap(turnToMessages);
-  const run = conversation.latest_run;
-  if (!run) return messages;
-  messages.push(newChatMessage("user", run.question));
-  if (run.state === "cancelled" || run.state === "failed" || run.state === "expired") {
-    messages.push(newChatMessage("assistant", ENDED_RUN_TEXT[run.state], {
-      endedRun: { id: run.id, state: run.state },
-      question: run.question,
-      ...(run.state === "cancelled" ? {} : { partial: true }),
-    }));
-  }
-  return messages;
-}
-
-/** The most recent reply that cited anything — what the sources panel shows. */
-function latestGrounded(messages: ChatMessage[]): ChatMessage | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role === "assistant" && m.citations && m.citations.length > 0) {
-      return m;
-    }
-  }
-  return null;
 }
 
 /**
@@ -124,15 +88,10 @@ export default function RAGChatPage() {
   const handoff         = useConsumeHandoff();
 
   const [conversations, setConversations]   = useState<ConversationSummary[]>([]);
-  const [activeId, setActiveId]             = useState<number | null>(null);
-  const [unavailable, setUnavailable]       = useState(false);
-  const [messages, setMessages]             = useState<ChatMessage[]>([]);
-  const [loading, setLoading]               = useState(false);
   const [historyOpen, setHistoryOpen]       = useState(true);
   const [sourcesOpen, setSourcesOpen]       = useState(false);
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
-  const [draft, setDraft]                   = useState<string | null>(handoff);
   // Too narrow to hold history and sources beside the answer, they open one at
   // a time as drawers over it, closed until asked for (IR-570). Unmeasured
   // (jsdom, the first paint) counts as wide: the layout this page always had.
@@ -154,141 +113,55 @@ export default function RAGChatPage() {
     drawerOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDrawer(panel);
   };
-  const { streaming, ask, follow, cancel, detach } = useAskStream();
-  // The conversation on screen, and the one being opened, read after an
-  // await: an answer or a load that arrives late belongs to the one it was
-  // for, and is dropped if the reader has moved on.
-  const activeRef  = useRef<number | null>(null);
-  const openingRef = useRef<number | null>(null);
-  // Which answer `loading` belongs to; leaving a conversation abandons it.
-  const answering  = useRef(0);
-
-  // Read off the reply itself, so the panel cannot show one conversation's
-  // cards beside another's passages, and a reload restores both together
-  // (IR-284). The panel used to fetch a record per citation; the answer has
-  // already been told whose work each passage is.
-  const grounded = useMemo(() => latestGrounded(messages), [messages]);
-  const citations = grounded?.citations ?? [];
-  const sources = grounded?.sources ?? [];
-  const sourcesAvailable = citations.length > 0;
-
-  const activeTitle = unavailable
-    ? "Conversation unavailable"
-    : conversations.find((c) => c.id === activeId)?.title || "New chat";
-
-  const couldNotAnswer = useCallback(() => {
-    addToast({
-      type:    "error",
-      message: "IRIS could not answer right now. Check that the AI service is available.",
-    });
-  }, [addToast]);
-
   const refreshList = useCallback(async () => {
     const { data } = await aiApi.conversations.list();
     setConversations(data);
     return data;
   }, []);
 
-  /**
-   * Waits for one answer -- asked, followed or retried -- and appends it if
-   * its conversation is still the one on screen. The server stores it either
-   * way. Leaving stops following (`StreamDetached`), which is not an error.
-   */
-  const settle = useCallback(
-    async (conversationId: number, pending: () => Promise<AskStreamResult>) => {
-      const token = ++answering.current;
-      setLoading(true);
-      try {
-        const { message } = await pending();
-        if (activeRef.current === conversationId) {
-          // A replayed run whose Turn is already on screen adds nothing.
-          setMessages((prev) =>
-            message.turnId !== undefined && prev.some((m) => m.turnId === message.turnId)
-              ? prev
-              : [...prev, message]);
-          if (message.citations?.length) setSourcesOpen(true);
-        }
-        refreshList();
-      } catch (err) {
-        if (!(err instanceof StreamDetached)) couldNotAnswer();
-      } finally {
-        if (answering.current === token) setLoading(false);
-      }
+  // Transcripts, drafts, selected answers and answers in flight, one set per
+  // conversation, each answer bound to the conversation that asked (IR-562).
+  const client = useConversationClient({
+    onAnswered: (_conversationId, message, onScreen) => {
+      if (onScreen && message.citations?.length) setSourcesOpen(true);
+      refreshList();
     },
-    [couldNotAnswer, refreshList],
-  );
-
-  /** Puts `conversation` on screen, following its run if one is answering. */
-  const showConversation = useCallback(
-    (conversation: ConversationDetail) => {
-      detach();
-      answering.current += 1;
-      setLoading(false);
-      activeRef.current = conversation.id;
-      setActiveId(conversation.id);
-      setUnavailable(false);
-      setSourcesOpen(false);
-      setMessages(transcriptOf(conversation));
-      const run = conversation.latest_run;
-      if (run && (run.state === "queued" || run.state === "running")) {
-        void settle(conversation.id, () =>
-          follow(run.id, run.question, { conversationId: conversation.id }));
-      }
+    onFailed: () => {
+      addToast({
+        type:    "error",
+        message: "IRIS could not answer right now. Check that the AI service is available.",
+      });
     },
-    [detach, follow, settle],
-  );
+  });
+  const { activeId, unavailable, messages, selected } = client;
+  const loading = client.isAnswering;
 
-  /** Missing, deleted, malformed or someone else's: one answer for all. */
-  const showUnavailable = useCallback(() => {
-    detach();
-    answering.current += 1;
-    setLoading(false);
-    activeRef.current = null;
-    setActiveId(null);
-    setMessages([]);
-    setSourcesOpen(false);
-    setUnavailable(true);
-  }, [detach]);
+  // Read off the selected reply itself, so the panel cannot show one answer's
+  // passages beside another, or one conversation's beside another's (IR-284,
+  // IR-562). A newer answer that cited nothing shows that, not older sources.
+  const citations = selected?.citations ?? [];
+  const sources = selected?.sources ?? [];
+  const sourcesAvailable = selected !== null;
 
-  /** Loads conversation `id` through the owner-scoped API and shows it. */
-  const openConversation = useCallback(
-    async (id: number) => {
-      openingRef.current = id;
-      try {
-        const { data } = await aiApi.conversations.get(id);
-        if (openingRef.current === id) showConversation(data);
-      } catch (err) {
-        if (openingRef.current !== id) return;
-        if (!isNotFound(err)) throw err;
-        showUnavailable();
-      }
-    },
-    [showConversation, showUnavailable],
-  );
+  const activeTitle = unavailable
+    ? "Conversation unavailable"
+    : conversations.find((c) => c.id === activeId)?.title || "New chat";
+
+  const { open, show, showUnavailable, isOnScreen, setDraftFor } = client;
 
   /** Shows `conversation` and makes its address the current one. */
   const goTo = useCallback(
     (conversation: ConversationDetail, replace = false, nextDraft: string | null = null) => {
-      showConversation(conversation);
+      show(conversation);
+      if (nextDraft) setDraftFor(conversation.id, nextDraft);
       navigate(conversationPath(conversation.id), {
         replace,
-        // A draft rides in router state, never the address (IR-559).
+        // The draft also rides in router state, never the address (IR-559),
+        // so reloading the conversation's address still finds it.
         state: nextDraft ? { draft: nextDraft } : null,
       });
     },
-    [navigate, showConversation],
-  );
-
-  /**
-   * Asks `question` on Conversation `conversationId` and appends both sides
-   * of the exchange.
-   */
-  const sendQuestion = useCallback(
-    (conversationId: number, question: string) => {
-      setMessages((prev) => [...prev, newChatMessage("user", question)]);
-      return settle(conversationId, () => ask(question, { conversationId }));
-    },
-    [ask, settle],
+    [navigate, setDraftFor, show],
   );
 
   // `/ai` decides which conversation to open and replaces itself with its
@@ -311,7 +184,6 @@ export default function RAGChatPage() {
             ? await aiApi.conversations.get(scoped[0].id)
             : await aiApi.conversations.create({ record: Number(recordId) });
           if (cancelled) return;
-          setDraft(nextDraft);
           goTo(data, true, nextDraft);
           return;
         }
@@ -340,27 +212,36 @@ export default function RAGChatPage() {
     })();
 
     return () => { cancelled = true; };
-    // refreshList / goTo are stable across renders and `handoff` is read
-    // once on arrival — only the `record` query param, or arriving at `/ai`
+    // refreshList, goTo and the client's callbacks are stable across renders,
+    // and `handoff` is read once on arrival — only the `record` query param, or arriving at `/ai`
     // itself, should re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordParam, atIndex]);
 
+  // A draft that arrived with a conversation's own address -- a reload after
+  // a handoff -- belongs to the first conversation that address opens.
+  const routedDraft = useRef(atIndex ? null : handoff);
+
   // Opening an address: directly, on refresh, or by back and forward.
   useEffect(() => {
-    if (routeId === undefined || (routeId !== null && routeId === activeRef.current)) return;
+    if (routeId === undefined || (routeId !== null && isOnScreen(routeId))) return;
     if (routeId === null) {
-      openingRef.current = null;
       showUnavailable();
       return;
     }
-    openConversation(routeId).catch(() => {
-      addToast({
-        type:    "error",
-        message: "Could not load this conversation. Check that the AI service is available.",
+    open(routeId)
+      .then(() => {
+        const draft = routedDraft.current;
+        routedDraft.current = null;
+        if (draft && isOnScreen(routeId)) setDraftFor(routeId, draft);
+      })
+      .catch(() => {
+        addToast({
+          type:    "error",
+          message: "Could not load this conversation. Check that the AI service is available.",
+        });
       });
-    });
-  }, [routeId, openConversation, showUnavailable, addToast]);
+  }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, addToast]);
 
   // A drawer belongs to the layout that opened it, and to the conversation it
   // was opened over: widening the page or moving to another conversation (a
@@ -369,8 +250,11 @@ export default function RAGChatPage() {
     setDrawer(null);
   }, [panelsAsDrawers, activeId]);
 
-  // Stop following an answer when the page goes away; the run carries on.
-  useEffect(() => detach, [detach]);
+  // The sources column describes an answer in the conversation on screen, so
+  // another conversation opens with it closed, until its own answer cites.
+  useEffect(() => {
+    setSourcesOpen(false);
+  }, [activeId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -413,8 +297,9 @@ export default function RAGChatPage() {
 
   const handleDelete = async (id: number) => {
     await aiApi.conversations.remove(id);
+    client.forget(id);
     const list = await refreshList();
-    if (activeRef.current === id || unavailable) {
+    if (isOnScreen(id) || unavailable) {
       const { data } = list.length > 0
         ? await aiApi.conversations.get(list[0].id)
         : await aiApi.conversations.create();
@@ -424,23 +309,9 @@ export default function RAGChatPage() {
     addToast({ type: "info", message: "Chat removed." });
   };
 
-  const handleSend = (text: string) => {
-    if (!activeId) return;
-    setDraft(null);
-    return sendQuestion(activeId, text);
-  };
-
   const handleRetry = async (message: ChatMessage) => {
-    const run = message.endedRun;
-    const conversationId = activeRef.current;
-    if (!run || conversationId === null || loading) return;
     try {
-      const { data } = await aiApi.retryRun(run.id);
-      // The notice stays; only its Retry goes, since a second one would
-      // return this same retry anyway.
-      setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, endedRun: undefined } : m)));
-      void settle(conversationId, () =>
-        follow(data.run_id, message.question ?? "", { conversationId }));
+      await client.retry(message);
     } catch {
       addToast({ type: "error", message: "IRIS could not retry that question right now." });
     }
@@ -544,17 +415,24 @@ export default function RAGChatPage() {
             <ChatMessageList
               messages={messages}
               isLoading={loading}
-              streaming={streaming}
+              streaming={client.streaming}
               suggestions={suggestions}
-              onSuggestion={handleSend}
+              onSuggestion={client.send}
               indexedRecords={status?.indexed_records ?? null}
               onRetry={handleRetry}
-              onStop={() => void cancel()}
+              onStop={() => void client.stop()}
+              selectedId={selected?.id ?? null}
+              onSelectSources={(message) => {
+                client.select(message.id);
+                if (panelsAsDrawers) togglePanel("sources");
+                else setSourcesOpen(true);
+              }}
             />
           )}
           <ChatInput
-            onSend={handleSend}
-            draft={draft}
+            onSend={client.send}
+            draft={client.draft}
+            onDraftChange={client.setDraft}
             disabled={loading || !activeId}
             label={FOLLOW_UP_LABEL}
             // One line in a phone's composer; the name above stays whole.
@@ -567,6 +445,7 @@ export default function RAGChatPage() {
             open={sourcesOpen}
             citations={citations}
             sources={sources}
+            question={selected?.question ?? null}
             onClose={() => setSourcesOpen(false)}
           />
         )}
@@ -598,13 +477,13 @@ export default function RAGChatPage() {
       {drawer === "sources" && (
         <ChatDrawer
           title="Referenced passages"
-          description="The exact text behind the latest answer"
+          description={selected?.question ? `For “${selected.question}”` : "The exact text behind the answer"}
           side="end"
           closeLabel="Hide sources panel"
           onClose={() => setDrawer(null)}
           returnTo={drawerOpener.current}
         >
-          <SourcePassages citations={citations} sources={sources} />
+          <SourcePassages citations={citations} sources={sources} answered={selected !== null} />
         </ChatDrawer>
       )}
     </div>

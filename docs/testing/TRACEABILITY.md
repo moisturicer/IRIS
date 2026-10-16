@@ -1208,6 +1208,46 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
   - browser zoom and reduced motion.
 
 
+## IR-562: Ask IRIS keeps each answer and its sources with the Conversation that asked
+
+**Requirement.** IR-552 user stories 12, 14 and 16. Switching conversations while an answer is still arriving never puts that answer, or its sources, in the wrong conversation, and the sources panel describes the answer the reader selected. Before this, the panel showed the latest answer that had sources: ask A (cited), then B (uncited), and A's papers stayed beside B.
+
+**Implementation.**
+- `features/ai/conversation/useConversationClient.ts` is Ask IRIS's one Conversation client. Per conversation, it keeps the transcript, the unsent draft, the selected answer and the answer in flight.
+  - Loading goes through IR-548's owned route (`open`), and Stop and Retry through IR-548's run routes. The page keeps the address and nothing else.
+- Every answer is bound to the conversation that asked and to a request id minted at send. Its events and result apply only while that request is still the conversation's current one.
+  - A late answer lands in its own conversation, even after the reader has moved on.
+  - A load is dropped if the reader has since opened another conversation, or if an answer landed in that conversation while it was loading, since the transcript already held is newer.
+- **Behaviour change:** moving to another conversation no longer stops following the answer. Stopping cut a request-bound answer off, and the server then stored a fragment. Stop remains the reader's explicit cancellation. Because of this, the composer of another conversation is free while one is still answering.
+- The stream's event handling moves out of `useAskStream` into `conversation/answerStream.ts` (`streamAnswer`), a plain function, so several answers can be followed at once. `useAskStream` keeps its interface for Paper Chat, which IR-571 moves onto the client.
+- Sources follow the selected answer, which is the latest until the reader picks another with its "N sources" button (`aria-pressed`).
+  - The panel and drawer name the answer by its question.
+  - An answer that cited nothing says "This answer cited no passages." rather than showing an older answer's sources.
+  - The toolbar's Sources toggle is enabled once any answer exists, an ended-run notice included.
+- Each conversation keeps its own draft (`ChatInput` takes `draft` and `onDraftChange`). A handed-off draft still rides in router state, so reloading the conversation's address keeps it.
+- Activity is unchanged: the one polite status line under the answer (IR-570, IR-596). Each conversation shows only its own.
+
+**Tests.** `RAGChatPage.test.tsx` › "each answer stays with the conversation that asked (IR-562)", 10 page tests on delayed streams:
+- An answer still arriving stays out of the conversation the reader moved to, and its stream is not aborted.
+- Returning mid-answer shows the question and live line, then the answer, once.
+- The live line and Stop show only in the answering conversation, and another conversation's composer is free.
+- Each conversation keeps its own unsent draft.
+- A newer uncited answer shows "cited no passages" and its own question, never the older passages.
+- Selecting an earlier answer's sources shows them and names it.
+- A cited answer that lands after a mid-answer switch is selectable with its sources in its own conversation.
+- An answer that lands while its conversation is loading is kept rather than replaced by the older copy. With the guard removed, this test fails.
+- A handed-off draft survives reloading the conversation's address.
+- One conversation's sources never appear in another.
+
+Five failed before the change, and the live-line, sources-carry and reload-draft guards passed. The stale-load test was added after review and fails without its guard.
+
+**Evidence, 2026-10-16.**
+- `npm test`: **1130 passed, 3 failed**, the same 3 `Sidebar.test.tsx` failures as unmodified `main`. A full run once also hit the PaperAiOverview polling flake that IR-601 fixes. It passed 3 out of 3 when run alone.
+- `tsc --noEmit` is clean, lint has 0 errors (no warning in touched files), and `npm run build` passes. The impeccable design detector reports no findings.
+- A two-axis review (standards and spec) followed. It moved loading into the client, bound loads to the conversation's answer revision, carried a selection across a reload by Turn, renamed the composer props to match Paper view, and added the mid-answer sources and stale-load tests.
+- Not checked: a browser run. The dev corpus has no indexed records, so no answer carries citations there.
+
+
 ## IR-597 — Controller recovery, budgets and source safety
 
 Authority: ADR-042 and general-tools specification sections 7/10, scenarios A11, A12 and A15.
