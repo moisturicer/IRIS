@@ -210,6 +210,8 @@ class Envelope:
     facts: tuple[Mapping[str, Any], ...] = ()
     continuation: Optional[str] = None
     limitations: tuple[str, ...] = ()
+    #: Private immutable pointers for reauthorization; never included in public().
+    source_items: tuple = ()
 
     def __post_init__(self) -> None:
         for code in self.limitations:

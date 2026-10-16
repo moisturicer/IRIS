@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Optional, Protocol, Sequence
 
 from apps.ai.admission import scope as admission_scope
@@ -23,6 +23,10 @@ from apps.ai.inference import InferenceTask
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.retrieval.ports import RetrievedChunk
+from apps.ai.research.budget import BudgetExhausted, Spend
+from apps.ai.admission.ledger import estimate_tokens as admission_tokens
+from apps.ai.admission.limits import enforcing
+from apps.ai.history import estimate_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +124,10 @@ class ReadyToCompose:
     repair_attempts: int = 0
     degraded: bool = False
     pins: dict = field(default_factory=dict)
+    spend: Optional[Spend] = None
+    answer_input_limit: Optional[int] = None
+    context_current: Optional[Callable[[], bool]] = None
+    current_facts: Optional[Callable[[], tuple]] = None
     #: Chunk ids among the given sources still readable and current; None
     #: treats every source as current.
     current: Optional[Callable[[Sequence[RetrievedChunk]], set]] = None
@@ -137,7 +145,10 @@ class AnswerComposer:
 
     def compose(self, ready: ReadyToCompose) -> GroundedAnswer:
         sources = tuple(ready.passages)
-        if ready.intent == ANSWER and ready.basis == EVIDENCE and not sources and not ready.facts:
+        live = _live(ready, sources)
+        if cancelled() or not _facts_current(ready) or not _context_current(ready):
+            return _unavailable(live)
+        if ready.intent == ANSWER and ready.basis == EVIDENCE and not live and not ready.facts:
             # Empty, withheld and irrelevant all read the same (ADR-042).
             return GroundedAnswer(NO_SOURCES_TEXT, (), state=NO_SOURCES, degraded=ready.degraded)
         try:
@@ -145,16 +156,20 @@ class AnswerComposer:
         except (LLMUnavailable, CircuitOpen):
             return _unavailable(_live(ready, sources))
         system, prompt = _prompt(ready, sources)
-        raw = _draft(llm, system, prompt)
+        raw = _draft(llm, system, prompt, ready)
         if raw is None:
+            return _unavailable(_live(ready, sources))
+        if cancelled() or not _facts_current(ready) or not _context_current(ready):
             return _unavailable(_live(ready, sources))
         draft, issues, live = self._checked(ready, raw, sources)
         repaired = False
         repairable = [i for i in issues if i.code not in FENCED]
         if (repairable and not any(i.code in FENCED for i in issues)
                 and ready.repair_attempts > 0 and not cancelled()):
-            again = _draft(llm, system, prompt + _feedback(draft, issues))
+            again = _draft(llm, system, prompt + _feedback(draft, issues), ready)
             if again is not None:
+                if cancelled() or not _facts_current(ready) or not _context_current(ready):
+                    return _unavailable(_live(ready, sources))
                 draft, issues, live = self._checked(ready, again, sources)
                 repaired = True
         drop = {i.unit for i in issues if i.unit is not None}
@@ -185,6 +200,11 @@ class AnswerComposer:
 
 
 def _prompt(ready: ReadyToCompose, sources) -> tuple[str, str]:
+    # Keep citation positions stable while withholding any source lost before send.
+    live = {s.chunk_id for s in _live(ready, sources)}
+    sources = tuple(s if s.chunk_id in live else replace(
+        s, record_title="Unavailable source", content="", context_path=(), source_page=None,
+    ) for s in sources)
     if ready.intent == CLARIFY:
         prompt = build_prompt(ready.question, (), history=ready.history)
         return _CLARIFY_SYSTEM, f"{prompt}\n\nAmbiguity: {ready.clarify_about or 'unspecified'}"
@@ -200,12 +220,21 @@ def _prompt(ready: ReadyToCompose, sources) -> tuple[str, str]:
     return ANSWER_POLICY + CONTRACT, prompt
 
 
-def _draft(llm, system: str, prompt: str) -> Optional[str]:
+def _draft(llm, system: str, prompt: str, ready) -> Optional[str]:
     """One completion, or None on an outage or a reasoning-only reply."""
     try:
+        if cancelled() or not _facts_current(ready) or not _context_current(ready):
+            return None
+        if (enforcing() and ready.answer_input_limit is not None
+                and admission_tokens(system, prompt) > ready.answer_input_limit):
+            return None
+        if ready.spend is not None:
+            if ready.spend.remaining_seconds <= 0:
+                return None
+            ready.spend.charge_prompt_tokens(estimate_tokens(system + prompt), answer=True)
         raw = llm.generate(system=system, user=prompt)
-    except (LLMUnavailable, CircuitOpen, TimeoutError) as exc:
-        logger.warning("controller answer unavailable: %s", exc)
+    except (LLMUnavailable, CircuitOpen, TimeoutError, BudgetExhausted) as exc:
+        logger.warning("controller answer unavailable: %s", type(exc).__name__)
         return None
     raw = without_leaked_reasoning(raw or "")
     return raw if raw.strip() else None
@@ -246,3 +275,11 @@ def cancelled() -> bool:
 def _unavailable(sources) -> GroundedAnswer:
     return GroundedAnswer(UNAVAILABLE_TEXT, (), state=UNAVAILABLE, sources=tuple(sources),
                           degraded=True)
+
+
+def _facts_current(ready) -> bool:
+    return ready.current_facts is None or ready.current_facts() == ready.facts
+
+
+def _context_current(ready) -> bool:
+    return ready.context_current is None or ready.context_current()

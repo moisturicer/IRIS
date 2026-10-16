@@ -24,6 +24,7 @@ class Spend:
         self.subtask_calls = 0
         self.tool_calls = 0
         self.prompt_tokens = 0
+        self.protected_prompt_tokens = 0
 
     def begin_round(self) -> None:
         self._check_clock()
@@ -58,7 +59,10 @@ class Spend:
         if subtask:
             self.subtask_calls += 1
 
-    def charge_prompt_tokens(self, tokens: int) -> None:
+    def charge_prompt_tokens(self, tokens: int, *, answer: bool = False) -> None:
+        if (not answer and self.protected_prompt_tokens
+                and self.prompt_tokens + tokens > self._budget.max_prompt_tokens - self.protected_prompt_tokens):
+            raise BudgetExhausted("answer_reserve")
         self.prompt_tokens += tokens
         if self.prompt_tokens > self._budget.max_prompt_tokens:
             raise BudgetExhausted("max_prompt_tokens")

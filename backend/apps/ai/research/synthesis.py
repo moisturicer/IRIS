@@ -29,7 +29,10 @@ class LedgerRetriever(Retriever):
             raise PermissionError("research run owner mismatch")
         items = self.run.ledger.passages()
         allowed = disclosable(self.run.ctx, (p.record_id for p in items))
-        items = [p for p in items if p.record_id in allowed][:limit]
+        from .registry import sources_current
+
+        items = [p for p in items if p.record_id in allowed
+                 and sources_current(self.run, (p,))][:limit]
         self.source_handles = {i: p.handle for i, p in enumerate(items, 1)}
         self.sources = tuple(
             RetrievedChunk(

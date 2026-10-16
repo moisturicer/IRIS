@@ -14,6 +14,7 @@ from typing import Optional
 
 from django.conf import settings
 
+from apps.ai.admission import scope as admission_scope
 from apps.ai.answers.citations import GroundedAnswer, UNAVAILABLE
 from apps.ai.answers.events import RetrievalStarted
 from apps.ai.answers.service import UNAVAILABLE_TEXT
@@ -30,7 +31,7 @@ from apps.ai.research.audit import RunAudit, Step, argument_digest
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.context import RunContext
 from apps.ai.research.prompts import conversation_state, planner_history
-from apps.ai.research.registry import ToolRun, general_tools
+from apps.ai.research.registry import ToolRun, general_tools, sources_current
 from apps.ai.research.results import Status, ToolStatus, population_snapshot
 from apps.ai.research.synthesis import LedgerRetriever
 from apps.ai.research.tools.common import disclosable, visible_record_ids
@@ -38,6 +39,7 @@ from apps.ai.resilience.circuit import CircuitOpen
 
 from . import prompts
 from .budget import ControllerBudget, NotConfigured
+from .durable_budget import pinned, restore
 from .compose import CLARIFY, EVIDENCE, AnswerComposer, ReadyToCompose, cancelled
 from .versions import CONTROLLER_ENGINE, pin
 
@@ -81,18 +83,22 @@ class Controller:
         """Yield neutral progress; return an `Outcome`."""
         yield RetrievalStarted()
         try:
-            budget = ControllerBudget.from_settings()
+            budget = pinned("controller", ControllerBudget.from_settings, ControllerBudget)
         except NotConfigured as exc:
             logger.warning("controller not configured: %s", exc)
             return Outcome(_unavailable(), "not_configured")
         ctx = self._context(asked, user, budget)
         run = ToolRun.start(ctx, self.root, scoped_handles=True)
+        run = replace(run, spend=restore(run.spend, protected_tokens=budget.reserved_tokens))
         audit = RunAudit(ctx, self.clock)
         registry = general_tools()
         gathered = _Gathered([], set(), [])
         try:
             with model_call_deadline(ctx.budget.wall_clock_seconds, clock=self.clock):
-                decision, reason = self._gather(asked, run, registry, budget, audit, gathered)
+                with admission_scope.answer_allowance(
+                    tokens=budget.reserved_tokens, attempts=budget.answer_attempts,
+                ):
+                    decision, reason = self._gather(asked, run, registry, budget, audit, gathered)
                 if reason == "cancelled":
                     audit.finish(status=UNAVAILABLE, reason=reason,
                                  prompt_tokens=run.spend.prompt_tokens)
@@ -250,11 +256,15 @@ class Controller:
         if reason != "ready":
             limitations.append(f"stopped_{reason}")
         facts = tuple(dict(f) for e in envelopes for f in e.facts)
+        history = list(planner_history(run.ctx))
         return ReadyToCompose(
             question=asked.question, resolved_question=asked.resolved_question,
             intent=decision.intent, basis=EVIDENCE if envelopes else decision.basis,
             passages=passages, facts=facts, limitations=tuple(limitations),
-            stop_reason=reason, history=list(asked.history), clarify_about=decision.about,
+            spend=run.spend, answer_input_limit=budget.answer_reserve_tokens,
+            context_current=lambda: {t.pk for t in history} <= {t.pk for t in planner_history(run.ctx)},
+            current_facts=lambda: tuple(dict(f) for e in _current(run, envelopes) for f in e.facts),
+            stop_reason=reason, history=history, clarify_about=decision.about,
             repair_attempts=budget.repair_attempts, pins=pin(CONTROLLER_ENGINE),
             current=_still_current(run),
         )
@@ -315,7 +325,8 @@ def _current(run, envelopes) -> list:
     if any(_snapshots(e) for e in envelopes):
         snapshot = population_snapshot(visible_record_ids(run.ctx))
     return [e for e, ids in zip(envelopes, named)
-            if ids <= allowed.keys() and _snapshots(e) <= {snapshot}]
+            if ids <= allowed.keys() and _snapshots(e) <= {snapshot}
+            and sources_current(run, e.source_items)]
 
 
 def _snapshots(envelope) -> set:
@@ -334,11 +345,15 @@ def _still_current(run):
     """Chunk ids still readable, disclosable and in an active chunk set."""
     def current(sources) -> set:
         allowed = disclosable(run.ctx, {s.record_id for s in sources})
-        active = set(DocumentChunk.objects.filter(
+        active = dict(DocumentChunk.objects.filter(
             pk__in=[s.chunk_id for s in sources], chunk_set__is_active=True,
             deleted_at__isnull=True,
-        ).values_list("pk", flat=True))
-        return {s.chunk_id for s in sources if s.record_id in allowed and s.chunk_id in active}
+        ).values_list("pk", "chunk_set__content_hash"))
+        original = {p.chunk_id: p for p in run.ledger.passages()}
+        return {s.chunk_id for s in sources if s.record_id in allowed
+                and s.record_title == allowed[s.record_id].title
+                and s.chunk_id in original
+                and original[s.chunk_id].chunk_set_hash == active.get(s.chunk_id)}
     return current
 
 

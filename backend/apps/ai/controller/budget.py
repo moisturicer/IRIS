@@ -60,8 +60,10 @@ class ControllerBudget:
 
     def run_budget(self) -> Budget:
         """The registry's Budget, inside the run's original deadline."""
-        base = Budget.from_settings()
-        seconds = base.wall_clock_seconds
+        from .durable_budget import pinned, remaining_seconds
+
+        base = pinned("research", Budget.from_settings, Budget)
+        seconds = remaining_seconds(base.wall_clock_seconds)
         left: Optional[float] = time_left()
         if left is not None:
             seconds = min(seconds, max(0.0, left))
