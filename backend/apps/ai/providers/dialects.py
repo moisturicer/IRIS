@@ -31,6 +31,8 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from apps.ai.citation_markers import MARKER, numbers_in
+from apps.ai.providers.ports import NO_CAPABILITIES, LLMCapabilities
+from apps.ai.providers.tool_calling import ContinuationArtifact
 
 
 class VendorDialect(ABC):
@@ -49,6 +51,9 @@ class VendorDialect(ABC):
     #: loops for a dialect that leaves this False -- switching that off for a
     #: dialect that says True is IR-385's, not this one's.
     resolves_fallback: bool = False
+
+    #: What this vendor can return beyond text (IR-595).
+    capabilities: LLMCapabilities = NO_CAPABILITIES
 
     @abstractmethod
     def request_extras(
@@ -82,6 +87,14 @@ class VendorDialect(ABC):
             or getattr(delta, "reasoning_content", None)
             or ""
         )
+
+    def read_provider_summary(self, message: Any) -> str:
+        """The vendor's own reasoning summary, or "" (private candidate only)."""
+        return ""
+
+    def read_continuation(self, message: Any) -> tuple[ContinuationArtifact, ...]:
+        """Opaque artifacts to echo back; none for a vendor that declares none."""
+        return ()
 
     def normalize_citation_markers(self, text: str) -> str:
         """Rewrite this vendor's marker variants to the canonical `[n]`.
@@ -176,6 +189,19 @@ class OpenRouterDialect(VendorDialect):
     #: `request_extras`. IR-385 is what stops `apps/ai/inference/providers.py`
     #: looping a request per model once this is true.
     resolves_fallback = True
+
+    capabilities = LLMCapabilities(display_summary=True, continuation_artifacts=True)
+
+    def read_provider_summary(self, message: Any) -> str:
+        """Only `reasoning.summary` entries; raw text and encrypted blocks stay out."""
+        details = getattr(message, "reasoning_details", None) or []
+        parts = [d.get("summary") for d in details
+                 if isinstance(d, dict) and d.get("type") == "reasoning.summary"]
+        return " ".join(p.strip() for p in parts if isinstance(p, str) and p.strip())
+
+    def read_continuation(self, message: Any) -> tuple[ContinuationArtifact, ...]:
+        details = getattr(message, "reasoning_details", None)
+        return (ContinuationArtifact("reasoning_details", details),) if details else ()
 
     def request_extras(
         self, reasoning_effort: str, models: tuple[str, ...] = ()

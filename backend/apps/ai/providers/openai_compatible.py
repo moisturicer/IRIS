@@ -137,6 +137,8 @@ def _wire(message: Message) -> dict[str, Any]:
         }
     if isinstance(message, AssistantMessage):
         wire: dict[str, Any] = {"role": "assistant", "content": message.text or None}
+        for artifact in message.continuation:
+            wire[artifact.field] = artifact.payload
         if message.tool_calls:
             wire["tool_calls"] = [
                 {
@@ -514,6 +516,8 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         return ToolCompletion(
             text=getattr(message, "content", None) or "",
             reasoning=self.dialect.read_reasoning(message),
+            provider_summary=self.dialect.read_provider_summary(message),
+            continuation=self.dialect.read_continuation(message),
             tool_calls=tuple(
                 ToolCall(
                     name=getattr(getattr(call, "function", None), "name", "") or "",

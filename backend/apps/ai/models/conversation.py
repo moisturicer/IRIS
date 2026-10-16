@@ -210,6 +210,11 @@ class Turn(models.Model):
     widened = models.BooleanField(default=False)
     had_reasoning = models.BooleanField(default=False)
     reasoning = models.TextField(blank=True)
+    #: The validated display summary (IR-595): never evidence, never raw
+    #: reasoning. Same lifetime as the Turn; blank when none was safe.
+    reasoning_summary = models.TextField(blank=True)
+    #: Where it came from: "<engine>/<answer prompt version>".
+    reasoning_summary_source = models.CharField(max_length=60, blank=True)
     routing = models.JSONField(default=dict, blank=True)
     listing = models.JSONField(default=dict, blank=True)
     comparison = models.JSONField(default=dict, blank=True)

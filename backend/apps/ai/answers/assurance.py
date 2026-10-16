@@ -259,10 +259,44 @@ def without_units(text: str, drop: set[int]) -> str:
     return re.sub(r"(?<=\S) {2,}", " ", text).strip()
 
 
-def safe_summary(summary: str, answer: str) -> str:
-    """The analytical summary, or "" when it is not safe to show (spec §6.2)."""
+#: Narration, markup and vendor names a reader-facing summary may not carry.
+_NARRATION = re.compile(
+    r"<\s*/?\s*\w[^>]*>|\b(?:I|we|let me|let's)\b|\b(?:searched|searching|calling|called|invoked"
+    r"|queried|retrieved|fetched|looked up|tool|tools|step \d+)\b"
+    r"|\b(?:openai|anthropic|groq|openrouter|voyage|gpt[\w.-]*|claude|gemini|llama|mistral"
+    r"|deepseek|qwen)\b", re.I)
+_QUOTED = re.compile(r"\"([^\"\n]+)\"|“([^”\n]+)”")
+#: Common sentence openers allowed without support. Limit: lowercase claims are not checked.
+_STARTERS = frozenset(
+    "a an the this that these those it they both each all some most many several only one two "
+    "three no none however although while because since if when as in on of for with without "
+    "but and so then also here there evidence results result papers paper studies study "
+    "evaluation settings setting findings sources source differences difference".split())
+_CAPITALISED = re.compile(r"\b[A-Z][A-Za-z0-9-]*\b")
+
+
+def _words(text: str) -> set[str]:
+    return {w.lower() for w in re.findall(r"[A-Za-z0-9-]+", text)}
+
+
+def safe_summary(summary: str, answer: str, evidence: str = "") -> str:
+    """The analytical summary, or "" when it is not safe to show (spec §6.2).
+
+    Deterministic, no model call. Dropped, never repaired, when it narrates
+    tools or process, carries markup, citations or a vendor name, or states a
+    number, quoted phrase or proper noun that neither the answer nor the cited
+    passages (`evidence`) contain.
+    """
     summary = (summary or "").strip()
     if (not summary or len(summary) > 600 or "[" in summary or "]" in summary
-            or _INTERNAL.search(summary) or not numbers(summary) <= numbers(answer)):
+            or _INTERNAL.search(summary) or _NARRATION.search(summary)):
+        return ""
+    support = f"{answer}\n{evidence}"
+    if not numbers(summary) <= numbers(support):
+        return ""
+    if any((a or b).lower() not in support.lower() for a, b in _QUOTED.findall(summary)):
+        return ""
+    known = _words(support) | _STARTERS
+    if any(m.group().lower() not in known for m in _CAPITALISED.finditer(summary)):
         return ""
     return summary

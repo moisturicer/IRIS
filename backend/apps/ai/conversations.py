@@ -27,7 +27,8 @@ from typing import Optional
 from django.conf import settings
 from django.db import transaction
 
-from apps.ai.answers.citations import PARTIAL, GroundedAnswer
+from apps.ai import public as public_protocol
+from apps.ai.answers.citations import GENERATED, PARTIAL, GroundedAnswer
 from apps.ai.models import (
     MODEL_HISTORY_STATES,
     TURN_ANSWER_VECTOR,
@@ -203,6 +204,8 @@ def _write_turn(
         widened=widened,
         had_reasoning=answer.had_reasoning,
         reasoning=answer.reasoning,
+        reasoning_summary=answer.reasoning_summary if answer.state == GENERATED else "",
+        reasoning_summary_source=answer.reasoning_summary_source if answer.state == GENERATED else "",
         routing=routing or {},
         research=research or {},
         comparison=stored_comparison,
@@ -315,7 +318,7 @@ def _store_answer_vector(turn: Turn, answer: GroundedAnswer, embedder) -> None:
     )
 
 
-def turns_for_reader(conversation: Conversation, user) -> list[dict]:
+def turns_for_reader(conversation: Conversation, user, *, public: bool = False) -> list[dict]:
     """The conversation's Turns, every citation re-resolved against ``user``.
 
     Two queries for the whole transcript, not one pair per citation: which
@@ -323,20 +326,23 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
     live. Everything else -- dropping an invisible citation, degrading a
     tombstoned one -- is a lookup into those two results.
     """
-    return _for_reader(list(conversation.turns.prefetch_related("citations")), user)
+    return _for_reader(
+        list(conversation.turns.prefetch_related("citations")), user, public=public
+    )
 
 
-def turn_for_reader(turn: Turn, user) -> dict:
+def turn_for_reader(turn: Turn, user, *, public: bool = False) -> dict:
     """One Turn, re-resolved exactly as a reopened transcript would show it.
 
     What a queued run's replayed `done` is built from (IR-544), so a reader
     who reconnects gets the permissions of now, not of when it was written.
     """
     turn = Turn.objects.prefetch_related("citations").get(pk=turn.pk)
-    return _for_reader([turn], user)[0]
+    return _for_reader([turn], user, public=public)[0]
 
 
-def _for_reader(turns: list, user) -> list[dict]:
+def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
+    """``public`` (IR-595) projects bodies through `apps.ai.public`; stored data is kept."""
     all_citations = [
         citation for turn in turns for citation in turn.citations.all()
     ]
@@ -422,6 +428,12 @@ def _for_reader(turns: list, user) -> list[dict]:
                         citations=[], reasoning=None, state="unavailable", degraded=True)
         else:
             body["comparison"] = comparison
+    if public:
+        for turn, body in zip(turns, bodies):
+            summary = public_protocol.summary_for(turn, len(body["citations"]))
+            if summary:
+                body["reasoning_summary"] = summary
+        return [public_protocol.project_turn(body) for body in bodies]
     return bodies
 
 

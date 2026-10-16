@@ -176,7 +176,7 @@ class Controller:
             replies, stop = self._execute(run, registry, calls, budget, audit, gathered)
             if stop:
                 return prompts.Decision(), stop
-            previous = [AssistantMessage(tool_calls=calls),
+            previous = [AssistantMessage(tool_calls=calls, continuation=completion.continuation),
                         *(ToolResultMessage(c.id, reply) for c, reply in zip(calls, replies))]
 
     def _execute(self, run, registry, calls, budget, audit, gathered):
