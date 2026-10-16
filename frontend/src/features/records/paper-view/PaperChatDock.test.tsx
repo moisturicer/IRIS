@@ -1,4 +1,3 @@
-import { routingFixture } from "@/test/routingFixture";
 /**
  * Paper Chat as a Conversation scoped to the Record being viewed (IR-298).
  *
@@ -347,15 +346,84 @@ describe("minimized to a bar while the reader reads a citation (IR-354)", () => 
   });
 });
 
-it("reruns with the original answer scope even when the composer scope differs", async () => {
-  findForRecord.mockResolvedValue(conversation({ turns: [{
+const PROHIBITED = [
+  "Answer approach", "Why this approach", "Try instead", "Rerun with", "List papers",
+  "search_passages", "find_records", "read_record_sections", "Research steps",
+];
+
+const SUMMARY = "These papers address the same problem, but their settings differ.";
+
+describe("clean answers in Paper Chat (IR-596)", () => {
+  const oldTurn = (extra: Record<string, unknown> = {}) => ({
     id: 1, question: "Find flooding papers", resolved_question: null,
     answer: "Prior answer", message: null, state: "generative", degraded: false,
-    widened: true, created_at: "2026-10-11", citations: [], routing: routingFixture,
-  }] }));
-  renderScreen(<PaperChatPanel record={record} onClose={noop} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
-  await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
-    conversationId: 42, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
-  }, expect.any(AbortSignal)));
+    widened: false, created_at: "2026-10-11", citations: [],
+    routing: { lane: "listing", reason: "list_request", allowed_overrides: ["passage", "listing"] },
+    research: { steps: [{ position: 0, tool: "search_passages", status: "ok" }], coverage_notes: [] },
+    reasoning: "secret working",
+    ...extra,
+  }) as never;
+
+  it("reopens as answer and citations only, with the summary collapsed when there is one", async () => {
+    findForRecord.mockResolvedValue(conversation({ turns: [oldTurn({ reasoning_summary: SUMMARY })] }));
+    const { container } = renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    expect(await screen.findByText("Prior answer")).toBeInTheDocument();
+    for (const prohibited of PROHIBITED) expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+    expect(container.textContent).not.toContain("secret working");
+    expect(screen.queryByText(SUMMARY)).toBeNull();
+
+    const toggle = screen.getByRole("button", { name: "Reasoning summary" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    toggle.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(SUMMARY)).toBeInTheDocument();
+  });
+
+  it("offers no summary control for a turn without one", async () => {
+    findForRecord.mockResolvedValue(conversation({ turns: [oldTurn()] }));
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    await screen.findByText("Prior answer");
+    expect(screen.queryByRole("button", { name: /reasoning/i })).toBeNull();
+  });
+
+  it("shows the persistent notice below the composer before any question", async () => {
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    const notice = await screen.findByText(
+      "Ask IRIS can make mistakes. Check important details against the cited papers.",
+    );
+    const composer = screen.getByRole("textbox", { name: /ask about this paper/i });
+    expect(composer.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows one status row while answering, and no diagnostics", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockImplementation(() => (async function* () {
+      yield { event: "activity", id: "1", data: { state: "waiting", label: "Waiting…" } };
+      yield { event: "agent_step", id: "1", data: { position: 0, tool: "search_passages", status: "running" } };
+      await gate;
+      yield { event: "done", id: "2", data: answer({ answer: "Final answer." }) };
+    })());
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    await userEvent.type(await screen.findByRole("textbox", { name: /ask about this paper/i }), "What datasets?{Enter}");
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Waiting…");
+    for (const prohibited of PROHIBITED) expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+
+    release();
+    expect(await screen.findByText("Final answer.")).toBeInTheDocument();
+  });
+
+  it("has no serious or critical accessibility violations with a summary open", async () => {
+    findForRecord.mockResolvedValue(conversation({ turns: [oldTurn({ reasoning_summary: SUMMARY })] }));
+    const { container } = renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Reasoning summary" }));
+
+    await expectNoBlockingA11yViolations(container);
+  });
 });

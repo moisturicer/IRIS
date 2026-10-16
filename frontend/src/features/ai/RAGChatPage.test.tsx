@@ -1,4 +1,3 @@
-import { routingFixture } from "@/test/routingFixture";
 /**
  * Ask IRIS on persisted Conversations (IR-298).
  *
@@ -212,22 +211,113 @@ describe("the retired browser storage", () => {
   });
 });
 
-it("reruns an old answer using its original turn after newer discussion", async () => {
-  list.mockResolvedValue({ data: [summary({ id: 9 })] });
-  get.mockResolvedValue({ data: detail({ id: 9, turns: [{
-    id: 1, question: "Find flooding papers", resolved_question: "A resolved question",
+const PROHIBITED = [
+  "Answer approach", "Why this approach", "Try instead", "Rerun with", "List papers",
+  "search_passages", "find_records", "read_record_sections", "Research steps",
+];
+
+const SUMMARY = "These papers address the same problem, but their settings differ.";
+
+/** A Turn as a pre-IR-595 server would have stored it: diagnostics included. */
+function oldTurn(extra: Record<string, unknown> = {}) {
+  return {
+    id: 1, question: "Find flooding papers", resolved_question: null,
     answer: "Prior answer", message: null, state: "generative", degraded: false,
-    widened: true, created_at: "2026-10-11", citations: [], routing: routingFixture,
-  }, {
-    id: 2, question: "Now discuss a different topic", resolved_question: null,
-    answer: "Newer answer", message: null, state: "generative", degraded: false,
     widened: false, created_at: "2026-10-11", citations: [],
-  }] }) });
-  renderScreen(<RAGChatPage />);
-  await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
-  await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
-    conversationId: 9, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
-  }, expect.any(AbortSignal)));
+    routing: { lane: "listing", reason: "list_request", allowed_overrides: ["passage", "listing"] },
+    research: { steps: [{ position: 0, tool: "search_passages", status: "ok" }], coverage_notes: [] },
+    reasoning: "secret working",
+    ...extra,
+  } as never;
+}
+
+describe("clean answers (IR-596)", () => {
+  function renderAt(route: string) {
+    return renderScreen(
+      <Routes>
+        <Route path="/ai/conversations/:conversationId" element={<RAGChatPage />} />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it("reopens an old conversation as answer and citations only, with no diagnostics in the page", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9, turns: [oldTurn()] }) });
+    const { container } = renderAt("/ai/conversations/9");
+
+    expect(await screen.findByText("Prior answer")).toBeInTheDocument();
+
+    for (const prohibited of PROHIBITED) expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+    expect(screen.queryByRole("button", { name: /reasoning|rerun|try instead/i })).toBeNull();
+    expect(container.textContent).not.toContain("secret working");
+  });
+
+  it("shows a reopened turn's reasoning summary collapsed above its answer, and only when there is one", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9, turns: [
+      oldTurn({ id: 1, reasoning_summary: SUMMARY }),
+      oldTurn({ id: 2, question: "And again?", answer: "Second answer" }),
+    ] }) });
+    renderAt("/ai/conversations/9");
+
+    await screen.findByText("Prior answer");
+    const toggles = screen.getAllByRole("button", { name: "Reasoning summary" });
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(SUMMARY)).toBeNull();
+
+    await userEvent.click(toggles[0]);
+    expect(screen.getByText(SUMMARY)).toBeInTheDocument();
+  });
+
+  it("shows the persistent notice before any question is asked", async () => {
+    renderScreen(<RAGChatPage />);
+
+    expect(await screen.findByText(
+      "Ask IRIS can make mistakes. Check important details against the cited papers.",
+    )).toBeInTheDocument();
+  });
+
+  it("shows one status row from the activity frames, then the answer and summary, with no diagnostics", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockImplementation(() => (async function* () {
+      yield { event: "activity", id: "1", data: { state: "thinking", label: "Thinking…" } };
+      yield { event: "routing_decided", id: "1", data: { routing: { lane: "listing" } } };
+      yield { event: "agent_step", id: "1", data: { position: 0, tool: "search_passages", status: "running" } };
+      await gate;
+      yield { event: "activity", id: "2", data: { state: "preparing", label: "Preparing your answer…" } };
+      yield { event: "done", id: "3", data: answer({ answer: "Final answer.", reasoning_summary: SUMMARY }) };
+    })());
+    renderAt("/ai/conversations/1");
+
+    await userEvent.type(await screen.findByRole("textbox", { name: /ask a follow-up/i }), "What predicts flooding?{Enter}");
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Thinking…");
+    for (const prohibited of PROHIBITED) expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+
+    release();
+    expect(await screen.findByText("Final answer.")).toBeInTheDocument();
+    expect(screen.queryByText("Thinking…")).toBeNull();
+    expect(screen.queryByText("Preparing your answer…")).toBeNull();
+    expect(screen.getByRole("button", { name: "Reasoning summary" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(SUMMARY)).toBeNull();
+  });
+
+  it("does not add a second message when a followed run's Turn is already on screen", async () => {
+    const turn = oldTurn({ id: 41, answer: "Rainfall gauges feed the model." });
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9, turns: [turn], latest_run: { id: "r-5", state: "running", end_reason: "", question: "q", retry_of: null, last_sequence: 3 } }) });
+    resumeAskRun.mockImplementation(() => (async function* () {
+      yield { event: "done", id: "9", data: answer({ answer: "Rainfall gauges feed the model.", turn_id: 41, conversation_id: 9 }) };
+    })());
+    renderAt("/ai/conversations/9");
+
+    await waitFor(() => expect(resumeAskRun).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(screen.getAllByText("Rainfall gauges feed the model.")).toHaveLength(1);
+  });
 });
 
 

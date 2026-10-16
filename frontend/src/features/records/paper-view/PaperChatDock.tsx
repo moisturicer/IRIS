@@ -1,6 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from "react";
 import { aiApi } from "@/api/ai";
-import type { ChatLane } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
@@ -8,6 +7,7 @@ import { CitationOriginContext } from "@/lib/citedPage";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
 import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessageBubble";
+import { AskIrisNotice } from "@/features/ai/components/AskIrisNotice";
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -189,7 +189,7 @@ export function PaperChatPanel({
   const transcriptRef = useRef<HTMLDivElement>(null);
   const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const { streaming, ask } = useAskStream();
+  const { streaming, ask, cancel } = useAskStream();
   const [subject, setSubject] = useState<ChatSubject>(() => subjectOf(record));
   const pinned = subject.id !== record.id;
   // Read after an answer arrives: the reader may have switched conversations
@@ -257,7 +257,7 @@ export function PaperChatPanel({
     if (!minimized && transcript) transcript.scrollTop = transcriptScrollTop.current;
   }, [minimized]);
 
-  const sendQuestion = async (question: string, questionWiden: boolean, routeOverride?: ChatLane, routeOverrideTurnId?: number) => {
+  const sendQuestion = async (question: string, questionWiden: boolean) => {
     if (!question || busy || !ready) return;
 
     setMessages((prev) => [...prev, newChatMessage("user", question)]);
@@ -270,7 +270,7 @@ export function PaperChatPanel({
     };
     try {
       const conversationId = await conversationFor(askedAbout);
-      const { message } = await ask(question, { conversationId, widen: questionWiden, ...(routeOverride ? { routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { routeOverrideTurnId } : {}) });
+      const { message } = await ask(question, { conversationId, widen: questionWiden });
       show(message);
     } catch {
       show(newChatMessage("assistant", "IRIS could not answer right now."));
@@ -410,13 +410,10 @@ export function PaperChatPanel({
             conversation open on the paper they lead to (IR-355). */}
         <CitationOriginContext.Provider value="paper-chat">
           {messages.map((m) => (
-            <ChatMessageBubble key={m.id} message={m} compact overrideDisabled={busy || !ready}
-              onRouteOverride={(message, lane) => {
-                if (message.question) void sendQuestion(message.question, message.widened ?? false, lane, message.turnId);
-              }} />
+            <ChatMessageBubble key={m.id} message={m} compact retryDisabled={busy || !ready} />
           ))}
 
-          {busy && streaming && <StreamingMessageBubble state={streaming} compact />}
+          {busy && streaming && <StreamingMessageBubble state={streaming} compact onStop={() => void cancel()} />}
         </CitationOriginContext.Provider>
       </div>
 
@@ -478,6 +475,7 @@ export function PaperChatPanel({
           </div>
         </div>
         <p className="mt-1.5 px-1 text-2xs text-stone-500">Enter to send · Shift+Enter for a new line</p>
+        <AskIrisNotice className="mt-1 px-1 text-2xs" />
       </div>
     </aside>
   );

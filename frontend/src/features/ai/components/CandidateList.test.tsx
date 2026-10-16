@@ -10,11 +10,9 @@ import { turnToMessages } from "@/lib/chatMessages";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, within } from "@/test/render";
 import type { AnswerListing, CandidateRow, ConversationTurn } from "@/types/ai";
-import type { StreamingState } from "../hooks/useAskStream";
 
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { LiveCandidates } from "./CandidateList";
-import { statusLineText } from "./StreamStatusLine";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
 
 const PENDING: CandidateRow[] = [
@@ -42,10 +40,8 @@ describe("the live candidates", () => {
     expect(screen.getByRole("link", { name: "A paper IRIS may not read" })).toHaveAttribute("href", "/records/3");
   });
 
-  // IR-570 moved the announcement: the stream's one live line already says
-  // "Screening 2 candidate papers (1 checked)…" (below), and a second status
-  // region here made a screen reader hear the progress twice.
-  it("leaves announcing progress to the stream's status line, so it is said once", () => {
+  // The stream's one status row is the only live region (IR-596).
+  it("leaves announcing progress to the stream's status row, so it is said once", () => {
     renderScreen(<LiveCandidates candidates={[{ ...PENDING[0], state: "included" }, PENDING[1]]} />);
     expect(screen.queryByRole("status")).toBeNull();
   });
@@ -55,20 +51,10 @@ describe("the live candidates", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("puts the screening progress in the status line", () => {
-    const state: StreamingState = {
-      stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [],
-      candidates: [{ ...PENDING[0], state: "included" }, PENDING[1]],
-    };
-    expect(statusLineText(state)).toBe("Screening 2 candidate papers (1 checked)…");
-    expect(statusLineText({ ...state, candidates: state.candidates!.map((row) => ({ ...row, state: "excluded" })) }))
-      .toBe("Searching the repository…");
-  });
-
   it("appears inside the streaming reply", () => {
     renderScreen(
       <StreamingMessageBubble state={{
-        stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [], candidates: PENDING,
+        activity: "thinking", label: "Thinking…", text: "", citations: [], candidates: PENDING,
       }} />,
     );
     expect(screen.getByRole("region", { name: "Candidate papers" })).toBeInTheDocument();
@@ -97,7 +83,7 @@ const LISTING: AnswerListing = {
 const TURN: ConversationTurn = {
   id: 3, question: "Which papers are about flooding?", resolved_question: null,
   answer: LISTING.wording, message: null, state: "generative", degraded: true, widened: false,
-  partial: false, reasoning: null, created_at: "2026-10-14", citations: [],
+  partial: false, created_at: "2026-10-14", citations: [],
   listing: LISTING,
 };
 

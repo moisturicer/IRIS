@@ -607,7 +607,7 @@ router never constructed), `agent_step` ordering and content-free payloads, and
 replay of `Turn.research` steps and coverage notes. `test_routed_chat_http.py`'s
 off test still pins every endpoint's off behaviour. `research/tests/test_progress.py`
 covers running-then-outcome steps, an interrupted audit and the content-free run
-log line. Frontend: `ResearchSteps.test.tsx` (live trail, progress line,
+log line. Frontend (superseded by IR-596: `ResearchSteps` is deleted; see `StreamStatusRow.test.tsx`): `ResearchSteps.test.tsx` (live trail, progress line,
 collapsed finished trail, coverage notes, replay, axe) and `useAskStream.test.tsx`
 (step upsert, unknown events ignored). Five planner tests now read coverage notes
 from `coverage_notes` instead of the answer text — a deliberate contract change.
@@ -1122,9 +1122,19 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
 
 **Allowlists and limits.** Nested blobs (`listing`, `comparison`, `sources`, citations, candidate `source`, `latest_run`) have explicit allowlists, so `observed` figures and topic `method`/`version` fields are never sent; run `reason` values are kept only from a fixed code set; `capacity_limited` becomes a detail-free `waiting` activity. The summary fact check covers numbers, quotes and capitalised names (sentence openers included, bar a small function-word set); lowercase claims are not checked. The code-owned listing wording still names the topic-count method as prose.
 
-**Not built here.** No transcript-export endpoint exists, so there is nothing to project; a future one must use `turns_for_reader(..., public=True)`. The reader UI (IR-596) does not yet request the protocol. `latest_run` on conversation detail is unchanged. The OpenRouter `reasoning_details` shapes follow the vendor's published format and were not run against a live account.
+**Not built here.** No transcript-export endpoint exists, so there is nothing to project; a future one must use `turns_for_reader(..., public=True)`. The reader UI requests the protocol as of IR-596. `latest_run` on conversation detail is unchanged. The OpenRouter `reasoning_details` shapes follow the vendor's published format and were not run against a live account.
 
 **Evidence (2026-10-16).** `apps/ai/tests/test_public_protocol_http.py` (supported, unsupported, narrating and think-tag summaries, reasoning-only completions, activity dedupe, legacy body unchanged), `test_public_history_http.py` (legacy history, summary withheld after a revoked source, queued replay and reconnect), `test_continuation_http.py` (signature round trip), `providers/tests/test_reasoning_capabilities.py` (supported, unsupported, redacted) and `answers/tests/test_assurance.py`, all on fakes.
+
+## IR-596 — clean answers, one status row and collapsed reasoning summaries in the reader UI
+
+**Requirement.** [ADR-042](../adr/042-general-tools-conversation-contract.md) and the [general-tools spec](../architecture-review/2026-10-15-askiris-general-tools-spec.md) §6.1–6.2, acceptance scenarios A13 and A14 (UI half): no routing, lane-override or tool narration in Ask IRIS or Paper Chat, one status row while working, an optional collapsed Reasoning summary above the answer, and the persistent mistake notice under both prompt boxes.
+
+**Built.** `frontend/src/api/ai.ts` sends `X-IRIS-Protocol: public-1` on `/ai/ask/`, `/ai/ask/stream/`, `/ai/ask/runs/<id>/stream/` and conversation detail (Ask IRIS reopen and Paper Chat), and no longer sends `route_override`. `useAskStream` is driven by `activity` frames (`waiting`/`thinking`/`preparing`), keeps `startedAt` for a truthful elapsed time, and ignores every record already applied (same `id:`+event, or an id below the cursor), so a replayed `activity`, `text_delta` or `done` changes nothing. `StreamStatusRow` is the one live row (label in a single polite `role="status"`, elapsed time outside it, Stop for a followed queued run, pulse off under `prefers-reduced-motion`). `ReasoningSummary` is a button with `aria-expanded`/`aria-controls` whose body is not rendered until opened, shown only for a non-empty `reasoning_summary`. `AskIrisNotice` sits below the prompt box in both. The routing panel, override chips, research-step trail, raw reasoning panel and the old stage status line are deleted, with their types (`RoutingDecision`, `ResearchTrace`, `ChatLane`, `reasoning`). `RAGChatPage` skips a followed run's `done` whose Turn is already in the transcript. Copy answer copies `content` only.
+
+**Not built here.** There is no transcript export in the reader UI, so the opt-in "Include reasoning summary" choice does not exist; a future export must default it off. Elapsed time is not shown for a run followed after a reopen (its submission time is not in `latest_run`). Streamed `text_delta` text still renders as it arrives when the server sends it; the controller's atomic final answer (spec §5) is a server behaviour. Paper Chat now offers Stop on a queued run. The legacy protocol is no longer requested by the reader client, so the UI cannot show `routing` even against an old server. Colour contrast is not checked under jsdom.
+
+**Evidence (2026-10-16).** `StreamStatusRow.test.tsx`, `ReasoningSummary.test.tsx`, `AskIrisNotice.test.tsx`, `StreamingMessageBubble.test.tsx`, `ChatMessageBubble.test.tsx` (labels, live region, Enter/Space toggle, collapsed body absent, empty summary, copy, notice, prohibited strings, axe); `useAskStream.test.tsx` (activity frames, dedupe on replay, summary on done, diagnostics never read); `api/ai.test.ts` (protocol on every request); `RAGChatPage.test.tsx` and `PaperChatDock.test.tsx` (live, reopened and Paper Chat transcripts, prohibited strings absent from the DOM, notice, duplicate `done`).
 
 ## IR-560: Discover keeps its query, results and facets across Back, reload and Load more
 
@@ -1158,7 +1168,7 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
 - Surface roles (IR-558): the answer column is the page's one `surface`, and history and sources are `canvas`. `#FBFCFD` and the white toolbar, composer and sources header are gone.
 - The page is `h-dvh` rather than `h-screen` with a 480 px floor, and `index.html` declares `interactive-widget=resizes-content`, so the composer stays above a software keyboard. Keyboard hints are hidden on coarse pointers, and the placeholder shortens to "Ask a follow-up…" below 900 px while the accessible name stays whole.
 - The empty state centres with `m-auto`, so on a short screen it scrolls rather than clipping its top.
-- Activity (IR-504's status line and research steps): `StreamStatusLine` is one polite live region placed under the answer text, with Stop beside it. It stays mounted while empty, so the next stage is announced.
+- Activity (IR-504's status line and research steps; superseded by IR-596, whose `StreamStatusRow` tests replace it): `StreamStatusLine` is one polite live region placed under the answer text, with Stop beside it. It stays mounted while empty, so the next stage is announced.
 - `LiveCandidates` drops its own `role=status`, because the status line already says "Screening N candidate papers (k checked)…".
 - **Desktop also changes here, deliberately:** the status line and Stop now sit under the answer at every width, as the criterion asks.
 - Paper (IR-569 delivered entry, Back to paper and the citation bar): the minimized bar's accessible name changes from "Show Ask IRIS" to "Ask IRIS: back to the answer", its two visible lines. A followed citation is now announced as Back to the answer.

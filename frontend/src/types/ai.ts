@@ -1,46 +1,3 @@
-export type ChatLane = "passage" | "listing" | "count" | "comparison" | "research" | "landscape";
-
-export interface RoutingDecision {
-  lane: ChatLane;
-  suggested_lane: ChatLane;
-  stage: string;
-  reason: string;
-  injection_flagged: boolean;
-  planner_allowed: boolean;
-  /** Absent from a queued run's events, which keep router output out (IR-544). */
-  probabilities?: Partial<Record<ChatLane, number>>;
-  override: ChatLane | null;
-  override_applied: boolean;
-  allowed_overrides: ChatLane[];
-}
-
-/** One research-planner step (IR-504): names, codes and counts, no content.
- *  Sent `running` first, then again at the same `position` with its outcome. */
-export interface AgentStepEvent {
-  position:   number;
-  kind:       string;
-  status:     string;
-  tool:       string;
-  duplicate:  boolean;
-  latency_ms: number;
-  coverage:   string | null;
-  found:      number | null;
-}
-
-export interface CoverageNote {
-  code:    string;
-  reason?: string;
-  text:    string;
-}
-
-/** A research answer's finished steps and what it could not cover (IR-504). */
-export interface ResearchTrace {
-  run_id:         string;
-  stop_reason:    string;
-  steps:          AgentStepEvent[];
-  coverage_notes: CoverageNote[];
-}
-
 /**
  * What an exact metadata count (IR-543) was counted over. Present only on a
  * database count; `total` is of distinct IRIS records, never of unique works.
@@ -287,9 +244,8 @@ export interface RecordOverview {
 export interface AIAnswer {
   comparison?: AnswerComparison;
   turn_id?: number;
-  routing?: RoutingDecision;
+  reasoning_summary?: string;
   listing?: AnswerListing;
-  research?: ResearchTrace;
   /** Answer text, or null when nothing in the corpus matched. */
   answer:    string | null;
   /**
@@ -342,15 +298,15 @@ export type ChatCitation = Citation | ReplayedCitation;
 /** One question-and-answer pair in a persisted Conversation (IR-295). */
 export interface ConversationTurn {
   comparison?: AnswerComparison;
-  routing?: RoutingDecision;
   listing?: AnswerListing;
-  research?: ResearchTrace;
   id:                 number;
   question:           string;
   resolved_question:  string | null;
   answer:             string | null;
   message:            string | null;
-  state:              AIAnswerMode;
+  /** `state` on the legacy shape, `mode` under the public protocol (IR-595). */
+  state?:             AIAnswerMode;
+  mode?:              AIAnswerMode;
   degraded:           boolean;
   widened:            boolean;
   created_at:         string;
@@ -366,11 +322,10 @@ export interface ConversationTurn {
    */
   partial?:           boolean;
   /**
-   * The reasoning stored with this Turn (IR-381), `null` when none was.
-   * Optional only so fixtures predating the field still type-check — a real
-   * response always sends it.
+   * A short analytical account of the evidence, shown collapsed above the
+   * answer (IR-596). Absent on old Turns and whenever no safe summary exists.
    */
-  reasoning?:         string | null;
+  reasoning_summary?: string;
 }
 
 /** A Conversation without its Turns — the shape a sidebar lists (IR-295). */
