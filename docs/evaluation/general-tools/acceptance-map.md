@@ -23,3 +23,7 @@ This map records the approved product contract separately from the current-syste
 | A15 | Injected text and optional public query cannot widen access or egress | Tool admission and public adapter | HTTP control awaits DB; public adapter not built |
 
 The acceptance target is not the control path's generic 200 response. Downstream tests must use the same synthetic snapshot ID/digest or record their own corpus manifest, replace one approved but unmeasured expectation at a time with an executed assertion, and report the result by ID. No source-inspected text is counted as an HTTP observation.
+
+## IR-598 evidence
+
+[`conversation_set_v1.json`](conversation_set_v1.json) adds seven draft-labelled proxy conversations per ID (four development, three held out), validated and locked by `eval_conversations`. This is a labelled input only. No arm has run on it, no person has reviewed its labels and nothing was scored, so no row's "Current evidence" changes. Harness-injected conditions (private records, revocation, killed workers, planted documents, provider modes) are named in each conversation but not exercised. See the [pilot report](pilot-report.md) §5 for what exists and what is pending per ID.
