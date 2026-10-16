@@ -13,7 +13,7 @@ import math
 from collections import Counter
 from typing import Any, Mapping, Optional, Sequence
 
-from .capacity import percentile
+from .pilot_report import percentile
 
 ARMS = ("current", "fixed_synthesis", "controller")
 MODES = ("architecture", "model")
@@ -21,12 +21,15 @@ DEFAULT_MIN_EXAMPLES = 10
 Z = 1.96
 
 TARGET_LABEL = "proposed owner-review target — not an approved release gate"
-TARGETS = {"task_completion": 0.90, "claim_support": 0.95, "citation_support": 0.95}
+TARGETS = {"task_completion": 0.90, "claim_support": 0.95, "citation_support": 0.95,
+           "page_support": 0.95}
 
 COMPLETION = ("yes", "partial", "no")
 PAIR = ("useful", "weak", "wrong", "na")
 PREFERENCES = ("candidate", "baseline", "tie")
-CONDITION_KEYS = ("corpus_snapshot_digest", "model_ids", "data_policy", "limits")
+CONDITION_KEYS = ("corpus_snapshot_digest", "model_ids", "data_policy", "limits",
+                  "set_digests", "rubric_version")
+MIN_CAPACITY_BURST = 100
 
 ZERO_BREACH_NOTE = ("Zero observed breaches is limited by the suite size and "
                     "does not prove absence of risk.")
@@ -67,9 +70,13 @@ def _target(frac: Mapping, target: float) -> dict:
     return {"target": target, "label": TARGET_LABEL, "status": status, **frac}
 
 
+def _require_named(record: Mapping, field: str, label: Any, who: str = "reviewer") -> None:
+    if not str(record.get(field) or "").strip():
+        raise ScoringError(f"{label}: a named {who} is required")
+
+
 def _validate_review(r: Mapping, known: set[str]) -> None:
-    if not str(r.get("reviewer") or "").strip():
-        raise ScoringError(f"{r.get('conversation')}: a named reviewer is required")
+    _require_named(r, "reviewer", r.get("conversation"))
     if r.get("rubric_version") in (None, ""):
         raise ScoringError(f"{r.get('conversation')}: rubric_version is required")
     if r.get("conversation") not in known:
@@ -101,13 +108,17 @@ def _metrics(reviews: Sequence[Mapping], supported: set[str]) -> dict:
 
 
 def score_reviews(data: Mapping[str, Any], reviews: Sequence[Mapping], *, arm: str,
-                  min_examples: int = DEFAULT_MIN_EXAMPLES) -> dict:
+                  min_examples: int = DEFAULT_MIN_EXAMPLES,
+                  rubric_version: Any = None) -> dict:
     conversations = {c["id"]: c for c in data["conversations"]}
     supported = {cid for cid, c in conversations.items() if c.get("supported_unambiguous")}
     mine = [r for r in reviews if r.get("arm") == arm]
     seen = set()
     for r in mine:
         _validate_review(r, set(conversations))
+        if rubric_version is not None and r["rubric_version"] != rubric_version:
+            raise ScoringError(f"{r['conversation']}: rubric_version {r['rubric_version']} "
+                               f"differs from the run manifest's {rubric_version}")
         if r["conversation"] in seen:
             raise ScoringError(f"{r['conversation']}: duplicate review for arm {arm}; adjudicate first")
         seen.add(r["conversation"])
@@ -119,12 +130,17 @@ def score_reviews(data: Mapping[str, Any], reviews: Sequence[Mapping], *, arm: s
         entry["status"] = "INCONCLUSIVE" if len(rows) < min_examples else "reported"
         families[family] = entry
     overall = _metrics(mine, supported)
+    splits = {}
+    for split in ("development", "held_out"):
+        rows = [r for r in mine if conversations[r["conversation"]].get("split") == split]
+        splits[split] = _metrics(rows, supported)
+        splits[split]["targets"] = {k: _target(splits[split][k], t) for k, t in TARGETS.items()}
     breaches = sorted(r["conversation"] for r in mine if r.get("access_breach"))
     return {
         "arm": arm, "min_examples": min_examples,
         "reviewers": sorted({r["reviewer"] for r in mine}),
         "rubric_versions": sorted({str(r["rubric_version"]) for r in mine}),
-        "families": families, "overall": overall,
+        "families": families, "overall": overall, "splits": splits,
         "targets": {k: _target(overall[k], t) for k, t in TARGETS.items()},
         "enablement_blocked": bool(breaches),
         "access_breaches": {
@@ -134,16 +150,20 @@ def score_reviews(data: Mapping[str, Any], reviews: Sequence[Mapping], *, arm: s
     }
 
 
-def check_conditions(runs: Mapping[str, Mapping], *, mode: str) -> None:
-    """Refuse a comparison whose arms did not run under equal conditions."""
+def check_conditions(runs: Mapping[str, Mapping], *, mode: str,
+                     set_digests: Optional[Mapping[str, str]] = None) -> None:
+    """Refuse a run set whose manifests are incomplete or conditions unequal."""
     if mode not in MODES:
         raise ScoringError(f"mode must be one of {MODES}")
-    if len(runs) < 2:
-        raise ScoringError("a comparison needs at least two runs")
+    if not runs:
+        raise ScoringError("no runs")
     arms = [r.get("arm") for r in runs.values()]
     if mode == "architecture":
         if len(set(arms)) != len(arms) or any(a not in ARMS for a in arms):
             raise ScoringError(f"architecture mode needs distinct arms from {ARMS}")
+        for label, run in runs.items():
+            if label != run.get("arm"):
+                raise ScoringError(f"run label {label!r} must equal its arm {run.get('arm')!r}")
         keys = CONDITION_KEYS
     else:
         if len(set(arms)) != 1:
@@ -155,14 +175,17 @@ def check_conditions(runs: Mapping[str, Mapping], *, mode: str) -> None:
             raise ScoringError(f"manifest lacks {key}")
         if any(m[key] != manifests[0][key] for m in manifests):
             raise ScoringError(f"arms differ in {key}; conditions are not equal")
+    if mode == "architecture" and any(not m.get("model_ids") for m in manifests):
+        raise ScoringError("manifest lacks model_ids")
+    if set_digests is not None and manifests[0]["set_digests"] != dict(set_digests):
+        raise ScoringError("manifest set_digests do not match the locked set")
 
 
 def preference(records: Sequence[Mapping]) -> dict:
     for r in records:
         if r.get("blinded") is not True:
             raise ScoringError(f"{r.get('conversation')}: unblinded preference records are refused")
-        if not str(r.get("reviewer") or "").strip():
-            raise ScoringError(f"{r.get('conversation')}: a named reviewer is required")
+        _require_named(r, "reviewer", r.get("conversation"))
         if r.get("preferred") not in PREFERENCES:
             raise ScoringError(f"{r.get('conversation')}: preferred must be one of {PREFERENCES}")
     tally = Counter(r["preferred"] for r in records)
@@ -178,8 +201,7 @@ def calibrate_judge(items: Sequence[Mapping], *, adjudication: Optional[Mapping]
     if not items:
         raise ScoringError("no judge items")
     for i in items:
-        if not str(i.get("human_reviewer") or "").strip():
-            raise ScoringError(f"{i.get('item')}: a named human reviewer is required")
+        _require_named(i, "human_reviewer", i.get("item"), "human reviewer")
     n = len(items)
     agree = sum(i["judge"] == i["human"] for i in items)
     judge, human = Counter(i["judge"] for i in items), Counter(i["human"] for i in items)
@@ -198,10 +220,11 @@ def calibrate_judge(items: Sequence[Mapping], *, adjudication: Optional[Mapping]
 
 
 def _group(rows: Sequence[Mapping]) -> dict:
-    latencies = [r["latency_seconds"] for r in rows]
+    latencies = [r["latency_ms"] for r in rows if r.get("latency_ms") is not None]
     wins = [r for r in rows if r.get("success")]
     spent = sum(r.get("cost", 0) or 0 for r in rows)
     out = {"n": len(rows), "successes": len(wins),
+           "no_latency_recorded": len(rows) - len(latencies),
            "p50": percentile(latencies, 0.5), "p95": percentile(latencies, 0.95),
            "total_cost": spent,
            "cost_per_successful_task": spent / len(wins) if wins else None}
@@ -211,14 +234,20 @@ def _group(rows: Sequence[Mapping]) -> dict:
 
 
 def cost_latency(run: Mapping) -> dict:
-    """Queue-inclusive latency and cost, cold and warm apart."""
+    """Queue-inclusive latency (ms) and cost, cold and warm apart."""
     rows = run.get("conversations", ())
     fake = run.get("providers") != "real"
+    cold_distinct = len({r.get("id") for r in rows if r.get("cache") == "cold"})
     reasons = []
     if fake:
         reasons.append("providers were not real")
     if run.get("capacity_fit") is not True:
         reasons.append("the burst did not fit the approved budget")
+    if cold_distinct < MIN_CAPACITY_BURST:
+        reasons.append(f"{cold_distinct} distinct cold conversations, fewer than "
+                       f"{MIN_CAPACITY_BURST}")
+    if not str(run.get("manifest", {}).get("campaign_approval_id") or "").strip():
+        reasons.append("no campaign approval id in the manifest")
     return {
         "arm": run.get("arm"),
         "cold": _group([r for r in rows if r.get("cache") == "cold"]),

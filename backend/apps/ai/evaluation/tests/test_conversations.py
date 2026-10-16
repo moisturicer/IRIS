@@ -18,8 +18,8 @@ def conv(cid, family="A01", split="development", topic="floods", papers=("Paper 
         "papers": list(papers), "supported_unambiguous": True,
         "turns": [{
             "user": "Compare them", "intended_task": "compare",
-            "expected_pair": ["Paper A", "Paper B"],
-            "required_evidence": [{"title": "Paper A", "page": 2, "quote": "q"}],
+            "expected_pair": [papers[0]],
+            "required_evidence": [{"title": papers[0], "page": 2, "quote": "q"}],
             "clarification_necessary": False, "acceptable_uncertainty": None,
         }],
     }

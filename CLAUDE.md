@@ -264,11 +264,15 @@ python manage.py eval_conversations --set <set.json> --validate [--lock <lock.js
                                    # title and topic. --write-lock records one SHA-256 per split;
                                    # --lock re-checks the set against it. Free: no database, no
                                    # vendor. --score reads collected runs and named human reviews
-                                   # per arm and family (Wilson intervals, own denominators, any
-                                   # access breach sets enablement_blocked); it collects nothing
-                                   # and calls no model. Verified 2026-10-16 on
+                                   # per arm, family and split (Wilson intervals, own denominators,
+                                   # any access breach sets enablement_blocked); it collects nothing
+                                   # and calls no model. It REQUIRES --lock (and refuses on a
+                                   # mismatch) and refuses a draft_unreviewed set unless
+                                   # --allow-draft, which marks the run exploratory_draft_labels.
+                                   # --score has run only on test fixtures: no real reviews exist.
+                                   # --validate verified 2026-10-16 on
                                    # docs/evaluation/general-tools/conversation_set_v1.json: 105
-                                   # draft conversations (60 development, 45 held out, seven per
+                                   # draft conversations (62 development, 43 held out, seven per
                                    # family), 36 supported and unambiguous, zero leakage, `valid`,
                                    # lock written and re-checked. Labels are AI-drafted
                                    # (`draft_unreviewed`, `labelled_by` empty), so no score on it

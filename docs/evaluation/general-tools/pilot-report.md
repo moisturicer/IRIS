@@ -27,49 +27,50 @@ Run on 2026-10-16 from `backend/`:
 
 ```
 set general-tools-conversations-v1 (draft_unreviewed): 105 conversations, 36 supported and unambiguous
-development: A01=4 A02=4 ... A15=4
-held_out:    A01=3 A02=3 ... A15=3
+development: A01=4 ... A03=5 ... A09=5 ... A15=4   (62)
+held_out:    A01=3 ... A03=2 ... A09=2 ... A15=3   (43)
 coverage gaps: none
+(no topic-overlap warnings)
 shared across splits (allowed): 0
-digests development=b703c23705a8514c held_out=65b4475aa32b2941
+digests development=f11ab3beb3539af1 held_out=429c4015a3c448f6
 valid
 ```
 
-Lock write and re-check both ended `valid`. Leakage: zero shared papers, zero shared topics, `shared_allowed` is empty. Package suite `python -m pytest apps/ai/evaluation`: 299 passed, 1 failed. The failure is the known Windows-only `test_the_proxy_audit_pins_the_proxy_set_it_audited` (CRLF checkout of `proxy_starter.json` changes its digest); it predates this ticket.
+Lock write and re-check both ended `valid`. Checked: exact-string overlap of paper titles and topics between splits, counting titles in a turn's `expected_pair` and `required_evidence` as that conversation's papers, plus word-overlap warnings between topic names. Result: no overlap and no warning, and `shared_allowed` is empty. Near-synonym topics are **not** caught by either check; subject separation beyond that is a judgement a reviewer should confirm. Package suite `python -m pytest apps/ai/evaluation`: 299 passed, 1 failed. The failure is the known Windows-only `test_the_proxy_audit_pins_the_proxy_set_it_audited` (CRLF checkout of `proxy_starter.json` changes its digest); it predates this ticket.
 
 ## 2. The set
 
 `conversation_set_v1.json` holds **105 conversations** (2 turns: 70, 3 turns: 28, 4 turns: 7) over the 40-paper arXiv proxy corpus. It is a proxy, not CIT-U research, and nothing measured on it is a finding about CIT-U.
 
-**Partition.** Papers and topics were split together. Six topic groups (23 papers) are development; five groups (17 papers) are held out. A paper appears in one split only, and so does a topic. Within a conversation every turn stays in one split. Nothing may move between splits after output is seen.
+**Partition.** Papers and topics were split together. Six topic groups (25 papers) are development; four groups (15 papers) are held out. A first draft put quasars and active galactic nuclei in the held-out half, close in subject to the JWST high-redshift group in development; the whole group was moved to development, and an early-universe wording overlap in two topic names was renamed. No model output had been seen, so moving cases was allowed. A paper appears in one split only, and so does a topic. Within a conversation every turn stays in one split. Nothing may move between splits after output is seen.
 
 | Family | Scenario | Development | Held out | Total | Supported and unambiguous |
 |---|---|---|---|---|---|
 | A01 | Multi-turn discovery, pair, compare, simplify | 4 | 3 | 7 | 7 |
 | A02 | Ordinals follow the displayed order | 4 | 3 | 7 | 7 |
-| A03 | Exclusions and honest insufficient results | 4 | 3 | 7 | 5 |
+| A03 | Exclusions and honest insufficient results | 5 | 2 | 7 | 5 |
 | A04 | Ambiguous alias, exact title, unknown title | 4 | 3 | 7 | 0 |
 | A05 | Long paper, late section | 4 | 3 | 7 | 7 |
 | A06 | Exact metadata count vs classified topic count | 4 | 3 | 7 | 0 |
 | A07 | Different datasets or metrics, no winner | 4 | 3 | 7 | 0 |
 | A08 | More detail or simpler wording | 4 | 3 | 7 | 7 |
-| A09 | Missing field, no match, outage | 4 | 3 | 7 | 0 |
+| A09 | Missing field, no match, outage | 5 | 2 | 7 | 0 |
 | A10 | Harmless formatting vs unsupported number | 4 | 3 | 7 | 0 |
 | A11 | Access: revocation, stale brief, foreign handle, Paper Chat scope | 4 | 3 | 7 | 0 |
 | A12 | Cancel, redelivery, reconnect, concurrency | 4 | 3 | 7 | 0 |
 | A13 | Public surfaces and the prompt notice | 4 | 3 | 7 | 0 |
 | A14 | Missing summary capability, reasoning-only | 4 | 3 | 7 | 3 |
 | A15 | Injection and optional public egress | 4 | 3 | 7 | 0 |
-| **All** | | **60** | **45** | **105** | **36** |
+| **All** | | **62** | **43** | **105** | **36** |
 
 **Labels are drafts.** `label_status` is `draft_unreviewed` and `labelled_by` is `[]`: an AI agent drafted every label. 82 evidence entries carry a page and quote copied unchanged from `docs/evaluation/proxy_starter.json`; the drafting script asserted each one exists there. Everywhere else `page` and `quote` are `null`, meaning "some passage of this paper; a reviewer must locate it". No page or quote was invented. Some labels depend on a fact only a reviewer can check, such as "this paper reports no compute budget"; those say so in `acceptable_uncertainty`.
 
 **Limits of the set.**
 
-- Seven conversations per family (four development, three held out). With the default `--min-examples 10`, every family is **INCONCLUSIVE**, and an interval on seven cases is very wide. Splitting results in half is worse. The set meets the spec's "at least 100" and nothing more.
+- Seven conversations per family (mostly four development and three held out; A03 and A09 are five and two). With the default `--min-examples 10`, every family is **INCONCLUSIVE**, and an interval on seven cases is very wide. Splitting results in half is worse. The set meets the spec's "at least 100" and nothing more.
 - A04, A11, A12, A13, A14 and A15 test behaviour the harness injects (a seeded private record, a revoked source, a killed worker, a planted document, a provider with no summary support). The conversation text alone does not exercise them. The proxy corpus contains no private record, no injection and no outage.
 - A12 outcomes need real Postgres and independent worker processes, not fakes.
-- 36 supported-unambiguous conversations is the denominator for the 90% completion target, so that target has at most 36 cases across both splits.
+- 36 supported-unambiguous conversations is the denominator for the 90% completion target, so that target has at most 36 cases across both splits. **Flag for human review:** `supported_unambiguous` was an agent drafting choice, not a reviewed label. It is false for every A06, A07, A09 and A10 conversation (and most of A04, A11–A15), so those families never enter the completion denominator. A reviewer should confirm or change it before the 90% target means anything.
 - The set was not checked against a running retrieval stack. Whether each labelled paper can actually be retrieved is unknown.
 
 ## 3. Metrics and denominators
@@ -88,7 +89,9 @@ The scorer (`conversation_scoring.py`) reports each measure with its own denomin
 | Presentation leaks, no-answer count, access breaches | Counts | Reported with the number of reviewed conversations |
 | Blind preference | Candidate wins, baseline wins, ties | Judged pairs; ties are not dropped |
 | Judge calibration | Agreement with adjudicated human verdicts | Items carrying a human verdict |
-| Latency and cost | Queue-inclusive latency and cost per successful task | Successful tasks, cold and warm separately |
+| Latency and cost | Queue-inclusive latency (reported in milliseconds) and cost per successful task | Successful tasks, cold and warm separately |
+
+**Scoring preconditions (`--score`).** It requires `--lock` and refuses draft labels unless `--allow-draft` is given (a draft-label score is never a quality result). Each run needs a manifest with `corpus_snapshot_digest`, `model_ids`, `data_policy`, `limits`, `set_digests`, `rubric_version` and `campaign_approval_id`. Capacity is reported "verified" only with real providers, `capacity_fit`, at least 100 distinct cold conversations and a campaign approval id; otherwise it is **capacity unverified**.
 
 Architecture arms are `current`, `fixed_synthesis` and `controller`. The scorer refuses to compare arms whose corpus digest, model ids, data policy or limits differ. Model comparison is a separate `--mode model` axis. Fake-provider runs are labelled "contract check only".
 
@@ -98,7 +101,8 @@ Architecture arms are `current`, `fixed_synthesis` and `controller`. The scorer 
 |---|---|---|
 | Completion of unambiguous supported tasks | at least 90% | Supported conversations (36 in the draft set) |
 | Reviewed factual-claim support | at least 95% | Reviewed claims |
-| Citation and page support | at least 95% | Reviewed claims |
+| Citation support | at least 95% | Reviewed claims |
+| Page support | at least 95% | Claims where a page was judged |
 | Access or disclosure breaches in the adversarial suite | zero observed | Adversarial conversations reviewed |
 | Blind human preference over the fixed baseline | wins over baseline | Judged pairs |
 

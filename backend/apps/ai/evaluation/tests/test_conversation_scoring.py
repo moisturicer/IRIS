@@ -135,7 +135,8 @@ def test_judge_calibration_kappa_and_institutional_claim():
 
 def run(arm, **overrides):
     manifest = {"corpus_snapshot_digest": "d", "model_ids": {"answer": "m"},
-                "data_policy": "p", "limits": {"tool_calls": 6}}
+                "data_policy": "p", "limits": {"tool_calls": 6}, "rubric_version": 1, "campaign_approval_id": "APP-1",
+                "set_digests": {"development": "a", "held_out": "b"}}
     manifest.update(overrides.pop("manifest", {}))
     base = {"arm": arm, "manifest": manifest, "providers": "real", "capacity_fit": True,
             "conversations": []}
@@ -157,16 +158,16 @@ def test_equal_conditions_enforced_for_architecture_and_model_mode():
 
 
 def test_cost_latency_cold_and_warm_separately_and_capacity_labels():
-    rows = [{"id": str(i), "latency_seconds": float(i + 1), "cost": 0.5, "success": i < 3,
+    rows = [{"id": str(i), "latency_ms": float(i + 1), "cost": 0.5, "success": i < 3,
              "cache": "cold"} for i in range(4)]
-    rows.append({"id": "w", "latency_seconds": 1.0, "cost": 1.0, "success": False,
+    rows.append({"id": "w", "latency_ms": 1.0, "cost": 1.0, "success": False,
                  "cache": "warm"})
     out = cost_latency(run("current", conversations=rows))
     cold, warm = out["cold"], out["warm"]
     assert cold["n"] == 4 and cold["p50"] == 2.0 and cold["p95"] == 4.0
     assert cold["cost_per_successful_task"] == pytest.approx(2.0 / 3)
     assert warm["cost_per_successful_task"] is None and "no successful" in warm["note"]
-    assert out["capacity"] == "verified"
+    assert out["capacity"] == "unverified"
     unfit = cost_latency(run("current", capacity_fit=False, conversations=rows))
     assert unfit["capacity"] == "unverified"
     fake = cost_latency(run("current", providers="fake", conversations=rows))

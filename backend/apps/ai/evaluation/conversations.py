@@ -69,15 +69,51 @@ def _check_turns(conv: Mapping[str, Any], errors: list[str]) -> None:
                 errors.append(f"{cid} turn {n}: missing {field}")
 
 
+STOPWORDS = frozenset(
+    "about after also and are between from into over that their them then these this "
+    "through under using with within without".split())
+
+
+def _words(topic: Any) -> set[str]:
+    cleaned = "".join(ch if ch.isalnum() else " " for ch in _norm(topic))
+    return {w for w in cleaned.split() if len(w) >= 4 and w not in STOPWORDS}
+
+
+def _titles(conv: Mapping[str, Any]) -> set[str]:
+    """Every paper a conversation touches: its list, pairs and evidence."""
+    titles = list(conv.get("papers", ()))
+    for turn in conv.get("turns") or ():
+        titles += turn.get("expected_pair") or []
+        titles += [e["title"] for e in turn.get("required_evidence") or ()
+                   if isinstance(e, dict) and e.get("title")]
+    return {_norm(t) for t in titles}
+
+
+def _topic_overlaps(conversations) -> list[dict]:
+    topics = {split: {} for split in SPLITS}
+    for c in conversations:
+        if c.get("split") in SPLITS and c.get("topic"):
+            topics[c["split"]].setdefault(_norm(c["topic"]), []).append(c.get("id"))
+    out = []
+    for dev, dev_ids in topics["development"].items():
+        for held, held_ids in topics["held_out"].items():
+            shared = _words(dev) & _words(held)
+            if shared and dev != held:
+                out.append({"development_topic": dev, "held_out_topic": held,
+                            "words": sorted(shared), "development": dev_ids,
+                            "held_out": held_ids})
+    return out
+
+
 def _leakage(conversations, allowed):
     seen = {split: {"paper": {}, "topic": {}} for split in SPLITS}
     for c in conversations:
         if c.get("split") not in SPLITS:
             continue
         bucket = seen[c["split"]]
-        bucket["topic"].setdefault(_norm(c.get("topic", "")), []).append(c["id"])
-        for title in c.get("papers", ()):
-            bucket["paper"].setdefault(_norm(title), []).append(c["id"])
+        bucket["topic"].setdefault(_norm(c.get("topic", "")), []).append(c.get("id"))
+        for title in _titles(c):
+            bucket["paper"].setdefault(title, []).append(c.get("id"))
     permitted = {(a.get("kind"), _norm(a.get("value", ""))): a for a in allowed}
     leaks, shared = [], []
     for kind in ("paper", "topic"):
@@ -113,7 +149,10 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
         if not str(entry.get("reason", "")).strip():
             errors.append(f"shared_allowed {entry.get('value')!r}: a reason is required")
 
-    ids = Counter(c.get("id") for c in conversations)
+    ids = Counter(c["id"] for c in conversations if c.get("id") not in (None, ""))
+    for c in conversations:
+        if c.get("id") in (None, ""):
+            errors.append(f"conversation without an id (topic {c.get('topic')!r})")
     for cid, n in ids.items():
         if n > 1:
             errors.append(f"duplicate id {cid}")
@@ -146,6 +185,7 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
         "leakage": leaks, "allowed_shared": shared,
         "coverage_gaps": gaps, "held_out_coverage_gaps": held_gaps,
         "digests": split_digests(data), "errors": errors,
+        "warnings": [{"kind": "topic_overlap", **o} for o in _topic_overlaps(conversations)],
         "ready": not errors and not gaps,
         "ok": not errors,
     }

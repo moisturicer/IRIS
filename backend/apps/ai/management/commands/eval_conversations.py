@@ -14,7 +14,6 @@ quality evidence. Paid collection is not offered here.
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.evaluation.conversation_scoring import (
-    ARMS,
     DEFAULT_MIN_EXAMPLES,
     MODES,
     ScoringError,
@@ -30,7 +29,7 @@ from apps.ai.evaluation.conversations import (
     lock_record,
     validate_set,
 )
-from apps.ai.evaluation.runfile import file_digest, load_json, write_run
+from apps.ai.evaluation.runfile import file_digest, load_json, write_json, write_run
 from apps.ai.management.commands.eval_retrieval import DEFAULT_OUT
 
 
@@ -49,7 +48,10 @@ class Command(BaseCommand):
         parser.add_argument("--set", required=True)
         parser.add_argument("--validate", action="store_true")
         parser.add_argument("--score", action="store_true")
-        parser.add_argument("--lock", help="Lock file to check the set against.")
+        parser.add_argument("--lock", help="Lock file to check the set against. "
+                            "Required with --score.")
+        parser.add_argument("--allow-draft", action="store_true",
+                            help="Score a draft_unreviewed set as exploratory only.")
         parser.add_argument("--write-lock", help="Record the set's digests to this file.")
         parser.add_argument("--min-conversations", type=int, default=DEFAULT_MIN_CONVERSATIONS)
         parser.add_argument("--runs", action="append", default=[], help="arm=run.json")
@@ -75,16 +77,13 @@ class Command(BaseCommand):
           f"{report['supported_unambiguous']} supported and unambiguous")
         for split, counts in report["counts"].items():
             w(f"{split}: " + " ".join(f"{f}={n}" for f, n in counts.items()))
+        for warning in report["warnings"]:
+            w(f"WARNING topic overlap {warning['development_topic']!r} / "
+              f"{warning['held_out_topic']!r} share {', '.join(warning['words'])}")
         w(f"coverage gaps: {', '.join(report['coverage_gaps']) or 'none'}")
         w(f"shared across splits (allowed): {len(report['allowed_shared'])}")
         w(f"digests development={report['digests']['development'][:16]} "
           f"held_out={report['digests']['held_out'][:16]}")
-        if options["write_lock"]:
-            import json
-            from pathlib import Path
-            Path(options["write_lock"]).write_text(
-                json.dumps(lock_record(data), indent=2) + "\n", encoding="utf-8")
-            w(f"wrote lock {options['write_lock']}")
         mismatched = check_lock(data, load_json(options["lock"])) if options["lock"] else []
         for error in report["errors"]:
             w(f"ERROR {error}")
@@ -92,6 +91,9 @@ class Command(BaseCommand):
             w(f"LOCK MISMATCH {', '.join(mismatched)}")
         if report["errors"] or mismatched:
             raise CommandError("validation failed")
+        if options["write_lock"]:
+            write_json(options["write_lock"], lock_record(data))
+            w(f"wrote lock {options['write_lock']}")
         w("valid" + ("" if report["ready"] else " (not ready: coverage gaps)"))
 
     def _score(self, data, options):
@@ -99,6 +101,15 @@ class Command(BaseCommand):
         report = validate_set(data, min_conversations=0)
         if report["errors"]:
             raise CommandError("the set is invalid: " + "; ".join(report["errors"]))
+        if not options["lock"]:
+            raise CommandError("--score requires --lock")
+        mismatched = check_lock(data, load_json(options["lock"]))
+        if mismatched:
+            raise CommandError(f"the set no longer matches its lock: {', '.join(mismatched)}")
+        draft = data["label_status"] != "human_reviewed"
+        if draft and not options["allow_draft"]:
+            raise CommandError("labels are draft_unreviewed; pass --allow-draft for an "
+                               "exploratory score")
         runs = {}
         for spec in options["runs"]:
             label, _, path = spec.partition("=")
@@ -109,13 +120,13 @@ class Command(BaseCommand):
             raise CommandError("--score needs --runs and --reviews")
         reviews = load_json(options["reviews"])
         try:
-            if len(runs) > 1:
-                check_conditions(runs, mode=options["mode"])
+            check_conditions(runs, mode=options["mode"], set_digests=report["digests"])
             arms = {}
             for label, run in runs.items():
                 arm = run.get("arm") if options["mode"] == "architecture" else label
                 scored = score_reviews(data, reviews, arm=label,
-                                       min_examples=options["min_examples"])
+                                       min_examples=options["min_examples"],
+                                       rubric_version=run["manifest"]["rubric_version"])
                 arms[label] = {"architecture": arm, "scores": scored,
                                "cost_latency": cost_latency(run)}
             extras = {}
@@ -131,16 +142,17 @@ class Command(BaseCommand):
         blocked = [k for k, v in arms.items() if v["scores"]["enablement_blocked"]]
         out = write_run(options["out"], f"conversations-{data['set_id']}", {
             "set_id": data["set_id"], "set_sha256": file_digest(options["set"]),
-            "label_status": data["label_status"], "mode": options["mode"],
+            "label_status": data["label_status"], "exploratory_draft_labels": draft,
+            "mode": options["mode"],
             "digests": report["digests"], "arms": arms, **extras,
             "enablement_blocked": bool(blocked), "blocked_arms": blocked,
         })
-        self._print(arms, extras, blocked, out, data["label_status"])
+        self._print(arms, extras, blocked, out, draft)
 
-    def _print(self, arms, extras, blocked, out, label_status):
+    def _print(self, arms, extras, blocked, out, draft):
         w = self.stdout.write
-        if label_status != "human_reviewed":
-            w("NOTE labels are draft_unreviewed: results are exploratory")
+        if draft:
+            w("NOTE exploratory_draft_labels: labels are draft_unreviewed")
         for label, entry in arms.items():
             scores = entry["scores"]
             w(f"== {label} ({entry['architecture']}) reviewers {', '.join(scores['reviewers'])}")
@@ -148,6 +160,9 @@ class Command(BaseCommand):
                 w(f"{family} [{m['status']}] n={m['reviewed']} "
                   f"completion {_pct(m['task_completion'])} "
                   f"claims {_pct(m['claim_support'])} citations {_pct(m['citation_support'])}")
+            for split, m in scores["splits"].items():
+                w(f"{split}: n={m['reviewed']} completion {_pct(m['task_completion'])} "
+                  f"claims {_pct(m['claim_support'])}")
             for name, t in scores["targets"].items():
                 w(f"target {name} >= {t['target']}: {t['status']} "
                   f"[{t['label']}]")
@@ -155,7 +170,7 @@ class Command(BaseCommand):
             w(f"capacity {cl['capacity']} ({cl['capacity_reason'] or 'ok'}); {cl['evidence']}")
             for cache in ("cold", "warm"):
                 g = cl[cache]
-                w(f"{cache}: n={g['n']} p50={g['p50']} p95={g['p95']} "
+                w(f"{cache}: n={g['n']} p50={g['p50']}ms p95={g['p95']}ms no-latency={g['no_latency_recorded']} "
                   f"cost/success={g['cost_per_successful_task']}")
             w(f"breaches {scores['access_breaches']['count']} of "
               f"{scores['access_breaches']['suite_size']}: {scores['access_breaches']['note']}")
