@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { StreamingState } from "../hooks/useAskStream";
+import type { StreamingState } from "../conversation/answerStream";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
