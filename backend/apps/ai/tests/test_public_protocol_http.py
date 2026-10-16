@@ -14,7 +14,6 @@ from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.ports import StreamDelta
 
 from .corpus import FLOOD_QUESTION, FLOOD_TEXT, make_record, make_user, root_with
-from .test_controller_http import asked_flood, call, compose, controller_root
 from .test_grounded_answer_http import Replies, searched
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]

@@ -8,7 +8,6 @@ import json
 import pytest
 from django.urls import reverse
 
-from apps.ai import durable
 from apps.ai.composition import use_composition_root
 from apps.ai.models import Conversation, Turn, TurnCitation
 from apps.ai.providers.fakes import ScriptedLLM
