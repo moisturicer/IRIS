@@ -2,38 +2,35 @@ import { useCallback, useRef, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage } from "@/lib/chatMessages";
 import type { SSEEvent } from "@/lib/sse";
-import type {
-  AgentStepEvent, CandidateRow, CandidateState, ChatCitation, ChatLane, RoutingDecision,
-} from "@/types/ai";
+import type { CandidateRow, CandidateState, ChatCitation } from "@/types/ai";
 import type { ChatMessage, EndedRunState } from "@/types/chat";
 
 /**
- * The reader-visible phase of an in-flight answer (IR-329). Deliberately
- * fewer than the event vocabulary -- copy must read as one pipeline step,
- * never parallel agents (ADR-028). `queued` is a queued run waiting for a
- * worker (IR-544).
+ * What the server says an in-flight answer is doing (IR-595): the whole
+ * public vocabulary, not a per-tool sequence.
  */
-export type StreamStage = "queued" | "searching" | "found" | "thinking" | "answering";
+export type StreamActivity = "waiting" | "thinking" | "preparing";
+
+export const ACTIVITY_LABELS: Record<StreamActivity, string> = {
+  waiting:   "Waiting…",
+  thinking:  "Thinking…",
+  preparing: "Preparing your answer…",
+};
+
+const isActivity = (value: unknown): value is StreamActivity =>
+  typeof value === "string" && value in ACTIVITY_LABELS;
 
 export interface StreamingState {
   /** The queued run being followed, once known (IR-544) -- what Stop cancels. */
   runId?:   string;
-  routing?: RoutingDecision;
-  /** The research planner's steps so far, one per position (IR-504). */
-  steps?:   AgentStepEvent[];
+  activity: StreamActivity;
+  label:    string;
+  /** When the question was submitted; absent for a run followed after a reopen. */
+  startedAt?: number;
   /** A listing's candidates, in rank order, one row per paper (IR-546). */
   candidates?: CandidateRow[];
-  stage:     StreamStage;
-  foundInfo: { passageCount: number; recordCount: number } | null;
   /** The raw, still-unresolved answer text accumulated so far. */
   text:      string;
-  /**
-   * The model's reasoning accumulated so far (IR-381), on its own channel.
-   * Never joined into `text`: only `text` is scanned for citation markers and
-   * only `text` becomes the stored answer. Empty until a `reasoning_delta`
-   * arrives, which for a task with reasoning switched off is never.
-   */
-  reasoning: string;
   /** Populated once `citations_resolved` arrives, empty until then. */
   citations: ChatCitation[];
 }
@@ -43,8 +40,6 @@ interface AskStreamOptions {
   conversationId?: number;
   topK?:           number;
   widen?:          boolean;
-  routeOverride?:  ChatLane;
-  routeOverrideTurnId?: number;
 }
 
 export interface AskStreamResult {
@@ -111,16 +106,18 @@ export function useAskStream() {
       followed.current = knownRunId;
 
       let text = "";
-      let reasoning = "";
       let citations: ChatCitation[] = [];
-      let routing: RoutingDecision | undefined;
       let sawAnyEvent = false;
       let runId: string | null = knownRunId;
       let cursor = 0;
+      // A replayed record is never applied twice. An activity frame shares
+      // its event's `id:`, so the event name is part of the key.
+      const applied = new Set<string>();
 
       setStreaming({
-        stage: knownRunId ? "queued" : "searching", ...(knownRunId ? { runId: knownRunId } : {}),
-        foundInfo: null, text: "", reasoning: "", citations: [],
+        activity: "waiting", label: ACTIVITY_LABELS.waiting,
+        ...(knownRunId ? { runId: knownRunId } : { startedAt: Date.now() }),
+        text: "", citations: [],
       });
 
       const ended = (state: EndedRunState, content: string, partial: boolean): AskStreamResult => {
@@ -129,7 +126,7 @@ export function useAskStream() {
           message: newChatMessage("assistant", content, {
             ...(partial ? { partial: true } : {}),
             ...(runId ? { endedRun: { id: runId, state } } : {}),
-            routing, question, widened: options.widen,
+            question, widened: options.widen,
           }),
           conversationId: options.conversationId ?? null,
         };
@@ -140,11 +137,7 @@ export function useAskStream() {
         return {
           message: newChatMessage("assistant", text || INTERRUPTED_TEXT, {
             citations,
-            // Whatever working arrived before the cutoff is still worth
-            // showing -- the server stored the same text on the Turn.
-            reasoning: reasoning || null,
             partial: true,
-            routing,
             question,
             widened: options.widen,
           }),
@@ -156,46 +149,30 @@ export function useAskStream() {
       const handle = ({ event, data }: SSEEvent): AskStreamResult | null => {
         const payload = (data ?? {}) as Record<string, unknown>;
 
-        if (event === "run_queued") {
+        if (event === "activity") {
+          const state = payload.state;
+          if (isActivity(state)) {
+            const label = typeof payload.label === "string" && payload.label ? payload.label : ACTIVITY_LABELS[state];
+            // Unchanged state returns the same object, so a repeat re-renders nothing.
+            setStreaming((s) => (s && (s.activity !== state || s.label !== label) ? { ...s, activity: state, label } : s));
+          }
+        } else if (event === "run_queued") {
           runId = payload.run_id as string;
           followed.current = runId;
           const queuedRun = runId;
-          setStreaming((s) => (s ? { ...s, stage: "queued", runId: queuedRun } : s));
+          setStreaming((s) => (s ? { ...s, runId: queuedRun } : s));
         } else if (event === "run_started") {
           // A new attempt answers from the beginning; drop what an earlier,
           // lost attempt had written so far.
           text = "";
-          reasoning = "";
           citations = [];
-          setStreaming((s) =>
-            s
-              ? {
-                  ...s, stage: "searching", steps: undefined, candidates: undefined,
-                  foundInfo: null, text: "", reasoning: "", citations: [],
-                }
-              : s,
-          );
+          setStreaming((s) => (s ? { ...s, candidates: undefined, text: "", citations: [] } : s));
         } else if (event === "run_failed") {
           const state: EndedRunState = payload.state === "expired" ? "expired" : "failed";
           return ended(state, ENDED_RUN_TEXT[state], true);
         } else if (event === "run_cancelled") {
           // The reader's own choice, not an interrupted answer.
           return ended("cancelled", ENDED_RUN_TEXT.cancelled, false);
-        } else if (event === "routing_decided") {
-          routing = payload.routing as RoutingDecision;
-          setStreaming((s) => (s ? { ...s, routing } : s));
-        } else if (event === "agent_step") {
-          const step = payload as unknown as AgentStepEvent;
-          setStreaming((s) =>
-            s
-              ? {
-                  ...s,
-                  // A step arrives `running`, then again with its outcome.
-                  steps: [...(s.steps ?? []).filter((known) => known.position !== step.position), step]
-                    .sort((a, b) => a.position - b.position),
-                }
-              : s,
-          );
         } else if (event === "candidates_selected") {
           // The preview: shown as pending, and a replayed one replaces it.
           const rows = (payload.candidates as CandidateRow[]) ?? [];
@@ -211,63 +188,27 @@ export function useAskStream() {
               ? { ...s, candidates: s.candidates.map((row) => (next.has(row.record_id) ? { ...row, state: next.get(row.record_id)! } : row)) }
               : s,
           );
-        } else if (event === "retrieval_started") {
-          setStreaming((s) => (s ? { ...s, stage: "searching" } : s));
-        } else if (event === "retrieval_finished") {
-          setStreaming((s) =>
-            s
-              ? {
-                  ...s,
-                  stage: "found",
-                  foundInfo: {
-                    passageCount: payload.passage_count as number,
-                    recordCount:  payload.record_count as number,
-                  },
-                }
-              : s,
-          );
-        } else if (event === "generation_started") {
-          setStreaming((s) => (s && s.stage !== "answering" ? { ...s, stage: "thinking" } : s));
-        } else if (event === "reasoning_delta") {
-          reasoning += payload.text as string;
-          const snapshot = reasoning;
-          setStreaming((s) =>
-            s
-              ? {
-                  ...s,
-                  // Reasoning arriving while the answer is already writing
-                  // must not pull the stage back -- the answer is the thing
-                  // on screen by then.
-                  stage:     s.stage === "answering" ? s.stage : "thinking",
-                  reasoning: snapshot,
-                }
-              : s,
-          );
         } else if (event === "text_delta") {
           text += payload.text as string;
           const snapshot = text;
-          setStreaming((s) => (s ? { ...s, stage: "answering", text: snapshot } : s));
+          setStreaming((s) => (s ? { ...s, text: snapshot } : s));
         } else if (event === "citations_resolved") {
           citations = payload.citations as ChatCitation[];
           setStreaming((s) => (s ? { ...s, citations } : s));
         } else if (event === "done") {
           const body = (payload.answer ?? payload.message ?? "No readable sources matched that question.") as string;
+          const summary = typeof payload.reasoning_summary === "string" ? payload.reasoning_summary.trim() : "";
           const message = newChatMessage("assistant", body, {
             citations: payload.citations as ChatCitation[],
             turnId: payload.turn_id as number | undefined,
-            routing: (payload.routing as RoutingDecision | undefined) ?? routing,
             listing: payload.listing as ChatMessage["listing"],
             comparison: payload.comparison as ChatMessage["comparison"],
-            research: payload.research as ChatMessage["research"],
             question,
             sources:   payload.sources as ChatMessage["sources"],
             degraded:  payload.degraded as boolean,
             widened:   payload.widened as boolean,
             resolvedQuestion: payload.resolved_question as string | null,
-            // The server's joined text, not the deltas this hook
-            // accumulated: one source, so a reopened Turn and a watched
-            // one render the same panel (IR-381). A queued run sends none.
-            reasoning: (payload.reasoning as string | null) ?? (reasoning || null),
+            ...(summary ? { reasoningSummary: summary } : {}),
             // A queued run cut off at its deadline keeps its fragment.
             ...(payload.partial === true ? { partial: true } : {}),
           });
@@ -294,7 +235,13 @@ export function useAskStream() {
               if (detached()) throw new StreamDetached();
               sawAnyEvent = true;
               sawEventHere = true;
-              if (record.id !== undefined) cursor = Number(record.id);
+              if (record.id !== undefined) {
+                const id = Number(record.id);
+                const key = `${id}:${record.event}`;
+                if (id < cursor || applied.has(key)) continue;
+                applied.add(key);
+                cursor = id;
+              }
               const result = handle(record);
               if (result) return result;
             }

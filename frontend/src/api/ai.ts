@@ -4,7 +4,6 @@ import { readSSE, type SSEEvent } from "@/lib/sse";
 import { useAuthStore } from "@/store/auth.store";
 import type {
   Passage,
-  ChatLane,
   SemanticSearchResult,
   AIAnswer,
   AIStatus,
@@ -27,8 +26,6 @@ interface SemanticSearchResponse {
 interface AskOptions {
   comparisonRecordIds?: number[];
   topK?: number;
-  routeOverride?: ChatLane;
-  routeOverrideTurnId?: number;
   /** Appends the question and its answer to this Conversation as a Turn (IR-295). */
   conversationId?: number;
   /**
@@ -38,6 +35,9 @@ interface AskOptions {
    */
   widen?: boolean;
 }
+
+/** The reader protocol (IR-595): the server allowlists what it sends back. */
+const PUBLIC_PROTOCOL = { "X-IRIS-Protocol": "public-1" } as const;
 
 async function checkComparisonLimit(recordIds?: number[]): Promise<void> {
   if (recordIds === undefined) return;
@@ -69,7 +69,7 @@ async function* streamAsk(
   await checkComparisonLimit(body.comparison_record_ids as number[] | undefined);
   yield* openStream(`${API_BASE}/ai/ask/stream/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...PUBLIC_PROTOCOL },
     body: JSON.stringify(body),
     signal,
   });
@@ -83,7 +83,7 @@ async function* resumeAskRun(
 ): AsyncGenerator<SSEEvent> {
   yield* openStream(
     `${API_BASE}/ai/ask/runs/${encodeURIComponent(runId)}/stream/?after=${after}`,
-    { method: "GET", signal },
+    { method: "GET", headers: { ...PUBLIC_PROTOCOL }, signal },
   );
 }
 
@@ -141,27 +141,25 @@ export const aiApi = {
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
   /** Grounded answer plus the records it cites. */
-  ask: (question: string, { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId, comparisonRecordIds }: AskOptions = {}) => {
+  ask: (question: string, { topK = 5, conversationId, widen, comparisonRecordIds }: AskOptions = {}) => {
     const send = () => apiClient.post<AIAnswer>("/ai/ask/", {
       question,
       top_k: topK,
       conversation_id: conversationId,
       widen,
-      ...(routeOverride ? { route_override: routeOverride } : {}),
-      ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}),
       ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}),
-    });
+    }, { headers: PUBLIC_PROTOCOL });
     return comparisonRecordIds === undefined ? send() : checkComparisonLimit(comparisonRecordIds).then(send);
   },
 
   /** The same question, narrated as SSE (IR-326, IR-329) -- see `streamAsk`. */
   askStream: (
     question: string,
-    { topK = 5, conversationId, widen, routeOverride, routeOverrideTurnId, comparisonRecordIds }: AskOptions = {},
+    { topK = 5, conversationId, widen, comparisonRecordIds }: AskOptions = {},
     signal?: AbortSignal,
   ) =>
     streamAsk(
-      { question, top_k: topK, conversation_id: conversationId, widen, ...(routeOverride ? { route_override: routeOverride } : {}), ...(routeOverrideTurnId !== undefined ? { route_override_turn_id: routeOverrideTurnId } : {}), ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}) },
+      { question, top_k: topK, conversation_id: conversationId, widen, ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}) },
       signal,
     ),
 
@@ -193,7 +191,7 @@ export const aiApi = {
     create: createConversation,
 
     get: (id: number) =>
-      apiClient.get<ConversationDetail>(`/ai/conversations/${id}/`),
+      apiClient.get<ConversationDetail>(`/ai/conversations/${id}/`, { headers: PUBLIC_PROTOCOL }),
 
     remove: (id: number) => apiClient.delete(`/ai/conversations/${id}/`),
 
@@ -208,7 +206,10 @@ export const aiApi = {
         { params: { record: recordId } },
       );
       if (!existing[0]) return null;
-      const { data } = await apiClient.get<ConversationDetail>(`/ai/conversations/${existing[0].id}/`);
+      const { data } = await apiClient.get<ConversationDetail>(
+        `/ai/conversations/${existing[0].id}/`,
+        { headers: PUBLIC_PROTOCOL },
+      );
       return data;
     },
   },

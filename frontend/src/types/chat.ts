@@ -6,7 +6,7 @@
  * straight onto one of these, and so does a replayed Turn, which is what
  * lets both surfaces render through the same `ChatMessageBubble`.
  */
-import type { ChatCitation, SemanticSearchResult, RoutingDecision, AnswerListing, AnswerComparison, ResearchTrace } from "./ai";
+import type { ChatCitation, SemanticSearchResult, AnswerListing, AnswerComparison } from "./ai";
 
 export type ChatRole = "user" | "assistant";
 
@@ -15,11 +15,8 @@ export type EndedRunState = "cancelled" | "failed" | "expired";
 
 export interface ChatMessage {
   turnId?: number;
-  routing?: RoutingDecision;
   listing?: AnswerListing;
   comparison?: AnswerComparison;
-  /** The research planner's steps and coverage notes (IR-504). */
-  research?: ResearchTrace;
   question?: string;
   id:         string;
   role:       ChatRole;
@@ -62,13 +59,10 @@ export interface ChatMessage {
    */
   partial?:   boolean;
   /**
-   * The model's working behind this reply (IR-381), shown in a panel that is
-   * collapsed by default and never folded into `content` — the two arrived on
-   * separate channels and only `content` was scanned for citation markers.
-   * Undefined when the model reasoned nothing, or when the task that answered
-   * has reasoning switched off in its Profile.
+   * The approved reasoning summary (IR-596), shown collapsed above the answer.
+   * Never folded into `content`; undefined when the server sent none.
    */
-  reasoning?: string | null;
+  reasoningSummary?: string;
   /**
    * The queued run this reply stands for when it ended without an answer
    * (IR-548): stopped by the reader, failed or out of time. What a Retry

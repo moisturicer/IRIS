@@ -24,7 +24,7 @@ import { aiApi } from "@/api/ai";
 import { useUIStore } from "@/store/ui.store";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import type { ChatMessage } from "@/types/chat";
-import type { AIStatus, ConversationDetail, ConversationSummary, ChatLane } from "@/types/ai";
+import type { AIStatus, ConversationDetail, ConversationSummary } from "@/types/ai";
 import { recordsApi } from "@/api/records";
 import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
@@ -201,7 +201,11 @@ export default function RAGChatPage() {
       try {
         const { message } = await pending();
         if (activeRef.current === conversationId) {
-          setMessages((prev) => [...prev, message]);
+          // A replayed run whose Turn is already on screen adds nothing.
+          setMessages((prev) =>
+            message.turnId !== undefined && prev.some((m) => m.turnId === message.turnId)
+              ? prev
+              : [...prev, message]);
           if (message.citations?.length) setSourcesOpen(true);
         }
         refreshList();
@@ -280,10 +284,9 @@ export default function RAGChatPage() {
    * of the exchange.
    */
   const sendQuestion = useCallback(
-    (conversationId: number, question: string, routeOverride?: ChatLane, widen?: boolean, routeOverrideTurnId?: number) => {
+    (conversationId: number, question: string) => {
       setMessages((prev) => [...prev, newChatMessage("user", question)]);
-      return settle(conversationId, () =>
-        ask(question, { conversationId, ...(routeOverride ? { routeOverride, widen, ...(routeOverrideTurnId !== undefined ? { routeOverrideTurnId } : {}) } : {}) }));
+      return settle(conversationId, () => ask(question, { conversationId }));
     },
     [ask, settle],
   );
@@ -539,11 +542,6 @@ export default function RAGChatPage() {
             </div>
           ) : (
             <ChatMessageList
-              onRouteOverride={(message, lane) => {
-                if (activeId && !loading && message.question) {
-                  void sendQuestion(activeId, message.question, lane, message.widened ?? false, message.turnId);
-                }
-              }}
               messages={messages}
               isLoading={loading}
               streaming={streaming}

@@ -35,37 +35,50 @@ describe("finding a Record's conversation (IR-569)", () => {
     get.mockResolvedValueOnce({ data: [{ id: 4 }] }).mockResolvedValueOnce({ data: detail });
 
     expect(await aiApi.conversations.findForRecord(5)).toEqual(detail);
-    expect(get).toHaveBeenLastCalledWith("/ai/conversations/4/");
+    expect(get).toHaveBeenLastCalledWith("/ai/conversations/4/", { headers: { "X-IRIS-Protocol": "public-1" } });
   });
 });
 
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
-describe("answer route overrides", () => {
-  it("sends the chosen lane with the question and scope to the JSON endpoint", () => {
-    aiApi.ask("Original question", { conversationId: 42, widen: true, routeOverride: "listing", routeOverrideTurnId: 3 });
-    expect(post).toHaveBeenCalledWith("/ai/ask/", {
-      question: "Original question", top_k: 5, conversation_id: 42, widen: true, route_override: "listing", route_override_turn_id: 3,
-    });
+describe("the public reader protocol (IR-596)", () => {
+  const PROTOCOL = { "X-IRIS-Protocol": "public-1" };
+
+  it("opts the JSON endpoint in and sends no lane override", () => {
+    aiApi.ask("Original question", { conversationId: 42, widen: true });
+    expect(post).toHaveBeenCalledWith(
+      "/ai/ask/",
+      { question: "Original question", top_k: 5, conversation_id: 42, widen: true },
+      { headers: PROTOCOL },
+    );
   });
 
-  it("sends the chosen lane to the streaming endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('event: done\ndata: {}\n\n', {
+  it("opts the streaming endpoint in", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("event: done\ndata: {}\n\n", {
       headers: { "Content-Type": "text/event-stream" },
     }));
     vi.stubGlobal("fetch", fetchMock);
-    for await (const event of aiApi.askStream("Original question", { conversationId: 42, widen: false, routeOverride: "passage", routeOverrideTurnId: 3 })) {
+    for await (const event of aiApi.askStream("Original question", { conversationId: 42, widen: false })) {
       expect(event.event).toBe("done");
     }
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject(PROTOCOL);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      question: "Original question", top_k: 5, conversation_id: 42, widen: false, route_override: "passage", route_override_turn_id: 3,
+      question: "Original question", top_k: 5, conversation_id: 42, widen: false,
     });
   });
 
-  it("omits route_override on ordinary questions", () => {
-    aiApi.ask("Ordinary question");
-    expect(post.mock.calls[0][1]).not.toHaveProperty("route_override");
-    expect(post.mock.calls[0][1]).not.toHaveProperty("route_override_turn_id");
+  it("opts a reconnect to a run in", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("event: done\ndata: {}\n\n"));
+    vi.stubGlobal("fetch", fetchMock);
+    for await (const event of aiApi.resumeAskRun("run-1", 4)) expect(event.event).toBe("done");
+    expect(fetchMock.mock.calls[0][0]).toContain("/ai/ask/runs/run-1/stream/?after=4");
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject(PROTOCOL);
+  });
+
+  it("opts conversation detail in, for a reopened chat and for Paper Chat", async () => {
+    get.mockResolvedValueOnce({ data: { id: 4, turns: [] } });
+    await aiApi.conversations.get(4);
+    expect(get).toHaveBeenLastCalledWith("/ai/conversations/4/", { headers: PROTOCOL });
   });
 });
 
