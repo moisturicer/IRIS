@@ -24,8 +24,8 @@ is withheld and the sources remain available. Papers with no evidence are named.
 A response carries `routing`, an SSE stream first emits `routing_decided`, and `done`
 carries the same metadata. Optional `listing` carries its wording and rows. Each Turn
 stores the decision and record pointers; replay rechecks visibility and resolves
-current titles. Reader controls send `route_override` with the original question and
-scope choice, creating a new Turn. Overrides cannot escape Paper Chat scope or
+current titles. The reader UI no longer sends `route_override` as of IR-596 (the server field
+remains); an override creates a new Turn from the original question and scope choice. Overrides cannot escape Paper Chat scope or
 injection screening. Landscape decisions refuse without retrieval until the
 research-landscape capability exists; this ticket/draft ADR conflict is recorded in
 ADR-038's IR-515 divergence paragraph.

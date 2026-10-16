@@ -607,7 +607,7 @@ router never constructed), `agent_step` ordering and content-free payloads, and
 replay of `Turn.research` steps and coverage notes. `test_routed_chat_http.py`'s
 off test still pins every endpoint's off behaviour. `research/tests/test_progress.py`
 covers running-then-outcome steps, an interrupted audit and the content-free run
-log line. Frontend: `ResearchSteps.test.tsx` (live trail, progress line,
+log line. Frontend (superseded by IR-596: `ResearchSteps` is deleted; see `StreamStatusRow.test.tsx`): `ResearchSteps.test.tsx` (live trail, progress line,
 collapsed finished trail, coverage notes, replay, axe) and `useAskStream.test.tsx`
 (step upsert, unknown events ignored). Five planner tests now read coverage notes
 from `coverage_notes` instead of the answer text — a deliberate contract change.
@@ -1168,7 +1168,7 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
 - Surface roles (IR-558): the answer column is the page's one `surface`, and history and sources are `canvas`. `#FBFCFD` and the white toolbar, composer and sources header are gone.
 - The page is `h-dvh` rather than `h-screen` with a 480 px floor, and `index.html` declares `interactive-widget=resizes-content`, so the composer stays above a software keyboard. Keyboard hints are hidden on coarse pointers, and the placeholder shortens to "Ask a follow-up…" below 900 px while the accessible name stays whole.
 - The empty state centres with `m-auto`, so on a short screen it scrolls rather than clipping its top.
-- Activity (IR-504's status line and research steps): `StreamStatusLine` is one polite live region placed under the answer text, with Stop beside it. It stays mounted while empty, so the next stage is announced.
+- Activity (IR-504's status line and research steps; superseded by IR-596, whose `StreamStatusRow` tests replace it): `StreamStatusLine` is one polite live region placed under the answer text, with Stop beside it. It stays mounted while empty, so the next stage is announced.
 - `LiveCandidates` drops its own `role=status`, because the status line already says "Screening N candidate papers (k checked)…".
 - **Desktop also changes here, deliberately:** the status line and Stop now sit under the answer at every width, as the criterion asks.
 - Paper (IR-569 delivered entry, Back to paper and the citation bar): the minimized bar's accessible name changes from "Show Ask IRIS" to "Ask IRIS: back to the answer", its two visible lines. A followed citation is now announced as Back to the answer.

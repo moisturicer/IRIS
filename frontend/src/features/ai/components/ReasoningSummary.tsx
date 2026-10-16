@@ -1,13 +1,7 @@
 import { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * The approved reasoning summary (IR-596), above the answer and collapsed.
- *
- * A real button with `aria-expanded` and `aria-controls`, and the body is not
- * rendered at all until opened, so it is absent from the accessible tree and
- * from find-in-page. Renders nothing for an empty summary.
- */
+/** The collapsed reasoning summary (IR-596); its body is not rendered until opened. */
 export function ReasoningSummary({ summary, compact = false }: { summary?: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
@@ -19,7 +13,7 @@ export function ReasoningSummary({ summary, compact = false }: { summary?: strin
       <button
         type="button"
         aria-expanded={open}
-        aria-controls={bodyId}
+        aria-controls={open ? bodyId : undefined}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 -ml-1.5",

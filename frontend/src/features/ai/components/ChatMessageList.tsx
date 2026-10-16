@@ -87,7 +87,7 @@ export function ChatMessageList({
       {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
       <div className={`${CHAT_COLUMN} space-y-6`}>
         {messages.map((m) => (
-          <ChatMessageBubble key={m.id} message={m} overrideDisabled={isLoading} onRetry={onRetry} />
+          <ChatMessageBubble key={m.id} message={m} retryDisabled={isLoading} onRetry={onRetry} />
         ))}
         {isLoading && (streaming ? <StreamingMessageBubble state={streaming} onStop={onStop} /> : <AssistantMessageSkeleton />)}
         <div ref={bottomRef} />

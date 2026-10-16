@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { StreamingState } from "../hooks/useAskStream";
 import { cn } from "@/lib/utils";
 
-/** "12s", "1m 05s": time since submission, truthfully and without decimals. */
+/** "12s" or "1m 05s". */
 export function formatElapsed(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   if (seconds < 60) return `${seconds}s`;
@@ -22,11 +22,7 @@ function useElapsed(startedAt: number | undefined): string | null {
   return startedAt === undefined || now - startedAt < 1000 ? null : formatElapsed(now - startedAt);
 }
 
-/**
- * The one status row while an answer is being prepared (IR-596): the
- * server's lifecycle state, the time since submission and Stop. Only the
- * label sits in the polite live region, so a ticking clock is not announced.
- */
+/** The one status row (IR-596); only the label is live, so the clock is not announced. */
 export function StreamStatusRow({
   state,
   onStop,

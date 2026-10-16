@@ -38,6 +38,7 @@ interface AskOptions {
 
 /** The reader protocol (IR-595): the server allowlists what it sends back. */
 const PUBLIC_PROTOCOL = { "X-IRIS-Protocol": "public-1" } as const;
+const PUBLIC_CONFIG = { headers: PUBLIC_PROTOCOL };
 
 async function checkComparisonLimit(recordIds?: number[]): Promise<void> {
   if (recordIds === undefined) return;
@@ -83,7 +84,7 @@ async function* resumeAskRun(
 ): AsyncGenerator<SSEEvent> {
   yield* openStream(
     `${API_BASE}/ai/ask/runs/${encodeURIComponent(runId)}/stream/?after=${after}`,
-    { method: "GET", headers: { ...PUBLIC_PROTOCOL }, signal },
+    { ...PUBLIC_CONFIG, method: "GET", signal },
   );
 }
 
@@ -148,7 +149,7 @@ export const aiApi = {
       conversation_id: conversationId,
       widen,
       ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}),
-    }, { headers: PUBLIC_PROTOCOL });
+    }, PUBLIC_CONFIG);
     return comparisonRecordIds === undefined ? send() : checkComparisonLimit(comparisonRecordIds).then(send);
   },
 
@@ -191,7 +192,7 @@ export const aiApi = {
     create: createConversation,
 
     get: (id: number) =>
-      apiClient.get<ConversationDetail>(`/ai/conversations/${id}/`, { headers: PUBLIC_PROTOCOL }),
+      apiClient.get<ConversationDetail>(`/ai/conversations/${id}/`, PUBLIC_CONFIG),
 
     remove: (id: number) => apiClient.delete(`/ai/conversations/${id}/`),
 
@@ -208,7 +209,7 @@ export const aiApi = {
       if (!existing[0]) return null;
       const { data } = await apiClient.get<ConversationDetail>(
         `/ai/conversations/${existing[0].id}/`,
-        { headers: PUBLIC_PROTOCOL },
+        PUBLIC_CONFIG,
       );
       return data;
     },

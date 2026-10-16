@@ -410,7 +410,7 @@ export function PaperChatPanel({
             conversation open on the paper they lead to (IR-355). */}
         <CitationOriginContext.Provider value="paper-chat">
           {messages.map((m) => (
-            <ChatMessageBubble key={m.id} message={m} compact overrideDisabled={busy || !ready} />
+            <ChatMessageBubble key={m.id} message={m} compact retryDisabled={busy || !ready} />
           ))}
 
           {busy && streaming && <StreamingMessageBubble state={streaming} compact onStop={() => void cancel()} />}

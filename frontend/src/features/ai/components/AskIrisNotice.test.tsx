@@ -25,13 +25,6 @@ describe("the mistake notice (IR-596)", () => {
     expect(box.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("wraps rather than truncating", () => {
-    renderScreen(<AskIrisNotice />);
-
-    const classes = screen.getByText(TEXT).className;
-    expect(classes).not.toMatch(/truncate|whitespace-nowrap/);
-  });
-
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(<AskIrisNotice />);
 

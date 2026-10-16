@@ -46,7 +46,7 @@ describe("a still-streaming reply", () => {
   });
 
   it("renders no reasoning, routing or step panel, only the one status row", () => {
-    const { container } = renderScreen(
+    renderScreen(
       <StreamingMessageBubble state={state({ activity: "thinking", label: "Thinking…" })} />,
     );
 
@@ -54,7 +54,7 @@ describe("a still-streaming reply", () => {
     for (const prohibited of ["Answer approach", "Why this approach", "Try instead", "search_passages", "find_records"]) {
       expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
     }
-    expect(container.querySelectorAll("[aria-live], [role=status]")).toHaveLength(1);
+    expect(screen.getAllByRole("status")).toHaveLength(1);
   });
 
   it("puts the status row under the answer text", () => {

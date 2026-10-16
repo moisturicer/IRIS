@@ -29,14 +29,16 @@ describe("the status row", () => {
   });
 
   it("is a single polite live region that survives a change of state", () => {
-    const { container, rerender } = renderScreen(<StreamStatusRow state={state()} />);
-    const live = container.querySelectorAll("[aria-live], [role=status], [role=log], [role=alert]");
+    const { rerender } = renderScreen(<StreamStatusRow state={state()} />);
+    const live = screen.getAllByRole("status");
     expect(live).toHaveLength(1);
     expect(live[0]).toHaveAttribute("aria-live", "polite");
+    expect(screen.queryAllByRole("log")).toHaveLength(0);
+    expect(screen.queryAllByRole("alert")).toHaveLength(0);
 
     rerender(<StreamStatusRow state={state({ activity: "thinking", label: "Thinking…" })} />);
 
-    expect(container.querySelector("[role=status]")).toBe(live[0]);
+    expect(screen.getByRole("status")).toBe(live[0]);
     expect(live[0].textContent).toBe("Thinking…");
   });
 

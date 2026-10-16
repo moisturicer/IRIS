@@ -188,6 +188,28 @@ describe("activity and the reasoning summary (IR-596)", () => {
     expect(outcome.message.endedRun).toEqual({ id: "r-1", state: "failed" });
   });
 
+  it("dedupes the server's real batch shape: an id-less activity frame, then its event with the id", async () => {
+    const batch = (id: string, text: string) => [
+      { event: "activity", data: { state: "preparing", label: "Preparing your answer…" } },
+      { event: "text_delta", id, data: { text } },
+    ];
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "run_queued", id: "1", data: { run_id: "r-3", state: "queued" } };
+        for (const frame of batch("2", "Rainfall ")) yield frame;
+        throw new Error("connection reset");
+      })(),
+    );
+    resumeAskRun.mockReturnValueOnce(eventsOf(...batch("2", "Rainfall "), ...batch("3", "gauges.")));
+    resumeAskRun.mockImplementation(() => eventsOf());
+    const { result } = renderHook(() => useAskStream());
+
+    const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
+
+    expect(resumeAskRun).toHaveBeenCalledWith("r-3", 2, expect.any(AbortSignal));
+    expect(outcome.message.content).toBe("Rainfall gauges.");
+  }, 10_000);
+
   it("does not repeat text that a reconnect replays", async () => {
     askStream.mockReturnValue(
       (async function* () {

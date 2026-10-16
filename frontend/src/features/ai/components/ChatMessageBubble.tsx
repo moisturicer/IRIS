@@ -25,7 +25,7 @@ interface ChatMessageBubbleProps {
    */
   compact?: boolean;
   /** Disables Retry while another answer is in flight. */
-  overrideDisabled?: boolean;
+  retryDisabled?: boolean;
   /** Ask a run that ended without its answer again (IR-548). */
   onRetry?: (message: ChatMessage) => void;
 }
@@ -58,7 +58,7 @@ function RunEndedNotice({ onRetry, disabled }: { onRetry?: () => void; disabled?
  * text with no card/border/shadow, closer to a read surface than a chat
  * widget — the avatar is still what tells the two apart.
  */
-export function ChatMessageBubble({ message, compact = false, overrideDisabled, onRetry }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, compact = false, retryDisabled, onRetry }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -130,7 +130,7 @@ export function ChatMessageBubble({ message, compact = false, overrideDisabled, 
         {!isUser && message.endedRun && (
           <RunEndedNotice
             onRetry={onRetry ? () => onRetry(message) : undefined}
-            disabled={overrideDisabled}
+            disabled={retryDisabled}
           />
         )}
 

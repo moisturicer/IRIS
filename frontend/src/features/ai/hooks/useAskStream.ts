@@ -5,20 +5,17 @@ import type { SSEEvent } from "@/lib/sse";
 import type { CandidateRow, CandidateState, ChatCitation } from "@/types/ai";
 import type { ChatMessage, EndedRunState } from "@/types/chat";
 
-/**
- * What the server says an in-flight answer is doing (IR-595): the whole
- * public vocabulary, not a per-tool sequence.
- */
+/** What the server says an answer is doing (IR-595): the whole public vocabulary. */
 export type StreamActivity = "waiting" | "thinking" | "preparing";
 
-export const ACTIVITY_LABELS: Record<StreamActivity, string> = {
+const ACTIVITY_LABELS: Record<StreamActivity, string> = {
   waiting:   "Waiting…",
   thinking:  "Thinking…",
   preparing: "Preparing your answer…",
 };
 
 const isActivity = (value: unknown): value is StreamActivity =>
-  typeof value === "string" && value in ACTIVITY_LABELS;
+  typeof value === "string" && Object.prototype.hasOwnProperty.call(ACTIVITY_LABELS, value);
 
 export interface StreamingState {
   /** The queued run being followed, once known (IR-544) -- what Stop cancels. */
@@ -110,8 +107,8 @@ export function useAskStream() {
       let sawAnyEvent = false;
       let runId: string | null = knownRunId;
       let cursor = 0;
-      // A replayed record is never applied twice. An activity frame shares
-      // its event's `id:`, so the event name is part of the key.
+      // Replayed records apply once. The server puts `id:` only on a batch's last frame,
+      // so an id-less activity frame is deduped by state instead.
       const applied = new Set<string>();
 
       setStreaming({
