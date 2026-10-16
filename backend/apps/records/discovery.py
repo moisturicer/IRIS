@@ -77,7 +77,7 @@ def _catalogue(user, filters=None):
     queryset = (
         Record.objects.visible_to(user)
         .filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
-        .select_related("classification", "psced", "record_type")
+        .select_related("classification", "psced", "record_type", "ai_overview")
         .prefetch_related("authors")
         .annotate(file_count=Count("files", distinct=True))
         .order_by("-created_at", "-pk")

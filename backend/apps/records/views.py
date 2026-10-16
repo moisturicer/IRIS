@@ -85,7 +85,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # queryset, so "not yours" and "does not exist" produce the same
         # response and the API never confirms someone else's draft exists.
         qs = Record.objects.visible_to(self.request.user).select_related(
-            "classification", "psced", "record_type", "adviser"
+            "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
         if self.action == "metadata_suggestions":
