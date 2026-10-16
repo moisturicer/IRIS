@@ -71,6 +71,8 @@ class _Gathered:
     revoked: bool = False
     malformed: int = 0
     stalls: int = 0
+    history_ids: Optional[frozenset] = None
+    context_changed: bool = False
 
 
 class Controller:
@@ -92,7 +94,7 @@ class Controller:
         run = replace(run, spend=restore(run.spend, protected_tokens=budget.reserved_tokens))
         audit = RunAudit(ctx, self.clock)
         registry = general_tools()
-        gathered = _Gathered([], set(), [])
+        gathered = _Gathered([], set(), [], history_ids=frozenset(t.pk for t in asked.history))
         try:
             with model_call_deadline(ctx.budget.wall_clock_seconds, clock=self.clock):
                 with admission_scope.answer_allowance(
@@ -166,6 +168,12 @@ class Controller:
             audit.append(Step("plan", "ok", latency_ms=self._ms(started),
                               input_tokens=completion.input_tokens,
                               output_tokens=completion.output_tokens))
+            # A completion may have copied material revoked while PLAN ran.
+            # Recheck before any derived query/tool is sent or reused.
+            self._body(asked, run, budget, gathered)
+            if gathered.revoked:
+                previous, gathered.revoked = [], False
+                continue
             calls = completion.tool_calls
             if not calls:
                 return prompts.decision_from(completion.text, gathered=bool(gathered.envelopes)), "ready"
@@ -228,18 +236,25 @@ class Controller:
         if len(current) != len(gathered.envelopes):
             gathered.envelopes[:] = current
             gathered.revoked = True
+        history = list(planner_history(run.ctx))
+        history_ids = frozenset(t.pk for t in history)
+        if gathered.history_ids is not None and not gathered.history_ids <= history_ids:
+            gathered.revoked = True
+            gathered.context_changed = True
+        gathered.history_ids = history_ids
         payload = {
             "request": asked.question,
             "scope": "paper" if run.ctx.scope_record_id is not None else "corpus",
             "recent_history": [{"question": t.question, "answer": t.answer}
-                               for t in planner_history(run.ctx)],
+                               for t in history],
             "results": [e.public() for e in current],
             "remaining": {
                 "rounds": budget.max_rounds - run.spend.rounds,
                 "tool_calls": budget.max_tool_calls - run.spend.tool_calls,
             },
         }
-        if asked.resolved_question and asked.resolved_question != asked.question:
+        if (not gathered.context_changed and asked.resolved_question
+                and asked.resolved_question != asked.question):
             payload["request_in_context"] = asked.resolved_question
         state = conversation_state(run)
         if state is not None:
@@ -258,7 +273,8 @@ class Controller:
         facts = tuple(dict(f) for e in envelopes for f in e.facts)
         history = list(planner_history(run.ctx))
         return ReadyToCompose(
-            question=asked.question, resolved_question=asked.resolved_question,
+            question=asked.question,
+            resolved_question=None if gathered.context_changed else asked.resolved_question,
             intent=decision.intent, basis=EVIDENCE if envelopes else decision.basis,
             passages=passages, facts=facts, limitations=tuple(limitations),
             spend=run.spend, answer_input_limit=budget.answer_reserve_tokens,
@@ -321,11 +337,15 @@ def _current(run, envelopes) -> list:
               for item in (*run.ledger.records(), *run.ledger.passages())}
     named = [{owners[h] for h in _handles(e) if h in owners} for e in envelopes]
     allowed = disclosable(run.ctx, set().union(*named)) if named else {}
+    from apps.ai.research.tools.common import metadata_version
+
+    version = metadata_version(run.ctx) if any(e.metadata_version for e in envelopes) else None
     snapshot = None
     if any(_snapshots(e) for e in envelopes):
         snapshot = population_snapshot(visible_record_ids(run.ctx))
     return [e for e, ids in zip(envelopes, named)
             if ids <= allowed.keys() and _snapshots(e) <= {snapshot}
+            and (e.metadata_version is None or e.metadata_version == version)
             and sources_current(run, e.source_items)]
 
 

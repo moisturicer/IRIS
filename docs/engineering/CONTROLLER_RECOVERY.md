@@ -9,7 +9,7 @@ The new-run engine remains `lanes-v1`; human review and the existing release gat
 - Submission captures controller/research bounds in `AskRun.request.controller_budget`.
   Every round, tool attempt (including a malformed or duplicate call), and prompt charge
   commits under the current attempt fence before work. Redelivery retains those counters,
-  the original deadline and the admission run key. Queue time consumes the declared wall allowance.
+  the original deadline, declared admission ceiling and admission run key. Queue time consumes the declared wall allowance.
 - Evidence, handles, continuations and tool-result caches are rebuilt after a worker crash.
   No document-bearing checkpoint is restored. Current permissions, disclosure, source versions
   and conversation revision are checked again. An explicit user retry is a new run with fresh
@@ -26,7 +26,9 @@ The new-run engine remains `lanes-v1`; human review and the existing release gat
   conservatively abandoned after its lease. No raw provider response is needed to inspect it.
 - Envelopes keep private source pointers. Every subsequent planning prompt and answer handoff
   checks the exact title/abstract and active chunk-set hash as well as current access.
-  A metadata population change invalidates its computed facts. The answer and display summary
+  Metadata/filter/taxonomy/index eligibility changes invalidate computed facts even when visible
+  record IDs are unchanged. Replaced historical citations leave prompt/recall reuse; changes during
+  RESOLVE or PLAN discard derived rewrites, completions and tool arguments before another send. The answer and display summary
   are withheld if their computed facts or history lose authorization during composition.
   Withdrawn source positions stay stable during answer validation; stale text is not resent.
 
@@ -73,8 +75,10 @@ continuation artifacts, credentials or private tool payloads into routine metric
 | Exact version pins, rollback, reconnect/public compatibility | `test_controller_recovery_http.py`, `test_controller_http.py`, `test_public_history_http.py`, `test_public_protocol_http.py` |
 | Shared-store failure and independent-process accounting | `admission/tests/test_ledger.py`, `test_shared_processes.py` |
 
-The new process probes use separate interpreters and real Postgres, with stdin gates choosing the
-winning commit. Generation alone is scripted; claim, admission, Turn/state writes and journal are
-production paths. They are correctness/race evidence, not real model quality, Celery-broker
+The process probes use separate interpreters and real Postgres, with stdin gates choosing the
+winning commit. The controller crash probe uses production preparation, version checks, budget
+binding, controller and admission with deterministic providers; it crashes after a paid attempt is
+reserved, then restores cumulative spend on redelivery. The simpler ownership probes replace answer
+orchestration while retaining production claim, admission, Turn/state writes and journal. They are correctness/race evidence, not real model quality, Celery-broker
 availability or paid capacity evidence. Full authenticated controller and public replay tests cover
 the HTTP boundaries separately. No paid load test, institutional transmission or deployment ran.

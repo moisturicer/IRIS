@@ -151,7 +151,7 @@ class ToolRegistry:
             "reason": envelope.trace.reason, "duplicate": envelope.trace.duplicate,
             "recomputed": trace.recomputed, "elapsed_ms": trace.elapsed_ms,
         })
-        return replace(envelope, source_items=result.evidence)
+        return replace(envelope, source_items=result.evidence, metadata_version=result.metadata_version)
 
     def _dispatch(
         self, run: ToolRun, name: str, arguments: Any,
@@ -184,7 +184,14 @@ class ToolRegistry:
                 # Reauthorized before reuse (IR-590): stale or withheld, run again.
                 del run.cache[key]
                 recomputed = True
+            version = None
+            if tool.subject is CoverageSubject.METADATA_POPULATION:
+                from .tools.common import metadata_version
+
+                version = metadata_version(run.ctx)
             result = tool.execute(run, args)
+            if version is not None:
+                result = replace(result, metadata_version=version)
             run.cache[key] = result
             return result, args, recomputed
         except (ArgumentsRejected, HandleRejected) as exc:
@@ -209,9 +216,11 @@ class ToolRegistry:
 def _still_current(run: ToolRun, result: ToolResult) -> bool:
     """Every source still readable, disclosable and on its recorded version."""
     # Local imports: the tools package imports this module.
-    from .tools.common import visible_record_ids
+    from .tools.common import metadata_version, visible_record_ids
 
-    return (sources_current(run, result.evidence)
+    return ((result.metadata_version is None
+             or result.metadata_version == metadata_version(run.ctx))
+            and sources_current(run, result.evidence)
             and (result.visible_record_ids is None
                  or result.visible_record_ids == visible_record_ids(run.ctx)))
 

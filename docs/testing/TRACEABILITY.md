@@ -1196,3 +1196,37 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
   - a real phone keyboard: Chromium emulation only, so composer reachability is shown for Chromium, and Safari ignores `interactive-widget`;
   - the sources drawer in a browser: the dev corpus has no indexed records, so no answer carries citations;
   - browser zoom and reduced motion.
+
+
+## IR-597 — Controller recovery, budgets and source safety
+
+Authority: ADR-042 and general-tools specification sections 7/10, scenarios A11, A12 and A15.
+See [controller recovery runbook](../engineering/CONTROLLER_RECOVERY.md) for the criterion-to-test map,
+recovery/rollback procedure, conservative accounting rules and safe operational signals.
+
+The added suites exercise immutable controller bounds and cumulative pre-work charges on redelivery;
+shared paid ANSWER/repair reserve; stale attempt, terminal/deleted/deadline admission fences;
+unsupported version bundles before preparation; active source-version and metadata reauthorization;
+revoked facts during composition; malicious source instructions and closed capabilities; and
+independent-interpreter crash, supersession, cancellation and duplicate-delivery races on real Postgres.
+Existing authenticated journal/reconnect/public-history, conversation-revision, cache and store-failure
+suites are reused. No source-bearing checkpoint is restored: evidence and handles are rebuilt.
+
+Execution evidence (2026-10-16): the stale-chunk regression failed before the source-version fix.
+The fresh full backend run completed with **4,187 passed, 5 failed, 1 xpassed**. Four failures were
+legacy history fixtures lacking current chunk provenance; their setup was corrected without weakening
+assertions. The fifth was Windows CRLF conversion of `proxy_starter.json`: its committed LF bytes
+match the pinned audit, and restoring those exact bytes fixed the check without changing the audit or
+file content. The subsequent affected-area run passed **240 tests**, including all five prior failures;
+the new controller/recovery/budget/metadata/paid-reserve suites also passed in the earlier **91-test**
+focused run. Backend static checks pass. Django's configuration check reports only the existing
+`axes.W004` deprecation. New process tests use real Postgres and deterministic vendors, not paid calls.
+
+Deliberate existing-test changes: synthesis fixtures now issue actual current chunks instead of invented
+IDs/hashes; history, permission, public-summary and scoped-planner fixtures cite current chunks so their
+assertions test permission/scope loss rather than fail earlier on missing provenance. The answer-reserve
+exhaustion expectation now requires unavailable rather than an unfinished search reported as no matches.
+Missing/versionless citation rejection remains explicitly covered by new tests. Standards and spec reviews
+found source/metadata/history and recovery-evidence gaps; fixes and regressions were reviewed again with
+no outstanding findings. Full final-commit CI status is recorded in the PR. No model-quality,
+paid-capacity or production-readiness claim.

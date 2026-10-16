@@ -1,4 +1,4 @@
-"""The controller's hand-off to the shared ANSWER boundary (spec §2, §5).
+"""The controller's hand-off to the shared ANSWER boundary (spec Â§2, Â§5).
 
 `AnswerComposer` drafts, validates (`answers/assurance.py`), spends at most
 one repair, then keeps only supported sentences (ADR-042). Nothing here
@@ -149,6 +149,10 @@ class AnswerComposer:
         if cancelled() or not _facts_current(ready) or not _context_current(ready):
             return _unavailable(live)
         if ready.intent == ANSWER and ready.basis == EVIDENCE and not live and not ready.facts:
+            # An interrupted search did not establish that nothing matched.
+            if ready.stop_reason in {"answer_reserve", "max_outer_rounds", "max_tool_calls",
+                                     "max_prompt_tokens", "wall_clock_seconds", "planner_unavailable"}:
+                return _unavailable(())
             # Empty, withheld and irrelevant all read the same (ADR-042).
             return GroundedAnswer(NO_SOURCES_TEXT, (), state=NO_SOURCES, degraded=ready.degraded)
         try:

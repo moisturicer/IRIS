@@ -587,7 +587,8 @@ def run_scope(run: AskRun, attempt: AskRunAttempt | None = None) -> admission_sc
     from apps.ai.admission.limits import Ceiling
 
     pk = run.pk
-    ceiling = Ceiling(**run.request["comparison_ceiling"]) if run.request.get("comparison_ceiling") else None
+    declared = run.request.get("comparison_ceiling") or run.request.get("admission_ceiling")
+    ceiling = Ceiling(**declared) if declared else None
 
     def halted():
         live = AskRun.objects.filter(

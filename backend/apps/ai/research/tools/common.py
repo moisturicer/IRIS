@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Iterable, Optional
 
 from django.db.models import QuerySet
@@ -75,3 +77,30 @@ def disclosable(ctx: RunContext, record_ids: Iterable[int]) -> dict[int, Record]
 
 def collect_record(ledger: Ledger, record: Record) -> EvidenceItem:
     return ledger.add_record(record_id=record.pk, title=record.title, abstract=record.abstract)
+
+
+def metadata_version(ctx: RunContext) -> str:
+    """Fingerprint every visible aggregate input, including AI eligibility.
+
+    Names participate because filters/facets use them. Gate decisions and active
+    chunk sets participate because aggregate_records reports ai_readable. This
+    digest is private; public population provenance continues to name only IDs.
+    """
+    from apps.ai.models.chunk import ChunkSet
+
+    records = list(readable_records(ctx).select_related(
+        "classification", "psced", "record_type").order_by("pk"))
+    rows = [
+        (record.pk, record.year_completed,
+         record.classification.name if record.classification_id else None,
+         record.psced.name if record.psced_id else None,
+         record.record_type.name if record.record_type_id else None,
+         record.is_ip, bool(ctx.permits(record)))
+        for record in records
+    ]
+    indexed = list(ChunkSet.objects.filter(
+        record_id__in=[record.pk for record in records], is_active=True,
+    ).order_by("record_id", "pk").values_list(
+        "record_id", "pk", "content_hash", "extraction_hash", "strategy_id"))
+    payload = json.dumps({"records": rows, "index": indexed}, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()

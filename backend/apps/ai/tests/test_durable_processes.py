@@ -162,3 +162,37 @@ def test_crash_redelivery_and_duplicate_delivery_commit_exactly_one_final_turn(r
     assert run.events.filter(name="done").count() == 1
     assert list(run.events.values_list("sequence", flat=True)) == list(range(1, event_count + 1))
     assert ConversationState.objects.get(conversation=run.conversation).revision == 1
+
+
+def test_real_controller_crash_retains_shared_spend_and_rebuilds_evidence(run, budget, settings):
+    from apps.ai.controller.durable_budget import prepare_request
+    from apps.ai.controller.versions import CONTROLLER_ENGINE, pin
+
+    settings.AI_CONTROLLER_MAX_ROUNDS = 2
+    run.request = prepare_request({**run.request, "conversation_id": run.conversation_id,
+                                   "pin": pin(CONTROLLER_ENGINE)})
+    run.save(update_fields=["request"])
+    deadline = run.deadline_at
+    with _probe("controller_crash", run) as crashed:
+        result = _result(crashed, expected_code=23)
+        assert result["controller_crashed"]
+    run.refresh_from_db()
+    spent = run.request["controller_budget"]["spent"]
+    assert spent["rounds"] == 2 and spent["tool_calls"] == 1
+    assert spent["prompt_tokens"] > 0
+    assert _reservations(run).count() == 2
+    assert _reservations(run).filter(state="open").count() == 1
+    assert not Turn.objects.filter(conversation=run.conversation).exists()
+
+    with _probe("controller_deliver", run) as recovered:
+        assert _result(recovered)["planner_calls"] == 0
+    with _probe("controller_deliver", run) as duplicate:
+        assert _result(duplicate)["planner_calls"] == 0
+    run.refresh_from_db()
+    assert run.deadline_at == deadline
+    assert run.request["controller_budget"]["spent"] == spent
+    assert _reservations(run).count() == 2
+    assert Turn.objects.filter(conversation=run.conversation).count() == 1
+    assert run.turn.state == "unavailable"
+    assert run.events.filter(name="done").count() == 1
+    assert not run.turn.reasoning_summary

@@ -1,6 +1,7 @@
 """Independent durable worker probe; only Postgres and stdin cross processes.
 
-The scripted answer replaces generation only. Claims, admission, guarded Turn
+Legacy probes replace answer orchestration; controller probes replace providers only.
+Claims, admission, guarded Turn
 writes, conversation-state commits and the public journal use production code.
 A ready JSON line followed by a stdin gate fixes race ordering without sleeps.
 """
@@ -42,6 +43,41 @@ def main():
         with use_composition_root(root_with()):
             orchestrator = durable._QueuedOrchestrator(asked, max_sources=1, attempt=attempt)
             return orchestrator._record(GroundedAnswer(text="scripted answer", citations=()))
+
+    if mode in ("controller_crash", "controller_deliver"):
+        from apps.ai.composition import CompositionRoot
+        from apps.ai.controller.versions import CONTROLLER_ENGINE
+        from apps.ai.inference import InferenceTask
+        from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+        from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedToolCallingLLM
+
+        class Planner(MeteredAdapter):
+            calls = 0
+
+            def converse_with_tools(self, messages, tools, *, timeout_seconds=None):
+                super().converse_with_tools(messages, tools, timeout_seconds=timeout_seconds)
+                self.calls += 1
+                if mode == "controller_crash" and self.calls == 2:
+                    # The real controller charged round/prompt; admission committed
+                    # the physical reservation; this remote usage is now unknown.
+                    emit(controller_crashed=True)
+                    os._exit(23)
+                return ScriptedToolCallingLLM.calling(
+                    "aggregate_records", '{"operation":"count"}', "count-1",
+                )
+
+        planner = AdmittedLLMProvider(Planner())
+        writer = AdmittedLLMProvider(MeteredAdapter(text="A supported answer."))
+        root = CompositionRoot(
+            embedder=DeterministicEmbeddingProvider(dimensions=VECTOR_COLUMN_DIMENSIONS),
+            llm=writer, permits=lambda record: True, engine=CONTROLLER_ENGINE,
+        )
+        real = root.llm_for
+        root.llm_for = lambda task, **kwargs: planner if task == InferenceTask.PLAN else real(task, **kwargs)
+        with use_composition_root(root):
+            durable.execute(run_id)
+        emit(delivered=True, planner_calls=planner._adapter.calls)
+        return
 
     if mode == "deliver":
         # The real delivery/claim boundary, with deterministic generation.

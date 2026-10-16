@@ -61,6 +61,10 @@ def prepare_request(request, *, retry=False):
     if retry:
         state.pop("spent", None)
     payload[_KEY] = state
+    from apps.ai.admission.limits import enforcing, read_limits
+
+    if enforcing() and "admission_ceiling" not in payload:
+        payload["admission_ceiling"] = asdict(read_limits().run)
     return payload
 
 

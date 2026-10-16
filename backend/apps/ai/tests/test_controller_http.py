@@ -212,7 +212,7 @@ def test_no_research_starts_when_the_answer_reserve_cannot_be_met(
     with use_composition_root(root):
         body = asked_flood(flood_scene["client"], flood_scene["conversation"])
     assert planner.conversation_requests == []
-    assert body["answer"] is None and body["mode"] == "no_results"
+    assert body["mode"] == "unavailable" and not body["citations"]
 
 
 def test_an_unset_limit_refuses_without_calling_any_model(flood_scene, settings, monkeypatch, embedder):

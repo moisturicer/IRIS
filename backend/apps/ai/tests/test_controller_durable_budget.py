@@ -133,3 +133,28 @@ def test_durable_prompt_charges_cannot_refund_a_reservation(run):
         spend.charge_prompt_tokens(-1)
     run.refresh_from_db()
     assert run.request["controller_budget"]["spent"]["prompt_tokens"] == 10
+
+
+@pytest.mark.parametrize("name,value", [
+    ("AI_CONTROLLER_REPAIR_ATTEMPTS", -1), ("AI_CONTROLLER_REPAIR_ATTEMPTS", 2),
+    ("AI_CONTROLLER_ANSWER_RESERVE_TOKENS", 0),
+    ("AI_CONTROLLER_ANSWER_RESERVE_SECONDS", float("nan")),
+])
+def test_invalid_answer_allowance_never_declares_a_run(budget, settings, name, value):
+    from apps.ai.controller.budget import ControllerBudget, NotConfigured
+
+    setattr(settings, name, value)
+    with pytest.raises(NotConfigured):
+        ControllerBudget.from_settings()
+
+
+def test_queued_controller_keeps_declared_admission_ceiling(budget, settings):
+    from apps.ai.admission.tests.support import enforce
+    from apps.ai.controller.versions import CONTROLLER_ENGINE, pin
+    from apps.ai.admission.limits import Ceiling
+
+    enforce(settings, AI_ADMISSION_RUN_MAX_ATTEMPTS="7")
+    payload = prepare_request({"pin": pin(CONTROLLER_ENGINE)})
+    settings.AI_ADMISSION_RUN_MAX_ATTEMPTS = "700"
+    assert Ceiling(**payload["admission_ceiling"]).attempts == 7
+    assert prepare_request(payload, retry=True)["admission_ceiling"] == payload["admission_ceiling"]

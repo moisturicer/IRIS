@@ -68,6 +68,8 @@ class ToolResult:
     visible_record_ids: frozenset[int] | None = None
     #: An envelope-native result from a general tool (IR-591).
     shaped: Optional["Shaped"] = None
+    #: Private metadata/eligibility fingerprint, never included in planner messages.
+    metadata_version: Optional[str] = None
 
     @classmethod
     def rejected(cls, reason: str) -> "ToolResult":
@@ -212,6 +214,8 @@ class Envelope:
     limitations: tuple[str, ...] = ()
     #: Private immutable pointers for reauthorization; never included in public().
     source_items: tuple = ()
+    #: Private aggregate dependencies; the public population snapshot stays stable.
+    metadata_version: Optional[str] = None
 
     def __post_init__(self) -> None:
         for code in self.limitations:
@@ -309,6 +313,7 @@ def envelope_of(
             shaped.status, shaped.coverage, trace, items=shaped.items,
             evidence=_items_and_evidence(result)[1], facts=shaped.facts,
             continuation=shaped.continuation, limitations=shaped.limitations,
+            metadata_version=result.metadata_version,
         )
 
     limitations = []
@@ -324,7 +329,7 @@ def envelope_of(
     return Envelope(
         status, coverage_for(result, subject), trace,
         items=items, evidence=evidence, facts=_facts(result, subject, predicate),
-        limitations=tuple(limitations),
+        limitations=tuple(limitations), metadata_version=result.metadata_version,
     )
 
 

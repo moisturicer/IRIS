@@ -68,6 +68,30 @@ def _answer(*records, state=GENERATED, text="An answer."):
     )
 
 
+def _current_answer(record, *, text="An answer."):
+    """A cited answer with verifiable current provenance for history tests."""
+    from dataclasses import replace
+
+    from apps.ai.models import DocumentChunk
+
+    chunk_set = record.chunk_sets.filter(is_active=True).first()
+    if chunk_set is None:
+        chunk_set = ChunkSet.objects.create(
+            record=record, extraction_hash=f"e{record.pk}", strategy_id="test",
+            options={}, content_hash=f"v{record.pk}", is_active=True,
+        )
+    chunk = chunk_set.chunks.filter(deleted_at__isnull=True).first()
+    if chunk is None:
+        chunk = DocumentChunk.objects.create(
+            record=record, chunk_set=chunk_set, sequence=0, max_sequence=0,
+            text=f"About {record.title}.", content=f"About {record.title}.",
+            text_hash=f"t{record.pk}", token_count=3,
+        )
+    return GroundedAnswer(text=text, citations=(
+        replace(_citation(1, record), chunk_id=chunk.pk, text=chunk.content),
+    ))
+
+
 def _listing(*records):
     return {"completeness": "complete", "records": [{"record_id": r.pk} for r in records]}
 
@@ -258,8 +282,8 @@ class RevocationTests:
 
     def test_history_and_recall_drop_a_turn_whose_source_was_revoked(self, conversation, reader, embedder, space):
         a, b = _record("A"), _record("B")
-        kept = record_turn(conversation, "about b", _answer(b))
-        lost = record_turn(conversation, "about a", _answer(a))
+        kept = record_turn(conversation, "about b", _current_answer(b))
+        lost = record_turn(conversation, "about a", _current_answer(a))
         TurnEmbedding.objects.create(
             turn=lost, space=space, kind=TURN_QUESTION_VECTOR,
             embedding=embedder.embed_query("about a"),
@@ -393,9 +417,9 @@ class ContextAssemblyTests:
     def test_context_names_the_request_and_bounds_older_turns(self, conversation, reader, settings):
         settings.AI_HISTORY_TOKEN_BUDGET = 40
         a = _record("A")
-        old = record_turn(conversation, "first question about A", _answer(a, text="word " * 30))
+        old = record_turn(conversation, "first question about A", _current_answer(a, text="word " * 30))
         for n in range(3):
-            record_turn(conversation, f"question {n}", _answer(a, text="word " * 10))
+            record_turn(conversation, f"question {n}", _current_answer(a, text="word " * 10))
 
         context = conversation_context(conversation, reader, "simplify", "simplify A")
 
@@ -408,8 +432,8 @@ class ContextAssemblyTests:
     def test_a_revoked_dependency_removes_the_older_summary(self, conversation, reader, settings):
         settings.AI_HISTORY_TOKEN_BUDGET = 20
         a, b = _record("A"), _record("B")
-        old = record_turn(conversation, "first question about A", _answer(a))
-        record_turn(conversation, "later about B", _answer(b, text="word " * 10))
+        old = record_turn(conversation, "first question about A", _current_answer(a))
+        record_turn(conversation, "later about B", _current_answer(b, text="word " * 10))
         _revoke(a)
 
         context = conversation_context(conversation, reader, "next", "")

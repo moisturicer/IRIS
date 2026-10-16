@@ -370,6 +370,7 @@ def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
                 if citation.chunk_id is not None
             },
             deleted_at__isnull=True,
+            chunk_set__is_active=True,
         )
         # `page_sizes` lives on the chunk set, and regions are useless
         # without it (IR-334).
@@ -430,7 +431,10 @@ def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
             body["comparison"] = comparison
     if public:
         for turn, body in zip(turns, bodies):
-            summary = public_protocol.summary_for(turn, len(body["citations"]))
+            # A degraded historical pointer proves access, not the version
+            # that supported the analysis. Never revive its derived summary.
+            current = all(c.chunk_id in live_chunks for c in turn.citations.all())
+            summary = public_protocol.summary_for(turn, len(body["citations"])) if current else None
             if summary:
                 body["reasoning_summary"] = summary
         return [public_protocol.project_turn(body) for body in bodies]
@@ -443,8 +447,8 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
     ``None`` when the Record is no longer visible -- existence must not leak,
     so this is indistinguishable from a citation that was never stored at
     all. A record-level pointer (no ``text``, no ``record_title``) when the
-    Record is visible but the chunk it pointed at was tombstoned by a
-    re-chunk: the text it once quoted may no longer represent the record, so
+    Record is visible but the chunk it pointed at was removed or superseded
+    by a re-chunk: the text it once quoted may no longer represent the record, so
     showing it would be a stale quote rather than a re-resolved one.
     """
     if citation.record_id not in visible_titles:

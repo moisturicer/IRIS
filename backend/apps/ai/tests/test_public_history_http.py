@@ -80,13 +80,15 @@ def test_a_stored_summary_follows_the_turn_and_is_withheld_when_a_cited_source_i
     conversation = Conversation.objects.create(user=reader)
     turn = legacy_turn(conversation, reasoning_summary="Only one paper addresses forecasting.",
                        reasoning_summary_source="controller-v1/answer-1")
-    TurnCitation.objects.create(turn=turn, marker=1, record=visible)
+    TurnCitation.objects.create(turn=turn, marker=1, record=visible,
+                                chunk=visible.document_chunks.get())
     client = client_for(reader)
 
     assert detail(client, conversation, protocol=PUBLIC)["turns"][0]["reasoning_summary"] == (
         "Only one paper addresses forecasting.")
 
-    TurnCitation.objects.create(turn=turn, marker=2, record=hidden)
+    TurnCitation.objects.create(turn=turn, marker=2, record=hidden,
+                                chunk=hidden.document_chunks.get())
     shown = detail(client, conversation, protocol=PUBLIC)["turns"][0]
     assert "reasoning_summary" not in shown
     assert [c["record_id"] for c in shown["citations"]] == [visible.pk]
