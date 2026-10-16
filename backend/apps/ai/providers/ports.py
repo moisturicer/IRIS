@@ -123,13 +123,8 @@ class Reranker(ABC):
 
 @dataclass(frozen=True)
 class LLMCapabilities:
-    """What a vendor behind an adapter can return beyond text (IR-595, spec §6.2).
-
-    `display_summary`: it may supply a short summary of its reasoning, a
-    private candidate that is never forwarded to a reader as it arrives.
-    `continuation_artifacts`: it hands back opaque artifacts (signatures,
-    encrypted blocks) that must be returned verbatim on the next request.
-    """
+    """Vendor abilities beyond text: a private reasoning summary, and opaque
+    artifacts to echo back verbatim (IR-595)."""
 
     display_summary: bool = False
     continuation_artifacts: bool = False

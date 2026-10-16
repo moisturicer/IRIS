@@ -27,6 +27,7 @@ from typing import Optional
 from django.conf import settings
 from django.db import transaction
 
+from apps.ai import public as public_protocol
 from apps.ai.answers.citations import GENERATED, PARTIAL, GroundedAnswer
 from apps.ai.models import (
     MODEL_HISTORY_STATES,
@@ -341,9 +342,7 @@ def turn_for_reader(turn: Turn, user, *, public: bool = False) -> dict:
 
 
 def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
-    """``public`` (IR-595) projects each body through the reader allowlist of
-    `apps.ai.public`: stored reasoning, routing and research stay in the
-    database and out of the response."""
+    """``public`` (IR-595) projects bodies through `apps.ai.public`; stored data is kept."""
     all_citations = [
         citation for turn in turns for citation in turn.citations.all()
     ]
@@ -430,13 +429,11 @@ def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
         else:
             body["comparison"] = comparison
     if public:
-        from apps.ai import public as reader_protocol
-
         for turn, body in zip(turns, bodies):
-            summary = reader_protocol.summary_for(turn, len(body["citations"]))
+            summary = public_protocol.summary_for(turn, len(body["citations"]))
             if summary:
                 body["reasoning_summary"] = summary
-        return [reader_protocol.project_turn(body) for body in bodies]
+        return [public_protocol.project_turn(body) for body in bodies]
     return bodies
 
 

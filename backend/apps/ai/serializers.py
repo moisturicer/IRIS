@@ -7,7 +7,7 @@ the things that *are* rows.
 
 from rest_framework import serializers
 
-from apps.ai import public
+from apps.ai import public as public_protocol
 from apps.ai.conversations import turns_for_reader
 from apps.records.models import Record
 
@@ -71,12 +71,15 @@ class ConversationDetailSerializer(ConversationSerializer):
 
     def get_turns(self, conversation):
         request = self.context["request"]
-        return turns_for_reader(conversation, request.user, public=public.requested(request))
+        return turns_for_reader(conversation, request.user, public=public_protocol.requested(request))
 
     def get_latest_run(self, conversation):
         from apps.ai.durable import latest_run_for_reader
 
-        return latest_run_for_reader(conversation)
+        run = latest_run_for_reader(conversation)
+        if public_protocol.requested(self.context["request"]):
+            return public_protocol.project_latest_run(run)
+        return run
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

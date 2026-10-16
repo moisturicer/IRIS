@@ -620,8 +620,7 @@ def follow(run_id, user, after: int = 0, *, public=False, sleep=time.sleep, cloc
     the run's terminal event has been sent. Ends quietly if the run stops
     being the reader's -- deleted with its Conversation, for instance.
 
-    ``public`` (IR-595) sends the allowlisted reader protocol of `apps.ai.public`
-    instead: activity states, no routing or planner steps, the summary on `done`.
+    ``public`` (IR-595) sends the `apps.ai.public` protocol instead.
 
     Reads only. Closing this generator touches nothing in the run.
     """
@@ -680,7 +679,7 @@ def _frame(event: AskRunEvent, user):
     return _sse(event.sequence, name, data)
 
 
-def _payload(event: AskRunEvent, user, public=False):
+def _payload(event: AskRunEvent, user, *, public=False):
     data = event.data
     if event.name == "citations_resolved":
         visible = _visible_ids(user, [c["record_id"] for c in data["citations"]])
@@ -719,7 +718,7 @@ def _visible_candidates(user, data: dict) -> dict:
     ]}
 
 
-def _done(event: AskRunEvent, user, public=False):
+def _done(event: AskRunEvent, user, *, public=False):
     """The final answer as it reads now: rebuilt from the Turn, never replayed."""
     from apps.ai.conversations import turn_for_reader
 

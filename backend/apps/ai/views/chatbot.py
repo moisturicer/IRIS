@@ -31,7 +31,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
-from apps.ai import public
+from apps.ai import public as public_protocol
 from apps.ai.conversation_state import current_revision
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
@@ -286,7 +286,7 @@ class ChatQueryView(APIView):
     throttle_classes = [AIQueryThrottle]
 
     def post(self, request):
-        public_mode = public.requested(request)
+        public_mode = public_protocol.requested(request)
         prepared, error = prepare_ask(request.data, request.user)
         if error is not None:
             return error
@@ -296,9 +296,7 @@ class ChatQueryView(APIView):
         )
         answer = orchestrator.answer(request.user)
         if public_mode:
-            return Response(public.project_done(
-                {**done_body(prepared, orchestrator, answer),
-                 "reasoning_summary": answer.reasoning_summary}))
+            return Response(public_body(prepared, orchestrator, answer))
         return Response(done_body(prepared, orchestrator, answer))
 
 
@@ -338,6 +336,12 @@ def done_body(prepared, orchestrator, answer) -> dict:
         "had_reasoning": answer.had_reasoning,
         "reasoning": answer.reasoning or None,
     }
+
+
+def public_body(prepared, orchestrator, answer) -> dict:
+    """`done_body` under the public protocol, with the validated summary."""
+    return public_protocol.project_done(
+        {**done_body(prepared, orchestrator, answer), "reasoning_summary": answer.reasoning_summary})
 
 
 def event_payload(event) -> dict:
@@ -427,7 +431,7 @@ class ChatStreamView(APIView):
     def post(self, request):
         from apps.ai import durable
 
-        public_mode = public.requested(request)
+        public_mode = public_protocol.requested(request)
         queued = durable.requested(request.data)
         prepared, error = prepare_ask(request.data, request.user, resolve=not queued)
         if error is not None:
@@ -465,13 +469,12 @@ class ChatStreamView(APIView):
             # and as `partial` on interruption (IR-328).
             # Closed explicitly, so a run never waits on garbage collection.
             events = orchestrator.answer_stream(request.user)
-            projector = public.StreamProjector()
+            projector = public_protocol.StreamProjector()
             with closing(events):
                 for event in events:
                     if isinstance(event, Done):
-                        body = done_body(prepared, orchestrator, event.answer)
-                        if public_mode:
-                            body["reasoning_summary"] = event.answer.reasoning_summary
+                        body = (public_body if public_mode else done_body)(
+                            prepared, orchestrator, event.answer)
                     else:
                         body = event_payload(event)
                     if not public_mode:
@@ -509,7 +512,7 @@ class RunStreamView(APIView):
         except (TypeError, ValueError):
             after = 0
         return EventStreamResponse(
-            durable.follow(pk, request.user, after=after, public=public.requested(request))
+            durable.follow(pk, request.user, after=after, public=public_protocol.requested(request))
         )
 
 

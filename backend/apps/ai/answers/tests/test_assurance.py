@@ -112,6 +112,8 @@ def test_a_summary_with_markup_a_vendor_name_or_unsupported_names_is_omitted():
     assert safe_summary("The Acme benchmark differs.", answer, evidence) == ""
     assert safe_summary('The paper says "state of the art".', answer, evidence) == ""
     assert safe_summary("x" * 601, answer) == ""
+    assert safe_summary("Acme outperforms both baselines.", answer) == ""
+    assert safe_summary("Both studies differ in their evaluation settings.", answer)
 
 
 def test_a_year_or_an_abbreviation_in_a_cited_sentence_is_not_a_failure():

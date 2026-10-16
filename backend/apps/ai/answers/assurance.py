@@ -266,7 +266,12 @@ _NARRATION = re.compile(
     r"|\b(?:openai|anthropic|groq|openrouter|voyage|gpt[\w.-]*|claude|gemini|llama|mistral"
     r"|deepseek|qwen)\b", re.I)
 _QUOTED = re.compile(r"\"([^\"\n]+)\"|“([^”\n]+)”")
-_SENTENCE_START = re.compile(r"(?:^|(?<=[.!?])\s+)(\S+)")
+#: Common sentence openers allowed without support. Limit: lowercase claims are not checked.
+_STARTERS = frozenset(
+    "a an the this that these those it they both each all some most many several only one two "
+    "three no none however although while because since if when as in on of for with without "
+    "but and so then also here there evidence results result papers paper studies study "
+    "evaluation settings setting findings sources source differences difference".split())
 _CAPITALISED = re.compile(r"\b[A-Z][A-Za-z0-9-]*\b")
 
 
@@ -291,9 +296,7 @@ def safe_summary(summary: str, answer: str, evidence: str = "") -> str:
         return ""
     if any((a or b).lower() not in support.lower() for a, b in _QUOTED.findall(summary)):
         return ""
-    starts = {m.start(1) for m in _SENTENCE_START.finditer(summary)}
-    known = _words(support)
-    for m in _CAPITALISED.finditer(summary):
-        if m.start() not in starts and m.group().lower() not in known:
-            return ""
+    known = _words(support) | _STARTERS
+    if any(m.group().lower() not in known for m in _CAPITALISED.finditer(summary)):
+        return ""
     return summary
