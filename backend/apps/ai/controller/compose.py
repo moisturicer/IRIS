@@ -18,12 +18,15 @@ from apps.ai.answers.assurance import FENCED, check, parse_draft, safe_summary, 
 from apps.ai.answers.citations import GroundedAnswer, NO_SOURCES, UNAVAILABLE, build_prompt, parse_citations
 from apps.ai.answers.reasoning import without_leaked_reasoning
 from apps.ai.answers.service import UNAVAILABLE_TEXT, model_that_answered
+from apps.ai.controller.versions import ANSWER_PROMPT_VERSION, CONTROLLER_ENGINE
 from apps.ai.inference import InferenceTask
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.retrieval.ports import RetrievedChunk
 
 logger = logging.getLogger(__name__)
+
+SUMMARY_SOURCE = f"{CONTROLLER_ENGINE}/{ANSWER_PROMPT_VERSION}"
 
 ANSWER = "answer"
 CLARIFY = "clarify"
@@ -163,10 +166,14 @@ class AnswerComposer:
                  LEFT_OUT if any(i.code not in FENCED for i in issues if i.unit is not None) else ""]
         text = "\n\n".join([text, *filter(None, notes)])
         text, citations = parse_citations(text, sources)
+        cited = {c.chunk_id for c in citations}
+        evidence = "\n".join(s.content for s in sources if s.chunk_id in cited)
+        summary = "" if issues else safe_summary(draft.summary, text, evidence)
         return GroundedAnswer(
             text=text, citations=citations, sources=live, model=model_that_answered(llm),
             degraded=ready.degraded or bool(ready.limitations) or bool(issues),
-            reasoning_summary="" if issues else safe_summary(draft.summary, text),
+            reasoning_summary=summary,
+            reasoning_summary_source=SUMMARY_SOURCE if summary else "",
             validation=_codes(issues, repaired),
         )
 

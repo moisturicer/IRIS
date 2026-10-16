@@ -181,6 +181,9 @@ class GroundedAnswer:
     #: §6.2). Never evidence and never raw reasoning; "" when unsafe or absent.
     reasoning_summary: str = ""
 
+    #: Where the summary came from (engine and answer prompt version); "" with none.
+    reasoning_summary_source: str = ""
+
     #: Validation reason codes left after composing, plus "repaired" when the
     #: one repair was spent. Codes only, never content (IR-594).
     validation: tuple[str, ...] = ()

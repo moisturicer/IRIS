@@ -122,6 +122,31 @@ class Reranker(ABC):
 
 
 @dataclass(frozen=True)
+class LLMCapabilities:
+    """What a vendor behind an adapter can return beyond text (IR-595, spec §6.2).
+
+    `display_summary`: it may supply a short summary of its reasoning, a
+    private candidate that is never forwarded to a reader as it arrives.
+    `continuation_artifacts`: it hands back opaque artifacts (signatures,
+    encrypted blocks) that must be returned verbatim on the next request.
+    """
+
+    display_summary: bool = False
+    continuation_artifacts: bool = False
+
+
+NO_CAPABILITIES = LLMCapabilities()
+
+
+def capabilities_of(provider: object) -> LLMCapabilities:
+    """A provider's capabilities, through whichever decorators wrap it.
+
+    Every decorator already forwards `dialect`, so the declaration lives there.
+    """
+    return getattr(getattr(provider, "dialect", None), "capabilities", NO_CAPABILITIES)
+
+
+@dataclass(frozen=True)
 class StreamDelta:
     """One increment of a streamed answer.
 

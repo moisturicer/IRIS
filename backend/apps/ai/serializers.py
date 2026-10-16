@@ -7,6 +7,7 @@ the things that *are* rows.
 
 from rest_framework import serializers
 
+from apps.ai import public
 from apps.ai.conversations import turns_for_reader
 from apps.records.models import Record
 
@@ -69,7 +70,8 @@ class ConversationDetailSerializer(ConversationSerializer):
         fields = ConversationSerializer.Meta.fields + ["turns", "latest_run"]
 
     def get_turns(self, conversation):
-        return turns_for_reader(conversation, self.context["request"].user)
+        request = self.context["request"]
+        return turns_for_reader(conversation, request.user, public=public.requested(request))
 
     def get_latest_run(self, conversation):
         from apps.ai.durable import latest_run_for_reader

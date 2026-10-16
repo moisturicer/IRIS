@@ -83,6 +83,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connection, transaction
 from django.utils import timezone
 
+from apps.ai import public as public_protocol
 from apps.ai.admission import scope as admission_scope
 
 from apps.ai.answers.citations import PARTIAL as PARTIAL_ANSWER
@@ -614,14 +615,18 @@ def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
 # ---- following and replay ---------------------------------------------------
 
 
-def follow(run_id, user, after: int = 0, *, sleep=time.sleep, clock=time.monotonic):
+def follow(run_id, user, after: int = 0, *, public=False, sleep=time.sleep, clock=time.monotonic):
     """SSE frames for every event after ``after``, then the live tail, until
     the run's terminal event has been sent. Ends quietly if the run stops
     being the reader's -- deleted with its Conversation, for instance.
 
+    ``public`` (IR-595) sends the allowlisted reader protocol of `apps.ai.public`
+    instead: activity states, no routing or planner steps, the summary on `done`.
+
     Reads only. Closing this generator touches nothing in the run.
     """
     cursor = after
+    projector = public_protocol.StreamProjector(_seed_activity(run_id, after)) if public else None
     last_sent = clock()
     while True:
         run = AskRun.objects.owned_by(user).filter(pk=run_id).first()
@@ -630,7 +635,10 @@ def follow(run_id, user, after: int = 0, *, sleep=time.sleep, clock=time.monoton
         batch = list(run.events.filter(sequence__gt=cursor).order_by("sequence")[:_BATCH])
         for event in batch:
             cursor = event.sequence
-            yield _frame(event, user)
+            if projector is None:
+                yield _frame(event, user)
+            else:
+                yield from _public_frames(event, user, projector)
             last_sent = clock()
         if batch:
             continue
@@ -646,7 +654,33 @@ def follow(run_id, user, after: int = 0, *, sleep=time.sleep, clock=time.monoton
         sleep(settings.AI_DURABLE_ASK_POLL_SECONDS)
 
 
+def _seed_activity(run_id, after: int):
+    """The activity a reader reconnecting after ``after`` already holds."""
+    if after <= 0:
+        return None
+    names = AskRunEvent.objects.filter(run_id=run_id, sequence__lte=after).order_by(
+        "-sequence").values_list("name", flat=True)
+    return next((s for s in map(public_protocol.activity_state, names) if s), None)
+
+
+def _public_frames(event: AskRunEvent, user, projector):
+    """Public frames for one journal event. Only the last carries the event's
+    `id:`, so a reader who dropped between two frames replays both."""
+    name, data = _payload(event, user, public=True)
+    frames = projector.feed(name, data)
+    for position, (frame_name, frame_data) in enumerate(frames):
+        if position == len(frames) - 1:
+            yield _sse(event.sequence, frame_name, frame_data)
+        else:
+            yield f"event: {frame_name}\ndata: {json.dumps(frame_data)}\n\n"
+
+
 def _frame(event: AskRunEvent, user):
+    name, data = _payload(event, user)
+    return _sse(event.sequence, name, data)
+
+
+def _payload(event: AskRunEvent, user, public=False):
     data = event.data
     if event.name == "citations_resolved":
         visible = _visible_ids(user, [c["record_id"] for c in data["citations"]])
@@ -654,13 +688,13 @@ def _frame(event: AskRunEvent, user):
     elif event.name in ("candidates_selected", "candidates_updated"):
         data = _visible_candidates(user, data)
     elif event.name == "done":
-        data = _done(event, user)
+        data = _done(event, user, public=public)
         if data is None:
             # The Turn is gone; the run is still over, and must say so.
-            return _sse(event.sequence, "run_failed", {
+            return "run_failed", {
                 "run_id": str(event.run_id), "state": FAILED, "reason": "unavailable",
-            })
-    return _sse(event.sequence, event.name, data)
+            }
+    return event.name, data
 
 
 def _sse(sequence: int, name: str, data: dict) -> str:
@@ -685,14 +719,14 @@ def _visible_candidates(user, data: dict) -> dict:
     ]}
 
 
-def _done(event: AskRunEvent, user):
+def _done(event: AskRunEvent, user, public=False):
     """The final answer as it reads now: rebuilt from the Turn, never replayed."""
     from apps.ai.conversations import turn_for_reader
 
     turn = Turn.objects.filter(pk=event.data["turn_id"], conversation__user=user).first()
     if turn is None:
         return None
-    reader = turn_for_reader(turn, user)
+    reader = turn_for_reader(turn, user, public=public)
     sources = event.data.get("sources", [])
     if turn.comparison and "comparison" not in reader:
         sources = []
@@ -708,7 +742,7 @@ def _done(event: AskRunEvent, user):
     body.update(
         turn_id=turn.pk,
         conversation_id=turn.conversation_id,
-        mode=reader["state"],
+        mode=reader.get("state", reader.get("mode")),
         sources=[source for source in sources if source["id"] in visible],
     )
     return body
