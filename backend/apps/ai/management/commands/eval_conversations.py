@@ -97,7 +97,6 @@ class Command(BaseCommand):
         w("valid" + ("" if report["ready"] else " (not ready: coverage gaps)"))
 
     def _score(self, data, options):
-        w = self.stdout.write
         report = validate_set(data, min_conversations=0)
         if report["errors"]:
             raise CommandError("the set is invalid: " + "; ".join(report["errors"]))

@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 SCHEMA_VERSION = 1
 FAMILIES = tuple(f"A{i:02d}" for i in range(1, 16))
