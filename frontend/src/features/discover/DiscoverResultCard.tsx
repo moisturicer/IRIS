@@ -8,6 +8,7 @@ import { CitationIcon } from "./DiscoverIcons";
 import { ManuscriptCover } from "./ManuscriptCover";
 import { PaperSaveDropdown } from "./PaperSaveDropdown";
 import {
+  cardHook,
   formatAuthorList,
   highlightMatch,
   ipTypeLabel,
@@ -35,10 +36,7 @@ interface DiscoverResultCardProps {
 export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false }: DiscoverResultCardProps) {
   const [starred, setStarred] = useState(() => isStarred(record.id));
   const abstract = record.abstract?.trim() ?? "";
-  const firstSentence = abstract.replace(/\s+/g, " ").match(/^(.+?[.!?])(?:\s|$)/)?.[1] ?? abstract;
-  const hook = firstSentence.length > 145
-    ? `${firstSentence.slice(0, 145).replace(/\s+\S*$/, "")}…`
-    : firstSentence;
+  const hook = cardHook({ abstract, ai_hook: record.ai_hook });
 
   const flags = [
     record.is_ip && { key: "ip", icon: "fa-shield-halved", label: ipTypeLabel(record.ip_type) },
@@ -76,10 +74,10 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
         <div className="mt-auto border-t border-stone-200 px-5 pb-5 pt-4">
           <div className="flex items-center gap-2">
             <span aria-hidden className="h-0.5 w-4 rounded-full bg-brand" />
-            <span className="text-label font-semibold uppercase tracking-wide text-stone-700">From the abstract</span>
+            <span className="text-label font-semibold uppercase tracking-wide text-stone-700">{record.ai_hook?.trim() ? "At a glance" : "From the abstract"}</span>
           </div>
           <p className="mt-2 line-clamp-3 font-display text-[1.13rem] leading-snug text-stone-800">
-            {abstract ? highlightMatch(hook, searchHighlight) : "No abstract has been added yet."}
+            {hook ? highlightMatch(hook, searchHighlight) : "No abstract has been added yet."}
           </p>
         </div>
       </>}
