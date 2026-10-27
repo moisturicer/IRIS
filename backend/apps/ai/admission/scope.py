@@ -34,6 +34,7 @@ _run: ContextVar[Optional["RunScope"]] = ContextVar("admission_run", default=Non
 _attempt: ContextVar[Optional["AttemptUsage"]] = ContextVar("admission_attempt", default=None)
 _send_guard: ContextVar[Optional[Callable]] = ContextVar("provider_send_guard", default=None)
 _usage_observer: ContextVar[Optional[list]] = ContextVar("provider_usage_observer", default=None)
+_answer_allowance: ContextVar[Optional["AnswerAllowance"]] = ContextVar("provider_answer_allowance", default=None)
 _work_item: ContextVar[Optional[str]] = ContextVar("provider_work_item", default=None)
 
 
@@ -182,6 +183,12 @@ def observe_usage() -> Iterator[list[AttemptUsage]]:
 def mark_sent(*, model: Optional[str] = None) -> None:
     """Called by an adapter immediately before handing a request to its
     transport. An attempt that ends before this is released, not charged."""
+    run = _run.get()
+    if run is not None and run.halted():
+        from . import errors
+
+        note_denial(errors.RUN_CANCELLED)
+        raise errors.AdmissionDenied(errors.RUN_CANCELLED)
     guard = _send_guard.get()
     if guard is not None:
         guard(model)
@@ -248,3 +255,32 @@ def stepwise(events: Iterator, *scopes: Callable[[], ContextManager]):
                 with entered():
                     close()
             raise
+
+
+@dataclass(frozen=True)
+class AnswerAllowance:
+    # Admission input units are UTF-8 bytes plus framing, not tokenizer estimates.
+    input_tokens: int
+    attempts: int
+
+
+@contextmanager
+def answer_allowance(*, tokens: int, attempts: int):
+    """Protect final answer/repair capacity while research is being admitted.
+
+    ``tokens`` is the total conservative admission input allowance across
+    these attempts (bytes plus framing); callers must size prompts to fit it.
+    Output uses the configured physical completion cap for each attempt.
+    The surrounding run scope supplies the shared key across workers.
+    """
+    if tokens <= 0 or attempts <= 0:
+        raise ValueError("answer allowance must be positive")
+    token = _answer_allowance.set(AnswerAllowance(tokens, attempts))
+    try:
+        yield
+    finally:
+        _answer_allowance.reset(token)
+
+
+def current_answer_allowance() -> Optional[AnswerAllowance]:
+    return _answer_allowance.get()

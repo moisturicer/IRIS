@@ -15,9 +15,12 @@ from apps.ai.admission import scope as admission_scope
 from apps.ai.answers.events import Done, RetrievalStarted
 from apps.ai.routing.chat import RoutedChat, RoutingDecided
 from apps.ai.composition import composition_root
+from apps.ai.controller.loop import Controller
+from apps.ai.controller.versions import CONTROLLER_ENGINE
 from apps.ai.conversations import record_turn
 from apps.ai.evidence.shadow import shadow_turn
 from apps.ai.models import Conversation
+from apps.ai.research.planner import drain
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,10 @@ class ChatQuestion:
     route_override: Optional[str] = None
     override_turn_id: Optional[int] = None
     comparison_record_ids: tuple[int, ...] = ()
+    #: The conversation state revision read before any model call (IR-592).
+    context_revision: Optional[int] = None
+    #: The engine pinned for this run; `None` takes the root's (IR-593).
+    engine: Optional[str] = None
 
 
 class ChatOrchestrator:
@@ -43,6 +50,8 @@ class ChatOrchestrator:
         self._routing = RoutedChat(asked, root=self._root, max_sources=max_sources)
         self._max_sources = max_sources
         self._turn_id = None
+        self._engine = asked.engine or self._root.engine
+        self._outcome = None
         # Per-run provider caps sum over this. A queued question's own run,
         # opened around it by its worker, takes precedence (IR-545).
         self._run = admission_scope.new_run()
@@ -52,6 +61,16 @@ class ChatOrchestrator:
         return self._root.answer_service(
             max_sources=self._max_sources, record=self._asked.scope_record
         )
+
+    @property
+    def _controlled(self) -> bool:
+        return self._engine == CONTROLLER_ENGINE
+
+    @property
+    def research_run_id(self):
+        if self._outcome is not None:
+            return self._outcome.research_run_id
+        return (self._routing.research or {}).get("run_id")
 
     @property
     def metadata(self):
@@ -73,6 +92,10 @@ class ChatOrchestrator:
 
     def _answer(self, user):
         asked = self._asked
+        if self._controlled:
+            answer = drain(self._controller_events(user))
+            self._shadow(self._record(answer))
+            return answer
         routed = self._routing.answer(user)
         answer = routed if routed is not None else self._service.answer(
             asked.effective_question,
@@ -87,6 +110,14 @@ class ChatOrchestrator:
         """The service's events; the Turn is recorded before `Done` passes
         on, and shadowed only after the reader has it."""
         asked = self._asked
+        if self._controlled:
+            answer = yield from self._controller_events(user)
+            turn = self._record(answer)
+            try:
+                yield Done(answer)
+            finally:
+                self._shadow(turn)
+            return
         self._routing.decide(user)
         if self._routing.decision is not None:
             yield RoutingDecided(self._routing.decision)
@@ -115,6 +146,14 @@ class ChatOrchestrator:
             finally:
                 self._shadow(turn)
 
+    def _controller_events(self, user):
+        """Charged to the research lane, as any research workflow (IR-545)."""
+        self._outcome = yield from admission_scope.stepwise(
+            Controller(self._root).run(self._asked, user),
+            lambda: admission_scope.workload("research"),
+        )
+        return self._outcome.answer
+
     def _record_partial(self, answer) -> None:
         self._shadow(self._record(answer))
 
@@ -134,6 +173,8 @@ class ChatOrchestrator:
             research=self._routing.research,
             comparison=self._routing.comparison,
             guard=self._record_guard(answer),
+            context=self._outcome.context if self._outcome is not None else None,
+            expected_revision=asked.context_revision,
         )
         self._turn_id = turn.pk
         return turn

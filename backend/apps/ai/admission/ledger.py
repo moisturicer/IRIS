@@ -223,10 +223,29 @@ def _reserve(limits, request, lane, run, wanted, lease) -> tuple[int, int]:
     }
     if _over(charged, limits.spendable, {**wanted, "active_ms": active_ms}):
         raise _Refused(errors.CAMPAIGN_EXHAUSTED)
-    if run is not None and _over(
-        _charged(reservations.filter(run_key=run.key)), run.ceiling or limits.run, wanted,
-    ):
-        raise _Refused(errors.RUN_BUDGET_EXHAUSTED)
+    if run is not None:
+        run_charged = _charged(reservations.filter(run_key=run.key))
+        ceiling = run.ceiling or limits.run
+        if _over(run_charged, ceiling, wanted):
+            raise _Refused(errors.RUN_BUDGET_EXHAUSTED)
+        allowance = scope.current_answer_allowance()
+        if allowance is not None:
+            # Keep the allowance under the same campaign lock as the physical
+            # charge. Retries, fallback and unknown usage already appear in
+            # run_charged, so none can spend around the protected answer.
+            output = limits.max_output_tokens * allowance.attempts
+            answer = {
+                "attempts": allowance.attempts,
+                "input_tokens": allowance.input_tokens,
+                "output_tokens": output,
+                "cost_micros": _worst_cost(
+                    limits, tuple(limits.prices), allowance.input_tokens, output,
+                ),
+            }
+            if _over(run_charged, ceiling, {
+                name: wanted[name] + answer[name] for name in wanted
+            }):
+                raise _Refused(errors.ANSWER_RESERVED)
 
     reservation = ProviderReservation.objects.using(ALIAS).create(
         campaign=campaign,

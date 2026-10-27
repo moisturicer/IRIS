@@ -36,10 +36,29 @@ export interface RecordListItem {
   for_commercialization: boolean;
   community_extension:   boolean;
   access_count:          number;
+  /** One-sentence hook generated with the AI Overview; null until one exists (IR-604). */
+  ai_hook?:              string | null;
   /** Attachments on the record (documents.RecordUpload). */
   file_count:            number;
+  /** Whether the authenticated manuscript reader can serve a PDF. */
+  has_manuscript?:       boolean;
   created_at:            string;
   authors:               Author[];
+}
+
+export interface DiscoverInterestOption { id: number; name: string }
+export interface DiscoverInterests {
+  classifications: DiscoverInterestOption[];
+  psced: DiscoverInterestOption[];
+}
+export interface ForYouItem extends RecordListItem {
+  reason: { kind: "selected_area" | "latest"; area?: string };
+}
+export interface ForYouPage {
+  mode: "for_you" | "latest";
+  results: ForYouItem[];
+  next_cursor: string | null;
+  count: number;
 }
 
 /**

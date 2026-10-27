@@ -75,7 +75,7 @@ import logging
 import math
 import time
 from contextlib import closing, contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import timedelta
 
 from django.conf import settings
@@ -83,10 +83,13 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connection, transaction
 from django.utils import timezone
 
+from apps.ai import public as public_protocol
 from apps.ai.admission import scope as admission_scope
 
 from apps.ai.answers.citations import PARTIAL as PARTIAL_ANSWER
 from apps.ai.answers.events import Done, ReasoningDelta
+from apps.ai.composition import composition_root
+from apps.ai.controller.versions import pin, supported_engine
 from apps.ai.models import (
     AskRun,
     AskRunAttempt,
@@ -126,6 +129,10 @@ _BATCH = 100
 
 class StaleAttempt(Exception):
     """This attempt no longer owns the run: superseded, finished or deleted."""
+
+
+class RunExpired(StaleAttempt):
+    """The current attempt reached its original deadline before a write."""
 
 
 class NotRetryable(Exception):
@@ -178,6 +185,10 @@ def submit(prepared, user, data, *, max_sources: int):
     """
     request = {key: data[key] for key in REQUEST_FIELDS if key in data}
     request.update(conversation_id=prepared.conversation.pk, top_k=max_sources)
+    # A retry copies this, so it answers against the context it was asked in.
+    request["context_revision"] = prepared.context_revision
+    # The engine is pinned at submission; a later rollback changes new runs only.
+    request["pin"] = pin(composition_root().engine)
     if settings.AI_COMPARISON_ENABLED:
         from apps.ai.routing.router import _fixed_lane
         lane = prepared.route_override or _fixed_lane(
@@ -186,12 +197,12 @@ def submit(prepared, user, data, *, max_sources: int):
         )
         named_comparison = False
         if prepared.scope_record is None and lane != "comparison":
-            from apps.ai.composition import composition_root
             from apps.ai.research.context import RunContext
             from apps.ai.routing.lanes import _named_records
 
             context = RunContext.for_request(user=user, root=composition_root(), lane="comparison",
-                                             conversation=prepared.conversation)
+                                             conversation=prepared.conversation,
+                                             context_revision=prepared.context_revision)
             named, _ = _named_records(context, prepared.effective_question)
             named_comparison = len(named) >= 2
         if prepared.comparison_record_ids or lane == "comparison" or named_comparison:
@@ -239,6 +250,13 @@ def _queue(user, conversation_id, request: dict, *, retry_of=None):
     if any(not _expire_overdue(run) for run in busy):
         return None
     _admit_to_queue(user)
+    from apps.ai.controller.budget import NotConfigured as ControllerNotConfigured
+    from apps.ai.controller.durable_budget import prepare_request
+
+    try:
+        request = prepare_request(request, retry=retry_of is not None)
+    except ControllerNotConfigured:
+        raise Busy("controller_not_configured") from None
     seconds = (settings.AI_COMPARISON_DEADLINE_SECONDS if request.get("comparison_ceiling")
                else settings.AI_DURABLE_ASK_DEADLINE_SECONDS)
     deadline = timezone.now() + timedelta(seconds=seconds)
@@ -374,11 +392,13 @@ def _append(run: AskRun, attempt, name: str, data: dict) -> None:
     )
 
 
-def _locked(attempt: AskRunAttempt) -> AskRun:
+def _locked(attempt: AskRunAttempt, *, allow_overdue=False) -> AskRun:
     """The run, locked, if ``attempt`` still owns it; otherwise `StaleAttempt`."""
     run = AskRun.objects.select_for_update().filter(pk=attempt.run_id).first()
     if run is None or run.is_terminal or run.current_attempt_id != attempt.pk:
         raise StaleAttempt(str(attempt.pk))
+    if not allow_overdue and timezone.now() >= run.deadline_at:
+        raise RunExpired(str(attempt.pk))
     return run
 
 
@@ -403,7 +423,7 @@ def _end(run: AskRun, state: str, reason: str, *, attempt=None, turn=None, event
 
 def finish_without_turn(attempt: AskRunAttempt, state: str, reason: str) -> None:
     with transaction.atomic():
-        _end(_locked(attempt), state, reason, attempt=attempt)
+        _end(_locked(attempt, allow_overdue=True), state, reason, attempt=attempt)
 
 
 def claim(run_id):
@@ -463,6 +483,14 @@ class _QueuedOrchestrator(ChatOrchestrator):
     def _record_guard(self, answer):
         return self._finishing(answer)
 
+    def _record_partial(self, answer):
+        # A closing vendor generator may offer a fragment after its owner was
+        # fenced. Discard it quietly; it cannot revive stopped work.
+        try:
+            super()._record_partial(answer)
+        except StaleAttempt:
+            pass
+
     @contextmanager
     def _finishing(self, answer):
         with transaction.atomic():
@@ -478,7 +506,7 @@ class _QueuedOrchestrator(ChatOrchestrator):
             run = _locked(self._attempt)
 
             def written(turn: Turn) -> None:
-                research_id = (self._routing.research or {}).get("run_id")
+                research_id = self.research_run_id
                 if research_id and ResearchRun.objects.filter(pk=research_id).exists():
                     AskRunAttempt.objects.filter(pk=self._attempt.pk).update(
                         research_run_id=research_id,
@@ -519,6 +547,11 @@ def execute(run_id) -> None:
         return
     try:
         _answer(attempt)
+    except RunExpired:
+        try:
+            finish_without_turn(attempt, EXPIRED, "deadline_exceeded")
+        except StaleAttempt:
+            pass
     except StaleAttempt:
         logger.info("Queued question %s: attempt %s was fenced out", run_id, attempt.pk)
     except Exception:
@@ -542,21 +575,30 @@ def _answer(attempt: AskRunAttempt) -> None:
     # is charged to the run's own budget and bounded by the time left until
     # the deadline fixed at submission (IR-545). A redelivery opens the same
     # run key and the same deadline; neither is reset.
-    with admission_scope.run(run_scope(run)), \
+    from apps.ai.controller.durable_budget import bind
+
+    with bind(attempt), admission_scope.run(run_scope(run, attempt)), \
             model_call_deadline(max(0.0, left)):
         _answer_run(attempt, run)
 
 
-def run_scope(run: AskRun) -> admission_scope.RunScope:
-    """The admission scope a run's provider attempts are charged to, halted
-    once the run is cancelled (IR-548)."""
+def run_scope(run: AskRun, attempt: AskRunAttempt | None = None) -> admission_scope.RunScope:
+    """Halt new provider attempts when work expires or loses its live owner."""
     from apps.ai.admission.limits import Ceiling
 
     pk = run.pk
-    ceiling = Ceiling(**run.request["comparison_ceiling"]) if run.request.get("comparison_ceiling") else None
-    return admission_scope.RunScope(
-        f"ask:{pk}", ceiling=ceiling, halted=lambda: AskRun.objects.filter(pk=pk, state=CANCELLED).exists(),
-    )
+    declared = run.request.get("comparison_ceiling") or run.request.get("admission_ceiling")
+    ceiling = Ceiling(**declared) if declared else None
+
+    def halted():
+        live = AskRun.objects.filter(
+            pk=pk, state__in=(QUEUED, RUNNING), deadline_at__gt=timezone.now(),
+        )
+        if attempt is not None:
+            live = live.filter(current_attempt_id=attempt.pk)
+        return not live.exists()
+
+    return admission_scope.RunScope(f"ask:{pk}", ceiling=ceiling, halted=halted)
 
 
 def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
@@ -564,22 +606,34 @@ def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
 
     from apps.ai.views.chatbot import prepare_ask
 
+    # Refuse unsupported pins before preparation can call the resolver. A
+    # rollback must never execute new prompts under an older pinned version.
+    try:
+        engine = supported_engine(run.request.get("pin"))
+    except ValueError:
+        finish_without_turn(attempt, FAILED, "engine_unavailable")
+        return
+
     # Prepared again, as the asker, now: the Conversation and any override
     # Turn must still be theirs, and the resolver runs here, not in the request.
     try:
-        prepared, error = prepare_ask(run.request, run.user)
+        prepared, error = prepare_ask(
+            run.request, run.user, context_revision=run.request.get("context_revision"),
+        )
     except Http404:
         prepared, error = None, True
     if error is not None:
         finish_without_turn(attempt, FAILED, "not_answerable")
         return
+    prepared = replace(prepared, engine=engine)
 
     orchestrator = _QueuedOrchestrator(
         prepared, max_sources=run.request["top_k"], attempt=attempt,
     )
     overdue = False
     events = orchestrator.answer_stream(run.user)
-    # Closing records whatever answer text arrived as a `partial` Turn (IR-328).
+    # Closing may preserve a fragment (IR-328); the write guard still fences
+    # it at the original deadline and against cancellation or supersession.
     with closing(events):
         for event in events:
             if timezone.now() >= run.deadline_at and not orchestrator.finished:
@@ -600,14 +654,17 @@ def _answer_run(attempt: AskRunAttempt, run: AskRun) -> None:
 # ---- following and replay ---------------------------------------------------
 
 
-def follow(run_id, user, after: int = 0, *, sleep=time.sleep, clock=time.monotonic):
+def follow(run_id, user, after: int = 0, *, public=False, sleep=time.sleep, clock=time.monotonic):
     """SSE frames for every event after ``after``, then the live tail, until
     the run's terminal event has been sent. Ends quietly if the run stops
     being the reader's -- deleted with its Conversation, for instance.
 
+    ``public`` (IR-595) sends the `apps.ai.public` protocol instead.
+
     Reads only. Closing this generator touches nothing in the run.
     """
     cursor = after
+    projector = public_protocol.StreamProjector(_seed_activity(run_id, after)) if public else None
     last_sent = clock()
     while True:
         run = AskRun.objects.owned_by(user).filter(pk=run_id).first()
@@ -616,7 +673,10 @@ def follow(run_id, user, after: int = 0, *, sleep=time.sleep, clock=time.monoton
         batch = list(run.events.filter(sequence__gt=cursor).order_by("sequence")[:_BATCH])
         for event in batch:
             cursor = event.sequence
-            yield _frame(event, user)
+            if projector is None:
+                yield _frame(event, user)
+            else:
+                yield from _public_frames(event, user, projector)
             last_sent = clock()
         if batch:
             continue
@@ -632,7 +692,33 @@ def follow(run_id, user, after: int = 0, *, sleep=time.sleep, clock=time.monoton
         sleep(settings.AI_DURABLE_ASK_POLL_SECONDS)
 
 
+def _seed_activity(run_id, after: int):
+    """The activity a reader reconnecting after ``after`` already holds."""
+    if after <= 0:
+        return None
+    names = AskRunEvent.objects.filter(run_id=run_id, sequence__lte=after).order_by(
+        "-sequence").values_list("name", flat=True)
+    return next((s for s in map(public_protocol.activity_state, names) if s), None)
+
+
+def _public_frames(event: AskRunEvent, user, projector):
+    """Public frames for one journal event. Only the last carries the event's
+    `id:`, so a reader who dropped between two frames replays both."""
+    name, data = _payload(event, user, public=True)
+    frames = projector.feed(name, data)
+    for position, (frame_name, frame_data) in enumerate(frames):
+        if position == len(frames) - 1:
+            yield _sse(event.sequence, frame_name, frame_data)
+        else:
+            yield f"event: {frame_name}\ndata: {json.dumps(frame_data)}\n\n"
+
+
 def _frame(event: AskRunEvent, user):
+    name, data = _payload(event, user)
+    return _sse(event.sequence, name, data)
+
+
+def _payload(event: AskRunEvent, user, *, public=False):
     data = event.data
     if event.name == "citations_resolved":
         visible = _visible_ids(user, [c["record_id"] for c in data["citations"]])
@@ -640,13 +726,13 @@ def _frame(event: AskRunEvent, user):
     elif event.name in ("candidates_selected", "candidates_updated"):
         data = _visible_candidates(user, data)
     elif event.name == "done":
-        data = _done(event, user)
+        data = _done(event, user, public=public)
         if data is None:
             # The Turn is gone; the run is still over, and must say so.
-            return _sse(event.sequence, "run_failed", {
+            return "run_failed", {
                 "run_id": str(event.run_id), "state": FAILED, "reason": "unavailable",
-            })
-    return _sse(event.sequence, event.name, data)
+            }
+    return event.name, data
 
 
 def _sse(sequence: int, name: str, data: dict) -> str:
@@ -671,14 +757,14 @@ def _visible_candidates(user, data: dict) -> dict:
     ]}
 
 
-def _done(event: AskRunEvent, user):
+def _done(event: AskRunEvent, user, *, public=False):
     """The final answer as it reads now: rebuilt from the Turn, never replayed."""
     from apps.ai.conversations import turn_for_reader
 
     turn = Turn.objects.filter(pk=event.data["turn_id"], conversation__user=user).first()
     if turn is None:
         return None
-    reader = turn_for_reader(turn, user)
+    reader = turn_for_reader(turn, user, public=public)
     sources = event.data.get("sources", [])
     if turn.comparison and "comparison" not in reader:
         sources = []
@@ -694,7 +780,7 @@ def _done(event: AskRunEvent, user):
     body.update(
         turn_id=turn.pk,
         conversation_id=turn.conversation_id,
-        mode=reader["state"],
+        mode=reader.get("state", reader.get("mode")),
         sources=[source for source in sources if source["id"] in visible],
     )
     return body

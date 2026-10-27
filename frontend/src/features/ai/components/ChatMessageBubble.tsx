@@ -1,6 +1,4 @@
 import { Link } from "react-router-dom";
-import type { ChatLane } from "@/types/ai";
-import { RoutingDecisionPanel } from "./RoutingDecisionPanel";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
@@ -15,8 +13,7 @@ import {
   ResolvedQuestionNotice,
   ScopeNotice,
 } from "./PassageQuote";
-import { ReasoningPanel } from "./ReasoningPanel";
-import { CoverageNotes, ResearchSteps } from "./ResearchSteps";
+import { ReasoningSummary } from "./ReasoningSummary";
 import "highlight.js/styles/github.min.css";
 
 interface ChatMessageBubbleProps {
@@ -27,8 +24,8 @@ interface ChatMessageBubbleProps {
    * full-width transcript keeps the default.
    */
   compact?: boolean;
-  onRouteOverride?: (message: ChatMessage, lane: ChatLane) => void;
-  overrideDisabled?: boolean;
+  /** Disables Retry while another answer is in flight. */
+  retryDisabled?: boolean;
   /** Ask a run that ended without its answer again (IR-548). */
   onRetry?: (message: ChatMessage) => void;
 }
@@ -42,7 +39,7 @@ function RunEndedNotice({ onRetry, disabled }: { onRetry?: () => void; disabled?
         type="button"
         onClick={onRetry}
         disabled={disabled}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5
+        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5
           text-[13px] font-medium text-stone-700 hover:border-brand/40 hover:text-brand
           disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -61,7 +58,7 @@ function RunEndedNotice({ onRetry, disabled }: { onRetry?: () => void; disabled?
  * text with no card/border/shadow, closer to a read surface than a chat
  * widget — the avatar is still what tells the two apart.
  */
-export function ChatMessageBubble({ message, compact = false, onRouteOverride, overrideDisabled, onRetry }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, compact = false, retryDisabled, onRetry }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -98,9 +95,7 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
             : "min-w-0 flex-1",
         )}
       >
-        {!isUser && message.research && (
-          <ResearchSteps steps={message.research.steps} compact={compact} />
-        )}
+        {!isUser && <ReasoningSummary summary={message.reasoningSummary} compact={compact} />}
         {!isUser && message.comparison && <ComparisonTable comparison={message.comparison} />}
         {isUser ? (
           <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
@@ -126,13 +121,6 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
             </ul>
           </div>
         )}
-        {!isUser && message.research && (
-          <CoverageNotes notes={message.research.coverage_notes} />
-        )}
-        {!isUser && message.routing && (
-          <RoutingDecisionPanel decision={message.routing} disabled={overrideDisabled}
-            onOverride={onRouteOverride && message.question ? (lane) => onRouteOverride(message, lane) : undefined} />
-        )}
         {!isUser && message.resolvedQuestion && (
           <ResolvedQuestionNotice question={message.resolvedQuestion} />
         )}
@@ -142,14 +130,8 @@ export function ChatMessageBubble({ message, compact = false, onRouteOverride, o
         {!isUser && message.endedRun && (
           <RunEndedNotice
             onRetry={onRetry ? () => onRetry(message) : undefined}
-            disabled={overrideDisabled}
+            disabled={retryDisabled}
           />
-        )}
-
-        {/* Collapsed by default here too (IR-381) -- a reopened transcript
-            reads the same as one just finished streaming. */}
-        {!isUser && message.reasoning && (
-          <ReasoningPanel reasoning={message.reasoning} compact={compact} />
         )}
 
         {!isUser && (

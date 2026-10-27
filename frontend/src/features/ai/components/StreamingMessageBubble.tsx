@@ -1,18 +1,13 @@
-import { RoutingDecisionPanel } from "./RoutingDecisionPanel";
 import { cn } from "@/lib/utils";
 import type { StreamingState } from "../hooks/useAskStream";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
-import { ReasoningPanel } from "./ReasoningPanel";
-import { StreamStatusLine } from "./StreamStatusLine";
+import { StreamStatusRow } from "./StreamStatusRow";
 import { LiveCandidates } from "./CandidateList";
-import { ResearchSteps } from "./ResearchSteps";
 
-/** The reply while still streaming (IR-329) -- status line, the collapsed
- *  reasoning panel (IR-381), then text rendering progressively. Swapped for
- *  `ChatMessageBubble` on finish, which renders the same panel from the
- *  stored text, so the swap is not where the panel disappears.
+/** The reply while still streaming (IR-329): any text that has arrived, then
+ *  one status row (IR-596). Swapped for `ChatMessageBubble` on finish.
  *  No card/border -- matches the finished bubble's plain-text flow.
  *  `compact` matches `ChatMessageBubble`'s Paper Chat density (IR-356). */
 export function StreamingMessageBubble({
@@ -26,7 +21,7 @@ export function StreamingMessageBubble({
   onStop?: () => void;
 }) {
   return (
-    <div className={cn("flex animate-fade-in motion-reduce:animate-none", compact ? "gap-2.5" : "gap-3")} aria-busy="true">
+    <div className={cn("flex animate-fade-in motion-reduce:animate-none", compact ? "gap-2.5" : "gap-3")}>
       <div
         className={cn(
           "rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand",
@@ -37,23 +32,7 @@ export function StreamingMessageBubble({
       </div>
 
       <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
-        <StreamStatusLine state={state} />
-        {onStop && state.runId && (
-          <button
-            type="button"
-            onClick={onStop}
-            className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5
-              text-[13px] font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
-          >
-            <i className="fas fa-stop text-[10px]" aria-hidden />
-            Stop answering
-          </button>
-        )}
-        {state.routing && <RoutingDecisionPanel decision={state.routing} />}
-        {state.steps && <ResearchSteps steps={state.steps} live compact={compact} />}
         {state.candidates && <LiveCandidates candidates={state.candidates} compact={compact} />}
-
-        <ReasoningPanel reasoning={state.reasoning} streaming compact={compact} />
 
         {state.text && (
           <CitationText
@@ -63,6 +42,8 @@ export function StreamingMessageBubble({
             className={ANSWER_MARKDOWN}
           />
         )}
+
+        <StreamStatusRow state={state} onStop={onStop} className="mt-2" />
       </div>
     </div>
   );

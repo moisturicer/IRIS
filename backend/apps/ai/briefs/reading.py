@@ -32,14 +32,14 @@ def prompt(title, sources):
     return build_page_prompt(f"Read {title} fully into the required paper brief.", sources)
 
 
-def reading_sections(title, sources, context_window, output_tokens):
+def reading_sections(title, sources, context_window, output_tokens, system=SYSTEM):
     """Fit complete prompts, splitting oversized sections without losing text.
 
     UTF-8 bytes plus message overhead conservatively bound input tokens.
     Model windows are verified metadata; no passage/count limit is involved.
     """
     def fits(items):
-        return estimate_tokens(SYSTEM, prompt(title, items)) + output_tokens <= context_window
+        return estimate_tokens(system, prompt(title, items)) + output_tokens <= context_window
 
     if not fits([]):
         raise ValueError("context_window_too_small")
@@ -81,8 +81,34 @@ def _normalized(text):
     return " ".join(text.split())
 
 
-def verify_fields(reply, sources, stored_text):
-    """Drop an unsupported value; never relabel a failed extraction as absent."""
+_NUMBER = re.compile(r"-?\d+(?:[.,]\d+)*")
+
+
+def _metric(raw, quotes):
+    """A typed metric whose value is printed in one of its own cited quotes."""
+    if not isinstance(raw, dict) or set(raw) - {"name", "value", "unit", "context"}:
+        return None
+    name, value = raw.get("name"), raw.get("value")
+    if not isinstance(name, str) or not name.strip() or len(name) > 120:
+        return None
+    if type(value) not in (int, float):
+        return None
+    for key in ("unit", "context"):
+        if raw.get(key) is not None and (not isinstance(raw[key], str) or len(raw[key]) > 200):
+            return None
+    printed = {float(n.replace(",", "")) for q in quotes for n in _NUMBER.findall(q)}
+    if float(value) not in printed:
+        return None
+    return {"name": name.strip(), "value": value,
+            "unit": raw.get("unit"), "context": raw.get("context")}
+
+
+def verify_fields(reply, sources, stored_text, fields=FIELDS, metrics=False):
+    """Drop an unsupported value; never relabel a failed extraction as absent.
+
+    With `metrics`, a value may carry a typed metric (IR-591); one whose
+    number is not printed in its own cited quotes fails the value.
+    """
     reply = reply.strip()
     fenced = re.fullmatch(r"```(?:json)?\s*([\s\S]*?)\s*```", reply)
     if fenced:
@@ -91,7 +117,7 @@ def verify_fields(reply, sources, stored_text):
     if not isinstance(raw, dict):
         raise ValueError("invalid_brief")
     verified = {}
-    for name in FIELDS:
+    for name in fields:
         field = raw.get(name)
         if isinstance(field, dict) and field == {"state": "not_reported", "values": []}:
             verified[name] = field
@@ -126,22 +152,29 @@ def verify_fields(reply, sources, stored_text):
                         failed = True
                         continue
                     valid.append({"page": page, "quote": quote, "chunk_id": supporting[0].chunk_id})
-            if valid:
-                values.append({"value": entry["value"].strip(), "citations": valid})
-            else:
+            if not valid:
                 failed = True
+                continue
+            value = {"value": entry["value"].strip(), "citations": valid}
+            if metrics and entry.get("metric") is not None:
+                metric = _metric(entry["metric"], [c["quote"] for c in valid])
+                if metric is None:
+                    failed = True
+                    continue
+                value["metric"] = metric
+            values.append(value)
         verified[name] = {"state": "unsupported" if failed else "reported", "values": values}
     return verified
 
 
-def combine(sections):
+def combine(sections, fields=FIELDS):
     """Lossless union of verified section values, preserving every citation.
 
     No second model paraphrases numbers or quotes at the combination level.
     A field is absent only when every section explicitly reports it absent.
     """
     result = {}
-    for name in FIELDS:
+    for name in fields:
         values, seen = [], set()
         states = [section[name]["state"] for section in sections]
         for section in sections:

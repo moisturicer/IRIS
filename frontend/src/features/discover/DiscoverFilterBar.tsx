@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
-import { Modal } from "@/components/ui/Modal";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
@@ -48,8 +47,10 @@ export interface DiscoverFilterOptions {
 }
 
 interface DiscoverFilterBarProps {
+  className?: string;
   filters:   DiscoverFilters;
   onChange:  (next: DiscoverFilters) => void;
+  showSort?: boolean;
   sort:      DiscoverSort;
   onSort:    (next: DiscoverSort) => void;
   options:   DiscoverFilterOptions;
@@ -57,12 +58,6 @@ interface DiscoverFilterBarProps {
   loading:   boolean;
   /** How many results the current filters return, for the sheet's button. */
   resultCount: number | null;
-}
-
-interface Chip {
-  key:    string;
-  label:  string;
-  remove: () => void;
 }
 
 export function activeFilterCount(filters: DiscoverFilters): number {
@@ -76,53 +71,51 @@ export function activeFilterCount(filters: DiscoverFilters): number {
 }
 
 /**
- * The filter bar: a row of filters and a Sort menu, the active filters as
- * removable chips, and below `md` a "Filters" button that opens the same
- * filters in a sheet (spec §4.3, §4.13).
+ * One Filters control keeps the feed toolbar compact at every width. Its
+ * dropdown holds every catalogue filter and the optional Latest sort control.
  */
 export function DiscoverFilterBar({
+  className,
   filters,
   onChange,
+  showSort = true,
   sort,
   onSort,
   options,
   loading,
   resultCount,
 }: DiscoverFilterBarProps) {
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const count = activeFilterCount(filters);
+
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onEscape);
+    };
+  }, [open]);
 
   const set = <K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) =>
     onChange({ ...filters, [key]: value });
 
-  const labelOf = (list: FilterOption[], value: string) =>
-    list.find((o) => o.value === value)?.label ?? value;
-
-  const chips: Chip[] = [
-    ...(filters.recordType !== ALL_VALUE
-      ? [{ key: "type", label: labelOf(options.recordTypes, filters.recordType), remove: () => set("recordType", ALL_VALUE) }]
-      : []),
-    ...filters.colleges.map((id) => ({
-      key: `college-${id}`,
-      label: labelOf(options.colleges, id),
-      remove: () => set("colleges", filters.colleges.filter((c) => c !== id)),
-    })),
-    ...filters.classifications.map((id) => ({
-      key: `classification-${id}`,
-      label: labelOf(options.classifications, id),
-      remove: () => set("classifications", filters.classifications.filter((c) => c !== id)),
-    })),
-    ...(filters.year !== ALL_VALUE
-      ? [{ key: "year", label: filters.year, remove: () => set("year", ALL_VALUE) }]
-      : []),
-    ...(filters.ip !== ALL_VALUE
-      ? [{ key: "ip", label: labelOf(options.ip, filters.ip), remove: () => set("ip", ALL_VALUE) }]
-      : []),
-  ];
-
-  /** The five filters, laid out by the caller: a row, or the sheet's stack. */
-  const controls = (stacked: boolean) => {
-    const shared = { inline: stacked, block: stacked };
+  const controls = () => {
+    const shared = { inline: true, block: true };
     return (
       <>
         <DiscoverFilterDropdown
@@ -172,87 +165,49 @@ export function DiscoverFilterBar({
   };
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center gap-2">
-        {/* At md and up the filters are one row. */}
-        <div role="group" aria-label="Filter research" className="hidden md:flex flex-wrap items-center gap-2">
-          {controls(false)}
-        </div>
-
-        {/* Below md they live in a sheet, so results are not pushed off-screen. */}
+    <div ref={rootRef} className={cn("relative flex min-w-0 items-center justify-end", className)}>
         <button
           type="button"
-          onClick={() => setSheetOpen(true)}
+          ref={triggerRef}
+          onClick={() => setOpen((value) => !value)}
           aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
+          aria-label={count ? `Filters, ${count} active` : "Filters"}
           className={cn(
-            "md:hidden inline-flex items-center gap-2 min-h-[40px] px-4 rounded-full border text-small font-medium",
+            "relative inline-flex h-11 w-11 sm:w-auto sm:px-3 items-center justify-center gap-2 rounded-lg border text-small font-medium",
             COLOUR_TRANSITION,
             FOCUS_RING,
             count > 0 ? "bg-brand-50 border-brand text-brand" : "bg-white border-stone-300 text-stone-700",
           )}
         >
           <i className="fas fa-sliders text-[12px]" aria-hidden />
-          <span>Filters</span>
+          <span className="hidden sm:inline">Filters</span>
           {count > 0 && (
-            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-label font-semibold flex items-center justify-center">
+            <span className="absolute -right-1 -top-1 sm:static min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-label font-semibold flex items-center justify-center">
               {count}
               <span className="sr-only"> active</span>
             </span>
           )}
         </button>
 
-        <div className="ml-auto shrink-0">
-          <DiscoverFilterDropdown
-            neutral
-            name="Sort"
-            options={SORT_OPTIONS}
-            selected={sort}
-            onChange={(v) => onSort(v as DiscoverSort)}
-          />
-        </div>
-      </div>
-
-      {chips.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <ul aria-label="Active filters" className="flex flex-wrap items-center gap-2">
-            {chips.map((chip) => (
-              <li key={chip.key}>
-                <button
-                  type="button"
-                  onClick={chip.remove}
-                  aria-label={`Remove filter: ${chip.label}`}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 min-h-[32px] pl-3 pr-2.5 rounded-full bg-stone-100 text-small text-stone-800 hover:bg-stone-200",
-                    COLOUR_TRANSITION,
-                    FOCUS_RING,
-                  )}
-                >
-                  <span>{chip.label}</span>
-                  <i className="fas fa-xmark text-[12px] text-stone-600" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => onChange(EMPTY_FILTERS)}
-            className={cn(
-              "min-h-[32px] px-2 rounded-md text-small font-medium text-brand hover:underline underline-offset-2",
-              FOCUS_RING,
-            )}
-          >
-            Clear all filters
+      {open && <div id={panelId} role="dialog" aria-label="Filters"
+        className="fixed inset-x-4 bottom-4 z-50 flex max-h-[min(80dvh,34rem)] flex-col rounded-xl border border-stone-200 bg-white shadow-card-md sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]">
+        <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+          <h2 className="text-small font-semibold text-stone-900">Filters</h2>
+          <button type="button" ref={closeRef} onClick={() => { setOpen(false); triggerRef.current?.focus(); }} aria-label="Close filters"
+            className={cn("flex h-9 w-9 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
+            <i className="fas fa-xmark text-[13px]" aria-hidden />
           </button>
         </div>
-      )}
-
-      <Modal
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title="Filters"
-        sheet
-        footer={
-          <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 overflow-y-auto px-4 py-4">
+          {controls()}
+          {showSort && <DiscoverFilterDropdown
+            inline block neutral name="Sort" options={SORT_OPTIONS} selected={sort}
+            onChange={(v) => onSort(v as DiscoverSort)}
+          />}
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
             <button
               type="button"
               onClick={() => onChange(EMPTY_FILTERS)}
@@ -261,14 +216,11 @@ export function DiscoverFilterBar({
             >
               Clear all
             </button>
-            <button type="button" onClick={() => setSheetOpen(false)} className={PILL_PRIMARY}>
+            <button type="button" onClick={() => { setOpen(false); triggerRef.current?.focus(); }} className={PILL_PRIMARY}>
               {resultCount === null ? "Show results" : `Show ${resultCount} result${resultCount === 1 ? "" : "s"}`}
             </button>
-          </div>
-        }
-      >
-        <div className="flex flex-col gap-3">{controls(true)}</div>
-      </Modal>
+        </div>
+      </div>}
     </div>
   );
 }

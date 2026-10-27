@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T16:17:21Z",
+  "title": "Design System: IRIS",
+  "extensions": {
+    "colorMeta": {
+      "binding-maroon": { "role": "primary", "displayName": "Binding Maroon", "canonical": "#6B0F12", "tonalRamp": ["#2d0608", "#4A0A0C", "#6B0F12", "#8B1316", "#f9b8b9", "#fce4e4", "#fdf2f2"] },
+      "binding-maroon-light": { "role": "primary", "displayName": "Binding Maroon Light", "canonical": "#8B1316" },
+      "binding-maroon-dark": { "role": "primary", "displayName": "Binding Maroon Dark", "canonical": "#4A0A0C" },
+      "maroon-wash": { "role": "primary", "displayName": "Maroon Wash", "canonical": "#fdf2f2" },
+      "maroon-thread": { "role": "primary", "displayName": "Maroon Thread", "canonical": "#f9b8b9" },
+      "endpaper": { "role": "neutral", "displayName": "Endpaper", "canonical": "#fafaf9", "tonalRamp": ["#1c1917", "#292524", "#44403c", "#57534e", "#78716c", "#d6d3d1", "#e7e5e4", "#fafaf9"] },
+      "page-white": { "role": "neutral", "displayName": "Page White", "canonical": "#ffffff" },
+      "bar-stone": { "role": "neutral", "displayName": "Bar Stone", "canonical": "#f5f5f4" },
+      "desk-stone": { "role": "neutral", "displayName": "Desk Stone", "canonical": "#e7e5e4" },
+      "rule-stone": { "role": "neutral", "displayName": "Rule Stone", "canonical": "#d6d3d1" },
+      "faint-ink": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#78716c" },
+      "quiet-ink": { "role": "neutral", "displayName": "Quiet Ink", "canonical": "#57534e" },
+      "body-ink": { "role": "neutral", "displayName": "Body Ink", "canonical": "#44403c" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1c1917" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "A record's title on the Overview; 36px on a phone, 48px from sm." },
+      "headline": { "displayName": "Headline", "purpose": "Overview section headings and the Ask IRIS heading. Ink, never maroon." },
+      "title": { "displayName": "Title", "purpose": "The paper's title in the record bar; dialog and card titles." },
+      "body": { "displayName": "Body", "purpose": "Interface text." },
+      "reading": { "displayName": "Reading", "purpose": "AI Overview prose; the first paragraph is a 17px lead." },
+      "label": { "displayName": "Label", "purpose": "Every control's text." }
+    },
+    "shadows": [
+      { "name": "card-lift", "value": "0 4px 12px 0 rgb(0 0 0 / 0.08)", "purpose": "The Ask IRIS icon, and a record card on hover." },
+      { "name": "drawer-edge", "value": "-12px 0 32px rgb(41 37 36 / 0.12)", "purpose": "Ask IRIS as a drawer over the paper." },
+      { "name": "recess", "value": "inset 0 1px 3px rgb(41 37 36 / 0.28), inset 0 0 0 1px rgb(41 37 36 / 0.07)", "purpose": "The section track pressed into the record bar." },
+      { "name": "thumb", "value": "0 1px 2px rgb(41 37 36 / 0.35), 0 2px 6px rgb(107 15 18 / 0.25)", "purpose": "The maroon section thumb sitting in its track." }
+    ],
+    "motion": [
+      { "name": "colour-fade", "value": "150-200ms ease-out", "purpose": "Hover and focus colour changes." },
+      { "name": "settle", "value": "300ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The section thumb sliding; Record details folding away beside Ask IRIS." },
+      { "name": "panel-in", "value": "320ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Ask IRIS arriving from the edge it is docked to (1.5rem, opacity)." }
+    ],
+    "breakpoints": [
+      { "name": "reading-split", "value": "@container reading (min-width: 640px)" },
+      { "name": "reading-wide", "value": "@container reading (min-width: 1000px)" },
+      { "name": "overview-wide", "value": "@container overview (min-width: 64rem)" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary page action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action in a row (View, Continue, Open review).",
+      "html": "<button class=\"ds-pill-primary\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M2 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H2zM22 5h-7a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h8z\"/></svg>View</button>",
+      "css": ".ds-pill-primary { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border: none; border-radius: 9999px; background: #6B0F12; color: #fff; font: 600 14px/21px Inter, system-ui, sans-serif; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04); transition: background-color 200ms; cursor: pointer; } .ds-pill-primary:hover { background: #8B1316; } .ds-pill-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6B0F12; }"
+    },
+    {
+      "name": "Secondary page action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other page action (Save, Cite, Share): no fill, a stone outline.",
+      "html": "<button class=\"ds-pill-secondary\">Cite</button>",
+      "css": ".ds-pill-secondary { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border: none; border-radius: 9999px; background: transparent; color: #44403c; font: 600 14px/21px Inter, system-ui, sans-serif; box-shadow: inset 0 0 0 1px #d6d3d1; transition: color 200ms, box-shadow 200ms; cursor: pointer; } .ds-pill-secondary:hover { color: #6B0F12; box-shadow: inset 0 0 0 1px rgb(107 15 18 / 0.4); } .ds-pill-secondary:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
+    },
+    {
+      "name": "Reading control",
+      "kind": "button",
+      "refersTo": "control-outline",
+      "description": "A control in the record bar, reader toolbar or Ask IRIS: outlined at rest, maroon wash when on.",
+      "html": "<button class=\"ds-control\">Fit</button> <button class=\"ds-control ds-control-on\" aria-pressed=\"true\">Find</button>",
+      "css": ".ds-control { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid #d6d3d1; border-radius: 12px; background: transparent; color: #44403c; font: 600 13px/20px Inter, system-ui, sans-serif; transition: color 200ms, border-color 200ms; cursor: pointer; } .ds-control:hover { border-color: rgb(107 15 18 / 0.4); color: #6B0F12; } .ds-control:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; } .ds-control-on { background: #fdf2f2; border-color: #f9b8b9; color: #6B0F12; }"
+    },
+    {
+      "name": "Ghost control",
+      "kind": "button",
+      "refersTo": "control-ghost",
+      "description": "A secondary tool that should not compete, like Copy on the AI Overview.",
+      "html": "<button class=\"ds-ghost\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"9\" y=\"9\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M5 15V5a2 2 0 0 1 2-2h10\"/></svg>Copy</button>",
+      "css": ".ds-ghost { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border: none; border-radius: 12px; background: transparent; color: #78716c; font: 500 13px/20px Inter, system-ui, sans-serif; transition: background-color 200ms, color 200ms; cursor: pointer; } .ds-ghost:hover { background: #f5f5f4; color: #292524; } .ds-ghost:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
+    },
+    {
+      "name": "Section tabs",
+      "kind": "nav",
+      "refersTo": "section-track",
+      "description": "The record's sections: a recessed stone track with a sliding maroon thumb.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><span class=\"ds-tabs-thumb\"></span><button class=\"ds-tab ds-tab-on\" role=\"tab\" aria-selected=\"true\">Overview</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Paper</button></div>",
+      "css": ".ds-tabs { position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: 12px; background: #e7e5e4; box-shadow: inset 0 1px 3px rgb(41 37 36 / 0.28), inset 0 0 0 1px rgb(41 37 36 / 0.07); } .ds-tabs-thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 2); border-radius: 6px; background: #6B0F12; box-shadow: 0 1px 2px rgb(41 37 36 / 0.35), 0 2px 6px rgb(107 15 18 / 0.25); transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-tab { position: relative; z-index: 1; min-height: 36px; padding: 0 20px; border: none; border-radius: 6px; background: transparent; color: #57534e; font: 600 13px/20px Inter, system-ui, sans-serif; cursor: pointer; transition: color 300ms; } .ds-tab:hover { color: #6B0F12; } .ds-tab-on, .ds-tab-on:hover { color: #fff; } .ds-tab:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
+    },
+    {
+      "name": "Meta chip",
+      "kind": "chip",
+      "refersTo": "chip-meta",
+      "description": "Record type, classification and flags under a title: outlined, no fill.",
+      "html": "<span class=\"ds-chip\">Thesis / Research</span> <span class=\"ds-chip\">econometrics</span>",
+      "css": ".ds-chip { display: inline-flex; padding: 4px 10px; border-radius: 9999px; box-shadow: inset 0 0 0 1px #d6d3d1; color: #44403c; font: 600 13px/18px Inter, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Page citation",
+      "kind": "custom",
+      "refersTo": "citation-page",
+      "description": "An AI Overview citation reads as the page it cites, and opens the paper there.",
+      "html": "<p class=\"ds-cite-p\">Spline estimators do not substantially increase uncertainty.<a class=\"ds-cite\" href=\"#\">p14</a><a class=\"ds-cite\" href=\"#\">p15</a></p>",
+      "css": ".ds-cite-p { font: 400 16px/1.8 Inter, system-ui, sans-serif; color: #44403c; } .ds-cite { display: inline-flex; align-items: center; margin: 0 2px; padding: 0 6px; border-radius: 6px; background: #fdf2f2; color: #6B0F12; font: 600 12px/20px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; text-decoration: none; transition: background-color 150ms; } .ds-cite:hover { background: #fce4e4; text-decoration: underline; } .ds-cite:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
+    },
+    {
+      "name": "Ask IRIS icon",
+      "kind": "button",
+      "refersTo": "ask-iris-fab",
+      "description": "The one corner control: opens Ask IRIS, gone while the panel is open.",
+      "html": "<button class=\"ds-fab\" aria-label=\"Ask IRIS\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M12 12v9M8 21h8M5 5l2 2M19 5l-2 2\"/></svg></button>",
+      "css": ".ds-fab { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 9999px; background: #6B0F12; color: #fff; box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08); transition: background-color 200ms, transform 200ms; cursor: pointer; } .ds-fab:hover { background: #8B1316; transform: translateY(-2px); } .ds-fab:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6B0F12; }"
+    },
+    {
+      "name": "Ask IRIS composer",
+      "kind": "input",
+      "refersTo": "control-filled",
+      "description": "The question field, holding the scope chip and the one filled control, Send.",
+      "html": "<div class=\"ds-composer\"><textarea class=\"ds-composer-field\" rows=\"1\" placeholder=\"Ask about methodology, findings, datasets...\"></textarea><div class=\"ds-composer-row\"><span class=\"ds-scope\"><span class=\"ds-scope-dot\"></span>This paper</span><button class=\"ds-send\" aria-label=\"Send\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"><path d=\"M12 19V5M5 12l7-7 7 7\"/></svg></button></div></div>",
+      "css": ".ds-composer { border: 1px solid #d6d3d1; border-radius: 12px; background: #fff; transition: border-color 200ms, box-shadow 200ms; } .ds-composer:focus-within { border-color: rgb(107 15 18 / 0.6); box-shadow: 0 0 0 2px rgb(107 15 18 / 0.2); } .ds-composer-field { display: block; width: 100%; box-sizing: border-box; resize: none; border: none; background: transparent; padding: 10px 12px 0; color: #292524; font: 400 14px/21px Inter, system-ui, sans-serif; outline: none; } .ds-composer-field::placeholder { color: #78716c; } .ds-composer-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 8px; } .ds-scope { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid #f9b8b9; border-radius: 12px; background: #fdf2f2; color: #6B0F12; font: 600 13px/20px Inter, system-ui, sans-serif; } .ds-scope-dot { width: 6px; height: 6px; border-radius: 9999px; background: #6B0F12; } .ds-send { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #6B0F12; border-radius: 12px; background: #6B0F12; color: #fff; cursor: pointer; transition: background-color 200ms; } .ds-send:hover { background: #8B1316; } .ds-send:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Bound Volume",
+    "overview": "IRIS should read like a bound thesis in a university library. The cover is maroon, the titles are set in Garamond, and the pages are typeset with hairline rules. Everything else stays quiet so the work can be read. The paper is the one bright object on screen: on the Paper view, only the PDF pages are white, and the record bar, the toolbar, the Ask IRIS header and the desk behind the pages are stone. On the Overview, the page reads as one typeset column, with a large Garamond title, a byline of chips, the actions, and then sections divided by thin rules like the sections of a printed paper.\n\nMaroon is the binding, not the paint. It appears once or twice per view: the filled action, the selected section, the Ask IRIS mark and the page citations. Structure comes from type, space and one-pixel rules, never from boxes. The layout follows the room it has, not the window. The record page measures its own width with container queries, so the sidebar or the Ask IRIS panel beside it changes the layout as surely as a smaller screen does.\n\nRejected outright: cards wrapped around reading content, controls floating over content, and any colour outside maroon, stone, white and black.",
+    "keyCharacteristics": [
+      "One bright object: the paper (PDF pages, or the Overview column on its endpaper ground).",
+      "Garamond for what you read the title of; Inter for everything you operate.",
+      "Hairlines between regions, never cards, gaps or shadows between them.",
+      "One filled maroon action per row; everything else outlined or ghost.",
+      "One control scale: 44 px on touch, 36 px beside a pointer.",
+      "Width read from the container (`reading`, `overview`), not the viewport."
+    ],
+    "rules": [
+      { "name": "The Binding Rule", "body": "Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong.", "section": "colors" },
+      { "name": "The Four Inks Rule", "body": "The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Gold is decorative only: never text or the sole status signal. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).", "section": "colors" },
+      { "name": "The Token Authority Rule", "body": "`docs/adr/` and `docs/ui-ux/01-design-system.md` govern design decisions; `frontend/tailwind.config.js` defines the implemented tokens. This sidecar follows DESIGN.md after those sources are corrected.", "section": "overview" },
+      { "name": "The One Bright Object Rule", "body": "On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.", "section": "colors" },
+      { "name": "The Typeset Title Rule", "body": "Garamond is for what you read the title of (a paper, a section, a dialog). It never sets a control, a chip or a number.", "section": "typography" },
+      { "name": "The Named Size Rule", "body": "A size is asked for by role (`text-title`, `text-small`), never by pixel (`text-[13px]`). Nothing goes below 11 px, and labels are sentence case, never small tracked capitals.", "section": "typography" },
+      { "name": "The Container Rule", "body": "Read the container, never the window. A `lg:` breakpoint on a reading surface is a bug: the sidebar and Ask IRIS change the room without changing the window.", "section": "layout" },
+      { "name": "The Flush Column Rule", "body": "Reading text fills its column and meets what is beside it; the column, not the text, sets the measure.", "section": "layout" },
+      { "name": "The Hairline Rule", "body": "Two regions are separated by one Desk Stone or Rule Stone line. Never a card, a gap and a shadow at once.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** keep exactly one filled Binding Maroon action per row, and make it the viewer's next step.",
+      "**Do** separate reading regions with one Desk Stone (#e7e5e4) or Rule Stone (#d6d3d1) hairline; elsewhere use white cards with a one-pixel stone-200 border and no resting shadow.",
+      "**Do** keep the paper the only white thing on the Paper view; bars and headers are Bar Stone (#f5f5f4).",
+      "**Do** take control sizes from the reading scale (44 px touch, 36 px pointer) and read the `reading` or `overview` container for every layout change.",
+      "**Do** set titles and section headings in EB Garamond 600 and everything operable in Inter.",
+      "**Do** show unbuilt features as visibly closed (disabled, with a line saying so), never as working and never filled with invented content.",
+      "**Do** keep motion to opacity and transform, 150–320 ms, and none under reduced motion."
+    ],
+    "donts": [
+      "**Don't** wrap reading content (the AI Overview, the Abstract, the reader, Ask IRIS) in a card.",
+      "**Don't** float controls over content. Controls live in a bar or toolbar, and Ask IRIS is the one corner icon.",
+      "**Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.",
+      "**Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.",
+      "**Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.",
+      "**Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.",
+      "**Don't** put a thick accent border on a rounded shape."
+    ]
+  }
+}

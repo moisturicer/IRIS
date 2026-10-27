@@ -1,13 +1,8 @@
-/**
- * Discover's search box offers two distinct operations (IR-559): the catalogue
- * filter that runs as you type, and an explicit hand-off to Ask IRIS. Typing
- * or pressing Enter must never silently run the second.
- */
+/** Discover's search box filters the catalogue as the reader types. */
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { renderScreen, screen, userEvent } from "@/test/render";
+import { act, renderScreen, screen, userEvent } from "@/test/render";
 
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 
@@ -16,49 +11,48 @@ function Harness() {
   return <DiscoverSearchComposer value={value} onChange={setValue} />;
 }
 
-function Ask() {
-  const { state, search } = useLocation();
-  return <output aria-label="ask page">{JSON.stringify({ state, search })}</output>;
-}
-
 function renderDiscover() {
-  return renderScreen(
-    <Routes>
-      <Route path="/" element={<Harness />} />
-      <Route path="/ai" element={<Ask />} />
-    </Routes>,
-  );
+  return renderScreen(<Harness />);
 }
 
 describe("Discover search composer", () => {
-  it("offers catalogue search and Ask IRIS as two separate actions", () => {
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it("rotates whole example questions while empty and pauses while typing", () => {
+    vi.useFakeTimers();
+    const { rerender } = renderScreen(<DiscoverSearchComposer value="" onChange={() => {}} />);
+    expect(screen.getByText("What research explores flood resilience in Cebu?")).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(3600); });
+    expect(screen.getByText("What research explores flood resilience in Cebu?")).toHaveClass("opacity-0");
+    act(() => { vi.advanceTimersByTime(180); });
+    expect(screen.getByText("How can AI support learning at CIT-U?")).toHaveClass("opacity-100");
+    rerender(<DiscoverSearchComposer value="flood" onChange={() => {}} />);
+    expect(screen.queryByText("How can AI support learning at CIT-U?")).not.toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(8000); });
+    rerender(<DiscoverSearchComposer value="" onChange={() => {}} />);
+    expect(screen.getByText("How can AI support learning at CIT-U?")).toBeInTheDocument();
+  });
+
+  it("keeps the example static when reduced motion is preferred", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    renderDiscover();
+    act(() => { vi.advanceTimersByTime(12000); });
+    expect(screen.getByText("What research explores flood resilience in Cebu?")).toHaveClass("opacity-100");
+  });
+
+  it("offers catalogue search without a competing action", () => {
     renderDiscover();
 
     expect(screen.getByRole("textbox", { name: /search records/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /ask iris about this/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /ask iris about this/i })).not.toBeInTheDocument();
   });
 
-  it("does not hand off while typing or on Enter", async () => {
+  it("keeps the typed query in the field on Enter", async () => {
     renderDiscover();
 
     await userEvent.type(screen.getByRole("textbox", { name: /search records/i }), "edge AI{Enter}");
 
-    expect(screen.queryByLabelText("ask page")).toBeNull();
-  });
-
-  it("disables Ask IRIS until there is a question", () => {
-    renderDiscover();
-
-    expect((screen.getByRole("button", { name: /ask iris about this/i }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("hands the exact question over in route state, not the URL, on explicit Ask", async () => {
-    renderDiscover();
-
-    await userEvent.type(screen.getByRole("textbox", { name: /search records/i }), "Who works on edge AI & IoT?");
-    await userEvent.click(screen.getByRole("button", { name: /ask iris about this/i }));
-
-    const handed = JSON.parse(screen.getByLabelText("ask page").textContent ?? "{}");
-    expect(handed).toEqual({ state: { draft: "Who works on edge AI & IoT?" }, search: "" });
+    expect(screen.getByRole("textbox", { name: /search records/i })).toHaveValue("edge AI");
   });
 });

@@ -1,4 +1,3 @@
-import { routingFixture } from "@/test/routingFixture";
 /**
  * Ask IRIS on persisted Conversations (IR-298).
  *
@@ -10,11 +9,11 @@ import { routingFixture } from "@/test/routingFixture";
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
-import type { AIAnswer, AIStatus, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
+import { act, renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import type { AIAnswer, AIStatus, Citation, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
 
 import RAGChatPage from "./RAGChatPage";
 
@@ -212,22 +211,113 @@ describe("the retired browser storage", () => {
   });
 });
 
-it("reruns an old answer using its original turn after newer discussion", async () => {
-  list.mockResolvedValue({ data: [summary({ id: 9 })] });
-  get.mockResolvedValue({ data: detail({ id: 9, turns: [{
-    id: 1, question: "Find flooding papers", resolved_question: "A resolved question",
+const PROHIBITED = [
+  "Answer approach", "Why this approach", "Try instead", "Rerun with", "List papers",
+  "search_passages", "find_records", "read_record_sections", "Research steps",
+];
+
+const SUMMARY = "These papers address the same problem, but their settings differ.";
+
+/** A Turn as a pre-IR-595 server would have stored it: diagnostics included. */
+function oldTurn(extra: Record<string, unknown> = {}) {
+  return {
+    id: 1, question: "Find flooding papers", resolved_question: null,
     answer: "Prior answer", message: null, state: "generative", degraded: false,
-    widened: true, created_at: "2026-10-11", citations: [], routing: routingFixture,
-  }, {
-    id: 2, question: "Now discuss a different topic", resolved_question: null,
-    answer: "Newer answer", message: null, state: "generative", degraded: false,
     widened: false, created_at: "2026-10-11", citations: [],
-  }] }) });
-  renderScreen(<RAGChatPage />);
-  await userEvent.click(await screen.findByRole("button", { name: "Rerun with List papers" }));
-  await waitFor(() => expect(askStream).toHaveBeenCalledWith("Find flooding papers", {
-    conversationId: 9, routeOverride: "listing", widen: true, routeOverrideTurnId: 1,
-  }, expect.any(AbortSignal)));
+    routing: { lane: "listing", reason: "list_request", allowed_overrides: ["passage", "listing"] },
+    research: { steps: [{ position: 0, tool: "search_passages", status: "ok" }], coverage_notes: [] },
+    reasoning: "secret working",
+    ...extra,
+  } as never;
+}
+
+describe("clean answers (IR-596)", () => {
+  function renderAt(route: string) {
+    return renderScreen(
+      <Routes>
+        <Route path="/ai/conversations/:conversationId" element={<RAGChatPage />} />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it("reopens an old conversation as answer and citations only, with no diagnostics in the page", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9, turns: [oldTurn()] }) });
+    const { container } = renderAt("/ai/conversations/9");
+
+    expect(await screen.findByText("Prior answer")).toBeInTheDocument();
+
+    for (const prohibited of PROHIBITED) expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+    expect(screen.queryByRole("button", { name: /reasoning|rerun|try instead/i })).toBeNull();
+    expect(container.textContent).not.toContain("secret working");
+  });
+
+  it("shows a reopened turn's reasoning summary collapsed above its answer, and only when there is one", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9, turns: [
+      oldTurn({ id: 1, reasoning_summary: SUMMARY }),
+      oldTurn({ id: 2, question: "And again?", answer: "Second answer" }),
+    ] }) });
+    renderAt("/ai/conversations/9");
+
+    await screen.findByText("Prior answer");
+    const toggles = screen.getAllByRole("button", { name: "Reasoning summary" });
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0]).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(SUMMARY)).toBeNull();
+
+    await userEvent.click(toggles[0]);
+    expect(screen.getByText(SUMMARY)).toBeInTheDocument();
+  });
+
+  it("shows the persistent notice before any question is asked", async () => {
+    renderScreen(<RAGChatPage />);
+
+    expect(await screen.findByText(
+      "Ask IRIS can make mistakes. Check important details against the cited papers.",
+    )).toBeInTheDocument();
+  });
+
+  it("shows one status row from the activity frames, then the answer and summary, with no diagnostics", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockImplementation(() => (async function* () {
+      yield { event: "activity", id: "1", data: { state: "thinking", label: "Thinking…" } };
+      yield { event: "routing_decided", id: "1", data: { routing: { lane: "listing" } } };
+      yield { event: "agent_step", id: "1", data: { position: 0, tool: "search_passages", status: "running" } };
+      await gate;
+      yield { event: "activity", id: "2", data: { state: "preparing", label: "Preparing your answer…" } };
+      yield { event: "done", id: "3", data: answer({ answer: "Final answer.", reasoning_summary: SUMMARY }) };
+    })());
+    renderAt("/ai/conversations/1");
+
+    await userEvent.type(await screen.findByRole("textbox", { name: /ask a follow-up/i }), "What predicts flooding?{Enter}");
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Thinking…");
+    for (const prohibited of PROHIBITED) expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+
+    release();
+    expect(await screen.findByText("Final answer.")).toBeInTheDocument();
+    expect(screen.queryByText("Thinking…")).toBeNull();
+    expect(screen.queryByText("Preparing your answer…")).toBeNull();
+    expect(screen.getByRole("button", { name: "Reasoning summary" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(SUMMARY)).toBeNull();
+  });
+
+  it("does not add a second message when a followed run's Turn is already on screen", async () => {
+    const turn = oldTurn({ id: 41, answer: "Rainfall gauges feed the model." });
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9, turns: [turn], latest_run: { id: "r-5", state: "running", end_reason: "", question: "q", retry_of: null, last_sequence: 3 } }) });
+    resumeAskRun.mockImplementation(() => (async function* () {
+      yield { event: "done", id: "9", data: answer({ answer: "Rainfall gauges feed the model.", turn_id: 41, conversation_id: 9 }) };
+    })());
+    renderAt("/ai/conversations/9");
+
+    await waitFor(() => expect(resumeAskRun).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(screen.getAllByText("Rainfall gauges feed the model.")).toHaveLength(1);
+  });
 });
 
 
@@ -465,5 +555,158 @@ describe("owned conversation URLs (IR-548)", () => {
     const box = (await screen.findByRole("textbox", { name: /ask a follow-up/i })) as HTMLTextAreaElement;
     await waitFor(() => expect(box.value).toMatch(/record #5/i));
     expect(askStream).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * jsdom lays nothing out, so the page is measured as `width` wide: the width
+ * that decides whether history and sources sit beside the answer or open as
+ * drawers over it (IR-570).
+ */
+function pageAt(width: number) {
+  const watching = new Set<{ target: Element; callback: ResizeObserverCallback; observer: ResizeObserver }>();
+  const report = (target: Element, callback: ResizeObserverCallback, observer: ResizeObserver, w: number) =>
+    callback([{ target, contentRect: { width: w } } as unknown as ResizeObserverEntry], observer);
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        const entry = { target, callback: this.callback, observer: this as unknown as ResizeObserver };
+        watching.add(entry);
+        report(target, this.callback, entry.observer, width);
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  return {
+    resizeTo: (next: number) =>
+      act(() => watching.forEach((w) => report(w.target, w.callback, w.observer, next))),
+  };
+}
+
+/** Whether `el` sits inside an inert subtree, which a reader cannot reach. */
+function inert(el: Element): boolean {
+  return el.closest("[inert]") !== null;
+}
+
+describe("Ask IRIS on a phone (IR-570)", () => {
+  const citation: Citation = {
+    marker: 1, chunk_id: 11, record_id: 7, record_title: "Flood Prediction", page: 4,
+    text: "gauges predicted flooding a day ahead", context_path: ["Flood Prediction"], regions: [],
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function openAt360() {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Prior chat" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    pageAt(360);
+    renderScreen(<RAGChatPage />);
+    return (await screen.findByRole("textbox", { name: /ask a follow-up/i })) as HTMLTextAreaElement;
+  }
+
+  it("gives the answer the whole width, with history and sources closed", async () => {
+    const composer = await openAt360();
+
+    expect(screen.queryByRole("complementary", { name: "Chat history" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(inert(composer)).toBe(false);
+    composer.focus();
+    expect(composer).toHaveFocus();
+    // One line on a phone; its accessible name keeps the whole phrase.
+    expect(composer).toHaveAttribute("placeholder", "Ask a follow-up…");
+  });
+
+  it("opens history as a labelled drawer, keeps focus in it and gives it back on close", async () => {
+    await openAt360();
+    const opener = screen.getByRole("button", { name: "Show chat history" });
+
+    await userEvent.click(opener);
+
+    const drawer = screen.getByRole("dialog", { name: "Chat history" });
+    expect(drawer).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.getByRole("link", { name: /Prior chat/ })).toBeInTheDocument();
+    // Everything behind the drawer waits, so focus cannot wander out to it.
+    expect(inert(screen.getByRole("textbox", { name: /ask a follow-up/i }))).toBe(true);
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Chat history" })).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
+    expect(inert(screen.getByRole("textbox", { name: /ask a follow-up/i }))).toBe(false);
+  });
+
+  it("closes the history drawer from its own close button", async () => {
+    await openAt360();
+    const opener = screen.getByRole("button", { name: "Show chat history" });
+    await userEvent.click(opener);
+
+    await userEvent.click(screen.getByRole("button", { name: "Close chat history" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("offers New chat inside the history drawer, where a phone has room for it", async () => {
+    await openAt360();
+    create.mockResolvedValue({ data: detail({ id: 12 }) });
+    await userEvent.click(screen.getByRole("button", { name: "Show chat history" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("keeps an answer's sources closed until asked for, then opens them as a drawer", async () => {
+    const composer = await openAt360();
+    askStream.mockImplementation(() => doneStreamOf({ citations: [citation] }));
+
+    await userEvent.type(composer, "What predicts flooding?");
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByText(/Rainfall gauges predict flooding/);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const opener = screen.getByRole("button", { name: "Show sources" });
+    await userEvent.click(opener);
+
+    const drawer = screen.getByRole("dialog", { name: "Referenced passages" });
+    expect(drawer).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.getByText(/gauges predicted flooding a day ahead/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide sources panel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("closes a drawer and returns to the columns when the page widens", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Prior chat" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    const page = pageAt(360);
+    renderScreen(<RAGChatPage />);
+    await screen.findByRole("textbox", { name: /ask a follow-up/i });
+    await userEvent.click(screen.getByRole("button", { name: "Show chat history" }));
+
+    page.resizeTo(1100);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Chat history" })).toBeInTheDocument();
+  });
+
+  it("keeps history beside the answer on a desktop, as before", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Prior chat" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    pageAt(1100);
+    renderScreen(<RAGChatPage />);
+
+    await screen.findByRole("textbox", { name: /ask a follow-up/i });
+
+    expect(screen.getByRole("complementary", { name: "Chat history" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

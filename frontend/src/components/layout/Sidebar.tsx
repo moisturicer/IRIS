@@ -201,23 +201,19 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       {/* ── Brand ──────────────────────────────────────────────────────── */}
       <div className={cn("px-4 pb-4 pt-5", collapsed && "md:px-0 md:pb-3")}>
         <div className={cn("flex items-center gap-3", collapsed && "md:justify-center")}>
-          {collapsed ? (
-            // On the rail the mark opens it: the first thing a reader presses
-            // on a closed sidebar must not be a link that leaves the page.
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="Open sidebar"
-              title="Open sidebar"
-              className={cn("hidden h-9 w-9 flex-shrink-0 rounded-lg md:block", FOCUS_RING)}
-            >
-              <img src={irisLogo} alt="" className="h-9 w-9 object-contain" />
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Open sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Open sidebar" : "Collapse sidebar"}
+            className={cn("hidden h-9 w-9 flex-shrink-0 rounded-lg md:block", FOCUS_RING)}
+          >
+            <img src={irisLogo} alt="" className="h-9 w-9 object-contain" />
+          </button>
           <img
             src={irisLogo}
             alt=""
-            className={cn("h-9 w-9 flex-shrink-0 object-contain", collapsed && "md:hidden")}
+            className="h-9 w-9 flex-shrink-0 object-contain md:hidden"
           />
           <p
             className={cn(
@@ -267,26 +263,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
         ))}
       </nav>
 
-      {/* ── Collapse (desktop) and the account menu ────────────────────── */}
-      <div className="hidden px-3 pb-1 pt-2 md:block">
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          // The name says what it will do; an `aria-expanded` as well would be
-          // read as "Collapse sidebar, expanded", which contradicts itself.
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : undefined}
-          className={cn(
-            "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-100 hover:text-stone-900",
-            collapsed && "justify-center px-0",
-            COLOUR_TRANSITION,
-            FOCUS_RING,
-          )}
-        >
-          <i aria-hidden className={cn("fas w-5 text-center text-sm", collapsed ? "fa-angles-right" : "fa-angles-left")} />
-          {!collapsed && <span>Collapse</span>}
-        </button>
-      </div>
+      {/* ── Account menu ──────────────────────────────────────────────── */}
       <div className={cn("border-t border-stone-200 p-3", collapsed && "md:px-2")}>
         <AccountMenu collapsed={collapsed} onNavigate={closeSidebar} />
       </div>

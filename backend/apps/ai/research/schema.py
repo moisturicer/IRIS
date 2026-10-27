@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Mapping
 
 _SUPPORTED = {
@@ -10,6 +11,16 @@ _SUPPORTED = {
     "minLength", "maxLength", "minimum", "maximum", "maxItems", "enum",
     "description",
 }
+
+
+#: What the application injects into a run; never a model argument (IR-590).
+RESERVED = frozenset({
+    "user", "identity", "scope", "scope_record_id", "conversation_id",
+    "history_before_turn_id", "permits", "lane", "budget", "deadline", "spend",
+    "run_id", "source_policy", "context_revision",
+})
+#: A raw database id or SQL; a model names records by issued handle only.
+_RAW = re.compile(r"(?:^|_)(?:id|ids|pk|uuid|sql|identifier)$|[a-z](?:Id|Ids|Uuid)$")
 
 
 class ArgumentsRejected(ValueError):
@@ -23,10 +34,23 @@ def check_schema(schema: Mapping[str, Any]) -> None:
         raise ValueError(f"unsupported schema keywords: {sorted(unknown)}")
     if schema.get("type") == "object" and schema.get("additionalProperties") is not False:
         raise ValueError("an object schema must set additionalProperties: false")
-    for child in schema.get("properties", {}).values():
+    _check_bounded(schema)
+    for name, child in schema.get("properties", {}).items():
+        if name in RESERVED or _RAW.search(name):
+            raise ValueError(f"reserved parameter name: {name!r}")
         check_schema(child)
     if "items" in schema:
         check_schema(schema["items"])
+
+
+def _check_bounded(schema: Mapping[str, Any]) -> None:
+    kind = schema.get("type")
+    if kind == "string" and "maxLength" not in schema and "enum" not in schema:
+        raise ValueError("unbounded string")
+    if kind == "integer" and not {"minimum", "maximum"} <= set(schema):
+        raise ValueError("unbounded integer")
+    if kind == "array" and ("maxItems" not in schema or "items" not in schema):
+        raise ValueError("unbounded array")
 
 
 def validate(arguments: Any, schema: Mapping[str, Any]) -> dict[str, Any]:

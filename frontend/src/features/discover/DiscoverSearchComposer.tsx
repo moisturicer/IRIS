@@ -1,4 +1,7 @@
-import { useAskIrisHandoff } from "@/lib/askHandoff";
+import { useEffect, useState } from "react";
+
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { cn } from "@/lib/utils";
 import { RepositorySearchIcon } from "./DiscoverIcons";
 
 interface DiscoverSearchComposerProps {
@@ -6,60 +9,64 @@ interface DiscoverSearchComposerProps {
   onChange: (value: string) => void;
 }
 
-/**
- * The search composer. Typing filters the catalogue live; "Ask IRIS about
- * this" is a separate, explicit action that hands the exact text to Ask IRIS
- * as an editable draft. Neither runs the other (IR-559).
- */
-export function DiscoverSearchComposer({
-  value,
-  onChange,
-}: DiscoverSearchComposerProps) {
-  const askIris = useAskIrisHandoff();
+const EXAMPLES = [
+  "What research explores flood resilience in Cebu?",
+  "How can AI support learning at CIT-U?",
+  "What studies explore renewable energy for local communities?",
+  "How can technology make transport more accessible?",
+];
 
-  const question = value.trim();
+/** A compact catalogue search with rotating examples while it is empty. */
+export function DiscoverSearchComposer({ value, onChange }: DiscoverSearchComposerProps) {
+  const [example, setExample] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const preference = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let transition: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      clearInterval(interval);
+      clearTimeout(transition);
+    };
+    const start = () => {
+      stop();
+      setVisible(true);
+      if (value || preference?.matches) return;
+      interval = setInterval(() => {
+        setVisible(false);
+        transition = setTimeout(() => {
+          setExample((current) => (current + 1) % EXAMPLES.length);
+          setVisible(true);
+        }, 180);
+      }, 3600);
+    };
+    start();
+    preference?.addEventListener("change", start);
+    return () => {
+      stop();
+      preference?.removeEventListener("change", start);
+    };
+  }, [value]);
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl shadow-card px-4 pt-3.5 pb-3 focus-within:border-brand/40 transition-colors">
-      <div className="flex items-start gap-2.5">
-        <RepositorySearchIcon className="w-[18px] h-[18px] mt-0.5 shrink-0 text-stone-400" />
-        <textarea
-          rows={1}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter only keeps the box from growing a line; it never asks.
-            if (e.key === "Enter" && !e.shiftKey) e.preventDefault();
-          }}
-          aria-label="Search records"
-          placeholder="Who's working on edge AI at CIT-U? Search research, authors, topics…"
-          className="flex-1 min-w-0 resize-none bg-transparent text-[14px] text-stone-800 placeholder-stone-400 outline-none leading-6 max-h-32"
-        />
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            aria-label="Clear search"
-            className="p-1 text-stone-300 hover:text-stone-500"
-          >
-            <i className="fas fa-times-circle text-[14px]" aria-hidden />
-          </button>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 mt-2.5">
-        <span className="text-[12px] font-mono text-stone-400">Filtering the catalogue as you type</span>
-        <button
-          type="button"
-          onClick={() => askIris(value)}
-          disabled={!question}
-          title="Opens Ask IRIS with this text as a draft. Nothing is sent until you press Send."
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-200 bg-brand-50 text-brand text-[13px] font-semibold transition-colors hover:bg-brand-100 disabled:opacity-40"
-        >
-          <i className="fas fa-brain text-[12px]" aria-hidden />
-          Ask IRIS about this
-        </button>
-      </div>
+    <div className={cn("flex min-h-14 items-center gap-3 rounded-2xl border border-stone-300 bg-surface px-4 py-2 focus-within:border-brand", COLOUR_TRANSITION)}>
+        <RepositorySearchIcon className="h-5 w-5 shrink-0 text-brand" />
+        <div className="relative min-w-0 flex-1">
+          {!value && <span aria-hidden="true" className={cn(
+            "pointer-events-none absolute inset-x-0 top-2.5 truncate text-body text-stone-600 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none motion-reduce:transform-none",
+            visible ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0",
+          )}>{EXAMPLES[example]}</span>}
+          <textarea rows={1} value={value} onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.preventDefault(); }}
+            aria-label="Search records" aria-describedby="discover-search-help"
+            className={cn("block min-h-11 max-h-32 w-full resize-none rounded-lg bg-transparent py-2.5 text-body text-stone-900 caret-brand", FOCUS_RING)} />
+        </div>
+        {value && <button type="button" onClick={() => onChange("")} aria-label="Clear search"
+          className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 hover:text-brand [@media(pointer:fine)]:h-9 [@media(pointer:fine)]:w-9", COLOUR_TRANSITION, FOCUS_RING)}>
+          <i className="fas fa-times-circle" aria-hidden />
+        </button>}
+        <p id="discover-search-help" className="sr-only">Search research, authors and topics as you type.</p>
     </div>
   );
 }

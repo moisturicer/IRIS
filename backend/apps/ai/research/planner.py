@@ -333,7 +333,8 @@ class ResearchPlanner:
                 note = truncate_to_tokens(note + tail, 200).strip()
                 if note:
                     context.notes.append(note)
-            previous = [AssistantMessage(tool_calls=calls), ToolResultMessage(call.id, feedback)]
+            previous = [AssistantMessage(tool_calls=calls, continuation=completion.continuation),
+                        ToolResultMessage(call.id, feedback)]
 
     def _request(self, model, messages, tools, run, audit):
         estimated = self._prompt_tokens(messages, tools)
