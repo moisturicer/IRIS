@@ -32,6 +32,31 @@ class PSCEDClassification(models.Model):
     def __str__(self): return self.name
 
 
+class DiscoveryInterests(models.Model):
+    """A reader's optional, private catalogue Areas."""
+
+    user = models.OneToOneField(
+        "accounts.User", on_delete=models.CASCADE, related_name="discovery_interests"
+    )
+    classifications = models.ManyToManyField(Classification, blank=True)
+    psced = models.ManyToManyField(PSCEDClassification, blank=True)
+    revision = models.PositiveBigIntegerField(default=0)
+
+
+class DiscoveryFeedSnapshot(models.Model):
+    """Frozen ordering for one reader; Record access is checked again on every page."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="discovery_feed_snapshots"
+    )
+    interest_revision = models.PositiveBigIntegerField()
+    recipe_version = models.PositiveSmallIntegerField(default=1)
+    mode = models.CharField(max_length=12)
+    entries = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class RecordType(models.Model):
     """Proposal, Thesis/Research, Project."""
     name = models.CharField(max_length=100, unique=True)

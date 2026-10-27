@@ -17,12 +17,13 @@ export interface DiscoverQuery {
   q: string;
   filters: DiscoverFilters;
   sort: DiscoverSort;
+  feed: "for_you" | "latest" | "trending";
 }
 
-export const DEFAULT_QUERY: DiscoverQuery = { q: "", filters: EMPTY_FILTERS, sort: "newest" };
+export const DEFAULT_QUERY: DiscoverQuery = { q: "", filters: EMPTY_FILTERS, sort: "newest", feed: "latest" };
 
 /** The URL keys Discover owns. Any other key (`publish`) is left alone. */
-const KEYS = ["q", "type", "college", "classification", "year", "ip", "sort"] as const;
+const KEYS = ["q", "type", "college", "classification", "year", "ip", "sort", "feed"] as const;
 
 const ORDERING: Record<DiscoverSort, string> = {
   newest: "-created_at",
@@ -58,6 +59,9 @@ export function parseDiscoverQuery(params: URLSearchParams): DiscoverQuery {
       ip: single(params.get("ip"), isIp),
     },
     sort: sort === "viewed" ? "viewed" : "newest",
+    feed: params.get("feed") === "for_you" || params.get("feed") === "trending"
+      ? params.get("feed") as DiscoverQuery["feed"]
+      : "latest",
   };
 }
 
@@ -69,7 +73,7 @@ export function writeDiscoverQuery(params: URLSearchParams, query: DiscoverQuery
   const next = new URLSearchParams(params);
   for (const key of KEYS) next.delete(key);
 
-  const { q, filters, sort } = query;
+  const { q, filters, sort, feed } = query;
   if (q.trim()) next.set("q", q.trim());
   if (filters.recordType !== ALL_VALUE) next.set("type", filters.recordType);
   if (filters.colleges.length > 0) next.set("college", ids(filters.colleges.join(",")).join(","));
@@ -79,6 +83,7 @@ export function writeDiscoverQuery(params: URLSearchParams, query: DiscoverQuery
   if (filters.year !== ALL_VALUE) next.set("year", filters.year);
   if (filters.ip !== ALL_VALUE) next.set("ip", filters.ip);
   if (sort !== DEFAULT_QUERY.sort) next.set("sort", sort);
+  if (feed !== DEFAULT_QUERY.feed) next.set("feed", feed);
   return next;
 }
 
@@ -89,8 +94,8 @@ export function discoverQueryKey(query: DiscoverQuery): string {
 
 /** The list endpoint's params for `query`, before paging. */
 export function listParams(query: DiscoverQuery): Record<string, unknown> {
-  const { q, filters, sort } = query;
-  const params: Record<string, unknown> = { ordering: ORDERING[sort] };
+  const { q, filters, sort, feed } = query;
+  const params: Record<string, unknown> = { ordering: feed === "trending" ? "-access_count" : ORDERING[sort] };
 
   if (q) params.search = q;
   if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;

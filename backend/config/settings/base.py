@@ -724,6 +724,8 @@ AI_MEMORY_ANSWER_VECTOR_ENABLED = config(
 # owns reconciling the sources half against that total, and bounding the
 # recall half if it chooses to.
 AI_HISTORY_TOKEN_BUDGET = config("AI_HISTORY_TOKEN_BUDGET", default=3000, cast=int)
+# Older questions listed beside the verbatim window, with their cited ids (IR-592).
+AI_HISTORY_EARLIER_TOKEN_BUDGET = config("AI_HISTORY_EARLIER_TOKEN_BUDGET", default=500, cast=int)
 
 # Safety margin on every count made against the budget above. Mirrored by
 # apps.ai.history.DEFAULT_TOKEN_MARGIN.
@@ -805,6 +807,26 @@ AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
 )
 # Tokens one read_record_sections call may return (ADR-038 §2).
 AI_RESEARCH_READ_TOKEN_CAP = config("AI_RESEARCH_READ_TOKEN_CAP", default=3000, cast=int)
+
+# ---- Conversational controller limits (IR-593, spec §7) -------------------
+# No defaults: unset, the controller refuses (fail closed). Tests use
+# `apps.ai.controller.budget.FAKE_TEST_PROFILE`, never production numbers.
+def _optional(cast):
+    return lambda value: None if value in ("", None) else cast(value)
+
+
+AI_CONTROLLER_MAX_ROUNDS = config("AI_CONTROLLER_MAX_ROUNDS", default="", cast=_optional(int))
+AI_CONTROLLER_MAX_TOOL_CALLS = config("AI_CONTROLLER_MAX_TOOL_CALLS", default="", cast=_optional(int))
+AI_CONTROLLER_MAX_CONCURRENT_READS = config(
+    "AI_CONTROLLER_MAX_CONCURRENT_READS", default="", cast=_optional(int)
+)
+AI_CONTROLLER_REPAIR_ATTEMPTS = config("AI_CONTROLLER_REPAIR_ATTEMPTS", default="", cast=_optional(int))
+AI_CONTROLLER_ANSWER_RESERVE_TOKENS = config(
+    "AI_CONTROLLER_ANSWER_RESERVE_TOKENS", default="", cast=_optional(int)
+)
+AI_CONTROLLER_ANSWER_RESERVE_SECONDS = config(
+    "AI_CONTROLLER_ANSWER_RESERVE_SECONDS", default="", cast=_optional(float)
+)
 # ADR-027 §1d: corpus_facets refuses below this many visible records. The
 # ADR sets no value; this default is a placeholder until a corpus exists.
 AI_LANDSCAPE_MIN_RECORDS = config("AI_LANDSCAPE_MIN_RECORDS", default=20, cast=int)

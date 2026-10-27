@@ -27,7 +27,8 @@ from typing import Optional
 from django.conf import settings
 from django.db import transaction
 
-from apps.ai.answers.citations import PARTIAL, GroundedAnswer
+from apps.ai import public as public_protocol
+from apps.ai.answers.citations import GENERATED, PARTIAL, GroundedAnswer
 from apps.ai.models import (
     MODEL_HISTORY_STATES,
     TURN_ANSWER_VECTOR,
@@ -85,6 +86,8 @@ def record_turn(
     research=None,
     comparison=None,
     guard=None,
+    context=None,
+    expected_revision=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -121,6 +124,11 @@ def record_turn(
     yields a callback that receives the new Turn before the transaction
     commits, so a queued run can lock and fence itself first and record its
     outcome in the same commit. The vector still waits until after.
+
+    ``context`` and ``expected_revision`` (IR-592) advance the Conversation's
+    state in that same commit, after the guard, so a fenced attempt changes
+    nothing. Without ``context`` it is derived from the listing, comparison
+    or citations; see `apps.ai.conversation_state.commit`.
     """
     with (guard if guard is not None else nullcontext()) as written:
         with transaction.atomic():
@@ -136,6 +144,13 @@ def record_turn(
             )
             if written is not None:
                 written(turn)
+            from apps.ai.conversation_state import commit
+
+            commit(
+                conversation, turn, context=context, expected_revision=expected_revision,
+                cited=[citation.record_id for citation in answer.citations],
+                listing=listing, comparison=comparison,
+            )
     _store_answer_vector(turn, answer, embedder)
     return turn
 
@@ -189,6 +204,8 @@ def _write_turn(
         widened=widened,
         had_reasoning=answer.had_reasoning,
         reasoning=answer.reasoning,
+        reasoning_summary=answer.reasoning_summary if answer.state == GENERATED else "",
+        reasoning_summary_source=answer.reasoning_summary_source if answer.state == GENERATED else "",
         routing=routing or {},
         research=research or {},
         comparison=stored_comparison,
@@ -301,7 +318,7 @@ def _store_answer_vector(turn: Turn, answer: GroundedAnswer, embedder) -> None:
     )
 
 
-def turns_for_reader(conversation: Conversation, user) -> list[dict]:
+def turns_for_reader(conversation: Conversation, user, *, public: bool = False) -> list[dict]:
     """The conversation's Turns, every citation re-resolved against ``user``.
 
     Two queries for the whole transcript, not one pair per citation: which
@@ -309,20 +326,23 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
     live. Everything else -- dropping an invisible citation, degrading a
     tombstoned one -- is a lookup into those two results.
     """
-    return _for_reader(list(conversation.turns.prefetch_related("citations")), user)
+    return _for_reader(
+        list(conversation.turns.prefetch_related("citations")), user, public=public
+    )
 
 
-def turn_for_reader(turn: Turn, user) -> dict:
+def turn_for_reader(turn: Turn, user, *, public: bool = False) -> dict:
     """One Turn, re-resolved exactly as a reopened transcript would show it.
 
     What a queued run's replayed `done` is built from (IR-544), so a reader
     who reconnects gets the permissions of now, not of when it was written.
     """
     turn = Turn.objects.prefetch_related("citations").get(pk=turn.pk)
-    return _for_reader([turn], user)[0]
+    return _for_reader([turn], user, public=public)[0]
 
 
-def _for_reader(turns: list, user) -> list[dict]:
+def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
+    """``public`` (IR-595) projects bodies through `apps.ai.public`; stored data is kept."""
     all_citations = [
         citation for turn in turns for citation in turn.citations.all()
     ]
@@ -350,6 +370,7 @@ def _for_reader(turns: list, user) -> list[dict]:
                 if citation.chunk_id is not None
             },
             deleted_at__isnull=True,
+            chunk_set__is_active=True,
         )
         # `page_sizes` lives on the chunk set, and regions are useless
         # without it (IR-334).
@@ -408,6 +429,15 @@ def _for_reader(turns: list, user) -> list[dict]:
                         citations=[], reasoning=None, state="unavailable", degraded=True)
         else:
             body["comparison"] = comparison
+    if public:
+        for turn, body in zip(turns, bodies):
+            # A degraded historical pointer proves access, not the version
+            # that supported the analysis. Never revive its derived summary.
+            current = all(c.chunk_id in live_chunks for c in turn.citations.all())
+            summary = public_protocol.summary_for(turn, len(body["citations"])) if current else None
+            if summary:
+                body["reasoning_summary"] = summary
+        return [public_protocol.project_turn(body) for body in bodies]
     return bodies
 
 
@@ -417,8 +447,8 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
     ``None`` when the Record is no longer visible -- existence must not leak,
     so this is indistinguishable from a citation that was never stored at
     all. A record-level pointer (no ``text``, no ``record_title``) when the
-    Record is visible but the chunk it pointed at was tombstoned by a
-    re-chunk: the text it once quoted may no longer represent the record, so
+    Record is visible but the chunk it pointed at was removed or superseded
+    by a re-chunk: the text it once quoted may no longer represent the record, so
     showing it would be a stale quote rather than a re-resolved one.
     """
     if citation.record_id not in visible_titles:

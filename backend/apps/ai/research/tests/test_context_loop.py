@@ -21,7 +21,8 @@ def test_planner_reads_recent_answers_but_no_recalled_or_restricted_exchange(cor
                         answer="RECALLED_ONLY " * 500, state="generated")
     restricted = Turn.objects.create(conversation=conversation, question="PRIVATE_QUESTION",
                                      answer="PRIVATE_ANSWER", state="generated")
-    TurnCitation.objects.create(turn=restricted, marker=1, record=corpus["draft"])
+    TurnCitation.objects.create(turn=restricted, marker=1, record=corpus["draft"],
+                                chunk=corpus["draft"].document_chunks.get())
     Turn.objects.create(conversation=conversation, question="Recent rainfall question",
                         answer="RECENT_VISIBLE_ANSWER", state="generated")
     stack = root(embedder)
@@ -151,17 +152,15 @@ def test_oversized_weak_evidence_leaves_all_later_prompts_and_reports_coverage(c
     assert any("lowest-scoring passages" in note["text"] for note in result.coverage_notes)
 
 
-def test_synthesis_also_drops_whole_weak_passages_before_its_single_call(corpus, embedder, settings):
+def test_synthesis_also_drops_whole_weak_passages_before_its_single_call(corpus, embedder, settings, ledger_passage):
     from apps.ai.research.registry import ToolRun
     from apps.ai.research.synthesis import synthesize
     settings.AI_RESEARCH_CONTEXT_TOKEN_BUDGET = 2000
     stack = root(embedder)
     ctx = RunContext.for_request(user=corpus["student"], root=stack, lane="research")
     tool_run = ToolRun.start(ctx, stack)
-    for chunk, text, score in [(100, "STRONG_TEXT", 0.9), (101, "WEAK_TEXT " * 3000, 0.1)]:
-        tool_run.ledger.add_passage(record_id=corpus["public"].pk, chunk_id=chunk,
-            chunk_set_hash="fixture", record_title="Flood forecasting", text=text,
-            page=1, context_path=(), score=score)
+    for text, score in [("STRONG_TEXT", 0.9), ("WEAK_TEXT " * 3000, 0.1)]:
+        ledger_passage(tool_run, corpus["public"], text, score)
     answerer = ScriptedLLM(reply="Supported finding [1].")
     answer, handles, codes = synthesize(TOPIC, tool_run, answerer, [])
     assert codes == ()
@@ -196,7 +195,8 @@ def test_newly_gated_evidence_history_notes_and_plan_disappear_before_next_call(
     conversation = Conversation.objects.create(user=corpus["student"])
     turn = Turn.objects.create(conversation=conversation, question="CITED_QUESTION",
                                answer="CITED_ANSWER", state="generated")
-    TurnCitation.objects.create(turn=turn, marker=1, record=corpus["public"])
+    TurnCitation.objects.create(turn=turn, marker=1, record=corpus["public"],
+                                chunk=corpus["public"].document_chunks.get())
     calls = [
         ("plan_research", {"subtasks": ["Read Flood forecasting"]}, "PLAN_DERIVED_FROM_PAPER"),
         ("search_passages", {"query": TOPIC}, "SEARCH_NOTE"),
@@ -227,7 +227,8 @@ def test_paper_scope_and_history_never_send_another_paper_to_planner(corpus, emb
     conversation = Conversation.objects.create(user=corpus["student"], record=corpus["public"])
     widened = Turn.objects.create(conversation=conversation, question="WIDENED_QUESTION",
                                   answer="WIDENED_ANSWER", widened=True, state="generated")
-    TurnCitation.objects.create(turn=widened, marker=1, record=corpus["pond"])
+    TurnCitation.objects.create(turn=widened, marker=1, record=corpus["pond"],
+                                chunk=corpus["pond"].document_chunks.get())
     model = script(
         ("plan_research", {"subtasks": ["Read findings"]}, ""),
         ("search_passages", {"query": TOPIC}, ""),
@@ -248,7 +249,8 @@ def test_a_visible_but_undisclosable_prior_exchange_is_omitted(corpus, embedder)
     conversation = Conversation.objects.create(user=corpus["student"])
     turn = Turn.objects.create(conversation=conversation, question="GATED_QUESTION",
                                answer="GATED_ANSWER", state="generated")
-    TurnCitation.objects.create(turn=turn, marker=1, record=corpus["public"])
+    TurnCitation.objects.create(turn=turn, marker=1, record=corpus["public"],
+                                chunk=corpus["public"].document_chunks.get())
     Turn.objects.create(conversation=conversation, question="FAILED_QUESTION",
                         answer="FAILED_ANSWER", state="unavailable")
     model = script(("finish", {}, ""))

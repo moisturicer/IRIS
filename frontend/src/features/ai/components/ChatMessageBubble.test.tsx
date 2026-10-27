@@ -10,7 +10,7 @@
  * Every query goes through the accessible tree, by role and accessible name.
  */
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen } from "@/test/render";
@@ -153,20 +153,42 @@ describe("a cited answer", () => {
     expect(screen.queryByText(/cut off before it finished/i)).toBeNull();
   });
 
-  it("keeps a replayed reply's reasoning collapsed until the reader opens it (IR-381)", async () => {
-    const working = "The gauges are named in the Methods section, so I will cite that.";
-    renderScreen(<ChatMessageBubble message={assistantMessage({ reasoning: working })} />);
+  it("keeps a reply's reasoning summary collapsed, above the answer (IR-596)", async () => {
+    const summary = "These papers address the same problem but evaluate it differently.";
+    renderScreen(<ChatMessageBubble message={assistantMessage({ reasoningSummary: summary })} />);
 
-    expect(screen.queryByText(working)).toBeNull();
+    const toggle = screen.getByRole("button", { name: "Reasoning summary" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(summary)).toBeNull();
+    const answer = screen.getByText(/Rainfall gauge data was used/);
+    expect(toggle.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: /reasoning/i }));
-    expect(screen.getByRole("region", { name: "Reasoning" }).textContent).toBe(working);
+    await userEvent.click(toggle);
+    expect(screen.getByRole("region", { name: "Reasoning summary" }).textContent).toBe(summary);
   });
 
-  it("offers no reasoning panel on a reply that stored none", () => {
+  it("offers no summary control on a reply without one", () => {
     renderScreen(<ChatMessageBubble message={assistantMessage()} />);
 
     expect(screen.queryByRole("button", { name: /reasoning/i })).toBeNull();
+  });
+
+  it("copies the answer without the summary", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const summary = "These papers address the same problem but evaluate it differently.";
+    renderScreen(<ChatMessageBubble message={assistantMessage({ reasoningSummary: summary })} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Copy answer" }));
+    expect(writeText).toHaveBeenCalledWith("Rainfall gauge data was used [1].");
+  });
+
+  it("renders no routing, lane or tool narration for a reply (IR-596)", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage()} />);
+
+    for (const prohibited of ["Answer approach", "Why this approach", "Try instead", "List papers", "search_passages"]) {
+      expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+    }
   });
 
   it("has no serious or critical accessibility violations", async () => {

@@ -943,12 +943,35 @@ describe("the Paper tab (IR-372, IR-569)", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Back to paper" }));
 
-      const bar = screen.getByRole("button", { name: "Show Ask IRIS" });
+      const bar = screen.getByRole("button", { name: "Ask IRIS: back to the answer" });
       expect(inert(screen.getByRole("tabpanel"))).toBe(false);
       await waitFor(() => expect(bar).toHaveFocus());
 
       await userEvent.click(bar);
       expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
+    });
+
+    it("on a phone, closes the navigation drawer on entry and keeps an unsent draft across Back to paper (IR-570)", async () => {
+      const { aiApi } = await import("@/api/ai");
+      workspaceAt(360);
+      useUIStore.setState({ sidebarOpen: true });
+      await openPaperTab();
+      vi.mocked(aiApi.conversations.create).mockClear();
+
+      expect(useUIStore.getState().sidebarOpen).toBe(false);
+      const box = screen.getByRole("textbox", { name: "Ask about this paper" });
+      await userEvent.type(box, "What does the method assume?");
+
+      const paper = screen.getByRole("tabpanel");
+      await userEvent.click(screen.getByRole("button", { name: "Back to paper" }));
+      expect(inert(paper)).toBe(false);
+      await userEvent.click(screen.getByRole("button", { name: "Ask IRIS: back to the answer" }));
+
+      // The reader is the same element throughout, so its page and scroll
+      // position are kept rather than rebuilt (jsdom cannot scroll to show it).
+      expect(screen.getByRole("tabpanel")).toBe(paper);
+      expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toHaveValue("What does the method assume?");
+      expect(aiApi.conversations.create).not.toHaveBeenCalled();
     });
 
     it("steps aside when the sidebar opens and narrows the workspace, leaving the paper in view", async () => {
@@ -1119,7 +1142,7 @@ describe("following a citation from Paper Chat (IR-354)", () => {
   it("minimizes the sheet below lg, and restores it with the answer still there", async () => {
     await followCitationFromChat();
 
-    const bar = await screen.findByRole("button", { name: "Show Ask IRIS" });
+    const bar = await screen.findByRole("button", { name: "Ask IRIS: back to the answer" });
     expect(screen.queryByRole("textbox", { name: "Ask about this paper" })).not.toBeInTheDocument();
 
     await userEvent.click(bar);
@@ -1133,7 +1156,7 @@ describe("following a citation from Paper Chat (IR-354)", () => {
 
     await followCitationFromChat();
 
-    expect(screen.queryByRole("button", { name: "Show Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask IRIS: back to the answer" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Ask about this paper" })).toBeInTheDocument();
   });
 

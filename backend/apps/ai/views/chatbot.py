@@ -31,6 +31,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+from apps.ai import public as public_protocol
+from apps.ai.conversation_state import current_revision
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
     AgentStep,
@@ -145,10 +147,10 @@ def _recent_turns(conversation: Conversation) -> list:
     Both bounds apply *after* the exclusion, so a run of failures does not eat
     the window and leave the model with less real history than it has.
     """
-    return recent_window(conversation.turns.all())
+    return recent_window(conversation.turns.all(), user=conversation.user)
 
 
-def prepare_ask(data, user, *, resolve: bool = True):
+def prepare_ask(data, user, *, resolve: bool = True, context_revision=None):
     """Parse and validate one question, resolve it and its scope.
 
     Returns ``(prepared, None)`` on success or ``(None, error_response)`` on
@@ -160,6 +162,9 @@ def prepare_ask(data, user, *, resolve: bool = True):
     question (IR-544) is validated that way at submission and prepared again,
     resolution included, by the worker -- which re-checks the Conversation
     and any override Turn against the asker at the same time.
+
+    ``context_revision`` pins the conversation state the answer builds on
+    (IR-592); a queued run passes the one read at submission.
     """
     from apps.ai.routing.router import LANES
 
@@ -196,7 +201,9 @@ def prepare_ask(data, user, *, resolve: bool = True):
         if override_turn is None:
             raise Http404
         question = override_turn.question
-        history = recent_window(conversation.turns.filter(pk__lt=override_turn.pk))
+        history = recent_window(
+            conversation.turns.filter(pk__lt=override_turn.pk), user=conversation.user
+        )
         resolved_question = override_turn.resolved_question or None
     else:
         # Only resolution and the answer read history; a queued submission
@@ -227,6 +234,10 @@ def prepare_ask(data, user, *, resolve: bool = True):
             route_override=route_override,
             override_turn_id=override_turn.pk if override_turn else None,
             comparison_record_ids=tuple(record_ids),
+            context_revision=(
+                context_revision if context_revision is not None
+                else current_revision(conversation)
+            ),
         ),
         None,
     )
@@ -275,6 +286,7 @@ class ChatQueryView(APIView):
     throttle_classes = [AIQueryThrottle]
 
     def post(self, request):
+        public_mode = public_protocol.requested(request)
         prepared, error = prepare_ask(request.data, request.user)
         if error is not None:
             return error
@@ -283,6 +295,8 @@ class ChatQueryView(APIView):
             prepared, max_sources=_parse_top_k(request.data.get("top_k"))
         )
         answer = orchestrator.answer(request.user)
+        if public_mode:
+            return Response(public_body(prepared, orchestrator, answer))
         return Response(done_body(prepared, orchestrator, answer))
 
 
@@ -322,6 +336,12 @@ def done_body(prepared, orchestrator, answer) -> dict:
         "had_reasoning": answer.had_reasoning,
         "reasoning": answer.reasoning or None,
     }
+
+
+def public_body(prepared, orchestrator, answer) -> dict:
+    """`done_body` under the public protocol, with the validated summary."""
+    return public_protocol.project_done(
+        {**done_body(prepared, orchestrator, answer), "reasoning_summary": answer.reasoning_summary})
 
 
 def event_payload(event) -> dict:
@@ -411,6 +431,7 @@ class ChatStreamView(APIView):
     def post(self, request):
         from apps.ai import durable
 
+        public_mode = public_protocol.requested(request)
         queued = durable.requested(request.data)
         prepared, error = prepare_ask(request.data, request.user, resolve=not queued)
         if error is not None:
@@ -437,7 +458,7 @@ class ChatStreamView(APIView):
                     {"detail": "IRIS is still answering your previous question in this conversation."},
                     status=status.HTTP_409_CONFLICT,
                 )
-            return EventStreamResponse(durable.follow(run.pk, request.user))
+            return EventStreamResponse(durable.follow(run.pk, request.user, public=public_mode))
 
         orchestrator = ChatOrchestrator(
             prepared, max_sources=_parse_top_k(request.data.get("top_k"))
@@ -448,13 +469,19 @@ class ChatStreamView(APIView):
             # and as `partial` on interruption (IR-328).
             # Closed explicitly, so a run never waits on garbage collection.
             events = orchestrator.answer_stream(request.user)
+            projector = public_protocol.StreamProjector()
             with closing(events):
                 for event in events:
                     if isinstance(event, Done):
-                        body = done_body(prepared, orchestrator, event.answer)
+                        body = (public_body if public_mode else done_body)(
+                            prepared, orchestrator, event.answer)
                     else:
                         body = event_payload(event)
-                    yield _sse(event.name, body)
+                    if not public_mode:
+                        yield _sse(event.name, body)
+                        continue
+                    for name, data in projector.feed(event.name, body):
+                        yield _sse(name, data)
 
         return EventStreamResponse(event_source())
 
@@ -484,7 +511,9 @@ class RunStreamView(APIView):
             after = max(0, int(after))
         except (TypeError, ValueError):
             after = 0
-        return EventStreamResponse(durable.follow(pk, request.user, after=after))
+        return EventStreamResponse(
+            durable.follow(pk, request.user, after=after, public=public_protocol.requested(request))
+        )
 
 
 class RunCancelView(APIView):

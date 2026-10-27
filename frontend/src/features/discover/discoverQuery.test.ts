@@ -20,6 +20,7 @@ describe("parseDiscoverQuery", () => {
         ip: "patent",
       },
       sort: "viewed",
+      feed: "latest",
     });
   });
 
@@ -39,6 +40,12 @@ describe("parseDiscoverQuery", () => {
 
   it("keeps the valid ids in a list and drops the rest", () => {
     expect(parse("college=4,x,4,12").filters.colleges).toEqual(["4", "12"]);
+  });
+
+  it("accepts only the explicit feed modes", () => {
+    expect(parse("feed=for_you").feed).toBe("for_you");
+    expect(parse("feed=trending").feed).toBe("trending");
+    expect(parse("feed=personalized")).toEqual(DEFAULT_QUERY);
   });
 });
 

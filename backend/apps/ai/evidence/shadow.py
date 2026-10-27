@@ -319,7 +319,8 @@ def parity(turn, manifest: dict) -> dict:
     """What differs between the request's manifest and the task's view of
     the same request. Ids, lengths, digests and settings -- never text."""
     window = recent_window(
-        Turn.objects.filter(conversation_id=turn.conversation_id, pk__lt=turn.pk)
+        Turn.objects.filter(conversation_id=turn.conversation_id, pk__lt=turn.pk),
+        user=turn.conversation.user,
     )
     current = {**_configuration(), "window": [_window_entry(t) for t in window]}
     differences = {

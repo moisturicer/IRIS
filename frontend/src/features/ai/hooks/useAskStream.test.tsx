@@ -1,6 +1,6 @@
-import { routingFixture } from "@/test/routingFixture";
 /**
- * The streaming state machine driving Ask IRIS's live progress (IR-329).
+ * The streaming state machine driving Ask IRIS's live progress (IR-329,
+ * reworked to the public `activity` frames by IR-596).
  *
  * `aiApi.askStream` is mocked as an async generator yielding the same
  * `{event, data}` shape `readSSE` produces -- the seam this hook actually
@@ -38,16 +38,16 @@ it("keeps the checked comparison on the finished answer and forwards explicit pa
 });
 
 describe("a complete stream", () => {
-  it("moves through every pipeline stage in order", async () => {
+  it("follows the server's activity frames and ends on the finished answer", async () => {
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => { release = resolve; });
+    const frame = (state: string, label: string) => ({ event: "activity", data: { state, label } });
 
     askStream.mockReturnValue(
       (async function* () {
-        yield { event: "retrieval_started", data: {} };
-        yield { event: "retrieval_finished", data: { passage_count: 3, record_count: 2, degraded: false } };
-        yield { event: "generation_started", data: {} };
+        yield frame("thinking", "Thinking…");
         await gate;
+        yield frame("preparing", "Preparing your answer…");
         yield { event: "text_delta", data: { text: "Rainfall gauges feed the model." } };
         yield { event: "citations_resolved", data: { citations: [] } };
         yield {
@@ -55,7 +55,7 @@ describe("a complete stream", () => {
           data: {
             answer: "Rainfall gauges feed the model.", citations: [], sources: [],
             message: null, mode: "generative", degraded: false,
-            conversation_id: 9, resolved_question: null, widened: false, had_reasoning: false,
+            conversation_id: 9, resolved_question: null, widened: false,
           },
         };
       })(),
@@ -68,8 +68,9 @@ describe("a complete stream", () => {
       pending = result.current.ask("What predicts flooding?", { conversationId: 9 });
     });
 
-    await waitFor(() => expect(result.current.streaming?.stage).toBe("thinking"));
-    expect(result.current.streaming?.foundInfo).toEqual({ passageCount: 3, recordCount: 2 });
+    expect(result.current.streaming?.label).toBe("Waiting…");
+    expect(result.current.streaming?.startedAt).toBeTypeOf("number");
+    await waitFor(() => expect(result.current.streaming?.label).toBe("Thinking…"));
 
     release();
     const outcome = await pending as { message: { content: string; partial?: boolean }; conversationId: number | null };
@@ -83,14 +84,13 @@ describe("a complete stream", () => {
   it("matches the done event's shape for a non-generative answer", async () => {
     askStream.mockReturnValue(
       eventsOf(
-        { event: "retrieval_started", data: {} },
-        { event: "retrieval_finished", data: { passage_count: 0, record_count: 0, degraded: false } },
+        { event: "activity", data: { state: "thinking", label: "Thinking…" } },
         {
           event: "done",
           data: {
             answer: null, citations: [], sources: [], message: "No readable sources matched.",
             mode: "no_results", degraded: false, conversation_id: null, resolved_question: null,
-            widened: false, had_reasoning: false,
+            widened: false,
           },
         },
       ),
@@ -104,116 +104,132 @@ describe("a complete stream", () => {
   });
 });
 
-describe("the reasoning channel (IR-381)", () => {
-  it("accumulates reasoning deltas separately from the answer text", async () => {
-    let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => { release = resolve; });
-
-    askStream.mockReturnValue(
-      (async function* () {
-        yield { event: "retrieval_started", data: {} };
-        yield { event: "retrieval_finished", data: { passage_count: 1, record_count: 1, degraded: false } };
-        yield { event: "generation_started", data: {} };
-        yield { event: "reasoning_delta", data: { text: "Checking the sources. " } };
-        yield { event: "reasoning_delta", data: { text: "Looks right." } };
-        await gate;
-        yield { event: "text_delta", data: { text: "Rainfall gauges feed the model." } };
-        yield {
-          event: "done",
-          data: {
-            answer: "Rainfall gauges feed the model.", citations: [], sources: [],
-            message: null, mode: "generative", degraded: false, conversation_id: 9,
-            resolved_question: null, widened: false, had_reasoning: true,
-            reasoning: "Checking the sources. Looks right.",
-          },
-        };
-      })(),
-    );
-
-    const { result } = renderHook(() => useAskStream());
-
-    let pending!: Promise<unknown>;
-    act(() => { pending = result.current.ask("What predicts flooding?", { conversationId: 9 }); });
-
-    await waitFor(() =>
-      expect(result.current.streaming?.reasoning).toBe("Checking the sources. Looks right."),
-    );
-    expect(result.current.streaming?.text).toBe("");
-    expect(result.current.streaming?.stage).toBe("thinking");
-
-    release();
-    const outcome = await pending as { message: { content: string; reasoning?: string | null } };
-
-    expect(outcome.message.reasoning).toBe("Checking the sources. Looks right.");
-    expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
+describe("activity and the reasoning summary (IR-596)", () => {
+  const finished = (extra: Record<string, unknown> = {}) => ({
+    event: "done",
+    data: {
+      answer: "Rainfall gauges feed the model.", citations: [], sources: [],
+      message: null, mode: "generative", degraded: false, conversation_id: null,
+      resolved_question: null, widened: false, ...extra,
+    },
   });
 
-  it("does not pull the stage back to thinking once the answer is writing", async () => {
+  it("keeps the same status object when an identical activity frame arrives", async () => {
+    const seen: unknown[] = [];
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => { release = resolve; });
-
     askStream.mockReturnValue(
       (async function* () {
-        yield { event: "retrieval_started", data: {} };
-        yield { event: "generation_started", data: {} };
-        yield { event: "text_delta", data: { text: "Rainfall gauges " } };
-        yield { event: "reasoning_delta", data: { text: "second thoughts" } };
+        yield { event: "activity", id: "1", data: { state: "thinking", label: "Thinking…" } };
         await gate;
-        yield { event: "text_delta", data: { text: "feed the model." } };
+        yield { event: "activity", id: "1", data: { state: "thinking", label: "Thinking…" } };
+        yield { event: "activity", id: "2", data: { state: "thinking", label: "Thinking…" } };
+        await gate;
+        yield finished();
       })(),
     );
-
-    const { result } = renderHook(() => useAskStream());
-
+    const { result } = renderHook(() => { const hook = useAskStream(); seen.push(hook.streaming); return hook; });
     let pending!: Promise<unknown>;
-    act(() => { pending = result.current.ask("anything"); });
-
-    await waitFor(() => expect(result.current.streaming?.reasoning).toBe("second thoughts"));
-    expect(result.current.streaming?.stage).toBe("answering");
-
+    act(() => { pending = result.current.ask("q"); });
+    await waitFor(() => expect(result.current.streaming?.activity).toBe("thinking"));
+    const settled = result.current.streaming;
     release();
     await pending;
+    expect(seen.filter((state) => state === settled).length).toBeGreaterThan(0);
+    expect(new Set(seen.filter((state) => state && (state as { activity: string }).activity === "thinking")).size).toBe(1);
   });
 
-  it("carries no reasoning when the model produced none", async () => {
-    askStream.mockReturnValue(
-      eventsOf(
-        { event: "retrieval_started", data: {} },
-        { event: "text_delta", data: { text: "Rainfall gauges feed the model." } },
-        {
-          event: "done",
-          data: {
-            answer: "Rainfall gauges feed the model.", citations: [], sources: [],
-            message: null, mode: "generative", degraded: false, conversation_id: null,
-            resolved_question: null, widened: false, had_reasoning: false, reasoning: null,
-          },
-        },
-      ),
-    );
-
+  it("puts a non-empty reasoning summary on the finished message", async () => {
+    askStream.mockReturnValue(eventsOf(finished({ reasoning_summary: "  The papers differ in setting.  " })));
     const { result } = renderHook(() => useAskStream());
 
-    const outcome = await act(() => result.current.ask("anything"));
+    const outcome = await act(() => result.current.ask("q"));
 
-    expect(outcome.message.reasoning).toBeNull();
+    expect(outcome.message.reasoningSummary).toBe("The papers differ in setting.");
   });
 
-  it("keeps the reasoning that arrived before an interrupted stream cut off", async () => {
+  it.each([undefined, "", "   ", null])("carries no summary when the server sends %j", async (summary) => {
+    askStream.mockReturnValue(eventsOf(finished(summary === undefined ? {} : { reasoning_summary: summary })));
+    const { result } = renderHook(() => useAskStream());
+
+    const outcome = await act(() => result.current.ask("q"));
+
+    expect(outcome.message.reasoningSummary).toBeUndefined();
+  });
+
+  it("never reads raw reasoning, routing or steps even if a server sends them", async () => {
+    askStream.mockReturnValue(eventsOf(
+      { event: "reasoning_delta", data: { text: "secret working" } },
+      { event: "routing_decided", data: { routing: { lane: "listing" } } },
+      { event: "agent_step", data: { position: 0, tool: "search_passages", status: "running" } },
+      finished({ reasoning: "secret working", routing: { lane: "listing" } }),
+    ));
+    const { result } = renderHook(() => useAskStream());
+
+    const outcome = await act(() => result.current.ask("q"));
+
+    expect(JSON.stringify(outcome.message)).not.toMatch(/secret working|search_passages|listing"/);
+    expect(outcome.message).not.toHaveProperty("reasoning");
+    expect(outcome.message).not.toHaveProperty("routing");
+  });
+
+  it("applies a replayed done once and ignores records at or below the cursor", async () => {
+    askStream.mockReturnValue(eventsOf(
+      { event: "run_queued", id: "1", data: { run_id: "r-1", state: "queued" } },
+      { event: "text_delta", id: "2", data: { text: "Rainfall " } },
+      { event: "text_delta", id: "2", data: { text: "Rainfall " } },
+      { event: "text_delta", id: "1", data: { text: "stale " } },
+      { event: "run_failed", id: "3", data: { run_id: "r-1", state: "failed" } },
+    ));
+    const { result } = renderHook(() => useAskStream());
+
+    const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
+
+    expect(outcome.message.endedRun).toEqual({ id: "r-1", state: "failed" });
+  });
+
+  it("dedupes the server's real batch shape: an id-less activity frame, then its event with the id", async () => {
+    const batch = (id: string, text: string) => [
+      { event: "activity", data: { state: "preparing", label: "Preparing your answer…" } },
+      { event: "text_delta", id, data: { text } },
+    ];
     askStream.mockReturnValue(
       (async function* () {
-        yield { event: "retrieval_started", data: {} };
-        yield { event: "reasoning_delta", data: { text: "half a thought" } };
-        yield { event: "text_delta", data: { text: "Rainfall gauges" } };
+        yield { event: "run_queued", id: "1", data: { run_id: "r-3", state: "queued" } };
+        for (const frame of batch("2", "Rainfall ")) yield frame;
         throw new Error("connection reset");
       })(),
     );
-
+    resumeAskRun.mockReturnValueOnce(eventsOf(...batch("2", "Rainfall "), ...batch("3", "gauges.")));
+    resumeAskRun.mockImplementation(() => eventsOf());
     const { result } = renderHook(() => useAskStream());
 
-    const outcome = await act(() => result.current.ask("anything"));
+    const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
 
-    expect(outcome.message.partial).toBe(true);
-    expect(outcome.message.reasoning).toBe("half a thought");
+    expect(resumeAskRun).toHaveBeenCalledWith("r-3", 2, expect.any(AbortSignal));
+    expect(outcome.message.content).toBe("Rainfall gauges.");
+  }, 10_000);
+
+  it("does not repeat text that a reconnect replays", async () => {
+    askStream.mockReturnValue(
+      (async function* () {
+        yield { event: "run_queued", id: "1", data: { run_id: "r-2", state: "queued" } };
+        yield { event: "text_delta", id: "2", data: { text: "Rainfall " } };
+        throw new Error("connection reset");
+      })(),
+    );
+    resumeAskRun.mockReturnValue(eventsOf(
+      { event: "text_delta", id: "2", data: { text: "Rainfall " } },
+      { event: "text_delta", id: "3", data: { text: "gauges." } },
+      { event: "done", id: "4", data: { answer: null, message: null, turn_id: 5, conversation_id: 9, mode: "generative" } },
+      { event: "done", id: "4", data: { answer: null, message: null, turn_id: 5, conversation_id: 9, mode: "generative" } },
+    ));
+    const { result } = renderHook(() => useAskStream());
+
+    const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
+
+    expect(resumeAskRun).toHaveBeenCalledWith("r-2", 2, expect.any(AbortSignal));
+    expect(outcome.message.turnId).toBe(5);
   });
 });
 
@@ -289,69 +305,27 @@ describe("a request that never starts streaming", () => {
   });
 });
 
-it("keeps the live routing event and carries terminal listing rows into the answer", async () => {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
+it("carries terminal listing rows into the answer and sends no lane override", async () => {
   const listing = { completeness: "matches_found", wording: "Matches found", records: [{ record_id: 7, title: "Flood Prediction" }] };
-  askStream.mockReturnValue((async function* () {
-    yield { event: "routing_decided", data: { routing: routingFixture } };
-    await gate;
-    yield { event: "done", data: { answer: "Found papers", turn_id: 5, routing: routingFixture, listing } };
-  })());
+  askStream.mockReturnValue(eventsOf({ event: "done", data: { answer: "Found papers", turn_id: 5, listing } }));
   const { result } = renderHook(() => useAskStream());
-  let pending!: ReturnType<typeof result.current.ask>;
-  act(() => { pending = result.current.ask("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 }); });
-  await waitFor(() => expect(result.current.streaming?.routing).toEqual(routingFixture));
-  let outcome!: Awaited<typeof pending>;
-  await act(async () => { release(); outcome = await pending; });
-  expect(outcome.message.routing).toEqual(routingFixture);
+  const outcome = await act(() => result.current.ask("Find flooding papers", { conversationId: 9 }));
   expect(outcome.message.listing).toEqual(listing);
   expect(outcome.message.question).toBe("Find flooding papers");
   expect(outcome.message.turnId).toBe(5);
-  expect(askStream).toHaveBeenCalledWith("Find flooding papers", { conversationId: 9, routeOverride: "listing", routeOverrideTurnId: 3 }, expect.any(AbortSignal));
+  expect(askStream).toHaveBeenCalledWith("Find flooding papers", { conversationId: 9 }, expect.any(AbortSignal));
 });
 
-describe("the research lane (IR-504)", () => {
-  it("tracks each step by position and keeps the finished trace", async () => {
-    let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => { release = resolve; });
-    const step = { kind: "tool", tool: "search_passages", duplicate: false, latency_ms: 0, coverage: null, found: null };
-    const research = { run_id: "r", stop_reason: "finish", steps: [], coverage_notes: [] };
-    askStream.mockReturnValue(
-      (async function* () {
-        yield { event: "retrieval_started", data: {} };
-        yield { event: "agent_step", data: { ...step, position: 0, status: "running" } };
-        yield { event: "agent_step", data: { ...step, position: 0, status: "ok", found: 2 } };
-        await gate;
-        yield {
-          event: "done",
-          data: { answer: "A.", citations: [], sources: [], message: null, mode: "generative",
-                  degraded: false, conversation_id: 3, resolved_question: null, widened: false,
-                  had_reasoning: false, research },
-        };
-      })(),
-    );
-    const { result } = renderHook(() => useAskStream());
-    let pending!: Promise<unknown>;
-    act(() => { pending = result.current.ask("q"); });
-
-    await waitFor(() => expect(result.current.streaming?.steps?.[0]?.status).toBe("ok"));
-    expect(result.current.streaming?.steps).toHaveLength(1);
-    release();
-    const outcome = await pending as { message: { research?: unknown } };
-    expect(outcome.message.research).toEqual(research);
-  });
-
+describe("unknown events", () => {
   it("ignores an event type it does not know", async () => {
     askStream.mockReturnValue(
       eventsOf(
-        { event: "retrieval_started", data: {} },
         { event: "some_future_event", data: { anything: true } },
         {
           event: "done",
           data: { answer: "Fine.", citations: [], sources: [], message: null, mode: "generative",
                   degraded: false, conversation_id: null, resolved_question: null, widened: false,
-                  had_reasoning: false },
+                },
         },
       ),
     );
@@ -391,7 +365,7 @@ describe("a listing's candidates (IR-546)", () => {
         await gate;
         yield { event: "done", data: { answer: listing.wording, citations: [], sources: [], message: null,
           mode: "generative", degraded: false, conversation_id: 4, resolved_question: null, widened: false,
-          had_reasoning: false, listing } };
+          listing } };
       })(),
     );
     const { result } = renderHook(() => useAskStream());
@@ -425,8 +399,7 @@ describe("a listing's candidates (IR-546)", () => {
     const { result } = renderHook(() => useAskStream());
     let pending!: Promise<unknown>;
     act(() => { pending = result.current.ask("q"); });
-    await waitFor(() => expect(result.current.streaming?.stage).toBe("searching"));
-    expect(result.current.streaming?.candidates).toBeUndefined();
+    await waitFor(() => expect(result.current.streaming?.candidates).toBeUndefined());
     release();
     await pending;
   });
@@ -438,7 +411,7 @@ describe("a queued run (IR-544)", () => {
     data: {
       answer: "Rainfall gauges feed the model.", citations: [], sources: [], message: null,
       mode: "generative", degraded: false, conversation_id: 9, resolved_question: null,
-      widened: false, had_reasoning: false, turn_id: 41,
+      widened: false, turn_id: 41,
     },
   };
 
@@ -466,7 +439,7 @@ describe("a queued run (IR-544)", () => {
     expect(outcome.message.partial).toBeFalsy();
   });
 
-  it("shows the queued stage, then starts over when a new attempt begins", async () => {
+  it("shows it waiting, then starts over when a new attempt begins", async () => {
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => { release = resolve; });
     let resume: () => void = () => {};
@@ -488,7 +461,8 @@ describe("a queued run (IR-544)", () => {
     let pending!: Promise<unknown>;
     act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
 
-    await waitFor(() => expect(result.current.streaming?.stage).toBe("queued"));
+    await waitFor(() => expect(result.current.streaming?.runId).toBe("r-2"));
+    expect(result.current.streaming?.label).toBe("Waiting…");
     release();
     await waitFor(() => expect(result.current.streaming?.text).toBe("half an ans"));
     resume();
@@ -539,7 +513,7 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
     data: {
       answer: "Rainfall gauges feed the model.", citations: [], sources: [], message: null,
       mode: "generative", degraded: false, conversation_id: 9, resolved_question: null,
-      widened: false, had_reasoning: false, turn_id: 41,
+      widened: false, turn_id: 41,
     },
   };
 

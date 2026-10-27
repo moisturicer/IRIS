@@ -210,11 +210,19 @@ class Turn(models.Model):
     widened = models.BooleanField(default=False)
     had_reasoning = models.BooleanField(default=False)
     reasoning = models.TextField(blank=True)
+    #: The validated display summary (IR-595): never evidence, never raw
+    #: reasoning. Same lifetime as the Turn; blank when none was safe.
+    reasoning_summary = models.TextField(blank=True)
+    #: Where it came from: "<engine>/<answer prompt version>".
+    reasoning_summary_source = models.CharField(max_length=60, blank=True)
     routing = models.JSONField(default=dict, blank=True)
     listing = models.JSONField(default=dict, blank=True)
     comparison = models.JSONField(default=dict, blank=True)
     #: The research planner's steps and coverage notes (IR-504), never content.
     research = models.JSONField(default=dict, blank=True)
+    #: The `ConversationState` revision this Turn committed; null when it
+    #: was not delivered or predates IR-592.
+    context_revision = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = TurnQuerySet.as_manager()
@@ -225,6 +233,41 @@ class Turn(models.Model):
 
     def __str__(self) -> str:
         return f"Turn({self.pk}, conversation={self.conversation_id})"
+
+
+class ConversationState(models.Model):
+    """What the reader was shown and chose, one revision per delivered Turn (IR-592).
+
+    Record ids only, never titles or text; every read rechecks visibility.
+    Cascades with its Conversation, so it has no lifetime of its own.
+    """
+
+    RECORDED = "recorded"
+    CONFLICT = "conflict"
+    _BASIS_CHOICES = [(RECORDED, "Recorded"), (CONFLICT, "Conflict")]
+
+    conversation = models.OneToOneField(
+        Conversation, on_delete=models.CASCADE, primary_key=True, related_name="context_state"
+    )
+    revision = models.PositiveIntegerField(default=0)
+    basis = models.CharField(max_length=20, choices=_BASIS_CHOICES, default=RECORDED)
+    answer_turn = models.ForeignKey(
+        Turn, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    request = models.TextField(blank=True)
+    retrieval_query = models.TextField(blank=True)
+    topic = models.CharField(max_length=200, blank=True)
+    filters = models.JSONField(default=dict, blank=True)
+    presented = models.JSONField(default=list, blank=True)
+    selected = models.JSONField(default=list, blank=True)
+    excluded = models.JSONField(default=list, blank=True)
+    pending_clarification = models.JSONField(null=True, blank=True)
+    #: Record id (as a string) to the active ChunkSet content hash at commit.
+    source_versions = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"ConversationState({self.conversation_id}, revision={self.revision})"
 
 
 class TurnCitation(models.Model):

@@ -43,6 +43,18 @@ def sent_to_planner(*results):
     return planner.tool_requests[0].user
 
 
+def scalars(value):
+    """Every leaf value of a JSON-shaped payload."""
+    if isinstance(value, dict):
+        for child in value.values():
+            yield from scalars(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from scalars(child)
+    else:
+        yield value
+
+
 @contextmanager
 def registry_logs(caplog):
     # `apps` does not propagate to the root logger caplog listens on.

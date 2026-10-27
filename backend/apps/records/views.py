@@ -85,7 +85,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # queryset, so "not yours" and "does not exist" produce the same
         # response and the API never confirms someone else's draft exists.
         qs = Record.objects.visible_to(self.request.user).select_related(
-            "classification", "psced", "record_type", "adviser"
+            "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
         if self.action == "metadata_suggestions":
@@ -903,6 +903,22 @@ class RecordViewSet(viewsets.ModelViewSet):
             .distinct()
         )
         return Response({"years": list(years)})
+
+    @action(detail=False, methods=["get", "put"], url_path="interests")
+    def interests(self, request):
+        """The signed-in reader's optional Classification and PSCED Areas."""
+        from .discovery import get_interests, put_interests
+
+        if request.method == "PUT":
+            return put_interests(request.user, request.data)
+        return get_interests(request.user)
+
+    @action(detail=False, methods=["get"], url_path="for-you")
+    def for_you(self, request):
+        """One owner-scoped, stable metadata feed with current visibility."""
+        from .discovery import get_feed
+
+        return get_feed(request)
 
     @action(detail=False, methods=["get"])
     def mine(self, request):

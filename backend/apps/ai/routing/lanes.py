@@ -20,6 +20,7 @@ from apps.ai.research.context import RunContext
 from apps.ai.research.listing import screen_listing
 from apps.ai.research.planner import ResearchPlanner
 from apps.ai.research.registry import ToolRun
+from apps.ai.research.titles import exact_title_matches, title_key
 from apps.ai.research.tools.common import disclosable, readable_records
 from apps.ai.research.tools.records import _relevant
 from apps.ai.research.schema import ArgumentsRejected
@@ -77,12 +78,13 @@ def _named_records(ctx, question):
     quoted = [match[0] or match[1] for match in re.findall(r'"([^"\n]+)"|“([^”\n]+)”', question)]
     records = list(readable_records(ctx).only("pk", "title"))
     lowered = question.casefold()
+    exact = {r.pk for title in quoted for r in exact_title_matches(records, title)}
     matched = [record for record in records if record.title and (
-        record.title.casefold() in {title.casefold() for title in quoted}
+        record.pk in exact
         or re.search(r"(?<!\w)" + re.escape(record.title.casefold()) + r"(?!\w)", lowered)
     )]
-    known = {record.title.casefold() for record in matched}
-    missing = [title for title in quoted if title.casefold() not in known]
+    known = {title_key(record.title) for record in matched}
+    missing = [title for title in quoted if title_key(title) not in known]
     remainder = re.sub(r'"[^"\n]+"|“[^”\n]+”', "", question)
     for record in sorted(matched, key=lambda record: len(record.title), reverse=True):
         remainder = re.sub(re.escape(record.title), "", remainder, flags=re.IGNORECASE)
@@ -158,27 +160,31 @@ def _comparison(run, question, maximum):
                           degraded=degraded or bool(missing), model=model_that_answered(llm)), None
 
 
-def _context(lane, user, *, root, conversation, scope_record, max_sources, history_before_turn_id):
+def _context(lane, user, *, root, conversation, scope_record, max_sources, history_before_turn_id,
+             context_revision=None):
     if max_sources < 1:
         raise ValueError("max_sources must be positive")
-    ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation)
+    ctx = RunContext.for_request(user=user, root=root, lane=lane, conversation=conversation,
+                                 context_revision=context_revision)
     return replace(ctx, scope_record_id=scope_record.pk if scope_record is not None else None,
                    history_before_turn_id=history_before_turn_id)
 
 
 def research_run(question, user, *, root, conversation=None, scope_record=None,
-                 max_sources=8, history_before_turn_id=None):
+                 max_sources=8, history_before_turn_id=None, context_revision=None):
     """Yield the planner's steps; return its `ResearchAnswer` (IR-504)."""
     ctx = _context("research", user, root=root, conversation=conversation,
                    scope_record=scope_record, max_sources=max_sources,
-                   history_before_turn_id=history_before_turn_id)
+                   history_before_turn_id=history_before_turn_id,
+                   context_revision=context_revision)
     ctx = replace(ctx, budget=replace(ctx.budget,
         max_ledger_passages=min(ctx.budget.max_ledger_passages, max_sources)))
     return (yield from ResearchPlanner(root).run(question, ctx))
 
 
 def lane_events(lane, question, user, *, root, conversation=None, scope_record=None,
-                max_sources=8, history_before_turn_id=None, clock=time.monotonic):
+                max_sources=8, history_before_turn_id=None, context_revision=None,
+                clock=time.monotonic):
     """Run a bounded corpus workflow, yielding what a reader can watch.
 
     A listing and a topic count yield their candidates (IR-546, IR-547); a
@@ -188,7 +194,8 @@ def lane_events(lane, question, user, *, root, conversation=None, scope_record=N
     if lane not in ("listing", "count", "comparison"):
         raise ValueError(f"No application workflow for lane {lane!r}")
     ctx = _context(lane, user, root=root, conversation=conversation, scope_record=scope_record,
-                   max_sources=max_sources, history_before_turn_id=history_before_turn_id)
+                   max_sources=max_sources, history_before_turn_id=history_before_turn_id,
+                   context_revision=context_revision)
     run = ToolRun.start(ctx, root)
     seconds = ctx.budget.wall_clock_seconds
     if lane in ("listing", "count"):

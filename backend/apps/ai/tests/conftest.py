@@ -42,3 +42,29 @@ def client_for():
         return client
 
     return _client
+
+
+@pytest.fixture
+def budget(settings):
+    """The controller's fake-test limits (IR-593)."""
+    from apps.ai.controller.budget import FAKE_TEST_PROFILE
+
+    for name, value in FAKE_TEST_PROFILE.items():
+        setattr(settings, name, value)
+    return FAKE_TEST_PROFILE
+
+
+@pytest.fixture
+def flood_scene(budget, embedder, space, client_for):
+    """A reader, two indexed papers and a Conversation (IR-593, IR-594)."""
+    from apps.ai.models import Conversation
+    from apps.ai.research.tests.conftest import fresh_vector_indexes
+
+    from .corpus import FLOOD_TEXT, POND_TEXT, make_record, make_user
+
+    fresh_vector_indexes()
+    reader = make_user("scene@cit.edu")
+    flood = make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+    pond = make_record(title="Tilapia ponds", text=POND_TEXT, embedder=embedder, space=space)
+    return {"reader": reader, "flood": flood, "pond": pond, "client": client_for(reader),
+            "conversation": Conversation.objects.create(user=reader)}

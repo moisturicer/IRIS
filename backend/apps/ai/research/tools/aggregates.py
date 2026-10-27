@@ -6,17 +6,19 @@ from django.conf import settings
 from django.db.models import Count
 
 from apps.ai.research.registry import Tool, ToolRun
-from apps.ai.research.results import Completeness, Coverage, ToolResult, ToolStatus, status_for
+from apps.ai.research.results import (
+    Completeness, Coverage, CoverageSubject, ToolResult, ToolStatus, status_for,
+)
 
 from .common import FILTER_PROPERTIES, apply_filters, readable_records, visible_record_ids
 
-_GROUPS = {
+GROUPS = {
     "classification": "classification__name",
     "psced": "psced__name",
     "record_type": "record_type__name",
     "year": "year_completed",
 }
-_AREAS = {"classification": "classification__name", "psced": "psced__name"}
+AREAS = {"classification": "classification__name", "psced": "psced__name"}
 
 #: Every count is relative to the asker (ADR-027 §3); the planner words it so.
 RELATIVE_TO = "of the records you can see"
@@ -37,7 +39,7 @@ def count_records(run: ToolRun, args: dict) -> ToolResult:
 
     group_by = args.get("group_by")
     if group_by:
-        groups = _grouped(records, _GROUPS[group_by])
+        groups = _grouped(records, GROUPS[group_by])
         detail["groups"] = [g for g in groups if g["value"] is not None]
         detail["unclassified" if group_by != "year" else "undated"] = sum(
             g["count"] for g in groups if g["value"] is None
@@ -65,7 +67,7 @@ def corpus_facets(run: ToolRun, args: dict) -> ToolResult:
             visible_record_ids=visible,
         )
 
-    column = _AREAS[args["dimension"]]
+    column = AREAS[args["dimension"]]
     unclassified = records.filter(**{f"{column}__isnull": True}).count()
     share = round(unclassified / sample, 3) if sample else 0.0
     limit = settings.AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE
@@ -122,11 +124,12 @@ COUNT_RECORDS = Tool(
         "properties": {
             **FILTER_PROPERTIES,
             "is_ip": {"type": "boolean"},
-            "group_by": {"type": "string", "enum": list(_GROUPS)},
+            "group_by": {"type": "string", "enum": list(GROUPS)},
         },
         "additionalProperties": False,
     },
     execute=count_records,
+    subject=CoverageSubject.METADATA_POPULATION,
     cache_context=_visibility_cache_context,
 )
 
@@ -139,10 +142,11 @@ CORPUS_FACETS = Tool(
     ),
     parameters={
         "type": "object",
-        "properties": {"dimension": {"type": "string", "enum": list(_AREAS)}},
+        "properties": {"dimension": {"type": "string", "enum": list(AREAS)}},
         "required": ["dimension"],
         "additionalProperties": False,
     },
     execute=corpus_facets,
+    subject=CoverageSubject.METADATA_POPULATION,
     cache_context=_visibility_cache_context,
 )

@@ -132,6 +132,7 @@ class CompositionRoot:
         permits: Callable[[Record], bool] = disclosure_permits,
         policy_enabled: bool = True,
         shadow_llm: Optional["ToolCallingLLM"] = None,
+        engine: Optional[str] = None,
     ) -> None:
         self._embedder = embedder
         self._reranker = reranker
@@ -142,6 +143,15 @@ class CompositionRoot:
         self._permits = permits
         self._policy_enabled = policy_enabled
         self._shadow_llm = shadow_llm
+        self._engine = engine
+
+    @property
+    def engine(self) -> str:
+        """The answer engine a new run pins (IR-593, ADR-042). Code, not a
+        setting: no reader or deployment toggle chooses it."""
+        from apps.ai.controller.versions import NEW_RUN_ENGINE
+
+        return self._engine or NEW_RUN_ENGINE
 
     # -- the vendor seams ---------------------------------------------------
 

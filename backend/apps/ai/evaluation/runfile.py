@@ -50,3 +50,7 @@ def write_run(out_dir, name: str, record: dict) -> Path:
     out.write_text(json.dumps({"commit": git_commit(), **record}, indent=2) + "\n",
                    encoding="utf-8")
     return out
+
+
+def write_json(path, value) -> None:
+    Path(path).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
