@@ -1,158 +1,72 @@
-import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
-import { RepositorySearchIcon } from "./DiscoverIcons";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
-type SearchMode = "keyword" | "smart";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { cn } from "@/lib/utils";
+import { RepositorySearchIcon } from "./DiscoverIcons";
 
 interface DiscoverSearchComposerProps {
   value: string;
   onChange: (value: string) => void;
 }
 
-/**
- * The search composer. "Smart AI Search" hands the query to Ask IRIS, which is
- * a real grounded-retrieval endpoint — not a decorative label.
- */
-export function DiscoverSearchComposer({
-  value,
-  onChange,
-}: DiscoverSearchComposerProps) {
-  const navigate = useNavigate();
-  const [mode, setMode] = useState<SearchMode>("keyword");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+const EXAMPLES = [
+  "What research explores flood resilience in Cebu?",
+  "How can AI support learning at CIT-U?",
+  "What studies explore renewable energy for local communities?",
+  "How can technology make transport more accessible?",
+];
+
+/** A compact catalogue search with rotating examples while it is empty. */
+export function DiscoverSearchComposer({ value, onChange }: DiscoverSearchComposerProps) {
+  const [example, setExample] = useState(0);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    if (!menuOpen) return;
-    function onPointerDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
+    const preference = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let transition: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      clearInterval(interval);
+      clearTimeout(transition);
     };
-  }, [menuOpen]);
-
-  const submit = () => {
-    const query = value.trim();
-    if (!query) return;
-    // Keyword search already filters live as you type; only Smart search navigates.
-    if (mode === "smart") navigate(`/ai?q=${encodeURIComponent(query)}`);
-  };
+    const start = () => {
+      stop();
+      setVisible(true);
+      if (value || preference?.matches) return;
+      interval = setInterval(() => {
+        setVisible(false);
+        transition = setTimeout(() => {
+          setExample((current) => (current + 1) % EXAMPLES.length);
+          setVisible(true);
+        }, 180);
+      }, 3600);
+    };
+    start();
+    preference?.addEventListener("change", start);
+    return () => {
+      stop();
+      preference?.removeEventListener("change", start);
+    };
+  }, [value]);
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl shadow-card px-4 pt-3.5 pb-3 focus-within:border-brand/40 transition-colors">
-      <div className="flex items-start gap-2.5">
-        <RepositorySearchIcon className="w-[18px] h-[18px] mt-0.5 shrink-0 text-stone-400" />
-        <textarea
-          rows={1}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          aria-label="Search records"
-          placeholder="Who's working on edge AI at CIT-U? Search research, authors, topics…"
-          className="flex-1 min-w-0 resize-none bg-transparent text-[14px] text-stone-800 placeholder-stone-400 outline-none leading-6 max-h-32"
-        />
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            aria-label="Clear search"
-            className="p-1 text-stone-300 hover:text-stone-500"
-          >
-            <i className="fas fa-times-circle text-[14px]" aria-hidden />
-          </button>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 mt-2.5">
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-expanded={menuOpen}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[13px] font-semibold transition-colors",
-              mode === "smart"
-                ? "bg-brand-50 border-brand-200 text-brand"
-                : "bg-white border-stone-200 text-stone-600 hover:border-stone-300",
-            )}
-          >
-            <span>{mode === "smart" ? "Smart AI Search" : "Keyword Search"}</span>
-            <i className={cn("fas fa-chevron-down text-[8px] opacity-60 transition-transform", menuOpen && "rotate-180")} aria-hidden />
-          </button>
-
-          {menuOpen && (
-            <div className="absolute left-0 bottom-full mb-2 w-64 bg-white rounded-xl shadow-card-md border border-stone-200 py-1.5 z-40">
-              <ModeOption
-                active={mode === "keyword"}
-                title="Keyword Search"
-                detail="Filters this page as you type."
-                onClick={() => { setMode("keyword"); setMenuOpen(false); }}
-              />
-              <ModeOption
-                active={mode === "smart"}
-                title="Smart AI Search"
-                detail="Sends the question to Ask IRIS for a grounded answer."
-                onClick={() => { setMode("smart"); setMenuOpen(false); }}
-              />
-            </div>
-          )}
+    <div className={cn("flex min-h-14 items-center gap-3 rounded-2xl border border-stone-300 bg-surface px-4 py-2 focus-within:border-brand", COLOUR_TRANSITION)}>
+        <RepositorySearchIcon className="h-5 w-5 shrink-0 text-brand" />
+        <div className="relative min-w-0 flex-1">
+          {!value && <span aria-hidden="true" className={cn(
+            "pointer-events-none absolute inset-x-0 top-2.5 truncate text-body text-stone-600 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none motion-reduce:transform-none",
+            visible ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0",
+          )}>{EXAMPLES[example]}</span>}
+          <textarea rows={1} value={value} onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.preventDefault(); }}
+            aria-label="Search records" aria-describedby="discover-search-help"
+            className={cn("block min-h-11 max-h-32 w-full resize-none rounded-lg bg-transparent py-2.5 text-body text-stone-900 caret-brand", FOCUS_RING)} />
         </div>
-
-        <div className="ml-auto flex items-center gap-2.5">
-          <span className="hidden sm:inline text-[12px] font-mono text-stone-400">
-            {mode === "smart" ? "Enter to ask" : "Filtering as you type"}
-          </span>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!value.trim() || mode !== "smart"}
-            aria-label="Ask IRIS"
-            title={mode === "smart" ? "Ask IRIS" : "Switch to Smart AI Search to ask"}
-            className="w-8 h-8 shrink-0 rounded-full bg-brand text-white flex items-center justify-center transition-colors hover:bg-brand-light disabled:opacity-30"
-          >
-            <i className="fas fa-arrow-up text-[13px]" aria-hidden />
-          </button>
-        </div>
-      </div>
+        {value && <button type="button" onClick={() => onChange("")} aria-label="Clear search"
+          className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 hover:text-brand [@media(pointer:fine)]:h-9 [@media(pointer:fine)]:w-9", COLOUR_TRANSITION, FOCUS_RING)}>
+          <i className="fas fa-times-circle" aria-hidden />
+        </button>}
+        <p id="discover-search-help" className="sr-only">Search research, authors and topics as you type.</p>
     </div>
-  );
-}
-
-function ModeOption({
-  active,
-  title,
-  detail,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  detail: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left px-3 py-2 hover:bg-stone-50 transition-colors"
-    >
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-semibold text-stone-800">{title}</span>
-        {active && <i className="fas fa-check text-brand text-[12px]" aria-hidden />}
-      </span>
-      <span className="block text-[12px] text-stone-500 mt-0.5">{detail}</span>
-    </button>
   );
 }

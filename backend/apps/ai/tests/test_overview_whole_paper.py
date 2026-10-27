@@ -11,6 +11,7 @@ from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.inference import InferenceTask
 from apps.ai.models import ChunkSet, DocumentChunk, RecordOverview
 from apps.ai.overview import PROMPT_VERSION, overview_for
+from apps.ai.overview.service import generate_overview
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.providers.ports import EmbeddingProvider, Reranker
 from apps.records.models import Record
@@ -19,6 +20,19 @@ from core.enums import PipelineStatus
 from .corpus import DIMENSIONS
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
+
+
+@pytest.fixture(autouse=True)
+def suppress_task_publish(monkeypatch):
+    monkeypatch.setattr("apps.ai.overview.service._enqueue_overview", lambda *args: None)
+
+
+def _generate_overview(record):
+    chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+    pending = overview_for(record)
+    assert pending["state"] == "generating"
+    generate_overview(record.pk, chunk_set.pk, chunk_set.content_hash, PROMPT_VERSION)
+    return overview_for(record)
 
 
 class _FailingEmbedder(EmbeddingProvider):
@@ -107,7 +121,7 @@ class WholePaperAssemblyTests:
         llm = ScriptedLLM(reply="An account [1].")
 
         with use_composition_root(_root(llm)):
-            overview_for(paper)
+            _generate_overview(paper)
 
         prompt = _prompt(llm)
         positions = [prompt.index(word) for word in ("FIRST", "SECOND", "THIRD")]
@@ -117,17 +131,18 @@ class WholePaperAssemblyTests:
         llm = ScriptedLLM(reply="An account [1].")
 
         with use_composition_root(_root(llm)):
-            overview_for(paper)
+            _generate_overview(paper)
 
         prompt = _prompt(llm)
         assert "STALE" not in prompt
         assert "DELETED" not in prompt
 
-    def test_a_marker_resolves_to_the_chunk_assembled_at_that_number(self, paper):
-        llm = ScriptedLLM(reply="The gauge network is sparse [3].")
+    def test_a_marker_resolves_to_the_chunk_on_that_page(self, paper):
+        # Was chunk number 3; a marker names a page as of IR-434.
+        llm = ScriptedLLM(reply="The gauge network is sparse [p. 9].")
 
         with use_composition_root(_root(llm)):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         [citation] = result["overview"]["citations"]
         third = paper.chunks[2]
@@ -140,7 +155,7 @@ class NoRetrievalTests:
         self, paper
     ):
         with use_composition_root(_root(ScriptedLLM(reply="An account [1]."))):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         assert result["state"] == "ready"
 
@@ -150,7 +165,7 @@ class ReusedSeamsTests:
         root = _root(ScriptedLLM(reply="An account [1]."))
 
         with use_composition_root(root):
-            overview_for(paper)
+            _generate_overview(paper)
 
         assert root.tasks == [InferenceTask.SUMMARY]
 
@@ -164,6 +179,20 @@ class ReusedSeamsTests:
         assert llm.calls == []
         assert not RecordOverview.objects.filter(record=paper).exists()
 
+    def test_a_gate_that_refuses_after_the_claim_still_calls_no_model(self, paper):
+        llm = ScriptedLLM(reply="An account [1].")
+        chunk_set = ChunkSet.objects.get(record=paper, is_active=True)
+        with use_composition_root(_root(llm)):
+            assert overview_for(paper)["state"] == "generating"
+
+        with use_composition_root(_root(llm, permits=lambda record: False)):
+            generate_overview(
+                paper.pk, chunk_set.pk, chunk_set.content_hash, PROMPT_VERSION
+            )
+
+        assert llm.calls == []
+        assert RecordOverview.objects.get(record=paper).state == "unavailable"
+
 
 class PromptVersionTests:
     def test_a_row_stored_under_the_previous_version_is_regenerated(self, paper):
@@ -174,7 +203,64 @@ class PromptVersionTests:
         llm = ScriptedLLM(reply="From the whole paper [1].")
 
         with use_composition_root(_root(llm)):
-            result = overview_for(paper)
+            result = _generate_overview(paper)
 
         assert len(llm.calls) == 1
         assert result["overview"]["text"] == "From the whole paper [1]."
+
+
+class ComprehensiveSkeletonTests:
+    """IR-433: a structured account replaces two paragraphs of prose."""
+
+    def _sent(self, paper):
+        llm = ScriptedLLM(reply="An account [1].")
+        with use_composition_root(_root(llm)):
+            _generate_overview(paper)
+        [(system, user)] = llm.calls
+        return system, user
+
+    def test_the_question_names_the_four_sections_as_level_two_headings(self, paper):
+        _system, user = self._sent(paper)
+
+        for heading in ("Objectives", "Methodology", "Key findings",
+                        "Limitations and scope"):
+            assert f"## {heading}" in user
+        assert "###" not in user
+        assert "flowing prose" not in user
+
+    def test_the_question_carries_the_omission_rule(self, paper):
+        _system, user = self._sent(paper)
+
+        assert "Omit any section the paper does not support" in user
+
+    def test_the_closing_separates_demonstrated_from_suggested(self, paper):
+        _system, user = self._sent(paper)
+
+        assert "demonstrates" in user and "suggests" in user
+
+    def test_presentation_rules_are_inherited_not_restated(self, paper):
+        from apps.ai.answers.citations import PRESENTATION_RULES
+        from apps.ai.overview.pages import SYSTEM_PROMPT
+
+        system, user = self._sent(paper)
+
+        # The overview's own page-citing prompt since IR-434, same rules.
+        assert system == SYSTEM_PROMPT
+        assert PRESENTATION_RULES in system
+        assert PRESENTATION_RULES not in user
+        assert "LaTeX" not in user
+
+    @pytest.mark.parametrize("version", [2, 3])
+    def test_a_row_from_the_two_paragraph_question_is_stale(self, paper, version):
+        RecordOverview.objects.create(
+            record=paper, text="Two short paragraphs.", citations=[],
+            content_hash="new-hash", prompt_version=version,
+        )
+        llm = ScriptedLLM(reply="## Objectives\n\nForecasting [1].")
+
+        with use_composition_root(_root(llm)):
+            result = _generate_overview(paper)
+
+        assert len(llm.calls) == 1
+        assert result["overview"]["text"] == "## Objectives\n\nForecasting [1]."
+        assert RecordOverview.objects.get(record=paper).prompt_version == PROMPT_VERSION

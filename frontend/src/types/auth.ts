@@ -30,6 +30,19 @@ export interface User {
    * else's, so it is optional here.
    */
   review_access?:  ReviewAccess;
+  /**
+   * The user's latest role request while they have no role (IR-537): what the
+   * pending screen reads to tell waiting from declined. `null` once a role is
+   * held, or when nothing was asked for. Own payload only, like
+   * `review_access`, and read by nothing but `PendingApprovalPage`.
+   */
+  role_request?:   OwnRoleRequest | null;
+}
+
+export interface OwnRoleRequest {
+  status:         "pending" | "declined";
+  /** The role asked for at registration: Student or Adviser. */
+  requested_role: RoleName;
 }
 
 export interface ReviewAccess {
@@ -59,6 +72,8 @@ export interface RegisterPayload {
   last_name:        string;
   password:         string;
   confirm_password: string;
+  /** Required by the register serializer: the registrant agreed to the data notice (IR-540). */
+  consent_given:    true;
   /** "Student" or "Adviser" */
   role_name?:       string;
   /** Student: course FK id */

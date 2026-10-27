@@ -74,6 +74,7 @@ def _request_for(endpoint, embedder, space, client_for) -> dict:
 
 @override_settings(
     AI_EVIDENCE_DECISION="off",
+    AI_RESEARCH_LANE="off",
     AI_QUESTION_RESOLUTION_ENABLED=False,
     AI_CONVERSATION_MEMORY_ENABLED=False,
     LLM_TEMPERATURE=0.1,

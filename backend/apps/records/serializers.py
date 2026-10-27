@@ -26,6 +26,16 @@ class RecordOwnerSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "email", "full_name", "is_primary"]
 
 
+def ai_hook(record):
+    """The Overview's one-sentence hook for a catalogue card (IR-604), or None.
+
+    Lazy import: `apps.ai` imports `Record`.
+    """
+    from apps.ai.overview.service import hook_for
+
+    return hook_for(record)
+
+
 class RecordListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list views and DataTable."""
     classification_name = serializers.CharField(source="classification.name", read_only=True)
@@ -33,6 +43,15 @@ class RecordListSerializer(serializers.ModelSerializer):
     authors             = AuthorSerializer(many=True, read_only=True)
     # Annotated by RecordViewSet.get_queryset; 0 when the queryset omits it.
     file_count          = serializers.IntegerField(read_only=True, default=0)
+    has_manuscript      = serializers.SerializerMethodField()
+
+    def get_has_manuscript(self, obj):
+        return bool(obj.abstract_file or getattr(obj, "file_count", 0))
+
+    ai_hook             = serializers.SerializerMethodField()
+
+    def get_ai_hook(self, obj):
+        return ai_hook(obj)
 
     class Meta:
         model  = Record
@@ -40,8 +59,63 @@ class RecordListSerializer(serializers.ModelSerializer):
             "id", "title", "abstract", "year_accomplished", "classification_name",
             "record_type_name", "pipeline_status", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
-            "access_count", "file_count", "created_at", "authors",
+            "access_count", "file_count", "has_manuscript", "created_at", "authors", "ai_hook",
         ]
+
+
+class MyResearchSerializer(serializers.ModelSerializer):
+    """
+    `/records/mine/`: what a *My research* card shows, and nothing else
+    (IR-410; spec §4.9 as amended 2026-10-11). The status line is
+    `workflow_state_label`, the next step comes from `workflow_state`, and My
+    Library groups the list by `holders`, so the client derives no stage.
+
+    `context["workflow_facts"]` holds every listed record's facts, worked out
+    in one pass by `tracker.workflow_facts`, so the list's query count does
+    not grow with its length. Record detail's viewer-dependent blocks stay
+    on detail.
+    """
+    record_type_name     = serializers.CharField(source="record_type.name", read_only=True)
+    authors              = AuthorSerializer(many=True, read_only=True)
+    adviser_name         = serializers.SerializerMethodField()
+    workflow_state       = serializers.SerializerMethodField()
+    workflow_state_label = serializers.SerializerMethodField()
+    # Who has the record now: `[{party, label}]`, in tracker order.
+    holders              = serializers.SerializerMethodField()
+    # `[{office, label, preserved}]`: each office that has cleared it, and
+    # whether that clearance was kept through a resubmission (ADR-003).
+    cleared_offices      = serializers.SerializerMethodField()
+
+    def _facts(self, obj):
+        return self.context["workflow_facts"][obj.pk]
+
+    def get_adviser_name(self, obj):
+        if obj.adviser:
+            return obj.adviser.get_full_name() or obj.adviser.email
+        return None
+
+    def get_workflow_state(self, obj):
+        return self._facts(obj)["workflow_state"]
+
+    def get_workflow_state_label(self, obj):
+        from apps.reviews.tracker import record_state_label
+
+        return record_state_label(obj, self.get_workflow_state(obj))
+
+    def get_holders(self, obj):
+        return self._facts(obj)["holders"]
+
+    def get_cleared_offices(self, obj):
+        return self._facts(obj)["cleared_offices"]
+
+    class Meta:
+        model  = Record
+        fields = [
+            "id", "title", "record_type_name", "authors", "adviser_name",
+            "pipeline_status", "workflow_state", "workflow_state_label",
+            "holders", "cleared_offices", "created_at", "updated_at",
+        ]
+        read_only_fields = fields
 
 
 class RecordDetailSerializer(serializers.ModelSerializer):
@@ -57,6 +131,14 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     classification_name = serializers.CharField(source="classification.name", read_only=True)
     record_type_name    = serializers.CharField(source="record_type.name", read_only=True)
     file_count          = serializers.SerializerMethodField()
+    has_manuscript      = serializers.SerializerMethodField()
+
+    def get_has_manuscript(self, obj):
+        from .download_service import has_record_download_file
+
+        return has_record_download_file(obj)
+
+    ai_hook             = serializers.SerializerMethodField()
     # Paper View's byline credits the adviser by name (IR-472). It rides on
     # the record's own visibility: whoever may read the record may read this.
     adviser_name   = serializers.SerializerMethodField()
@@ -287,6 +369,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             latest_decline_stage=latest_decline.stage if latest_decline else None,
         )
 
+    def get_ai_hook(self, obj):
+        return ai_hook(obj)
+
     def get_file_count(self, obj):
         return obj.files.count()
 
@@ -340,7 +425,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "id", "title", "abstract", "abstract_file",
             "year_accomplished", "year_completed",
             "classification", "psced", "record_type",
-            "classification_name", "record_type_name", "file_count",
+            "classification_name", "record_type_name", "file_count", "has_manuscript", "ai_hook",
             "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",

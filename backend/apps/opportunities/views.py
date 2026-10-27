@@ -34,6 +34,19 @@ class OpportunityViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), IsOpportunityPoster()]
         return super().get_permissions()
 
+    def list(self, request, *args, **kwargs):
+        """
+        The page, plus whether this viewer may post (IR-530).
+
+        `can_post` sits beside the results rather than in a separate endpoint so
+        the board learns it from the request it already makes. It is decided by
+        `IsOpportunityPoster.has_permission`, the same check `create` runs, so
+        the button and the endpoint cannot disagree.
+        """
+        response = super().list(request, *args, **kwargs)
+        response.data["can_post"] = IsOpportunityPoster().has_permission(request, self)
+        return response
+
     def perform_create(self, serializer):
         serializer.save(posted_by=self.request.user)
 

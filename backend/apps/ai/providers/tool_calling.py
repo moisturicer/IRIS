@@ -55,6 +55,18 @@ class ToolCall:
 
 
 @dataclass(frozen=True)
+class ContinuationArtifact:
+    """An opaque vendor artifact to send back unchanged (IR-595).
+
+    `field` is the message field it travels in. The payload is never read,
+    rendered, logged or joined into any text; `repr` hides it.
+    """
+
+    field: str
+    payload: Any = field(repr=False, default=None)
+
+
+@dataclass(frozen=True)
 class ToolCompletion:
     """What a tool-offering call returned: text, reasoning and raw calls.
 
@@ -69,6 +81,11 @@ class ToolCompletion:
     #: Vendor-reported token counts, or `None` when the vendor said nothing.
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
+    #: A vendor-supplied reasoning summary: a private candidate for the
+    #: answer composer's own validation, never shown as received (IR-595).
+    provider_summary: str = ""
+    #: Opaque artifacts the vendor requires back on the next request.
+    continuation: tuple[ContinuationArtifact, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -87,10 +104,12 @@ class AssistantMessage:
 
     text: str = ""
     tool_calls: tuple[ToolCall, ...] = ()
+    continuation: tuple[ContinuationArtifact, ...] = ()
 
     @classmethod
     def from_completion(cls, completion: ToolCompletion) -> "AssistantMessage":
-        return cls(text=completion.text, tool_calls=completion.tool_calls)
+        return cls(text=completion.text, tool_calls=completion.tool_calls,
+                   continuation=completion.continuation)
 
 
 @dataclass(frozen=True)

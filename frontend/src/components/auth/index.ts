@@ -7,3 +7,4 @@ export { ProtectedRoute } from "./ProtectedRoute";
 export { ForbiddenScreen } from "./ForbiddenScreen";
 export { AuthLayout } from "./AuthLayout";
 export { AuthBrandPanel, AuthFormBrandMark } from "./AuthBrandPanel";
+export type { AuthPanelVariant } from "./AuthBrandPanel";

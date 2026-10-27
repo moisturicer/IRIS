@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
-import { nextTrapFocus, tabbableWithin } from "@/lib/focusTrap";
+import { useId, useRef, type ReactNode } from "react";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 interface ModalProps {
   open:     boolean;
@@ -30,74 +30,13 @@ export function Modal({
   displayTitle = false,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  // The element that had focus when the dialog opened, so it can be given focus
-  // back on close. Without this, closing drops focus to <body> and a keyboard
-  // user restarts from the top of the page.
-  const triggerRef = useRef<HTMLElement | null>(null);
   // `useId` rather than a literal "modal-title": two dialogs mounted at once
   // (a confirm on top of a form) would otherwise share one id, and
   // `aria-labelledby` would resolve to whichever rendered first.
   const titleId = useId();
 
-  // Close on Escape key
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  // Move focus into the panel on open, and restore it to the trigger on close.
-  useEffect(() => {
-    if (!open) return;
-
-    const active = document.activeElement;
-    // A modal opened programmatically (a route effect, a toast action) leaves
-    // <body> as the active element. Recording it would make the restore a
-    // silent no-op -- body.focus() does nothing -- while looking like it worked.
-    triggerRef.current =
-      active instanceof HTMLElement && active !== document.body ? active : null;
-
-    const panel = panelRef.current;
-    if (panel) {
-      // Prefer the first real control; fall back to the panel, which carries
-      // tabIndex={-1} so a dialog of pure text is still announced and still
-      // takes Escape.
-      const [first] = tabbableWithin(panel);
-      (first ?? panel).focus();
-    }
-
-    return () => {
-      // `isConnected` guards the case where the trigger itself was unmounted by
-      // whatever the dialog did -- focusing a detached node silently sends focus
-      // to <body>, which is the bug this restore exists to prevent.
-      const trigger = triggerRef.current;
-      if (trigger && trigger.isConnected) trigger.focus();
-      triggerRef.current = null;
-    };
-  }, [open]);
-
-  // Keep Tab inside the panel.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return;
-      const panel = panelRef.current;
-      if (!panel) return;
-
-      const focusables = tabbableWithin(panel);
-      const current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      const next = nextTrapFocus(focusables, current, e.shiftKey);
-      // A null target means there is nothing to trap onto; let Tab through
-      // rather than stranding the user in a dialog with no exit.
-      if (!next) return;
-
-      e.preventDefault();
-      next.focus();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open]);
+  // Escape, focus in, Tab kept inside, focus restored on close (IR-158).
+  useDialogFocus(open, panelRef, onClose);
 
   if (!open) return null;
 
@@ -115,8 +54,8 @@ export function Modal({
         tabIndex={-1}
         className={
           sheet
-            ? `relative bg-white shadow-xl w-full h-full md:h-auto md:rounded-xl ${size} md:max-h-[90vh] flex flex-col outline-none`
-            : `relative bg-white rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`
+            ? `relative bg-overlay shadow-xl w-full h-full md:h-auto md:rounded-xl ${size} md:max-h-[90vh] flex flex-col outline-none`
+            : `relative bg-overlay rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`
         }
         role="dialog"
         aria-modal="true"

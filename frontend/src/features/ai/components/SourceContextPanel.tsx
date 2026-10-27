@@ -32,20 +32,18 @@ interface SourceContextPanelProps {
  * answer text carry citation detail now, this is just a reference list.
  */
 export function SourceContextPanel({ open, citations, sources, onClose }: SourceContextPanelProps) {
-  const cardFor = (recordId: number) => sources.find((s) => s.id === recordId);
-
   return (
     <aside
       // Collapses by width, matching `ConversationSidebar`'s own transition,
       // rather than mounting/unmounting instantly.
-      className={`shrink-0 flex flex-col border-l border-stone-200/80 bg-stone-50/50
+      className={`shrink-0 flex flex-col border-l border-stone-200/80 bg-canvas
         overflow-hidden transition-[width] duration-200 ease-out
         ${open ? "w-[min(100%,320px)] sm:w-[300px]" : "w-0 border-l-0 invisible"}`}
       aria-label="Referenced passages"
       aria-hidden={!open}
     >
       <div className="w-[min(100vw,320px)] sm:w-[300px] flex flex-col h-full">
-      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60 bg-white">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60">
         <div>
           <h2 className="text-[14px] font-bold text-stone-800">Referenced passages</h2>
           <p className="text-[12px] text-stone-500 mt-0.5">
@@ -62,49 +60,62 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5">
-        {citations.length === 0 && (
-          <p className="text-[14px] text-stone-500 text-center py-8 px-2">
-            Ask a question to see the passages IRIS used in its answer.
-          </p>
-        )}
-
-        {citations.map((citation) => {
-          const card = cardFor(citation.record_id);
-          const hasQuote = hasCitationQuote(citation);
-
-          return (
-            <article
-              key={`${citation.chunk_id}-${citation.marker}`}
-              className="pb-2.5 border-b border-stone-100 last:border-b-0 last:pb-0"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="text-[14px] font-semibold text-stone-900 leading-snug line-clamp-2">
-                  <span aria-hidden className="text-[#6B0F12] mr-1">[{citation.marker}]</span>
-                  {card?.title ?? (hasQuote ? citation.record_title : "Source")}
-                </h3>
-                {citation.page != null && (
-                  <span className="shrink-0 text-[11px] font-semibold text-stone-400">
-                    Page {citation.page}
-                  </span>
-                )}
-              </div>
-              {card?.authors && (
-                <p className="text-[12px] text-stone-500 mt-0.5 line-clamp-1">{card.authors}</p>
-              )}
-
-              {hasQuote && <PassageQuote text={citation.text} className="mt-1" />}
-
-              <OpenPassageLink
-                citation={citation}
-                title={card?.title ?? (hasQuote ? undefined : "the source")}
-                className="mt-1.5"
-              />
-            </article>
-          );
-        })}
-      </div>
+      <SourcePassages citations={citations} sources={sources} />
       </div>
     </aside>
+  );
+}
+
+/**
+ * The passages one answer cited, quote first and then whose work it is.
+ * Beside the answer on a wide page, and in the sources drawer on a phone
+ * (IR-570), so the two cannot show them differently.
+ */
+export function SourcePassages({ citations, sources }: Pick<SourceContextPanelProps, "citations" | "sources">) {
+  const cardFor = (recordId: number) => sources.find((s) => s.id === recordId);
+
+  return (
+    <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5">
+      {citations.length === 0 && (
+        <p className="text-[14px] text-stone-500 text-center py-8 px-2">
+          Ask a question to see the passages IRIS used in its answer.
+        </p>
+      )}
+
+      {citations.map((citation) => {
+        const card = cardFor(citation.record_id);
+        const hasQuote = hasCitationQuote(citation);
+
+        return (
+          <article
+            key={`${citation.chunk_id}-${citation.marker}`}
+            className="pb-2.5 border-b border-stone-100 last:border-b-0 last:pb-0"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-[14px] font-semibold text-stone-900 leading-snug line-clamp-2">
+                <span aria-hidden className="text-[#6B0F12] mr-1">[{citation.marker}]</span>
+                {card?.title ?? (hasQuote ? citation.record_title : "Source")}
+              </h3>
+              {citation.page != null && (
+                <span className="shrink-0 text-[11px] font-semibold text-stone-400">
+                  Page {citation.page}
+                </span>
+              )}
+            </div>
+            {card?.authors && (
+              <p className="text-[12px] text-stone-500 mt-0.5 line-clamp-1">{card.authors}</p>
+            )}
+
+            {hasQuote && <PassageQuote text={citation.text} className="mt-1" />}
+
+            <OpenPassageLink
+              citation={citation}
+              title={card?.title ?? (hasQuote ? undefined : "the source")}
+              className="mt-1.5"
+            />
+          </article>
+        );
+      })}
+    </div>
   );
 }

@@ -134,6 +134,12 @@ DATABASES = {
         "PORT": config("DB_PORT", default="5432"),
     }
 }
+# IR-545 (ADR-041): the same database on its own connection. A provider
+# reservation must commit the moment it is made -- even when its caller is
+# inside a transaction (a queued run writing its Turn embeds the answer) --
+# or no other process sees it, and the campaign row's lock is held for the
+# length of a vendor call. Only `apps.ai.admission` uses this alias.
+DATABASES["admission"] = {**DATABASES["default"], "TEST": {"MIRROR": "default"}}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -176,6 +182,9 @@ REST_FRAMEWORK = {
         "anon": "100/day",
         "user": "1000/day",
         "ai_query": "60/hour",
+        # A page view reads a cached overview and polls while one is made: a
+        # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
+        "ai_overview": "600/hour",
     },
 }
 
@@ -260,6 +269,8 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
+    "apps.ai.tasks.generate_record_overview": {"queue": "embedding"},
+    "apps.ai.tasks.generate_paper_brief": {"queue": "embedding"},
     # IR-466: its own concurrency-1 worker, apart from reader work.
     "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
 }
@@ -433,6 +444,9 @@ LLM_ANSWER_FALLBACK_MODELS = config("LLM_ANSWER_FALLBACK_MODELS", default="")
 LLM_ANSWER_REASONING = config("LLM_ANSWER_REASONING", default=True, cast=bool)
 LLM_ANSWER_PROVIDER_ONLY = config("LLM_ANSWER_PROVIDER_ONLY", default="")
 LLM_ANSWER_PROVIDER_PINS = config("LLM_ANSWER_PROVIDER_PINS", default="")
+# Verified model context windows for full-paper briefs. Unknown windows refuse
+# brief generation; answer requests retain their existing behavior.
+LLM_ANSWER_CONTEXT_WINDOWS = config("LLM_ANSWER_CONTEXT_WINDOWS", default="")
 
 # Question resolution runs here as of IR-383, and the old LLM_RESOLUTION_MODEL
 # namespace is gone -- the contradiction recorded here is resolved, not
@@ -479,6 +493,22 @@ AI_SCREEN_DUPLICATE_MIN_SIMILARITY = config("AI_SCREEN_DUPLICATE_MIN_SIMILARITY"
 # research. UNTUNED -- the AI track sets it against real proposals once
 # indexing is unblocked (IR-250).
 AI_NOVELTY_MIN_SIMILARITY = config("AI_NOVELTY_MIN_SIMILARITY", default=0.70, cast=float)
+# IR-546: screening batches in flight at once, passages read for an uncertain
+# paper, and uncertain papers rechecked. Initial pilot values, not measured.
+AI_SCREEN_CONCURRENCY = config("AI_SCREEN_CONCURRENCY", default=3, cast=int)
+AI_SCREEN_RECHECK_PASSAGES = config("AI_SCREEN_RECHECK_PASSAGES", default=2, cast=int)
+AI_SCREEN_RECHECK_MAX_RECORDS = config("AI_SCREEN_RECHECK_MAX_RECORDS", default=5, cast=int)
+# IR-546: hard deadline for an ordinary listing, from the start of its workflow.
+AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS = config(
+    "AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS", default=30.0, cast=float
+)
+# IR-547: remember a reader's own screening verdicts so a repeat is not sent to
+# the model again. Per reader only: cross-user sharing is a count channel
+# (ADR-027 §3, ADR-038) and is not built until a person approves it. Off until
+# someone with authority enables it and sets the policy version, which belongs
+# in every key so a changed approval stops old verdicts being reused.
+AI_SCREEN_CACHE = config("AI_SCREEN_CACHE", default=False, cast=bool)
+AI_SCREEN_CACHE_POLICY = config("AI_SCREEN_CACHE_POLICY", default="")
 
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
@@ -488,6 +518,59 @@ LLM_ROUTE_FALLBACK_MODELS = config("LLM_ROUTE_FALLBACK_MODELS", default="")
 LLM_ROUTE_REASONING = config("LLM_ROUTE_REASONING", default=False, cast=bool)
 LLM_ROUTE_PROVIDER_ONLY = config("LLM_ROUTE_PROVIDER_ONLY", default="")
 LLM_ROUTE_PROVIDER_PINS = config("LLM_ROUTE_PROVIDER_PINS", default="")
+# off | staff | on (IR-504): staff routes office staff only, ahead of readers.
+AI_RESEARCH_LANE = config("AI_RESEARCH_LANE", default="off")
+# IR-544: when on, EVERY `/ask/stream/` question asked inside a Conversation,
+# from any client, is answered by a worker on `default` and can be resumed.
+# Off until IR-545's queue sizing and spend gates are approved (fixed-workflow
+# pilot README §6).
+AI_DURABLE_ASK = config("AI_DURABLE_ASK", default=False, cast=bool)
+# Fixed at submission and never moved by a redelivery (pilot contract §1).
+AI_DURABLE_ASK_DEADLINE_SECONDS = config("AI_DURABLE_ASK_DEADLINE_SECONDS", default=30, cast=int)
+# How long past its deadline an unfinished run waits before a reader expires it.
+AI_DURABLE_ASK_STALE_SECONDS = config("AI_DURABLE_ASK_STALE_SECONDS", default=30, cast=int)
+# How often a following stream checks the journal for new events.
+AI_DURABLE_ASK_POLL_SECONDS = config("AI_DURABLE_ASK_POLL_SECONDS", default=0.25, cast=float)
+
+# IR-545 (ADR-041): every paid provider attempt is admitted against shared
+# limits held in Postgres, or refused. `off` admits nothing and checks
+# nothing (today's behaviour); `enforce` checks every attempt. Django refuses
+# to start with AI_DURABLE_ASK on and this off.
+#
+# FAIL CLOSED: none of the limits below has a default. Under `enforce`, an
+# unset limit refuses paid work rather than guessing a number. No value has
+# been approved (fixed-workflow pilot README §6); the ones in .env.example are
+# the proposed campaign's, for illustration only.
+AI_PROVIDER_ADMISSION = config("AI_PROVIDER_ADMISSION", default="off")
+AI_ADMISSION_CAMPAIGN = config("AI_ADMISSION_CAMPAIGN", default="")
+AI_ADMISSION_CAMPAIGN_MAX_ATTEMPTS = config("AI_ADMISSION_CAMPAIGN_MAX_ATTEMPTS", default="")
+AI_ADMISSION_CAMPAIGN_MAX_INPUT_TOKENS = config("AI_ADMISSION_CAMPAIGN_MAX_INPUT_TOKENS", default="")
+AI_ADMISSION_CAMPAIGN_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_CAMPAIGN_MAX_OUTPUT_TOKENS", default="")
+AI_ADMISSION_CAMPAIGN_MAX_COST_USD = config("AI_ADMISSION_CAMPAIGN_MAX_COST_USD", default="")
+AI_ADMISSION_CAMPAIGN_MAX_ACTIVE_MINUTES = config("AI_ADMISSION_CAMPAIGN_MAX_ACTIVE_MINUTES", default="")
+# The protected share of every campaign limit, kept back until the budget
+# owner releases it by setting AI_ADMISSION_RESERVE_RELEASED.
+AI_ADMISSION_RESERVE_FRACTION = config("AI_ADMISSION_RESERVE_FRACTION", default="")
+AI_ADMISSION_RESERVE_RELEASED = config("AI_ADMISSION_RESERVE_RELEASED", default=False, cast=bool)
+AI_ADMISSION_RUN_MAX_ATTEMPTS = config("AI_ADMISSION_RUN_MAX_ATTEMPTS", default="")
+AI_ADMISSION_RUN_MAX_INPUT_TOKENS = config("AI_ADMISSION_RUN_MAX_INPUT_TOKENS", default="")
+AI_ADMISSION_RUN_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_RUN_MAX_OUTPUT_TOKENS", default="")
+AI_ADMISSION_RUN_MAX_COST_USD = config("AI_ADMISSION_RUN_MAX_COST_USD", default="")
+# JSON object: lane -> attempts in flight at once, e.g. {"chat": 8, "research": 3}.
+# A lane it does not name is refused.
+AI_ADMISSION_LANE_CONCURRENCY = config("AI_ADMISSION_LANE_CONCURRENCY", default="")
+# Attempts in flight at once on any one vendor account, whatever the lane.
+AI_ADMISSION_ACCOUNT_CONCURRENCY = config("AI_ADMISSION_ACCOUNT_CONCURRENCY", default="")
+# JSON object: model -> {"input": US$ per million tokens, "output": ...}.
+# A model it does not price is refused.
+AI_ADMISSION_PRICES = config("AI_ADMISSION_PRICES", default="")
+# The completion cap sent with every chat-model attempt, and reserved for it.
+AI_ADMISSION_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_MAX_OUTPUT_TOKENS", default="")
+# Queued questions waiting or running at once, and per asker.
+AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
+AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
+# Added to an attempt's own timeout to make its lease. Not a spending limit.
+AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)
@@ -646,6 +729,8 @@ AI_MEMORY_ANSWER_VECTOR_ENABLED = config(
 # owns reconciling the sources half against that total, and bounding the
 # recall half if it chooses to.
 AI_HISTORY_TOKEN_BUDGET = config("AI_HISTORY_TOKEN_BUDGET", default=3000, cast=int)
+# Older questions listed beside the verbatim window, with their cited ids (IR-592).
+AI_HISTORY_EARLIER_TOKEN_BUDGET = config("AI_HISTORY_EARLIER_TOKEN_BUDGET", default=500, cast=int)
 
 # Safety margin on every count made against the budget above. Mirrored by
 # apps.ai.history.DEFAULT_TOKEN_MARGIN.
@@ -727,6 +812,26 @@ AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
 )
 # Tokens one read_record_sections call may return (ADR-038 §2).
 AI_RESEARCH_READ_TOKEN_CAP = config("AI_RESEARCH_READ_TOKEN_CAP", default=3000, cast=int)
+
+# ---- Conversational controller limits (IR-593, spec §7) -------------------
+# No defaults: unset, the controller refuses (fail closed). Tests use
+# `apps.ai.controller.budget.FAKE_TEST_PROFILE`, never production numbers.
+def _optional(cast):
+    return lambda value: None if value in ("", None) else cast(value)
+
+
+AI_CONTROLLER_MAX_ROUNDS = config("AI_CONTROLLER_MAX_ROUNDS", default="", cast=_optional(int))
+AI_CONTROLLER_MAX_TOOL_CALLS = config("AI_CONTROLLER_MAX_TOOL_CALLS", default="", cast=_optional(int))
+AI_CONTROLLER_MAX_CONCURRENT_READS = config(
+    "AI_CONTROLLER_MAX_CONCURRENT_READS", default="", cast=_optional(int)
+)
+AI_CONTROLLER_REPAIR_ATTEMPTS = config("AI_CONTROLLER_REPAIR_ATTEMPTS", default="", cast=_optional(int))
+AI_CONTROLLER_ANSWER_RESERVE_TOKENS = config(
+    "AI_CONTROLLER_ANSWER_RESERVE_TOKENS", default="", cast=_optional(int)
+)
+AI_CONTROLLER_ANSWER_RESERVE_SECONDS = config(
+    "AI_CONTROLLER_ANSWER_RESERVE_SECONDS", default="", cast=_optional(float)
+)
 # ADR-027 §1d: corpus_facets refuses below this many visible records. The
 # ADR sets no value; this default is a placeholder until a corpus exists.
 AI_LANDSCAPE_MIN_RECORDS = config("AI_LANDSCAPE_MIN_RECORDS", default=20, cast=int)
@@ -849,6 +954,17 @@ AI_EMBEDDING_TOKEN_CEILING = config(
 AI_OVERVIEW_TOKEN_CEILING = config(
     "AI_OVERVIEW_TOKEN_CEILING", default=100_000, cast=int
 )
+# Full-paper briefs remain off pending acceptance of their proposed ADR.
+# Generation additionally requires enforced shared provider admission.
+AI_PAPER_BRIEFS_ENABLED = config("AI_PAPER_BRIEFS_ENABLED", default=False, cast=bool)
+# Full-reading comparisons are opt-in while their governing proposals await approval.
+AI_COMPARISON_ENABLED = config("AI_COMPARISON_ENABLED", default=False, cast=bool)
+AI_COMPARISON_MAX_RECORDS = config("AI_COMPARISON_MAX_RECORDS", default=6, cast=int)
+AI_COMPARISON_DEADLINE_SECONDS = config("AI_COMPARISON_DEADLINE_SECONDS", default=300, cast=int)
+AI_COMPARISON_MAX_ATTEMPTS = config("AI_COMPARISON_MAX_ATTEMPTS", default="")
+AI_COMPARISON_MAX_INPUT_TOKENS = config("AI_COMPARISON_MAX_INPUT_TOKENS", default="")
+AI_COMPARISON_MAX_OUTPUT_TOKENS = config("AI_COMPARISON_MAX_OUTPUT_TOKENS", default="")
+AI_COMPARISON_MAX_COST_USD = config("AI_COMPARISON_MAX_COST_USD", default="")
 # Approximate, and printed as approximate. Vendor pricing is not in this
 # repository's control, so this is a figure for deciding whether a run is
 # worth starting, never a quote. Voyage's contextualized-embedding list price

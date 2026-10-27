@@ -6,7 +6,21 @@ when this module is loaded early in the Django startup cycle.
 
 Design rule: create_audit_event() must NEVER raise.  Audit failures
 must not break the main request/response path.
+
+**Each insert runs in its own savepoint (IR-144).** The workflow services
+call this inside their own `transaction.atomic()`. On PostgreSQL a failed
+INSERT aborts the whole transaction, so swallowing the exception alone is not
+enough: every later statement of the act -- and its commit -- would fail. The
+savepoint rolls back the audit row only, and the act carries on. A failure is
+logged at ERROR with the event type and Record id, because an evaluation event
+that silently goes missing cannot be reconstructed afterwards.
 """
+
+import logging
+
+from django.db import transaction
+
+logger = logging.getLogger(__name__)
 
 
 def create_audit_event(
@@ -21,13 +35,12 @@ def create_audit_event(
     Parameters
     ----------
     event_type : str
-        One of AuditEvent.LOGIN | LOGOUT | FAILED_LOGIN | ACCESS | UPLOAD |
-        DOWNLOAD | DELETE | RENAME | PIN_GENERATED | PIN_VERIFIED |
-        ROLE_CHANGE | ACCOUNT_LOCKED | ACCOUNT_UNLOCKED | SESSION_REVOKE |
-        QUESTION_INJECTION
-        (see AuditEvent.EVENT_TYPE_CHOICES).
+        One of the AuditEvent constants (see AuditEvent.EVENT_TYPE_CHOICES).
+        The workflow types are written through `apps.audit.workflow`, which
+        fixes their metadata keys.
     user       : accounts.User or None
-        The acting user.  Passing None is allowed (anonymous access).
+        The acting user.  Passing None is allowed (anonymous access, or an
+        act IRIS took itself, such as the hand-back to RDCO).
     record     : records.Record or None
         The record this event relates to, if any.
     metadata   : dict or None
@@ -36,12 +49,17 @@ def create_audit_event(
     """
     try:
         from .models import AuditEvent  # local import to break circular deps
-        AuditEvent.objects.create(
-            event_type=event_type,
-            user=user,
-            record=record,
-            metadata=metadata or {},
-        )
+
+        with transaction.atomic():
+            AuditEvent.objects.create(
+                event_type=event_type,
+                user=user,
+                record=record,
+                metadata=metadata or {},
+            )
     except Exception:
         # Audit must never crash the caller.
-        pass
+        logger.exception(
+            "audit event %s for record %s was not written",
+            event_type, getattr(record, "pk", None),
+        )

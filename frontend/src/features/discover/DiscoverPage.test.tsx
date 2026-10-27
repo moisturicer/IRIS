@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Discover, redesigned for the settled workflow (IR-407, F2; spec §4.3).
  *
  * The page finds published research, and lets an author start a submission.
@@ -10,8 +10,8 @@
  * and never calls a Proposal "ongoing research" -- Proposals are not in the
  * public catalogue (ADR-021 §13).
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLocation } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
@@ -58,14 +58,28 @@ const approvedProposal = listItem({
 
 let listed: RecordListItem[] = [publishedThesis];
 let total: number | null = null;
+let recommended: { mode: "for_you" | "latest"; results: (RecordListItem & { reason: { kind: "selected_area" | "latest"; area?: string } })[]; next_cursor: string | null; count: number } = {
+  mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1,
+};
 
 const page = <T,>(results: T[], count = results.length) =>
   Promise.resolve({ data: { results, count } });
 
+const feedPage = (data: Awaited<ReturnType<typeof recordsApi.forYou>>["data"]) =>
+  Promise.resolve({ data } as Awaited<ReturnType<typeof recordsApi.forYou>>);
+
 vi.mock("@/api/records", () => ({
   recordsApi: {
     list: vi.fn(() => page(listed, total ?? listed.length)),
+    forYou: vi.fn(() => Promise.resolve({ data: recommended })),
+    interests: vi.fn(() => Promise.resolve({ data: { classifications: [], psced: [] } })),
+    updateInterests: vi.fn((body: { classification_ids: number[]; psced_ids: number[] }) => Promise.resolve({ data: {
+      classifications: body.classification_ids.map((id) => ({ id, name: "Applied Research" })),
+      psced: body.psced_ids.map((id) => ({ id, name: "Engineering" })),
+    } })),
+    facets: vi.fn(() => Promise.resolve({ data: { years: [2026, 2009] } })),
     classifications: vi.fn(() => page([{ id: 7, name: "Applied Research" }])),
+    pscedList: vi.fn(() => page([{ id: 3, name: "Engineering" }])),
     recordTypes: vi.fn(() =>
       page([
         { id: 1, name: "Thesis/Research" },
@@ -119,12 +133,15 @@ function lastListParams(): Record<string, unknown> {
   return (calls[calls.length - 1]?.[0] ?? {}) as Record<string, unknown>;
 }
 
-/** The desktop filter row: filters are buttons named by what they filter. */
-function filterRow() {
-  return screen.getByRole("group", { name: "Filter research" });
+async function filterSheet() {
+  const open = screen.queryByRole("dialog", { name: "Filters" });
+  if (open) return open;
+  await userEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+  return screen.findByRole("dialog", { name: "Filters" });
 }
 
-async function choose(control: RegExp, option: RegExp, scope = filterRow()) {
+async function choose(control: RegExp, option: RegExp, scope?: HTMLElement) {
+  scope ??= await filterSheet();
   await userEvent.click(within(scope).getByRole("button", { name: control }));
   const list = await screen.findByRole("listbox");
   await userEvent.click(within(list).getByRole("option", { name: option }));
@@ -132,8 +149,11 @@ async function choose(control: RegExp, option: RegExp, scope = filterRow()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
+  localStorage.clear();
   listed = [publishedThesis];
   total = null;
+  recommended = { mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1 };
   signInAs("Student");
 });
 
@@ -148,6 +168,30 @@ describe("the page head", () => {
     expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent("publish=new");
 
     await expectNoBlockingA11yViolations(container);
+  });
+
+  // IR-554: the search box's debounce timer, armed on load and on every
+  // keystroke, used to write back the URL it saw when armed -- so a Publish
+  // click inside its 300ms was erased when it fired.
+  it("keeps the Publish dialog open when the search debounce fires after the click", async () => {
+    renderDiscover();
+
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent("publish=new");
+  });
+
+  it("keeps both a just-typed search and the Publish dialog in the URL", async () => {
+    renderDiscover();
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "rainfall");
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const query = screen.getByRole("status", { name: "Current query" });
+    expect(query).toHaveTextContent("publish=new");
+    expect(query).toHaveTextContent("q=rainfall");
   });
 
   it("shows an Adviser the Publish action too, because an Adviser authors", async () => {
@@ -165,14 +209,135 @@ describe("the page head", () => {
 });
 
 describe("browsing", () => {
-  it("has no saved views, and opens on the newest research", async () => {
+  it("offers For you, Latest, and Trending, opening on the latest catalogue", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    for (const view of ["For you", "Latest", "Theses"]) {
-      expect(screen.queryByRole("tab", { name: view })).not.toBeInTheDocument();
-    }
+    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Latest" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Trending" })).toHaveAttribute("aria-pressed", "false");
     expect(lastListParams()).toMatchObject({ ordering: "-created_at" });
+  });
+
+  it("shows most viewed research in Trending and retains catalogue filters", async () => {
+    renderDiscover("/?type=2");
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "Trending" }));
+    await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-access_count", record_type: "2" }));
+    expect(screen.getByRole("button", { name: "Trending" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent("feed=trending");
+    await userEvent.click(screen.getByRole("button", { name: "Latest" }));
+    await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at", record_type: "2" }));
+  });
+
+  it("defaults to one column and cycles through two and three", async () => {
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    expect(screen.getByRole("button", { name: "1 column; switch to 2" })).toBeInTheDocument();
+    expect(card.parentElement).toHaveClass("grid-cols-1");
+    expect(card.parentElement).not.toHaveClass("md:grid-cols-2");
+    const preview = within(card).getByRole("complementary", { name: "Manuscript and abstract preview" });
+    expect(preview).toHaveTextContent("From the abstract");
+    expect(preview).toHaveTextContent("An abstract.");
+
+    await userEvent.click(screen.getByRole("button", { name: "1 column; switch to 2" }));
+    expect(card.parentElement).toHaveClass("md:grid-cols-2");
+    expect(localStorage.getItem("iris.discover.columns")).toBe("2");
+    expect(within(card).queryByRole("complementary", { name: "Manuscript and abstract preview" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "2 columns; switch to 3" }));
+    expect(card.parentElement).toHaveClass("xl:grid-cols-3");
+
+    await userEvent.click(screen.getByRole("button", { name: "3 columns; switch to 1" }));
+    expect(card.parentElement).not.toHaveClass("md:grid-cols-2");
+  });
+
+  it("keeps filters across feeds, applies them to recommendations, and hides recommendation sorting", async () => {
+    renderDiscover("/?type=1&college=4&year=2026");
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({
+      record_type: "1", college: "4", year_from: "2026", year_to: "2026",
+    })));
+    const forYouFilters = await filterSheet();
+    expect(screen.queryByRole("button", { name: /Sort:/ })).not.toBeInTheDocument();
+    await choose(/^Year/, /^2009$/, forYouFilters);
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2009" })));
+    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Latest" }));
+    await waitFor(() => expect(lastListParams()).toMatchObject({ record_type: "1", college: "4", year_from: "2009" }));
+    expect(within(await filterSheet()).getByRole("button", { name: /^Sort/ })).toBeInTheDocument();
+  });
+
+  it("offers clearing active For you filters when they match no research", async () => {
+    recommended = { mode: "for_you", results: [], next_cursor: null, count: 0 };
+    renderDiscover("/?feed=for_you&year=2009");
+    expect(await screen.findByRole("heading", { name: "No research matches these filters" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, { ordering: "-created_at" }));
+    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("offers personalized results with the API explanation", async () => {
+    recommended = { mode: "for_you", results: [{ ...publishedThesis, reason: { kind: "selected_area", area: "Applied Research" } }], next_cursor: null, count: 1 };
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    expect(await screen.findByText("Because you chose Applied Research")).toBeInTheDocument();
+    expect(vi.mocked(recordsApi.forYou)).toHaveBeenCalled();
+
+  });
+
+  it("keeps a direct For you link selected after the search debounce", async () => {
+    renderDiscover("/?feed=for_you");
+    await screen.findByText(publishedThesis.title);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
+    expect(recordsApi.forYou).toHaveBeenCalledTimes(1);
+  });
+
+  it("truthfully explains that For you is showing Latest until Areas are chosen", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    expect(await screen.findByText(/Choose an Area to get recommendations/)).toBeInTheDocument();
+    expect(await screen.findByText("Latest research")).toBeInTheDocument();
+  });
+
+  it("saves optional classification and PSCED Areas, then opens For you", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "Choose Areas" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByLabelText("Applied Research"));
+    await userEvent.click(within(dialog).getByLabelText("Engineering"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save Areas" }));
+    await waitFor(() => expect(recordsApi.updateInterests).toHaveBeenCalledWith({ classification_ids: [7], psced_ids: [3] }));
+    expect(await screen.findByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("loads another For you page with the cursor", async () => {
+    recommended = { mode: "for_you", results: [{ ...publishedThesis, reason: { kind: "selected_area", area: "Applied Research" } }], next_cursor: "next", count: 2 };
+    vi.mocked(recordsApi.forYou).mockImplementationOnce(() => feedPage(recommended))
+      .mockImplementationOnce(() => feedPage({ ...recommended, results: [{ ...publishedThesis, id: 2, title: "Next result", reason: { kind: "selected_area", area: "Applied Research" } }], next_cursor: null }));
+    renderDiscover("/?feed=for_you");
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: /Load more/ }));
+    expect(await screen.findByText("Next result")).toBeInTheDocument();
+    expect(recordsApi.forYou).toHaveBeenLastCalledWith("next", { ordering: "-created_at" });
+  });
+
+  it("refreshes the personalized list when its cursor has gone stale", async () => {
+    recommended = { mode: "for_you", results: [{ ...publishedThesis, reason: { kind: "selected_area", area: "Applied Research" } }], next_cursor: "stale", count: 2 };
+    vi.mocked(recordsApi.forYou).mockImplementationOnce(() => feedPage(recommended))
+      .mockImplementationOnce(() => Promise.reject({ response: { status: 409, data: { code: "stale_cursor" } } }))
+      .mockImplementationOnce(() => feedPage({ ...recommended, results: [{ ...publishedThesis, reason: { kind: "selected_area", area: "Applied Research" } }], next_cursor: null, count: 1 }));
+    renderDiscover("/?feed=for_you");
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: /Load more/ }));
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalledTimes(3));
+    expect(await screen.findByText(/recommendation list changed/)).toBeInTheDocument();
   });
 
   it("shows no tabs while Research is the only content, so there is no empty Proposals tab", async () => {
@@ -186,17 +351,19 @@ describe("browsing", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await userEvent.click(screen.getByRole("button", { name: /^sort/i }));
+    const sheet = await filterSheet();
+    await userEvent.click(within(sheet).getByRole("button", { name: /^sort/i }));
     await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Most viewed" }));
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-access_count" }));
 
-    await userEvent.click(screen.getByRole("button", { name: /^sort/i }));
+    await userEvent.click(within(sheet).getByRole("button", { name: /^sort/i }));
     await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Newest" }));
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at" }));
   });
 
   it("shows each result's type, title, authors, year and IP, and lets a reader cite it", async () => {
     listed = [listItem({ id: 5, title: "Rice Husk Insulation Panels", is_ip: true, ip_type: "patent" })];
+    localStorage.setItem("iris.discover.columns", "2");
     renderDiscover();
 
     const card = await screen.findByRole("article", { name: "Rice Husk Insulation Panels" });
@@ -224,7 +391,7 @@ describe("browsing", () => {
 });
 
 describe("filtering", () => {
-  it("maps each filter to its query param and shows it as a removable chip", async () => {
+  it("maps each filter to its query param and counts active choices in one control", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
@@ -242,12 +409,8 @@ describe("filtering", () => {
     await choose(/^ip & patents/i, /^has ip$/i);
     await waitFor(() => expect(lastListParams()).toMatchObject({ is_ip: true }));
 
-    const chips = screen.getByRole("list", { name: "Active filters" });
-    for (const chip of ["Project", "College of Engineering", "Applied Research", "Has IP"]) {
-      expect(within(chips).getByRole("button", { name: `Remove filter: ${chip}` })).toBeInTheDocument();
-    }
-
-    await userEvent.click(within(chips).getByRole("button", { name: "Remove filter: Project" }));
+    expect(screen.getByRole("button", { name: "Filters, 4 active" })).toBeInTheDocument();
+    await choose(/^type/i, /^any type$/i);
     await waitFor(() => expect(lastListParams()).not.toHaveProperty("record_type"));
     expect(lastListParams()).toMatchObject({ college: "4", classification: "7", is_ip: true });
   });
@@ -273,7 +436,7 @@ describe("filtering", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await userEvent.click(within(filterRow()).getByRole("button", { name: /^type/i }));
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^type/i }));
     const options = await screen.findByRole("listbox");
     expect(within(options).getByRole("option", { name: /thesis\/research/i })).toBeInTheDocument();
     expect(within(options).queryByRole("option", { name: /proposal/i })).not.toBeInTheDocument();
@@ -284,24 +447,19 @@ describe("filtering", () => {
     await screen.findByText(publishedThesis.title);
     await choose(/^type/i, /^project$/i);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Clear all filters" }));
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: "Clear all" }));
     await waitFor(() => expect(lastListParams()).not.toHaveProperty("record_type"));
-    expect(screen.queryByRole("list", { name: "Active filters" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
   });
 
-  it("opens the filters in a sheet that holds focus, for a phone", async () => {
+  it("opens every filter in one compact panel", async () => {
     const { container } = renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
-    const sheet = await screen.findByRole("dialog", { name: "Filters" });
+    const sheet = await filterSheet();
 
-    // The sheet is modal and takes focus as it opens. Tab cycling itself is
-    // `Modal`'s trap, which jsdom cannot drive: with no layout,
-    // `tabbableWithin` finds nothing to cycle through. It is verified in a
-    // browser instead (see the PR).
-    expect(sheet).toHaveAttribute("aria-modal", "true");
-    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.getByRole("button", { name: "Filters" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(sheet).getByRole("button", { name: "Close filters" })).toBeInTheDocument();
 
     await choose(/^type/i, /^project$/i, sheet);
     await waitFor(() => expect(lastListParams()).toMatchObject({ record_type: "2" }));
@@ -360,5 +518,213 @@ describe("states", () => {
 
     await screen.findByText(approvedProposal.title);
     expect(screen.queryByText(/research ongoing/i)).not.toBeInTheDocument();
+  });
+});
+
+/* ── IR-560: the query survives Back, reload and Load more ─────────────── */
+
+/** A Record page that only offers Back, so a test can leave Discover and return. */
+function RecordStub() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(-1)}>
+      Back to Discover
+    </button>
+  );
+}
+
+function renderDiscoverWithRecords(route = "/") {
+  return renderScreen(
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <>
+            <DiscoverPage />
+            <LocationProbe />
+          </>
+        }
+      />
+      <Route path="/records/:id" element={<RecordStub />} />
+    </Routes>,
+    { route },
+  );
+}
+
+/** The list mock, typed loosely: these fixtures return `{ data }`, not a full response. */
+const listMock = () =>
+  vi.mocked(recordsApi.list) as unknown as MockInstance<(params?: Record<string, unknown>) => Promise<unknown>>;
+
+const secondPagePaper = listItem({ id: 3, title: "Bamboo Truss Load Testing" });
+
+/** page 1 is `listed`; page 2 is the second-page paper. */
+function twoPages() {
+  total = 2;
+  listMock().mockImplementation((params) => {
+    const { page: n, page_size: size } = (params ?? {}) as { page?: number; page_size?: number };
+    if (n === 2) return page([secondPagePaper], 2);
+    // A restored depth asks for both pages at once.
+    return page(size && size > 12 ? [publishedThesis, secondPagePaper] : [publishedThesis], 2);
+  });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+describe("continuity", () => {
+  afterEach(() => {
+    listMock().mockImplementation(() => page(listed, total ?? listed.length));
+  });
+
+  it("restores the search, filters and sort from the URL", async () => {
+    renderDiscover("/?q=rain&type=2&year=2019&sort=viewed");
+
+    await waitFor(() =>
+      expect(lastListParams()).toMatchObject({
+        search: "rain",
+        record_type: "2",
+        year_from: "2019",
+        year_to: "2019",
+        ordering: "-access_count",
+      }),
+    );
+    expect(screen.getByRole("textbox", { name: "Search records" })).toHaveValue("rain");
+    expect(screen.getByRole("button", { name: "Filters, 2 active" })).toBeInTheDocument();
+  });
+
+  it("writes each filter and sort change into the URL", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    await choose(/^type/i, /^project$/i);
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^sort/i }));
+    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Most viewed" }));
+
+    const query = screen.getByRole("status", { name: "Current query" });
+    await waitFor(() => expect(query).toHaveTextContent("type=2"));
+    expect(query).toHaveTextContent("sort=viewed");
+  });
+
+  it("falls back to safe defaults for values it does not recognise, and corrects the URL", async () => {
+    renderDiscover("/?sort=bogus&year=19&type=thesis&college=4,x");
+
+    await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at", college: "4" }));
+    expect(lastListParams()).not.toHaveProperty("year_from");
+    expect(lastListParams()).not.toHaveProperty("record_type");
+    await waitFor(() =>
+      expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?college=4$/),
+    );
+  });
+
+  it("brings back the query and every loaded result after opening a Record and going Back", async () => {
+    twoPages();
+    renderDiscoverWithRecords("/?type=2");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Load more (1 left)" }));
+    await screen.findByText(secondPagePaper.title);
+
+    await userEvent.click(screen.getByRole("link", { name: publishedThesis.title }));
+    await userEvent.click(await screen.findByRole("button", { name: "Back to Discover" }));
+
+    expect(await screen.findByText(secondPagePaper.title)).toBeInTheDocument();
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+    expect(lastListParams()).toMatchObject({ record_type: "2", page: 1, page_size: 24 });
+    expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it("never appends an older page after the filters change", async () => {
+    total = 2;
+    const oldPageTwo = deferred<{ data: { results: RecordListItem[]; count: number } }>();
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    listMock().mockImplementationOnce(() => oldPageTwo.promise);
+    await userEvent.click(screen.getByRole("button", { name: "Load more (1 left)" }));
+
+    const projectPaper = listItem({ id: 8, title: "Solar Dryer for Copra" });
+    listed = [projectPaper];
+    total = 1;
+    await choose(/^type/i, /^project$/i);
+    await screen.findByText(projectPaper.title);
+
+    oldPageTwo.resolve({ data: { results: [listItem({ id: 9, title: "Stale Second Page" })], count: 2 } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText("Stale Second Page")).not.toBeInTheDocument();
+    expect(screen.getByText(projectPaper.title)).toBeInTheDocument();
+  });
+
+  it("offers every year in the catalogue, not only the years of the loaded cards", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^year/i }));
+    const options = await screen.findByRole("listbox");
+    expect(within(options).getByRole("option", { name: "2009" })).toBeInTheDocument();
+  });
+
+  it("recovers the filter choices on their own when they fail to load", async () => {
+    vi.mocked(recordsApi.facets).mockImplementationOnce(() => Promise.reject(new Error("down")));
+    renderDiscover();
+
+    // The results still load: only the filter choices failed.
+    expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Some filters couldn't load");
+
+    await userEvent.click(within(alert).getByRole("button", { name: "Retry filters" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(recordsApi.facets).toHaveBeenCalledTimes(2);
+  });
+
+  it("recovers a failed Load more on its own, keeping the first page", async () => {
+    total = 2;
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    listMock().mockImplementationOnce(() => Promise.reject(new Error("down")));
+    await userEvent.click(screen.getByRole("button", { name: "Load more (1 left)" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("More results didn't load.");
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+
+    listMock().mockImplementationOnce(() => page([secondPagePaper], 2));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText(secondPagePaper.title)).toBeInTheDocument();
+  });
+});
+
+describe("continuity: the search box follows the URL", () => {
+  /** What the sidebar's Discover link does: go to "/" while Discover is open. */
+  function DiscoverLink() {
+    const navigate = useNavigate();
+    return (
+      <button type="button" onClick={() => navigate("/")}>
+        Discover home
+      </button>
+    );
+  }
+
+  it("empties the search box when the URL drops the search", async () => {
+    renderScreen(
+      <>
+        <DiscoverPage />
+        <DiscoverLink />
+      </>,
+      { route: "/?q=robotics" },
+    );
+    const box = screen.getByRole("textbox", { name: "Search records" });
+    expect(box).toHaveValue("robotics");
+
+    await userEvent.click(screen.getByRole("button", { name: "Discover home" }));
+
+    await waitFor(() => expect(box).toHaveValue(""));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(lastListParams()).not.toHaveProperty("search");
   });
 });

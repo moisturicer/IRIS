@@ -7,6 +7,7 @@ the things that *are* rows.
 
 from rest_framework import serializers
 
+from apps.ai import public as public_protocol
 from apps.ai.conversations import turns_for_reader
 from apps.records.models import Record
 
@@ -61,12 +62,24 @@ class ConversationDetailSerializer(ConversationSerializer):
     """
 
     turns = serializers.SerializerMethodField()
+    #: The latest queued run while no Turn shows for it (IR-548), so a reader
+    #: opening the Conversation can follow it again or retry it.
+    latest_run = serializers.SerializerMethodField()
 
     class Meta(ConversationSerializer.Meta):
-        fields = ConversationSerializer.Meta.fields + ["turns"]
+        fields = ConversationSerializer.Meta.fields + ["turns", "latest_run"]
 
     def get_turns(self, conversation):
-        return turns_for_reader(conversation, self.context["request"].user)
+        request = self.context["request"]
+        return turns_for_reader(conversation, request.user, public=public_protocol.requested(request))
+
+    def get_latest_run(self, conversation):
+        from apps.ai.durable import latest_run_for_reader
+
+        run = latest_run_for_reader(conversation)
+        if public_protocol.requested(self.context["request"]):
+            return public_protocol.project_latest_run(run)
+        return run
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

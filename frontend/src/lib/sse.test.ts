@@ -57,6 +57,16 @@ describe("reading Ask IRIS's event stream", () => {
     expect(await collect(response)).toEqual([]);
   });
 
+  it("keeps a queued run's event id and skips keepalive comments (IR-544)", async () => {
+    const response = new Response(
+      streamOf('id: 7\nevent: text_delta\ndata: {"text": "gauges"}\n\n: keepalive\n\n'),
+    );
+
+    expect(await collect(response)).toEqual([
+      { event: "text_delta", data: { text: "gauges" }, id: "7" },
+    ]);
+  });
+
   it("yields nothing when the response carries no body", async () => {
     const response = new Response(null);
 

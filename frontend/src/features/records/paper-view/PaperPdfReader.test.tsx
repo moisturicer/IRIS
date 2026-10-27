@@ -19,6 +19,7 @@ import type { TextRun } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 
 import { PaperPdfReader } from "./PaperPdfReader";
+import { PANE_TOP_PX, READER_TOOLBAR_TOP_PX } from "./paneLayout";
 
 const manuscriptBlob = vi.fn();
 vi.mock("@/api/records", () => ({
@@ -177,9 +178,9 @@ describe("landing on a cited passage (IR-354)", () => {
    * and the pane have neither, so they are reached from what does -- the
    * toolbar is what holds the Download control, the pane what holds both.
    */
-  async function openReader() {
+  async function openReader(contained = false) {
     const view = render(
-      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="opened" />,
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="opened" contained={contained} />,
     );
     await screen.findByText("Page 1 / 3");
     const area = screen.getByRole("region", { name: "Paper, 3 pages" });
@@ -195,13 +196,14 @@ describe("landing on a cited passage (IR-354)", () => {
     rerender: (ui: ReactElement) => void,
     regions: Region[],
     navKey = "followed",
+    contained = false,
   ) {
     rerender(
-      <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={regions} navKey={navKey} />,
+      <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={regions} navKey={navKey} contained={contained} />,
     );
   }
 
-  describe("below lg, where the window scrolls", () => {
+  describe("in a narrower workspace, where the window scrolls", () => {
     let scrollBy: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
@@ -227,9 +229,9 @@ describe("landing on a cited passage (IR-354)", () => {
       follow(rerender, PASSAGE_LOW);
 
       // The region starts at 1500 + 850 = 2350. It lands 48px of context
-      // below the toolbar, which sticks at 122px and is 44px tall.
+      // below the toolbar, which sticks at READER_TOOLBAR_TOP_PX and is 44px tall.
       await waitFor(() =>
-        expect(scrollBy).toHaveBeenCalledWith({ top: 2350 - (122 + 44) - 48, behavior: "smooth" }),
+        expect(scrollBy).toHaveBeenCalledWith({ top: 2350 - (READER_TOOLBAR_TOP_PX + 44) - 48, behavior: "smooth" }),
       );
     });
 
@@ -238,7 +240,7 @@ describe("landing on a cited passage (IR-354)", () => {
       follow(rerender, PASSAGE_HIGH);
 
       await waitFor(() =>
-        expect(scrollBy).toHaveBeenCalledWith({ top: 1520 - (122 + 44) - 48, behavior: "smooth" }),
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1520 - (READER_TOOLBAR_TOP_PX + 44) - 48, behavior: "smooth" }),
       );
     });
 
@@ -247,7 +249,7 @@ describe("landing on a cited passage (IR-354)", () => {
       follow(rerender, []);
 
       await waitFor(() =>
-        expect(scrollBy).toHaveBeenCalledWith({ top: 1500 - (122 + 44) - 16, behavior: "smooth" }),
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1500 - (READER_TOOLBAR_TOP_PX + 44) - 16, behavior: "smooth" }),
       );
     });
 
@@ -282,7 +284,7 @@ describe("landing on a cited passage (IR-354)", () => {
 
       // From where the passage is now: 1456 + 0.85 * 970 = 2280.5.
       await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(2));
-      expect(scrollBy).toHaveBeenLastCalledWith({ top: 2280.5 - (122 + 44) - 48, behavior: "smooth" });
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 2280.5 - (READER_TOOLBAR_TOP_PX + 44) - 48, behavior: "smooth" });
     });
 
     it("does not pull the reader back to the passage for a refit long after landing", async () => {
@@ -309,18 +311,18 @@ describe("landing on a cited passage (IR-354)", () => {
     });
   });
 
-  describe("at lg, inside the contained pane", () => {
+  describe("in a reading-wide workspace, inside the contained pane (IR-569)", () => {
     it("brings the pane to rest below the header, then scrolls the pane to the region", async () => {
-      // The one stub answers every query, reduced motion included.
+      // Reduced motion, so the landing is instant.
       mediaQueryAt(true);
       const windowScrollBy = vi.fn();
       vi.stubGlobal("scrollBy", windowScrollBy);
-      const reader = await openReader();
+      const reader = await openReader(true);
       const paneScrollBy = vi.fn();
       reader.area.scrollBy = paneScrollBy;
 
-      // The pane is 400px down; it rests at 126px, under the header and the
-      // view switch. Its toolbar ends at 444px, its scroll area at 1000px.
+      // The pane is 400px down; it rests at PANE_TOP_PX, under the view
+      // reading header. Its toolbar ends at 444px, its scroll area at 1000px.
       vi.spyOn(reader.pane, "getBoundingClientRect").mockReturnValue(box(400, 600));
       vi.spyOn(reader.toolbar, "getBoundingClientRect").mockReturnValue(box(400, 44));
       vi.spyOn(reader.area, "getBoundingClientRect").mockReturnValue(box(444, 556));
@@ -330,9 +332,9 @@ describe("landing on a cited passage (IR-354)", () => {
         { top: 2492, height: 1000 },
       ]);
 
-      follow(reader.rerender, PASSAGE_LOW);
+      follow(reader.rerender, PASSAGE_LOW, "followed", true);
 
-      await waitFor(() => expect(windowScrollBy).toHaveBeenCalledWith({ top: 400 - 126, behavior: "auto" }));
+      await waitFor(() => expect(windowScrollBy).toHaveBeenCalledWith({ top: 400 - PANE_TOP_PX, behavior: "auto" }));
       // The region starts at 1476 + 850 = 2326; it lands 48px below the
       // pane's toolbar, measured in the pane, so the window's own scroll
       // (which moves both) does not change it.
@@ -371,14 +373,14 @@ describe("zoom controls", () => {
     );
     await screen.findByText("Page 1 / 3");
 
-    expect(screen.getByText("130%")).toBeInTheDocument();
+    expect(screen.getByText("140%")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /zoom in/i }));
-    expect(screen.getByText("150%")).toBeInTheDocument();
+    expect(screen.getByText("160%")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /zoom out/i }));
     await userEvent.click(screen.getByRole("button", { name: /zoom out/i }));
-    expect(screen.getByText("110%")).toBeInTheDocument();
+    expect(screen.getByText("120%")).toBeInTheDocument();
   });
 });
 
@@ -541,13 +543,38 @@ describe("fitting the paper to its pane (IR-352)", () => {
     expect(screen.getByText("200%")).toBeInTheDocument();
   });
 
-  it("keeps the default zoom when the pane cannot be measured", async () => {
+  it("keeps the default zoom, 140%, when the pane cannot be measured", async () => {
     render(
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
     );
 
     await screen.findByText("Page 1 / 3");
-    expect(screen.getByText("130%")).toBeInTheDocument();
+    expect(screen.getByText("140%")).toBeInTheDocument();
+  });
+
+  it("opens at 140% in a pane wide enough for it, with Fit one press away (IR-569)", async () => {
+    // (782 - the page's 2px border) / 300px at scale 1 = 2.6, held to the 240% maximum.
+    measurePaneAs(782);
+    render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+
+    await screen.findByText("Page 1 / 3");
+    expect(screen.getByText("140%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fit to width" })).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Fit to width" }));
+    expect(screen.getByText("240%")).toBeInTheDocument();
+  });
+
+  it("opens fitted in a pane narrower than 640px, where 140% would run past its edge (IR-569)", async () => {
+    measurePaneAs(602);
+    render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+
+    await screen.findByText("Page 1 / 3");
+    expect(screen.getByText("200%")).toBeInTheDocument();
   });
 
   it("sizes each page from its own dimensions at the current zoom", async () => {
@@ -626,11 +653,10 @@ describe("keeping its place through a layout change (IR-352)", () => {
     expect([...watching].every((el) => el.isConnected)).toBe(true);
   });
 
-  it("puts the reader back in place when the window crosses into the contained layout", async () => {
-    const crossTo = mediaQueryAt(false);
+  it("puts the reader back in place when the workspace crosses into the contained layout", async () => {
     const scrollBy = vi.fn();
     vi.stubGlobal("scrollBy", scrollBy);
-    render(
+    const { rerender } = render(
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
     );
     await screen.findByText("Page 1 / 3");
@@ -644,13 +670,15 @@ describe("keeping its place through a layout change (IR-352)", () => {
     fireEvent.scroll(window);
     await screen.findByText("Page 2 / 3");
 
-    // ...the window widens past 1024px and the same page is now elsewhere.
+    // ...the workspace widens to reading-wide and the same page is now elsewhere.
     placePages([
       { top: 20, height: 520 },
       { top: 556, height: 520 },
       { top: 1092, height: 520 },
     ]);
-    act(() => crossTo(true));
+    rerender(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" contained />,
+    );
 
     // A quarter down the moved page 2 is at 556 + 130 = 686.
     await waitFor(() => expect(scrollBy).toHaveBeenCalledWith(0, 686));
@@ -824,20 +852,21 @@ describe("find in this paper (IR-353)", () => {
     await openPaper();
     const input = await openFind();
     // Below lg the window scrolls. Page 3 is 1000px tall, 2516px down; the
-    // toolbar, with find open inside it, is 96px tall once stuck at 122px.
+    // toolbar, with find open inside it, is 96px tall once stuck at
+    // READER_TOOLBAR_TOP_PX.
     placePages([
       { top: 484, height: 1000 },
       { top: 1500, height: 1000 },
       { top: 2516, height: 1000 },
     ]);
-    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(122, 96));
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(READER_TOOLBAR_TOP_PX, 96));
 
     await userEvent.type(input, "arm");
 
     // Page 3's line is half way down: 2516 + 500 = 3016. It lands 48px of
     // context below the toolbar, at once rather than smoothly.
     await waitFor(() =>
-      expect(scrollBy).toHaveBeenCalledWith({ top: 3016 - (122 + 96) - 48, behavior: "auto" }),
+      expect(scrollBy).toHaveBeenCalledWith({ top: 3016 - (READER_TOOLBAR_TOP_PX + 96) - 48, behavior: "auto" }),
     );
   });
 
@@ -852,7 +881,7 @@ describe("find in this paper (IR-353)", () => {
       { top: 1316, height: 1000 },
       { top: 2332, height: 1000 },
     ]);
-    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(122, 96));
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(READER_TOOLBAR_TOP_PX, 96));
 
     await userEvent.type(input, "vision");
     await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 1"));

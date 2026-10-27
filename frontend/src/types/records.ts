@@ -36,10 +36,52 @@ export interface RecordListItem {
   for_commercialization: boolean;
   community_extension:   boolean;
   access_count:          number;
+  /** One-sentence hook generated with the AI Overview; null until one exists (IR-604). */
+  ai_hook?:              string | null;
   /** Attachments on the record (documents.RecordUpload). */
   file_count:            number;
+  /** Whether the authenticated manuscript reader can serve a PDF. */
+  has_manuscript?:       boolean;
   created_at:            string;
   authors:               Author[];
+}
+
+export interface DiscoverInterestOption { id: number; name: string }
+export interface DiscoverInterests {
+  classifications: DiscoverInterestOption[];
+  psced: DiscoverInterestOption[];
+}
+export interface ForYouItem extends RecordListItem {
+  reason: { kind: "selected_area" | "latest"; area?: string };
+}
+export interface ForYouPage {
+  mode: "for_you" | "latest";
+  results: ForYouItem[];
+  next_cursor: string | null;
+  count: number;
+}
+
+/**
+ * One row of `/records/mine/`: what a *My research* card shows, and nothing
+ * else (IR-410, spec §4.9). Not Record detail -- the per-viewer review blocks
+ * stay on Paper View, so the list costs the same queries for any length.
+ */
+export interface MyResearchItem {
+  id:                   number;
+  title:                string;
+  record_type_name:     string | null;
+  authors:              Author[];
+  adviser_name:         string | null;
+  pipeline_status:      PipelineStatus;
+  /** Derived by the server, as on Record detail; the client derives no stage. */
+  workflow_state:       WorkflowState;
+  workflow_state_label: string;
+  /** Who has the record now, in tracker order; empty when nobody does. */
+  holders:              { party: Party; label: string }[];
+  /** Offices that have cleared it; `preserved` when kept through a resubmission (ADR-003). */
+  cleared_offices:      { office: "itso" | "ierc" | "ktto"; label: string; preserved: boolean }[];
+  created_at:           string;
+  updated_at:           string;
 }
 
 export interface RecordReview {

@@ -39,6 +39,7 @@ from .models import Record, DownloadRequest, DeleteRequest
 from .serializers import (
     RecordListSerializer,
     RecordDetailSerializer,
+    MyResearchSerializer,
     RecordWriteSerializer,
     DownloadRequestSerializer,
     DeleteRequestSerializer,
@@ -84,7 +85,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # queryset, so "not yours" and "does not exist" produce the same
         # response and the API never confirms someone else's draft exists.
         qs = Record.objects.visible_to(self.request.user).select_related(
-            "classification", "psced", "record_type", "adviser"
+            "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
         if self.action in ("metadata_suggestions", "related_research"):
@@ -96,19 +97,20 @@ class RecordViewSet(viewsets.ModelViewSet):
             # their refusal the same 404 as a missing record.
             qs = qs.filter(owners__user=self.request.user)
 
-        if self.action == "list":
+        if self.action in ("list", "facets"):
             # Discover is a public catalogue, not an authorization boundary, so
             # it narrows further. visible_to() is wider than the catalogue --
             # it also admits your own drafts and, for staff, everything -- and
             # browse must not surface either. Own records live at
             # /records/mine/ (MyRecordsViewSet). This filter only ever removes
-            # rows from what visible_to() already allowed.
-            #
+            # rows from what visible_to() already allowed. `facets` offers the
+            # filter choices for exactly this catalogue (IR-560).
+            qs = qs.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
+
+        if self.action == "list":
             # distinct=True on the count: the college/department filters join
             # through owners.
-            qs = qs.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).annotate(
-                file_count=Count("files", distinct=True)
-            )
+            qs = qs.annotate(file_count=Count("files", distinct=True))
         return qs
 
     def get_serializer_class(self):
@@ -908,23 +910,65 @@ class RecordViewSet(viewsets.ModelViewSet):
         return Response(RecordDetailSerializer(record, context={"request": request}).data)
 
     @action(detail=False, methods=["get"])
-    def mine(self, request):
-        """GET /records/mine/ -- records the current user owns.
-        Optional: ?pipeline_status=published,approved  (comma-separated)
+    def facets(self, request):
+        """GET /records/facets/ -- the filter choices Discover offers (IR-560).
 
-        Uses RecordDetailSerializer, not RecordListSerializer -- My Workspace
-        needs clearances[] to show per-office status, which the list
-        serializer doesn't carry. (There is a MyRecordsViewSet elsewhere in
-        this file with serializer_class = RecordDetailSerializer that looks
-        like it already does this -- it isn't registered in urls.py, so it
-        serves nothing. Found live: My Workspace read record.clearances
-        everywhere and always got undefined.)
+        Drawn from the whole catalogue `list` serves, so a year held only by
+        Records beyond the first page is still offered. `year_accomplished`
+        is what `year_from`/`year_to` filter on, so every year returns a
+        Record. Distinct values only: no count of anything is exposed.
         """
-        qs = Record.objects.filter(owners__user=request.user).distinct()
+        years = (
+            self.get_queryset()
+            .exclude(year_accomplished__isnull=True)
+            .order_by("-year_accomplished")
+            .values_list("year_accomplished", flat=True)
+            .distinct()
+        )
+        return Response({"years": list(years)})
+
+    @action(detail=False, methods=["get", "put"], url_path="interests")
+    def interests(self, request):
+        """The signed-in reader's optional Classification and PSCED Areas."""
+        from .discovery import get_interests, put_interests
+
+        if request.method == "PUT":
+            return put_interests(request.user, request.data)
+        return get_interests(request.user)
+
+    @action(detail=False, methods=["get"], url_path="for-you")
+    def for_you(self, request):
+        """One owner-scoped, stable metadata feed with current visibility."""
+        from .discovery import get_feed
+
+        return get_feed(request)
+
+    @action(detail=False, methods=["get"])
+    def mine(self, request):
+        """GET /records/mine/ -- records the current user owns, newest change
+        first. Optional: ?pipeline_status=published,approved  (comma-separated)
+
+        My Library's *My research* list (IR-410), so `MyResearchSerializer`
+        rather than Record detail: Record detail cost about 15.6 queries per
+        record here. Every row's workflow facts are worked out in one pass, so
+        the query count does not grow with the number of records.
+        """
+        from apps.reviews.tracker import workflow_facts
+
+        qs = (
+            Record.objects.filter(owners__user=request.user).distinct()
+            .select_related("record_type", "adviser")
+            .prefetch_related("authors")
+            .order_by("-updated_at", "-pk")
+        )
         statuses = request.query_params.get("pipeline_status")
         if statuses:
             qs = qs.filter(pipeline_status__in=[s.strip() for s in statuses.split(",")])
-        serializer = RecordDetailSerializer(qs, many=True, context={"request": request})
+        records = list(qs)
+        serializer = MyResearchSerializer(
+            records, many=True,
+            context={"request": request, "workflow_facts": workflow_facts(records)},
+        )
         return Response(serializer.data)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])

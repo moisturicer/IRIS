@@ -1,10 +1,14 @@
 from django.urls import path
 from .views.research import ResearchRunDetailView
+from .views.brief import PaperBriefView
 
 from .views import (
     AIStatusView,
     ChatQueryView,
     ChatStreamView,
+    RunStreamView,
+    RunCancelView,
+    RunRetryView,
     SemanticSearchView,
     ConversationListCreateView,
     ConversationDetailView,
@@ -18,9 +22,13 @@ from .views import (
 # stays out until its service exists — a 404 is more honest than a 500 from a
 # `pass` body.
 urlpatterns = [
+    path("records/<int:pk>/brief/", PaperBriefView.as_view(), name="ai-paper-brief"),
     path("research/runs/<uuid:pk>/", ResearchRunDetailView.as_view(), name="ai-research-run"),
     path("ask/",        ChatQueryView.as_view(),  name="ai-ask"),
     path("ask/stream/", ChatStreamView.as_view(), name="ai-ask-stream"),
+    path("ask/runs/<uuid:pk>/stream/", RunStreamView.as_view(), name="ai-ask-run-stream"),
+    path("ask/runs/<uuid:pk>/cancel/", RunCancelView.as_view(), name="ai-ask-run-cancel"),
+    path("ask/runs/<uuid:pk>/retry/", RunRetryView.as_view(), name="ai-ask-run-retry"),
     path("search/", SemanticSearchView.as_view(), name="ai-search"),
     path("status/", AIStatusView.as_view(),       name="ai-status"),
     path("records/<int:pk>/overview/", RecordOverviewView.as_view(),

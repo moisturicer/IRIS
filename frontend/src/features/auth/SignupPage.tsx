@@ -1,9 +1,12 @@
-﻿import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useId, useRef, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { accountsApi } from "@/api/accounts";
-import { useUIStore } from "@/store/ui.store";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { Button, Input, Select } from "@/components/ui";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { DataNotice } from "./DataNotice";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Role = "Student" | "Adviser";
@@ -33,8 +36,41 @@ const EMPTY: FormState = {
   college_id: "", course_id: "", dept_id: "",
 };
 
-const INPUT_BASE =
-  "w-full rounded-lg px-4 py-3 text-[15px] bg-[#F3F3F3] outline-none transition-colors placeholder:text-gray-500 text-gray-900 border font-[inherit]";
+/**
+ * The register serializer's error keys, onto the fields they mean (IR-540). Two
+ * are named differently on the server; `consent_given` belongs to the consent
+ * box. Anything else -- `non_field_errors`, `detail`, `role_name` -- is shown
+ * as an alert, because no field here can own it.
+ */
+const SERVER_FIELD: Record<string, keyof FormState> = {
+  email:            "email",
+  first_name:       "first_name",
+  last_name:        "last_name",
+  middle_initial:   "middle_initial",
+  password:         "password",
+  confirm_password: "password2",
+  college_id:       "college_id",
+  course_id:        "course_id",
+  department_id:    "dept_id",
+};
+
+interface FormAlert { title: string; message: string; }
+
+/** A reply with nothing to say about the fields: none came, or the server failed. */
+const UNREACHABLE: FormAlert = {
+  title:   "IRIS can't be reached right now",
+  message: "This is a connection or server problem, not a problem with what you typed. Try again shortly.",
+};
+
+const firstMessage = (val: unknown) => (Array.isArray(val) ? String(val[0]) : String(val));
+
+/** The consent box's own error, shown on it when a submit arrives without it (IR-540). */
+const CONSENT_REQUIRED = "Agree to the data notice to register.";
+
+const ROLES: { value: Role; label: string }[] = [
+  { value: "Student", label: "Student" },
+  { value: "Adviser", label: "Faculty / Adviser" },
+];
 
 // ── Validation ─────────────────────────────────────────────────────────────
 function validateAll(f: FormState, role: Role): FieldErrors {
@@ -75,14 +111,24 @@ function validateLive(f: FormState, role: Role): FieldErrors {
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function SignupPage() {
-  const navigate     = useNavigate();
-  const { addToast } = useUIStore();
 
   const [role, setRole]             = useState<Role>("Student");
   const [form, setForm]             = useState<FormState>(EMPTY);
   const [errors, setErrors]         = useState<FieldErrors>({});
   const [touched, setTouched]       = useState<Partial<Record<keyof FormState, boolean>>>({});
-  const [terms, setTerms]           = useState(false);
+  const [consented, setConsented]   = useState(false);
+  const [consentError, setConsentError] = useState<string>();
+  const [formAlert, setFormAlert]   = useState<FormAlert | null>(null);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const noticeTriggerId = useId();
+  const noticeId        = useId();
+  const consentErrorId  = useId();
+  const nextStepsId     = useId();
+  // Set once the account exists: the screen then confirms in place instead of
+  // leaving on a toast (IR-540), naming the address exactly as it was entered.
+  const [registered, setRegistered] = useState<{ email: string; role: Role } | null>(null);
+  const confirmationRef = useRef<HTMLHeadingElement>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword]   = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
@@ -91,8 +137,13 @@ export default function SignupPage() {
   const [allDepts,   setAllDepts]   = useState<Department[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [loadingRef, setLoadingRef] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  // A failure is said inside the form, with a retry that keeps what was typed
+  // (IR-540), in place of a toast that left three empty selects behind it.
+  const loadOptions = useCallback(() => {
+    setLoadingRef(true);
+    setLoadFailed(false);
     Promise.all([
       accountsApi.colleges(),
       accountsApi.departments(),
@@ -102,9 +153,16 @@ export default function SignupPage() {
       setAllDepts(deptRes.data.results);
       setAllCourses(courseRes.data.results);
     }).catch(() => {
-      addToast({ type: "error", message: "Failed to load form options. Please refresh." });
+      setLoadFailed(true);
     }).finally(() => setLoadingRef(false));
-  }, [addToast]);
+  }, []);
+
+  useEffect(loadOptions, [loadOptions]);
+  // The form a screen-reader user was in has just gone, so their focus goes
+  // to what replaced it.
+  useEffect(() => {
+    if (registered) confirmationRef.current?.focus();
+  }, [registered]);
 
   const collegeNum = Number(form.college_id);
   const filteredDepts = allDepts.filter((d) => d.college === collegeNum);
@@ -147,12 +205,12 @@ export default function SignupPage() {
     setTouched(allKeys.reduce((acc, k) => ({ ...acc, [k]: true }), {}));
     const errs = validateAll(form, role);
     setErrors(errs);
-    if (Object.values(errs).some(Boolean)) return;
-    if (!terms) {
-      addToast({ type: "error", message: "Please agree to the Terms of Service." });
-      return;
-    }
+    // Consent is checked with the fields, not after them, so one press of
+    // Register shows everything that is missing at once (IR-540).
+    setConsentError(consented ? undefined : CONSENT_REQUIRED);
+    if (Object.values(errs).some(Boolean) || !consented) return;
 
+    setFormAlert(null);
     setSubmitting(true);
     try {
       await authApi.register({
@@ -162,26 +220,31 @@ export default function SignupPage() {
         last_name:        form.last_name.trim(),
         password:         form.password,
         confirm_password: form.password2,
+        // Required by the register serializer, and never sent before IR-540:
+        // every registration from this screen was refused until it was.
+        consent_given:    true,
         role_name:        role,
         ...(role === "Student"
           ? { course_id: Number(form.course_id) }
           : { college_id: Number(form.college_id), department_id: Number(form.dept_id) }),
       });
-      addToast({ type: "success", message: "Account created! Check your email to verify your account." });
-      navigate("/login");
+      setRegistered({ email: form.email.trim(), role });
     } catch (err: unknown) {
-      const data = (err as { response?: { data?: Record<string, unknown> } }).response?.data;
-      if (data && typeof data === "object") {
-        const mapped: FieldErrors = {};
-        for (const [key, val] of Object.entries(data)) {
-          mapped[key as keyof FormState] = Array.isArray(val) ? (val[0] as string) : String(val);
-        }
-        setErrors((prev) => ({ ...prev, ...mapped }));
-        const first = Object.values(mapped)[0];
-        if (first) addToast({ type: "error", message: first });
-      } else {
-        addToast({ type: "error", message: "Registration failed. Please try again." });
+      const response = (err as { response?: { status?: number; data?: unknown } }).response;
+      const data = response?.data;
+      if (!response || (response.status ?? 0) >= 500 || !data || typeof data !== "object") {
+        setFormAlert(UNREACHABLE);
+        return;
       }
+      const onFields: FieldErrors = {};
+      const elsewhere: string[] = [];
+      for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
+        if (key === "consent_given") setConsentError(firstMessage(val));
+        else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = firstMessage(val);
+        else elsewhere.push(firstMessage(val));
+      }
+      setErrors((prev) => ({ ...prev, ...onFields }));
+      if (elsewhere.length) setFormAlert({ title: "Registration failed", message: elsewhere.join(" ") });
     } finally {
       setSubmitting(false);
     }
@@ -194,264 +257,299 @@ export default function SignupPage() {
     setTouched((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
   };
 
-  const cls = (name: keyof FormState) => {
-    const isError = touched[name] && errors[name];
-    const isValid = touched[name] && !errors[name] && form[name];
-    return [
-      INPUT_BASE,
-      isError
-        ? "border-brand bg-red-50/50 focus:border-brand focus:bg-white"
-        : isValid
-          ? "border-green-400/60 bg-white focus:border-brand"
-          : "border-transparent focus:border-brand focus:bg-white",
-    ].join(" ");
-  };
+  // An error shows once its field has been touched, as before IR-539; the
+  // primitives then make it the field's description and mark it invalid.
+  const field = (name: keyof FormState) => ({
+    value:    form[name],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      handleChange(name, e.target.value),
+    onBlur:   () => handleBlur(name),
+    error:    touched[name] && errors[name] ? errors[name] : undefined,
+    size:     "lg" as const,
+  });
 
-  const errMsg = (name: keyof FormState) =>
-    touched[name] && errors[name]
-      ? <p className="text-[13px] text-red-600 mt-1.5">{errors[name]}</p>
-      : null;
+  // Feedback in words, with the check as decoration (IR-539): the hint says
+  // the same thing whether or not its colour or its glyph is seen.
+  const passwordHint = form.password.length >= 8
+    ? <><i className="fas fa-check mr-1.5" aria-hidden />At least 8 characters</>
+    : "At least 8 characters";
+  const password2Hint = form.password2 && form.password2 === form.password
+    ? <><i className="fas fa-check mr-1.5" aria-hidden />Passwords match</>
+    : undefined;
 
-  const labelCls = "block text-[14px] font-semibold text-gray-900 mb-2";
+  if (registered) {
+    return (
+      <AuthLayout variant="signup" wide>
+        <h2
+          ref={confirmationRef}
+          tabIndex={-1}
+          className="text-balance font-display text-display font-semibold text-stone-900 outline-none"
+        >
+          Check your email
+        </h2>
+        <p className="mt-3 text-pretty text-body text-stone-700">
+          Your account was created. We sent a verification link to{" "}
+          <strong className="font-semibold text-stone-900">{registered.email}</strong>.
+        </p>
+        <ol className="mt-section list-decimal space-y-2 pl-5 text-body text-stone-700">
+          <li>Open the link in that email to verify your address.</li>
+          <li>
+            RDCO reviews your request to join as {registered.role === "Adviser" ? "an Adviser" : "a Student"}, and
+            emails you when they decide.
+          </li>
+        </ol>
+        {/* Not "contact RDCO": an email is read-only to every IRIS screen,
+            RDCO's included, so the only fix IRIS offers is a fresh registration. */}
+        <p className="mt-section text-small text-stone-600">
+          If that address is wrong, register again with the right one.
+        </p>
+        <Link
+          to="/login"
+          // Drawn as the primary action, since it is the only one left. Button
+          // cannot render as a link yet (IR-538 adds that); until then this
+          // copies its `primary` + `full` look, in type-role sizes.
+          className={`mt-section-lg flex min-h-11 w-full items-center justify-center rounded-lg bg-brand px-5 py-3.5 text-heading font-medium text-white transition-colors hover:bg-brand-light ${FOCUS_RING}`}
+        >
+          Go to sign in
+        </Link>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout variant="signup" wide>
-      <h2 className="text-[28px] font-bold text-gray-900">Create an Account</h2>
-      <p className="mt-2 text-[15px] text-gray-500 mb-6">
+      <h2 className="text-balance font-display text-display font-semibold text-stone-900">
+        Create an Account
+      </h2>
+      <p className="mt-2 mb-section text-body text-stone-600">
         Enter your details to register for IRIS.
       </p>
 
-      {/* Role tabs */}
-      <div className="flex gap-2 mb-6">
-        {(["Student", "Adviser"] as Role[]).map((r) => (
-          <button
-            key={r}
-            type="button"
-            onClick={() => switchRole(r)}
-            className={`flex-1 py-2.5 rounded-lg text-[14px] font-semibold transition-all border ${
-              role === r
-                ? "border-brand text-brand bg-cream"
-                : "border-gray-200 text-gray-500 bg-[#F3F3F3] hover:border-brand/40 hover:text-brand"
-            }`}
-          >
-            {r === "Adviser" ? "Faculty / Adviser" : r}
-          </button>
-        ))}
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+        {loadFailed && (
+          <AuthAlert variant="error" title="Some of this form didn't load">
+            IRIS couldn&apos;t load the colleges, programs and departments to choose from.
+            <div className="mt-3">
+              <Button type="button" variant="outline" size="full" onClick={loadOptions}>
+                Try again
+              </Button>
+            </div>
+          </AuthAlert>
+        )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_76px]">
-          <div>
-            <label className={labelCls}>
-              First Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={form.first_name}
-              onChange={(e) => handleChange("first_name", e.target.value)}
-              onBlur={() => handleBlur("first_name")}
-              placeholder="Juan"
-              className={cls("first_name")}
-            />
-            {errMsg("first_name")}
-          </div>
-          <div>
-            <label className={labelCls}>
-              Last Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={form.last_name}
-              onChange={(e) => handleChange("last_name", e.target.value)}
-              onBlur={() => handleBlur("last_name")}
-              placeholder="Dela Cruz"
-              className={cls("last_name")}
-            />
-            {errMsg("last_name")}
-          </div>
-          <div>
-            <label className={labelCls}>M.I.</label>
-            <input
-              value={form.middle_initial}
-              onChange={(e) => handleChange("middle_initial", e.target.value)}
-              onBlur={() => handleBlur("middle_initial")}
-              placeholder="S."
-              maxLength={10}
-              className={cls("middle_initial")}
-            />
-            {errMsg("middle_initial")}
-          </div>
-        </div>
-
-        <div>
-          <label className={labelCls}>
-            CIT-U Email <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            value={form.email}
-            onChange={(e) => handleChange("email", e.target.value)}
-            onBlur={() => handleBlur("email")}
-            placeholder="you@cit.edu"
-            className={cls("email")}
-          />
-          {errMsg("email")}
-        </div>
-
-        <div>
-          <label className={labelCls}>
-            College <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={form.college_id}
-            onChange={(e) => handleChange("college_id", e.target.value)}
-            onBlur={() => handleBlur("college_id")}
-            disabled={loadingRef}
-            className={`${cls("college_id")} appearance-none disabled:opacity-50`}
-          >
-            <option value="">{loadingRef ? "Loading…" : "Select college"}</option>
-            {colleges.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+        {/* A real radio group (IR-539): it announces its question, both
+            choices and which one is chosen, and the arrow keys move between
+            them. The two buttons it replaces announced no state at all. */}
+        <fieldset role="radiogroup">
+          <legend className="mb-1 text-sm font-medium text-stone-700">I am registering as</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {ROLES.map(({ value, label }) => (
+              <label
+                key={value}
+                className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-4 py-2.5
+                  text-sm font-semibold transition-colors
+                  ${role === value
+                    ? "border-brand bg-brand-50 text-brand"
+                    : "border-stone-300 bg-surface text-stone-700 hover:border-stone-400"}`}
+              >
+                <input
+                  type="radio"
+                  name="register-role"
+                  value={value}
+                  checked={role === value}
+                  onChange={() => switchRole(value)}
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-brand"
+                />
+                {label}
+              </label>
             ))}
-          </select>
-          {errMsg("college_id")}
+          </div>
+        </fieldset>
+
+        <div className="grid gap-5 sm:grid-cols-5 sm:gap-3">
+          <div className="sm:col-span-2">
+            <Input id="signup-first-name" label="First Name" required placeholder="Juan"
+              autoComplete="given-name" {...field("first_name")} />
+          </div>
+          <div className="sm:col-span-2">
+            <Input id="signup-last-name" label="Last Name" required placeholder="Dela Cruz"
+              autoComplete="family-name" {...field("last_name")} />
+          </div>
+          <Input id="signup-middle-initial" label="M.I." placeholder="S." maxLength={10}
+            {...field("middle_initial")} />
         </div>
+
+        <Input id="signup-email" label="CIT-U Email" required type="email" placeholder="you@cit.edu"
+          autoComplete="email" {...field("email")} />
+
+        <Select id="signup-college" label="College" required disabled={loadingRef} {...field("college_id")}>
+          <option value="">{loadingRef ? "Loading…" : "Select college"}</option>
+          {colleges.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </Select>
 
         {role === "Student" && (
-          <div>
-            <label className={labelCls}>
-              Program <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.course_id}
-              onChange={(e) => handleChange("course_id", e.target.value)}
-              onBlur={() => handleBlur("course_id")}
-              disabled={!form.college_id}
-              className={`${cls("course_id")} appearance-none disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <option value="">
-                {!form.college_id ? "Select college first" : filteredCourses.length === 0 ? "No programs available" : "Select program"}
-              </option>
-              {courseGroups.map(({ deptName, courses }) => (
-                <optgroup key={deptName} label={deptName}>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            {errMsg("course_id")}
-          </div>
+          <Select id="signup-program" label="Program" required disabled={!form.college_id} {...field("course_id")}>
+            <option value="">
+              {!form.college_id ? "Select college first" : filteredCourses.length === 0 ? "No programs available" : "Select program"}
+            </option>
+            {courseGroups.map(({ deptName, courses }) => (
+              <optgroup key={deptName} label={deptName}>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
         )}
 
         {role === "Adviser" && (
-          <div>
-            <label className={labelCls}>
-              Department <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.dept_id}
-              onChange={(e) => handleChange("dept_id", e.target.value)}
-              onBlur={() => handleBlur("dept_id")}
-              disabled={!form.college_id}
-              className={`${cls("dept_id")} appearance-none disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <option value="">
-                {!form.college_id ? "Select college first" : filteredDepts.length === 0 ? "No departments available" : "Select department"}
-              </option>
-              {filteredDepts.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            {errMsg("dept_id")}
-          </div>
+          <Select id="signup-department" label="Department" required disabled={!form.college_id} {...field("dept_id")}>
+            <option value="">
+              {!form.college_id ? "Select college first" : filteredDepts.length === 0 ? "No departments available" : "Select department"}
+            </option>
+            {filteredDepts.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
         )}
 
-        <div>
-          <label className={labelCls}>
-            Password <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              value={form.password}
-              onChange={(e) => handleChange("password", e.target.value)}
-              onBlur={() => handleBlur("password")}
-              placeholder="At least 8 characters"
-              className={`${cls("password")} pr-16`}
+        <Input
+          id="signup-password"
+          label="Password"
+          required
+          type={showPassword ? "text" : "password"}
+          autoComplete="new-password"
+          // No placeholder: the hint below already says it, and says it while typing.
+          hint={passwordHint}
+          {...field("password")}
+          trailing={
+            <PasswordToggle
+              shown={showPassword}
+              onToggle={() => setShowPassword((v) => !v)}
+              what="password"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-brand hover:underline"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-          {form.password && !errors.password && (
-            <p className="text-[12px] text-green-600 mt-1.5">Password looks good.</p>
-          )}
-          {errMsg("password")}
-        </div>
+          }
+        />
 
-        <div>
-          <label className={labelCls}>
-            Confirm Password <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword2 ? "text" : "password"}
-              value={form.password2}
-              onChange={(e) => handleChange("password2", e.target.value)}
-              onBlur={() => handleBlur("password2")}
-              placeholder="Re-enter password"
-              className={`${cls("password2")} pr-16`}
+        <Input
+          id="signup-password2"
+          label="Confirm Password"
+          required
+          type={showPassword2 ? "text" : "password"}
+          autoComplete="new-password"
+          placeholder="Re-enter password"
+          hint={password2Hint}
+          {...field("password2")}
+          trailing={
+            <PasswordToggle
+              shown={showPassword2}
+              onToggle={() => setShowPassword2((v) => !v)}
+              what="confirmed password"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword2((v) => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-brand hover:underline"
-            >
-              {showPassword2 ? "Hide" : "Show"}
-            </button>
+          }
+        />
+
+        {/* Consent against a notice on this page (IR-540), in place of links to
+            a Terms of Service and a Data Privacy Policy that do not exist yet
+            (IR-214). The notice opens in place, so reading it clears nothing. */}
+        <div className="pt-1">
+          <div className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="signup-consent"
+              checked={consented}
+              onChange={(e) => {
+                setConsented(e.target.checked);
+                if (e.target.checked) setConsentError(undefined);
+              }}
+              aria-invalid={consentError ? true : undefined}
+              aria-describedby={consentError ? consentErrorId : undefined}
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
+            />
+            <label htmlFor="signup-consent" className="cursor-pointer text-small text-stone-600">
+              I have read the data notice and agree to IRIS using my details as it describes.
+            </label>
           </div>
-          {form.password2 && !errors.password2 && (
-            <p className="text-[12px] text-green-600 mt-1.5">Passwords match.</p>
+          {consentError && (
+            <p id={consentErrorId} className="mt-1.5 flex items-start gap-1.5 text-small text-brand">
+              <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+              {consentError}
+            </p>
           )}
-          {errMsg("password2")}
+          <button
+            type="button"
+            id={noticeTriggerId}
+            aria-expanded={noticeOpen}
+            aria-controls={noticeId}
+            onClick={() => setNoticeOpen((v) => !v)}
+            // 44px tall, as sign-in's "Forgot password?" is (2.5.5).
+            className={`mt-1 inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
+          >
+            <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-label`} aria-hidden />
+            Read the data notice
+          </button>
+          {noticeOpen && (
+            <div
+              id={noticeId}
+              role="region"
+              aria-labelledby={noticeTriggerId}
+              className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3"
+            >
+              <DataNotice />
+            </div>
+          )}
         </div>
 
-        <div className="flex items-start gap-2.5 pt-1">
-          <input
-            type="checkbox"
-            id="terms"
-            checked={terms}
-            onChange={(e) => setTerms(e.target.checked)}
-            className="mt-0.5 w-4 h-4 shrink-0 accent-brand cursor-pointer"
-          />
-          <label htmlFor="terms" className="text-[13px] text-gray-500 leading-relaxed cursor-pointer">
-            I agree to the IRIS{" "}
-            <a href="#" className="text-brand font-semibold hover:underline">Terms of Service</a>
-            {" "}and{" "}
-            <a href="#" className="text-brand font-semibold hover:underline">Data Privacy Policy</a>.
-          </label>
+        {formAlert && (
+          <AuthAlert variant="error" title={formAlert.title}>
+            {formAlert.message}
+          </AuthAlert>
+        )}
+
+        {/* Said before anything is sent, so the wait after it surprises no one (IR-533). */}
+        <div>
+          <p id={nextStepsId} className="text-small font-semibold text-stone-700">What happens next</p>
+          <ol aria-labelledby={nextStepsId} className="mt-1 list-decimal space-y-0.5 pl-5 text-small text-stone-600">
+            <li>You verify your email with the link we send you.</li>
+            <li>RDCO reviews your request, and emails you when they decide.</li>
+          </ol>
         </div>
 
-        <button
-          type="submit"
-          disabled={submitting || !terms}
-          className="w-full py-3.5 rounded-lg text-[16px] font-semibold text-white transition-colors bg-gold hover:bg-gold-dark disabled:bg-gray-300 disabled:cursor-not-allowed mt-1"
-        >
+        {/* `size="full"` carries the width and the 44px step. Maroon under
+            white is 12.3:1 at rest and 9.5:1 on hover; gold was 2.76:1. */}
+        <Button type="submit" variant="primary" size="full" loading={submitting}>
           {submitting ? "Creating account…" : "Register"}
-        </button>
+        </Button>
       </form>
 
-      <div className="mt-8 pt-6 border-t border-gray-100">
-        <p className="text-[14px] text-gray-500 text-center">
+      <div className="mt-section-lg border-t border-stone-200 pt-section">
+        <p className="text-center text-sm text-stone-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-brand font-semibold hover:underline">
+          <Link to="/login" className="font-semibold text-brand hover:underline">
             Sign in
           </Link>
         </p>
       </div>
     </AuthLayout>
+  );
+}
+
+/**
+ * The show/hide toggle in a password field's trailing slot, as on sign in
+ * (IR-204). Its accessible name begins with the word it shows, so "click Show"
+ * still matches for a voice user (2.5.3), and its box is 44 by 44 (2.5.5).
+ */
+function PasswordToggle({ shown, onToggle, what }: { shown: boolean; onToggle: () => void; what: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={`${shown ? "Hide" : "Show"} ${what}`}
+      className="flex min-h-11 min-w-11 items-center justify-center px-1 text-sm font-semibold text-brand hover:underline"
+    >
+      {shown ? "Hide" : "Show"}
+    </button>
   );
 }

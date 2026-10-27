@@ -294,8 +294,11 @@ class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
         "apps/records/lifecycle.py",  # defines it
         "apps/records/apps.py",  # validates it at startup
         # Applies it to the new model's resubmission (IR-273), and logs which
-        # arm ran. Serializes no policy: only which offices a version keeps,
-        # as `offices_preserved` already does.
+        # arm ran. No API reads or writes the policy here: only which offices a
+        # version keeps, as `offices_preserved` already does. The arm's name
+        # does reach the RDCO-only, read-only audit log in `RESUBMITTED`
+        # (IR-144), because ADR-004's two arms cannot be told apart afterwards
+        # without it; nothing there can set it.
         "apps/reviews/new_version.py",
         "config/settings/base.py",  # loads it from the environment
     }
@@ -316,13 +319,14 @@ class PolicyIsNotReachableThroughTheApiTests(SimpleTestCase):
     def test_only_the_permitted_modules_mention_the_policy(self):
         from pathlib import Path
 
+        from testing.source_files import python_sources
+
         backend = Path(lifecycle.__file__).resolve().parent.parent.parent
         offenders = sorted(
             path.relative_to(backend).as_posix()
-            for path in backend.rglob("*.py")
+            for path in python_sources(backend)
             if not path.name.startswith("test_")
             and "tests" not in path.parts
-            and ".venv" not in path.parts
             and "migrations" not in path.parts
             and any(
                 needle in path.read_text(encoding="utf-8").lower().replace("_", "")

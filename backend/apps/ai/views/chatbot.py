@@ -20,8 +20,10 @@ retriever or an answer service, and shape the reply — which is what makes the
 whole path drivable from a test with deterministic fakes.
 """
 import json
+from contextlib import closing
 
-from django.http import Http404, StreamingHttpResponse
+from django.conf import settings
+from django.http import Http404
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -29,8 +31,13 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+from apps.ai import public as public_protocol
+from apps.ai.conversation_state import current_revision
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
+    AgentStep,
+    CandidatesSelected,
+    CandidatesUpdated,
     CitationsResolved,
     Done,
     ReasoningDelta,
@@ -40,6 +47,7 @@ from apps.ai.answers.events import (
 from apps.ai.composition import composition_root
 from apps.ai.models import Conversation
 from apps.ai.orchestrator import ChatOrchestrator, ChatQuestion
+from apps.ai.streaming import EventStreamResponse
 from apps.ai.presentation import (
     answer_body,
     answer_mode,
@@ -89,7 +97,7 @@ def _parse_top_k(raw, default: int = DEFAULT_TOP_K) -> int:
         return default
 
 
-def _conversation_for(request):
+def _conversation_for(data, user):
     """The Conversation this question belongs to, or ``None`` for a one-off.
 
     Looked up inside the caller's own conversations, so somebody else's id is
@@ -97,7 +105,7 @@ def _conversation_for(request):
     transcript exists would leak the one thing this model is private for. A
     malformed id takes the same exit rather than a 500.
     """
-    raw = request.data.get("conversation_id")
+    raw = data.get("conversation_id")
     if raw in (None, ""):
         return None
     try:
@@ -106,7 +114,7 @@ def _conversation_for(request):
         raise Http404
     try:
         return Conversation.objects.select_related("record").get(
-            pk=pk, user=request.user
+            pk=pk, user=user
         )
     except Conversation.DoesNotExist:
         raise Http404
@@ -139,19 +147,39 @@ def _recent_turns(conversation: Conversation) -> list:
     Both bounds apply *after* the exclusion, so a run of failures does not eat
     the window and leave the model with less real history than it has.
     """
-    return recent_window(conversation.turns.all())
+    return recent_window(conversation.turns.all(), user=conversation.user)
 
 
-def _prepare_ask_request(request):
+def prepare_ask(data, user, *, resolve: bool = True, context_revision=None):
     """Parse and validate one question, resolve it and its scope.
 
     Returns ``(prepared, None)`` on success or ``(None, error_response)`` on
     a validation failure the caller should return exactly as given -- a 400
     happens identically whether the answer that follows is one JSON body or
     a stream of events.
+
+    ``resolve=False`` validates without the resolver's model call. A queued
+    question (IR-544) is validated that way at submission and prepared again,
+    resolution included, by the worker -- which re-checks the Conversation
+    and any override Turn against the asker at the same time.
+
+    ``context_revision`` pins the conversation state the answer builds on
+    (IR-592); a queued run passes the one read at submission.
     """
-    conversation = _conversation_for(request)
-    question = (request.data.get("question") or "").strip()
+    from apps.ai.routing.router import LANES
+
+    route_override = data.get("route_override")
+    if route_override is not None and (not isinstance(route_override, str) or route_override not in LANES):
+        return None, Response({"detail": "route_override must name a supported lane."}, status=400)
+    conversation = _conversation_for(data, user)
+    record_ids = data.get("comparison_record_ids", [])
+    if not isinstance(record_ids, list) or any(type(pk) is not int or pk < 1 for pk in record_ids):
+        return None, Response({"detail": "comparison_record_ids must be positive integer IDs."}, status=400)
+    if record_ids and not 2 <= len(record_ids) <= settings.AI_COMPARISON_MAX_RECORDS:
+        return None, Response({"detail": f"Choose 2 to {settings.AI_COMPARISON_MAX_RECORDS} Records; narrow the list."}, status=400)
+    if len(set(record_ids)) != len(record_ids):
+        return None, Response({"detail": "Choose distinct Records to compare."}, status=400)
+    question = (data.get("question") or "").strip()
     if not question:
         return None, Response(
             {"detail": "question is required."}, status=status.HTTP_400_BAD_REQUEST
@@ -162,19 +190,34 @@ def _prepare_ask_request(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    history = _recent_turns(conversation) if conversation is not None else []
-
-    resolved_question = None
-    if conversation is not None:
-        resolver = composition_root().resolver()
-        if resolver is not None:
-            resolved_question = resolver.resolve(question, history)
+    override_turn = None
+    turn_reference = data.get("route_override_turn_id")
+    if turn_reference is not None:
+        if route_override is None or conversation is None:
+            return None, Response({"detail": "An override Turn requires a lane and conversation."}, status=400)
+        if type(turn_reference) is not int or turn_reference < 1:
+            return None, Response({"detail": "route_override_turn_id must be a positive integer."}, status=400)
+        override_turn = conversation.turns.filter(pk=turn_reference).first()
+        if override_turn is None:
+            raise Http404
+        question = override_turn.question
+        history = recent_window(
+            conversation.turns.filter(pk__lt=override_turn.pk), user=conversation.user
+        )
+        resolved_question = override_turn.resolved_question or None
+    else:
+        # Only resolution and the answer read history; a queued submission
+        # does neither in the request.
+        history = _recent_turns(conversation) if conversation is not None and resolve else []
+        resolved_question = None
+        if conversation is not None and resolve:
+            resolver = composition_root().resolver()
+            if resolver is not None:
+                resolved_question = resolver.resolve(question, history)
     effective_question = resolved_question or question
 
-    # Widened only when there was a scope to widen *from* -- an unscoped
-    # Conversation, or no Conversation, was never narrower than "every
-    # paper", so `widen` has nothing to do there.
-    widen = bool(request.data.get("widen"))
+    # A saved override reuses the scope choice that produced the original Turn.
+    widen = override_turn.widened if override_turn else bool(data.get("widen"))
     scoped_to = conversation.record if conversation is not None else None
     widened = scoped_to is not None and widen
     scope_record = None if widened else scoped_to
@@ -188,6 +231,13 @@ def _prepare_ask_request(request):
             history=history,
             widened=widened,
             scope_record=scope_record,
+            route_override=route_override,
+            override_turn_id=override_turn.pk if override_turn else None,
+            comparison_record_ids=tuple(record_ids),
+            context_revision=(
+                context_revision if context_revision is not None
+                else current_revision(conversation)
+            ),
         ),
         None,
     )
@@ -236,7 +286,8 @@ class ChatQueryView(APIView):
     throttle_classes = [AIQueryThrottle]
 
     def post(self, request):
-        prepared, error = _prepare_ask_request(request)
+        public_mode = public_protocol.requested(request)
+        prepared, error = prepare_ask(request.data, request.user)
         if error is not None:
             return error
 
@@ -244,42 +295,75 @@ class ChatQueryView(APIView):
             prepared, max_sources=_parse_top_k(request.data.get("top_k"))
         )
         answer = orchestrator.answer(request.user)
-        mode = answer_mode(answer.state)
+        if public_mode:
+            return Response(public_body(prepared, orchestrator, answer))
+        return Response(done_body(prepared, orchestrator, answer))
 
-        return Response(
-            {
-                **answer_body(mode, answer.text),
-                "conversation_id": (
-                    None if prepared.conversation is None else prepared.conversation.pk
-                ),
-                # What retrieval actually searched with, shown so a reader
-                # can see when IRIS guessed wrong (IR-296). Null whenever
-                # resolution did not run or changed nothing.
-                "resolved_question": prepared.resolved_question,
-                # A citation is an object: the record it belongs to, the page,
-                # and the quoted passage (IR-284). A bare record id asked a
-                # reader to find the sentence themselves.
-                "citations": citations(answer.citations),
-                # Every passage the model was shown, not only the cited ones:
-                # a reader who wants to check what IRIS read needs the list it
-                # read, and a vendor failure returns it with no answer at all.
-                "sources": record_sources(answer.sources),
-                "mode": mode,
-                "degraded": answer.degraded,
-                # Whether this answer left its Conversation's Record scope
-                # (IR-298) -- always false with no scope to have left.
-                "widened": prepared.widened,
-                # Whether the model produced any reasoning (IR-327), and the
-                # reasoning itself (IR-381). Always false and always `None`
-                # here: `answer()` calls `generate()`, not `stream()`, so this
-                # endpoint never requests a reasoning channel at all. Sent
-                # anyway, because the two endpoints' bodies are the same shape
-                # by contract -- a client must end up in an identical state
-                # whichever one it called.
-                "had_reasoning": answer.had_reasoning,
-                "reasoning": answer.reasoning or None,
-            }
-        )
+
+def done_body(prepared, orchestrator, answer) -> dict:
+    """The final answer's wire body, one shape for `/ask/` and `done`."""
+    mode = answer_mode(answer.state)
+    return {
+        **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
+        **orchestrator.metadata,
+        "conversation_id": (
+            None if prepared.conversation is None else prepared.conversation.pk
+        ),
+        # What retrieval actually searched with, shown so a reader
+        # can see when IRIS guessed wrong (IR-296). Null whenever
+        # resolution did not run or changed nothing.
+        "resolved_question": prepared.resolved_question,
+        # A citation is an object: the record it belongs to, the page,
+        # and the quoted passage (IR-284). A bare record id asked a
+        # reader to find the sentence themselves.
+        "citations": citations(answer.citations),
+        # Every passage the model was shown, not only the cited ones:
+        # a reader who wants to check what IRIS read needs the list it
+        # read, and a vendor failure returns it with no answer at all.
+        "sources": record_sources(answer.sources),
+        "mode": mode,
+        "degraded": answer.degraded,
+        # Whether this answer left its Conversation's Record scope
+        # (IR-298) -- always false with no scope to have left.
+        "widened": prepared.widened,
+        # Whether the model produced any reasoning (IR-327), and the
+        # reasoning itself (IR-381). Always false and always `None` from
+        # `/ask/`: `answer()` calls `generate()`, not `stream()`, so that
+        # endpoint never requests a reasoning channel at all. Sent anyway,
+        # because the two endpoints' bodies are the same shape by contract
+        # -- a client must end up in an identical state whichever one it
+        # called.
+        "had_reasoning": answer.had_reasoning,
+        "reasoning": answer.reasoning or None,
+    }
+
+
+def public_body(prepared, orchestrator, answer) -> dict:
+    """`done_body` under the public protocol, with the validated summary."""
+    return public_protocol.project_done(
+        {**done_body(prepared, orchestrator, answer), "reasoning_summary": answer.reasoning_summary})
+
+
+def event_payload(event) -> dict:
+    """The wire body of one stream event other than `done`."""
+    from apps.ai.routing.chat import RoutingDecided
+
+    if isinstance(event, RoutingDecided):
+        return {"routing": event.routing}
+    if isinstance(event, (AgentStep, CandidatesSelected, CandidatesUpdated)):
+        return event.wire()
+    if isinstance(event, RetrievalFinished):
+        return {
+            "passage_count": event.passage_count,
+            "record_count": event.record_count,
+            "degraded": event.degraded,
+        }
+    if isinstance(event, (TextDelta, ReasoningDelta)):
+        return {"text": event.text}
+    if isinstance(event, CitationsResolved):
+        return {"citations": citations(event.citations)}
+    # RetrievalStarted, GenerationStarted -- no payload beyond the name.
+    return {}
 
 
 def _sse(event_name: str, data: dict) -> str:
@@ -321,11 +405,18 @@ class ChatStreamView(APIView):
 
     **This stays a plain synchronous view.** Retrieval, the disclosure gate,
     memory recall and persistence are the exact same synchronous calls
-    `ChatQueryView` makes; under the ASGI deployment ADR-017 requires,
-    Django's own ASGI handler is what bridges a synchronous view's
-    `StreamingHttpResponse` onto the event loop -- pulling `streaming_content`
-    one chunk at a time via `sync_to_async` internally -- so there is no
-    async plumbing to write by hand here.
+    `ChatQueryView` makes; `EventStreamResponse` streams it under ASGI.
+    The research lane adds `agent_step` events and `done.research` (IR-504).
+    A listing adds `candidates_selected` (every candidate, relevance pending,
+    as soon as chosen) and `candidates_updated` (new states by record id),
+    then `done.listing` with every candidate in one state (IR-546).
+
+    **With `AI_DURABLE_ASK` on, a question inside a Conversation is queued
+    instead (IR-544).** The same response then follows the run's journal:
+    `run_queued`, `run_started`, the events above, and `done` (or
+    `run_failed`), each with an SSE `id:` a reader can reconnect from through
+    `RunStreamView`. Leaving unsubscribes; the worker answers regardless.
+    `apps/ai/durable.py` has the lifecycle.
 
     **Generation streams against the real configured model as of IR-334.**
     The IR-321 resilience decorators implement `stream()` now, rather than
@@ -338,9 +429,36 @@ class ChatStreamView(APIView):
     throttle_classes = [AIQueryThrottle]
 
     def post(self, request):
-        prepared, error = _prepare_ask_request(request)
+        from apps.ai import durable
+
+        public_mode = public_protocol.requested(request)
+        queued = durable.requested(request.data)
+        prepared, error = prepare_ask(request.data, request.user, resolve=not queued)
         if error is not None:
             return error
+        if queued:
+            # Answered by a worker; this response only follows its journal,
+            # so a disconnect unsubscribes and nothing else (IR-544).
+            try:
+                run = durable.submit(
+                    prepared, request.user, request.data,
+                    max_sources=_parse_top_k(request.data.get("top_k")),
+                )
+            except durable.Busy as busy:
+                # Refused before anything was queued (IR-545): an explicit
+                # busy status, not a run that would wait past its deadline.
+                return Response(
+                    {"detail": "IRIS is busy answering other questions. Please try again shortly.",
+                     "status": "busy", "reason": busy.reason},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    headers={"Retry-After": "5"},
+                )
+            if run is None:
+                return Response(
+                    {"detail": "IRIS is still answering your previous question in this conversation."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            return EventStreamResponse(durable.follow(run.pk, request.user, public=public_mode))
 
         orchestrator = ChatOrchestrator(
             prepared, max_sources=_parse_top_k(request.data.get("top_k"))
@@ -349,55 +467,134 @@ class ChatStreamView(APIView):
         def event_source():
             # The orchestrator records the Turn before `Done` reaches here,
             # and as `partial` on interruption (IR-328).
-            for event in orchestrator.answer_stream(request.user):
-                if isinstance(event, RetrievalFinished):
-                    yield _sse(
-                        event.name,
-                        {
-                            "passage_count": event.passage_count,
-                            "record_count": event.record_count,
-                            "degraded": event.degraded,
-                        },
-                    )
-                elif isinstance(event, (TextDelta, ReasoningDelta)):
-                    yield _sse(event.name, {"text": event.text})
-                elif isinstance(event, CitationsResolved):
-                    yield _sse(event.name, {"citations": citations(event.citations)})
-                elif isinstance(event, Done):
-                    answer = event.answer
-                    mode = answer_mode(answer.state)
-                    yield _sse(
-                        event.name,
-                        {
-                            **answer_body(mode, answer.text),
-                            "conversation_id": (
-                                None
-                                if prepared.conversation is None
-                                else prepared.conversation.pk
-                            ),
-                            "resolved_question": prepared.resolved_question,
-                            "citations": citations(answer.citations),
-                            "sources": record_sources(answer.sources),
-                            "mode": mode,
-                            "degraded": answer.degraded,
-                            "widened": prepared.widened,
-                            "had_reasoning": answer.had_reasoning,
-                            "reasoning": answer.reasoning or None,
-                        },
-                    )
-                else:
-                    # RetrievalStarted, GenerationStarted -- no payload
-                    # beyond the event name itself.
-                    yield _sse(event.name, {})
+            # Closed explicitly, so a run never waits on garbage collection.
+            events = orchestrator.answer_stream(request.user)
+            projector = public_protocol.StreamProjector()
+            with closing(events):
+                for event in events:
+                    if isinstance(event, Done):
+                        body = (public_body if public_mode else done_body)(
+                            prepared, orchestrator, event.answer)
+                    else:
+                        body = event_payload(event)
+                    if not public_mode:
+                        yield _sse(event.name, body)
+                        continue
+                    for name, data in projector.feed(event.name, body):
+                        yield _sse(name, data)
 
-        response = StreamingHttpResponse(
-            event_source(), content_type="text/event-stream"
+        return EventStreamResponse(event_source())
+
+
+class RunStreamView(APIView):
+    """
+    GET /api/v1/ai/ask/runs/<uuid>/stream/?after=N
+
+    Reconnect to a queued question (IR-544): the run's public events after
+    sequence ``N`` (or the SSE ``Last-Event-ID`` header), then the live tail
+    until its terminal event. The same events, names and `id:` cursor that
+    `/ask/stream/` sent before the connection dropped.
+
+    Someone else's run is a 404 identical to one that never existed.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from apps.ai import durable
+        from apps.ai.models import AskRun
+
+        if not AskRun.objects.owned_by(request.user).filter(pk=pk).exists():
+            raise Http404
+        after = request.query_params.get("after", request.headers.get("Last-Event-ID", 0))
+        try:
+            after = max(0, int(after))
+        except (TypeError, ValueError):
+            after = 0
+        return EventStreamResponse(
+            durable.follow(pk, request.user, after=after, public=public_protocol.requested(request))
         )
-        response["Cache-Control"] = "no-cache"
-        # nginx buffers a proxied response by default, which would turn this
-        # into one delayed burst instead of a stream -- see `nginx.conf`.
-        response["X-Accel-Buffering"] = "no"
-        return response
+
+
+class RunCancelView(APIView):
+    """
+    POST /api/v1/ai/ask/runs/<uuid>/cancel/
+
+    Stop the asker's queued question (IR-548). 200 with ``cancelled`` once it
+    is, or if it already was; 409 with the state it ended in when it had
+    already finished. Someone else's run is a 404 identical to a missing one.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from apps.ai import durable
+        from apps.ai.models.queued import CANCELLED
+
+        run = durable.cancel(pk, request.user)
+        if run is None:
+            raise Http404
+        body = {"run_id": str(run.pk), "state": run.state}
+        return Response(body, status=200 if run.state == CANCELLED else status.HTTP_409_CONFLICT)
+
+
+def _require_owned_run(user, pk) -> None:
+    """Someone else's run, or a missing one: the same 404."""
+    from apps.ai.models import AskRun
+
+    if not AskRun.objects.owned_by(user).filter(pk=pk).exists():
+        raise Http404
+
+
+class RunRetryView(APIView):
+    """
+    POST /api/v1/ai/ask/runs/<uuid>/retry/
+
+    Ask a run's question again as a new, linked run (IR-548): 201 with its
+    id, which `RunStreamView` follows from the start. Repeating the request
+    returns that same run with 200 instead of starting another. 409 while the
+    run has not ended, once it ended with its answer, or while another run in
+    its Conversation is unfinished; 503 when the queue is full.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AIQueryThrottle]
+
+    def post(self, request, pk):
+        from apps.ai import durable
+
+        if not durable.enabled():
+            _require_owned_run(request.user, pk)
+            return Response(
+                {"detail": "Queued questions are switched off; ask the question again."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            result = durable.retry(pk, request.user)
+        except durable.NotRetryable as refused:
+            return Response(
+                {"detail": "Only a question that ended without its answer can be retried.",
+                 "run_id": str(pk), "state": refused.state},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except durable.Busy as busy:
+            return Response(
+                {"detail": "IRIS is busy answering other questions. Please try again shortly.",
+                 "status": "busy", "reason": busy.reason},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                headers={"Retry-After": "5"},
+            )
+        if result is None:
+            _require_owned_run(request.user, pk)
+            return Response(
+                {"detail": "IRIS is still answering another question in this conversation."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        run, created = result
+        return Response(
+            {"run_id": str(run.pk), "retry_of": str(run.retry_of_id), "state": run.state},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class SemanticSearchView(APIView):
@@ -495,6 +692,7 @@ class AIStatusView(APIView):
                     }
                 ),
                 "generative": composition_root().generation_configured(),
+                "comparison_max_records": settings.AI_COMPARISON_MAX_RECORDS,
                 # Counted through `visible_to`, like everything else on this
                 # path: a raw corpus total would tell an asker how many
                 # records exist that they cannot see.

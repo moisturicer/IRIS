@@ -2,6 +2,8 @@
 
 ## Status
 
+> **Later decision accepted — 2026-10-15 (IR-589).** [ADR-042](042-general-tools-conversation-contract.md) makes a conversational controller the default reader path when delivered, without a controller on/off switch or reader lane choice. It supersedes exclusive fixed lanes and the proposed whole-answer-withholding rule for that new path. This pointer does not approve this ADR or alter its earlier history; the legacy implementation still follows its own behavior until replaced.
+
 **Proposed** — 2026-10-11 (IR-499). Drafted by an AI agent from [proposal 13](../architecture-review/13-bounded-research-agent-proposal.md) and the owner decisions recorded in its §Owner decisions — 2026-10-11, which **Jive Tyler Revalde** gave in a design review. **Awaiting approval by a named person.** The agent does not mark this accepted. Until a person records that approval in this file, nothing below is a decision, and **none of IR-500 (tool layer), IR-501 (screening and topic counts), IR-502 (planner, answer validation, run audit), IR-503 (Jev router and injection screen) or IR-504 (production rollout) may merge**.
 
 **Supersedes [ADR-035](035-ask-iris-decides-whether-it-needs-evidence.md) §4 and §11 for the research lane only.** Everywhere else ADR-035 stands as written, including its Proposed IR-487 amendment, which this ADR neither accepts nor rejects.
@@ -334,3 +336,44 @@ FR-M4, FR-M4-01 (RAG chatbot) · NFR-R2 (graceful degradation) · NFR-S4 (no una
 **Deferred:** [IR-505](https://citiris.atlassian.net/browse/IR-505) — evaluation, shadow mode, the ADR-023 amendment, chunk injection screening.
 
 **Elsewhere:** [IR-250](https://citiris.atlassian.net/browse/IR-250) (the embargo field the gate waits on) · [IR-278](https://citiris.atlassian.net/browse/IR-278) (a real corpus) · [IR-485](https://citiris.atlassian.net/browse/IR-485) and [IR-487](https://citiris.atlassian.net/browse/IR-487) (Jev's vendor terms, and the proposed amendments this ADR partly supersedes) · IR-302 to IR-305 (the Lens, unbuilt).
+
+
+### IR-515 implementation divergence — 2026-10-11
+
+IR-515 explicitly requires landscape and gap questions to be refused with a reason,
+never answered from passage retrieval. This conflicts with the draft §3 landscape
+paragraph. The implementation follows the explicit IR-515 instruction: a landscape
+decision returns `no_sources` with the capability limitation, performs no retrieval,
+and cannot be overridden into an evidence workflow while the capability is absent.
+This records the contradiction; it does not accept this Proposed ADR or authorize
+merge. The flag remains off and cannot be enabled with `DEBUG=False` until IR-504.
+
+### IR-547 implementation divergence — 2026-10-14
+
+IR-547 (Jira, under IR-551) changes two things §6 describes. A reader's topic count now
+screens at most **twenty** distinct candidates and says so ("N matches among M assessed
+of S selected candidate papers"), instead of screening every visible record and
+labelling the count `exhaustive`, `screened`, `matches_found` or `sample`. And a
+per-reader store of screening verdicts (`ScreeningJudgment`, off by default, inert
+without a named approval policy) now exists. The store is per reader only; the
+"cached or cross-user aggregate is not [safe]" rule in §Counts still stands and no
+cross-reader sharing is authorised or built. This records the contradiction and the
+new store; it does not accept this Proposed ADR or authorize merge. Contract:
+[pilot README §12](../evaluation/fixed-workflow-pilot/README.md).
+
+### IR-504 implementation record — 2026-10-12
+
+Records proposal 13 D8 as built; it does not accept this ADR. **D8: ASGI**, which
+production already runs. Against Celery offload it adds no queue or relay, at the
+cost of a run holding a thread and a connection with no resume across a restart
+(trade-offs in [RESEARCH_LANE_ROLLOUT.md](../engineering/RESEARCH_LANE_ROLLOUT.md)).
+Building it found that Django buffers a synchronous SSE stream to the end under
+ASGI, so no progress reached a reader in production; `EventStreamResponse` now
+streams it. `AI_RESEARCH_LANE` gains `staff` and is no longer refused with
+`DEBUG=False`. Planner steps stream as `agent_step` and persist on `Turn.research`
+with the coverage notes, which no longer append to the answer text.
+
+**Contradiction recorded, not resolved:** IR-504 states that IR-499's decisions
+are accepted by the owner, while this file's Status still reads Proposed and says
+IR-504 may not merge until a person records acceptance here. The Status line wins
+until it is updated.

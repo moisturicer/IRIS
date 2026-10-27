@@ -53,7 +53,7 @@ def test_duplicate_is_fed_back_and_spends_the_inner_budget(corpus, embedder):
     model = planning(*[("search_passages", {"query": TOPIC})] * 2)
     result = run(corpus, embedder, model, max_calls_per_subtask=2, max_tool_calls=3)
     assert result.stop_reason == "max_tool_calls"
-    assert "stopped" in result.answer.text
+    assert "stopped" in result.coverage_notes[0]["text"]
     assert [step for step in result.steps if step.kind == "tool"][-1].duplicate is True
 
 
@@ -90,7 +90,7 @@ def test_provider_failure_with_evidence_synthesizes_without_another_search(corpu
     assert result.fallback is False
     assert result.answer.citations
     assert result.stop_reason == "planner_unavailable"
-    assert "stopped" in result.answer.text
+    assert "stopped" in result.coverage_notes[0]["text"]
 
 
 @pytest.mark.parametrize("reply, code", [
@@ -181,16 +181,14 @@ def test_leaked_reasoning_is_never_validated_as_answer_content(corpus, embedder)
     assert result.answer.text == "Supported prose [1]."
 
 
-def test_source_mapping_above_thirty_preserves_valid_citations(corpus, embedder):
+def test_source_mapping_above_thirty_preserves_valid_citations(corpus, embedder, ledger_passage):
     from apps.ai.research.registry import ToolRun
     from apps.ai.research.synthesis import synthesize
     stack = root(embedder)
     ctx = RunContext.for_request(user=corpus["student"], root=stack, lane="research", budget=replace(Budget.from_settings(), max_ledger_passages=40))
     tool_run = ToolRun.start(ctx, stack)
-    for index in range(40):
-        tool_run.ledger.add_passage(record_id=corpus["public"].pk, chunk_id=index + 1, chunk_set_hash="fixture",
-                                   record_title="Flood forecasting", text="Known passage.", page=1,
-                                   context_path=(), score=1)
+    for _ in range(40):
+        ledger_passage(tool_run, corpus["public"], "Known passage.", 1)
     answer, handles, codes = synthesize(TOPIC, tool_run, ScriptedLLM(reply="Known passage [31]."), [])
     assert codes == ()
     assert answer.state == "generated"

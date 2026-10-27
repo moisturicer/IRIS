@@ -1,4 +1,57 @@
 import typography from "@tailwindcss/typography";
+import defaultColors from "tailwindcss/colors";
+import plugin from "tailwindcss/plugin";
+
+/**
+ * The entry panel's shelf (IR-586): each volume rises onto the shelf in turn,
+ * `SHELF_STEP_MS` after the one to its left. Generated rather than written
+ * out, because the entry frame takes no inline style to carry a per-volume
+ * delay. The fill is `backwards` so a volume waits unseen through its delay,
+ * and once it has landed the animation lets go of `transform`, leaving the
+ * hover lift free to move it. Nothing of it runs under reduced motion.
+ */
+const SHELF_VOLUMES = 24;
+const SHELF_STEP_MS = 35;
+
+const shelfRise = plugin(({ addBase, addComponents }) => {
+  const stagger = Object.fromEntries(
+    Array.from({ length: SHELF_VOLUMES - 1 }, (_, i) => [
+      `.shelf-rise > :nth-child(${i + 2})`,
+      { animationDelay: `${(i + 1) * SHELF_STEP_MS}ms` },
+    ]),
+  );
+  // In the base layer rather than `theme.keyframes`: Tailwind emits a theme
+  // keyframe only beside an `animate-*` utility that names it, and none does.
+  addBase({
+    "@keyframes shelve": {
+      "0%":   { opacity: "0", transform: "translateY(1.5rem)" },
+      "100%": { opacity: "1", transform: "translateY(0)" },
+    },
+  });
+  addComponents({
+    "@media (prefers-reduced-motion: no-preference)": {
+      ".shelf-rise > *": { animation: "shelve 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards" },
+      ...stagger,
+    },
+  });
+});
+
+/**
+ * The record page's workspace tiers (IR-569): container queries on the
+ * `reading` container, so the layout follows the content width, not the
+ * window. `paneLayout.ts` holds the same numbers for React.
+ */
+export const readingVariants = {
+  "reading-split": "@container reading (min-width: 640px)",
+  "reading-wide": "@container reading (min-width: 1000px)",
+  // The Overview's own column, which Ask IRIS narrows when it sits beside it:
+  // the record details sit beside the page only while there is room for both.
+  "overview-wide": "@container overview (min-width: 64rem)",
+};
+
+const readingTiers = plugin(({ addVariant }) => {
+  for (const [name, query] of Object.entries(readingVariants)) addVariant(name, query);
+});
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -9,7 +62,28 @@ export default {
 
   theme: {
     extend: {
+      // A window too short for the entry panel's shelf to carry its spine
+      // titles clear of their gold bands (IR-535). Height, not width.
+      screens: {
+        short: { raw: "(max-height: 680px)" },
+      },
+
+      // The one cap for an app page (IR-519): PageContainer's "standard" width.
+      maxWidth: {
+        page: "90rem",
+      },
       colors: {
+        // Surface roles (IR-558; 01-design-system.md section 0). Three
+        // backgrounds, named for what they are for, so a screen asks for the
+        // role and never picks a near-white by hand: `canvas` is the ground
+        // every screen sits on, `surface` is content (a card, a panel, a
+        // field), `overlay` is anything that floats over content (a toast, a
+        // menu, the reading toolbar). `surface` and `overlay` are both opaque
+        // white today; they are two names so that one can change alone.
+        canvas:  defaultColors.stone[50],
+        surface: "#ffffff",
+        overlay: "#ffffff",
+
         // Primary brand color -- deep maroon
         gold: {
           DEFAULT: "#C59334",
@@ -84,6 +158,13 @@ export default {
       boxShadow: {
         card: "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04)",
         "card-md": "0 4px 12px 0 rgb(0 0 0 / 0.08)",
+      },
+
+      // The app shell (IR-413): the drawer slides, the rail narrows and the
+      // content margin follows, so one element can carry all three without one
+      // `transition-property` class silently overriding another.
+      transitionProperty: {
+        shell: "transform, width, margin",
       },
 
       // Line clamp utilities (built-in in Tailwind v3.3+, kept here for older versions)
@@ -218,8 +299,20 @@ export default {
           "0%":   { backgroundColor: "rgb(252 211 77 / 0.75)" },
           "100%": { backgroundColor: "rgb(252 211 77 / 0.35)" },
         },
+        // Ask IRIS arriving from the edge it is docked to (IR-569).
+        "panel-in": {
+          "0%":   { opacity: "0", transform: "translateX(1.5rem)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        // The same arrival from the start edge, for Ask IRIS's history drawer (IR-570).
+        "panel-in-start": {
+          "0%":   { opacity: "0", transform: "translateX(-1.5rem)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
       },
       animation: {
+        "panel-in": "panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
+        "panel-in-start": "panel-in-start 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "fade-in-up": "fade-in-up 0.3s ease-out",
         "fade-in":    "fade-in 0.2s ease-out",
         "citation-flash": "citation-flash 1.6s ease-out",
@@ -232,5 +325,7 @@ export default {
     // Without it they emit no CSS and Preflight flattens every heading,
     // list and table. @tailwindcss/forms is still not needed.
     typography,
+    shelfRise,
+    readingTiers,
   ],
 };

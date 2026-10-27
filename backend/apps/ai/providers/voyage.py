@@ -118,26 +118,51 @@ def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
         from .openai_compatible import DeadlineExceeded
 
         raise DeadlineExceeded("the research run's deadline has passed")
-    try:
-        response = httpx.post(
-            f"{_BASE_URL}{path}",
-            json=payload,
-            headers={"Authorization": f"Bearer {_api_key()}"},
-            timeout=timeout,
-        )
-    except VoyageError:
-        raise
-    except httpx.HTTPError as exc:
-        classified = _classify_transport_error(exc)
-        raise VoyageError(
-            f"Voyage request to {path} failed: {exc}", kind=classified.kind
-        ) from exc
-    if response.status_code >= 400:
-        raise VoyageError(
-            f"Voyage returned {response.status_code} at {path}: {response.text[:300]}",
-            kind=_classify_response(response),
-        )
-    return response.json()
+    key = _api_key()
+    # IR-545: one admitted physical attempt per request. Voyage bills input
+    # tokens only, and reports them. Imported here: the ledger needs the app
+    # registry, and this module is imported by tests that have none.
+    import json
+
+    from apps.ai.admission.ledger import Request, account_for, provider_attempt
+    from apps.ai.admission.ledger import estimate_tokens as upper_bound_tokens
+    from apps.ai.admission.scope import mark_sent, report_usage
+
+    rerank = path == "/rerank"
+    with provider_attempt(lambda: Request(
+        operation="rerank" if rerank else "embed",
+        default_lane="reranking" if rerank else "embedding",
+        account=account_for(key),
+        models=(str(payload.get("model", "")),),
+        input_tokens=upper_bound_tokens(json.dumps(payload, ensure_ascii=False)),
+        output_tokens=0,
+        timeout_seconds=timeout,
+    )):
+        try:
+            mark_sent()
+            response = httpx.post(
+                f"{_BASE_URL}{path}",
+                json=payload,
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=timeout,
+            )
+        except VoyageError:
+            raise
+        except httpx.HTTPError as exc:
+            classified = _classify_transport_error(exc)
+            raise VoyageError(
+                f"Voyage request to {path} failed: {exc}", kind=classified.kind
+            ) from exc
+        if response.status_code >= 400:
+            raise VoyageError(
+                f"Voyage returned {response.status_code} at {path}: {response.text[:300]}",
+                kind=_classify_response(response),
+            )
+        body = response.json()
+        usage = body.get("usage") if isinstance(body, dict) else None
+        if isinstance(usage, dict) and isinstance(usage.get("total_tokens"), int):
+            report_usage(input_tokens=usage["total_tokens"], output_tokens=0)
+        return body
 
 
 class VoyageEmbeddingProvider(EmbeddingProvider):

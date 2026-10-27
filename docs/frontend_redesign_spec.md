@@ -113,7 +113,7 @@ Everything else either:
 
 - moves into a dialog (Publish, Edit details, Request document, Route…);
 - becomes a section of Paper View (Files, Action required);
-- or leaves the sidebar (Notifications stays in the header bell; Settings moves to the account menu).
+- or leaves the sidebar (Notifications becomes the bell at the top of the sidebar; Settings moves to the account menu in the sidebar's user block). *Amended 2026-10-11 by IR-519: there is no app header.*
 
 The visual language set on Paper View by IR-356 becomes the whole product's:
 
@@ -216,7 +216,7 @@ The visual language set on Paper View by IR-356 becomes the whole product's:
 ### Navigation and consistency (everyone)
 
 74. As any user, I want a short sidebar (Discover, Ask IRIS, My Library, My Reviews if I review, Calls & Conferences), so that the product feels simple.
-75. As any user, I want notifications in the header bell, and settings under my account menu, so that they don't crowd the main navigation.
+75. As any user, I want notifications in a bell at the top of the sidebar, and settings under my account menu, so that they don't crowd the main navigation. *(Amended 2026-10-11, IR-519: the bell was in an app header, which no longer exists.)*
 76. As a user with an old link to Submit Disclosure, My Workspace, a review evaluation page or a documents page, I want to land in the right new place, so that nothing I bookmarked breaks.
 77. As any user, I want status words to be the same everywhere a record appears, so that "In review" means one thing.
 78. As a keyboard user, I want every dialog to trap focus, return focus when closed, and close on Escape, so that I can work without a mouse.
@@ -250,9 +250,9 @@ IP Management                                ── Administration (RDCO only) �
 Review Queue                                   Delete Requests
   Review Queue             → My Reviews        Audit Log
   Approved Proposals (RDCO)→ removed
-Tools                                        Header: notification bell · account menu
-  Notifications            → header bell            (Settings & Profile, Help, Sign out)
-  Settings & Profile       → account menu
+Tools                                        Sidebar top: notification bell (IR-519)
+  Notifications            → sidebar bell     Sidebar user block: account menu
+  Settings & Profile       → account menu            (Settings & Profile, Help, Sign out)
 Administration (RDCO) — unchanged
 ```
 
@@ -295,11 +295,13 @@ Administration (RDCO) — unchanged
   - Both the sidebar entry and the `/review` route guard read this flag. The access map keeps `reviewQueue` only as the outer role gate, and the server's queue endpoint still scopes every row.
   - Landing after sign-in follows the same flag: My Reviews when `my_reviews` is true, otherwise Discover.
 - **The sidebar's workspace badge becomes a dot on My Library.** It is shown only when something needs the user's action. It is justified because it is actionable, not a count for its own sake. **Correction found while verifying:** today's badge reads `/dashboard/stats/`'s `pending_mine`, which counts the user's records that are *in review*, not records *waiting on the user*. The dot therefore needs `needs_action_mine` added to that endpoint (B2, Appendix D).
-- **One app header on every screen.** Discover's private header is removed, and Discover becomes a normal page under the shared header. The header holds only:
-  - the menu toggle (mobile);
-  - the breadcrumbs slot;
-  - the notification bell;
-  - the account menu.
+- **No app header** *(amended 2026-10-11 by IR-519; this replaces "One app header on every screen")*. The project lead reversed the shared header: it cost 58px of height on every screen, and the only thing it held besides the bell was a search box with no handler. Discover's private header is removed as well. What the header was to hold goes here instead:
+  - **the notification bell:** at the top of the sidebar, beside the IRIS logo and the collapse control. It stays visible when the sidebar is collapsed and keeps its dropdown, whose "View all" opens `/notifications`;
+  - **the breadcrumbs:** at the top of the page content;
+  - **the account menu:** the sidebar's user block (IR-413);
+  - **the menu toggle:** below `md` only, in a slim bar with the bell. The bar scrolls away with the page instead of sticking, so no sticky offset depends on it.
+
+  Every page also takes its width from one place, `PageContainer` (about 1440px centred, or full width for the PDF reader and the wide admin tables), chosen per route by `AppShell`. A page sets no outer cap of its own.
 
 ### 4.3 Discover
 
@@ -570,6 +572,17 @@ Every screen asks the adapter. No component reads a role name or `can_act` direc
 
 ### 4.9 My Library
 
+> **Amended 2026-10-11 (IR-410, project lead, built).** The lead had the page redesigned with the `impeccable` design skill and allowed the plan below to be overridden. The lead chose **"grouped by who holds it"** from two rounds of three structures. **This amendment supersedes the layout, filter, rail and select text below wherever they differ;** the rest stands.
+>
+> - **Grouping replaces the filters.** An author's research is grouped by who has each record now. The sections are, in order: **Waiting on you**, With your Adviser, With the offices, With RDCO for a decision, In review, Drafts, Finished, Deletion requested, and a collapsed **Archived**. Empty sections are left out. Waiting on you sits in a soft maroon panel; a coloured left edge was rejected.
+>   - The seven filter buttons are gone. So is "Needs my action" as a filter with an attention dot: Waiting on you *is* that list, shown first.
+>   - Grouping reads only server fields: `workflow_state`, the new `holders`, and `pipeline_status` (`features/library/researchSections.ts`). No stage is worked out on the client.
+> - **The office review is on the card.** `/records/mine/` gained `holders` (who has the record now) and `cleared_offices` (each office that cleared it, `preserved` when kept through a resubmission, by `clearance_state.is_preserved`). Each card shows "ITSO cleared · kept", "IERC reviewing" and so on. This is clearance-aware resubmission (ADR-003), shown where the author works. Both fields come from the list's existing bulk pass plus one query, so the flat query count holds.
+> - **The rail is replaced by "Your reading."** It is a panel beside the research, not a left rail. It lists Want to read, Reading, Completed, the reader's own folders, Liked papers, History and New folder, plus the three most recently opened papers. It says "Saved in this browser only." Choosing a folder shows it in the main column with *Back to your research*. Renaming and deleting a folder move into the folder's own view.
+> - **No select below `md`.** Below `lg` the panel stacks under the research, and the header gains a *Your reading* jump link, so saved reading is never hidden behind a control.
+> - **Cards** are `ResearchCard` with its new `compact` option, so titles stay at `text-title` and a screen holds several records. Search covers titles and authors across every section.
+> - **Unchanged:** no counters; the status line is `workflow_state_label`; Continue on a draft opens Publish; Respond opens Paper View at Review or Files; authors open on their research and everyone else on Want to read; and `/workspace` redirects here.
+
 **The page's primary task is to see and continue my own research, and secondarily to find what I saved.**
 
 **Layout:** the folder rail on the left (IR-350-era `LibraryFolderRail`, extended) and the content on the right. This follows the library model already built on the alphaXiv reference:
@@ -765,7 +778,7 @@ It never asserts internal state, hook calls or component structure. It is writte
 1. **Adviser-publish wording — PRODUCT-LANGUAGE DECISION, open.** ADR-032 decides the *rule* (an Adviser may accept & publish when no specialist review is needed, §3) but not the words students or advisers see. ui-ux/16's confirmation text (*"This publishes the thesis to Discover. No office will review it."*) is a draft, not a decision. The project lead approves the Adviser's confirmation text and any student-facing mention before IR-270's UI ships.
 2. **IR-118 is re-scoped, not closed.** Preset document lists fit ADR-022's existing architecture: a document request already carries items drawn from the record type's upload slots (the `document-requests/slots` picklist), plus free-text *Other*. IR-118 becomes **"request templates"**: an office's named preset list of slots, which a reviewer sends as one `DocumentRequest` in one click. It adds no new requirement system, no submission-time requirement, and no parallel model; possibly one small table (template → slots), decided in IR-118.
 3. **Upload slots are not required — no change needed.** The spec no longer assumes the seeded slots are required. IR-118's migration `documents/0005` already set every slot `is_required = false`, and the wizard already requires only the manuscript. The earlier recommendation to migrate the seeds is **withdrawn**. The Publish dialog does not read `is_required` at all.
-4. **Notifications move to the header bell and Settings to the account menu — ADOPTED.** Both routes stay; only the sidebar entries go (F1).
+4. **Notifications move to the bell and Settings to the account menu — ADOPTED; amended 2026-10-11 (IR-519).** The bell sits at the top of the sidebar, because there is no app header (§4.2). The account menu is the sidebar's user block (IR-413). Both routes stay; only the sidebar entries go.
 5. **The Review | Ask IRIS switch — NEEDS VALIDATION against IR-356 and IR-372** (§4.6). It is not decided in isolation. It is settled with a mode-by-mode layout preview before F6's pane layout is final.
 6. **Import Records stays an RDCO administration page — ADOPTED.** It is filing on behalf of others, not Publish.
 7. **Student identity on Discoverable Proposals — PRIVACY / PRODUCT DECISION, open.** ADR-032 §8 lists authors' names on the summary. That is the first place student names appear on unapproved work, to every signed-in user. The project lead decides, with the DPO question already open on IR-123, whether:
@@ -845,6 +858,7 @@ It never asserts internal state, hook calls or component structure. It is writte
 - Sidebar badges: a workspace count from `/dashboard/stats/`, and role requests.
 - **Header:** the breadcrumbs, a **non-functional search box** (hidden on Paper View), and the bell.
 - **Discover and Ask IRIS** are "full-bleed": `AppShell` omits the shared header, and **Discover renders its own header** with its own menu toggle and bell.
+- *Since 2026-10-11 (IR-519):* the shared header, its search box and Discover's private header are all removed (§4.2). This appendix records the state at `fc779a3`.
 - Landing after sign-in (`lib/roleDashboard.ts`): students go to Discover; every reviewer role goes to `/review`.
 
 **Pages of interest:**
@@ -899,7 +913,7 @@ It never asserts internal state, hook calls or component structure. It is writte
 
 - **Records rendered four ways:** Discover card, library table row, workspace case card, queue row.
 - **Two `EmptyState`s.**
-- **Two headers:** the shared one and Discover's.
+- **Two headers:** the shared one and Discover's. *(Resolved by IR-519: there are none.)*
 - **Metadata edited in two places:** the wizard steps and `EditRecordPage`.
 - **Status wording partly client-mapped:** `PIPELINE_LABELS`, which IR-342/IR-274 already target.
 
@@ -946,8 +960,8 @@ It never asserts internal state, hook calls or component structure. It is writte
 
 | View | Class | Primary task → verdict |
 |---|---|---|
-| Sidebar / navigation | 3 | Wayfinding. Five sections → one short list and Administration; Tools to the header |
-| Header | 2 | One header everywhere; drop the inert search |
+| Sidebar / navigation | 3 | Wayfinding. Five sections → one short list and Administration; Tools to the sidebar bell and the account menu (no header since IR-519) |
+| Header | 2 | ~~One header everywhere~~ No header (IR-519, 2026-10-11): bell to the sidebar, inert search dropped |
 | Discover | 3 | Find research. Dissolve the saved views, add Publish, the Research/Proposals split, `ResearchCard`, the shared empty state |
 | Discover Proposals tab | 6 | Blocked on the Discoverable backend |
 | Submit Disclosure wizard | 5 → Publish dialog (3) | Start a submission. Replaced |
@@ -1096,9 +1110,8 @@ It never asserts internal state, hook calls or component structure. It is writte
 
 - **Build:**
   - the §4.1 sidebar;
-  - Notifications and Settings to the header / account menu;
-  - removal of the header search;
-  - Discover under the shared header;
+  - Settings to the account menu in the sidebar's user block;
+  - ~~Notifications to the header bell; removal of the header search; Discover under the shared header~~: done by IR-519, which removed the header (§4.2);
   - the `HomePage` branch removed;
   - access-map changes;
   - the redirect table;
@@ -1182,11 +1195,11 @@ It never asserts internal state, hook calls or component structure. It is writte
   - the non-author default.
 - **AC:**
   - no numeric counters render;
-  - each *My research* filter maps to `/records/mine/?pipeline_status=` or to the returned `workflow_state`, with no client stage derivation;
+  - each *My research* filter maps to `/records/mine/?pipeline_status=` or to the returned `workflow_state`, with no client stage derivation; *(amended 2026-10-11, §4.9: filters became sections grouped by the server's `workflow_state`, `holders` and `pipeline_status`)*
   - the next-step line appears only when the server's `workflow_state` shows the owner owes something;
   - Continue on a draft opens Publish at that draft;
   - the "this browser only" note stays on Saved;
-  - the rail becomes a select below `md`;
+  - the rail becomes a select below `md`; *(amended 2026-10-11, §4.9: the rail became the "Your reading" panel, which stacks under the research below `lg`, with a jump link)*
   - verified at the four viewports;
   - the old tests for the deleted modules are retired with the reason stated.
 - **Depends:** F0; F3 for Continue (or a stub link).
@@ -1406,10 +1419,10 @@ The ADR-032 vertical tickets are created later, per the hold recorded on IR-255.
 
 | Ticket | Remains that ticket's responsibility | Belongs to the redesign | Rule for the redesign |
 |---|---|---|---|
-| **IR-351** Chat and chrome stay available while scrolling | `main` is not a scroll container; sticky offsets clear the header; the rail is capped | F1 changes `AppShell` (Discover under the shared header) | F1 **must not** add `overflow` to `main`, and keeps the sticky offsets. A regression test is added in F1 |
+| **IR-351** Chat and chrome stay available while scrolling | `main` is not a scroll container; sticky offsets clear the header; the rail is capped | F1 changes `AppShell` (Discover under the shared header). *IR-519 removed the header and recomputed the offsets from the top of the window* | F1 **must not** add `overflow` to `main`, and keeps the sticky offsets as IR-519 recomputed them (`paneLayout.ts`, pinned by `paneLayout.test.ts`). A regression test is added in F1 |
 | **IR-352** Contained PDF viewer | The reader, its pane geometry, fit-to-width, the page counter, `readerGeometry` / `paneLayout` | The Review section places the same reader beside the review pane | F6 **reuses** `PaperPdfReader` and the pane helpers unchanged; no second reader |
 | **IR-353** Find in paper (Done) | Find UI in the reader chrome | — | It comes free wherever the reader renders; no work |
-| **IR-354** Citation lands on the passage | `citationLandingDelta`, first-region landing, the below-`lg` sheet behaviour | Any new pane mode the Review section adds | F6 adds a test that a citation landing in the Review section clears the header and the pane (IR-354's helper, not a new one) |
+| **IR-354** Citation lands on the passage | `citationLandingDelta`, first-region landing, the below-`lg` sheet behaviour | Any new pane mode the Review section adds | F6 adds a test that a citation landing in the Review section clears the pane and its sticky section switch (IR-354's helper, not a new one). *There is no app header since IR-519.* |
 | **IR-355** Cross-paper citation keeps the conversation (To Do) | Pinning, the header "Chatting about X", release triggers, the ADR-026 §9 amendment (Jive reviews) | F5 restructures `PaperViewPage` sections, which touches the same mount path | **Land IR-355 before F5**, or F5 carries its regression test. F5 must not reintroduce the `LoadingSkeleton` unmount that IR-355 fixes |
 | **IR-356** Editorial visual redesign | The Paper View visual language: serif titles, header block, Abstract reading column, chat panel design (AI label, scope toggle in the header, composer, starter questions) | F0 extends the *tokens* app-wide; F5 rebuilds the header *structure* (sections, slots) | F5 keeps IR-356's visual treatment and only adds structure. Ask IRIS stays out of the Review section (§4.6), so IR-356's chat design is untouched |
 | **IR-372** Paper tab = reader + Ask IRIS docked right, full width | The Paper tab's layout rule and the dock preference behaviour | Overview (was Abstract), Review and Files sections | The Paper section is unchanged, and the Review section has no chat, so IR-372's rule is not stretched. Correct the card's stale "left" wording |

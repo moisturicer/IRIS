@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Formik, Form, Field, type FormikHelpers, type FieldProps } from "formik";
 import * as Yup from "yup";
-import { useUIStore } from "@/store/ui.store";
 import { Button, Input } from "@/components/ui";
 
 export interface LoginFormValues {
@@ -33,8 +32,10 @@ export function LoginForm({
   showCredentialsError = false,
   onIdentifierChange,
 }: LoginFormProps) {
-  const { addToast } = useUIStore();
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const forgotTriggerId = useId();
+  const forgotAnswerId = useId();
 
   return (
     <Formik<LoginFormValues>
@@ -107,19 +108,36 @@ export function LoginForm({
             )}
           </Field>
 
-          <div className="flex justify-end -mt-1">
-            <button
-              type="button"
-              className="text-[14px] font-semibold text-brand hover:underline"
-              onClick={() =>
-                addToast({
-                  type: "info",
-                  message: "Password reset is not available yet. Contact your administrator.",
-                })
-              }
-            >
-              Forgot password?
-            </button>
+          {/* An honest answer in place of a dead end (IR-536). IRIS has no
+              self-service reset, so the disclosure says who resets one. It
+              names the office rather than an address: the product holds no
+              contact route for RDCO to point at. */}
+          <div className="-mt-1">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                id={forgotTriggerId}
+                aria-expanded={forgotOpen}
+                aria-controls={forgotAnswerId}
+                onClick={() => setForgotOpen((v) => !v)}
+                // The same 44px target as the Show toggle above (2.5.5).
+                className="inline-flex items-center min-h-11 px-1 text-sm font-semibold
+                  text-brand hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+            {forgotOpen && (
+              <div
+                id={forgotAnswerId}
+                role="region"
+                aria-labelledby={forgotTriggerId}
+                className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700"
+              >
+                IRIS has no self-service password reset. Ask RDCO or your department
+                administrator to reset it for you.
+              </div>
+            )}
           </div>
 
           {/* `size="full"` carries the full width and the larger step. Passing

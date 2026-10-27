@@ -4,12 +4,14 @@ from .conversation import (
     TURN_QUESTION_VECTOR,
     VECTORS_PER_TURN,
     Conversation,
+    ConversationState,
     Turn,
     TurnCitation,
     TurnEmbedding,
     model_history_q,
 )
 from .summary import RecordOverview
+from .brief import PaperBrief
 from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, EmbeddingJob
 from .embedding_space import (
@@ -23,11 +25,21 @@ from .chunk import ChunkSet, DocumentChunk, ChunkEmbedding
 from .ingestion_job import IngestionJob
 from .shadow import ShadowEvidenceDecision, ShadowEvidenceTally
 from .research import ResearchRun, ResearchStep
+from .queued import AskRun, AskRunAttempt, AskRunEvent
+from .admission import ProviderCampaign, ProviderReservation
+from .screening import ScreeningJudgment
 
 __all__ = [
+    "AskRun",
+    "AskRunAttempt",
+    "AskRunEvent",
+    "ProviderCampaign",
+    "ProviderReservation",
     "ResearchRun",
     "ResearchStep",
+    "ScreeningJudgment",
     "Conversation",
+    "ConversationState",
     "Turn",
     "TurnCitation",
     "TurnEmbedding",
@@ -37,6 +49,7 @@ __all__ = [
     "TURN_QUESTION_VECTOR",
     "VECTORS_PER_TURN",
     "RecordOverview",
+    "PaperBrief",
     "DocumentMetadata",
     "RecordEmbedding",
     "EmbeddingJob",

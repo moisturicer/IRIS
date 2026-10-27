@@ -92,6 +92,36 @@ def embed_chunk_set(self, record_id: int, *, force: bool = False):
     return outcome.as_dict()
 
 
+@shared_task(bind=True, max_retries=2)
+def generate_record_overview(
+    self, record_id: int, chunk_set_id: int, content_hash: str, prompt_version: int
+):
+    """Generate the record's whole-paper overview away from the HTTP request."""
+    from apps.ai.models import RecordOverview
+    from apps.ai.overview.service import generate_overview
+
+    try:
+        generate_overview(record_id, chunk_set_id, content_hash, prompt_version)
+    except Exception as exc:
+        if self.request.retries >= self.max_retries:
+            RecordOverview.objects.filter(
+                record_id=record_id,
+                state="generating",
+                content_hash=content_hash,
+                prompt_version=prompt_version,
+            ).update(state="unavailable")
+            raise
+        raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task
+def generate_paper_brief(brief_id: int, claim: str):
+    """Read a claimed paper on the Overview's existing background queue."""
+    from apps.ai.briefs.service import generate_brief
+
+    generate_brief(brief_id, claim)
+
+
 @shared_task(bind=True, max_retries=3)
 def index_record(self, record_id: int, *, force: bool = False):
     """Both halves of one record's indexing, under one job (IR-282).
@@ -172,6 +202,9 @@ def _run_ingestion(self, extraction, force: bool) -> dict:
     # queued message that arrives after another worker has already embedded
     # the record costs one query and no vendor call.
     if outcome.wrote_anything:
+        from apps.ai.overview.service import queue_overview_for_chunk_set
+
+        queue_overview_for_chunk_set(outcome.chunk_set_id)
         embed_chunk_set.delay(outcome.record_id)
 
     return {
@@ -243,3 +276,19 @@ def metadata_extraction_task(document_id):
 @shared_task
 def embedding_generation_task(document_id):
     pass
+
+
+@shared_task(acks_late=True, reject_on_worker_lost=True, ignore_result=True)
+def answer_queued_question(run_id: str):
+    """One delivery of a queued Ask IRIS question (IR-544).
+
+    Acknowledged late, so a worker that dies mid-answer leaves the message to
+    be delivered again. Each delivery claims a new attempt and fences out the
+    one before it; a run that already ended is left alone, which is what keeps
+    a redelivery from writing a second Turn. No retry beyond that: a failure
+    ends the run, and spending more on it is IR-545's decision. Time limits
+    are set per dispatch from the run's deadline (`durable._dispatch`).
+    """
+    from apps.ai.durable import execute
+
+    execute(run_id)

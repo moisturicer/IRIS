@@ -1,72 +1,148 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
+
 import { opportunitiesApi } from "@/api/opportunities";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import {
   getSavedOpportunityIds,
+  pruneSavedOpportunities,
   toggleSavedOpportunity,
 } from "@/lib/opportunityLibrary";
-import type { Opportunity, OpportunityType } from "@/types/opportunities";
 import { cn } from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
+import type { Opportunity, OpportunityType } from "@/types/opportunities";
+
+import { OpportunityFormDialog } from "./OpportunityFormDialog";
+import { OpportunityRow } from "./OpportunityRow";
 import {
-  TYPE_TABS,
-  TYPE_BADGE_CLASS,
-  countdownChip,
-  formatCeiling,
-  formatDueDate,
+  DEADLINE_GROUPS,
+  OPPORTUNITY_TYPES,
+  byBoardOrder,
+  deadlineGroup,
   matchesQuery,
 } from "./opportunityUtils";
 
+/** A filter chip, as My Reviews draws them: soft maroon when on. */
+function chipClass(on: boolean) {
+  return cn(
+    "inline-flex shrink-0 items-center gap-1.5 min-h-11 lg:min-h-9 px-3 rounded-full border text-small font-medium whitespace-nowrap",
+    COLOUR_TRANSITION,
+    FOCUS_RING,
+    on ? "border-brand bg-brand-50 text-brand" : "border-stone-200 bg-white text-stone-700 hover:border-stone-400",
+    "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-stone-200",
+  );
+}
+
+/** Which sheet is open: none, a new call, or an existing one being edited. */
+type FormTarget = null | "new" | Opportunity;
+
 /**
- * Calls & Conferences — a deadline board (IR-121).
+ * Calls & Conferences: a deadline board (IR-121, redesigned in IR-530).
  *
- * The one question this page answers is "what can I still apply to, and by
- * when". Everything is ordered around that: featured first, then soonest
- * deadline (server-side), with urgency encoded in the countdown chip's colour.
+ * The one question it answers is "what can I still apply to, and by when", so
+ * the board is a single column grouped by how soon each call closes, in date
+ * order inside each group; a featured call is starred, not moved. Closed calls
+ * stay in a last group, so someone mid-application can still find the page,
+ * until the server drops them a month after the deadline.
  *
- * Two deliberate departures from the mockup, both recorded in IR-121:
+ * RDCO, KTTO and Advisers post here, and change what they posted. The page
+ * offers that only when the server says so (`can_post`, `can_edit`); the API
+ * is the boundary either way.
  *
- *  - the header counter read "0 Saved Reminders". Reminders are .ics downloads
- *    that live in the user's own calendar, so IRIS has nothing to count. It
- *    shows saved bookmarks instead, which IRIS does know about.
- *  - closed items are not hidden the moment they pass. They grey out in place
- *    so somebody mid-application can still find the page they were reading,
- *    and only drop off after a month (enforced server-side).
+ * Saving is per-browser (`lib/opportunityLibrary`), and the page says so.
+ * There is no server-side bookmark, and no in-app reminder: the calendar
+ * action hands over an .ics file the viewer's own calendar keeps.
  */
 export function CallsAndConferencesPage() {
-  const [items,   setItems]   = useState<Opportunity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
+  const ids = useId();
+
+  const [items,    setItems]    = useState<Opportunity[]>([]);
+  const [canPost,  setCanPost]  = useState(false);
+  const [loading,  setLoading]  = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const [activeType, setActiveType] = useState<OpportunityType | null>(null);
   const [query,      setQuery]      = useState("");
+  const [savedOnly,  setSavedOnly]  = useState(false);
   const [savedIds,   setSavedIds]   = useState<number[]>(() => getSavedOpportunityIds());
-  const [busyIcs,    setBusyIcs]    = useState<number | null>(null);
 
-  useEffect(() => {
+  const [icsBusy,   setIcsBusy]   = useState<number | null>(null);
+  const [icsFailed, setIcsFailed] = useState<number | null>(null);
+
+  const [formTarget, setFormTarget] = useState<FormTarget>(null);
+  const [deleting,   setDeleting]   = useState<Opportunity | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadFailed(false);
     opportunitiesApi
-      .list()
-      .then(({ data }) => {
-        if (!cancelled) setItems(data.results);
+      .board()
+      .then((board) => {
+        if (cancelled) return;
+        setItems([...board.items].sort(byBoardOrder));
+        setCanPost(board.can_post);
+        // The whole board is here, so a saved id that is not on it belongs to
+        // a call that was deleted or has dropped off: forget it.
+        setSavedIds(pruneSavedOpportunities(board.items.map((o) => o.id)));
       })
-      .catch(() => {
-        if (!cancelled) setError("Could not load calls and conferences.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .catch(() => { if (!cancelled) setLoadFailed(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
-  const visible = useMemo(
-    () => items.filter(
-      (o) => (activeType === null || o.opportunity_type === activeType) && matchesQuery(o, query),
-    ),
-    [items, activeType, query],
+  useEffect(() => load(), [load]);
+
+  // ---- Filtering ---------------------------------------------------------
+
+  const savedSet = useMemo(() => new Set(savedIds), [savedIds]);
+  /** Saved calls that are on the board now, which is what the Saved chip counts. */
+  const savedOnBoard = useMemo(() => items.filter((o) => savedSet.has(o.id)).length, [items, savedSet]);
+
+  /** Everything the search and saved filters keep, before the type filter. */
+  const searched = useMemo(
+    () => items.filter((o) => matchesQuery(o, query) && (!savedOnly || savedSet.has(o.id))),
+    [items, query, savedOnly, savedSet],
   );
 
-  // "Active" means still open — a closed call is not something you can act on,
-  // so counting it here would overstate what the board offers.
-  const activeCount = useMemo(() => items.filter((o) => !o.is_closed).length, [items]);
+  const visible = useMemo(
+    () => searched.filter((o) => activeType === null || o.opportunity_type === activeType),
+    [searched, activeType],
+  );
+
+  const groups = useMemo(
+    () =>
+      DEADLINE_GROUPS
+        .map((g) => ({ ...g, items: visible.filter((o) => deadlineGroup(o) === g.id) }))
+        .filter((g) => g.items.length > 0),
+    [visible],
+  );
+
+  /** Each type chip counts what it would show, given the search and saved filters. */
+  const typeCounts = useMemo(() => {
+    const counts = new Map<OpportunityType, number>();
+    for (const o of searched) counts.set(o.opportunity_type, (counts.get(o.opportunity_type) ?? 0) + 1);
+    return counts;
+  }, [searched]);
+
+  const openCount = useMemo(() => items.filter((o) => !o.is_closed).length, [items]);
+  const filtered  = activeType !== null || query.trim() !== "" || savedOnly;
+
+  const clearFilters = () => {
+    setActiveType(null);
+    setQuery("");
+    setSavedOnly(false);
+  };
+
+  // ---- Actions -----------------------------------------------------------
 
   const handleToggleSave = (id: number) => {
     toggleSavedOpportunity(id);
@@ -74,10 +150,11 @@ export function CallsAndConferencesPage() {
   };
 
   const handleDownloadIcs = async (o: Opportunity) => {
-    setBusyIcs(o.id);
+    setIcsBusy(o.id);
+    setIcsFailed(null);
     try {
       const { data } = await opportunitiesApi.calendar(o.id);
-      // Fetched with auth then handed to the browser as a blob — a plain link
+      // Fetched with auth then handed to the browser as a blob: a plain link
       // to the endpoint would arrive unauthenticated and 401.
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
@@ -88,318 +165,272 @@ export function CallsAndConferencesPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      setError("Could not build the calendar file.");
+      // Said on the row it failed for, not by replacing the whole board.
+      setIcsFailed(o.id);
     } finally {
-      setBusyIcs(null);
+      setIcsBusy(null);
     }
   };
 
+  const handleSaved = (saved: Opportunity, created: boolean) => {
+    setItems((current) =>
+      [...current.filter((o) => o.id !== saved.id), saved].sort(byBoardOrder),
+    );
+    setFormTarget(null);
+    addToast({ type: "success", message: created ? "Call posted." : "Changes saved." });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleting || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await opportunitiesApi.remove(deleting.id);
+      setItems((current) => current.filter((o) => o.id !== deleting.id));
+      setDeleting(null);
+      addToast({ type: "success", message: "Call deleted." });
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      setDeleteError(
+        status === 403 || status === 404
+          ? "You can no longer delete this call. It may already be gone."
+          : "Could not delete the call. Check your connection and try again.",
+      );
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  // ---- Render ------------------------------------------------------------
+
+  const postButton = canPost && (
+    <button type="button" onClick={() => setFormTarget("new")} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+      <i className="fas fa-plus" aria-hidden="true" />
+      Post a call
+    </button>
+  );
+
+  const ready = !loading && !loadFailed;
+
+  const summary = !ready
+    ? ""
+    : filtered
+      ? `Showing ${visible.length} of ${items.length} ${items.length === 1 ? "call" : "calls"}.`
+      : `${openCount} open ${openCount === 1 ? "call" : "calls"}${items.length > openCount ? `, ${items.length - openCount} recently closed` : ""}.` +
+        (savedOnBoard > 0 ? " Saved calls are kept in this browser only." : "");
+
   return (
-    <div className="p-4 sm:p-6 max-w-[1400px] mx-auto space-y-4">
-      {/* ---- Orientation ------------------------------------------------- */}
-      <header className="bg-white rounded-xl border border-stone-200 p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
-                <i className="fas fa-bullhorn text-[11px]" aria-hidden />
-              </span>
-              <span className="text-[12px] font-bold uppercase tracking-wider text-brand">
-                Institutional &amp; External Announcements
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold text-stone-900">Calls &amp; Conferences</h1>
-            <p className="text-[14px] text-stone-600 mt-1 max-w-2xl">
-              Internal research calls, upcoming conference deadlines, and competitive funding
-              windows published by CIT-U offices and partner institutions.
-            </p>
-          </div>
+    <div>
+      <PageHeader
+        title="Calls & Conferences"
+        description="Internal research calls, conference deadlines and funding windows, posted by CIT-U offices and advisers. Soonest deadline first."
+        actions={postButton || undefined}
+      />
 
-          <div className="flex items-center gap-3 text-[13px] font-semibold rounded-lg border border-stone-200 px-3 py-2 shrink-0">
-            <span className="flex items-center gap-1.5 text-stone-700">
-              <i className="fas fa-calendar-check text-brand text-[12px]" aria-hidden />
-              {activeCount} Active {activeCount === 1 ? "Call" : "Calls"}
-            </span>
-            <span className="w-px h-4 bg-stone-200" aria-hidden />
-            {/* Saved, not "reminders": an .ics download lives in the user's own
-                calendar and IRIS never sees it again. */}
-            <span className="text-stone-500" title="Saved in this browser only">
-              {savedIds.length} Saved
-            </span>
-          </div>
-        </div>
-
-        {/* ---- Filters --------------------------------------------------- */}
-        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-stone-100 flex-wrap">
-          <div
-            className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin -mb-1 pb-1"
-            role="tablist"
-            aria-label="Filter by type"
-          >
-            {TYPE_TABS.map((tab) => {
-              const active = activeType === tab.id;
-              return (
-                <button
-                  key={tab.label}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setActiveType(tab.id)}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-colors",
-                    active
-                      ? "bg-brand text-white"
-                      : "text-stone-600 border border-stone-200 hover:bg-stone-50",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="relative ml-auto min-w-[200px] flex-1 sm:flex-none sm:w-[280px]">
-            <i
-              className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-[12px]"
-              aria-hidden
-            />
-            <input
+      {/* ---- Search and filters ------------------------------------------ */}
+      {/* Search first, in its own row under the title: it is the first thing
+          a reader reaches for, and at the end of the chip row it was missed.
+          Counts appear only once there is a board to count; a 0 before the
+          data arrives would be a number IRIS does not know. */}
+      <div className="space-y-3 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0 max-w-md">
+            <Input
+              id={`${ids}-search`}
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search calls, keywords..."
-              aria-label="Search calls and conferences"
-              className="w-full pl-8 pr-3 py-2 rounded-lg border border-stone-200 text-[13px]
-                placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40"
+              placeholder="Search calls"
+              aria-label="Search calls by title, office or tag"
+              disabled={loadFailed}
+              leading={<i className="fas fa-magnifying-glass text-xs" aria-hidden="true" />}
             />
           </div>
+          <button
+            type="button"
+            aria-pressed={savedOnly}
+            aria-describedby={`${ids}-saved-hint`}
+            onClick={() => setSavedOnly((v) => !v)}
+            disabled={loadFailed}
+            className={chipClass(savedOnly)}
+          >
+            <i className={cn(savedOnly ? "fas" : "far", "fa-bookmark text-3xs")} aria-hidden="true" />
+            Saved
+            {ready && <span className="tabular-nums opacity-80">{savedOnBoard}</span>}
+          </button>
         </div>
-      </header>
+
+        {/* One scrolling row on a phone, cued by the chip cut off at the edge,
+            so five chips do not stack into four rows; wrapped from `sm` up. */}
+        <div
+          role="group"
+          aria-label="Filter by type"
+          className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible"
+        >
+          <button
+            type="button"
+            aria-pressed={activeType === null}
+            onClick={() => setActiveType(null)}
+            disabled={loadFailed}
+            className={chipClass(activeType === null)}
+          >
+            All
+            {ready && <span className="tabular-nums opacity-80">{searched.length}</span>}
+          </button>
+          {OPPORTUNITY_TYPES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={activeType === t.id}
+              onClick={() => setActiveType(activeType === t.id ? null : t.id)}
+              disabled={loadFailed}
+              className={chipClass(activeType === t.id)}
+            >
+              <i className={cn("fas", t.icon, "text-3xs")} aria-hidden="true" />
+              {t.label}
+              {ready && <span className="tabular-nums opacity-80">{typeCounts.get(t.id) ?? 0}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Always rendered, so a change to it is what a screen reader hears. */}
+      <p role="status" aria-live="polite" className="text-small text-stone-600 min-h-5 mb-section">
+        {summary}
+      </p>
+      {/* What every save control points at: touch and screen-reader users never
+          see a tooltip, so the per-browser limit is said, not hovered. */}
+      <p id={`${ids}-saved-hint`} className="sr-only">Saved calls are kept in this browser only.</p>
 
       {/* ---- Board ------------------------------------------------------- */}
       {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" aria-busy="true">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-xl border border-stone-200 p-5 animate-pulse">
-              <div className="h-5 w-32 bg-stone-100 rounded-full" />
-              <div className="h-5 w-3/4 bg-stone-100 rounded mt-4" />
-              <div className="h-3 w-1/2 bg-stone-100 rounded mt-3" />
-              <div className="h-3 w-full bg-stone-100 rounded mt-4" />
-              <div className="h-3 w-5/6 bg-stone-100 rounded mt-2" />
-            </div>
-          ))}
-        </div>
-      ) : error ? (
-        <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
-          <i className="fas fa-triangle-exclamation text-red-500 text-xl" aria-hidden />
-          <p className="text-[14px] text-stone-700 mt-2">{error}</p>
-        </div>
-      ) : visible.length === 0 ? (
-        <div className="bg-white rounded-xl border border-stone-200 p-10 text-center">
-          <i className="fas fa-bullhorn text-stone-300 text-2xl" aria-hidden />
-          <p className="text-[14px] font-semibold text-stone-700 mt-3">
-            {items.length === 0
-              ? "No calls have been posted yet."
-              : "Nothing matches these filters."}
-          </p>
-          <p className="text-[13px] text-stone-500 mt-1">
-            {items.length === 0
-              ? "RDCO, KTTO and advisers publish calls here as they open."
-              : "Try a different type, or clear the search."}
-          </p>
-          {items.length > 0 && (
-            <button
-              type="button"
-              onClick={() => { setActiveType(null); setQuery(""); }}
-              className="mt-4 px-3.5 py-1.5 rounded-lg text-[13px] font-semibold text-brand border border-brand-200 hover:bg-brand-50"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
+        <BoardSkeleton />
+      ) : loadFailed ? (
+        <EmptyState
+          framed
+          tone="error"
+          icon="fa-triangle-exclamation"
+          title="Could not load calls and conferences"
+          message="The board did not load. Your saved calls are still kept in this browser."
+          action={<Button variant="outline" onClick={load}>Try again</Button>}
+        />
+      ) : items.length === 0 ? (
+        <EmptyState
+          framed
+          icon="fa-bullhorn"
+          title="No calls posted yet"
+          message={
+            canPost
+              ? "Post the first internal call, conference deadline or funding window, and it appears here for everyone."
+              : "RDCO, KTTO and advisers post calls here as they open. Check back soon."
+          }
+          action={postButton || undefined}
+        />
+      ) : groups.length === 0 ? (
+        <EmptyState
+          framed
+          icon={savedOnly ? "fa-bookmark" : "fa-magnifying-glass"}
+          title={savedOnly && savedOnBoard === 0 ? "Nothing saved yet" : "Nothing matches these filters"}
+          message={
+            savedOnly && savedOnBoard === 0
+              ? "Use the bookmark on a call to keep it here. Saved calls stay in this browser only."
+              : "Try another type, or clear the search."
+          }
+          action={<Button variant="outline" onClick={clearFilters}>Clear filters</Button>}
+        />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {visible.map((o) => (
-            <OpportunityCard
-              key={o.id}
-              opportunity={o}
-              saved={savedIds.includes(o.id)}
-              icsBusy={busyIcs === o.id}
-              onToggleSave={() => handleToggleSave(o.id)}
-              onDownloadIcs={() => void handleDownloadIcs(o)}
-            />
+        <div className="space-y-section-lg">
+          {groups.map((group) => (
+            <section key={group.id} aria-labelledby={`${ids}-${group.id}`}>
+              <h2
+                id={`${ids}-${group.id}`}
+                className="flex items-baseline gap-2 text-heading font-semibold text-stone-900 mb-3"
+              >
+                {group.title}
+                <span className="text-small font-normal text-stone-600 tabular-nums">
+                  {group.items.length} {group.items.length === 1 ? "call" : "calls"}
+                </span>
+              </h2>
+              <ol
+                className={cn(
+                  "bg-white rounded-xl border border-stone-200 divide-y divide-stone-200",
+                  group.id === "closed" && "bg-stone-50",
+                )}
+              >
+                {group.items.map((o) => (
+                  <li key={o.id}>
+                    <OpportunityRow
+                      opportunity={o}
+                      saved={savedSet.has(o.id)}
+                      savedHintId={`${ids}-saved-hint`}
+                      icsBusy={icsBusy === o.id}
+                      icsFailed={icsFailed === o.id}
+                      onToggleSave={() => handleToggleSave(o.id)}
+                      onDownloadIcs={() => void handleDownloadIcs(o)}
+                      onEdit={() => setFormTarget(o)}
+                      onDelete={() => { setDeleteError(null); setDeleting(o); }}
+                    />
+                  </li>
+                ))}
+              </ol>
+            </section>
           ))}
         </div>
       )}
+
+      {formTarget !== null && (
+        <OpportunityFormDialog
+          opportunity={formTarget === "new" ? null : formTarget}
+          onClose={() => setFormTarget(null)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete this call?"
+        message={
+          deleting
+            ? `"${deleting.title}" will be removed from the board for everyone. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete call"
+        danger
+        confirming={deleteBusy}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   );
 }
 
-interface CardProps {
-  opportunity:   Opportunity;
-  saved:         boolean;
-  icsBusy:       boolean;
-  onToggleSave:  () => void;
-  onDownloadIcs: () => void;
-}
-
-function OpportunityCard({ opportunity: o, saved, icsBusy, onToggleSave, onDownloadIcs }: CardProps) {
-  const chip    = countdownChip(o);
-  const ceiling = formatCeiling(o.funding_ceiling);
+/** Rows shaped like the board's own, so the page does not jump when it loads. */
+function BoardSkeleton() {
+  const [announce, setAnnounce] = useState(false);
+  // Filled on the next tick so screen readers hear the change (see Skeleton).
+  useEffect(() => setAnnounce(true), []);
 
   return (
-    <article
-      className={cn(
-        "bg-white rounded-xl border p-5 flex flex-col transition-colors",
-        // A closed call stays legible but visibly spent — it is reference now,
-        // not an option.
-        o.is_closed ? "border-stone-200 opacity-70" : "border-stone-200 hover:border-stone-300",
-      )}
-    >
-      <div className="flex items-center gap-2 flex-wrap">
-        <span
-          className={cn(
-            "px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider",
-            o.is_closed ? "bg-stone-200 text-stone-600" : TYPE_BADGE_CLASS[o.opportunity_type],
-          )}
-        >
-          {o.type_display}
-        </span>
-
-        {o.is_featured && !o.is_closed && (
-          <span className="px-2 py-1 rounded-md text-[11px] font-bold bg-stone-900 text-white flex items-center gap-1">
-            <i className="fas fa-star text-[9px]" aria-hidden />
-            Featured
-          </span>
-        )}
-
-        {o.source === "external" && (
-          <span
-            className="px-2 py-1 rounded-md text-[11px] font-semibold border border-stone-200 text-stone-500"
-            title="Published by an external body and reposted here"
-          >
-            External
-          </span>
-        )}
-
-        <span
-          className={cn(
-            "ml-auto px-2.5 py-1 rounded-full text-[12px] font-semibold flex items-center gap-1.5 shrink-0",
-            chip.className,
-          )}
-        >
-          <i className="far fa-clock text-[11px]" aria-hidden />
-          {chip.label}
-        </span>
-      </div>
-
-      <h2 className="text-[16px] font-bold text-stone-900 mt-3 leading-snug">{o.title}</h2>
-
-      <dl className="mt-2.5 space-y-1.5">
-        <MetaRow icon="fa-building-columns" label="Posting office">
-          <span className="text-brand font-medium">{o.posting_office}</span>
-        </MetaRow>
-        {o.audience && (
-          <MetaRow icon="fa-users" label="Audience">{o.audience}</MetaRow>
-        )}
-        {ceiling && (
-          <MetaRow icon="fa-money-bill-wave" label="Funding ceiling">
-            <span className="font-semibold text-stone-800">{ceiling}</span>
-          </MetaRow>
-        )}
-      </dl>
-
-      {o.description && (
-        <p className="text-[13px] text-stone-600 leading-relaxed mt-3 line-clamp-3">
-          {o.description}
-        </p>
-      )}
-
-      {o.tags.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5 mt-3">
-          {o.tags.map((tag) => (
-            <li
-              key={tag}
-              className="px-2 py-0.5 rounded-md bg-stone-50 border border-stone-200 text-[11px] text-stone-500"
-            >
-              #{tag}
-            </li>
+    <div role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">{announce ? "Loading calls and conferences…" : ""}</span>
+      <div aria-hidden="true">
+        <div className="h-5 w-48 rounded bg-stone-200 mb-3 animate-pulse motion-reduce:animate-none" />
+        <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-200">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex gap-4 p-card-compact md:p-card">
+              <div className="w-14 sm:w-16 h-20 shrink-0 rounded-lg bg-stone-100 animate-pulse motion-reduce:animate-none" />
+              <div className="flex-1 space-y-2.5 pt-1">
+                <div className="h-3 w-28 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+                <div className="h-5 w-3/4 rounded bg-stone-200 animate-pulse motion-reduce:animate-none" />
+                <div className="h-3 w-1/2 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+                <div className="h-3 w-5/6 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+              </div>
+              <div className="hidden sm:block w-28 h-7 rounded-full bg-stone-100 animate-pulse motion-reduce:animate-none" />
+            </div>
           ))}
-        </ul>
-      )}
-
-      <footer className="flex items-center gap-2 mt-4 pt-3.5 border-t border-stone-100">
-        <span className="text-[12px] text-stone-500 flex items-center gap-1.5">
-          <i className="far fa-calendar text-[11px]" aria-hidden />
-          Due: {formatDueDate(o.due_date)}
-        </span>
-
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onToggleSave}
-            aria-pressed={saved}
-            aria-label={saved ? `Remove ${o.title} from saved` : `Save ${o.title}`}
-            title={saved ? "Saved in this browser" : "Save in this browser"}
-            className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-              saved ? "text-brand bg-brand-50" : "text-stone-400 hover:text-stone-700 hover:bg-stone-50",
-            )}
-          >
-            <i className={cn(saved ? "fas" : "far", "fa-bookmark text-[13px]")} aria-hidden />
-          </button>
-
-          <button
-            type="button"
-            onClick={onDownloadIcs}
-            disabled={icsBusy}
-            aria-label={`Add ${o.title} deadline to your calendar`}
-            title="Add the deadline to your own calendar (.ics)"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400
-              hover:text-stone-700 hover:bg-stone-50 transition-colors disabled:opacity-50"
-          >
-            <i
-              className={cn(icsBusy ? "fas fa-spinner fa-spin" : "far fa-calendar-plus", "text-[13px]")}
-              aria-hidden
-            />
-          </button>
-
-          {o.external_url ? (
-            <a
-              href={o.external_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                "px-3.5 py-1.5 rounded-lg text-[13px] font-semibold transition-colors ml-1",
-                o.is_closed
-                  ? "bg-stone-100 text-stone-500 hover:bg-stone-200"
-                  : "bg-brand text-white hover:bg-brand-light",
-              )}
-            >
-              {o.is_closed ? "View" : "View & Apply"}
-              <i className="fas fa-arrow-up-right-from-square text-[9px] ml-1.5" aria-hidden />
-            </a>
-          ) : (
-            // No link means the poster gave none — say so rather than render a
-            // button that goes nowhere.
-            <span className="px-3 py-1.5 text-[12px] text-stone-400 ml-1">
-              Contact {o.posting_office.split("(")[0].trim()}
-            </span>
-          )}
         </div>
-      </footer>
-    </article>
-  );
-}
-
-function MetaRow({
-  icon, label, children,
-}: { icon: string; label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2 text-[13px] text-stone-600">
-      <i className={cn("fas", icon, "text-stone-400 text-[12px] mt-0.5 w-3.5 shrink-0")} aria-hidden />
-      <dt className="sr-only">{label}</dt>
-      <dd className="min-w-0">{children}</dd>
+      </div>
     </div>
   );
 }

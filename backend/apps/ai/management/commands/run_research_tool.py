@@ -8,7 +8,14 @@ will use, so a handle issued by one call is usable by the next:
         --call read_record_sections='{"record": "R1"}'
 
 It prints what a planner would be sent, plus the stored pointer behind each
-handle. The disclosure gate in force applies: until IR-250 that withholds all
+handle. `--general` runs the general-tools contract (IR-591) instead and prints
+each call's model-visible envelope:
+
+    manage.py run_research_tool --user student@cit.edu --general \
+        --call search_research='{"query": "flooding", "target": "papers"}' \
+        --call read_papers='{"records": ["R1-..."], "view": "outline"}'
+
+The disclosure gate in force applies: until IR-250 that withholds all
 content unless IR-317's development bypass is on.
 """
 
@@ -20,9 +27,10 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.composition import composition_root
+from apps.ai.conversation_state import current_revision
 from apps.ai.models.conversation import Conversation
 from apps.ai.research.context import RunContext
-from apps.ai.research.registry import ToolRun, research_tools
+from apps.ai.research.registry import ToolRun, general_tools, research_tools
 
 
 class Command(BaseCommand):
@@ -37,6 +45,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--conversation", type=int,
             help="A Conversation of this user's; a Paper Chat one scopes the run.",
+        )
+        parser.add_argument(
+            "--general", action="store_true",
+            help="Use the five general research tools and print their envelopes.",
         )
 
     def handle(self, *args, **options):
@@ -55,12 +67,19 @@ class Command(BaseCommand):
         calls = [_parse(call) for call in options["call"]]
         root = composition_root()
         ctx = RunContext.for_request(
-            user=user, root=root, lane="research", conversation=conversation
+            user=user, root=root, lane="research", conversation=conversation,
+            context_revision=current_revision(conversation),
         )
-        run = ToolRun.start(ctx, root)
-        registry = research_tools()
+        general = options["general"]
+        run = ToolRun.start(ctx, root, scoped_handles=general)
+        registry = general_tools() if general else research_tools()
 
         for name, arguments in calls:
+            if general:
+                envelope = registry.invoke(run, name, arguments)
+                self.stdout.write(f"== {name} {arguments}")
+                self.stdout.write(json.dumps(envelope.public(), indent=2, ensure_ascii=False))
+                continue
             result = registry.call(run, name, arguments)
             self.stdout.write(f"== {name} {arguments}")
             self.stdout.write(json.dumps(json.loads(result.planner_message()), indent=2,

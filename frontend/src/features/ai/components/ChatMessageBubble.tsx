@@ -1,8 +1,11 @@
+import { Link } from "react-router-dom";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
+import { CandidateList } from "./CandidateList";
+import { ComparisonTable } from "./ComparisonTable";
 import { CopyButton } from "./CopyButton";
 import {
   DegradedNotice,
@@ -10,7 +13,7 @@ import {
   ResolvedQuestionNotice,
   ScopeNotice,
 } from "./PassageQuote";
-import { ReasoningPanel } from "./ReasoningPanel";
+import { ReasoningSummary } from "./ReasoningSummary";
 import "highlight.js/styles/github.min.css";
 
 interface ChatMessageBubbleProps {
@@ -21,6 +24,30 @@ interface ChatMessageBubbleProps {
    * full-width transcript keeps the default.
    */
   compact?: boolean;
+  /** Disables Retry while another answer is in flight. */
+  retryDisabled?: boolean;
+  /** Ask a run that ended without its answer again (IR-548). */
+  onRetry?: (message: ChatMessage) => void;
+}
+
+/** A queued question that ended unanswered, and the way to ask it again. */
+function RunEndedNotice({ onRetry, disabled }: { onRetry?: () => void; disabled?: boolean }) {
+  if (!onRetry) return null;
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={disabled}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5
+          text-[13px] font-medium text-stone-700 hover:border-brand/40 hover:text-brand
+          disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <i className="fas fa-rotate-right text-[11px]" aria-hidden />
+        Retry
+      </button>
+    </div>
+  );
 }
 
 /**
@@ -31,7 +58,7 @@ interface ChatMessageBubbleProps {
  * text with no card/border/shadow, closer to a read surface than a chat
  * widget — the avatar is still what tells the two apart.
  */
-export function ChatMessageBubble({ message, compact = false }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, compact = false, retryDisabled, onRetry }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -68,27 +95,43 @@ export function ChatMessageBubble({ message, compact = false }: ChatMessageBubbl
             : "min-w-0 flex-1",
         )}
       >
+        {!isUser && <ReasoningSummary summary={message.reasoningSummary} compact={compact} />}
+        {!isUser && message.comparison && <ComparisonTable comparison={message.comparison} />}
         {isUser ? (
           <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
-        ) : (
+        ) : !message.listing || message.listing.count ? (
           <CitationText
             text={message.content}
             citations={message.citations ?? []}
             className={ANSWER_MARKDOWN}
           />
-        )}
+        ) : null}
 
+        {!isUser && message.listing?.candidates && <CandidateList listing={message.listing} />}
+        {!isUser && message.listing && !message.listing.count && !message.listing.candidates && (
+          <div className="mt-3">
+            <p className="text-sm text-stone-600">{message.listing.wording}</p>
+            {message.listing.records.length === 0 && <p className="mt-2">No papers are listed for this answer.</p>}
+            <ul className="mt-2 space-y-1">
+              {message.listing.records.map((record) => (
+                <li key={record.record_id}>
+                  <Link to={`/records/${record.record_id}`} className="text-brand hover:underline">{record.title}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {!isUser && message.resolvedQuestion && (
           <ResolvedQuestionNotice question={message.resolvedQuestion} />
         )}
         {!isUser && message.degraded && <DegradedNotice subject="answer" />}
         {!isUser && message.widened && <ScopeNotice />}
-        {!isUser && message.partial && <PartialAnswerNotice />}
-
-        {/* Collapsed by default here too (IR-381) -- a reopened transcript
-            reads the same as one just finished streaming. */}
-        {!isUser && message.reasoning && (
-          <ReasoningPanel reasoning={message.reasoning} compact={compact} />
+        {!isUser && message.partial && !message.endedRun && <PartialAnswerNotice />}
+        {!isUser && message.endedRun && (
+          <RunEndedNotice
+            onRetry={onRetry ? () => onRetry(message) : undefined}
+            disabled={retryDisabled}
+          />
         )}
 
         {!isUser && (

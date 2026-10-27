@@ -30,6 +30,8 @@ from typing import Any, Iterator, Optional, Sequence
 
 from django.conf import settings
 
+from apps.ai.admission.scope import mark_sent, report_usage
+
 from .deadline import bounded, time_left
 from .dialects import DEFAULT_DIALECT, VendorDialect
 from .errors import ClassifiedError, ErrorKind, classify_message, classify_status_code
@@ -135,6 +137,8 @@ def _wire(message: Message) -> dict[str, Any]:
         }
     if isinstance(message, AssistantMessage):
         wire: dict[str, Any] = {"role": "assistant", "content": message.text or None}
+        for artifact in message.continuation:
+            wire[artifact.field] = artifact.payload
         if message.tool_calls:
             wire["tool_calls"] = [
                 {
@@ -146,6 +150,19 @@ def _wire(message: Message) -> dict[str, Any]:
             ]
         return wire
     raise TypeError(f"not a message: {type(message).__name__}")
+
+
+def _report(response) -> None:
+    """Hand the vendor's own usage figures to provider admission (IR-545).
+    A response without them leaves the attempt charged at its reservation."""
+    usage = getattr(response, "usage", None)
+    prompt = getattr(usage, "prompt_tokens", None)
+    completion = getattr(usage, "completion_tokens", None)
+    report_usage(
+        input_tokens=prompt if isinstance(prompt, int) else None,
+        output_tokens=completion if isinstance(completion, int) else None,
+        model=getattr(response, "model", None) if isinstance(getattr(response, "model", None), str) else None,
+    )
 
 
 def _deadline_passed() -> "DeadlineExceeded":
@@ -168,8 +185,14 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         fallback_models: Sequence[str] = (),
         max_tokens: Optional[int] = None,
         timeout_seconds: Optional[float] = None,
+        bounded_attempts: bool = False,
     ) -> None:
         self._max_tokens = max_tokens
+        # IR-545: under provider admission every physical attempt must be one
+        # IRIS admitted and every output bounded. The SDK's own retries are
+        # attempts nobody admitted, so they are switched off, and the
+        # completion cap is sent on tool calls as well.
+        self._bounded_attempts = bounded_attempts
         self._timeout_seconds = timeout_seconds
         self._base_url = base_url
         self._api_key = api_key
@@ -203,6 +226,29 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
         if not self._fallback_models:
             return ()
         return (self.model, *self._fallback_models)
+
+    @property
+    def max_tokens(self) -> Optional[int]:
+        """The completion cap every request carries, or ``None``."""
+        return self._max_tokens or None
+
+    @property
+    def account(self) -> str:
+        """A digest naming the vendor account this adapter spends (IR-545)."""
+        from apps.ai.admission.ledger import account_for
+
+        return account_for(self._api_key or getattr(settings, "LLM_API_KEY", "") or "")
+
+    def call_timeout(self, explicit: Optional[float] = None) -> float:
+        """The timeout the next call will use; see `_call_timeout`."""
+        return self._call_timeout(explicit)
+
+    def _cap(self) -> dict[str, int]:
+        """The completion cap as this model's request field, or nothing."""
+        if not self._max_tokens:
+            return {}
+        field = "max_completion_tokens" if self.model == "openai/gpt-6-luna" else "max_tokens"
+        return {field: self._max_tokens}
 
     def _resolved_reasoning_effort(self) -> str:
         """The effort to send, or `""` to send no reasoning configuration.
@@ -262,9 +308,11 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                 "OpenAI-compatible vendor, not only OpenAI (ADR-036)"
             ) from exc
 
+        extra = {"max_retries": 0} if self._bounded_attempts else {}
         return OpenAI(
             api_key=self._resolved_key(),
             base_url=self._base_url or getattr(settings, "LLM_BASE_URL", None),
+            **extra,
         )
 
     # -- the port -----------------------------------------------------------
@@ -280,15 +328,10 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             self._resolved_reasoning_effort(), self.models
         )
         extra["timeout"] = timeout
-        if self._max_tokens:
-            limit_field = (
-                "max_completion_tokens"
-                if self.model == "openai/gpt-6-luna"
-                else "max_tokens"
-            )
-            extra[limit_field] = self._max_tokens
+        extra.update(self._cap())
 
         try:
+            mark_sent(model=self.model)
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -306,6 +349,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                 f"{type(exc).__name__}: {exc}", kind=classified.kind
             ) from exc
 
+        _report(response)
         choices = getattr(response, "choices", None) or []
         if not choices:
             raise LLMUnavailable("the model returned no choices")
@@ -336,15 +380,14 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             self._resolved_reasoning_effort(), self.models
         )
         extra["timeout"] = timeout
-        if self._max_tokens:
-            limit_field = (
-                "max_completion_tokens"
-                if self.model == "openai/gpt-6-luna"
-                else "max_tokens"
-            )
-            extra[limit_field] = self._max_tokens
+        extra.update(self._cap())
 
+        if self._bounded_attempts:
+            # Without this an OpenAI-format stream reports no usage at all,
+            # and every streamed answer is charged its worst case (IR-545).
+            extra["stream_options"] = {"include_usage": True}
         try:
+            mark_sent(model=self.model)
             chunks = client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -369,6 +412,8 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
                 left = time_left()
                 if left is not None and left <= 0:
                     raise _deadline_passed()
+                # Vendors that report a stream's usage put it on a chunk.
+                _report(chunk)
                 choices = getattr(chunk, "choices", None) or []
                 if not choices:
                     continue
@@ -430,8 +475,11 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             self._resolved_reasoning_effort(), self.models
         )
         extra["timeout"] = timeout
+        if self._bounded_attempts:
+            extra.update(self._cap())
 
         try:
+            mark_sent(model=self.model)
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[_wire(message) for message in messages],
@@ -463,10 +511,13 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             raise LLMUnavailable("the model returned no choices")
 
         message = choices[0].message
+        _report(response)
         usage = getattr(response, "usage", None)
         return ToolCompletion(
             text=getattr(message, "content", None) or "",
             reasoning=self.dialect.read_reasoning(message),
+            provider_summary=self.dialect.read_provider_summary(message),
+            continuation=self.dialect.read_continuation(message),
             tool_calls=tuple(
                 ToolCall(
                     name=getattr(getattr(call, "function", None), "name", "") or "",

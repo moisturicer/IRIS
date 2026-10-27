@@ -83,7 +83,7 @@ export const PaperFind = forwardRef<HTMLInputElement, PaperFindProps>(function P
           placeholder="Find in this paper"
           autoComplete="off"
           spellCheck={false}
-          className="w-full h-11 lg:h-8 rounded-lg border border-stone-200 bg-white pl-7 pr-2 text-sm text-stone-800 placeholder:text-stone-400 focus:border-brand/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 [&::-webkit-search-cancel-button]:hidden"
+          className="w-full min-h-11 reading-split:min-h-9 rounded-lg border border-stone-200 bg-white pl-7 pr-2 text-sm text-stone-800 placeholder:text-stone-400 focus:border-brand/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 [&::-webkit-search-cancel-button]:hidden"
         />
       </div>
       {/* "This paper has no searchable text" takes a line of its own under

@@ -1,10 +1,11 @@
 import { apiClient } from "./client";
 import type {
-  RecordListItem, RecordDetail, RecordFormData,
+  RecordListItem, RecordDetail, RecordFormData, MyResearchItem,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, DeleteRequest, RecordTracker,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
+  DiscoverInterests, ForYouPage,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -20,15 +21,18 @@ export const recordsApi = {
   list:           (params?: Record<string, unknown>) =>
     apiClient.get<PaginatedResponse<RecordListItem>>("/records/", { params }),
 
-  // My records — backend returns a plain array (not paginated).
-  // RecordViewSet.mine() (the actual registered action -- MyRecordsViewSet
-  // elsewhere in views.py looks like it should serve this with
-  // RecordDetailSerializer already, but isn't wired into urls.py at all) now
-  // uses RecordDetailSerializer too, so clearances/ip_type/requested_itso
-  // etc. are really in this payload. Was mistyped as RecordListItem[] before
-  // the backend fix, matching what the endpoint used to actually return.
+  // Discover's filter choices over the whole catalogue `list` serves (IR-560).
+  facets:         () => apiClient.get<{ years: number[] }>("/records/facets/"),
+  interests:      () => apiClient.get<DiscoverInterests>("/records/interests/"),
+  updateInterests:(body: { classification_ids: number[]; psced_ids: number[] }) =>
+    apiClient.put<DiscoverInterests>("/records/interests/", body),
+  forYou:         (cursor?: string, params?: Record<string, unknown>) =>
+    apiClient.get<ForYouPage>("/records/for-you/", { params: { ...params, ...(cursor ? { cursor } : {}) } }),
+
+  // My Library's *My research* list -- a plain array, not paginated, of
+  // the narrow rows `MyResearchSerializer` returns (IR-410).
   mine:           (params?: Record<string, unknown>) =>
-    apiClient.get<RecordDetail[]>("/records/mine/", { params }),
+    apiClient.get<MyResearchItem[]>("/records/mine/", { params }),
 
   detail:         (id: number) => apiClient.get<RecordDetail>(`/records/${id}/`),
   /**

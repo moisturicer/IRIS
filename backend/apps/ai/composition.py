@@ -132,6 +132,7 @@ class CompositionRoot:
         permits: Callable[[Record], bool] = disclosure_permits,
         policy_enabled: bool = True,
         shadow_llm: Optional["ToolCallingLLM"] = None,
+        engine: Optional[str] = None,
     ) -> None:
         self._embedder = embedder
         self._reranker = reranker
@@ -142,6 +143,15 @@ class CompositionRoot:
         self._permits = permits
         self._policy_enabled = policy_enabled
         self._shadow_llm = shadow_llm
+        self._engine = engine
+
+    @property
+    def engine(self) -> str:
+        """The answer engine a new run pins (IR-593, ADR-042). Code, not a
+        setting: no reader or deployment toggle chooses it."""
+        from apps.ai.controller.versions import NEW_RUN_ENGINE
+
+        return self._engine or NEW_RUN_ENGINE
 
     # -- the vendor seams ---------------------------------------------------
 
@@ -163,7 +173,7 @@ class CompositionRoot:
             self._reranker = VoyageReranker()
         return self._reranker
 
-    def llm_for(self, task: "InferenceTask | str") -> LLMProvider:
+    def llm_for(self, task: "InferenceTask | str", *, max_tokens=None, application_fallbacks=False) -> LLMProvider:
         """The provider for one named Inference task (IR-378).
 
         The only way to reach a model -- ``llm()``, the untasked accessor
@@ -191,7 +201,8 @@ class CompositionRoot:
             return self._llm
 
         resolved = inference_task(task)
-        provider = self._task_llms.get(resolved)
+        key = resolved if max_tokens is None and not application_fallbacks else (resolved, max_tokens, application_fallbacks)
+        provider = self._task_llms.get(key)
         if provider is None:
             profile = profile_for(resolved)
             # Wrapped here, not inside `build_profile_llm` -- that function's
@@ -202,11 +213,12 @@ class CompositionRoot:
             provider = CompletionLoggingLLMProvider(
                 build_profile_llm(
                     profile,
-                    max_tokens=256 if resolved is InferenceTask.ROUTE else None,
+                    max_tokens=256 if resolved is InferenceTask.ROUTE else max_tokens,
+                    application_fallbacks=application_fallbacks,
                 ),
                 profile,
             )
-            self._task_llms[resolved] = provider
+            self._task_llms[key] = provider
         return provider
 
     def resolver(self) -> Optional["QuestionResolver"]:
@@ -269,7 +281,7 @@ class CompositionRoot:
                 return None
             try:
                 self._shadow_llm = build_profile_llm(
-                    profile, breaker_key=SHADOW_BREAKER_KEY
+                    profile, breaker_key=SHADOW_BREAKER_KEY, lane="shadow"
                 )
             except LLMUnavailable:
                 return None

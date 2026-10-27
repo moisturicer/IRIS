@@ -11,6 +11,20 @@ The decisions behind this are [ADR-032](../adr/032-adviser-first-review-and-offi
 - A Discoverable Proposal is listed only while in review.
 - Proposal cards carry no similarity count.
 
+**Amended 2026-10-14 (IR-569, Paper mode):**
+
+- **One record bar** replaces the floating section switch and the floating *Ask about this paper* button (supersedes IR-527): Back and the sections, as a recessed track whose maroon thumb slides to the chosen one; in Paper also the title in one line (full title in the heading and its tooltip) and the manuscript version. Overview keeps its editorial header; Paper drops it.
+- **Ask IRIS is a round maroon icon at the bottom right** of every section but Review, not a button in the bar. It opens one panel everywhere, and the icon is gone while the panel is open. No Notes or Info icons beside it until private notes (IR-580) exist.
+- **Paper is a full-height workspace**, after the alphaXiv PDF view: the record bar, then the reader (its own flat toolbar: page, zoom, fit, find, download) beside Ask IRIS, divided by hairlines rather than cards. Only the PDF pages are white; the bar and toolbar are `stone-100` and the desk behind the pages `stone-200`. The paper opens at 140% (fitted in a pane under 640px).
+- **The layout follows the content width, not the window**: the page is a CSS container named `reading`. At 1000 px and up Ask IRIS is a column beside the paper (paper at least 640 px); from 640 px it is a drawer over the paper, a modal dialog with focus held in it; below 640 px it is the whole workspace, with **Back to paper**. React reads the same thresholds (`paneLayout.readingTier`).
+- **The panel is as wide as the reader drags it**: 450 px by default, from 320 px up to half the workspace (and, beside the paper, what leaves it 640 px), by dragging its left edge or with the arrow keys; a double click restores 450 px. The width is remembered in this browser.
+- **On the Overview and Files the panel is a column beside the page**, never over it: the page is its own container (`overview`) and narrows to fit, the rail dropping under the abstract when there is not room for both. Opening the sidebar so far that the page would give way closes Ask IRIS (always over the paper, and below 640 px elsewhere) instead of covering it.
+- **The scope control ("This paper" / "All papers") sits in the composer**, beside Send.
+- **The Overview is wide**, after alphaXiv's abstract page: the page takes the width it has, with the title large in EB Garamond, outlined chips for status, type and classification, the authors as chips, then the actions. **View is the filled action** (it opens the paper; Save is outlined, and is filled only where there is no paper). Below: the Abstract and the **AI Overview**, which is a heading and text on the page like the Abstract, with no card around it and no label about how it was made, and a Copy action that copies it as prose (page markers removed). It reads as an article: the first paragraph is the lead (18 px, darker), a section heading is near-black Garamond with room above and no rule, lists take maroon markers, and a citation is the page it cites, "p8", at the size of the text around it. Then Related works. **Record details** (routing for participants, governance, documents) sit beside the page, sticky under the record bar, while the Overview's own column is 64 rem or wider, and under it otherwise, so the sidebar moves them. **While Ask IRIS is open they fold away** (the column closes, or the block collapses to nothing when it sat under the page) and return when it closes, over 300 ms and not at all under reduced motion; the panel itself arrives from its edge. The reading sections (Abstract, AI Overview, Related works, Comments) are set apart by one hairline each (`stone-200`). **The page is one column up to 60 rem**, set against whatever is beside it (the Ask IRIS panel, or the rail) so its text reaches that edge, with the room left over on its left and a 56 px left gutter; the Abstract and the AI Overview fill the column rather than holding a measure of their own. The AI Overview's Copy is a quiet text button, no outline. On the rail, the IRIS mark opens the sidebar, and Back always carries its label.
+- **One control scale** (44 px on touch, 36 px beside a pointer, `rounded-lg`) for the record bar, the reader toolbar and Ask IRIS: see "Reading controls" in the design system.
+- **Entering Paper opens Ask IRIS** (first visit, direct link, citation arrival) and collapses the desktop sidebar to its rail for the visit without saving it. Opening finds the paper's conversation and never starts one; the first question does. Closing keeps the draft.
+- The panel is named **Ask IRIS** throughout (it was "Paper Chat").
+
 The frontend implementation plan is [`../frontend_redesign_spec.md`](../frontend_redesign_spec.md).
 
 **Superseded by this page:**
@@ -231,6 +245,8 @@ Proposal cards carry the **Proposal · In development** label and **View proposa
 ## 8 · Public discussion
 
 A flat thread below the paper, in Reading and Summary modes, on published records and Discoverable Proposals.
+
+**Drawn, not built (IR-569; function is IR-420).** The Overview ends with a Comments section: a heading with a count of 0, a "Not open yet" mark, a composer whose field and Post are disabled and say commenting is not open, and an empty state. No comment is shown that nobody wrote.
 
 - Any signed-in user may post.
 - Owners and administrators may **hide** a comment. Hidden comments show as *"Hidden by the author"*.

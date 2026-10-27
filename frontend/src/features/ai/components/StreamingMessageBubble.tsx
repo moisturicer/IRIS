@@ -3,24 +3,25 @@ import type { StreamingState } from "../hooks/useAskStream";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
-import { ReasoningPanel } from "./ReasoningPanel";
-import { StreamStatusLine } from "./StreamStatusLine";
+import { StreamStatusRow } from "./StreamStatusRow";
+import { LiveCandidates } from "./CandidateList";
 
-/** The reply while still streaming (IR-329) -- status line, the collapsed
- *  reasoning panel (IR-381), then text rendering progressively. Swapped for
- *  `ChatMessageBubble` on finish, which renders the same panel from the
- *  stored text, so the swap is not where the panel disappears.
+/** The reply while still streaming (IR-329): any text that has arrived, then
+ *  one status row (IR-596). Swapped for `ChatMessageBubble` on finish.
  *  No card/border -- matches the finished bubble's plain-text flow.
  *  `compact` matches `ChatMessageBubble`'s Paper Chat density (IR-356). */
 export function StreamingMessageBubble({
   state,
   compact = false,
+  onStop,
 }: {
   state: StreamingState;
   compact?: boolean;
+  /** Cancel the queued run being followed (IR-548); offered only for one. */
+  onStop?: () => void;
 }) {
   return (
-    <div className={cn("flex animate-fade-in motion-reduce:animate-none", compact ? "gap-2.5" : "gap-3")} aria-busy="true">
+    <div className={cn("flex animate-fade-in motion-reduce:animate-none", compact ? "gap-2.5" : "gap-3")}>
       <div
         className={cn(
           "rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand",
@@ -31,9 +32,7 @@ export function StreamingMessageBubble({
       </div>
 
       <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
-        <StreamStatusLine state={state} />
-
-        <ReasoningPanel reasoning={state.reasoning} streaming compact={compact} />
+        {state.candidates && <LiveCandidates candidates={state.candidates} compact={compact} />}
 
         {state.text && (
           <CitationText
@@ -43,6 +42,8 @@ export function StreamingMessageBubble({
             className={ANSWER_MARKDOWN}
           />
         )}
+
+        <StreamStatusRow state={state} onStop={onStop} className="mt-2" />
       </div>
     </div>
   );

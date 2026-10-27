@@ -36,6 +36,8 @@ from __future__ import annotations
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.audit import workflow as audit
+from apps.audit.models import AuditEvent
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
@@ -155,6 +157,7 @@ def _close_if_complete(assignment, actor) -> bool:
     assignment.closed_by = actor
     assignment.closed_at = timezone.now()
     assignment.save(update_fields=["state", "closed_by", "closed_at"])
+    audit.assignment_closed(assignment, actor, how=audit.COMPLETED)
     # A specialist office's clearance, the RDCO hand-back and their
     # notifications (IR-269). Here rather than in the caller, so a verdict and
     # a coordinator's withdrawal complete an office the same way.
@@ -186,7 +189,9 @@ def claim(assignment, user) -> ReviewerSeat:
             f"Someone at {_label(assignment.party)} has already taken this review. "
             f"A seat holder can add you, or a coordinator can assign you."
         )
-    return _seat(assignment, user, source=SeatSource.CLAIMED, by=user)
+    seat = _seat(assignment, user, source=SeatSource.CLAIMED, by=user)
+    audit.seat_moved(AuditEvent.SEAT_CLAIMED, seat, user)
+    return seat
 
 
 def require_coordinator(user, party):
@@ -202,7 +207,9 @@ def assign(assignment, coordinator, reviewer) -> ReviewerSeat:
     """A coordinator seats a member of their own office."""
     assignment = _locked(assignment)
     require_coordinator(coordinator, assignment.party)
-    return _seat(assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator)
+    seat = _seat(assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator)
+    audit.seat_moved(AuditEvent.SEAT_ASSIGNED, seat, coordinator)
+    return seat
 
 
 @transaction.atomic
@@ -222,7 +229,9 @@ def add_reviewer(assignment, holder, reviewer) -> ReviewerSeat:
         raise SeatRefused(
             f"Only a reviewer seated for {_label(assignment.party)} may add a colleague."
         )
-    return _seat(assignment, reviewer, source=SeatSource.ADDED, by=holder)
+    seat = _seat(assignment, reviewer, source=SeatSource.ADDED, by=holder)
+    audit.seat_moved(AuditEvent.REVIEWER_ADDED, seat, holder)
+    return seat
 
 
 def _member_options(assignment) -> dict:
@@ -307,7 +316,9 @@ def nominate(assignment, router, reviewer) -> ReviewerSeat:
     that the nominee belongs to the office they were nominated for.
     """
     assignment = _locked(assignment)
-    return _seat(assignment, reviewer, source=SeatSource.NOMINATED, by=router)
+    seat = _seat(assignment, reviewer, source=SeatSource.NOMINATED, by=router)
+    audit.seat_moved(AuditEvent.SEAT_NOMINATED, seat, router)
+    return seat
 
 
 def _require_open(seat):
@@ -330,6 +341,7 @@ def withdraw(seat, coordinator) -> ReviewerSeat:
     _require_open(seat)
     seat.state = SeatState.WITHDRAWN
     seat.save(update_fields=["state"])
+    audit.seat_moved(AuditEvent.SEAT_WITHDRAWN, seat, coordinator)
     _close_if_complete(assignment, coordinator)
     return seat
 
@@ -346,7 +358,9 @@ def reassign(seat, coordinator, reviewer) -> ReviewerSeat:
         raise SeatError(f"{_name(reviewer)} already holds this seat.")
     seat.state = SeatState.WITHDRAWN
     seat.save(update_fields=["state"])
-    return _seat(assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator)
+    new_seat = _seat(assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator)
+    audit.seat_moved(AuditEvent.SEAT_REASSIGNED, new_seat, coordinator, previous=seat)
+    return new_seat
 
 
 @transaction.atomic
@@ -368,6 +382,9 @@ def open_review(seat, user) -> ReviewerSeat:
     seat.state = SeatState.IN_REVIEW
     seat.opened_at = timezone.now()
     seat.save(update_fields=["state", "opened_at"])
+    # Only here: a seat already in review returned above, so this is the
+    # first open, the start of this reviewer's hands-on time.
+    audit.seat_opened(seat, user)
     return seat
 
 

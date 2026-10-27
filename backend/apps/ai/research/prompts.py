@@ -12,13 +12,31 @@ from .tools.common import disclosable, visible_record_ids
 def planner_history(ctx):
     if ctx.conversation_id is None:
         return []
-    turns = recent_window(Turn.objects.filter(
+    candidates = Turn.objects.filter(
         conversation_id=ctx.conversation_id, conversation__user=ctx.user,
-    ).prefetch_related("citations"))
-    cited = {c.record_id for turn in turns for c in turn.citations.all()}
-    allowed = disclosable(ctx, cited)
-    return [turn for turn in turns
-            if all(c.record_id in allowed for c in turn.citations.all())]
+    )
+    if ctx.history_before_turn_id is not None:
+        candidates = candidates.filter(pk__lt=ctx.history_before_turn_id)
+    # Filtered before the budget, so a revoked Turn leaves no hole (IR-592).
+    return recent_window(candidates, allowed=lambda ids: disclosable(ctx, ids).keys())
+
+
+def conversation_state(run):
+    """The state's papers as this run's handles, positions kept (IR-592)."""
+    from apps.ai.conversation_state import reissue_handles, snapshot
+    from apps.ai.models import Conversation
+
+    ctx = run.ctx
+    if ctx.conversation_id is None:
+        return None
+    conversation = Conversation.objects.filter(pk=ctx.conversation_id, user=ctx.user).first()
+    if conversation is None:
+        return None
+    snap = snapshot(conversation, ctx.user)
+    if not snap.state.record_ids() and not snap.state.topic:
+        return None
+    return {"topic": snap.state.topic, "filters": snap.state.filters,
+            **reissue_handles(run, snap)}
 
 
 def current_results(results, allowed, visible):
@@ -44,6 +62,8 @@ class PlannerContext:
 
     def body(self, results):
         run = self.run
+        # First, so its reissued records are tracked for revocation below.
+        state = conversation_state(run)
         items = (*run.ledger.records(), *run.ledger.passages())
         allowed = disclosable(run.ctx, (item.record_id for item in items))
         evidence = [item for item in items if item.record_id in allowed]
@@ -70,4 +90,6 @@ class PlannerContext:
                                  for result in current_results(results, allowed, visible)],
             "planner_notes_not_evidence": list(self.notes),
         }
+        if state is not None:
+            payload["conversation_state"] = state
         return json.dumps(payload, ensure_ascii=False)

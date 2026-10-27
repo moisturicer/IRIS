@@ -21,12 +21,14 @@ text it once pointed at may no longer represent it.
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from typing import Optional
 
 from django.conf import settings
 from django.db import transaction
 
-from apps.ai.answers.citations import PARTIAL, GroundedAnswer
+from apps.ai import public as public_protocol
+from apps.ai.answers.citations import GENERATED, PARTIAL, GroundedAnswer
 from apps.ai.models import (
     MODEL_HISTORY_STATES,
     TURN_ANSWER_VECTOR,
@@ -78,6 +80,14 @@ def record_turn(
     resolved_question: Optional[str] = None,
     widened: bool = False,
     embedder=None,
+    *,
+    routing=None,
+    listing=None,
+    research=None,
+    comparison=None,
+    guard=None,
+    context=None,
+    expected_revision=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -109,12 +119,59 @@ def record_turn(
     with a fake and count the calls. The call is made **after** the Turn is
     committed and its failure is logged rather than raised -- see the module
     docstring for why that order is not an accident.
+
+    ``guard`` (IR-544) is a context manager the write happens inside. It
+    yields a callback that receives the new Turn before the transaction
+    commits, so a queued run can lock and fence itself first and record its
+    outcome in the same commit. The vector still waits until after.
+
+    ``context`` and ``expected_revision`` (IR-592) advance the Conversation's
+    state in that same commit, after the guard, so a fenced attempt changes
+    nothing. Without ``context`` it is derived from the listing, comparison
+    or citations; see `apps.ai.conversation_state.commit`.
     """
-    turn = _write_turn(
-        conversation, question, answer, resolved_question, widened
-    )
+    with (guard if guard is not None else nullcontext()) as written:
+        with transaction.atomic():
+            if comparison:
+                from apps.ai.comparison.service import reader_view
+
+                ids = [row["record_id"] for row in comparison["source_versions"]]
+                list(Record.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
+                if reader_view(comparison, conversation.user) is None:
+                    raise ValueError("comparison_sources_changed")
+            turn = _write_turn(
+                conversation, question, answer, resolved_question, widened, routing, listing, research, comparison
+            )
+            if written is not None:
+                written(turn)
+            from apps.ai.conversation_state import commit
+
+            commit(
+                conversation, turn, context=context, expected_revision=expected_revision,
+                cited=[citation.record_id for citation in answer.citations],
+                listing=listing, comparison=comparison,
+            )
     _store_answer_vector(turn, answer, embedder)
     return turn
+
+
+def _stored_listing(listing) -> dict:
+    """A listing as a Turn keeps it: ids, states and quotes, never titles or wording."""
+    if not listing:
+        return {}
+    stored = {**listing, "records": [{"record_id": row["record_id"]} for row in listing["records"]]}
+    if "candidates" in listing:
+        stored["candidates"] = [
+            {key: row[key] for key in ("record_id", "state", "quote", "source", "restricted") if key in row}
+            for row in listing["candidates"]
+        ]
+        stored.pop("wording", None)
+    if "topic_count" in listing:
+        # Provenance of the run only: every figure is rebuilt from the candidates.
+        from apps.ai.research.listing import TOPIC_PROVENANCE
+
+        stored["topic_count"] = {key: listing["topic_count"][key] for key in TOPIC_PROVENANCE}
+    return stored
 
 
 @transaction.atomic
@@ -124,11 +181,19 @@ def _write_turn(
     answer: GroundedAnswer,
     resolved_question: Optional[str],
     widened: bool,
+    routing=None,
+    listing=None,
+    research=None,
+    comparison=None,
 ) -> Turn:
     """The Turn, its citations and its free question vector, all or nothing.
 
     Everything here is local: no vendor call belongs inside this transaction.
     """
+    stored_comparison = {}
+    if comparison:
+        from apps.ai.comparison.storage import comparison_pointers
+        stored_comparison = comparison_pointers(comparison)
     turn = Turn.objects.create(
         conversation=conversation,
         question=question,
@@ -139,6 +204,12 @@ def _write_turn(
         widened=widened,
         had_reasoning=answer.had_reasoning,
         reasoning=answer.reasoning,
+        reasoning_summary=answer.reasoning_summary if answer.state == GENERATED else "",
+        reasoning_summary_source=answer.reasoning_summary_source if answer.state == GENERATED else "",
+        routing=routing or {},
+        research=research or {},
+        comparison=stored_comparison,
+        listing=_stored_listing(listing),
     )
     TurnCitation.objects.bulk_create(
         TurnCitation(
@@ -247,7 +318,7 @@ def _store_answer_vector(turn: Turn, answer: GroundedAnswer, embedder) -> None:
     )
 
 
-def turns_for_reader(conversation: Conversation, user) -> list[dict]:
+def turns_for_reader(conversation: Conversation, user, *, public: bool = False) -> list[dict]:
     """The conversation's Turns, every citation re-resolved against ``user``.
 
     Two queries for the whole transcript, not one pair per citation: which
@@ -255,16 +326,41 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
     live. Everything else -- dropping an invisible citation, degrading a
     tombstoned one -- is a lookup into those two results.
     """
-    turns = list(conversation.turns.prefetch_related("citations"))
+    return _for_reader(
+        list(conversation.turns.prefetch_related("citations")), user, public=public
+    )
+
+
+def turn_for_reader(turn: Turn, user, *, public: bool = False) -> dict:
+    """One Turn, re-resolved exactly as a reopened transcript would show it.
+
+    What a queued run's replayed `done` is built from (IR-544), so a reader
+    who reconnects gets the permissions of now, not of when it was written.
+    """
+    turn = Turn.objects.prefetch_related("citations").get(pk=turn.pk)
+    return _for_reader([turn], user, public=public)[0]
+
+
+def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
+    """``public`` (IR-595) projects bodies through `apps.ai.public`; stored data is kept."""
     all_citations = [
         citation for turn in turns for citation in turn.citations.all()
     ]
 
+    listed = {
+        row["record_id"] for turn in turns
+        for row in (*turn.listing.get("records", []), *turn.listing.get("candidates", []))
+    }
     visible_titles = dict(
         Record.objects.visible_to(user)
-        .filter(pk__in={citation.record_id for citation in all_citations})
+        .filter(pk__in={citation.record_id for citation in all_citations} | listed)
         .values_list("pk", "title")
     )
+    # A candidate listing's quotes are checked against the text as it is now.
+    listing_records = {
+        record.pk: record
+        for record in Record.objects.visible_to(user).filter(pk__in=listed).only("title", "abstract")
+    } if any("candidates" in turn.listing for turn in turns) else {}
     live_chunks = {
         chunk.pk: chunk
         for chunk in DocumentChunk.objects.filter(
@@ -274,6 +370,7 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
                 if citation.chunk_id is not None
             },
             deleted_at__isnull=True,
+            chunk_set__is_active=True,
         )
         # `page_sizes` lives on the chunk set, and regions are useless
         # without it (IR-334).
@@ -286,10 +383,14 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
               "chunk_set__page_sizes")
     }
 
-    return [
+    bodies = [
         {
-            **answer_body(answer_mode(turn.state), turn.answer),
+            **_listing_answer(
+                answer_body(answer_mode(turn.state), turn.answer, preserve_no_results=bool(turn.routing)),
+                turn, listing_records,
+            ),
             "id": turn.pk,
+            **_route_for_reader(turn, visible_titles, listing_records),
             "question": turn.question,
             "resolved_question": turn.resolved_question or None,
             "state": answer_mode(turn.state),
@@ -317,6 +418,27 @@ def turns_for_reader(conversation: Conversation, user) -> list[dict]:
         }
         for turn in turns
     ]
+    for turn, body in zip(turns, bodies):
+        if not turn.comparison:
+            continue
+        from apps.ai.comparison.service import reader_view
+
+        comparison = reader_view(turn.comparison, user)
+        if comparison is None:
+            body.update(answer=None, message="The comparison sources changed or are no longer readable. Please compare again.",
+                        citations=[], reasoning=None, state="unavailable", degraded=True)
+        else:
+            body["comparison"] = comparison
+    if public:
+        for turn, body in zip(turns, bodies):
+            # A degraded historical pointer proves access, not the version
+            # that supported the analysis. Never revive its derived summary.
+            current = all(c.chunk_id in live_chunks for c in turn.citations.all())
+            summary = public_protocol.summary_for(turn, len(body["citations"])) if current else None
+            if summary:
+                body["reasoning_summary"] = summary
+        return [public_protocol.project_turn(body) for body in bodies]
+    return bodies
 
 
 def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
@@ -325,8 +447,8 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
     ``None`` when the Record is no longer visible -- existence must not leak,
     so this is indistinguishable from a citation that was never stored at
     all. A record-level pointer (no ``text``, no ``record_title``) when the
-    Record is visible but the chunk it pointed at was tombstoned by a
-    re-chunk: the text it once quoted may no longer represent the record, so
+    Record is visible but the chunk it pointed at was removed or superseded
+    by a re-chunk: the text it once quoted may no longer represent the record, so
     showing it would be a stale quote rather than a re-resolved one.
     """
     if citation.record_id not in visible_titles:
@@ -353,3 +475,31 @@ def _resolve_citation(citation, visible_titles, live_chunks) -> Optional[dict]:
             normalized_regions(chunk.bboxes, chunk.chunk_set.page_sizes)
         ),
     }
+
+
+def _listing_answer(body: dict, turn, records) -> dict:
+    """A candidate listing's answer is its wording, rebuilt so it counts only what this reader sees."""
+    if "candidates" not in turn.listing:
+        return body
+    from apps.ai.research.listing import reader_view
+
+    wording = reader_view(turn.listing, records)["wording"]
+    # The sentence is `answer` when something matched and `message` when not.
+    return {key: wording if value == turn.answer else value for key, value in body.items()}
+
+
+def _route_for_reader(turn, titles, records=None):
+    metadata = {"routing": turn.routing} if turn.routing else {}
+    if turn.research:
+        # Steps and notes carry codes and counts only, so nothing to re-gate.
+        metadata["research"] = turn.research
+    if "candidates" in turn.listing:
+        from apps.ai.research.listing import reader_view
+
+        metadata["listing"] = reader_view(turn.listing, records or {})
+    elif turn.listing:
+        metadata["listing"] = {**turn.listing, "records": [
+            {"record_id": row["record_id"], "title": titles[row["record_id"]]}
+            for row in turn.listing["records"] if row["record_id"] in titles
+        ]}
+    return metadata

@@ -9,6 +9,8 @@ that no module reaches for it.
 
 import pathlib
 
+from testing.source_files import python_sources
+
 APPS = pathlib.Path(__file__).resolve().parents[3]
 INFERENCE = APPS / "ai" / "inference"
 
@@ -16,8 +18,8 @@ INFERENCE = APPS / "ai" / "inference"
 def _python_files():
     return [
         path
-        for path in APPS.rglob("*.py")
-        if "__pycache__" not in path.parts and INFERENCE not in path.parents
+        for path in python_sources(APPS)
+        if INFERENCE not in path.parents
     ]
 
 

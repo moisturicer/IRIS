@@ -133,7 +133,7 @@ class SubmitDocumentView(APIView):
         # --- Basic presence check ---
         if not all([record_id, slot_id or item_id, file]):
             return Response(
-                {"detail": "record, slot, and file are required."},
+                {"detail": "record, file, and one of slot or request_item are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -658,7 +658,7 @@ class DocumentRequestDecisionView(APIView):
             return refused
         return _apply(
             document_request, request.user, WithdrawSerializer(data=request.data),
-            lambda data: withdraw_request(document_request),
+            lambda data: withdraw_request(document_request, request.user),
         )
 
 
@@ -687,7 +687,7 @@ class DocumentRequestItemDecisionView(APIView):
 
         def decide(data):
             if data["action"] == "accept":
-                accept_item(item)
+                accept_item(item, request.user)
             else:
                 reject_item(item, request.user, reason=data["reason"])
 

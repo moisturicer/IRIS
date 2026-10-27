@@ -1,11 +1,10 @@
 /**
- * The reply bubble while an answer is still streaming in (IR-329): a status
- * line before any text arrives, then the answer text itself, with citation
- * markers held back as placeholders.
+ * The reply bubble while an answer is still streaming in (IR-329, IR-596):
+ * one status row, then any answer text, with citation markers held back as
+ * placeholders. No routing, step or reasoning panel exists to render.
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -15,22 +14,20 @@ import type { StreamingState } from "../hooks/useAskStream";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
 
 function state(overrides: Partial<StreamingState> = {}): StreamingState {
-  return {
-    stage: "searching", foundInfo: null, text: "", reasoning: "", citations: [], ...overrides,
-  };
+  return { activity: "waiting", label: "Waiting…", text: "", citations: [], ...overrides };
 }
 
 describe("a still-streaming reply", () => {
-  it("shows the status line before any answer text has arrived", () => {
-    renderScreen(<StreamingMessageBubble state={state({ stage: "searching" })} />);
+  it("shows the status row before any answer text has arrived", () => {
+    renderScreen(<StreamingMessageBubble state={state({ activity: "thinking", label: "Thinking…" })} />);
 
-    expect(screen.getByText("Searching the repository…")).toBeTruthy();
+    expect(screen.getByRole("status")).toHaveTextContent("Thinking…");
   });
 
   it("renders the answer text as it arrives", () => {
     renderScreen(
       <StreamingMessageBubble
-        state={state({ stage: "answering", text: "Rainfall gauges feed the model." })}
+        state={state({ activity: "preparing", label: "Preparing your answer…", text: "Rainfall gauges feed the model." })}
       />,
     );
 
@@ -40,7 +37,7 @@ describe("a still-streaming reply", () => {
   it("holds a citation marker back as a placeholder rather than raw brackets", () => {
     renderScreen(
       <StreamingMessageBubble
-        state={state({ stage: "answering", text: "Rainfall gauges feed the model [1]." })}
+        state={state({ activity: "preparing", label: "Preparing your answer…", text: "Rainfall gauges feed the model [1]." })}
       />,
     );
 
@@ -48,34 +45,32 @@ describe("a still-streaming reply", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
-  it("offers the reasoning collapsed while the answer is still writing", async () => {
+  it("renders no reasoning, routing or step panel, only the one status row", () => {
+    renderScreen(
+      <StreamingMessageBubble state={state({ activity: "thinking", label: "Thinking…" })} />,
+    );
+
+    expect(screen.queryByRole("button", { name: /reasoning/i })).toBeNull();
+    for (const prohibited of ["Answer approach", "Why this approach", "Try instead", "search_passages", "find_records"]) {
+      expect(screen.queryByText(new RegExp(prohibited, "i"))).toBeNull();
+    }
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("puts the status row under the answer text", () => {
     renderScreen(
       <StreamingMessageBubble
-        state={state({
-          stage: "answering",
-          text: "Rainfall gauges feed the model.",
-          reasoning: "The gauges are named in the Methods section.",
-        })}
+        state={state({ activity: "preparing", label: "Preparing your answer…", text: "Two papers use rainfall gauges." })}
       />,
     );
 
-    expect(screen.queryByText(/named in the Methods section/)).toBeNull();
-
-    await userEvent.click(screen.getByRole("button", { name: /reasoning/i }));
-    expect(screen.getByRole("region", { name: "Reasoning" }).textContent).toBe(
-      "The gauges are named in the Methods section.",
-    );
-  });
-
-  it("offers no reasoning panel when none arrived", () => {
-    renderScreen(<StreamingMessageBubble state={state({ stage: "thinking" })} />);
-
-    expect(screen.queryByRole("button", { name: /reasoning/i })).toBeNull();
+    const answer = screen.getByText(/use rainfall gauges/);
+    expect(answer.compareDocumentPosition(screen.getByRole("status")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(
-      <StreamingMessageBubble state={state({ stage: "thinking" })} />,
+      <StreamingMessageBubble state={state({ activity: "thinking", label: "Thinking…" })} />,
     );
 
     await expectNoBlockingA11yViolations(container);

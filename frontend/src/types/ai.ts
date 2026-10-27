@@ -1,4 +1,120 @@
 /**
+ * What an exact metadata count (IR-543) was counted over. Present only on a
+ * database count; `total` is of distinct IRIS records, never of unique works.
+ */
+export interface MetadataCountBasis {
+  total: number;
+  predicate: string;
+  population: string;
+  /** When the count was read; a reopened transcript keeps the original. */
+  snapshot: string;
+  visible: number;
+  ai_assessable: number;
+  not_ai_assessable: number;
+  possible_duplicate_titles: number;
+  undated: number | null;
+  unit: string;
+}
+
+/**
+ * A candidate's state in a listing (IR-546). `pending` is only a preview and is
+ * never a match; `unassessed` is a paper that was not judged, never a rejection.
+ */
+export type CandidateState = "pending" | "included" | "excluded" | "uncertain" | "unassessed";
+
+export interface CandidateRow {
+  record_id: number;
+  /** Absent for a paper IRIS may not read: it is counted, never named. */
+  title?: string;
+  state: CandidateState;
+  restricted?: boolean;
+  /** Verbatim text that decided it, and where it came from (final listing only). */
+  quote?: string;
+  source?: { field: "title" | "abstract" | "passage"; page?: number | null; chunk_id?: number };
+}
+
+export interface CandidateCoverage {
+  limit: number;
+  selected: number;
+  included: number;
+  excluded: number;
+  uncertain: number;
+  unassessed: number;
+  more_available: boolean;
+  search_degraded: boolean;
+  changed: boolean;
+}
+
+/**
+ * A topic-match count over a screened subset (IR-547): matches among the papers
+ * assessed of those selected, never a count of the catalogue. Every figure is
+ * derived in code from the candidates, so it moves with them on a reopened chat.
+ */
+export interface TopicCount {
+  criterion: string;
+  method: string;
+  version: string;
+  basis: "topic_classification_of_selected_candidates";
+  matches: number;
+  /** Included, excluded and uncertain; `unassessed` papers are not in it. */
+  assessed: number;
+  excluded: number;
+  uncertain: number;
+  unassessed: number;
+  selected: number;
+  limit: number;
+  more_available: boolean;
+}
+
+/** What one run observed. Not a measure of capacity: a warm run proves nothing about a fresh model. */
+export interface ObservedRun {
+  cache_hits: number;
+  cache_misses: number;
+  model_calls: number;
+  prompt_tokens_estimated: number;
+  stage_ms: { select: number; screen: number; finish: number; total: number };
+  note: string;
+}
+
+export interface AnswerListing {
+  completeness: "matches_found" | "screened" | "exact_count" | "inconclusive";
+  wording: string;
+  records: { record_id: number; title: string }[];
+  /** Every selected candidate in one state each (IR-546). */
+  candidates?: CandidateRow[];
+  coverage?: CandidateCoverage;
+  count?: MetadataCountBasis;
+  topic_count?: TopicCount;
+  observed?: ObservedRun;
+}
+
+export interface ComparisonCitation {
+  page: number | null;
+  quote: string;
+  chunk_id: number;
+  marker?: number;
+}
+
+export interface ComparisonCell {
+  record_id: number;
+  state: "reported" | "not_reported" | "unsupported";
+  values: { value: string; citations: ComparisonCitation[] }[];
+}
+
+/** A comparison built from checked paper facts, separate from answer prose. */
+export interface AnswerComparison {
+  records: { record_id: number; title: string }[];
+  rows: { dimension: string; label: string; cells: ComparisonCell[] }[];
+  coverage: {
+    record_id?: number;
+    title?: string;
+    state: "read_fully" | "read_by_section" | "could_not_read" | "not_permitted";
+    reason?: string;
+  }[];
+  removed_claims: number;
+}
+
+/**
  * One highlightable rectangle on a page, as a fraction of it (0–1), left/top
  * origin (IR-334). Fractions rather than pixels or PDF points: a reader's PDF
  * page is rendered at whatever zoom the viewer is at, and a fraction of the
@@ -85,6 +201,7 @@ export interface EmbeddingSpaceInfo {
 }
 
 export interface AIStatus {
+  comparison_max_records?: number;
   embedding_space:  EmbeddingSpaceInfo | null;
   generative:       boolean;
   /** Records with indexed passages that the asker may read. */
@@ -107,7 +224,7 @@ export interface AIStatus {
  * "no overview" as one undifferentiated blank.
  */
 export interface RecordOverviewResponse {
-  state:    "ready" | "not_indexed" | "unavailable";
+  state:    "ready" | "generating" | "not_indexed" | "unavailable";
   overview: RecordOverview | null;
   /** Present only on `ready` — whether this read hit the cache. */
   cached?:  boolean;
@@ -115,9 +232,9 @@ export interface RecordOverviewResponse {
 
 export interface RecordOverview {
   text:          string;
-  /** The same citation shape chat renders — see `Citation`, minus a `marker`
-   * numbering scheme of its own (the overview's own [n] markers are numbered
-   * independently, same as any other grounded answer). */
+  /** The same citation shape chat renders — see `Citation` — but `marker`
+   * is the cited page, not a source number: `[12]` cites page 12, carrying
+   * every chunk on it (IR-434). */
   citations:     Citation[];
   degraded:      boolean;
   model:         string | null;
@@ -125,6 +242,10 @@ export interface RecordOverview {
 }
 
 export interface AIAnswer {
+  comparison?: AnswerComparison;
+  turn_id?: number;
+  reasoning_summary?: string;
+  listing?: AnswerListing;
   /** Answer text, or null when nothing in the corpus matched. */
   answer:    string | null;
   /**
@@ -176,12 +297,16 @@ export type ChatCitation = Citation | ReplayedCitation;
 
 /** One question-and-answer pair in a persisted Conversation (IR-295). */
 export interface ConversationTurn {
+  comparison?: AnswerComparison;
+  listing?: AnswerListing;
   id:                 number;
   question:           string;
   resolved_question:  string | null;
   answer:             string | null;
   message:            string | null;
-  state:              AIAnswerMode;
+  /** `state` on the legacy shape, `mode` under the public protocol (IR-595). */
+  state?:             AIAnswerMode;
+  mode?:              AIAnswerMode;
   degraded:           boolean;
   widened:            boolean;
   created_at:         string;
@@ -197,11 +322,10 @@ export interface ConversationTurn {
    */
   partial?:           boolean;
   /**
-   * The reasoning stored with this Turn (IR-381), `null` when none was.
-   * Optional only so fixtures predating the field still type-check — a real
-   * response always sends it.
+   * A short analytical account of the evidence, shown collapsed above the
+   * answer (IR-596). Absent on old Turns and whenever no safe summary exists.
    */
-  reasoning?:         string | null;
+  reasoning_summary?: string;
 }
 
 /** A Conversation without its Turns — the shape a sidebar lists (IR-295). */
@@ -216,8 +340,23 @@ export interface ConversationSummary {
 }
 
 /** One Conversation with its full transcript (IR-295). */
+/**
+ * A Conversation's latest queued run while no Turn shows for it (IR-548):
+ * still `queued`/`running`, so an opened page follows it again, or ended
+ * without an answer, so the page says so and offers Retry.
+ */
+export interface LatestAskRun {
+  id:            string;
+  state:         "queued" | "running" | "failed" | "expired" | "cancelled";
+  end_reason:    string;
+  question:      string;
+  retry_of:      string | null;
+  last_sequence: number;
+}
+
 export interface ConversationDetail extends ConversationSummary {
   turns: ConversationTurn[];
+  latest_run?: LatestAskRun | null;
 }
 
 export interface EmbeddingJobStatus {
