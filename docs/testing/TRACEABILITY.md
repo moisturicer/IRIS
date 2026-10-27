@@ -1156,7 +1156,7 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
 
 ## IR-566: Saved Records and reading status follow the reader's account (ADR only, not built)
 
-**Status.** Design proposed, not implemented. [ADR-042](../adr/042-account-backed-research-library.md) is **Proposed**. IR-566 is not labelled ready-for-agent until the ADR is accepted by a named person and its open questions are answered: Likes, reading history, and Calls & Conferences saves. No code, migration or test exists for it yet, so no requirement here is met.
+**Status.** Design proposed, not implemented. [ADR-043](../adr/043-account-backed-research-library.md) is **Proposed**. IR-566 is not labelled ready-for-agent until the ADR is accepted by a named person and its open questions are answered: Likes, reading history, and Calls & Conferences saves. No code, migration or test exists for it yet, so no requirement here is met.
 
 ## IR-570: Ask IRIS on a phone: a full-width answer, with history and sources in drawers
 

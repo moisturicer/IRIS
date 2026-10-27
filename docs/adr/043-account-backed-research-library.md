@@ -1,4 +1,4 @@
-# ADR-042: A reader's saved Records and reading status belong to their account
+# ADR-043: A reader's saved Records and reading status belong to their account
 
 ## Status
 
