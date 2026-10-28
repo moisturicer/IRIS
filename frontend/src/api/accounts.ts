@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { User, UserListItem, RoleRequest } from "@/types/auth";
+import type { AdviserOption, User, UserListItem, RoleRequest } from "@/types/auth";
 
 interface College    { id: number; name: string; code: string; }
 interface Department { id: number; name: string; code: string; college: number; college_name: string; }
@@ -22,7 +22,7 @@ export const accountsApi = {
 
   /** List all active Adviser-role users — usable by any authenticated user. */
   listAdvisers: () =>
-    apiClient.get<PaginatedResponse<User>>("/users/advisers/"),
+    apiClient.get<PaginatedResponse<AdviserOption>>("/users/advisers/"),
 
   /** Alias used by UserListPage -- same endpoint, narrower return type */
   userList:   (params?: Record<string, unknown>) =>
