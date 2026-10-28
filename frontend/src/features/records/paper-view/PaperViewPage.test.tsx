@@ -107,6 +107,7 @@ const record: RecordDetail = {
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
   versions: null,
   manuscript_unsubmitted: false,
+  submitter_status: null,
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -163,6 +164,7 @@ const approvedProposal: RecordDetail = {
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
   versions: null,
   manuscript_unsubmitted: false,
+  submitter_status: null,
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -391,6 +393,7 @@ const inReview: RecordDetail = {
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
   versions: null,
   manuscript_unsubmitted: false,
+  submitter_status: null,
 };
 
 /**
@@ -671,6 +674,83 @@ describe("document requests (IR-262)", () => {
 
     await waitForRecord(inReview.title);
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the submitter's own status (IR-625)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const openRequest = {
+    id: 1, party: "adviser", label: "Adviser", state: "open", state_label: "Open",
+    message: "The signed form, please.", requested_by: null,
+    created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
+    items: [],
+  };
+
+  const waitingOwner: RecordDetail = {
+    ...inReview,
+    workflow_state: "awaiting_resubmission",
+    workflow_state_label: "Awaiting resubmission",
+    submitter_status: {
+      line: "Revision requested by IERC: action needed",
+      waiting_on_you: [
+        { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" },
+        { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" },
+      ],
+      history: [
+        {
+          number: 1, cause_label: "Submission", submitted_at: "2026-09-01T02:00:00Z",
+          decisions: [
+            { party: "adviser", label: "Adviser", verdict: "approved", verdict_label: "Approved" },
+            { party: "ierc", label: "IERC", verdict: "declined", verdict_label: "Revision requested" },
+          ],
+        },
+        { number: 2, cause_label: "Revision", submitted_at: "2026-09-15T02:00:00Z", decisions: [] },
+      ],
+    },
+  };
+
+  it("tells the owner where the record is, what waits on them, and each version's history", async () => {
+    shownRecord = waitingOwner;
+    signInAs(OWNER_ID, "Student");
+    const { container } = renderPaperView();
+
+    const panel = await screen.findByRole("region", { name: "Your submission" });
+    expect(panel).toHaveTextContent("Revision requested by IERC: action needed");
+
+    const waiting = within(panel).getByRole("region", { name: "Waiting on you" });
+    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
+      .toHaveAttribute("href", "#revision-requested");
+    expect(within(waiting).getByRole("link", { name: "Upload the documents (Documents requested by Adviser)" }))
+      .toHaveAttribute("href", "#documents-requested");
+
+    const versions = within(within(panel).getByRole("list", { name: "Version history" })).getAllByRole("listitem");
+    expect(versions).toHaveLength(2);
+    expect(versions[0]).toHaveTextContent("v1 · Submission");
+    expect(versions[0]).toHaveTextContent("Adviser: Approved · IERC: Revision requested");
+    expect(versions[1]).toHaveTextContent("No decision yet");
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows nothing of the kind to anyone the server sends none", async () => {
+    shownRecord = { ...waitingOwner, submitter_status: null };
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("region", { name: "Your submission" })).not.toBeInTheDocument();
+  });
+
+  it("lands on the request a My Library link named, once it has loaded", async () => {
+    documentRequests.mockResolvedValueOnce({ data: [openRequest] });
+    shownRecord = waitingOwner;
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=overview#documents-requested`);
+
+    const panel = await screen.findByRole("region", { name: "Action required" });
+    await waitFor(() => expect(panel).toHaveFocus());
   });
 });
 

@@ -9,6 +9,8 @@ import type { DocumentRequest, DocumentRequestItem } from "@/types/records";
 
 interface ActionRequiredPanelProps {
   recordId: number;
+  /** The panel's id, so a link can land on it (IR-625). */
+  id?: string;
   /** Told after an upload, so the page can refresh what it derived from the old state. */
   onChanged?: () => void;
 }
@@ -37,7 +39,7 @@ interface ActionRequiredPanelProps {
  * §3.4). A list that fails to load says so: an empty panel would read as
  * "nothing required", which is exactly the wrong thing to tell an owner.
  */
-export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanelProps) {
+export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredPanelProps) {
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -85,8 +87,10 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
 
   return (
     <section
+      id={id}
+      tabIndex={id ? -1 : undefined}
       aria-labelledby={headingId}
-      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 space-y-4"
+      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 space-y-4 scroll-mt-20 focus:outline-none"
     >
       <h2 id={headingId} className="text-sm font-bold text-brand-dark flex items-center gap-2">
         <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />
