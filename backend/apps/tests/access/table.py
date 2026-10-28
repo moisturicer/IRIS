@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cells import (
-    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, KnownDefect, Ref, Upload, row,
+    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, Ref, Upload, row,
 )
 
 # -- shorthands -------------------------------------------------------------
@@ -58,11 +58,6 @@ DOCUMENTS_EXCEPTION = (
     "ADR-022 §Amendment 4 point 4: authorize_record_documents answers 403 to a caller "
     "who cannot see the Record, whose id they supplied (IR-153)"
 )
-
-#: The upload and file download routes answer 403 for an object on a Record
-#: the caller cannot see and 404 for a missing one. Not covered by the
-#: exception above: the caller supplies an upload or file id, not a Record id.
-EXISTENCE_ORACLE = "IR-627"
 
 
 @dataclass(frozen=True)
@@ -286,22 +281,19 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     # -- one upload or file, named by its own id: the 404 convention ------
     "record-upload-download": Entry({
         "GET": _case(
-            row(ANON, KnownDefect(HIDE, EXISTENCE_ORACLE, "403"), OK, DENY, OK, OK, OK, OK,
-                KnownDefect(HIDE, EXISTENCE_ORACLE, "403")),
+            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE),
             kwargs=UPLOAD,
         ),
     }),
     "record-upload-delete": Entry({
         "DELETE": _case(
-            row(ANON, KnownDefect(HIDE, EXISTENCE_ORACLE, "403"), OK, DENY, OK, OK, OK, OK,
-                KnownDefect(HIDE, EXISTENCE_ORACLE, "403")),
+            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE),
             kwargs=UPLOAD,
         ),
     }),
     "record-file-download": Entry({
         "GET": _case(
-            row(ANON, KnownDefect(HIDE, EXISTENCE_ORACLE, "403"), OK, DENY, OK, OK, OK, OK,
-                KnownDefect(HIDE, EXISTENCE_ORACLE, "403")),
+            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE),
             kwargs=RECORD_FILE,
         ),
     }),
