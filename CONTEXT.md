@@ -127,7 +127,7 @@ One [[Specialist office]]'s review of a Record, from being routed the Record unt
 _Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads as a person being assigned, which is a Seat), pass.
 
 **Due date**:
-When a party's turn at a Record is expected to finish: a [[Review round]] for a [[Specialist office]], or the Adviser's or RDCO's turn. Set from that party's [[Turnaround]] when the party receives the Record, in working days, and fixed from then on except by an [[Extension]]. It belongs to the office, not a person, so an unclaimed [[Pool]] has one too; every [[Seat]] shows the same date. A due date only prompts reminders and an [[Escalation]]; it never decides, clears or routes anything (ADR-043, proposed).
+When a party's turn at a Record is expected to finish: a [[Review round]] for a [[Specialist office]], or the Adviser's or RDCO's turn. Set from that party's [[Turnaround]] when the party receives the Record, in working days, and fixed from then on except by an [[Extension]]. It belongs to the office, not a person, so an unclaimed [[Pool]] has one too; every [[Seat]] shows the same date. A due date only prompts reminders and an [[Escalation]]; it never decides, clears or routes anything (ADR-043).
 _Avoid_: Deadline (implies something happens automatically when it passes), SLA (an external commitment IRIS does not make), seat due date.
 
 **Turnaround**:
