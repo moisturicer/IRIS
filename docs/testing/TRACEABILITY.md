@@ -8,6 +8,19 @@
 
 ---
 
+## IR-625 the submitter sees where their record is and what waits on them
+
+**Design:** Jira IR-625, building on IR-534's My Library dot and IR-342's rule that the frontend words no status itself.
+
+- **Field:** `submitter_status` on My Library's list and on Record detail, sent to an owner only (`null` otherwise). It holds `line` (one sentence: *With your Adviser*, *In specialist review: IERC, KTTO*, *Revision requested by IERC: action needed*) and `waiting_on_you` (one item per party with an open revision or document request). Record detail adds `history`: each version, when it was submitted and each party's verdict on it.
+- **Agreement with the dot:** `waiting_on_you` is non-empty exactly when `workflow_state` is in `OWNER_ACTION_STATES`, the states IR-534 counts.
+- **No reviewer identity:** a party is named by its label. Why it asked stays in the revision banner and the document-request panel, under their own read rules.
+- **Frontend:** `SubmissionStatus` heads Overview. Each Waiting-on-you link focuses its panel in place. A My Library link arrives with a `#fragment`, which `useFragmentFocus` lands once the panel renders.
+
+**Tests:** `apps/reviews/test_submitter_status.py` · `apps/records/test_my_research_list.py` · `paper-view/PaperViewPage.test.tsx` · `features/library/MyLibraryPage.test.tsx`.
+
+**Status:** IMPLEMENTED, tested. Not reviewed by a person yet.
+
 ## IR-587 the adviser picker shows no account state (NFR-S4, FR-M6-06)
 
 **Design:** the decision recorded on Jira IR-587 (2026-10-14), following the IR-540 data notice.

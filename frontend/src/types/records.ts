@@ -80,8 +80,38 @@ export interface MyResearchItem {
   holders:              { party: Party; label: string }[];
   /** Offices that have cleared it; `preserved` when kept through a resubmission (ADR-003). */
   cleared_offices:      { office: "itso" | "ierc" | "ktto"; label: string; preserved: boolean }[];
+  submitter_status:     SubmitterStatus;
   created_at:           string;
   updated_at:           string;
+}
+
+/** One open request the owner must answer, worded by the server (IR-625). */
+export interface WaitingItem {
+  kind:         "revision" | "document";
+  party:        Party;
+  /** "Revision requested by IERC". */
+  label:        string;
+  /** The act that answers it: "Submit a new version". */
+  action_label: string;
+}
+
+/**
+ * Where an owner's record is, in the server's words (IR-625). `waiting_on_you`
+ * is non-empty exactly when `workflow_state` is `awaiting_resubmission` or
+ * `awaiting_document`. Carries no reviewer's name or words.
+ */
+export interface SubmitterStatus {
+  /** "With your Adviser", "In specialist review: ITSO, IERC", … */
+  line:           string;
+  waiting_on_you: WaitingItem[];
+}
+
+/** One version as its owner reads its history: when it went in, and what each party decided. */
+export interface SubmitterVersion {
+  number:       number;
+  cause_label:  string;
+  submitted_at: string;
+  decisions:    { party: Party; label: string; verdict: string; verdict_label: string }[];
 }
 
 export interface RecordReview {
@@ -274,6 +304,8 @@ export interface RecordDetail extends RecordListItem {
    * latest version's manuscript.
    */
   manuscript_unsubmitted: boolean;
+  /** The owner's status, what waits on them, and each version's history. Null to anyone but an owner (IR-625). */
+  submitter_status:     (SubmitterStatus & { history: SubmitterVersion[] }) | null;
 }
 
 /** One numbered snapshot of what the record put in front of its reviewers. */

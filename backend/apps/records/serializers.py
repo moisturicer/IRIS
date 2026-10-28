@@ -85,6 +85,9 @@ class MyResearchSerializer(serializers.ModelSerializer):
     # `[{office, label, preserved}]`: each office that has cleared it, and
     # whether that clearance was kept through a resubmission (ADR-003).
     cleared_offices      = serializers.SerializerMethodField()
+    # The owner's status line and what waits on them (IR-625). Every row
+    # here is the caller's own record.
+    submitter_status     = serializers.SerializerMethodField()
 
     def _facts(self, obj):
         return self.context["workflow_facts"][obj.pk]
@@ -108,12 +111,23 @@ class MyResearchSerializer(serializers.ModelSerializer):
     def get_cleared_offices(self, obj):
         return self._facts(obj)["cleared_offices"]
 
+    def get_submitter_status(self, obj):
+        from apps.reviews.submitter_status import submitter_status
+
+        facts = self._facts(obj)
+        return submitter_status(
+            record=obj, workflow_state=facts["workflow_state"],
+            holders=[h["party"] for h in facts["holders"]],
+            revision_parties=facts["revision_parties"],
+            document_parties=facts["document_parties"],
+        )
+
     class Meta:
         model  = Record
         fields = [
             "id", "title", "record_type_name", "authors", "adviser_name",
             "pipeline_status", "workflow_state", "workflow_state_label",
-            "holders", "cleared_offices", "created_at", "updated_at",
+            "holders", "cleared_offices", "submitter_status", "created_at", "updated_at",
         ]
         read_only_fields = fields
 
@@ -192,6 +206,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # submitted (IR-273). True for an owner only; everyone else is served the
     # latest version's manuscript meanwhile, so it is never theirs to label.
     manuscript_unsubmitted = serializers.SerializerMethodField()
+    # The owner's status line, what waits on them, and each version's
+    # history (IR-625). `None` to anyone but an owner.
+    submitter_status     = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -339,6 +356,18 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return manuscript_unsubmitted(obj, self._viewer())
 
+    def get_submitter_status(self, obj):
+        from apps.reviews.submitter_status import detail_status
+        from core.permissions import is_record_owner
+
+        if not is_record_owner(self._viewer(), obj):
+            return None
+        workflow = self._workflow(obj)
+        return detail_status(
+            obj, workflow_state=workflow["workflow_state"],
+            holders=[h["party"] for h in workflow["current_holders"]],
+        )
+
     def _ordered_clearances(self, obj):
         return list(obj.clearances.select_related("reviewed_by").order_by("office"))
 
@@ -436,7 +465,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
-            "versions", "manuscript_unsubmitted",
+            "versions", "manuscript_unsubmitted", "submitter_status",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as

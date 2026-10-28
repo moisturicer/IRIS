@@ -194,6 +194,8 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
       `derive_workflow_state`'s alone.
     - `holders`: the parties with an active assignment, in tracker order,
       as `{party, label}` -- who has the record now.
+    - `revision_parties`, `document_parties`: the asking party of each open
+      revision and document request on a record in review.
     - `cleared_offices`: each office whose clearance is `cleared`, with
       `preserved` from `clearance_state.is_preserved`, so a clearance kept
       through a resubmission reads as kept here exactly as on Record detail.
@@ -221,7 +223,7 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
         ResubmissionRequest.objects.filter(
             record_id__in=in_review, state=ResubmissionRequestState.OPEN
         ),
-        "pk",
+        "party",
     )
     documents = per_record(
         DocumentRequest.objects.filter(record_id__in=in_review, state=DocumentRequestState.OPEN),
@@ -263,6 +265,9 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
                 deciding_parties=lifecycle.deciding_parties_for(r),
             ),
             "holders": holders(r.pk),
+            # Who asked, per open request: what `submitter_status` names (IR-625).
+            "revision_parties": resubmissions.get(r.pk, []),
+            "document_parties": documents.get(r.pk, []),
             "cleared_offices": [
                 {
                     "office": office,
