@@ -24,7 +24,7 @@ import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
-import type { User } from "@/types/auth";
+import type { AdviserOption } from "@/types/auth";
 import type { Classification, PSCEDClassification, RecordDetail } from "@/types/records";
 
 import { describeFailure, stateFromDraft, type ApiFailure } from "@/features/publish/draft";
@@ -32,7 +32,7 @@ import { FORM_FIELD, MetadataForm, focusFirstInvalid } from "@/features/records/
 import { metadataPayload, metadataSchema, type MetadataValues } from "@/features/records/metadata/metadataSchema";
 
 interface Lists {
-  advisers:        User[];
+  advisers:        AdviserOption[];
   classifications: Classification[];
   psceds:          PSCEDClassification[];
 }

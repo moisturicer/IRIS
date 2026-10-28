@@ -9,7 +9,7 @@ from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer,
 )
@@ -119,9 +119,10 @@ class AdviserListView(generics.ListAPIView):
     GET /users/advisers/
     Returns all active users whose role is "Adviser".
     Used by the record creation form so students can pick their adviser.
-    Any authenticated user may call this endpoint.
+    Any authenticated user may call this endpoint, which is why it serializes
+    only the picker's fields and no account state (IR-587).
     """
-    serializer_class   = UserSerializer
+    serializer_class   = AdviserOptionSerializer
     permission_classes = [IsAuthenticated]
     pagination_class   = LargeResultsPagination  # advisers list is small; return them all at once
 

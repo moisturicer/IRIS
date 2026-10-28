@@ -96,14 +96,26 @@ export interface ApiFailure {
 }
 
 const NETWORK_MESSAGE = "We couldn't reach IRIS. Check your connection and try again.";
+const SERVER_MESSAGE = "IRIS isn't responding right now. Try again in a few minutes.";
+const TOO_LARGE_MESSAGE = "This is too large for the server to accept.";
+
+/**
+ * What to say when the body has nothing readable (IR-610): a proxy's empty 5xx
+ * or HTML error page means the server failed, not whatever the caller was sending.
+ */
+function statusMessage(status: number | undefined, fallback: string): string {
+  if (status === 413) return TOO_LARGE_MESSAGE;
+  if (status != null && status >= 500) return SERVER_MESSAGE;
+  return fallback;
+}
 
 export function describeFailure(err: unknown, fallback: string): ApiFailure {
-  const response = (err as { response?: { data?: unknown } })?.response;
+  const response = (err as { response?: { status?: number; data?: unknown } })?.response;
   if (!response) return { message: NETWORK_MESSAGE, fields: {}, network: true };
 
   const data = response.data;
   const fields: Record<string, string> = {};
-  let message = fallback;
+  let message = statusMessage(response.status, fallback);
 
   if (data && typeof data === "object" && !Array.isArray(data)) {
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
@@ -112,8 +124,11 @@ export function describeFailure(err: unknown, fallback: string): ApiFailure {
       if (key === "detail" || key === "non_field_errors") message = text;
       else fields[key] = text;
     }
-  } else if (typeof data === "string" && data.length < 300) {
-    message = data;
+  } else if (typeof data === "string" && (response.status ?? 0) < 500) {
+    // A blank body or an error page is not a message, and a 5xx's text is the
+    // proxy's (IR-610), so only a short plain reply from IRIS itself is shown.
+    const text = data.trim();
+    if (text && !text.startsWith("<") && text.length < 300) message = text;
   }
 
   return { message, fields, network: false };

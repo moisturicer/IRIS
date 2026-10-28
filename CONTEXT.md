@@ -126,6 +126,22 @@ _Avoid_: Route to RDCO, escalation, final routing.
 One [[Specialist office]]'s review of a Record, from being routed the Record until its [[Seat]]s are done. An office routed the same Record again starts a new Review round, and the latest completed one sets the office's [[Clearance]]; the earlier outcome stands until then.
 _Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads as a person being assigned, which is a Seat), pass.
 
+**Due date**:
+When a party's turn at a Record is expected to finish: a [[Review round]] for a [[Specialist office]], or the Adviser's or RDCO's turn. Set from that party's [[Turnaround]] when the party receives the Record, in working days, and fixed from then on except by an [[Extension]]. It belongs to the office, not a person, so an unclaimed [[Pool]] has one too; every [[Seat]] shows the same date. A due date only prompts reminders and an [[Escalation]]; it never decides, clears or routes anything (ADR-043).
+_Avoid_: Deadline (implies something happens automatically when it passes), SLA (an external commitment IRIS does not make), seat due date.
+
+**Turnaround**:
+How many working days a party is given for its turn at a Record, set per party by an administrator. A party with no Turnaround has no [[Due date]] at all; IRIS never supplies one. Changing it affects only turns that start afterwards.
+_Avoid_: SLA, deadline, review period.
+
+**Extension**:
+Moving a [[Due date]] later, always with a reason and always visible beside the original date. Made by a coordinator of that office, or by IRIS itself while the office's own document request waits on the owner. An Adviser's due date is never extended by hand.
+_Avoid_: Reset (a new Version gives reopened parties a fresh due date, which is not an Extension), postponement.
+
+**Escalation**:
+Telling an office's coordinators that its [[Due date]] has passed. Only a notification: the Record, its [[Seat]]s and its [[Clearance]]s are unchanged. The Adviser stage has no Escalation.
+_Avoid_: Using it for the [[Hand-back]] to RDCO, auto-escalation (suggests the Record moves).
+
 **Revision request**:
 One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and nobody can decide it; the party that asked cannot finish its own review either. Answered by the next Version, or withdrawn by the party that asked. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).

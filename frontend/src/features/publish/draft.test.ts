@@ -57,6 +57,40 @@ describe("describeFailure", () => {
     expect(describeFailure({ response: { data: { adviser: ["Required."] } } }, "Fallback.").message).toBe("Fallback.");
   });
 
+  // IR-610: a server error with nothing readable in it named the file, not the server.
+  it.each([
+    ["a 500 with an empty body", 500, ""],
+    ["a 502 with an HTML body", 502, "<html><body><h1>502 Bad Gateway</h1></body></html>"],
+    ["a 504 with no body", 504, undefined],
+    ["a 502 with a proxy's plain-text body", 502, "upstream connect error or disconnect/reset before headers"],
+  ])("says IRIS is not responding for %s", (_label, status, data) => {
+    const failure = describeFailure({ response: { status, data } }, "The upload failed.");
+    expect(failure.message).toMatch(/IRIS isn't responding/);
+    expect(failure.network).toBe(false);
+  });
+
+  it.each([
+    ["an empty body", ""],
+    ["nginx's error page", "<html><head><title>413 Request Entity Too Large</title></head></html>"],
+  ])("says it is too large for a 413 with %s", (_label, data) => {
+    const failure = describeFailure({ response: { status: 413, data } }, "The upload failed.");
+    expect(failure.message).toMatch(/too large/);
+  });
+
+  it("shows a short plain reply from IRIS itself, trimmed", () => {
+    expect(describeFailure({ response: { status: 400, data: "Bad request.\n\n" } }, "fallback").message).toBe("Bad request.");
+  });
+
+  it("keeps the server's own message over the status", () => {
+    const failure = describeFailure({ response: { status: 503, data: { detail: "Down for maintenance." } } }, "fallback");
+    expect(failure.message).toBe("Down for maintenance.");
+  });
+
+  it("keeps the fallback for a 400 that carries only field errors", () => {
+    const failure = describeFailure({ response: { status: 400, data: { abstract_file: ["Only PDF files are accepted."] } } }, "Fallback.");
+    expect(failure).toEqual({ message: "Fallback.", fields: { abstract_file: "Only PDF files are accepted." }, network: false });
+  });
+
   it("says the network failed when there was no response at all", () => {
     const failure = describeFailure(new Error("Network Error"), "fallback");
     expect(failure.network).toBe(true);
