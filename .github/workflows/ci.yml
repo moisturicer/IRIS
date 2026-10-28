@@ -290,11 +290,44 @@ jobs:
         with:
           python-version: '3.11'
 
+      # IR-613: the audits used to end in `|| true`, so a critical CVE left the
+      # job green. Now each tool writes JSON and security/audit_gate.py decides:
+      # high/critical fails unless security/allowlist.yml accepts it, and an
+      # expired allowlist entry fails on its own. Tools are pinned so a new
+      # release cannot change what the gate means.
+      - name: Install the audit gate
+        run: pip install pip-audit==2.10.1 pyyaml==6.0.2 pytest==8.3.5
+
+      - name: Audit gate self-test
+        run: python -m pytest security/tests -q -p no:cacheprovider
+
+      # production.txt starts with `-r base.txt`, so this one run covers both
+      # files the ticket names. Each tool exits non-zero when it finds anything
+      # at all; that is expected, and the gate reads the report. A run that
+      # produced no report (resolver or network failure) fails here instead.
       - name: Dependency audit (Python)
         run: |
-          pip install pip-audit
-          pip-audit -r backend/requirements/base.txt --desc || true
+          pip-audit -r backend/requirements/production.txt --desc -f json -o pip-audit.json || true
+          test -s pip-audit.json || { echo "pip-audit produced no report"; exit 1; }
 
       - name: Dependency audit (Node)
         working-directory: frontend
-        run: npm audit --audit-level=high || true
+        run: |
+          npm audit --json > ../npm-audit.json || true
+          node -e 'if (!JSON.parse(require("fs").readFileSync("../npm-audit.json")).vulnerabilities) process.exit(1)' \
+            || { echo "npm audit produced no report"; exit 1; }
+
+      - name: Dependency audit gate (fails on high/critical)
+        run: |
+          python -m security.audit_gate --allowlist security/allowlist.yml \
+            --pip-audit pip-audit.json --npm-audit npm-audit.json
+
+      - name: Keep the audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit
+          path: |
+            pip-audit.json
+            npm-audit.json
+          if-no-files-found: ignore

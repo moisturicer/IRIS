@@ -1,0 +1,12 @@
+# Accepted high/critical findings for the CI security gate (IR-613).
+#
+# Every entry needs all four fields, and CI fails once `expires` is in the past:
+# an exception is a decision with a date on it, not a permanent silence.
+#
+#   - id: GHSA-xxxx-xxxx-xxxx      # GHSA, CVE or PYSEC id; aliases match too
+#     reason: Why it does not apply here, or why it cannot be fixed yet.
+#     owner: The person who will revisit it
+#     expires: 2026-12-31          # YYYY-MM-DD; at most 90 days out
+#
+# Process: docs/testing/TEST_PLAN.md §Security gate.
+entries: []

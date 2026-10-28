@@ -103,6 +103,33 @@ cd frontend && npm run build
 
 CI runs on every push and pull request to `feat/rag-service` and `main` — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). `ci.yml`'s own comment records that it is expected to stay red until IR-57 (application boot) and IR-58 (Docker stack) land — do not weaken a gate to make it green.
 
+### Security gate — dependency audits (IR-613)
+
+The CI `security` job fails on any **high or critical** advisory in the backend's production dependencies (`pip-audit -r backend/requirements/production.txt`, which includes `base.txt`) or the frontend lockfile (`npm audit`), unless the advisory is accepted in [`security/allowlist.yml`](../../security/allowlist.yml). Moderate and low findings are printed and kept as the `dependency-audit` artifact, but do not fail the job.
+
+`security/audit_gate.py` makes the decision, not the tools' own flags: `npm audit` has no allowlist, and `pip-audit` reports no severity. Python severities are the GitHub-reviewed ones from OSV. A finding whose severity cannot be found counts as high, so an OSV outage fails the gate rather than passing it. The gate's own tests run first in the same job (`python -m pytest security/tests`).
+
+**Accepting a finding.** Fix by upgrading wherever an upgrade exists. When one does not, or the advisory does not apply (for example a dev-server-only bug in a tool that never ships), add an entry:
+
+```yaml
+entries:
+  - id: GHSA-xxxx-xxxx-xxxx    # any alias matches: GHSA, CVE or PYSEC
+    reason: Why it does not apply, or what blocks the upgrade.
+    owner: Who revisits it
+    expires: 2026-12-31        # at most 90 days out
+```
+
+All four fields are required. **An expired entry fails CI** even if the finding is gone. The entry goes through normal PR review like any other change. When the gate reports an entry as `unused`, the finding is gone and the entry should be deleted.
+
+Reproduce locally from the repo root:
+
+```bash
+pip install pip-audit==2.10.1 pyyaml==6.0.2
+pip-audit -r backend/requirements/production.txt -f json -o pip-audit.json
+(cd frontend && npm audit --json > ../npm-audit.json)
+python -m security.audit_gate --allowlist security/allowlist.yml --pip-audit pip-audit.json --npm-audit npm-audit.json
+```
+
 ---
 
 ## 7 · Entry and exit
