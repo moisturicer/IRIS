@@ -1060,6 +1060,18 @@ and no capacity burst. The control run's figures measure arithmetic and plumbing
 
 **Status:** instrument implemented and tested; every evaluation gate is OPEN and human review remains required.
 
+## IR-601: the AI Overview polling test no longer races its own timer
+
+**Defect.** `PaperAiOverview.test.tsx` › "explains that generation is pending and polls until the overview is ready" advanced the fake clock by 2500ms once. The component's poll timer is set by an effect that React runs on a faked timer after "being prepared" is on screen. A single advance could therefore run that effect partway through and leave the new 2500ms timer beyond the advance, so the poll never happened in time. It is a test bug; in a browser the timer simply fires.
+
+**Measured, 2026-10-15, local:**
+- Run alone, the test failed **30 of 30**, and in every failure the poll timer did not yet exist when the clock moved. In its whole file it failed 2 runs in 5. It also failed PR #276's Frontend job once.
+- Waiting for the timer before advancing: **0 of 15** failed, which confirms the cause.
+
+**Fix.** The test advances in steps, at most three, until the poll has happened. It does not use `waitFor`, because its own timeout is a faked timer too. The assertions are unchanged: the pending state is announced, exactly one poll follows, and the overview renders. A deliberately broken poll (a 60s interval) still fails the test.
+
+**Evidence:** alone, **0 of 30** failed; in its file, **0 of 10**. `npm test` **1071 passed, 3 failed**, the three `Sidebar.test.tsx` tests that fail identically on `main` locally and pass in CI.
+
 ## IR-589 — approved general-tools conversation contract and regression baseline
 
 IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as **accepted by Jive Tyler Revalde on 2026-10-15**: the controller is the default reader path without an on/off switch; detailed supported answers survive nonessential tool failures; one bounded repair may preserve independently supported parts; both prompt boxes carry the mistake notice; and the outdated SRS/SDD are not current engineering authority. It changes no runtime behavior, approves no provider or spending limit, and does not accept the separate proposed ADR-038/040/041 details. The [version 1 specification](../architecture-review/2026-10-15-askiris-general-tools-spec.md) §§1–2, 5–11 owns A01–A15. The [fixture pack](../../backend/apps/ai/evaluation/fixtures/general_tools_contract_v1.json) separates approved expectations from source-observed current failure wording and unmeasured cases; `test_general_tools_contract_fixture.py` validates scenario coverage, record and ordering consistency, snapshot digest, literal current wording, and specific regression oracles without a vendor or database. `test_general_tools_current_http.py` is a runnable fake-provider control over HTTP, SSE and reopened Conversation; its 34 database cases skipped locally without Postgres. The [evaluation protocol](../evaluation/general-tools/README.md) and [acceptance map](../evaluation/general-tools/acceptance-map.md) own development/held-out split, human rubric, pinned manifest, proposed thresholds and paid-test approval boundaries. **Evidence:** 3 fixture tests passed, 34 HTTP controls skipped, owner decision recorded; runtime behavior, paid quality results and production gates remain open for downstream tickets.
