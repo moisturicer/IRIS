@@ -245,3 +245,42 @@ class OwnRoleRequestTests(APITestCase):
             response.data["role_request"],
             {"status": "declined", "requested_role": "Student"},
         )
+
+
+class AdviserPickerTests(APITestCase):
+    """
+    `GET /users/advisers/` is open to every signed-in user so a student can
+    name their Adviser. It must carry what the IR-540 data notice promises --
+    name, email, college and department -- and no account state (IR-587).
+    """
+
+    PICKER_FIELDS = {
+        "id", "first_name", "middle_initial", "last_name", "email",
+        "college_name", "department_name",
+    }
+
+    def setUp(self):
+        # Seeded rows, not new ones: see AffiliationDisplayTests.setUp.
+        course          = Course.objects.select_related("department__college").first()
+        self.department = course.department
+        self.college    = self.department.college
+        self.adviser    = make_user("adviser@cit.edu", "Adviser", is_staff=True)
+        AdviserProfile.objects.create(
+            user=self.adviser, college=self.college, department=self.department,
+        )
+        self.url = reverse("user-advisers")
+        self.client.force_authenticate(make_user("student@cit.edu", "Student"))
+
+    def test_a_student_sees_exactly_the_fields_the_notice_names(self):
+        """
+        An exact key set, so any field added later fails here first -- and
+        whoever adds it has to check the data notice says so too.
+        """
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        [row] = response.data["results"]
+        self.assertEqual(set(row), self.PICKER_FIELDS)
+        self.assertEqual(row["email"], "adviser@cit.edu")
+        self.assertEqual(row["college_name"], self.college.name)
+        self.assertEqual(row["department_name"], self.department.name)

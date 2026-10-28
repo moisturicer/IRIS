@@ -8,6 +8,18 @@
 
 ---
 
+## IR-587 the adviser picker shows no account state (NFR-S4, FR-M6-06)
+
+**Design:** the decision recorded on Jira IR-587 (2026-10-14), following the IR-540 data notice.
+
+- **Fields:** `GET /users/advisers/` returns exactly `id`, `first_name`, `middle_initial`, `last_name`, `email`, `college_name` and `department_name` (`AdviserOptionSerializer`), which is what the IR-540 notice tells registrants an Adviser shows to signed-in users. It used `UserSerializer`, which also sent `role`, `is_staff`, `is_superuser`, `is_verified`, `is_locked`, `consent_given`, `date_joined`, `is_office_coordinator` and `course_name` to every signed-in user.
+- **Who may call it:** unchanged. Any signed-in user still needs the list to name an Adviser.
+- **Frontend type:** `AdviserOption` replaces `User` on `listAdvisers` and its callers, so the type no longer claims fields the server does not send.
+
+**Tests:** `apps.accounts.tests.AdviserPickerTests` asserts the exact key set a Student receives, so any added field fails it and forces a check of the notice. `PublishDialog.test.tsx` and `EditDetailsDialog.test.tsx` cover the callers.
+
+**Status:** IMPLEMENTED, tested. Not reviewed by a person yet.
+
 ## IR-410 My Library absorbs My Workspace
 
 **Design:** [frontend redesign spec §4.9 as amended 2026-10-11, and Appendix F F4](../frontend_redesign_spec.md), following [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md) and [ADR-003](../adr/003-clearance-aware-resubmission.md).

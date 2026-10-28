@@ -1,5 +1,15 @@
 import type { RoleName } from "@/lib/constants";
 
+/**
+ * One Adviser in the picker, from `GET /users/advisers/` (IR-587). Narrower
+ * than `User` on purpose: every signed-in user can read this list, so the
+ * server sends only what the IR-540 data notice names -- no account state.
+ */
+export type AdviserOption = Pick<
+  User,
+  "id" | "first_name" | "middle_initial" | "last_name" | "email" | "college_name" | "department_name"
+>;
+
 export interface User {
   id:             number;
   email:          string;

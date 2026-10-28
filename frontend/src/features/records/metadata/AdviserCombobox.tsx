@@ -15,13 +15,13 @@ import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { fieldClasses } from "@/components/ui/fieldClasses";
 import { cn } from "@/lib/utils";
-import type { User } from "@/types/auth";
+import type { AdviserOption } from "@/types/auth";
 
 import { personName } from "./personName";
 
 interface AdviserComboboxProps {
   id:          string;
-  advisers:    User[];
+  advisers:    AdviserOption[];
   value:       number | undefined;
   onChange:    (id: number | undefined) => void;
   onBlur?:     () => void;
@@ -64,7 +64,7 @@ export function AdviserCombobox({
   // The list is hidden when nothing matches, so it is not "expanded" then.
   const listShown = open && options.length > 0;
 
-  function choose(adviser: User) {
+  function choose(adviser: AdviserOption) {
     if (adviser.id === selfId) return;
     onChange(adviser.id);
     setQuery(null);
