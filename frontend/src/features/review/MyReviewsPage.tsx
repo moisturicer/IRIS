@@ -9,6 +9,8 @@ import { Badge, Button, Skeleton } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/features/document-requests/errorDetail";
+import { canAccess, pathFor } from "@/lib/access";
+import type { RoleName } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import type { MyReviewsPage as Page, MyReviewsRow, MyReviewsTab } from "@/types/reviews";
@@ -164,21 +166,23 @@ export default function MyReviewsPage() {
         title="My Reviews"
         description="What you need to review, what you have opened, and what you have finished."
         actions={
-          // Coordinators only, from `review_access` (IR-623); the server refuses anyone else.
-          coordinatorOffice ? (
-            <Link
-              to="/review/office"
-              className={cn(
-                "inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand",
-                COLOUR_TRANSITION,
-                FOCUS_RING,
-              )}
-            >
-              <i className="fas fa-users-gear" aria-hidden />
-              {officeLabel} console
-            </Link>
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-3">
+            {canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
+              <Link to={pathFor("reviewAnalytics")}
+                    className={cn("inline-flex min-h-11 items-center text-sm font-medium text-brand hover:underline", FOCUS_RING)}>
+                Workflow analytics
+              </Link>
+            )}
+            {coordinatorOffice && (
+              <Link to="/review/office"
+                className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+                <i className="fas fa-users-gear" aria-hidden />
+                {officeLabel} console
+              </Link>
+            )}
+          </div>
         }
+
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

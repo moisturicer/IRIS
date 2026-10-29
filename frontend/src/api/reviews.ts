@@ -1,6 +1,13 @@
 import { apiClient } from "./client";
 import type { AddReviewerOptions, ReviewerSeat } from "@/types/records";
-import type { MyReviewsPage, MyReviewsQuery, OfficeConsole } from "@/types/reviews";
+import type {
+  OfficeConsole,
+  MyReviewsPage,
+  MyReviewsQuery,
+  WorkflowAnalytics,
+  WorkflowAnalyticsQuery,
+} from "@/types/reviews";
+
 
 /**
  * Reviewer seats (ADR-032 §4, IR-415). The server re-checks every act: a
@@ -57,9 +64,22 @@ export const reviewsApi = {
         ...(overdue ? { overdue: "1" } : {}),
       },
     }),
+  /**
+   * Workflow analytics (IR-626): an office's own figures, every party's for
+   * RDCO. Empty filters are left off, so the server applies none.
+   */
+  analytics: ({ office, from, to }: WorkflowAnalyticsQuery) =>
+    apiClient.get<WorkflowAnalytics>("/reviews/analytics/", {
+      params: {
+        ...(office ? { office } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+      },
+    }),
   /** A coordinator's console of their office's open work (IR-623). Refused (403) to anyone else. */
   office: (office: string | null) =>
     apiClient.get<OfficeConsole>("/reviews/office/", { params: office ? { office } : {} }),
+
   /** Request a one-time PIN emailed to the current user's account email. */
   generatePin:(recordId: number) => apiClient.post("/reviews/pin/generate/", { record_id: recordId }),
   /** Verify a PIN and confirm access. Returns { verified: true, record_id }. */
