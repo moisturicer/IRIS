@@ -2,12 +2,15 @@
 
 ## Status and approval
 
-**Proposed — 2026-10-30, IR-641. Not accepted; no runtime change authorized.**
-Named human approver: **pending**. Approval date and evidence: **pending**.
-Acceptance requires the person's name, explicit approval of this revision and a
-durable review/comment link recorded here. AI review and merging a draft do not
-constitute architectural approval. IR-642 and IR-643 remain **not-ready** until
-that record exists and their readiness is reassessed against the accepted text.
+**Accepted — 2026-10-30, IR-641.**
+Named human approver: **Lee Jasmin Adolfo**. Approval covers the contract merged
+in [PR #334](https://github.com/moisturicer/IRIS/pull/334) at
+`deb7f413a47b7971246616fcbc36f0a930f214ac`.
+[Approval evidence](https://citiris.atlassian.net/browse/IR-641?focusedCommentId=10824):
+the project lead identified himself as the approver in response to the outstanding
+architectural-approval gate. The agent transcribed that human decision.
+IR-642 and IR-643 have been reassessed against this contract and are ready for
+implementation. Acceptance authorizes their specified work, not production deployment.
 
 ## Context and observed baseline
 
@@ -18,7 +21,7 @@ change, registration and GET activation, but no reset or resend endpoint.
 purpose or persisted consumption record. `RegisterView.perform_create` dispatches
 mail inside its transaction. `core/utils.py:send_email_async` can fall back to a
 synchronous, silently failing send; `accounts/tasks.py` retries mail three times.
-These are observations, not the proposed recovery guarantees.
+These are observations, not the recovery guarantees specified below.
 
 `User` stores verification, active and manual-lock flags separately from role and
 `RoleRequest`. `sessions.py` tracks browser sessions; `authentication.py` still
@@ -26,7 +29,7 @@ accepts access JWTs without `sid`. Registration and password-change serializers
 check length but do not call all configured Django password validators. Recovery
 must not inherit these gaps or accidentally become an approval/unlock mechanism.
 
-## Proposed decision
+## Decision
 
 ### 1. Account eligibility and effects
 
@@ -281,7 +284,7 @@ Document environment configuration in `backend/.env.example` on implementation:
 Also require existing SMTP sender/host/credentials, shared Redis and Celery
 configuration. Validate positive bounds and required secrets at startup; never
 silently disable limits or fall back on missing dependencies. Values above are
-the proposed defaults; changing them requires documented security review and
+the accepted defaults; changing them requires documented security review and
 updated tests. No real secrets belong in examples.
 
 Narrow shared work belongs in `apps/accounts`: token/intent persistence and
@@ -332,8 +335,8 @@ but make these guarantees testable. Immediate revocation on resend simplifies
 ordering and closes older links, but a failed new email strands the old link;
 cooldowns, generic retry guidance and support are the chosen mitigation.
 
-Human review must explicitly approve eligibility, lifetimes, immediate resend
+The approval recorded above covers eligibility, lifetimes, immediate resend
 revocation, generic delivery states, limits, forced credential rollout and legacy
-activation retirement. Record approval above, then replace dependent-ticket draft
-references with this accepted revision and reassess readiness. Until then this
-document is a proposal, and the final approval acceptance criterion remains open.
+activation retirement. Dependent tickets reference this accepted contract and
+its configuration, state rules and required automated evidence. Acceptance does
+not claim that either recovery journey is implemented or deployed.

@@ -1582,14 +1582,14 @@ Authority: ADR-042 and general-tools specification §9–§11 (scenarios A01–A
 
 **IR-623 CI follow-up (2026-10-29).** The workload count field is renamed from `open` to `open_count` in the backend response, TypeScript type, renderer and HTTP/UI fixtures. It counts unfinished seats; it is not `DocumentRequestState.OPEN`. The shared vocabulary guard is unchanged. The HTTP fixture changes deliberately to pin the new field name. Focused checks and updated CI results are recorded on PR #322.
 
-## IR-641 — Account recovery contract (proposal only)
+## IR-641 - Accepted account recovery contract
 
-[ADR-045](../adr/045-account-recovery-contract.md) proposes both recovery
-journeys: §1 account eligibility and unchanged approval/restrictions; §2 HTTP
-contracts; §3 token lifecycle and races; §4 passwords and credential invalidation;
-§5 privacy/limits; §6 committed delivery and retries; §7 accessible states;
-§8 audit/configuration and bounded implementation; §9 required automated evidence.
-No recovery implementation or automated coverage is claimed by this ticket.
-Human architectural approval is pending (§Status and approval); IR-642 and
-IR-643 remain not-ready. Existing behavior is documented as baseline, not as
-evidence that the proposed guarantees already exist.
+[ADR-045](../adr/045-account-recovery-contract.md) defines both recovery
+journeys: account eligibility, HTTP contracts, token lifecycle and races,
+passwords and credential invalidation, privacy and limits, committed delivery,
+accessible states, audit, configuration and required automated evidence.
+Lee Jasmin Adolfo approved the contract on 2026-10-30; the ADR links the recorded
+human decision. IR-642 and IR-643 have been reassessed and are ready for
+implementation. No recovery implementation or automated coverage is claimed.
+Existing behavior is a baseline, not evidence that the accepted guarantees
+already exist. PR #334 passed all four CI checks before merge.
