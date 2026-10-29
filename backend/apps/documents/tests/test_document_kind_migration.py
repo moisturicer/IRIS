@@ -18,7 +18,8 @@ from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from apps.records.models import Record, RecordType
+from apps.records.models import RecordType
+from apps.reviews.workflow_test_helpers import model_at_current_state
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -36,12 +37,12 @@ def test_the_backfill_marks_existing_rows_from_the_owner_they_hang_off():
         OldUploadSlot = old_apps.get_model("documents", "UploadSlot")
         OldRecordUpload = old_apps.get_model("documents", "RecordUpload")
 
-        # Created through the current model, for the reason the sibling
-        # migration test records: this rewinds only `documents`, so
-        # `records_record` stays at its latest schema and the historical
-        # class would not match it.
+        # Cross-app dependencies can also rewind records. Match the schema
+        # actually left applied, rather than the live model or target closure.
         record_type = RecordType.objects.create(name="Thesis")
-        record = Record.objects.create(title="Pre-existing thesis", record_type=record_type)
+        record = model_at_current_state("records", "Record").objects.create(
+            title="Pre-existing thesis", record_type_id=record_type.pk,
+        )
 
         slot = OldUploadSlot.objects.create(name="Ethics Clearance", record_type_id=record_type.pk)
         upload = OldRecordUpload.objects.create(

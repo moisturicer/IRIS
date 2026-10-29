@@ -583,7 +583,7 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             user = self.context["request"].user
             from django.db.models.functions import Lower
             owners = list(User.objects.annotate(normalized_email=Lower("email")).filter(normalized_email__in=emails, is_active=True))
-            adviser = attrs.get("adviser", record.adviser)
+            adviser = attrs.get(Record.adviser.field.name, record.adviser)
             if len(owners) != len(emails) or user.email.lower() not in emails or (adviser and adviser.email.lower() in emails):
                 raise serializers.ValidationError({"owner_emails": "Use existing active accounts, include yourself, and exclude the Adviser."})
             attrs["owner_emails"] = owners

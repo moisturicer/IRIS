@@ -21,9 +21,9 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.records.models import Record, RecordType
+from apps.records.models import RecordType
 from apps.reviews.models import RecordClearance
-from apps.reviews.workflow_test_helpers import purge_records_at_current_state
+from apps.reviews.workflow_test_helpers import model_at_current_state, purge_records_at_current_state
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -90,8 +90,10 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
         proposal = RecordType.objects.get_or_create(name="Proposal")[0]
 
         def record(title, status, record_type=thesis, **extra):
-            return Record.objects.create(
-                title=title, record_type=record_type, added_by=owner,
+            if "adviser" in extra:
+                extra["adviser_id"] = extra.pop("adviser").pk
+            return model_at_current_state("records", "Record").objects.create(
+                title=title, record_type_id=record_type.pk, added_by_id=owner.pk,
                 pipeline_status=status, **extra,
             )
 
@@ -123,7 +125,7 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
         review(reread, "itso", itso_old, 2, decision="declined")
         review(reread, "itso", itso_new, 3)
         clearance = RecordClearance.objects.create(
-            record=reread, office="itso", status="pending", reviewed_by=itso_new,
+            record_id=reread.pk, office="itso", status="pending", reviewed_by=itso_new,
         )
         signed_at = T0 + timedelta(minutes=4)
         RecordClearance.objects.filter(pk=clearance.pk).update(updated_at=signed_at)

@@ -127,6 +127,9 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "DELETE": _case(OWNER_ACTS, kwargs=RECORD),
     }),
     "record-submit": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
+    "record-continue-as": Entry({"POST": _case(
+        OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
+    )}),
     "record-manuscript": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # Earlier versions are review material: participants, or the pool of a
     # party with an active assignment (IR-479). RDCO holds none on `record`.
