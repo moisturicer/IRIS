@@ -8,6 +8,7 @@ export const AUDIT_EVENT_GROUPS = {
   Workflow: {
     SUBMITTED: "Submitted", ROUTED: "Routed", ASSIGNMENT_CLOSED: "Assignment Closed",
     ASSIGNMENT_EXTENDED: "Assignment Deadline Extended", DECISION_RECORDED: "Decision Recorded",
+    ASSIGNMENT_ESCALATED: "Assignment Overdue Escalated",
     PUBLISHED: "Published", RESUBMISSION_REQUESTED: "Revision Requested",
     REVISION_REQUEST_WITHDRAWN: "Revision Request Withdrawn", RESUBMITTED: "New Version Submitted",
     CLEARANCE_PRESERVED: "Clearance Preserved", RECORD_WITHDRAWN: "Record Withdrawn",
