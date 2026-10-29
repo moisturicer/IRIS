@@ -292,8 +292,8 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
 
 - **The act.** `POST /records/<id>/new-version/`, by an **owner** only. A reviewer who can see the record gets a 403; anyone else gets a 404. It needs a record on the new model with at least one open request. It writes v(n+1) through the one writer, resolves **every** open request as `resubmitted`, and records `resubmission_count` and `last_resubmitted_at`, so `preserved` is derived exactly as on the legacy path.
 - **What resets.** Under `CLEARANCE_AWARE`, only the requesting parties' clearance rows go back to pending. Under `RESTART_ALL`, every row does.
-    - Seats are the same under both policies, which is the card's "the two policies differ only in which clearances reset". Every `done` seat on a requesting party's active assignment returns to `in_review`, so an office whose second reviewer asked re-reviews the new version in full. Nobody else's seat changes.
-    - *Consequence, for review:* under `RESTART_ALL`, an office that had already completed keeps its completed assignment, and its pending clearance is re-cleared only if it is routed again. If the comparison arm should instead reopen those offices, that is a change to this rule.
+    - Seats are the same under both policies, which is the card's "the two policies differ only in which clearances reset". Every `done` seat on a requesting party's active assignment returns to `in_review`, so an office whose second reviewer asked re-reviews the new version in full. Nobody else's seat changes. *Superseded 2026-10-29 for `RESTART_ALL` by the IR-632 amendment below: every office whose clearance resets is reopened too. `CLEARANCE_AWARE` is unchanged.*
+    - *Consequence, for review:* under `RESTART_ALL`, an office that had already completed keeps its completed assignment, and its pending clearance is re-cleared only if it is routed again. If the comparison arm should instead reopen those offices, that is a change to this rule. *That change is the IR-632 amendment below.*
 - **What counts as a change** since the **newest** open request:
     - a manuscript other than the latest version's;
     - a supporting document an owner uploaded (`RecordUpload`);
@@ -309,7 +309,22 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
     - The legacy `declined` path keeps extracting on upload. No reviewer is acting on a declined record, and IR-274 deletes the path.
     - *Accepted:* for the extraction latency after a submission, Paper Chat may still quote the previous version. That is the same window every upload has.
 - **Which manuscript is current.** Between the owner's upload and their new version, `/manuscript/` serves everyone but an owner the latest version's file. An owner reads their own upload, and record detail's `manuscript_unsubmitted` labels it. The owner's version picker then offers the latest submitted version too, as `?version=N`.
-- **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else.
+- **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else. *Under `RESTART_ALL`, also to the reopened offices' seat holders: IR-632 amendment below.*
+
+**Amendment, 2026-10-29 (IR-632): under `RESTART_ALL`, every office whose clearance resets reviews the new version.** Settled in a design grilling with a team member, every recommendation accepted. **Pending the adviser's review.** Found by the 28 Oct audit: as built above, `RESTART_ALL` reset an office's clearance row but left its reviewer `done`, so nobody reviewed the new version for it. The two arms then differed only in a label, which is the arithmetic identity [ADR-004](004-restart-all-comparison-mode.md) rejects: *"the point of the experiment is that participants actually perform the repeated reviews."*
+
+`CLEARANCE_AWARE`, the production default, does not change. Under `RESTART_ALL`:
+
+- **Who reopens.** Every party whose clearance the version resets, which under `RESTART_ALL` is every clearance office with a row. The Adviser and RDCO have no clearance row, so they reopen only when they are the requesting party, exactly as under `CLEARANCE_AWARE`.
+    - *Rejected:* reopening the Adviser and RDCO as well. ADR-004 defines the control as resetting every *clearance*, and making the control stricter than that would inflate the effect being measured.
+- **How.** The reopened office's **same seats** go back: `done` → `in_review`, and its assignment back to active. This is the mechanism the requesting party already gets, so the same reviewer reviews the new version.
+    - *Rejected:* a fresh assignment that anyone in the pool can pick up. That adds a pick-up step `CLEARANCE_AWARE` never has, which would be a second difference between the arms.
+- **When.** Reopened offices review **in parallel** with the requesting party. ADR-004's "route to the first clearance stage for the record type" predates this ADR's parallel office pools, and is superseded by them. Replaying stages would make the control slower for a routing reason, not a re-review reason.
+- **Only finished work reopens.** A seat still `in_review` or not yet opened is left alone. That office has nothing to redo, and it behaves the same in both arms.
+- **Notifications.** The reopened offices' seat holders get the same new-version notification as the requesting party's, so no facilitator prompt is needed in one arm only.
+- **The record.** `rereview_parties` in the resubmission audit event names the reopened offices as well as the requesting ones, so the analysis export sees who reviewed again. Nothing that is preserved under `CLEARANCE_AWARE` changes.
+
+The "two policies differ only in which clearances reset" rule above becomes **the two policies differ only in which offices reset and review again**. `test_the_policies_differ_only_in_which_clearances_reset` pinned the old rule, and is rewritten on purpose to pin this one.
 
 ### 6. Lineage: an accepted Proposal continues as a new record
 

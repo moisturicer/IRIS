@@ -1,0 +1,18 @@
+# bandit settings for the CI security gate (IR-614).
+#
+# Every exclusion here is one rule in one kind of file, with the reason. Do not
+# add `skips:` or `exclude_dirs:` -- a rule switched off everywhere is a rule
+# the gate no longer enforces. To accept a single finding, use an entry in
+# security/allowlist.yml (id `bandit:<rule>:<path>`), which expires.
+
+# B101 assert_used: pytest's assertions are plain `assert`, so in test files
+# this rule fires on every test (5,759 times when this was written) and buries
+# everything else in the report. It stays on for application code, where an
+# `assert` disappears under `python -O` and must not guard anything.
+assert_used:
+  skips:
+    - '*/tests/*'
+    - '*/test_*.py'
+    - '*/tests.py'
+    - '*_tests.py'
+    - '*/conftest.py'

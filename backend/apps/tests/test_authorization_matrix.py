@@ -34,6 +34,51 @@ from apps.reviews.models import RecordAssignment
 # passed throughout the entire is_staff bypass.
 ALL_ROLES = ["Student", "Adviser", "RDCO", "KTTO", "ITSO", "IERC"]
 
+# ADR-043 §6, IR-619: the extension act follows the same object-scoped
+# convention as reviewer seats. IR-615's generic route table also declares
+# this endpoint; these configured-success cases require an actual 200.
+ASSIGNMENT_EXTENSION_ACCESS = {
+    "owner": 403, "adviser": 403, "seated": 403, "unseated": 403,
+    "other_coordinator": 403, "rdco": 403, "coordinator": 200,
+    "other": 404, "admin": 404, "anonymous": 401,
+}
+
+
+class AssignmentExtensionMatrixTests(APITestCase):
+    def test_extension_authority_is_own_office_coordinator_only(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.reviews.deadlines import end_of_day, MANILA
+        from apps.reviews.models import ReviewerSeat, Turnaround
+
+        owner = make_user("deadline-matrix-owner@cit.edu", "Student")
+        adviser = make_user("deadline-matrix-adviser@cit.edu", "Adviser")
+        actors = {
+            "owner": owner, "adviser": adviser,
+            "seated": make_user("deadline-matrix-seat@cit.edu", "ITSO"),
+            "unseated": make_user("deadline-matrix-pool@cit.edu", "ITSO"),
+            "other_coordinator": make_user("deadline-matrix-ierc@cit.edu", "IERC", is_office_coordinator=True),
+            "rdco": make_user("deadline-matrix-rdco@cit.edu", "RDCO", is_office_coordinator=True),
+            "coordinator": make_user("deadline-matrix-coord@cit.edu", "ITSO", is_office_coordinator=True),
+            "other": make_user("deadline-matrix-other@cit.edu", "Student"),
+            "admin": make_user("deadline-matrix-admin@cit.edu", is_superuser=True, is_staff=True),
+            "anonymous": None,
+        }
+        record = Record.objects.create(title="Deadline matrix", adviser=adviser, added_by=owner,
+                                        pipeline_status="in_review")
+        RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+        Turnaround.objects.create(party="itso", working_days=1)
+        assignment = RecordAssignment.objects.create(record=record, party="itso")
+        ReviewerSeat.objects.create(assignment=assignment, reviewer=actors["seated"], source="claimed")
+        url = reverse("assignment-extend", args=[assignment.pk])
+        due = end_of_day(timezone.now().astimezone(MANILA).date() + timedelta(days=14))
+        body = {"due_at": due.isoformat(), "reason": "Office committee unavailable"}
+        for role, expected in ASSIGNMENT_EXTENSION_ACCESS.items():
+            with self.subTest(role=role):
+                self.client.force_authenticate(actors[role])
+                response = self.client.post(url, body, format="json")
+                self.assertEqual(response.status_code, expected, response.data)
+
 
 def make_user(email, role_name=None, **extra):
     role = Role.objects.get_or_create(name=role_name)[0] if role_name else None

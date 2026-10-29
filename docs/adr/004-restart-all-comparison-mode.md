@@ -29,6 +29,12 @@ The evaluation runs the same SME participants over the same scenario set under b
 
 **The comparison runs on a separate evaluation instance, never on the customer's production instance.** Instance-per-tenant (ADR-005) makes this free.
 
+**Amendment, 2026-10-29 (IR-632).** Settled in a design grilling with a team member. **Pending the adviser's review.**
+
+- **What `RESTART_ALL` does on the current model** is set out in [ADR-032 §5, IR-632 amendment](032-adviser-first-review-and-office-reviewer-pools.md). Every office whose clearance resets is reopened, with the same reviewer, in parallel with the requesting party. "Route to the first clearance stage" above predates ADR-032's parallel pools and is superseded. Before this amendment, the built control reset clearance rows without anyone reviewing again, which this ADR's own *Alternatives* rejects.
+- **Scenarios.** Each participant walks two **matched but different** scenarios, one per policy, in counterbalanced order, rather than "the same scenario set" twice. Walking the same document twice makes the second pass faster from memory, and that learning effect would read as the treatment.
+- The session protocol (primary measure, analysis, stop rule) belongs to the validation plan (IR-79), not here.
+
 ## Alternatives Considered
 
 **Keep preserved-clearance counting as primary evidence.** Rejected — see Context. It cannot produce a negative result.

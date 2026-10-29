@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
@@ -159,3 +161,22 @@ class SystemSetting(models.Model):
 
     def __str__(self):
         return self.key
+
+
+class UserSession(models.Model):
+    """
+    One sign-in, for the inactivity rule (IR-166, NFR-S2).
+
+    Its id rides in every token of the sign-in as the `sid` claim; simplejwt
+    copies claims through rotation and into each access token. `last_activity_at`
+    is the last time the *user* did something -- see `apps.accounts.sessions` --
+    and a session idle past `SESSION_IDLE_TIMEOUT_MINUTES` is ended for good.
+    """
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user             = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions")
+    created_at       = models.DateTimeField()
+    last_activity_at = models.DateTimeField()
+    ended_at         = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.email} session {self.id}"

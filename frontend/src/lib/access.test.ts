@@ -122,7 +122,7 @@ test("an Adviser keeps Submit Disclosure until Discover is their home (IR-534)",
 test("RDCO's coordination screens, Import Records included, are one Administration group", () => {
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
-    "Administration: Import Records", "Administration: Role Requests", "Administration: Download Requests",
+    "Administration: Import Records", "Administration: Users", "Administration: Role Requests", "Administration: Download Requests",
     "Administration: Delete Requests", "Administration: Audit Log",
   ]);
 });
@@ -172,7 +172,7 @@ test("RDCO alone holds the coordination screens", () => {
 test("KTTO is not an administrator", () => {
   // ADMIN_ROLES was {KTTO, RDCO}. KTTO evaluates commercial potential; it has
   // no reason to read the audit log or approve a deletion.
-  for (const key of ["audit", "roleRequests", "deleteRequests"] as ScreenKey[]) {
+  for (const key of ["audit", "roleRequests", "users", "deleteRequests"] as ScreenKey[]) {
     assertEqual(canAccess(ROLES.KTTO, key), false, `KTTO must not reach ${key}`);
   }
 });
