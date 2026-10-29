@@ -6,6 +6,7 @@ import { cn, formatDate } from "@/lib/utils";
 import type { RecordTracker } from "@/types/records";
 
 import { RailHeading } from "./headings";
+import { ReviewStatus } from "./ReviewStatus";
 import { timelineEntries, type TimelineEntry, type TimelineKind } from "./timelineEntries";
 
 /** A glyph per kind of entry, beside its words, never instead of them. */
@@ -25,9 +26,10 @@ const KIND_ICON: Record<TimelineKind, string> = {
  * review, oldest first, each entry saying who did what, as which party, and
  * when. Built from `GET /records/<id>/tracker/` alone (`timelineEntries.ts`).
  *
- * It is a history, so it marks nothing as current. Where the record is now
- * is the party strip's job, on Overview's rail; this list never renders a
- * party -- Intake included, which ADR-032 retires -- as the present step.
+ * The history marks nothing as current: where the review stands now is
+ * `ReviewStatus`'s, drawn above it from the same tracker read (IR-624), and
+ * the history never renders a party -- Intake included, which ADR-032
+ * retires -- as the present step.
  *
  * The host remounts it (a new `key`) when something it shows has changed.
  */
@@ -56,47 +58,50 @@ export function ReviewTimeline({ recordId }: { recordId: number }) {
   const entries = data ? timelineEntries(data) : [];
 
   return (
-    <section aria-labelledby={headingId} className="space-y-3">
-      <RailHeading id={headingId}>Timeline</RailHeading>
+    <div className="space-y-6">
+      {data && !failed && <ReviewStatus data={data} />}
+      <section aria-labelledby={headingId} className="space-y-3">
+        <RailHeading id={headingId}>Timeline</RailHeading>
 
-      {failed ? (
-        <div className="space-y-2">
-          <p role="alert" className="text-small text-stone-700">
-            Could not load the review timeline.
-          </p>
-          <button
-            type="button"
-            onClick={() => setAttempt((n) => n + 1)}
-            className={cn("text-small font-semibold text-brand hover:underline min-h-11", FOCUS_RING)}
-          >
-            Try again
-          </button>
-        </div>
-      ) : !data ? (
-        <div aria-hidden className="space-y-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-10 rounded-lg bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          ))}
-        </div>
-      ) : (
-        <>
-          {data.routing_recorded_from && (
-            <p className="text-2xs text-stone-600">
-              Routing recorded from {formatDate(data.routing_recorded_from)}.
+        {failed ? (
+          <div className="space-y-2">
+            <p role="alert" className="text-small text-stone-700">
+              Could not load the review timeline.
             </p>
-          )}
-          {entries.length === 0 ? (
-            <p className="text-small text-stone-600">Nothing has happened in this review yet.</p>
-          ) : (
-            <ol aria-label="Review timeline" className="relative space-y-4 border-l border-stone-200 ml-2">
-              {entries.map((entry) => (
-                <TimelineItem key={entry.key} entry={entry} />
-              ))}
-            </ol>
-          )}
-        </>
-      )}
-    </section>
+            <button
+              type="button"
+              onClick={() => setAttempt((n) => n + 1)}
+              className={cn("text-small font-semibold text-brand hover:underline min-h-11", FOCUS_RING)}
+            >
+              Try again
+            </button>
+          </div>
+        ) : !data ? (
+          <div aria-hidden className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-10 rounded-lg bg-stone-100 animate-pulse motion-reduce:animate-none" />
+            ))}
+          </div>
+        ) : (
+          <>
+            {data.routing_recorded_from && (
+              <p className="text-2xs text-stone-600">
+                Routing recorded from {formatDate(data.routing_recorded_from)}.
+              </p>
+            )}
+            {entries.length === 0 ? (
+              <p className="text-small text-stone-600">Nothing has happened in this review yet.</p>
+            ) : (
+              <ol aria-label="Review timeline" className="relative space-y-4 border-l border-stone-200 ml-2">
+                {entries.map((entry) => (
+                  <TimelineItem key={entry.key} entry={entry} />
+                ))}
+              </ol>
+            )}
+          </>
+        )}
+      </section>
+    </div>
   );
 }
 

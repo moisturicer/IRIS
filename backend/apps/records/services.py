@@ -1,3 +1,4 @@
+import pyexcel
 from django.contrib.postgres.search import SearchVector
 from core.enums import RecordTypeName
 from .models import Record, RecordOwner
@@ -45,7 +46,10 @@ def soft_delete_record(record: Record, deleted_by):
 def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     """
     Parse a .xls or .xlsx spreadsheet and return (rows, errors).
-    Uses pyexcel-xls / pyexcel-xlsx (see requirements/base.txt).
+    Uses pyexcel with its pyexcel-xls / pyexcel-xlsx plugins (see
+    requirements/base.txt). pyexcel is imported at module level, not caught
+    here: a missing dependency is a broken deployment, and reporting it as a
+    skipped row is what hid it until IR-315.
 
     Expected columns (header row 1 — case-insensitive):
       Title, Abstract, Year Accomplished, Year Completed,
@@ -74,10 +78,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     file_type = "xls" if ext == ".xls" else "xlsx"
 
     try:
-        import pyexcel
         all_rows = pyexcel.get_array(file_stream=file, file_type=file_type)
-    except ImportError:
-        return [], ["pyexcel is not installed. Check requirements/base.txt."]
     except Exception as exc:
         return [], [f"Could not open file: {exc}. Make sure it is a valid .xls or .xlsx file."]
 

@@ -144,7 +144,19 @@ export interface RecordClearance {
    * the last decline, which is a different rule than `resubmit_record` applies.
    */
   preserved:        boolean;
+  /** What the latest version did to this clearance, with the version it applies to (IR-624). */
+  carryover:         Carryover | null;
+  carryover_version: number | null;
+  /** "Cleared on v1, preserved", "Reset by v2": the server's words. */
+  carryover_label:   string | null;
 }
+
+/**
+ * Across the latest version (IR-624): `preserved` -- cleared on an earlier
+ * version and kept -- or `reset` by it and awaiting review. The server's call
+ * (`clearance_state.carryover`); the client never works either out.
+ */
+export type Carryover = "preserved" | "reset";
 
 /** What happened across resubmissions, and which offices survived them. */
 export interface RecordResubmission {
@@ -530,7 +542,7 @@ export interface TrackerHolder {
   opened_by: string | null;
 }
 
-export interface TrackerPartyRow {
+export interface TrackerPartyRow extends AssignmentDeadline {
   party:         Party;
   /** Server-worded; Intake reads differently to staff and to students. */
   label:         string;
@@ -546,6 +558,10 @@ export interface TrackerPartyRow {
   outcome_label: string | null;
   at:            string | null;
   preserved:     boolean;
+  /** As on `RecordClearance`; null for a party that holds no clearance (IR-624). */
+  carryover:         Carryover | null;
+  carryover_version: number | null;
+  carryover_label:   string | null;
   /**
    * This party has an open document request and is waiting on it (◐). Null
    * when the viewer may not read the record's document requests (IR-349):
@@ -571,6 +587,34 @@ export interface TrackerPartyRow {
    * take part in the review: not disclosed, which is not the same as none.
    */
   seats:           TrackerSeat[] | null;
+}
+
+/**
+ * The party's turnaround clock (IR-619; `docs/testing/ASSIGNMENT_DEADLINES.md`),
+ * spread onto each tracker party row. All null and false for a party with no
+ * assignment, or none configured.
+ */
+export interface AssignmentDeadline {
+  due_at:          string | null;
+  /** The current version's original deadline, before any extension. */
+  original_due_at: string | null;
+  /** Never for a paused clock or a closed assignment: the server's call. */
+  is_overdue:      boolean;
+  /** Waiting on the owner: an open document request or revision. */
+  clock_paused:    boolean;
+  can_extend:      boolean;
+  extensions:      AssignmentExtension[];
+}
+
+export interface AssignmentExtension {
+  id:              number;
+  previous_due_at: string;
+  due_at:          string;
+  /** Null to a viewer who may not read the review. */
+  reason:          string | null;
+  system:          boolean;
+  actor:           number | null;
+  created_at:      string;
 }
 
 export interface TrackerSeat {
