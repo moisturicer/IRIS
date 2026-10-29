@@ -138,6 +138,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
         authors = [a.strip() for a in authors_raw.split(",") if a.strip()]
 
         records.append({
+            "row_num":               row_num,
             "title":                 title,
             "abstract":              get_col(row, "abstract") or "",
             "year_accomplished":     parse_year(get_col(row, "year accomplished")),
