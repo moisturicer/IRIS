@@ -360,6 +360,8 @@ def _row_party(stage) -> Party:
 
 
 def _seat_row(seat, scope, *, since=None, **fields):
+    from .deadlines import deadline_payload
+
     assignment = seat.assignment
     reviewer = seat.reviewer
     return _row(
@@ -368,6 +370,7 @@ def _seat_row(seat, scope, *, since=None, **fields):
         seat=seat.pk, assignment=assignment.pk,
         holder=seat.reviewer_id, holder_name=_name(reviewer),
         is_mine=seat.reviewer_id == scope.user.pk,
+        **deadline_payload(assignment, scope.user),
         **(_since(since) if since else {}),
         **fields,
     )
@@ -376,17 +379,18 @@ def _seat_row(seat, scope, *, since=None, **fields):
 def _current_rows(scope, tab) -> list[dict]:
     """To review or In review: seats, then (To review only) the pool."""
     user = scope.user
+    from .deadlines import deadline_payload, with_deadlines
     rows = []
     state = SeatState.ASSIGNED if tab == MyReviewsTab.TO_REVIEW else SeatState.IN_REVIEW
-    seats = _current_seats(scope, state).select_related(
+    seats = with_deadlines(_current_seats(scope, state).select_related(
         "assignment__record__record_type", "reviewer",
-    )
+    ), prefix="assignment__")
     for seat in seats:
         since = seat.assigned_at if state == SeatState.ASSIGNED else (seat.opened_at or seat.assigned_at)
         rows.append(_seat_row(seat, scope, since=since, entry=seat.source == SeatSource.ENTRY))
 
     if tab == MyReviewsTab.TO_REVIEW:
-        for assignment in _pool(scope).select_related("record__record_type"):
+        for assignment in with_deadlines(_pool(scope).select_related("record__record_type")):
             party = assignment.party
             rows.append(_row(
                 kind=POOL, pk=assignment.pk, record=assignment.record,
@@ -394,6 +398,7 @@ def _current_rows(scope, tab) -> list[dict]:
                 assignment=assignment.pk,
                 can_claim=is_office_member(user, party),
                 can_assign=is_office_coordinator(user, party),
+                **deadline_payload(assignment, user),
                 **_since(assignment.opened_at),
             ))
 
@@ -452,14 +457,16 @@ def _add_context(rows):
 
 
 def _done_rows(scope, outcome, cursor) -> tuple[list[dict], str | None]:
+    from .deadlines import with_deadlines
+
     seats = _done_seats(scope)
     reviews = _seatless_reviews(scope)
     if outcome is not None:
         seats = seats.filter(_outcome_q(outcome))
         reviews = reviews.filter(_outcome_q(outcome))
-    seats = _after(seats, SEAT, cursor).select_related(
+    seats = with_deadlines(_after(seats, SEAT, cursor).select_related(
         "assignment__record__record_type", "reviewer",
-    ).order_by("-when", "-pk")[: PAGE_SIZE + 1]
+    ).order_by("-when", "-pk")[: PAGE_SIZE + 1], prefix="assignment__")
     reviews = _after(reviews, REVIEW, cursor).select_related(
         "record__record_type", "reviewed_by",
     ).order_by("-when", "-pk")[: PAGE_SIZE + 1]

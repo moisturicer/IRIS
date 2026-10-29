@@ -91,6 +91,20 @@ def assignment_closed(assignment, actor, *, how, decision=None, withdrawn_seats=
     )
 
 
+def assignment_extended(extension):
+    """ADR-043 history is mandatory: failure rolls back the date movement."""
+    assignment = extension.assignment
+    return AuditEvent.objects.create(
+        event_type=AuditEvent.ASSIGNMENT_EXTENDED, user=extension.actor,
+        record_id=assignment.record_id,
+        metadata={"assignment": assignment.pk, "party": assignment.party,
+                  "extension": extension.pk,
+                  "previous_due_at": extension.previous_due_at.isoformat(),
+                  "due_at": extension.due_at.isoformat(),
+                  "reason": extension.reason, "system": extension.system},
+    )
+
+
 # --- verdicts and decisions ------------------------------------------------------
 
 def decision_recorded(record, actor, *, party, outcome, final, review):

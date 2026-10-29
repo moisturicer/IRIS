@@ -246,6 +246,15 @@ def submit_new_version(record, actor):
         assignment__state=AssignmentState.ACTIVE,
     )
     requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
+    from .deadlines import start_clock
+
+    for assignment in RecordAssignment.objects.select_for_update().filter(
+        record=record, party__in=parties, state=AssignmentState.ACTIVE,
+    ):
+        start_clock(assignment, now)
+        assignment.save(update_fields=[
+            "due_at", "original_due_at", "clock_started_at", "document_pause_started_at",
+        ])
     audit.resubmitted(
         record, actor, version=version, policy=lifecycle.resubmission_policy().value,
         requests=[r.pk for r in requests], rereview_parties=rereview,

@@ -428,10 +428,13 @@ def seat_entry(assignment) -> ReviewerSeat | None:
 
 # --- what the API reads -------------------------------------------------------
 
-def seat_payload(seat) -> dict:
+def seat_payload(seat, user=None) -> dict:
     """One seat, as every seat endpoint and the record's `my_seats` state it."""
     assignment = seat.assignment
+    from .deadlines import deadline_payload
+
     return {
+        **deadline_payload(assignment, user),
         "id": seat.pk,
         "assignment": assignment.pk,
         "record": assignment.record_id,
@@ -463,7 +466,7 @@ def my_seats(record, user) -> list[dict]:
         .select_related("assignment", "reviewer")
         .order_by("assigned_at", "pk")
     )
-    return [seat_payload(s) for s in seats]
+    return [seat_payload(s, user) for s in seats]
 
 
 def review_access(user) -> dict:

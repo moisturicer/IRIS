@@ -52,6 +52,19 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 ## Event types
 
+### Assignment deadlines (IR-619, ADR-043)
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `ASSIGNMENT_EXTENDED` | A coordinator extends an assignment, or a completed document-request pause moves its deadline | `assignment`, `party`, `extension`, `previous_due_at`, `due_at` (ISO-8601 timestamps), `reason`, `system` (true for a pause) |
+
+The actor is null on a system Extension. Its reason is deliberately recorded
+as the explanation for a changed deadline. Unlike IR-144's best-effort events,
+this event is mandatory: an insert failure rolls back both the Extension and
+the deadline movement. New-Version clock starts are not Extensions; the
+assignment keeps its original date for that clock and earlier Extensions as
+history. Existing assignments receive no backfilled date or event.
+
 ### Entering review and moving between parties
 
 | Type | Written when | `metadata` |
