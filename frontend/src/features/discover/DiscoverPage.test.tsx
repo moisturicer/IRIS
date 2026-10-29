@@ -17,6 +17,7 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
 import { useAuthStore } from "@/store/auth.store";
+import { getCollections, isStarred } from "@/lib/recordLibrary";
 import type { RecordListItem } from "@/types/records";
 import type { User } from "@/types/auth";
 
@@ -77,6 +78,9 @@ vi.mock("@/api/records", () => ({
       classifications: body.classification_ids.map((id) => ({ id, name: "Applied Research" })),
       psced: body.psced_ids.map((id) => ({ id, name: "Engineering" })),
     } })),
+    notInterested: vi.fn(() => Promise.resolve({ data: undefined })),
+    undoNotInterested: vi.fn(() => Promise.resolve({ data: undefined })),
+    resetInterests: vi.fn(() => Promise.resolve({ data: { classifications: [], psced: [] } })),
     facets: vi.fn(() => Promise.resolve({ data: { years: [2026, 2009] } })),
     classifications: vi.fn(() => page([{ id: 7, name: "Applied Research" }])),
     pscedList: vi.fn(() => page([{ id: 3, name: "Engineering" }])),
@@ -387,6 +391,184 @@ describe("browsing", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Load more (2 left)" }));
     await waitFor(() => expect(lastListParams()).toMatchObject({ page: 2 }));
+  });
+});
+
+describe("Not interested, Undo and reset (IR-576)", () => {
+  const second = listItem({ id: 2, title: "Rice Husk Insulation Panels" });
+
+  beforeEach(() => {
+    recommended = {
+      mode: "for_you",
+      results: [
+        { ...publishedThesis, reason: { kind: "selected_area", area: "Applied Research" } },
+        { ...second, reason: { kind: "latest" } },
+      ],
+      next_cursor: null,
+      count: 2,
+    };
+    // One column draws each card's actions twice (phone and wide footers).
+    localStorage.setItem("iris.discover.columns", "2");
+  });
+
+  /** Everything this browser keeps for the reader: saves, folders and stars live here. */
+  const browserLibrary = () => JSON.stringify(Object.entries({ ...localStorage }).sort());
+
+  it("removes a recommendation at once and offers Undo, which restores it in a fresh feed", async () => {
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+
+    await userEvent.click(within(card).getByRole("button", { name: "Not interested" }));
+
+    expect(screen.queryByRole("article", { name: publishedThesis.title })).not.toBeInTheDocument();
+    expect(screen.getByRole("article", { name: second.title })).toBeInTheDocument();
+    expect(recordsApi.notInterested).toHaveBeenCalledWith(publishedThesis.id);
+    expect(await screen.findByText(/won.t be recommended/)).toBeInTheDocument();
+    expect(recordsApi.forYou).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() => expect(recordsApi.undoNotInterested).toHaveBeenCalledWith(publishedThesis.id));
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalledTimes(2));
+    expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.anything());
+    expect(await screen.findByRole("article", { name: publishedThesis.title })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+  });
+
+  it("waits for the dismissal to land before Undo, so a fast Undo is not lost", async () => {
+    let land!: () => void;
+    vi.mocked(recordsApi.notInterested).mockImplementationOnce(
+      () => new Promise((resolve) => { land = () => resolve({ data: undefined } as never); }),
+    );
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Not interested" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(recordsApi.undoNotInterested).not.toHaveBeenCalled();
+
+    land();
+    await waitFor(() => expect(recordsApi.undoNotInterested).toHaveBeenCalledWith(publishedThesis.id));
+  });
+
+  it("keeps a dismissed card out of a page loaded before the server stored the dismissal", async () => {
+    recommended = { ...recommended, next_cursor: "next", count: 3 };
+    vi.mocked(recordsApi.notInterested).mockImplementationOnce(() => new Promise(() => {}));
+    vi.mocked(recordsApi.forYou)
+      .mockImplementationOnce(() => feedPage(recommended))
+      .mockImplementationOnce(() => feedPage({
+        mode: "for_you", next_cursor: null, count: 3,
+        results: [
+          { ...publishedThesis, reason: { kind: "latest" } },
+          { ...listItem({ id: 3, title: "Third paper" }), reason: { kind: "latest" } },
+        ],
+      }));
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Not interested" }));
+
+    await userEvent.click(screen.getByRole("button", { name: /Load more/ }));
+
+    expect(await screen.findByRole("article", { name: "Third paper" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: publishedThesis.title })).not.toBeInTheDocument();
+  });
+
+  it("puts the recommendation back and says so when Not interested fails", async () => {
+    vi.mocked(recordsApi.notInterested).mockRejectedValueOnce(new Error("offline"));
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+
+    await userEvent.click(within(card).getByRole("button", { name: "Not interested" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t be hidden/i);
+    expect(await screen.findByRole("article", { name: publishedThesis.title })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+  });
+
+  it("offers Not interested only on For you, not on Latest", async () => {
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    expect(within(card).queryByRole("button", { name: "Not interested" })).not.toBeInTheDocument();
+  });
+
+  it("leaves saves and folders alone when dismissing, and keeps feedback off this browser", async () => {
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Save to collection" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Star paper" }));
+    const saved = browserLibrary();
+
+    await userEvent.click(within(card).getByRole("button", { name: "Not interested" }));
+
+    // The folder and star are untouched, and the feedback went to the account, not storage.
+    expect(browserLibrary()).toBe(saved);
+    expect(getCollections().find((c) => c.id === "want-to-read")?.recordIds).toEqual([publishedThesis.id]);
+    expect(isStarred(publishedThesis.id)).toBe(true);
+    expect(recordsApi.notInterested).toHaveBeenCalledWith(publishedThesis.id);
+  });
+
+  it("does not count unstarring a paper as Not interested", async () => {
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: second.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Star paper" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Starred" }));
+
+    expect(isStarred(second.id)).toBe(false);
+    expect(screen.getByRole("article", { name: second.title })).toBeInTheDocument();
+    expect(recordsApi.notInterested).not.toHaveBeenCalled();
+  });
+
+  it("does not count removing a paper from a folder as Not interested", async () => {
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: second.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Save to collection" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
+    expect(getCollections().find((c) => c.id === "want-to-read")?.recordIds).toEqual([second.id]);
+    await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
+
+    expect(getCollections().find((c) => c.id === "want-to-read")?.recordIds).toEqual([]);
+    expect(screen.getByRole("article", { name: second.title })).toBeInTheDocument();
+    expect(recordsApi.notInterested).not.toHaveBeenCalled();
+  });
+
+  it("resets Areas and Not interested after a confirmation, then refreshes For you", async () => {
+    vi.mocked(recordsApi.interests).mockResolvedValueOnce({
+      data: { classifications: [{ id: 7, name: "Applied Research" }], psced: [] },
+    } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
+    renderDiscover("/?feed=for_you");
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Save to collection" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
+    const saved = browserLibrary();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Areas" }));
+    const dialog = await screen.findByRole("dialog");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
+    expect(recordsApi.resetInterests).not.toHaveBeenCalled();
+    expect(within(dialog).getByText(/saved papers and folders stay/i)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reset" }));
+
+    await waitFor(() => expect(recordsApi.resetInterests).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/interests were reset/i)).toBeInTheDocument();
+    expect(browserLibrary()).toBe(saved);
+    expect(await screen.findByRole("button", { name: "Choose Areas" })).toBeInTheDocument();
+  });
+
+  it("keeps the dialog open with a message when the reset fails", async () => {
+    vi.mocked(recordsApi.resetInterests).mockRejectedValueOnce(new Error("offline"));
+    renderDiscover("/?feed=for_you");
+    await screen.findByRole("article", { name: publishedThesis.title });
+    await userEvent.click(screen.getByRole("button", { name: "Choose Areas" }));
+    const dialog = await screen.findByRole("dialog");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reset" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/couldn.t be reset/i);
+    expect(recordsApi.forYou).toHaveBeenCalledTimes(1);
   });
 });
 

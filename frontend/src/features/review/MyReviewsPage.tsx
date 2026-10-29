@@ -163,6 +163,22 @@ export default function MyReviewsPage() {
       <PageHeader
         title="My Reviews"
         description="What you need to review, what you have opened, and what you have finished."
+        actions={
+          // Coordinators only, from `review_access` (IR-623); the server refuses anyone else.
+          coordinatorOffice ? (
+            <Link
+              to="/review/office"
+              className={cn(
+                "inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand",
+                COLOUR_TRANSITION,
+                FOCUS_RING,
+              )}
+            >
+              <i className="fas fa-users-gear" aria-hidden />
+              {officeLabel} console
+            </Link>
+          ) : undefined
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

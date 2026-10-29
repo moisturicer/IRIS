@@ -73,6 +73,8 @@ class World:
         obj = self.objects[name]
         if isinstance(obj, Record):
             return obj
+        if isinstance(obj, ReviewerSeat):
+            return obj.assignment.record
         if hasattr(obj, "record"):
             return obj.record
         return obj.request.record   # a document-request item
@@ -97,6 +99,24 @@ class World:
     def can_see(self, role: str, name: str) -> bool:
         """Is `name`'s Record in `visible_to()` for `role`? (IR-153)"""
         user = self.users[role]
+        obj = self.objects[name]
+        from apps.ai.models import AskRun, Conversation, ResearchRun
+        from apps.notifications.models import Notification
+        if isinstance(obj, (AskRun, Conversation, ResearchRun)):
+            return user is not None and obj.user_id == user.pk
+        if isinstance(obj, Notification):
+            return user is not None and Notification.objects.visible_to(user).filter(pk=obj.pk).exists()
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+        if isinstance(obj, OutstandingToken):
+            return role == "rdco"
+        if isinstance(obj, User):
+            return role == "rdco"
+        from apps.accounts.models import RoleRequest
+        if isinstance(obj, RoleRequest):
+            return role == "rdco"
+        from apps.opportunities.models import Opportunity
+        if isinstance(obj, Opportunity):
+            return user is not None
         return Record.objects.visible_to(user).filter(pk=self.record_of(name).pk).exists()
 
 
@@ -218,5 +238,48 @@ def build_world() -> World:
     )
     o["delete_request"] = DeleteRequest.objects.create(
         record=pending, requested_by=owner, previous_pipeline_status=PipelineStatus.PUBLISHED,
+    )
+    from datetime import timedelta
+    from apps.accounts.models import RoleRequest, SystemSetting
+    from apps.ai.models import AskRun, Conversation, ResearchRun, Turn
+    from apps.notifications.models import Notification, NotificationType
+    from apps.opportunities.models import Opportunity
+    from rest_framework_simplejwt.tokens import RefreshToken
+    from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+    token = RefreshToken.for_user(other)
+    o["session_token"] = OutstandingToken.objects.get(jti=token["jti"])
+    o["reviewer_target"] = users["unseated"]
+    o["target_user"] = users["other"]
+    o["role_request"] = RoleRequest.objects.create(user=other, requested_role=users["adviser"].role)
+    SystemSetting.objects.get_or_create(key="matrix-setting", defaults={"value": "test"})
+    o["assignment"] = record.assignments.get(party=Party.ITSO)
+    o["seat"] = o["assignment"].seats.get(reviewer=itso)
+    o["conversation"] = Conversation.objects.create(user=owner, title="Private matrix conversation")
+    o["turn"] = Turn.objects.create(conversation=o["conversation"], question="PRIVATE_TURN_QUESTION",
+                                    answer="PRIVATE_TURN_ANSWER", state="no_sources")
+    o["ask_run"] = AskRun.objects.create(
+        user=owner, conversation=o["conversation"], state="cancelled",
+        deadline_at=timezone.now()+timedelta(minutes=1),
+    )
+    o["research_run"] = ResearchRun.objects.create(user=owner, conversation=o["conversation"])
+    o["notification"] = Notification.objects.create(
+        recipient=owner, notif_type=NotificationType.objects.first(), message="Private matrix notification",
+    )
+    o["other_notification"] = Notification.objects.create(
+        recipient=other, notif_type=NotificationType.objects.first(), message="Other reader notification",
+    )
+    o["student_broadcast"] = Notification.objects.create(
+        broadcast_to_role=owner.role, notif_type=NotificationType.objects.first(), message="Student broadcast",
+    )
+    o["office_broadcast"] = Notification.objects.create(
+        broadcast_to_role=itso.role, notif_type=NotificationType.objects.first(), message="ITSO broadcast",
+    )
+    o["opportunity"] = Opportunity.objects.create(
+        title="Matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
+        posted_by=users["rdco"], opportunity_type="internal_call", posting_office="RDCO",
+    )
+    o["adviser_opportunity"] = Opportunity.objects.create(
+        title="Adviser's matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
+        posted_by=users["adviser"], opportunity_type="internal_call", posting_office="Adviser",
     )
     return world

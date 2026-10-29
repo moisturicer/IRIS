@@ -104,7 +104,7 @@ Every seat event carries `party`, `assignment`, `seat`, `reviewer` (user id) and
 | `SEAT_ASSIGNED` | A coordinator seats a member | |
 | `SEAT_NOMINATED` | The router named the member when routing | |
 | `REVIEWER_ADDED` | A seat holder adds a colleague from their own office | |
-| `SEAT_REASSIGNED` | A coordinator moves a seat to another member; `seat` is the new one | `previous_seat`, `previous_reviewer` |
+| `SEAT_REASSIGNED` | A coordinator moves a seat to another member; `seat` is the new one | `previous_seat`, `previous_reviewer`, `reason` (required since IR-623; absent on earlier rows) |
 | `SEAT_WITHDRAWN` | A coordinator takes a seat away | |
 | `SEAT_OPENED` | The holder opens their review for the **first** time; a second open writes nothing | |
 

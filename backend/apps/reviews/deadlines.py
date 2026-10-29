@@ -70,7 +70,7 @@ def revision_pending(assignment):
 def with_deadlines(queryset, *, prefix=""):
     """Batch list facts so My Reviews' SQL count stays independent of page size."""
     return queryset.prefetch_related(
-        f"{prefix}extensions",
+        f"{prefix}extensions__actor",
         Prefetch(f"{prefix}resubmission_requests",
                  queryset=ResubmissionRequest.objects.filter(state=ResubmissionRequestState.OPEN),
                  to_attr="deadline_open_revisions"),
@@ -164,6 +164,9 @@ def deadline_payload(assignment, user=None, *, readable=True):
         "extensions": [{"id": e.pk, "previous_due_at": e.previous_due_at.isoformat(),
                         "due_at": e.due_at.isoformat(), "reason": e.reason if readable else None,
                         "system": e.system, "actor": e.actor_id if readable else None,
+                        # Who moved it, for the Review timeline (IR-623).
+                        "actor_name": (e.actor.get_full_name() or e.actor.email)
+                        if readable and e.actor else None,
                         "created_at": e.created_at.isoformat()}
                        for e in assignment.extensions.all()],
     }

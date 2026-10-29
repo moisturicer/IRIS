@@ -97,6 +97,27 @@ class MyReviewsView(APIView):
         return Response(payload)
 
 
+class OfficeConsoleView(APIView):
+    """
+    GET /reviews/office/?office=  -- the coordinator console (IR-623)
+
+    One office's open seats, unclaimed pool and per-member load. `office`
+    defaults to the office the caller coordinates; anyone who does not
+    coordinate the office asked for is refused with 403.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .office_console import ConsoleRefused, office_console
+
+        try:
+            payload = office_console(request.user, office=request.query_params.get("office"))
+        except ConsoleRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        return Response(payload)
+
+
 class RecordAuthPinViewSet(viewsets.GenericViewSet):
     """
     POST /reviews/pin/generate/  -- issue a one-time PIN and email it to the requester

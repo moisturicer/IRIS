@@ -14,7 +14,7 @@
  * tagged: a version is never worked out from a timestamp. Review comments
  * join when their backend lands (IR-419).
  */
-import { joinLabels } from "@/lib/utils";
+import { formatDate, joinLabels } from "@/lib/utils";
 import type { RecordTracker, TrackerResubmission } from "@/types/records";
 
 export type TimelineKind =
@@ -23,7 +23,9 @@ export type TimelineKind =
   | "revision"
   | "revision_resolved"
   | "document_request"
-  | "version";
+  | "version"
+  | "reassignment"
+  | "extension";
 
 export interface TimelineEntry {
   key: string;
@@ -183,6 +185,42 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       details: [v.manuscript_url ? v.cause_label : `${v.cause_label} · no manuscript`],
       version: null,
     });
+  }
+
+  // A coordinator moved a seat (IR-623). The names are null to a viewer who
+  // may not read the review, and the act still says what happened.
+  for (const r of tracker.reassignments ?? []) {
+    entries.push({
+      key: `reassignment-${r.seat}`,
+      kind: "reassignment",
+      at: r.at,
+      actor: r.by_name,
+      party: r.label,
+      act: r.from_name && r.to_name ? `Reassigned from ${r.from_name} to ${r.to_name}` : "Reassigned a reviewer",
+      status: null,
+      note: r.reason || null,
+      details: [],
+      version: null,
+    });
+  }
+
+  // A due date moved (ADR-043 §6): by a coordinator, with their reason, or by
+  // IRIS for a document-request pause, whose wording is a fact, not a note.
+  for (const h of tracker.assignment_deadline_history ?? []) {
+    for (const e of h.extensions) {
+      entries.push({
+        key: `extension-${e.id}`,
+        kind: "extension",
+        at: e.created_at,
+        actor: e.system ? null : e.actor_name,
+        party: h.label,
+        act: e.system ? "Due date moved for a document request" : "Extended the due date",
+        status: null,
+        note: e.system ? null : e.reason || null,
+        details: [`Due ${formatDate(e.due_at)}, was ${formatDate(e.previous_due_at)}`],
+        version: null,
+      });
+    }
   }
 
   // Oldest first. An entry with no time sorts before every dated one; ties

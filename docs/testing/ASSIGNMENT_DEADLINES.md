@@ -43,9 +43,10 @@ versus missing responses and invalid extension bodies.
 | RDCO acting outside its office | 403 | 404 |
 | Roleless Django superuser | 404 | 404 |
 
-Tracker parties, current assignment capabilities, reviewer seats and My Reviews
-rows share `deadline_payload`: `due_at`, `original_due_at`, `is_overdue`,
-`clock_paused`, `extensions` and `can_extend`. Extension prose and actor ids
+Tracker parties, current assignment capabilities, reviewer seats, My Reviews
+rows and the coordinator console's rows (IR-623) share `deadline_payload`:
+`due_at`, `original_due_at`, `is_overdue`, `clock_paused`, `extensions` and
+`can_extend`. Extension prose, actor ids and actor names (`actor_name`, IR-623)
 follow the tracker's existing review-content visibility predicate. An open own
 revision or document pause suppresses overdue; closed assignments are never
 overdue. Workflow transitions and clearances do not consume these fields.
