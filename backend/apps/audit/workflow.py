@@ -106,6 +106,18 @@ def assignment_extended(extension):
     )
 
 
+def assignment_escalated(assignment, *, step, overdue, recipients):
+    """An escalation and its mandatory history commit with the sent-moment ledger."""
+    return AuditEvent.objects.create(
+        event_type=AuditEvent.ASSIGNMENT_ESCALATED, user=None,
+        record_id=assignment.record_id,
+        metadata={"assignment": assignment.pk, "party": assignment.party,
+                  "due_at": assignment.due_at.isoformat(), "step": step,
+                  "overdue_working_days": overdue,
+                  "recipients": [user.pk for user in recipients]},
+    )
+
+
 # --- verdicts and decisions ------------------------------------------------------
 
 def decision_recorded(record, actor, *, party, outcome, final, review):
