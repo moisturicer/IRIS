@@ -78,7 +78,7 @@ and a Proposal's accept write no `PUBLISHED`.
 |---|---|---|
 | `RESUBMISSION_REQUESTED` | A party asks the owners to revise the work | `party`, `request`, `reason`, `version` (the version it was made against) |
 | `REVISION_REQUEST_WITHDRAWN` | The request is withdrawn unanswered | `party`, `request`, `closed_by` (`requesting_party`, or `record_withdrawn` when the owner withdrew the record) |
-| `RESUBMITTED` | The owner submits a new version answering every open request | `version`, `policy` (`clearance_aware` or `restart_all`, the active ADR-004 arm), `requests` (the request ids it answered), `rereview_parties` (the parties that asked, who review the new version), `reset_parties` (the offices whose clearance the policy reset), `preserved_parties` (the offices whose `cleared` clearance it kept) |
+| `RESUBMITTED` | The owner submits a new version answering every open request | `version`, `policy` (`clearance_aware` or `restart_all`, the active ADR-004 arm), `requests` (the request ids it answered), `rereview_parties` (the parties that review the new version: those that asked, and under `restart_all` the offices it reopens, IR-632), `reset_parties` (the offices whose clearance the policy reset), `preserved_parties` (the offices whose `cleared` clearance it kept) |
 | `CLEARANCE_PRESERVED` | One row per office in `preserved_parties`, right after its `RESUBMITTED` | `party`, `version`, `policy` |
 
 ### Reviewer seats (ADR-032 §4)
@@ -131,7 +131,8 @@ for one record's whole life, then checks each clock against the workflow tables.
 
 A party's clock **starts** when it is handed work and **stops** when its assignment closes:
 
-- start: `SUBMITTED` (for `to_party`), or `ROUTED` with `opened` true (for `to_party`);
+- start: `SUBMITTED` (for `to_party`), or `ROUTED` with `opened` true (for `to_party`), or
+  `RESUBMITTED` (for each of `rereview_parties` with no clock running);
 - stop: `ASSIGNMENT_CLOSED` (for `party`).
 
 ```python
@@ -140,6 +141,9 @@ for row in sorted(rows, key=lambda r: r["id"]):
     m, at = row["metadata"], parse(row["created_at"])
     if row["event_type"] == "SUBMITTED" or (row["event_type"] == "ROUTED" and m["opened"]):
         started[m["to_party"]] = at
+    elif row["event_type"] == "RESUBMITTED":
+        for party in m["rereview_parties"]:
+            started.setdefault(party, at)
     elif row["event_type"] == "ASSIGNMENT_CLOSED":
         turnaround.append((m["party"], m["how"], at - started.pop(m["party"])))
 ```
@@ -148,17 +152,20 @@ A party routed to again after it finished gets a second clock. Exclude `how ==
 "withdrawn"` and `"closed_by_decision"` when measuring how long a party took to finish:
 those turns were ended, not completed.
 
-**A revision does not stop the clock, so `RESUBMITTED` starts none.** IR-144's card says a
-clock also starts at `RESUBMITTED` for `reset_parties`. That rule was not built, deliberately:
+**A revision does not stop the clock, so `RESUBMITTED` restarts none.** IR-144's card says a
+clock also starts at `RESUBMITTED` for `reset_parties`. That rule was not built as written:
 
-- under `clearance_aware`, every reset party is a party that asked, and a party with an
-  open revision request cannot complete, so its clock is still running and restarting it
-  would erase the time before the request;
-- under `restart_all`, the other reset offices' assignments stay completed and nobody is
-  handed work (`new_version.py`: seats and assignments do not read the policy), so there is
-  no clock to start.
+- a party that asked has an open revision request and cannot complete, so its clock is
+  still running, and restarting it would erase the time before the request. `setdefault`
+  leaves it alone;
+- under `restart_all`, an office that had completed is reopened and reviews the new
+  version (ADR-032 §5, IR-632 amendment). It is in `rereview_parties` with no clock
+  running, so `RESUBMITTED` starts its second clock. Under `clearance_aware` no such
+  office exists, so the rule starts nothing there;
+- a reset office still reviewing is not in `rereview_parties` unless it asked; its first
+  clock simply keeps running.
 
-Instead, the author's share of a party's clock is
+The author's share of a requesting party's clock is
 `RESUBMITTED.created_at - RESUBMISSION_REQUESTED.created_at` for each party in
 `rereview_parties`; subtract it to get the reviewer-side time.
 

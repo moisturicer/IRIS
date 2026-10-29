@@ -1,6 +1,7 @@
 """
 The owner answers the open revision requests with a new version; only the
-requesting parties' clearances and seats reset (IR-273).
+requesting parties' clearances and seats reset (IR-273), except that under
+`RESTART_ALL` every reset office that had completed reviews again (IR-632).
 
 ADR-032 §5 and its 2026-10-08 Amendments, at the REST seam IR-255 confirmed:
 ADR-003's clearance-aware resubmission on the new model. One class per
@@ -21,7 +22,7 @@ from apps.documents.models import RecordUpload, UploadSlot
 from apps.notifications.models import Notification
 from apps.records import lifecycle
 from apps.records.models import Record, RecordVersion
-from apps.reviews import routing
+from apps.reviews import routing, seats
 from apps.reviews.models import (
     RecordAssignment,
     RecordClearance,
@@ -31,6 +32,7 @@ from apps.reviews.models import (
     RoutingEvent,
 )
 from core.enums import (
+    AssignmentState,
     ClearanceStatus,
     Party,
     PipelineStatus,
@@ -41,6 +43,7 @@ from core.enums import (
     WorkflowState,
 )
 
+from .test_decisions import decide_url
 from .test_office_review import detail_url
 from .test_revisions import RevisionTestBase
 
@@ -475,25 +478,143 @@ class RestartAllTests(NewVersionTestBase):
         hint_kept = self.detail(record, self.owner)["revision"]["new_version"]
         self.assertIsNone(hint_kept)  # nothing is open any more
 
-    def test_the_policies_differ_only_in_which_clearances_reset(self):
-        """Seats, requests and the version are the clearance-aware arm's."""
+    def test_a_completed_office_reviews_again_with_the_same_reviewer(self):
+        """
+        The arms differ in which offices reset *and review again* (ADR-032 §5,
+        IR-632 amendment). This replaced IR-273's "differ only in which
+        clearances reset", under which ITSO's reviewer stayed done and nobody
+        reviewed v2 for ITSO -- the label-only control ADR-004 rejects.
+        """
         record = self.itso_cleared_and_ierc_asked()
+        itso_assignment = RecordAssignment.objects.get(record=record, party=Party.ITSO)
         self.edit_title(record)
 
         self.submitted(record)
 
-        self.assertEqual(self.seat_state(record, Party.ITSO, self.itso), SeatState.DONE)
+        seat = ReviewerSeat.objects.get(assignment=itso_assignment, reviewer=self.itso)
+        self.assertEqual(seat.state, SeatState.IN_REVIEW)
+        self.assertIsNone(seat.done_at)
+        itso_assignment.refresh_from_db()
+        self.assertEqual(itso_assignment.state, AssignmentState.ACTIVE)
+        self.assertIsNone(itso_assignment.closed_at)
         self.assertEqual(self.seat_state(record, Party.IERC, self.ierc), SeatState.IN_REVIEW)
-        self.assertEqual(self.active(record), {Party.IERC})
+        self.assertEqual(self.active(record), {Party.ITSO, Party.IERC})
+        self.assertEqual(RecordAssignment.objects.filter(record=record, party=Party.ITSO).count(), 1)
         self.assertEqual(len(self.versions(record)), 2)
         self.assertFalse(self.open_requests(record).exists())
 
-    def test_the_owner_is_told_that_nothing_is_kept(self):
+    def test_the_reopened_reviewer_is_told(self):
+        record = self.itso_cleared_and_ierc_asked()
+        self.edit_title(record)
+        before = set(Notification.objects.values_list("pk", flat=True))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.submitted(record)
+
+        new = Notification.objects.exclude(pk__in=before)
+        self.assertEqual({n.recipient for n in new}, {self.itso, self.ierc})
+        self.assertEqual({n.message for n in new}, {new.first().message})
+
+    def test_the_adviser_is_not_reopened(self):
+        record = self.itso_cleared_and_ierc_asked()
+        adviser = RecordAssignment.objects.get(record=record, party=Party.ADVISER)
+        self.edit_title(record)
+
+        self.submitted(record)
+
+        adviser.refresh_from_db()
+        self.assertEqual(adviser.state, AssignmentState.COMPLETED)
+        self.assertEqual(
+            set(ReviewerSeat.objects.filter(assignment=adviser).values_list("state", flat=True)),
+            {SeatState.DONE},
+        )
+
+    def test_when_rdco_asked_the_completed_office_reviews_again_beside_it(self):
+        record = self.thesis(Party.ITSO)
+        self.opened_seat(record, Party.ITSO, self.itso)
+        self.cleared(record, self.itso)  # the hand-back opens RDCO's pool
+        self.opened_seat(record, Party.RDCO, self.rdco)
+        self.asked(record, self.rdco)
+        self.edit_title(record)
+
+        self.submitted(record)
+
+        self.assertEqual(self.active(record), {Party.ITSO, Party.RDCO})
+        self.assertEqual(self.seat_state(record, Party.ITSO, self.itso), SeatState.IN_REVIEW)
+        self.assertEqual(self.seat_state(record, Party.RDCO, self.rdco), SeatState.IN_REVIEW)
+        self.assertEqual(self.rdco_assignments(record).count(), 1)
+
+    def test_an_office_still_reviewing_keeps_its_seat(self):
+        """KTTO had not finished, so it has nothing to redo: the same under both arms."""
+        record = self.thesis(Party.ITSO, Party.IERC, Party.KTTO)
+        self.opened_seat(record, Party.ITSO, self.itso)
+        self.cleared(record, self.itso)
+        ktto = self.opened_seat(record, Party.KTTO, self.ktto)
+        self.opened_seat(record, Party.IERC, self.ierc)
+        self.asked(record, self.ierc)
+        self.edit_title(record)
+
+        self.submitted(record)
+
+        ktto.refresh_from_db()
+        self.assertEqual(ktto.state, SeatState.IN_REVIEW)
+        self.assertIsNotNone(ktto.opened_at)
+        self.assertEqual(self.active(record), {Party.ITSO, Party.IERC, Party.KTTO})
+        self.assertEqual(RecordAssignment.objects.filter(record=record, party=Party.KTTO).count(), 1)
+
+    def test_the_record_still_reaches_a_decision(self):
+        record = self.itso_cleared_and_ierc_asked()
+        self.edit_title(record)
+        self.submitted(record)
+
+        self.cleared(record, self.itso)
+        self.assertFalse(self.rdco_assignments(record).exists())  # IERC still reviewing
+        self.cleared(record, self.ierc)
+        rdco = RecordAssignment.objects.get(
+            record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
+        )
+        seats.open_review(seats.claim(rdco, self.rdco), self.rdco)
+        token = self.detail(record, self.rdco)["decision"]["token"]
+        response = self.post(
+            decide_url(record), self.rdco, {"outcome": "publish", "comment": "", "token": token},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        record.refresh_from_db()
+        self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
+        self.assertEqual(self.clearance(record, Party.ITSO), ClearanceStatus.CLEARED)
+        self.assertEqual(self.clearance(record, Party.IERC), ClearanceStatus.CLEARED)
+
+    def test_the_owner_is_told_that_nothing_is_kept_and_who_reviews_again(self):
         record = self.itso_cleared_and_ierc_asked()
 
         hint = self.detail(record, self.owner)["revision"]["new_version"]
 
-        self.assertEqual((hint["rereview"], hint["kept"]), (["IERC"], []))
+        self.assertEqual((hint["rereview"], hint["kept"]), (["ITSO", "IERC"], []))
+
+
+class ClearanceAwareReopensNobodyElseTests(NewVersionTestBase):
+    """The production arm, on the scenario IR-632 changes for `RESTART_ALL`."""
+
+    def test_the_office_that_cleared_keeps_its_completed_review(self):
+        record = self.itso_cleared_and_ierc_asked()
+        itso_assignment = RecordAssignment.objects.get(record=record, party=Party.ITSO)
+        self.edit_title(record)
+
+        self.submitted(record)
+
+        itso_assignment.refresh_from_db()
+        self.assertEqual(itso_assignment.state, AssignmentState.COMPLETED)
+        self.assertEqual(self.seat_state(record, Party.ITSO, self.itso), SeatState.DONE)
+        self.assertEqual(self.active(record), {Party.IERC})
+        self.assertEqual(self.clearance(record, Party.ITSO), ClearanceStatus.CLEARED)
+
+    def test_the_owner_is_told_only_the_requester_reviews_again(self):
+        record = self.itso_cleared_and_ierc_asked()
+
+        hint = self.detail(record, self.owner)["revision"]["new_version"]
+
+        self.assertEqual((hint["rereview"], hint["kept"]), (["IERC"], ["ITSO"]))
 
 
 # --- AC: RDCO or Adviser revision ----------------------------------------------------------
