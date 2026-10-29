@@ -194,6 +194,8 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
       `derive_workflow_state`'s alone.
     - `holders`: the parties with an active assignment, in tracker order,
       as `{party, label}` -- who has the record now.
+    - `revision_parties`, `document_parties`: the asking party of each open
+      revision and document request on a record in review.
     - `cleared_offices`: each office whose clearance is `cleared`, with
       `preserved` from `clearance_state.is_preserved`, so a clearance kept
       through a resubmission reads as kept here exactly as on Record detail.
@@ -221,7 +223,7 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
         ResubmissionRequest.objects.filter(
             record_id__in=in_review, state=ResubmissionRequestState.OPEN
         ),
-        "pk",
+        "party",
     )
     documents = per_record(
         DocumentRequest.objects.filter(record_id__in=in_review, state=DocumentRequestState.OPEN),
@@ -263,6 +265,9 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
                 deciding_parties=lifecycle.deciding_parties_for(r),
             ),
             "holders": holders(r.pk),
+            # Who asked, per open request: what `submitter_status` names (IR-625).
+            "revision_parties": resubmissions.get(r.pk, []),
+            "document_parties": documents.get(r.pk, []),
             "cleared_offices": [
                 {
                     "office": office,
@@ -407,6 +412,7 @@ def current_holders(
 def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[str, Any]:
     """The workflow fields Record detail carries (IR-258, IR-262)."""
     active = _active_assignments(record)
+    from .deadlines import deadline_payload
     state = workflow_state(record, active_assignments=active)
     return {
         "workflow_state": state,
@@ -415,6 +421,11 @@ def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[st
             record, user, active_assignments=active, readable=readable,
         ),
         "can_request_document": requestable_parties(record, user, active_assignments=active),
+        "assignment_deadlines": [
+            {"assignment": a.pk, "party": a.party,
+             **deadline_payload(a, user, readable=may_read_review(user, record))}
+            for a in active
+        ],
     }
 
 
@@ -455,8 +466,9 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
 
 def _party_rows(
     record, *, reviews: list, clearances: list, staff: bool, disclose_requests: bool,
-    disclose_seats: bool = False,
+    disclose_seats: bool = False, user=None,
 ) -> list[dict]:
+    from .deadlines import deadline_payload
     assignments: dict[str, RecordAssignment] = {}
     for a in (
         RecordAssignment.objects.filter(record=record)
@@ -573,6 +585,7 @@ def _party_rows(
             # completed round still stands beside it (ADR-032 §5 Amendment,
             # IR-272). Which party asked is not review content (IR-479).
             "changes_requested": party in asking,
+            **deadline_payload(assignment, user, readable=disclose_seats),
             # The outcome is an earlier review round's, standing while a new
             # one runs (IR-269).
             "outcome_earlier": earlier,
@@ -675,6 +688,17 @@ def _resubmissions(record, *, staff: bool, readable: bool) -> list[dict]:
     ]
 
 
+def _deadline_history(record, user, *, readable):
+    from .deadlines import deadline_payload
+
+    return [
+        {"assignment": a.pk, "party": a.party, "state": a.state,
+         "opened_at": _iso(a.opened_at), "clock_started_at": _iso(a.clock_started_at),
+         **deadline_payload(a, user, readable=readable)}
+        for a in record.assignments.order_by("opened_at", "pk").prefetch_related("extensions")
+    ]
+
+
 def tracker_payload(record, user) -> dict[str, Any]:
     """`GET /records/<id>/tracker/` -- §8.1 of the architecture doc."""
     from apps.documents.request_serializers import serialize_requests
@@ -700,10 +724,12 @@ def tracker_payload(record, user) -> dict[str, Any]:
         "record_id": record.pk,
         "record_type": lifecycle.type_name_of(record) or None,
         **workflow_fields(record, user, readable=readable),
+        # Earlier rounds remain available after re-routing opens a new one.
+        "assignment_deadline_history": _deadline_history(record, user, readable=readable),
         "parties": _party_rows(
             record, reviews=reviews, clearances=clearances, staff=staff,
             disclose_requests=disclose_requests,
-            disclose_seats=readable,
+            disclose_seats=readable, user=user,
         ),
         "routing_history": _routing_history(record, staff=staff, readable=readable),
         "routing_recorded_from": _routing_recorded_from(),

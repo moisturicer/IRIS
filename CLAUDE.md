@@ -105,6 +105,11 @@ python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db
 python manage.py seed_demo                # accounts + Discover catalogue + every workflow_state
                                           # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
                                           # plus admin@cit.edu (Django superuser, no app role).
+                                          # Office coordinators (IR-478): itso.coordinator@,
+                                          # ierc.coordinator@, ktto.coordinator@ and
+                                          # rdco.coordinator@cit.edu, same password. The plain
+                                          # <role>@cit.edu office logins are members, not
+                                          # coordinators; re-running restores both flags.
                                           # Replaced scripts/seed_demo_{users,records,clearances}.py
                                           # and seed_test_users, all deleted. Idempotent for records;
                                           # re-running resets passwords. Refuses with DEBUG off

@@ -146,6 +146,7 @@ class Conversation(models.Model):
         related_name="ai_conversations",
     )
     title = models.CharField(max_length=200, blank=True)
+    is_default = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -154,6 +155,12 @@ class Conversation(models.Model):
     class Meta:
         ordering = ["-updated_at", "-id"]
         indexes = [models.Index(fields=["user", "-updated_at"])]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "record"], condition=models.Q(is_default=True),
+                                    name="unique_default_paper_conversation"),
+            models.CheckConstraint(condition=models.Q(is_default=False) | models.Q(record__isnull=False),
+                                   name="default_conversation_has_record"),
+        ]
 
     def __str__(self) -> str:
         return f"Conversation({self.pk}, user={self.user_id}, record={self.record_id})"
@@ -233,6 +240,27 @@ class Turn(models.Model):
 
     def __str__(self) -> str:
         return f"Turn({self.pk}, conversation={self.conversation_id})"
+
+
+class ChatSubmission(models.Model):
+    """A committed claim before any paid work (IR-561). Never auto-reclaimed.
+
+    An interrupted process may already have called a vendor. Keeping the claim
+    prevents a transport retry from paying twice, even when no Turn was saved.
+    """
+
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="submissions")
+    request_id = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+    turn = models.OneToOneField(Turn, on_delete=models.CASCADE, null=True, blank=True, related_name="submission")
+    run = models.OneToOneField("ai.AskRun", on_delete=models.CASCADE, null=True, blank=True, related_name="submission")
+    finished = models.BooleanField(default=False)
+    source_refs = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["conversation", "request_id"],
+                                               name="unique_chat_submission_request")]
 
 
 class ConversationState(models.Model):

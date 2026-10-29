@@ -34,7 +34,7 @@ import { rolesFor } from "@/lib/access";
 import { tabbableWithin } from "@/lib/focusTrap";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import type { User } from "@/types/auth";
+import type { AdviserOption, User } from "@/types/auth";
 import type { Classification, PSCEDClassification, RecordType, TrackerHolder } from "@/types/records";
 
 import { FORM_FIELD, MetadataForm, focusFirstInvalid } from "@/features/records/metadata/MetadataForm";
@@ -136,7 +136,7 @@ type Phase =
 
 interface Lists {
   recordTypes:     RecordType[];
-  advisers:        User[];
+  advisers:        AdviserOption[];
   classifications: Classification[];
   psceds:          PSCEDClassification[];
 }

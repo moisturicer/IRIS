@@ -41,6 +41,7 @@ export interface StreamingState {
 }
 
 export interface AskStreamOptions {
+  requestId?: string;
   comparisonRecordIds?: number[];
   conversationId?: number;
   topK?:           number;

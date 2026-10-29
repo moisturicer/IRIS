@@ -182,10 +182,10 @@ export function PaperChatPanel({
   const input = draft ?? ownInput;
   const setInput = onDraftChange ?? setOwnInput;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<number | null>(null);
   const [widen, setWiden] = useState(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -217,14 +217,12 @@ export function PaperChatPanel({
     setReady(false);
     setWiden(false);
     // Nothing of the old conversation may receive or show anything meanwhile.
-    setConversationId(null);
     setMessages([]);
 
     (async () => {
       try {
         const conversation = await aiApi.conversations.findForRecord(subject.id);
         if (cancelled || !conversation) return;
-        setConversationId(conversation.id);
         setMessages(conversation.turns.flatMap(turnToMessages));
       } finally {
         if (!cancelled) setReady(true);
@@ -236,9 +234,11 @@ export function PaperChatPanel({
 
   /** The subject's Conversation, started now if this is its first question. */
   const conversationFor = async (askedAbout: number): Promise<number> => {
-    if (conversationId != null) return conversationId;
-    const { data } = await aiApi.conversations.create({ record: askedAbout });
-    if (subjectId.current === askedAbout) setConversationId(data.id);
+    const { data } = await aiApi.conversations.create({ record: askedAbout, reuse_default: true });
+    if (subjectId.current === askedAbout) {
+      // Another tab may have started this default after our initial GET.
+      setMessages([...data.turns.flatMap(turnToMessages)]);
+    }
     return data.id;
   };
 
@@ -258,9 +258,10 @@ export function PaperChatPanel({
   }, [minimized]);
 
   const sendQuestion = async (question: string, questionWiden: boolean) => {
-    if (!question || busy || !ready) return;
+    if (!question || sending.current || !ready) return;
+    sending.current = true;
+    const requestId = crypto.randomUUID();
 
-    setMessages((prev) => [...prev, newChatMessage("user", question)]);
     setBusy(true);
     const askedAbout = subject.id;
     // The answer is stored in the conversation it was asked in either way;
@@ -270,11 +271,13 @@ export function PaperChatPanel({
     };
     try {
       const conversationId = await conversationFor(askedAbout);
-      const { message } = await ask(question, { conversationId, widen: questionWiden });
+      if (subjectId.current === askedAbout) setMessages((prev) => [...prev, newChatMessage("user", question)]);
+      const { message } = await ask(question, { conversationId, widen: questionWiden, requestId });
       show(message);
     } catch {
       show(newChatMessage("assistant", "IRIS could not answer right now."));
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };

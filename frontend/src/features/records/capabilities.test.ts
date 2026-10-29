@@ -82,6 +82,7 @@ function record(overrides: Partial<RecordDetail> = {}): RecordDetail {
     decision: NO_DECISION,
     versions: null,
     manuscript_unsubmitted: false,
+    submitter_status: null,
     ...overrides,
   };
 }

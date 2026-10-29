@@ -20,7 +20,7 @@ import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/field
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
-import type { User } from "@/types/auth";
+import type { AdviserOption } from "@/types/auth";
 import type { Classification, PSCEDClassification } from "@/types/records";
 
 import { AdviserCombobox } from "./AdviserCombobox";
@@ -74,7 +74,7 @@ export function focusFirstInvalid(errors: FieldErrors<MetadataValues>, openMore:
 }
 
 interface MetadataFormProps {
-  advisers:        User[];
+  advisers:        AdviserOption[];
   classifications: Classification[];
   psceds:          PSCEDClassification[];
   /** Who is signed in, so they can be shown but not chosen as adviser. */

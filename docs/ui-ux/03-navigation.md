@@ -66,6 +66,8 @@ ADMINISTRATION                                        (RDCO)
 
 **Amended 2026-09-06.** This section described three sections, `Published Records` (deleted — Discover took the browse role) and `Notifications` in the header rather than the sidebar. It now matches what ships. **Manage Users and Active Sessions are gone from the app entirely**: account administration belongs to the Django admin site, and per-user session management is a separate screen tracked as `IR-124`.
 
+**Amended 2026-10-29 (IR-478).** *Users* is back in RDCO's Administration group, after Import Records: the Django admin site never registered `User`, and RDCO, not the superuser, holds the coordinator grant. See [02](02-information-architecture.md) §5. Active Sessions stays out.
+
 ### Rules
 
 | Rule | Reason |

@@ -38,12 +38,14 @@ class ConversationSerializer(serializers.ModelSerializer):
                                          default=None)
     # Annotated by `owned_by`, not walked per row.
     turn_count = serializers.IntegerField(read_only=True)
+    reuse_default = serializers.BooleanField(write_only=True, default=False)
 
     class Meta:
         model = Conversation
         fields = [
             "id", "title", "record", "record_title", "turn_count",
             "created_at", "updated_at",
+            "reuse_default",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -52,6 +54,11 @@ class ConversationSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request is not None:
             self.fields["record"].queryset = Record.objects.visible_to(request.user)
+
+    def validate(self, attrs):
+        if attrs.get("reuse_default") and not attrs.get("record"):
+            raise serializers.ValidationError({"record": "A default Conversation requires a readable Record."})
+        return attrs
 
 
 class ConversationDetailSerializer(ConversationSerializer):
