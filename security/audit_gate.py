@@ -4,7 +4,8 @@ CI runs ``pip-audit`` and ``npm audit`` with JSON output, then hands both files
 to this script. It fails the job when:
 
 - a **high or critical** finding is not in ``security/allowlist.yml``, or
-- any allowlist entry is malformed or **past its expiry date**.
+- any allowlist entry is malformed, duplicated or **past its expiry date**, or
+- a dependency could not be audited, or no report was given at all (IR-633).
 
 Moderate and low findings are printed but never fail the job.
 
@@ -26,6 +27,7 @@ Usage (repo root)::
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import sys
 import urllib.error
@@ -78,7 +80,7 @@ def load_allowlist(path: Path, today: date) -> list[AllowlistEntry]:
     raw = data.get("entries") or []
     if not isinstance(raw, list):
         raise AllowlistError("`entries` must be a list")
-    entries, problems = [], []
+    entries, problems, seen = [], [], set()
     for n, item in enumerate(raw, 1):
         label = (item or {}).get("id") or f"entry {n}"
         missing = [f for f in REQUIRED_FIELDS if not str((item or {}).get(f) or "").strip()]
@@ -99,6 +101,10 @@ def load_allowlist(path: Path, today: date) -> list[AllowlistEntry]:
             problems.append(f"{label}: expires {expires.isoformat()}, more than "
                             f"{MAX_EXPIRY.days} days out")
             continue
+        if str(item["id"]).upper() in seen:
+            problems.append(f"{label}: duplicate id")
+            continue
+        seen.add(str(item["id"]).upper())
         entries.append(AllowlistEntry(str(item["id"]), str(item["reason"]), str(item["owner"]), expires))
     if problems:
         raise AllowlistError("; ".join(problems))
@@ -112,6 +118,16 @@ def findings_from_pip_audit(
 ) -> list[Finding]:
     findings = []
     for dep in report.get("dependencies", []):
+        if dep.get("skip_reason"):
+            # pip-audit could not look at it, so nothing says it is safe (IR-633).
+            # Accepted, if at all, by an entry with id `skipped:<package>`.
+            findings.append(Finding(
+                id=f"skipped:{dep['name']}",
+                ids=(f"skipped:{dep['name']}",),
+                package=f"{dep['name']} ({dep['skip_reason']})",
+                severity="high",
+            ))
+            continue
         for vuln in dep.get("vulns", []):
             ids = (vuln["id"], *vuln.get("aliases", []))
             findings.append(Finding(
@@ -123,44 +139,66 @@ def findings_from_pip_audit(
     return findings
 
 
-def findings_from_npm_audit(report: dict) -> list[Finding]:
+def findings_from_npm_audit(
+    report: dict, aliases_of: Callable[[str], Sequence[str]] = lambda ghsa: ()
+) -> list[Finding]:
+    """One finding per advisory. npm reports only the GHSA id, so `aliases_of`
+    supplies the rest (CVE) for allowlist matching (IR-633)."""
     by_id: dict[str, Finding] = {}
     for vuln in report.get("vulnerabilities", {}).values():
         for via in vuln.get("via", []):
             if not isinstance(via, dict):
                 continue  # a package name: the advisory itself is listed under it
             ghsa = via["url"].rstrip("/").rsplit("/", 1)[-1]
-            by_id.setdefault(ghsa, Finding(
+            if ghsa in by_id:
+                continue  # the same advisory reached through another package
+            by_id[ghsa] = Finding(
                 id=ghsa,
-                ids=(ghsa,),
+                ids=(ghsa, *aliases_of(ghsa)),
                 package=f"{via['name']} {via['range']}",
                 severity=via["severity"],
-            ))
+            )
     return list(by_id.values())
 
 
-def osv_severity(ids: Sequence[str]) -> str | None:
-    """The GitHub-reviewed severity for any of ``ids``, from OSV, or None."""
-    for vid in ids:
-        try:
-            with urllib.request.urlopen(f"https://api.osv.dev/v1/vulns/{vid}", timeout=20) as resp:
-                record = json.load(resp)
-        except (urllib.error.URLError, TimeoutError, ValueError):
-            continue
-        severity = (record.get("database_specific") or {}).get("severity")
-        if severity:
-            return severity.lower()
-    return None
+def osv_record(vid: str) -> dict | None:
+    """OSV's record for ``vid``, or None when it cannot be had.
+
+    Any network, protocol or parse failure is None -- "unknown" -- which the
+    callers treat as high severity and no aliases: it can fail the gate, never
+    pass it.
+    """
+    try:
+        with urllib.request.urlopen(f"https://api.osv.dev/v1/vulns/{vid}", timeout=20) as resp:
+            return json.load(resp)
+    except (OSError, http.client.HTTPException, ValueError):
+        return None
+
+
+def severity_lookup(osv: Callable[[str], dict | None]) -> Callable[[Sequence[str]], str | None]:
+    """The GitHub-reviewed severity for any of the ids, from OSV, or None."""
+    def severity_of(ids):
+        for vid in ids:
+            severity = ((osv(vid) or {}).get("database_specific") or {}).get("severity")
+            if severity:
+                return severity.lower()
+        return None
+    return severity_of
+
+
+def alias_lookup(osv: Callable[[str], dict | None]) -> Callable[[str], Sequence[str]]:
+    return lambda vid: tuple((osv(vid) or {}).get("aliases") or ())
 
 
 # --- the decision ------------------------------------------------------------
 
 def evaluate(findings: Iterable[Finding], allowlist: Sequence[AllowlistEntry]) -> Result:
     result = Result()
-    allowed_ids = {e.id for e in allowlist}
+    # Ids compare case-insensitively: GHSA ids are written both ways.
+    allowed_ids = {e.id.upper() for e in allowlist}
     used: set[str] = set()
     for f in findings:
-        match = allowed_ids.intersection(f.ids)
+        match = allowed_ids.intersection(i.upper() for i in f.ids)
         if match:
             used |= match
             result.allowed.append(f)
@@ -168,16 +206,19 @@ def evaluate(findings: Iterable[Finding], allowlist: Sequence[AllowlistEntry]) -
             result.blocking.append(f)
         else:
             result.reported.append(f)
-    result.unused = [e for e in allowlist if e.id not in used]
+    result.unused = [e for e in allowlist if e.id.upper() not in used]
     return result
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None, osv: Callable[[str], dict | None] = osv_record) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--allowlist", type=Path, required=True)
-    parser.add_argument("--pip-audit", type=Path, action="append", default=[])
-    parser.add_argument("--npm-audit", type=Path, action="append", default=[])
+    parser.add_argument("--pip-audit", type=Path, action="append", default=None)
+    parser.add_argument("--npm-audit", type=Path, action="append", default=None)
     args = parser.parse_args(argv)
+    if not args.pip_audit and not args.npm_audit:
+        # Nothing audited is not "nothing found" (IR-633).
+        parser.error("give at least one --pip-audit or --npm-audit report")
 
     try:
         allowlist = load_allowlist(args.allowlist, date.today())
@@ -186,10 +227,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     findings: list[Finding] = []
-    for path in args.pip_audit:
-        findings += findings_from_pip_audit(json.loads(path.read_text(encoding="utf-8")), osv_severity)
-    for path in args.npm_audit:
-        findings += findings_from_npm_audit(json.loads(path.read_text(encoding="utf-8")))
+    for path in args.pip_audit or []:
+        findings += findings_from_pip_audit(json.loads(path.read_text(encoding="utf-8")), severity_lookup(osv))
+    for path in args.npm_audit or []:
+        findings += findings_from_npm_audit(json.loads(path.read_text(encoding="utf-8")), alias_lookup(osv))
 
     result = evaluate(findings, allowlist)
     for f in result.reported:
