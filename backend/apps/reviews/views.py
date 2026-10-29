@@ -141,7 +141,7 @@ class RecordAuthPinViewSet(viewsets.GenericViewSet):
             return Response({"detail": "record_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            record = Record.objects.get(pk=record_id)
+            record = Record.objects.visible_to(request.user).get(pk=record_id)
         except Record.DoesNotExist:
             return Response({"detail": "Record not found."}, status=status.HTTP_404_NOT_FOUND)
 

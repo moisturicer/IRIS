@@ -36,6 +36,9 @@
 
 **Status:** implemented and focused tests verified; CI rerun and independent human approval remain outstanding. Deterministic provider tests establish call counts, not production vendor performance.
 
+## IR-635 PIN generation respects Record visibility (NFR-S4)
+
+`RecordAuthPinViewSet.generate` resolves through `visible_to(request.user)` before creating a PIN or emailing a title. Hidden and missing Records return the same 404. `apps/reviews/test_pin_visibility.py` asserts both the refusal and absence of PIN/email side effects, plus the owner's positive path. The IR-616 PIN defect markers are removed without changing expected access. Database execution is pending CI because local Docker's engine is unavailable; no pass is claimed.
 ## IR-636 analytics retains its office-only gate (NFR-S4)
 
 The manually bound `reviews-analytics` URL now passes its declared `IsAuthenticated`/`IsStaff` permission classes into `as_view`, rather than falling back to `IsReviewer`. `apps/reviews/test_analytics_access.py` asserts Adviser, Student and role-less superuser 403, anonymous 401 and all four office roles reaching the declared 501 stub. The IR-616 defect marker is removed without relaxing access. This does not implement analytics. Database execution is pending CI because local Docker's engine is unavailable; no pass is claimed.
