@@ -48,7 +48,7 @@ class RegistrationPasswordPolicyTests(APITestCase):
         )
 
     def test_an_entirely_numeric_password_is_refused(self):
-        response = self.client.post(self.url, registration("80245193"), format="json")
+        response = self.client.post(self.url, registration("12345678"), format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("This password is entirely numeric.", response.data["password"])
@@ -89,7 +89,7 @@ class ChangePasswordPolicyTests(APITestCase):
         self.assertTrue(self.user.check_password("pw12345!"))
 
     def test_an_entirely_numeric_password_is_refused(self):
-        response = self.change("80245193")
+        response = self.change("12345678")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("This password is entirely numeric.", response.data["new_password"])
@@ -106,3 +106,16 @@ class ChangePasswordPolicyTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["old_password"], ["Old password is incorrect."])
+
+    def test_every_broken_rule_is_reported_together(self):
+        response = self.change("1234567")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            sorted(response.data["new_password"]),
+            sorted([
+                "This password is too short. It must contain at least 8 characters.",
+                "This password is too common.",
+                "This password is entirely numeric.",
+            ]),
+        )

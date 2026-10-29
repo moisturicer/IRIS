@@ -498,7 +498,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
   it("shows every reason the server refused a password, not just the first (IR-647)", async () => {
     const user = userEvent.setup();
     refuse({ password: ["This password is too common.", "This password is entirely numeric."] });
-    renderSignup();
+    const { container } = renderSignup();
     await optionsLoaded();
     await submitStudent(user);
 
@@ -507,6 +507,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
         "This password is too common. This password is entirely numeric.",
       ),
     );
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("puts errors named the server's way on the field they mean", async () => {

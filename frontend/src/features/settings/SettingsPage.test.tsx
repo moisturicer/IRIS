@@ -50,8 +50,9 @@ describe("changing your password", () => {
 
     await changePassword(user, "12345678");
 
-    const status = await screen.findByText(/This password is too common\./);
-    expect(status).toHaveTextContent("This password is too common. This password is entirely numeric.");
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "This password is too common. This password is entirely numeric.",
+    );
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -64,6 +65,6 @@ describe("changing your password", () => {
 
     await changePassword(user, "Kalamansi-Tide-42");
 
-    expect(await screen.findByText("Old password is incorrect.")).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("Old password is incorrect.");
   });
 });
