@@ -29,6 +29,11 @@ HEADERS = [
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
+def row(*cells):
+    """The leading cells of one data row, blank to the last column."""
+    return [*cells] + [None] * (len(HEADERS) - len(cells))
+
+
 def workbook(*rows):
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -83,9 +88,9 @@ class ExcelImportTests(APITestCase):
         number and skipped, and the rows around it are still created.
         """
         response = self.post(workbook(
-            ["First Imported Record"] + [None] * 10,
-            [None, "An abstract with no title."] + [None] * 9,
-            ["Third Imported Record"] + [None] * 10,
+            row("First Imported Record"),
+            row(None, "An abstract with no title."),
+            row("Third Imported Record"),
         ))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)

@@ -43,8 +43,9 @@ httpx>=0.27.0
 tokenizers==0.22.2
 # IR-315: pyexcel itself, not only its plugins. The plugins register readers
 # with it but do not install it, so without this line the Excel import failed
-# for every upload.
-pyexcel>=0.7
+# for every upload. Capped below 0.8: the pyexcel-io 0.6 line the plugins pull
+# in is written against pyexcel 0.7.
+pyexcel>=0.7,<0.8
 pyexcel-xls>=0.7
 pyexcel-xlsx>=0.6
 openpyxl>=3.1                  # FR-M2-04: styled .xlsx template download
