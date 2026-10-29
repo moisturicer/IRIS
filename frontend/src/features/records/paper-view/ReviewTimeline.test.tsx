@@ -31,6 +31,9 @@ const payload: RecordTracker = {
       started: false, outcome: null, outcome_label: null, at: null, preserved: false,
       awaiting_document: null, outcome_earlier: false, in_pool: false, changes_requested: false,
       seats: null,
+      carryover: null, carryover_version: null, carryover_label: null,
+      due_at: null, original_due_at: null, is_overdue: false, clock_paused: false,
+      can_extend: false, extensions: [],
     },
   ],
   routing_history: [
