@@ -5,11 +5,15 @@ Until now immutability rested on the absence of an endpoint, so a shell, a
 careless migration or a future view could rewrite history. A trigger is the
 control an application check cannot be: it binds every client of the table.
 
-DELETE is always refused. UPDATE is refused with one exception, which is
-Django's own ``on_delete=SET_NULL``: deleting a User or a Record sets
-``user_id``/``record_id`` to NULL on the rows that name it. That UPDATE is
-allowed only when it clears one or both of those pointers and changes nothing
-else, so the row -- type, time, metadata -- survives its subject.
+Every DELETE and every UPDATE that changes anything is refused. An UPDATE that
+rewrites a row with its own values (an unchanged ``save()``) is let through,
+since it alters nothing. The comparison is the whole row, so a column added
+later is protected without editing this trigger.
+
+That leaves no room for ``on_delete=SET_NULL``, which updates audit rows when
+their User or Record is deleted. So the two foreign keys become
+``DO_NOTHING`` with no database constraint, first, in this same migration:
+deleting a subject leaves its audit rows untouched, still carrying its id.
 
 TRUNCATE is not row-level and is not caught. Django's test teardown uses it,
 and nothing in the application issues it.
@@ -19,28 +23,18 @@ change to history therefore has to be a reviewed migration that says so, which
 is the point: it can no longer happen by accident.
 """
 
-from django.db import migrations
+import django.db.models.deletion
+from django.conf import settings
+from django.db import migrations, models
 
 FORWARD = """
 CREATE FUNCTION audit_auditevent_insert_only() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        RAISE EXCEPTION 'audit_auditevent is insert-only: DELETE refused (IR-166)';
-    END IF;
-
-    -- UPDATE: only on_delete=SET_NULL detaching the row from its subject.
-    IF NEW.id = OLD.id
-       AND NEW.event_type = OLD.event_type
-       AND NEW.metadata = OLD.metadata
-       AND NEW.created_at = OLD.created_at
-       AND (NEW.user_id IS NOT DISTINCT FROM OLD.user_id OR NEW.user_id IS NULL)
-       AND (NEW.record_id IS NOT DISTINCT FROM OLD.record_id OR NEW.record_id IS NULL)
-    THEN
+    IF TG_OP = 'UPDATE' AND to_jsonb(NEW) = to_jsonb(OLD) THEN
         RETURN NEW;
     END IF;
-
-    RAISE EXCEPTION 'audit_auditevent is insert-only: UPDATE refused (IR-166)';
+    RAISE EXCEPTION 'audit_auditevent is insert-only: % refused (IR-166)', TG_OP;
 END;
 $$;
 
@@ -58,4 +52,29 @@ DROP FUNCTION IF EXISTS audit_auditevent_insert_only();
 class Migration(migrations.Migration):
     dependencies = [("audit", "0004_workflow_event_types")]
 
-    operations = [migrations.RunSQL(FORWARD, REVERSE)]
+    operations = [
+        migrations.AlterField(
+            model_name="auditevent",
+            name="user",
+            field=models.ForeignKey(
+                db_constraint=False,
+                null=True,
+                on_delete=django.db.models.deletion.DO_NOTHING,
+                related_name="audit_events",
+                to=settings.AUTH_USER_MODEL,
+            ),
+        ),
+        migrations.AlterField(
+            model_name="auditevent",
+            name="record",
+            field=models.ForeignKey(
+                blank=True,
+                db_constraint=False,
+                null=True,
+                on_delete=django.db.models.deletion.DO_NOTHING,
+                related_name="audit_events",
+                to="records.record",
+            ),
+        ),
+        migrations.RunSQL(FORWARD, REVERSE),
+    ]

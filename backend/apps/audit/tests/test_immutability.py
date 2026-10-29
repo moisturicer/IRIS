@@ -7,8 +7,9 @@ rewrite history. The guard is a PostgreSQL trigger (migration 0005), so these
 tests go through the ORM *and* raw SQL: an application-level check would pass
 the first and fail the second.
 
-The one UPDATE the trigger permits is Django's own `on_delete=SET_NULL`:
-deleting a User or a Record detaches its audit rows, changing nothing else.
+No UPDATE that changes anything is permitted, so the foreign keys are
+`DO_NOTHING` without a constraint: deleting a User or a Record leaves its
+audit rows exactly as they were, still carrying its id.
 """
 
 from django.db import DatabaseError, connection, transaction
@@ -78,19 +79,21 @@ class AuditRowsAreInsertOnlyTests(TestCase):
         self.assertEqual(fresh.metadata, {"email": "audited@cit.edu"})
         self.assertEqual(fresh.created_at, self.event.created_at)
 
-    def test_deleting_the_user_detaches_the_row_and_keeps_it(self):
-        # on_delete=SET_NULL is the one UPDATE allowed: the row survives,
-        # with only the pointer to the deleted account cleared.
+    def test_deleting_the_user_leaves_the_row_exactly_as_it_was(self):
+        # DO_NOTHING with no constraint: the row keeps the deleted account's id.
+        user_id = self.user.pk
         self.user.delete()
         fresh = AuditEvent.objects.get(pk=self.event.pk)
-        self.assertIsNone(fresh.user_id)
+        self.assertEqual(fresh.user_id, user_id)
         self.assertEqual(fresh.metadata, {"email": "audited@cit.edu"})
-        self.assertEqual(fresh.event_type, AuditEvent.LOGIN)
 
-    def test_detaching_cannot_carry_another_change(self):
-        # The SET_NULL exception is exact: clearing the user *and* touching
-        # anything else is refused.
-        self.refused(lambda: AuditEvent.objects.filter(pk=self.event.pk).update(user=None, metadata={}))
+    def test_clearing_who_acted_is_refused(self):
+        # The hole SET_NULL needed: no UPDATE may strip attribution.
+        self.refused(lambda: AuditEvent.objects.filter(pk=self.event.pk).update(user=None))
+
+    def test_an_unchanged_save_is_not_a_change(self):
+        self.event.save()
+        self.assertEqual(AuditEvent.objects.get(pk=self.event.pk).metadata, {"email": "audited@cit.edu"})
 
     def test_repointing_a_row_at_another_user_is_refused(self):
         other = make_user("other@cit.edu")
@@ -105,6 +108,17 @@ class NoRouteMutatesTheAuditLogTests(APITestCase):
 
     def test_the_list_is_readable(self):
         self.assertEqual(self.client.get(AUDIT).status_code, 200)
+
+    def test_a_row_whose_user_was_deleted_still_lists(self):
+        gone = make_user("gone@cit.edu")
+        create_audit_event(AuditEvent.LOGIN, gone, metadata={"email": "gone@cit.edu"})
+        gone_id = gone.pk
+        gone.delete()
+        response = self.client.get(AUDIT, {"page_size": 100})
+        self.assertEqual(response.status_code, 200)
+        [row] = [r for r in response.data["results"] if r["metadata"] == {"email": "gone@cit.edu"}]
+        self.assertEqual(row["user"], gone_id)
+        self.assertIsNone(row["user_name"])
 
     def test_every_write_method_is_not_allowed(self):
         for method in ("post", "put", "patch", "delete"):

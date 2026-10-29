@@ -48,5 +48,7 @@ class IdleAwareTokenRefreshSerializer(TokenRefreshSerializer):
             return super().validate(attrs)
         if not sid:
             raise InvalidToken("This sign-in predates session tracking. Sign in again.")
+        # Validated first, so a rotated or blacklisted token records no activity.
+        data = super().validate(attrs)
         sessions.touch(sid, self.context["request"])
-        return super().validate(attrs)
+        return data

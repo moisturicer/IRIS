@@ -57,11 +57,15 @@ class SessionIdle(AuthenticationFailed):
     for those (with a ``WWW-Authenticate`` header) and turns anything else
     raised during authentication into a 403.
     """
-    default_detail = "You were signed out after 30 minutes of inactivity."
+    default_detail = "You were signed out after a period of inactivity."
     default_code = "session_idle"
 
     def __init__(self):
-        super().__init__({"detail": self.default_detail, "code": self.default_code})
+        minutes = settings.SESSION_IDLE_TIMEOUT_MINUTES
+        super().__init__({
+            "detail": f"You were signed out after {minutes} minutes of inactivity.",
+            "code": self.default_code,
+        })
 
 
 def start_session(user) -> RefreshToken:

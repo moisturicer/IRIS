@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import timedelta
 
+from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
@@ -224,6 +225,9 @@ CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default=FRONTEND_URL, cast=csv_list
 )
 CORS_ALLOW_CREDENTIALS = True
+# The interface reports the user's idle time on every request (IR-166); a
+# cross-origin deployment's preflight refuses any header not listed here.
+CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds")
 
 # ---- Email --------------------------------------------------------------
 
