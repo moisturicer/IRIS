@@ -89,8 +89,8 @@ class ResubmissionRegressionTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         def user(email, role_name):
-            # Roles are seeded by migration with explicit keys, so create() would
-            # collide with the sequence (IR-126).
+            # Roles are seeded by migration; get_or_create reuses the seeded row
+            # rather than tripping the unique name.
             role = Role.objects.get_or_create(name=role_name)[0]
             return User.objects.create_user(
                 email=email, password="TestPass123!", first_name="Test",

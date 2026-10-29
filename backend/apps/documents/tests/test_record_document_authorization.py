@@ -73,9 +73,7 @@ class RecordDocumentAuthorizationTests(APITestCase):
         self.stranger = self.make_user("doc-stranger@cit.edu", "Student")
         self.rdco     = self.make_user("doc-rdco@cit.edu", "RDCO")
 
-        # Reuse a seeded RecordType rather than creating one: accounts/0003
-        # seeds reference rows with explicit ids and leaves the Postgres
-        # sequence at 1, so create() raises duplicate-pkey (IR-126).
+        # Reuse a RecordType seeded by records/0002 rather than creating one.
         self.record_type = RecordType.objects.first()
         self.assertIsNotNone(self.record_type, "no seeded RecordType -- migrations incomplete")
 
