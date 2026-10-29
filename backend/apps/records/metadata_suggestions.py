@@ -61,8 +61,9 @@ def suggestions_payload(record) -> dict:
 
     **Two known gaps, recorded rather than hidden.** A retrying extraction
     reads ``failed`` between attempts (``_run_extraction`` saves the failure
-    before Celery retries it), and the dialog stops polling on ``failed``, so
-    a retry that later succeeds offers no chips. And an image-only scan is
+    before Celery retries it), and the dialog stops polling on ``failed``
+    until Details is opened again (IR-409), so a retry that succeeds while it
+    stays open offers no chips until then. And an image-only scan is
     stored as ``failed`` (the extractor raises ``EmptyExtraction``), not as
     the ``ready``-with-nulls spec §4.5 describes -- the dialog shows its
     neutral line for it rather than nothing. Both are for the spec's owner.

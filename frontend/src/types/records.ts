@@ -221,6 +221,19 @@ export type Capability =
   | "comment_public"
   | "cite";
 
+/**
+ * `GET /records/<id>/metadata-suggestions/` (IR-406; spec §4.5). `pending`
+ * while Docling reads the manuscript, `ready` once it has, `failed` when it
+ * could not (an image-only scan included), `unsupported` when there is no
+ * manuscript extraction at all. A `ready` field with nothing found is null.
+ * There is deliberately no confidence value: Docling gives none.
+ */
+export interface MetadataSuggestions {
+  state:       "pending" | "ready" | "failed" | "unsupported";
+  suggestions: { title: string | null; abstract: string | null };
+  source:      "pdf_structure";
+}
+
 export interface RecordDetail extends RecordListItem {
   /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
   capabilities:   Capability[];

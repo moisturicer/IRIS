@@ -140,6 +140,10 @@ test("the review queue is every reviewer, and excludes Student", () => {
   only("reviewQueue", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
 });
 
+test("workflow analytics is the four offices, not the Adviser (IR-626)", () => {
+  only("reviewAnalytics", [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
+});
+
 test("My Reviews is listed only when the server says the user has review work", () => {
   const listed = (role: RoleName, access?: { my_reviews: boolean } | null) =>
     navFor(role, access).some((item) => item.key === "reviewQueue");

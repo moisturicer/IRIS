@@ -30,7 +30,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cells import (
-    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, STUB, Call, Case, Ref, Upload, row,
+    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, Ref, Upload, row,
+
 )
 
 # -- shorthands -------------------------------------------------------------
@@ -398,8 +399,9 @@ REVIEWS = {
     "reviews-mine": Entry({"GET": _case(SIGNED_IN)}),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
-    "reviews-analytics": Entry({"GET": _case(row(ANON, DENY, DENY, DENY, STUB, STUB, STUB, STUB, DENY))}),
+    "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
     "pin-generate": Entry({"POST": _case(READS_RECORD, data={"record_id": Ref("record")}, objects=("record",))}),
+
     "pin-verify": Entry({"POST": _case(SIGNED_IN, data={"record_id": Ref("record"), "pin": "invalid"})}),
     "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=ASSIGNMENT, data={})}),
     "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,
