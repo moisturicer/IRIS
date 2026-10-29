@@ -66,3 +66,75 @@ export interface MyReviewsQuery {
   office?:  string | null;
   cursor?:  string | null;
 }
+
+// --- Workflow analytics (IR-626, ADR-043) -----------------------------------
+
+/** One party's active assignments now. Overdue counts only dated, running clocks. */
+export interface AnalyticsOpenNow {
+  party: string;
+  open: number;
+  /** Assignments in the office's pool, with nobody seated. */
+  unseated: number;
+  open_seats: number;
+  /** No due date: opened before IR-619, or the party has no turnaround. */
+  undated: number;
+  /** Waiting on the owner: an open revision or document request. */
+  paused: number;
+  overdue: number;
+  overdue_seats: number;
+}
+
+/** Elapsed time in stage. `record_type` null is the office's all-types row. */
+export interface AnalyticsTimeInStage {
+  party: string;
+  record_type: string | null;
+  records: number;
+  turns: number;
+  median_hours: number | null;
+  p90_hours: number | null;
+  /** The figures withheld because the cell has too few records. */
+  too_few_for: ("median" | "p90")[];
+}
+
+export interface AnalyticsUnmeasured {
+  party: string;
+  started_before_log: number;
+  ended_not_completed: number;
+  still_open: number;
+}
+
+export interface AnalyticsThroughput {
+  party: string;
+  /** The Monday (Asia/Manila) the week starts on, YYYY-MM-DD. */
+  week_start: string;
+  entered: number;
+  left: number;
+}
+
+export interface AnalyticsRevisionCycles {
+  policy: string;
+  cycles: number;
+  cycles_preserving: number;
+  preserved_clearances: number;
+}
+
+export interface WorkflowAnalytics {
+  parties: { party: string; label: string }[];
+  /** The earliest workflow event in scope; null when there is none yet. */
+  data_since: string | null;
+  generated_at: string;
+  range: { from: string | null; to: string | null };
+  thresholds: { median: number; p90: number };
+  open_now: AnalyticsOpenNow[];
+  time_in_stage: AnalyticsTimeInStage[];
+  unmeasured: AnalyticsUnmeasured[];
+  throughput: AnalyticsThroughput[];
+  revision_cycles: AnalyticsRevisionCycles[];
+  preserved_by_office: { party: string; policy: string; preserved_clearances: number }[];
+}
+
+export interface WorkflowAnalyticsQuery {
+  office: string;
+  from: string;
+  to: string;
+}

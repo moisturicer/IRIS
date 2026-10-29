@@ -137,6 +137,11 @@ def sync_document_pause(assignment, *, now):
     assignment.save(update_fields=["document_pause_started_at"])
 
 
+def is_overdue(due_at, *, paused, now):
+    """An active assignment is overdue past a due date, while its clock runs."""
+    return bool(due_at and not paused and now > due_at)
+
+
 def deadline_payload(assignment, user=None, *, readable=True):
     """One projection for tracker, seats, pools and capabilities; prose is private."""
     if assignment is None:
@@ -147,8 +152,8 @@ def deadline_payload(assignment, user=None, *, readable=True):
     return {
         "due_at": due.isoformat() if due else None,
         "original_due_at": assignment.original_due_at.isoformat() if assignment.original_due_at else None,
-        "is_overdue": bool(due and assignment.state == AssignmentState.ACTIVE
-                           and not paused and timezone.now() > due),
+        "is_overdue": assignment.state == AssignmentState.ACTIVE
+                      and is_overdue(due, paused=paused, now=timezone.now()),
         "clock_paused": paused,
         "can_extend": can_extend(assignment, user),
         "extensions": [{"id": e.pk, "previous_due_at": e.previous_due_at.isoformat(),

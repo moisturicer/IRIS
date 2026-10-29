@@ -9,6 +9,8 @@ import { Badge, Button, Skeleton } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/features/document-requests/errorDetail";
+import { canAccess, pathFor } from "@/lib/access";
+import type { RoleName } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import type { MyReviewsPage as Page, MyReviewsRow, MyReviewsTab } from "@/types/reviews";
@@ -152,6 +154,12 @@ export default function MyReviewsPage() {
       <PageHeader
         title="My Reviews"
         description="What you need to review, what you have opened, and what you have finished."
+        actions={canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
+          <Link to={pathFor("reviewAnalytics")}
+                className={cn("text-sm font-medium text-brand hover:underline", FOCUS_RING)}>
+            Workflow analytics
+          </Link>
+        )}
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

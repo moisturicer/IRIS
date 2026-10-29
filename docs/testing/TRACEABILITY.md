@@ -36,9 +36,15 @@
 
 **Status:** implemented and focused tests verified; CI rerun and independent human approval remain outstanding. Deterministic provider tests establish call counts, not production vendor performance.
 
+## IR-626 workflow analytics: time in stage, open and overdue, throughput (ADR-043, ADR-011)
+
+`GET /api/v1/reviews/analytics/` replaces the 501 stub, and `/review/analytics` (linked from My Reviews for the four offices) shows it. Figures replay IR-144's workflow `AuditEvent`s with AUDIT_EXPORT.md's clock rule (`apps/reviews/analytics.py`); definitions, thresholds and the relation to ADR-011 are in `docs/evaluation/WORKFLOW_ANALYTICS.md`. The access matrix row moves from `STUB` to `OFFICE_ONLY`. This is not FR-M7-01's deferred KPI dashboard, which stays deferred.
+
+**Tests:** `apps/reviews/test_analytics.py` — exact figures from fixture event logs (median, nearest-rank p90, record-type cells, revisions and reassignment not restarting a clock, restart-all's second clock, unmeasured turns never zero, Manila week boundaries, the date range, revision cycles per scope, open and overdue now) and, against PostgreSQL, the endpoint's office scope, RDCO's narrowing, the 403 for another office, malformed filters, no reviewer identifiers in the payload, and the empty-log state. `apps/reviews/test_analytics_access.py` now expects 200 for the offices. `frontend/src/features/review/ReviewAnalyticsPage.test.tsx` (data start date, too-few cells, elapsed-not-effort, office filter for RDCO only, load failure, axe); `lib/access.test.ts`.
+
 ## IR-636 analytics retains its office-only gate (NFR-S4)
 
-The manually bound `reviews-analytics` URL now passes its declared `IsAuthenticated`/`IsStaff` permission classes into `as_view`, rather than falling back to `IsReviewer`. `apps/reviews/test_analytics_access.py` asserts Adviser, Student and role-less superuser 403, anonymous 401 and all four office roles reaching the declared 501 stub. The IR-616 defect marker is removed without relaxing access. This does not implement analytics. Database execution is pending CI because local Docker's engine is unavailable; no pass is claimed.
+The manually bound `reviews-analytics` URL now passes its declared `IsAuthenticated`/`IsStaff` permission classes into `as_view`, rather than falling back to `IsReviewer`. `apps/reviews/test_analytics_access.py` asserts Adviser, Student and role-less superuser 403, anonymous 401 and all four office roles reaching the declared 501 stub (**superseded by IR-626**, above: the offices now get 200 and the matrix row is `OFFICE_ONLY`). The IR-616 defect marker is removed without relaxing access. This does not implement analytics. Database execution is pending CI because local Docker's engine is unavailable; no pass is claimed.
 
 ## IR-616 authorization coverage across every app (NFR-S4)
 

@@ -52,6 +52,9 @@ const REVIEWERS: RoleName[] = [
  */
 const COORDINATOR: RoleName[] = [ROLES.RDCO];
 
+/** The four offices (`IsStaff` on the server). Not the Adviser, who has no office. */
+const OFFICES: RoleName[] = [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO];
+
 /**
  * The sidebar's groups (IR-413, spec §4.1). "Main" is one short, unlabelled
  * list every role shares; "Administration" is RDCO's labelled group. The five
@@ -125,6 +128,10 @@ export const SCREEN_ACCESS = {
   reviewQueue: { path: "/review",  roles: REVIEWERS,
                  nav: { label: "My Reviews", icon: "fa-list-check", section: "Main",
                         needsReviewAccess: true } },
+
+  // Workflow analytics (IR-626): an office's own figures, every office's for
+  // RDCO. Reached from My Reviews, not the sidebar.
+  reviewAnalytics: { path: "/review/analytics", roles: OFFICES },
 
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.

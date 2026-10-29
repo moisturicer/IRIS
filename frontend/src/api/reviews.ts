@@ -1,6 +1,11 @@
 import { apiClient } from "./client";
 import type { AddReviewerOptions, ReviewerSeat } from "@/types/records";
-import type { MyReviewsPage, MyReviewsQuery } from "@/types/reviews";
+import type {
+  MyReviewsPage,
+  MyReviewsQuery,
+  WorkflowAnalytics,
+  WorkflowAnalyticsQuery,
+} from "@/types/reviews";
 
 /**
  * Reviewer seats (ADR-032 §4, IR-415). The server re-checks every act: a
@@ -47,6 +52,18 @@ export const reviewsApi = {
         ...(outcome ? { outcome } : {}),
         ...(office ? { office } : {}),
         ...(cursor ? { cursor } : {}),
+      },
+    }),
+  /**
+   * Workflow analytics (IR-626): an office's own figures, every party's for
+   * RDCO. Empty filters are left off, so the server applies none.
+   */
+  analytics: ({ office, from, to }: WorkflowAnalyticsQuery) =>
+    apiClient.get<WorkflowAnalytics>("/reviews/analytics/", {
+      params: {
+        ...(office ? { office } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
       },
     }),
   /** Request a one-time PIN emailed to the current user's account email. */
