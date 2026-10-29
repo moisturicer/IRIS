@@ -88,6 +88,7 @@ def record_turn(
     guard=None,
     context=None,
     expected_revision=None,
+    submission_id=None,
 ) -> Turn:
     """Append one Turn to ``conversation`` and return it.
 
@@ -142,6 +143,18 @@ def record_turn(
             turn = _write_turn(
                 conversation, question, answer, resolved_question, widened, routing, listing, research, comparison
             )
+            if submission_id is not None:
+                from apps.ai.models import ChatSubmission
+
+                references = {}
+                for source in answer.sources:
+                    references[source.record_id] = max(
+                        float(source.score), references.get(source.record_id, float("-inf")),
+                    )
+                ChatSubmission.objects.filter(pk=submission_id).update(
+                    turn=turn, finished=True,
+                    source_refs=[{"id": pk, "score": score} for pk, score in references.items()],
+                )
             if written is not None:
                 written(turn)
             from apps.ai.conversation_state import commit

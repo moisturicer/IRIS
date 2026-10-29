@@ -24,6 +24,8 @@ interface SemanticSearchResponse {
 }
 
 interface AskOptions {
+  /** Reuse on transport retry; a new question gets a new identity. */
+  requestId?: string;
   comparisonRecordIds?: number[];
   topK?: number;
   /** Appends the question and its answer to this Conversation as a Turn (IR-295). */
@@ -118,10 +120,10 @@ async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEv
  * here, once, rather than read as `undefined` by each caller (IR-548).
  */
 async function createConversation(
-  body: { record?: number; title?: string } = {},
+  body: { record?: number; title?: string; reuse_default?: boolean } = {},
 ): Promise<{ data: ConversationDetail }> {
-  const { data } = await apiClient.post<ConversationSummary>("/ai/conversations/", body);
-  return { data: { ...data, turns: [], latest_run: null } };
+  const { data } = await apiClient.post<ConversationDetail>("/ai/conversations/", body, PUBLIC_CONFIG);
+  return { data: { ...data, turns: data.turns ?? [], latest_run: data.latest_run ?? null } };
 }
 
 export const aiApi = {
@@ -142,11 +144,12 @@ export const aiApi = {
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
   /** Grounded answer plus the records it cites. */
-  ask: (question: string, { topK = 5, conversationId, widen, comparisonRecordIds }: AskOptions = {}) => {
+  ask: (question: string, { topK = 5, conversationId, widen, comparisonRecordIds, requestId = crypto.randomUUID() }: AskOptions = {}) => {
     const send = () => apiClient.post<AIAnswer>("/ai/ask/", {
       question,
       top_k: topK,
       conversation_id: conversationId,
+      ...(conversationId ? { request_id: requestId } : {}),
       widen,
       ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}),
     }, PUBLIC_CONFIG);
@@ -156,11 +159,11 @@ export const aiApi = {
   /** The same question, narrated as SSE (IR-326, IR-329) -- see `streamAsk`. */
   askStream: (
     question: string,
-    { topK = 5, conversationId, widen, comparisonRecordIds }: AskOptions = {},
+    { topK = 5, conversationId, widen, comparisonRecordIds, requestId = crypto.randomUUID() }: AskOptions = {},
     signal?: AbortSignal,
   ) =>
     streamAsk(
-      { question, top_k: topK, conversation_id: conversationId, widen, ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}) },
+      { question, top_k: topK, conversation_id: conversationId, widen, ...(conversationId ? { request_id: requestId } : {}), ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}) },
       signal,
     ),
 
@@ -204,7 +207,7 @@ export const aiApi = {
     findForRecord: async (recordId: number): Promise<ConversationDetail | null> => {
       const { data: existing } = await apiClient.get<ConversationSummary[]>(
         "/ai/conversations/",
-        { params: { record: recordId } },
+        { params: { record: recordId, default: true } },
       );
       if (!existing[0]) return null;
       const { data } = await apiClient.get<ConversationDetail>(
