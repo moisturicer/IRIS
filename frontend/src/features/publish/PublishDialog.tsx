@@ -7,7 +7,9 @@
  *   1. **Your manuscript** — the type, and the PDF. Choosing the file creates
  *      the draft at once, titled from the file name, so nothing typed later
  *      can be lost, and the server starts reading the PDF straight away.
- *   2. **Details** — `MetadataForm`, patched onto the draft on Continue.
+ *   2. **Details** — `MetadataForm`, patched onto the draft on Continue. The
+ *      manuscript's own title and abstract are offered as chips while it is
+ *      shown (IR-409, `usePrefill`); they never block it.
  *   3. **Review & submit** — every value, consent, Submit.
  *
  * **Opened by the URL**: `/?publish=new` starts one, `/?publish=<draftId>`
@@ -56,6 +58,8 @@ import {
   type PublishStep,
 } from "./draft";
 import { ManuscriptStep, type ManuscriptUpload } from "./ManuscriptStep";
+import { PrefillChip } from "./PrefillChip";
+import { usePrefill, type Suggestions } from "./prefill";
 import { PublishSuccess, successHeadline } from "./PublishSuccess";
 import { ReviewStep } from "./ReviewStep";
 
@@ -141,6 +145,11 @@ interface Lists {
   psceds:          PSCEDClassification[];
 }
 
+const PREFILL_FIELDS = ["title", "abstract"] as const;
+type PrefillField = (typeof PREFILL_FIELDS)[number];
+
+const NEUTRAL_PREFILL = "We couldn't read details from this file — fill them in below.";
+
 const NO_LISTS: Lists = { recordTypes: [], advisers: [], classifications: [], psceds: [] };
 
 interface PublishFlowProps {
@@ -185,6 +194,13 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [upload, setUpload] = useState<ManuscriptUpload>({ status: "idle" });
   const fileRef = useRef<File | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Which uploaded file the prefill is about; a replacement bumps it, which
+  // forgets the old file's suggestions and anything the author dismissed.
+  const [uploadGeneration, setUploadGeneration] = useState(0);
+  const [dismissed, setDismissed] = useState<ReadonlySet<PrefillField>>(new Set());
+  // The title the dialog itself wrote from the file name. Replacing it is not
+  // replacing the author's words, so its chip offers a plain Use.
+  const provisionalTitleRef = useRef<string | null>(null);
 
   const [moreOpen, setMoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -318,7 +334,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         setDraftId(id);
         savedTypeId.current = typeId;
         onDraftCreated(id);
-        if (!form.getValues("title")) form.setValue("title", title);
+        if (!form.getValues("title")) {
+          form.setValue("title", title);
+          provisionalTitleRef.current = title;
+        }
       }
       await recordsApi.uploadManuscript(id, file, {
         signal: controller.signal,
@@ -326,6 +345,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           setUpload((u) => (u.status === "uploading" ? { ...u, progress } : u)),
       });
       setUpload({ status: "done", fileName: file.name, size: file.size });
+      setUploadGeneration((n) => n + 1);
+      setDismissed(new Set());
     } catch (err) {
       if (controller.signal.aborted) return;
       const failure = describeFailure(err, "The upload failed.");
@@ -390,6 +411,23 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   const continueFromDetails = form.handleSubmit(saveDetails, (errors) => focusFirstInvalid(errors, () => setMoreOpen(true)));
 
+  const prefill = usePrefill({
+    recordId: draftId,
+    active: phase.kind === "form" && step === 2 && upload.status === "done",
+    generation: uploadGeneration,
+  });
+
+  /** Fill a field from its suggestion, and put the author in it. */
+  function acceptSuggestion(field: PrefillField, text: string) {
+    form.setValue(field, text, { shouldDirty: true, shouldValidate: true });
+    form.setFocus(field);
+  }
+
+  function dismissSuggestion(field: PrefillField) {
+    setDismissed((prev) => new Set(prev).add(field));
+    form.setFocus(field);
+  }
+
   /* ── Step 3: submit, then re-read who holds it ───────────────────────── */
   async function submit() {
     const id = draftIdRef.current;
@@ -437,6 +475,21 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   /* ── What the steps show ─────────────────────────────────────────────── */
   const values = form.watch();
+  const prefillNotes = prefillFieldNotes(prefill.status, prefill.suggestions, (field) => {
+    const text = prefill.suggestions[field];
+    const current = values[field] ?? "";
+    if (text == null || dismissed.has(field) || current === text) return null;
+    const replaces = current.trim() !== "" && !(field === "title" && current === provisionalTitleRef.current);
+    return (
+      <PrefillChip
+        field={field}
+        suggestion={text}
+        replaces={replaces}
+        onUse={() => acceptSuggestion(field, text)}
+        onDismiss={() => dismissSuggestion(field)}
+      />
+    );
+  });
   const adviser = lists.advisers.find((a) => a.id === values.adviser);
   const adviserName = adviser ? personName(adviser) : null;
   const typeName = lists.recordTypes.find((t) => t.id === typeId)?.name ?? "";
@@ -636,6 +689,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
           {step === 2 && (
             <FormProvider {...form}>
+              {(prefill.status === "failed" || prefill.status === "unsupported") && (
+                <p className="mb-section-sm text-small text-stone-600">{NEUTRAL_PREFILL}</p>
+              )}
               <form
                 noValidate
                 onSubmit={(e) => {
@@ -651,6 +707,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
                   loadError={listsFailed.advisers || listsFailed.classification || listsFailed.psced}
                   moreOpen={moreOpen}
                   onMoreOpenChange={setMoreOpen}
+                  fieldNotes={prefillNotes}
                 />
               </form>
             </FormProvider>
@@ -678,6 +735,28 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       )}
     </Modal>
   );
+}
+
+/**
+ * What sits under the title and abstract: "Reading your PDF…" while Docling
+ * runs (the fields stay editable), then each field's chip, if it has one.
+ */
+function prefillFieldNotes(
+  status: string,
+  suggestions: Suggestions,
+  chipFor: (field: PrefillField) => ReactNode,
+): Partial<Record<PrefillField, ReactNode>> {
+  if (status === "pending") {
+    const reading = (
+      <p className="mt-1 flex items-center gap-1.5 text-small text-stone-600">
+        <i className="fas fa-spinner fa-spin text-label" aria-hidden />
+        Reading your PDF…
+      </p>
+    );
+    return { title: reading, abstract: reading };
+  }
+  if (status !== "ready") return {};
+  return Object.fromEntries(PREFILL_FIELDS.filter((f) => suggestions[f] != null).map((f) => [f, chipFor(f)]));
 }
 
 /** Where the author is: done steps say so in words, the current one is marked. */
