@@ -19,7 +19,7 @@ class ReviewViewSet(viewsets.GenericViewSet):
     """
     POST /reviews/submit/     -- retired fixed-stage action (410)
     POST /reviews/resubmit/   -- retired fixed-stage resubmission (410)
-    GET  /reviews/analytics/  -- per-stage average processing time (TODO stub, 501)
+    GET  /reviews/analytics/  -- workflow analytics, scoped by office (IR-626)
     """
     permission_classes = [IsAuthenticated, IsReviewer]
 
@@ -38,16 +38,21 @@ class ReviewViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsStaff])
     def analytics(self, request):
         """
-        GET /reviews/analytics/
+        GET /reviews/analytics/?office=&from=&to=  -- workflow analytics (IR-626)
 
-        TODO (M07 — FR-M7-01): implement per-stage average processing time.
-        For each Review.stage, compute the average elapsed days between consecutive
-        Review.created_at timestamps on the same record (ordered by created_at).
-        Exclude records still in a stage (no subsequent review entry yet).
-        Return: { stage_averages: [{ stage, avg_days, record_count }] }
-        Permission: IsAuthenticated + IsStaff
+        Computed from the workflow audit log (`apps/reviews/analytics.py`). An
+        office reads its own figures and RDCO every party's; naming another
+        office is refused with 403.
         """
-        return Response({"detail": "Analytics not yet implemented."}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        from . import analytics
+
+        try:
+            payload = analytics.workflow_analytics(request.user, request.query_params)
+        except analytics.AnalyticsRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except analytics.AnalyticsError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload)
 
     @action(detail=False, methods=["post"])
     def submit(self, request):
@@ -65,7 +70,7 @@ class ReviewViewSet(viewsets.GenericViewSet):
 
 class MyReviewsView(APIView):
     """
-    GET /reviews/mine/?tab=&outcome=&office=&cursor=  -- My Reviews (IR-268)
+    GET /reviews/mine/?tab=&outcome=&office=&cursor=&sort=&overdue=  -- My Reviews (IR-268, IR-622)
 
     A reviewer's own seats plus their office's pool, one tab at a time, with
     every tab's count (ADR-032 §9 and its 2026-10-08 Amendment). `office` is a
@@ -87,11 +92,34 @@ class MyReviewsView(APIView):
                 outcome=params.get("outcome"),
                 office=params.get("office"),
                 cursor=params.get("cursor"),
+                sort=params.get("sort"),
+                overdue=params.get("overdue"),
             )
         except my_reviews.MyReviewsRefused as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except my_reviews.MyReviewsError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload)
+
+
+class OfficeConsoleView(APIView):
+    """
+    GET /reviews/office/?office=  -- the coordinator console (IR-623)
+
+    One office's open seats, unclaimed pool and per-member load. `office`
+    defaults to the office the caller coordinates; anyone who does not
+    coordinate the office asked for is refused with 403.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .office_console import ConsoleRefused, office_console
+
+        try:
+            payload = office_console(request.user, office=request.query_params.get("office"))
+        except ConsoleRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         return Response(payload)
 
 
@@ -118,7 +146,7 @@ class RecordAuthPinViewSet(viewsets.GenericViewSet):
             return Response({"detail": "record_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            record = Record.objects.get(pk=record_id)
+            record = Record.objects.visible_to(request.user).get(pk=record_id)
         except Record.DoesNotExist:
             return Response({"detail": "Record not found."}, status=status.HTTP_404_NOT_FOUND)
 

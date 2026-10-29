@@ -151,11 +151,13 @@ describe("the AI overview on a paper", () => {
     expect((await screen.findByRole("link", { name: /at page 12/i })).textContent).toBe("p12");
   });
 
-  it("offers the cited passage as a link into the paper at that page", async () => {
+  // Changed deliberately by IR-578: an Overview citation is a page, and its
+  // link says so, so the paper lands it as page context even after a reload.
+  it("offers the cited page as a link into the paper, labelled as page context", async () => {
     renderScreen(<PaperAiOverview record={record} />);
 
-    const chip = await screen.findByRole("link", { name: /at page 12/i });
-    expect(chip.getAttribute("href")).toBe("/records/7?page=12");
+    const chip = await screen.findByRole("link", { name: /at page 12, page context/i });
+    expect(chip.getAttribute("href")).toBe("/records/7?page=12&context=page");
   });
 
   it("says when the summary came from the degraded path", async () => {

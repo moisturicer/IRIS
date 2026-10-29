@@ -16,8 +16,9 @@ reconstructed. So:
   savepoint and logs a failure instead of raising.
 - **No review prose.** Decision and finding comments are never copied
   (IR-479). The only free text is what the event needs to mean anything: a
-  revision request's `reason`, a document request's `message`, and a rejected
-  document's `reason`.
+  revision request's `reason`, a document request's `message`, a rejected
+  document's `reason`, an extension's `reason` (IR-619), and a
+  reassignment's `reason` (IR-623).
 - **Kept apart (ADR-022).** A document request writes only `DOCUMENT_REQUEST*`
   events and a revision only revision events, so "you forgot a form" stays
   distinguishable from "revise the work".
@@ -102,6 +103,18 @@ def assignment_extended(extension):
                   "previous_due_at": extension.previous_due_at.isoformat(),
                   "due_at": extension.due_at.isoformat(),
                   "reason": extension.reason, "system": extension.system},
+    )
+
+
+def assignment_escalated(assignment, *, step, overdue, recipients):
+    """An escalation and its mandatory history commit with the sent-moment ledger."""
+    return AuditEvent.objects.create(
+        event_type=AuditEvent.ASSIGNMENT_ESCALATED, user=None,
+        record_id=assignment.record_id,
+        metadata={"assignment": assignment.pk, "party": assignment.party,
+                  "due_at": assignment.due_at.isoformat(), "step": step,
+                  "overdue_working_days": overdue,
+                  "recipients": [user.pk for user in recipients]},
     )
 
 
@@ -194,7 +207,8 @@ def seat_moved(event_type, seat, actor, *, previous=None):
     """
     metadata = _seat_metadata(seat)
     if previous is not None:
-        metadata.update(previous_seat=previous.pk, previous_reviewer=previous.reviewer_id)
+        metadata.update(previous_seat=previous.pk, previous_reviewer=previous.reviewer_id,
+                        reason=seat.reason)
     _write(event_type, actor, seat.assignment.record, **metadata)
 
 

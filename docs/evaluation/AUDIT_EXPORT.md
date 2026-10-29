@@ -5,8 +5,7 @@ metrics are computed from `GET /api/v1/audit/` rows alone.
 **Owns.** The workflow event types and their metadata keys.
 **Does not own.** The metrics' definitions ([ADR-011](../adr/011-evaluation-framework.md)),
 the resubmission arms ([ADR-003](../adr/003-clearance-aware-resubmission.md),
-[ADR-004](../adr/004-restart-all-comparison-mode.md)), and the CSV column mapping (IR-529
-adds it here).
+[ADR-004](../adr/004-restart-all-comparison-mode.md)). The CSV column mapping is below.
 **Update when.** An event type or metadata key changes. The keys are fixed in
 `backend/apps/audit/workflow.py`; change that file and this one in the same PR.
 
@@ -57,6 +56,14 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 | Type | Written when | `metadata` |
 |---|---|---|
 | `ASSIGNMENT_EXTENDED` | A coordinator extends an assignment, or a completed document-request pause moves its deadline | `assignment`, `party`, `extension`, `previous_due_at`, `due_at` (ISO-8601 timestamps), `reason`, `system` (true for a pause) |
+| `ASSIGNMENT_ESCALATED` | The hourly job records the latest overdue escalation moment (IR-621) | `assignment`, `party`, `due_at` (ISO-8601), `step` (0 initially, incremented every five working days), `overdue_working_days`, `recipients` (visible coordinator user ids) |
+
+Escalations have no actor. Their audit row is mandatory and commits with the
+sent-moment ledger; an audit failure rolls back the moment so the next tick
+can retry. Recipients are the visibility-checked intended recipients;
+notification delivery remains best effort and failures are logged. An empty
+recipient list records a moment with no eligible coordinator. Escalation
+changes no workflow state, clearance or Seat.
 
 The actor is null on a system Extension. Its reason is deliberately recorded
 as the explanation for a changed deadline. Unlike IR-144's best-effort events,
@@ -104,7 +111,7 @@ Every seat event carries `party`, `assignment`, `seat`, `reviewer` (user id) and
 | `SEAT_ASSIGNED` | A coordinator seats a member | |
 | `SEAT_NOMINATED` | The router named the member when routing | |
 | `REVIEWER_ADDED` | A seat holder adds a colleague from their own office | |
-| `SEAT_REASSIGNED` | A coordinator moves a seat to another member; `seat` is the new one | `previous_seat`, `previous_reviewer` |
+| `SEAT_REASSIGNED` | A coordinator moves a seat to another member; `seat` is the new one | `previous_seat`, `previous_reviewer`, `reason` (required since IR-623; absent on earlier rows) |
 | `SEAT_WITHDRAWN` | A coordinator takes a seat away | |
 | `SEAT_OPENED` | The holder opens their review for the **first** time; a second open writes nothing | |
 
@@ -135,6 +142,55 @@ Every document-request event carries `party` (the **requesting** party), `reques
 | `DOCUMENT_REQUEST_WITHDRAWN` | The request closes unanswered | all | `closed_by` (`requesting_party`, `decision` or `record_withdrawn`), `closed_by_decision` (true when a Decision closed it) |
 
 ## Computing the metrics
+
+### CSV export (IR-529)
+
+The Audit Log's **Export CSV** downloads `GET /api/v1/audit/export/`. It is RDCO-only,
+read-only, and applies the same validated `event_type`, `record`, `user`, `from` and
+`to` filters as the list. Dates are inclusive in Django's configured timezone.
+Apply the screen's Filter button first: export uses the applied filters. It exports
+**all matching rows**, ignoring pagination, in insertion (`id`) order. The list is
+newest first, breaking timestamp ties by `id`. An empty export contains its header.
+
+Columns are fixed, in this exact order; missing scalar values are empty cells:
+
+| Column | Source |
+|---|---|
+| `created_at` | Row timestamp, ISO 8601 with offset |
+| `event_type` | Row type |
+| `actor_id` | Row `user_id`, retained even if the account was deleted |
+| `actor_role` | Existing account's **current** role name; blank for missing/no account or no role. Historical roles were not captured and are not inferred |
+| `record_id` | Row `record_id`, retained even if the Record was deleted |
+| `party` | `metadata.party` |
+| `from_party` | `metadata.from_party` |
+| `to_party` | `metadata.to_party` |
+| `outcome` | `metadata.outcome` |
+| `version` | `metadata.version` (version number) |
+| `policy` | `metadata.policy` |
+| `preserved_parties` | `metadata.preserved_parties`, JSON array when present |
+| `reset_parties` | `metadata.reset_parties`, JSON array when present |
+| `request_id` | `metadata.request` (singular); resubmission's plural `requests` stays in `metadata_json` |
+| `item_ids` | JSON array of each `metadata.items[].id`; `[]` if absent |
+| `reason` | `metadata.reason` |
+| `metadata_json` | Complete metadata as JSON, including `opened`, `final`, `how`, `rereview_parties`, item labels and other keys not given a dedicated column |
+
+CSV quoting preserves commas, double quotes, Unicode and embedded newlines. Text
+cells whose first non-whitespace character is `=`, `+`, `-` or `@` receive a leading
+apostrophe to prevent spreadsheet formula execution. `metadata_json` retains the
+original text without that display escape. Neither export nor display edits a row.
+
+The fixed columns deliberately omit `id`: keep CSV row order to replay history
+when timestamps tie. For metric recipes below, use `json.loads(row["metadata_json"])`
+as metadata, `actor_id` as the user, and iterate CSV rows in their existing order.
+`AuditCsvTests.test_exports_every_matching_row_and_workflow_metrics_without_pagination`
+demonstrates total turnaround of 7,200 seconds and one preserved clearance from CSV
+alone, including the final-decision flag in `metadata_json`. The existing workflow
+tests exercise per-party clocks across resubmissions using the same metadata.
+
+Exports are not completeness certificates: pre-deployment or failed inserts cannot
+be reconstructed. Keep unmatched start/stop events as incomplete observations;
+never impute a zero duration or invent an event. Check the backend error log before
+trusting metrics, and widen the date filter if a clock begins outside the export.
 
 Fetch every row for the record (`?record=<id>`, all pages) and sort by `id`.
 `apps/audit/tests/test_workflow_events.py::MetricsFromTheExportTests` does exactly this

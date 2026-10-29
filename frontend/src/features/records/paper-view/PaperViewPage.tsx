@@ -10,7 +10,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useUIStore } from "@/store/ui.store";
 import { cn, formatDate } from "@/lib/utils";
-import { citedPage, followedFromPaperChat, type CitationNavigationState } from "@/lib/citedPage";
+import {
+  answerReference,
+  citedPage,
+  followedFromPaperChat,
+  hasCitationQuote,
+  landedAsPageContext,
+  trustedCitation,
+  type AnswerReturn,
+} from "@/lib/citedPage";
+import { conversationPath } from "@/lib/askHandoff";
 import type { RecordDetail, IpType } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region, SemanticSearchResult } from "@/types/ai";
@@ -56,6 +65,7 @@ import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type Readin
 import { ReadingHeader } from "./ReadingHeader";
 import { SubmissionStatus } from "./SubmissionStatus";
 import { useFragmentFocus } from "./useFragmentFocus";
+import { useCitationReference, type CitationResolution } from "./useCitationReference";
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -333,7 +343,41 @@ export default function PaperViewPage() {
   // the page that supports the claim rather than the paper's first. The
   // rules for reading that number live in `lib/citedPage`, testable without
   // standing up this screen.
-  const openAtPage = citedPage(searchParams.get("page"));
+  //
+  // The answer it was followed from rides in the address as ids (IR-578).
+  // A citation this page load carried is used as it is; any other -- after a
+  // reload, from a restored tab -- is re-resolved through the reader's own
+  // Conversation, and the page it reads now wins over the address's.
+  const reference = answerReference(searchParams);
+  const carried = trustedCitation(location.state, reference);
+  const resolution = useCitationReference(carried ? null : reference, id ? Number(id) : null);
+  const resolvedPage =
+    resolution.status === "passage" ? resolution.citation.page
+      : resolution.status === "changed" ? resolution.page
+        : null;
+  const openAtPage = resolvedPage ?? citedPage(searchParams.get("page"));
+  // The reader lands once per navigation, so it waits for the re-read: a
+  // landing on the address's page would not move again to the page it reads now.
+  const landingPage = resolution.status === "loading" ? null : openAtPage;
+  // Back to answer (IR-578): Ask IRIS's lives at its address; Paper Chat's is
+  // this page's panel, opened on that conversation.
+  const [chatReturn, setChatReturn] = useState<AnswerReturn | null>(null);
+  const backToAnswer =
+    reference && resolution.status !== "gone" && resolution.status !== "loading"
+      ? () => {
+          if (reference.from === "ask") {
+            navigate(`${conversationPath(reference.conversationId)}?turn=${reference.turnId}`);
+            return;
+          }
+          chat.setOpen(true);
+          chat.setMinimized(false);
+          setChatReturn((last) => ({
+            conversationId: reference.conversationId,
+            turnId: reference.turnId,
+            key: (last?.key ?? 0) + 1,
+          }));
+        }
+      : undefined;
 
   // What counts as arriving. A change of section or of the Edit details
   // dialog rewrites the URL, which gives the location a new key, but nobody
@@ -609,7 +653,9 @@ export default function PaperViewPage() {
   // bookmark -- carries no state, and the reader still opens at `openAtPage`
   // with nothing to highlight, which is the same graceful case a passage
   // with no recovered regions already is.
-  const navCitation = (location.state as CitationNavigationState | null)?.citation;
+  const navCitation = carried ?? (resolution.status === "passage" ? resolution.citation : null);
+  // The Overview cites a page as a whole: only that page is marked (IR-578).
+  const pageContext = landedAsPageContext(searchParams, location.state);
   // One Ask IRIS everywhere (IR-569): a column or drawer in the Paper
   // workspace, a column beside the page on the other sections. The Review section has none
   // (spec §4.6): the panel stays mounted there, only hidden.
@@ -645,9 +691,14 @@ export default function PaperViewPage() {
   // A citation's regions and page are the current paper's (ADR-031), so an
   // earlier version opens at its start with nothing highlighted.
   const highlightRegions: Region[] =
-    !viewedVersion && navCitation && navCitation.record_id === record.id && "regions" in navCitation
-      ? navCitation.regions
+    !viewedVersion && navCitation && navCitation.record_id === record.id && hasCitationQuote(navCitation)
+      ? pageContext
+        ? navCitation.regions.filter((region) => region.page === navCitation.page)
+        : navCitation.regions
       : [];
+  const landingNotice = viewedVersion
+    ? null
+    : citationLandingNotice(resolution, pageContext, openAtPage, highlightRegions.length > 0);
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = () => (
@@ -681,11 +732,16 @@ export default function PaperViewPage() {
       )}
       </div>
       )}
+      {landingNotice && (
+        <p role="status" className={cn("text-small text-stone-600", onPaperTab ? "px-4 pt-3" : "mb-3")}>
+          {landingNotice}
+        </p>
+      )}
       <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
         <PaperPdfReader
           recordId={record.id}
           version={viewedVersion?.number ?? null}
-          scrollToPage={viewedVersion ? null : openAtPage}
+          scrollToPage={viewedVersion ? null : landingPage}
           highlightRegions={highlightRegions}
           navKey={arrivalKey.current}
           contained={onPaperTab || tier === "wide"}
@@ -784,6 +840,7 @@ export default function PaperViewPage() {
         tabId={tabId}
         panelId={arriving ? undefined : `${tabsId}-panel`}
         onBack={() => navigate(-1)}
+        onBackToAnswer={backToAnswer}
         title={!onPaperTab ? undefined : arriving ? null : record.title}
         version={onPaperTab ? paperVersion : undefined}
       />
@@ -1272,6 +1329,7 @@ export default function PaperViewPage() {
           minimized={chatMinimized}
           onRestore={() => chat.setMinimized(false)}
           viewingVersion={viewedVersion?.number ?? null}
+          returnTo={chatReturn}
           className={chatPanelClass}
         />
       )}
@@ -1283,4 +1341,36 @@ export default function PaperViewPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * What a reader is told about where a citation landed, when it is not
+ * simply the passage, highlighted (IR-578). Every case says what is and is
+ * not marked, so nothing reads as a guess.
+ */
+function citationLandingNotice(
+  resolution: CitationResolution,
+  pageContext: boolean,
+  page: number | null,
+  marked: boolean,
+): string | null {
+  switch (resolution.status) {
+    case "changed":
+      // The stored page is from when the answer was written; the paper may
+      // have changed since, so it is offered as that, not as the passage.
+      return page != null
+        ? `The passage this answer quoted has changed since, so nothing is highlighted. Page ${page} is where it was when the answer was written.`
+        : "The passage this answer quoted has changed since, so nothing is highlighted.";
+    case "missing":
+      return "That citation is no longer part of the answer, so nothing is highlighted.";
+    case "elsewhere":
+      return "That citation points at another paper, so nothing is highlighted here.";
+    case "gone":
+      return "The answer this citation came from is no longer available, so nothing is highlighted.";
+    default:
+      if (!pageContext || page == null) return null;
+      return marked
+        ? `Page context: the Overview drew on page ${page} as a whole, so only page ${page} is marked.`
+        : `Page context: the Overview drew on page ${page} as a whole.`;
+  }
 }

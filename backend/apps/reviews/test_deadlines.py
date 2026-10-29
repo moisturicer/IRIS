@@ -102,7 +102,7 @@ class AssignmentDeadlineTests(SeatTestBase):
         config.working_days = 10
         config.save()
         response = self.post(f"/api/v1/seats/{seat.pk}/reassign/", self.itso_coordinator,
-                             {"reviewer": self.itso2.pk})
+                             {"reviewer": self.itso2.pk, "reason": "Workload"})
         self.assertEqual(response.status_code, 201, response.data)
         assignment.refresh_from_db()
         self.assertEqual(assignment.due_at, before)

@@ -27,6 +27,7 @@ vi.mock("@/api/records", () => ({
     uploadManuscript: vi.fn(),
     submit: vi.fn(),
     detail: vi.fn(),
+    metadataSuggestions: vi.fn(),
   },
 }));
 
@@ -103,6 +104,17 @@ const COMPLETE = {
   authors: [{ id: 1, name: "Ada Reyes", role: null }],
 };
 
+/** A `metadata-suggestions` reply (IR-406's contract). */
+function suggestions(state: string, found: { title?: string; abstract?: string } = {}) {
+  return {
+    data: {
+      state,
+      suggestions: { title: found.title ?? null, abstract: found.abstract ?? null },
+      source: "pdf_structure",
+    },
+  };
+}
+
 beforeEach(() => {
   vi.mocked(recordsApi.recordTypes).mockResolvedValue(page(TYPES) as never);
   vi.mocked(recordsApi.classifications).mockResolvedValue(page([{ id: 5, name: "Computing" }]) as never);
@@ -113,6 +125,9 @@ beforeEach(() => {
   vi.mocked(recordsApi.uploadManuscript).mockResolvedValue({ data: { id: 42 } } as never);
   vi.mocked(recordsApi.submit).mockResolvedValue({ data: { detail: "Submitted." } } as never);
   vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail() } as never);
+  // Ready with nothing found: no chip and no line, so tests of other criteria see
+  // Details exactly as before prefill existed.
+  vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready") as never);
   useAuthStore.setState({
     user: makeUser({ id: SELF_ID, first_name: "Ada", last_name: "Reyes", role_name: ROLES.ADVISER }),
   });
@@ -768,5 +783,214 @@ describe("closing", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+});
+
+describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
+  const FOUND_TITLE = "Clearance-Aware Resubmission in a University Research Office";
+  const FOUND_ABSTRACT = "This study examines how a research office can preserve clearances across revisions.";
+  const NEUTRAL = "We couldn't read details from this file — fill them in below.";
+
+  function chip(field: "title" | "abstract") {
+    return screen.queryByRole("group", { name: `Suggested ${field}` });
+  }
+
+  it("offers a chip only for a field the server found text for", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    const title = await screen.findByRole("group", { name: "Suggested title" });
+    expect(within(title).getByText("Found in your PDF")).toBeInTheDocument();
+    expect(within(title).getByText(FOUND_TITLE)).toBeInTheDocument();
+    expect(chip("abstract")).not.toBeInTheDocument();
+    expect(recordsApi.metadataSuggestions).toHaveBeenCalledWith(42);
+  });
+
+  it("fills the field on Use, over the title made from the file name", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(
+      suggestions("ready", { title: FOUND_TITLE, abstract: FOUND_ABSTRACT }) as never,
+    );
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    // The title is still the provisional one from the file name: the dialog
+    // put it there, the author did not, so the chip offers a plain Use.
+    expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue("My Clearance Study");
+    await user.click(within(await screen.findByRole("group", { name: "Suggested title" })).getByRole("button", { name: "Use" }));
+    await user.click(within(screen.getByRole("group", { name: "Suggested abstract" })).getByRole("button", { name: "Use" }));
+
+    expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue(FOUND_TITLE);
+    expect(screen.getByRole("textbox", { name: /^Abstract/ })).toHaveValue(FOUND_ABSTRACT);
+    expect(chip("title")).not.toBeInTheDocument();
+    expect(chip("abstract")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /^Abstract/ })).toHaveFocus();
+  });
+
+  it("removes the chip on Dismiss and leaves the field alone", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    await user.click(within(await screen.findByRole("group", { name: "Suggested title" })).getByRole("button", { name: "Dismiss" }));
+
+    expect(chip("title")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue("My Clearance Study");
+  });
+
+  it("never overwrites what the author typed, and offers Replace with suggestion instead", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { abstract: FOUND_ABSTRACT }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+    await screen.findByRole("group", { name: "Suggested abstract" });
+
+    const abstract = screen.getByRole("textbox", { name: /^Abstract/ });
+    await user.type(abstract, "My own words about this study.");
+
+    const offer = screen.getByRole("group", { name: "Suggested abstract" });
+    expect(within(offer).queryByRole("button", { name: "Use" })).not.toBeInTheDocument();
+    expect(abstract).toHaveValue("My own words about this study.");
+
+    await user.click(within(offer).getByRole("button", { name: "Replace with suggestion" }));
+    expect(abstract).toHaveValue(FOUND_ABSTRACT);
+  });
+
+  it("does not offer a suggestion back once it was used and then edited", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { abstract: FOUND_ABSTRACT }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    await user.click(within(await screen.findByRole("group", { name: "Suggested abstract" })).getByRole("button", { name: "Use" }));
+    await user.type(screen.getByRole("textbox", { name: /^Abstract/ }), " Plus a sentence of mine.");
+
+    expect(chip("abstract")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /^Abstract/ })).toHaveValue(`${FOUND_ABSTRACT} Plus a sentence of mine.`);
+  });
+
+  it("announces the prefill once, in a polite status line", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    expect(await screen.findByText("Found a title in your PDF. Suggestions are shown under each field.", { selector: "[role=status]" })).toBeInTheDocument();
+  });
+
+  it("treats a resumed draft's saved title as the author's", async () => {
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ title: "A Title I Wrote" }) } as never);
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+
+    const offer = await screen.findByRole("group", { name: "Suggested title" });
+    expect(within(offer).getByRole("button", { name: "Replace with suggestion" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue("A Title I Wrote");
+  });
+
+  it("shows Reading your PDF… while pending, without disabling the fields", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("pending") as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    expect(await screen.findAllByText("Reading your PDF…")).not.toHaveLength(0);
+    expect(screen.getByRole("textbox", { name: /^Title/ })).toBeEnabled();
+    expect(screen.getByRole("textbox", { name: /^Abstract/ })).toBeEnabled();
+    await user.type(screen.getByRole("textbox", { name: /^Abstract/ }), "Typed while it reads.");
+    expect(screen.getByRole("textbox", { name: /^Abstract/ })).toHaveValue("Typed while it reads.");
+  });
+
+  it("stops asking once the author leaves Details", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("pending") as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+    await screen.findAllByText("Reading your PDF…");
+    const asked = vi.mocked(recordsApi.metadataSuggestions).mock.calls.length;
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    // Longer than one 2 s interval: a poll still running would have fired.
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+
+    expect(recordsApi.metadataSuggestions).toHaveBeenCalledTimes(asked);
+  });
+
+  it.each(["failed", "unsupported"])("shows the neutral line, not an error, on %s", async (state) => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions(state) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    expect(await screen.findByText(NEUTRAL)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reading your PDF…")).not.toBeInTheDocument();
+  });
+
+  it("asks again when Details is re-entered after failed, so a retried extraction still offers chips", async () => {
+    vi.mocked(recordsApi.metadataSuggestions)
+      .mockResolvedValueOnce(suggestions("failed") as never)
+      .mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+    await screen.findByText(NEUTRAL);
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("group", { name: "Suggested title" })).toBeInTheDocument();
+    expect(screen.queryByText(NEUTRAL)).not.toBeInTheDocument();
+  });
+
+  it("offers the new file's suggestion after the manuscript is replaced", async () => {
+    vi.mocked(recordsApi.metadataSuggestions)
+      .mockResolvedValueOnce(suggestions("ready", { title: "The Old File's Title" }) as never)
+      .mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+    await screen.findByText("The Old File's Title");
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: "Replace file" }));
+    dropFile(pdf("Second_Draft.pdf"));
+    await waitFor(() => expect(recordsApi.uploadManuscript).toHaveBeenCalledTimes(2));
+    await screen.findByText(/uploaded/i, { selector: "p" });
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText(FOUND_TITLE)).toBeInTheDocument();
+    expect(screen.queryByText("The Old File's Title")).not.toBeInTheDocument();
+  });
+
+  it("is never needed to submit: a failed suggestions request still lets the author finish", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockRejectedValue(new Error("Network Error"));
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+    await screen.findByText(NEUTRAL);
+
+    await completeDetails(user);
+    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
+    await user.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    await waitFor(() => expect(recordsApi.submit).toHaveBeenCalledWith(42, true));
+  });
+
+  it("shows no confidence value, and passes axe with chips on screen", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(
+      suggestions("ready", { title: FOUND_TITLE, abstract: FOUND_ABSTRACT }) as never,
+    );
+    const user = userEvent.setup();
+    const { container } = openNew();
+    await completeManuscript(user);
+    await screen.findByRole("group", { name: "Suggested abstract" });
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).not.toHaveTextContent(/confiden|certain|\d+\s?%/i);
+    await expectNoBlockingA11yViolations(container);
   });
 });

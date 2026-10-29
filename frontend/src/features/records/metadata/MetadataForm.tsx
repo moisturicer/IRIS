@@ -92,6 +92,11 @@ interface MetadataFormProps {
    * (IR-507): they are shown, not edited, and the caller does not send them.
    */
   submitted?:      boolean;
+  /**
+   * Shown under the title and abstract. Publish puts its prefill here
+   * (IR-409); the form itself knows nothing of where a suggestion came from.
+   */
+  fieldNotes?:     Partial<Record<Extract<keyof MetadataValues, "title" | "abstract">, ReactNode>>;
 }
 
 const MAX_ABSTRACT = 5000;
@@ -105,6 +110,7 @@ export function MetadataForm({
   moreOpen,
   onMoreOpenChange,
   submitted = false,
+  fieldNotes,
 }: MetadataFormProps) {
   const {
     register,
@@ -155,6 +161,7 @@ export function MetadataForm({
           aria-describedby={describedBy("title")}
           className={fieldClasses(Boolean(errors.title))}
         />
+        {fieldNotes?.title}
       </Field>
 
       <Field label="Keywords" htmlFor={ids.keywords} error={errors.keywords?.message} errorId={errorId("keywords")}>
@@ -191,6 +198,7 @@ export function MetadataForm({
           className={cn(fieldClasses(Boolean(errors.abstract)), "resize-y")}
         />
         {errors.abstract && <FieldError id={errorId("abstract")}>{errors.abstract.message}</FieldError>}
+        {fieldNotes?.abstract}
       </div>
 
       <div className="grid gap-section-sm sm:grid-cols-[minmax(0,1fr)_9rem]">

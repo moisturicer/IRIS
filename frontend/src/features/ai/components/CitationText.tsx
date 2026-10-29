@@ -1,4 +1,4 @@
-import { useContext, type ComponentPropsWithoutRef } from "react";
+import type { ComponentPropsWithoutRef } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -7,13 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
-import {
-  CitationOriginContext,
-  citationHref,
-  citationNavigationState,
-  hasCitationQuote,
-  openCitationLabel,
-} from "@/lib/citedPage";
+import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -68,19 +62,20 @@ function CitationPlaceholder() {
  * way a reader would cite a page, instead of an 8px digit in a dot.
  */
 function CitationChip({ citation, page = false }: { citation: ChatCitation; page?: boolean }) {
-  const origin = useContext(CitationOriginContext);
-  const label = openCitationLabel(
-    citation,
-    hasCitationQuote(citation) ? undefined : "the source",
-  );
+  const { to, state, pageContext } = useCitationLink(citation);
+  // The Overview cites a page as a whole, and says so (IR-578).
+  const label =
+    openCitationLabel(citation, hasCitationQuote(citation) ? undefined : "the source") +
+    (pageContext ? ", page context" : "");
   return (
     <Link
-      to={citationHref(citation)}
+      to={to}
       // The citation itself, regions included -- so the paper view can draw
       // the highlight without a second fetch (IR-335). See
       // `citationNavigationState`'s own doc for the graceful fallback. Inside
-      // Paper Chat it also says so, which keeps the conversation (IR-355).
-      state={citationNavigationState(citation, origin)}
+      // Paper Chat it also says so, which keeps the conversation (IR-355),
+      // and the answer it came from rides in the address (IR-578).
+      state={state}
       title={label}
       aria-label={label}
       className={

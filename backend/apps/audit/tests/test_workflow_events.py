@@ -412,7 +412,7 @@ class SeatTests(AuditTestBase):
         )).data
         reassigned = self.ok(self.post(
             reverse("seat-reassign", args=[assigned["id"]]), coordinator,
-            {"reviewer": coordinator.pk},
+            {"reviewer": coordinator.pk, "reason": "Workload"},
         )).data
         self.ok(self.post(reverse("seat-withdraw", args=[reassigned["id"]]), coordinator, {}))
         added = self.ok(self.post(
@@ -436,8 +436,9 @@ class SeatTests(AuditTestBase):
             ],
         )
         self.assertEqual(
-            (seat_rows[2]["metadata"]["previous_seat"], seat_rows[2]["metadata"]["previous_reviewer"]),
-            (assigned["id"], self.itso2.pk),
+            (seat_rows[2]["metadata"]["previous_seat"], seat_rows[2]["metadata"]["previous_reviewer"],
+             seat_rows[2]["metadata"]["reason"]),
+            (assigned["id"], self.itso2.pk, "Workload"),
         )
         self.assertTrue(all(row["metadata"]["party"] == Party.ITSO for row in seat_rows))
 

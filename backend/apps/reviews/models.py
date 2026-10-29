@@ -242,6 +242,37 @@ class Extension(models.Model):
         )]
 
 
+class DeadlineMoment(models.Model):
+    """
+    A reminder or escalation already sent for one due date (ADR-043 §8).
+
+    The unique constraint is the idempotency: a re-run, a missed tick or two
+    beat instances insert the same row, and only one insert wins. A new due
+    date is a new key, which is how an Extension or a pause re-arms every
+    moment. `step` counts the repeat escalations every 5 working days (§7);
+    it is 0 for both reminders.
+    """
+
+    class Kind(models.TextChoices):
+        DUE_SOON = "due_soon", "Due in 2 working days"
+        DUE_TODAY = "due_today", "Due today"
+        ESCALATION = "escalation", "Overdue escalation"
+
+    assignment = models.ForeignKey(RecordAssignment, on_delete=models.CASCADE,
+                                   related_name="deadline_moments")
+    due_at = models.DateTimeField()
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    step = models.PositiveIntegerField(default=0)
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["sent_at", "pk"]
+        constraints = [models.UniqueConstraint(
+            fields=["assignment", "due_at", "kind", "step"],
+            name="one_deadline_moment_per_due_date",
+        )]
+
+
 class ReviewerSeat(models.Model):
     """
     One person reviewing a record for a party. ADR-032 §4, IR-415.
@@ -286,6 +317,13 @@ class ReviewerSeat(models.Model):
         "reviews.Review", on_delete=models.RESTRICT,
         null=True, blank=True, related_name="closed_seats",
     )
+    #: The seat a coordinator's *Reassign* moved this one from, and why
+    #: (IR-623). Blank on every seat that was not reassigned.
+    reassigned_from = models.ForeignKey(
+        "self", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="reassigned_to",
+    )
+    reason      = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["assignment", "assigned_at", "pk"]

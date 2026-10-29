@@ -34,6 +34,7 @@ class AuditEvent(models.Model):
     ROUTED                     = "ROUTED"
     ASSIGNMENT_CLOSED          = "ASSIGNMENT_CLOSED"
     ASSIGNMENT_EXTENDED        = "ASSIGNMENT_EXTENDED"
+    ASSIGNMENT_ESCALATED       = "ASSIGNMENT_ESCALATED"
     DECISION_RECORDED          = "DECISION_RECORDED"
     PUBLISHED                  = "PUBLISHED"
     RESUBMISSION_REQUESTED     = "RESUBMISSION_REQUESTED"
@@ -74,6 +75,7 @@ class AuditEvent(models.Model):
         (ROUTED,                     "Routed"),
         (ASSIGNMENT_CLOSED,          "Assignment Closed"),
         (ASSIGNMENT_EXTENDED,        "Assignment Deadline Extended"),
+        (ASSIGNMENT_ESCALATED,       "Assignment Overdue Escalated"),
         (DECISION_RECORDED,          "Decision Recorded"),
         (PUBLISHED,                  "Published"),
         (RESUBMISSION_REQUESTED,     "Revision Requested"),
