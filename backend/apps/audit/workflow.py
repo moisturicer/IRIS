@@ -17,7 +17,8 @@ reconstructed. So:
 - **No review prose.** Decision and finding comments are never copied
   (IR-479). The only free text is what the event needs to mean anything: a
   revision request's `reason`, a document request's `message`, a rejected
-  document's `reason`, and a reassignment's or extension's `reason` (IR-623).
+  document's `reason`, an extension's `reason` (IR-619), and a
+  reassignment's `reason` (IR-623).
 - **Kept apart (ADR-022).** A document request writes only `DOCUMENT_REQUEST*`
   events and a revision only revision events, so "you forgot a form" stays
   distinguishable from "revise the work".

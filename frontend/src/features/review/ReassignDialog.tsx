@@ -93,7 +93,7 @@ export function ReassignDialog({
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700">
           <span className="font-semibold text-stone-900">{recordTitle}</span>
           {holderName ? ` is with ${holderName}.` : "."} The person you choose takes it over and finds it in their
           To review. Its due date does not change.

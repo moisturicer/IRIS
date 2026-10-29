@@ -83,7 +83,7 @@ export function ExtendDueDateDialog({
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700">
           <span className="font-semibold text-stone-900">{recordTitle}</span> is due {formatDate(dueAt)}.
           The new date ends at 23:59, Manila time.
         </p>

@@ -95,7 +95,7 @@ def _live_seats(assignment):
     return assignment.seats.exclude(state=SeatState.WITHDRAWN)
 
 
-def _seat(assignment, reviewer, *, source, by) -> ReviewerSeat:
+def _seat(assignment, reviewer, *, source, by, reassigned_from=None, reason="") -> ReviewerSeat:
     """
     Seat `reviewer` on `assignment`. Shared by every act that adds a person.
 
@@ -119,6 +119,7 @@ def _seat(assignment, reviewer, *, source, by) -> ReviewerSeat:
             return ReviewerSeat.objects.create(
                 assignment=assignment, reviewer=reviewer, source=source,
                 assigned_by=by, assigned_at=timezone.now(),
+                reassigned_from=reassigned_from, reason=reason,
             )
     except IntegrityError:
         # The partial unique constraint, reached by a concurrent request the
@@ -369,10 +370,10 @@ def reassign(seat, coordinator, reviewer, *, reason) -> ReviewerSeat:
         raise SeatError(f"{_name(reviewer)} already holds this seat.")
     seat.state = SeatState.WITHDRAWN
     seat.save(update_fields=["state"])
-    new_seat = _seat(assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator)
-    new_seat.reassigned_from = seat
-    new_seat.reason = reason.strip()
-    new_seat.save(update_fields=["reassigned_from", "reason"])
+    new_seat = _seat(
+        assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator,
+        reassigned_from=seat, reason=reason.strip(),
+    )
     audit.seat_moved(AuditEvent.SEAT_REASSIGNED, new_seat, coordinator, previous=seat)
     return new_seat
 

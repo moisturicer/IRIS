@@ -62,7 +62,8 @@ def _row(assignment, user, seat=None) -> dict:
         "reviewer_name": _name(seat.reviewer) if seat else None,
         "seat_state": seat.state if seat else None,
         "seat_state_label": seat.get_state_display() if seat else None,
-        # When the office received the record: the clock's start (ADR-043 §1).
+        # When the office received the record. Not `clock_started_at`, which a
+        # new Version restarts (ADR-043 §5): "opened" is when it arrived.
         "opened_at": assignment.opened_at.isoformat(),
         **deadline_payload(assignment, user),
     }
