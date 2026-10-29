@@ -132,6 +132,10 @@ class NoRouteMutatesTheAuditLogTests(APITestCase):
             self.assertNotIn(method, allow)
 
     def test_no_url_under_the_audit_prefix_addresses_a_single_event(self):
-        # A detail route is where an update or delete would have to live.
-        from apps.audit import urls as audit_urls
-        self.assertEqual([str(p.pattern) for p in audit_urls.urlpatterns], [""])
+        # Exercise the boundary: a read-only CSV collection is allowed, but
+        # a detail route must not expose a row for updates or deletion.
+        event = AuditEvent.objects.create(event_type=AuditEvent.LOGIN)
+        for method in ("get", "put", "patch", "delete"):
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(f"{AUDIT}{event.pk}/")
+                self.assertEqual(response.status_code, 404)
