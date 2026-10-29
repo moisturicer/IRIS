@@ -101,6 +101,45 @@ def scene(embedder, space, client_for):
 
 
 class QueuedQuestionTests:
+    def test_request_identity_follows_the_same_queued_run(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        identity = str(uuid.uuid4())
+        args = (scene["client"], scene["conversation"], dispatched, django_capture_on_commit_callbacks)
+        first, _ = _submit(*args, request_id=identity)
+        second, _ = _submit(*args, request_id=identity)
+        assert first == second
+        assert len(dispatched) == 1
+        assert AskRun.objects.count() == 1
+        with use_composition_root(scene["root"]):
+            answer_queued_question(first)
+        response = ask_stream(scene["client"], FLOOD_QUESTION,
+                              conversation_id=scene["conversation"].pk, request_id=identity)
+        done = _frames(response.streaming_content)[-1][2]
+        assert done["turn_id"] == Turn.objects.get().pk
+        json_retry = scene["client"].post(reverse("ai-ask"), {
+            "question": FLOOD_QUESTION, "conversation_id": scene["conversation"].pk,
+            "request_id": identity,
+        }, format="json", HTTP_X_IRIS_PROTOCOL="public-1")
+        assert json_retry.status_code == 200
+        assert json_retry.json()["turn_id"] == done["turn_id"]
+        assert len(dispatched) == 1
+
+    def test_cancelled_request_identity_does_not_report_pending(
+        self, scene, dispatched, django_capture_on_commit_callbacks
+    ):
+        identity = str(uuid.uuid4())
+        run_id, _ = _submit(scene["client"], scene["conversation"], dispatched,
+                            django_capture_on_commit_callbacks, request_id=identity)
+        scene["client"].post(reverse("ai-ask-run-cancel", args=[run_id]))
+        response = scene["client"].post(reverse("ai-ask"), {
+            "question": FLOOD_QUESTION, "conversation_id": scene["conversation"].pk,
+            "request_id": identity,
+        }, format="json")
+        assert response.status_code == 409
+        assert response.json()["status"] == "interrupted"
+        assert len(dispatched) == 1
+
     def test_submit_disconnect_reconnect_and_one_final_turn(
         self, scene, dispatched, django_capture_on_commit_callbacks
     ):

@@ -8,6 +8,20 @@
 
 ---
 
+## IR-561 Paper Chat default reuse and idempotent sends
+
+**Design:** [ADR-019 implementation note](../adr/019-persisted-unified-conversation-history.md), implementing IR-552 story 13 while preserving IR-569's deferred creation.
+
+**Implementation:** one default Conversation per reader/Record, elected atomically at first Send; explicit additional Conversations remain available. A UUID submission claim precedes any model call. Duplicate pending submissions return 409 with Retry-After; completed requests replay the same permission-checked Turn; queued duplicates follow their existing AskRun. Partial Turns retain the identity. No claim is automatically reclaimed after an unknown provider outcome.
+
+**Tests:** `apps/ai/tests/test_chat_identity_http.py` (real concurrent PostgreSQL connections, JSON/SSE and public-protocol replay, ownership and partial answers); `test_chat_identity_migration.py` (non-empty history survives migration); `test_durable_ask_http.py` (queued identity and cross-transport retry); `frontend/src/features/records/paper-view/PaperChatDock.test.tsx` (repeated empty opens, double Send and another tab's history); `frontend/src/api/ai.test.ts` (request identity and default lookup wire contracts).
+
+**Verification (2026-10-29):** 109 focused backend tests pass (107 conversation/answer/queued/identity regressions, followed by the corrected intentional-disconnect test and non-empty migration test); 145 affected frontend page/API tests pass. TypeScript and AI-app flake8 pass; `makemigrations --check --dry-run` finds no missing migration (its database-history check warned about a transient Docker DNS failure). The full frontend run has three unrelated Sidebar failures caused by a Node/jsdom AbortSignal mismatch after fixing the affected Paper Chat mock. The full backend run could not complete: one attempt failed loading the harness with `Cannot allocate memory`, and the retry exited without a result.
+
+**CI follow-up:** [PR #309's initial full run](https://github.com/moisturicer/IRIS/actions/runs/40795166357) passed Frontend (lint, tests, build), Security and Docker Compose. Backend ran 4,278 passing tests and found one vocabulary-guard collision: submission-response `pending` is not a workflow request status. The guard's existing documented allowlist now excludes `ai/submissions.py` for that separate meaning; no workflow value or behavior changes. Migration 0033 was also rolled back and reapplied successfully on a restored development-database copy, preserving its 19 Records; that copy had no Conversations, so the separate non-empty history fixture supplies Conversation/Turn preservation evidence. The disposable database and snapshot were removed.
+
+**Status:** implemented and focused tests verified; CI rerun and independent human approval remain outstanding. Deterministic provider tests establish call counts, not production vendor performance.
+
 ## IR-615 every route is declared in the authorization matrix (NFR-S4)
 
 **Design:** IR-611's spec (slice 3), [ADR-009](../adr/009-authorization-model.md), and the 404-versus-403 convention of [ADR-022 §Amendment 4](../adr/022-explicit-document-requests.md), including its one recorded exception.

@@ -88,6 +88,37 @@ per-task — only `answer` has it on, and a task whose Profile switches it off
 sends no reasoning configuration at all and stores nothing (ADR-036
 §Amendment).
 
+## Implementation note — IR-561: default Conversation and request identity
+
+Implemented for review; this note is not human approval of the change.
+
+Paper Chat still creates nothing on an empty open (IR-569). Its first Send
+posts `reuse_default: true` with the Record to the existing Conversation
+endpoint. Under a short Record-row lock the server adopts the caller's most
+recent legacy Conversation, or creates a default. A partial unique constraint
+allows only one default per caller and Record. Ordinary POSTs continue to
+create additional Conversations; they do not replace the elected default.
+GET with `record` and `default=true` reads that default, with a legacy fallback
+before its first election. Existing transcripts are neither merged nor deleted.
+
+Both answer transports accept a UUID `request_id`, scoped to the caller-owned
+Conversation. A unique submission claim commits before resolution or generation;
+no database transaction is held across those vendor calls. A repeated identity
+with changed question/options returns 409. An unfinished request returns 409
+`pending` and `Retry-After: 1`; once written, its original Turn is replayed with
+current citation permissions and the requested reader protocol. A queued repeat
+follows the same AskRun, including cancellation and retry semantics already
+owned by ADR-040. Older callers without an identity retain their prior behavior.
+
+The claim and Turn link commit together, including partial answers. Source
+references retain only Record ids and ranking scores, with cards rebuilt under
+current visibility on replay. A process lost after sending paid work is never
+automatically reclaimed: a retry may not purchase a second answer when the
+first call's outcome is unknown. A request ending without a Turn requires an
+explicit new question/identity. This favors at-most-once submission over
+automatic recovery of a request-bound answer. Durable recovery remains the
+existing queued-run transport, not another worker or journal.
+
 ## Alternatives Considered
 
 **Persist Ask IRIS only, leave Paper Chat as-is.** Rejected. It ships the illusion that Paper Chat has been fixed when it hasn't — a user who asks a follow-up in Paper Chat still loses it on panel close, while the same action in Ask IRIS now survives. Two different reliability guarantees for what looks, to a user, like the same feature.
