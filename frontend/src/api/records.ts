@@ -39,6 +39,8 @@ export const recordsApi = {
     apiClient.get<MyResearchItem[]>("/records/mine/", { params }),
 
   detail:         (id: number) => apiClient.get<RecordDetail>(`/records/${id}/`),
+  continueAs: (id: number, recordType: number) =>
+    apiClient.post<RecordDetail>(`/records/${id}/continue-as/`, { record_type: recordType }),
   /**
    * Related institutional works. The backend reuses the Ask IRIS retrieval
    * service, so this returns the retrieval shape (RetrievedSource.as_dict()),

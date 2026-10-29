@@ -159,7 +159,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const schema = useMemo(() => metadataSchema(selfId), [selfId]);
   const form = useForm<MetadataValues>({
     resolver: zodResolver(schema),
-    defaultValues: emptyMetadata(personName(user)),
+    defaultValues: { ...emptyMetadata(personName(user)), owner_emails: user.email },
     mode: "onTouched",
     // Focus is moved by hand: the adviser is a custom control, and a field
     // inside a closed More details must be opened before it can take focus.
@@ -175,6 +175,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   const [step, setStep] = useState<PublishStep>(1);
   const [typeId, setTypeId] = useState<number | null>(null);
+  const [isContinuation, setIsContinuation] = useState(false);
   // The type the server holds, so Continue saves only a change.
   const savedTypeId = useRef<number | null>(null);
   // A ref as well as state: a retry reads it from a closure made before the
@@ -249,6 +250,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           return;
         }
         const state = stateFromDraft(record, loaded);
+        setIsContinuation(Boolean(record.lineage?.derived_from));
         form.reset(state.values);
         draftIdRef.current = id;
         setDraftId(id);
@@ -442,6 +444,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const typeName = lists.recordTypes.find((t) => t.id === typeId)?.name ?? "";
 
   const summary = {
+    keywords: values.keywords,
+    ownerEmails: values.owner_emails,
     typeName,
     fileName: upload.status === "done" ? upload.fileName : null,
     title: values.title ?? "",
@@ -625,7 +629,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           <div ref={stepRef} tabIndex={-1} className="outline-none">
           {step === 1 && (
             <ManuscriptStep
-              recordTypes={lists.recordTypes}
+              recordTypes={isContinuation ? lists.recordTypes.filter((type) => !isProposal(type.name)) : lists.recordTypes}
               typeId={typeId}
               onTypeChange={setTypeId}
               upload={upload}

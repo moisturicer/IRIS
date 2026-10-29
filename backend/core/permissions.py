@@ -361,6 +361,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         offered.append("request_revision")
 
     if is_record_owner(user, record):
+        from apps.records.continuation import continuable
+
+        if continuable(record):
+            offered.append("continue_as")
         if workflow["workflow_state"] == PipelineStatus.DRAFT:
             offered.extend(["continue_draft", "edit_details"])
         elif workflow["workflow_state"] == WorkflowState.AWAITING_RESUBMISSION:
