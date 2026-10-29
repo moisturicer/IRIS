@@ -1419,3 +1419,5 @@ Authority: ADR-042 and general-tools specification §9–§11 (scenarios A01–A
 
 **Evidence (2026-10-16).** `eval_conversations --validate` on the set: 105 conversations, 36 supported and unambiguous, no coverage gap, no leakage or topic-overlap warning (exact-string checks, evidence titles included; near-synonyms not caught), `valid`; `--write-lock` then `--validate --lock` both `valid`. The three new test files pass (24 tests). `python -m pytest apps/ai/evaluation`: 299 passed, 1 failed; the failure is the known Windows-only `test_the_proxy_audit_pins_the_proxy_set_it_audited` (CRLF checkout changes the proxy file digest) and predates this ticket. The scorer has only seen invented reviews.
 
+
+**IR-623 CI follow-up (2026-10-29).** The workload count field is renamed from `open` to `open_count` in the backend response, TypeScript type, renderer and HTTP/UI fixtures. It counts unfinished seats; it is not `DocumentRequestState.OPEN`. The shared vocabulary guard is unchanged. The HTTP fixture changes deliberately to pin the new field name. Focused checks and updated CI results are recorded on PR #322.

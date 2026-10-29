@@ -51,8 +51,8 @@ function payload(overrides: Partial<OfficeConsole> = {}): { data: OfficeConsole 
       office: "itso", office_label: "ITSO",
       rows: [row(), POOL],
       load: [
-        { reviewer: 5, name: "Maria Reyes", open: 1, overdue: 1 },
-        { reviewer: 6, name: "Juan Santos", open: 0, overdue: 0 },
+        { reviewer: 5, name: "Maria Reyes", open_count: 1, overdue: 1 },
+        { reviewer: 6, name: "Juan Santos", open_count: 0, overdue: 0 },
       ],
       ...overrides,
     },

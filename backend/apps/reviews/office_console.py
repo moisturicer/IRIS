@@ -104,7 +104,7 @@ def office_console(user, *, office=None) -> dict:
         load.append({
             "reviewer": member.pk,
             "name": _name(member),
-            "open": len(mine),
+            "open_count": len(mine),
             "overdue": sum(r["is_overdue"] for r in mine),
         })
     return {

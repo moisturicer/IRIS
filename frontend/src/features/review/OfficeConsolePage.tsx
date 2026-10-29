@@ -124,7 +124,7 @@ export default function OfficeConsolePage() {
                   {(data?.load ?? []).map((m) => (
                     <tr key={m.reviewer} className="border-t border-stone-100">
                       <td className="px-4 py-2 text-stone-900">{m.name}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{m.open}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{m.open_count}</td>
                       <td className={cn("px-4 py-2 text-right tabular-nums", m.overdue > 0 && "font-semibold text-brand")}>
                         {m.overdue}
                       </td>

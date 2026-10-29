@@ -140,7 +140,7 @@ class OfficeConsoleTests(APITestCase):
         load = self.get(self.coordinator, office="itso").data["load"]
 
         self.assertEqual(
-            [(m["name"], m["open"], m["overdue"]) for m in load],
+            [(m["name"], m["open_count"], m["overdue"]) for m in load],
             # Every member, idle ones too, so the coordinator sees who is free.
             [("Cora Dinator", 0, 0), ("Maria Reyes", 2, 1), ("Juan Santos", 0, 0)],
         )

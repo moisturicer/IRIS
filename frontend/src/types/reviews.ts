@@ -98,7 +98,7 @@ export interface OfficeConsoleRow {
 export interface OfficeLoad {
   reviewer: number;
   name:     string;
-  open:     number;
+  open_count: number;
   overdue:  number;
 }
 
