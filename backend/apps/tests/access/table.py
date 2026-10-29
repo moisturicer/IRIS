@@ -379,7 +379,7 @@ REVIEWS = {
     "reviews-mine": Entry({"GET": _case(SIGNED_IN)}),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
-    "reviews-analytics": Entry({"GET": _case(row(ANON, DENY, DENY, KnownDefect(DENY, "IR-636", "501 through dropped IsStaff"), STUB, STUB, STUB, STUB, DENY))}),
+    "reviews-analytics": Entry({"GET": _case(row(ANON, DENY, DENY, DENY, STUB, STUB, STUB, STUB, DENY))}),
     "pin-generate": Entry({"POST": _case(
         row(ANON, KnownDefect(HIDE, "IR-635", "201 and title emailed"), OK, OK, OK, OK, OK, OK,
             KnownDefect(HIDE, "IR-635", "201 and title emailed")),
