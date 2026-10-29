@@ -29,7 +29,7 @@ export const ADVISER_IS_SELF = "You can't be your own adviser. Choose another fa
  */
 export function metadataSchema(selfId: number | null, { submitted = false }: { submitted?: boolean } = {}) {
   const adviser = z
-    .number({ required_error: ADVISER_REQUIRED, invalid_type_error: ADVISER_REQUIRED })
+    .number({ error: ADVISER_REQUIRED })
     .int()
     .positive(ADVISER_REQUIRED)
     .refine((id) => selfId == null || id !== selfId, ADVISER_IS_SELF);
@@ -47,9 +47,10 @@ export function metadataSchema(selfId: number | null, { submitted = false }: { s
       .max(5000, "Abstract is too long."),
 
     // An emptied number input is NaN, not undefined, so the type error needs
-    // the message too, or Zod says "Expected number, received nan".
+    // the message too, or Zod says "Expected number, received nan". Zod 4's
+    // `error` covers both the missing and the wrong-type case.
     year: z
-      .number({ required_error: "Year is required.", invalid_type_error: "Year is required." })
+      .number({ error: "Year is required." })
       .int("Year is required.")
       .min(1990, "Year must be 1990 or later.")
       .max(new Date().getFullYear() + 1, "Year cannot be in the future."),

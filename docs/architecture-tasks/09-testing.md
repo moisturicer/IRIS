@@ -304,6 +304,8 @@ Merged; four assertions passing in CI.
 Automatically detect known-vulnerable dependencies and committed secrets, so neither reaches the deployed system unnoticed.
 
 ## Problem
+> **Status, 2026-10-29:** the dependency audit now exists and fails CI. `pip-audit` and `npm audit` run in the `security` job through `security/audit_gate.py`, with a reviewed, expiring allowlist (IR-613, PR #306; silent-pass paths closed in IR-633). The rest of this section describes the state when the task was written.
+
 There is no scanning of any kind — no dependency audit, no secret detection, no automated alerting. This matters more than usual here, because the codebase has already demonstrated both failure modes: credentials committed to version control, and a dependency list that drifted out of step with the code.
 
 ## Evidence
@@ -370,8 +372,8 @@ P2
 XS
 
 ## Acceptance Criteria
-- [ ] `pip-audit` runs in CI and fails the build on a high or critical advisory.
-- [ ] `npm audit --audit-level=high` runs in CI and fails on high or critical.
+- [x] `pip-audit` runs in CI and fails the build on a high or critical advisory. (IR-613)
+- [x] `npm audit` runs in CI and fails on high or critical. (IR-613; the gate decides, so `--audit-level` is not used)
 - [ ] A deliberately introduced vulnerable dependency fails the build (demonstrated, then reverted).
 - [ ] Dependabot is enabled for `pip` and `npm` and has opened at least one pull request or reported clean.
 - [ ] Secret scanning with push protection is enabled, **or** a documented alternative (`gitleaks`) runs in CI if unavailable on this repository's plan.

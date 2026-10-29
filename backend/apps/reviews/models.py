@@ -152,6 +152,12 @@ class RecordAssignment(models.Model):
     )
     closed_at = models.DateTimeField(null=True, blank=True)
     reason    = models.TextField(blank=True)
+    # ADR-043: old assignments deliberately stay undated. Configuration is
+    # sampled once at opening, never on an ordinary save.
+    due_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    original_due_at = models.DateTimeField(null=True, blank=True)
+    clock_started_at = models.DateTimeField(null=True, blank=True)
+    document_pause_started_at = models.DateTimeField(null=True, blank=True)
     #: The Decision that closed this assignment: the decider's own, which
     #: completed, or another party's, which it withdrew (ADR-021 §12, IR-270).
     #: Null for anything closed another way.
@@ -181,8 +187,59 @@ class RecordAssignment(models.Model):
             ),
         ]
 
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.state == AssignmentState.ACTIVE:
+            from .deadlines import start_clock
+
+            start_clock(self, self.opened_at)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Record {self.record_id} | {self.party} | {self.state}"
+
+
+class Turnaround(models.Model):
+    """Institution-entered working days; absence means no clock (ADR-043 §2)."""
+
+    party = models.CharField(max_length=20, choices=[
+        (p.value, p.label) for p in Party if p not in RETIRED_PARTIES
+    ], unique=True)
+    working_days = models.PositiveIntegerField()
+
+    def __str__(self):
+        return f"{self.get_party_display()}: {self.working_days} working days"
+
+
+class Holiday(models.Model):
+    date = models.DateField(unique=True)
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        ordering = ["date"]
+
+    def __str__(self):
+        return f"{self.date}: {self.name}"
+
+
+class Extension(models.Model):
+    """Append-only history of a manual or document-pause date movement."""
+
+    assignment = models.ForeignKey(RecordAssignment, on_delete=models.CASCADE,
+                                   related_name="extensions")
+    previous_due_at = models.DateTimeField()
+    due_at = models.DateTimeField()
+    reason = models.TextField()
+    system = models.BooleanField(default=False)
+    actor = models.ForeignKey("accounts.User", on_delete=models.SET_NULL,
+                              null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        constraints = [models.CheckConstraint(
+            condition=models.Q(due_at__gt=models.F("previous_due_at")),
+            name="extension_moves_deadline_later",
+        )]
 
 
 class ReviewerSeat(models.Model):

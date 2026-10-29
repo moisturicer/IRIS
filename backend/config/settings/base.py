@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import timedelta
 
+from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
@@ -162,7 +163,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # simplejwt's, plus the 30-minute inactivity rule (IR-166).
+        "apps.accounts.authentication.IdleAwareJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -200,7 +202,14 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    # Refuses a refresh for a session idle past the limit below (IR-166).
+    "TOKEN_REFRESH_SERIALIZER": "apps.accounts.authentication.IdleAwareTokenRefreshSerializer",
 }
+
+# NFR-S2: a session ends after this long with no user activity, independent of
+# the token lifetimes above (IR-166, apps/accounts/sessions.py). The interface
+# signs itself out on the same figure: frontend/src/lib/activity.ts.
+SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
 
 # ---- CORS ---------------------------------------------------------------
 
@@ -216,6 +225,9 @@ CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default=FRONTEND_URL, cast=csv_list
 )
 CORS_ALLOW_CREDENTIALS = True
+# The interface reports the user's idle time on every request (IR-166); a
+# cross-origin deployment's preflight refuses any header not listed here.
+CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds")
 
 # ---- Email --------------------------------------------------------------
 

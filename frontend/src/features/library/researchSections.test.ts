@@ -15,6 +15,7 @@ const item = (id: number, overrides: Partial<MyResearchItem>): MyResearchItem =>
   workflow_state_label: "In review",
   holders: [],
   cleared_offices: [],
+  submitter_status: { line: "In review", waiting_on_you: [] },
   created_at: "2026-10-01T00:00:00Z",
   updated_at: "2026-10-01T00:00:00Z",
   ...overrides,

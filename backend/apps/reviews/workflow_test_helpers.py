@@ -33,29 +33,27 @@ def purge_records_at_current_state():
     state.apps.get_model("records", "Record").objects.all().delete()
 
 
-#: The last reviews migration before IR-274 retired Intake. 0015 changed only
-#: `choices`, so the tables are exactly those `reviews/0014` ran against.
-CUTOVER_SCHEMA = ("reviews", "0015_alter_recordassignment_party_and_more")
-
-
 def at_the_cutover_schema():
     """
-    Rewind `reviews` to just before IR-274 (`CUTOVER_SCHEMA`) -- tables
-    identical to those IR-260's cutover migration (`reviews/0014`) ran
-    against -- for the rest of this test only.
+    Permit active Intake fixtures for the rest of this test only.
 
     IR-274's `reviews/0016` forbids an active Intake assignment. A test of
     0014 must build exactly that row -- it is what 0014 retires -- so it
-    rewinds 0016, which drops only that constraint. Call it from a `TestCase`:
-    PostgreSQL's DDL is transactional, so the test's own rollback restores the
-    constraint and the migration record. Pending deferred FK checks would
-    block the DDL, so they are run first.
+    removes only that constraint. Rewinding to 0015 would also remove later
+    columns (IR-619) that these tests' live model fixtures need. These tests
+    drive the cutover functions directly; migration executor tests separately
+    exercise historical schemas. Call from a `TestCase`: PostgreSQL's DDL is
+    transactional, so its rollback restores the constraint. No migration
+    records or expected outcomes change.
     """
     from django.db import connection
-    from django.db.migrations.executor import MigrationExecutor
+    from .models import RecordAssignment
 
     if not connection.in_atomic_block:
         raise RuntimeError("at_the_cutover_schema() needs a TestCase's transaction to undo it")
     with connection.cursor() as cursor:
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
-    MigrationExecutor(connection).migrate([CUTOVER_SCHEMA])
+    constraint = next(c for c in RecordAssignment._meta.constraints
+                      if c.name == "no_active_assignment_for_a_retired_party")
+    with connection.schema_editor() as editor:
+        editor.remove_constraint(RecordAssignment, constraint)

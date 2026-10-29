@@ -54,6 +54,8 @@ export function makeUser(overrides: Partial<User> = {}): User {
     is_superuser: false,
     is_verified: true,
     is_locked: false,
+    is_active: true,
+    is_office_coordinator: false,
     consent_given: true,
     date_joined: "2026-01-05T00:00:00Z",
     college_name: "",

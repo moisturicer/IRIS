@@ -135,6 +135,9 @@ def resolve_item_for_upload(record, item_id, slot_id=None) -> tuple[DocumentRequ
     An item on another record reads exactly like a missing one, so the
     refusal never confirms that someone else's request exists (IR-153).
     """
+    from apps.records.models import Record
+
+    Record.objects.select_for_update().get(pk=record.pk)
     try:
         item = (
             DocumentRequestItem.objects.select_for_update(of=("self",))
@@ -198,6 +201,9 @@ def fulfil_by_slot_upload(record, slot: UploadSlot, upload, *, uploaded_by) -> l
     """
     if slot.record_id is not None:
         return []
+    from apps.records.models import Record
+
+    Record.objects.select_for_update().get(pk=record.pk)
     candidates = list(
         DocumentRequestItem.objects.select_for_update(of=("self",))
         .filter(
@@ -297,6 +303,9 @@ def _lock_decidable(item: DocumentRequestItem) -> tuple[DocumentRequestItem, Doc
     so a decision and an upload cannot interleave -- and confirm the item is
     an upload awaiting the requesting party's verdict. Call in a transaction.
     """
+    from apps.records.models import Record
+
+    Record.objects.select_for_update().get(pk=item.request.record_id)
     item = DocumentRequestItem.objects.select_for_update().get(pk=item.pk)
     request = DocumentRequest.objects.select_for_update().get(pk=item.request_id)
     if request.state == DocumentRequestState.WITHDRAWN:
@@ -360,6 +369,9 @@ def withdraw_request(request: DocumentRequest, user) -> DocumentRequest:
     the audit log.
     """
     with transaction.atomic():
+        from apps.records.models import Record
+
+        Record.objects.select_for_update().get(pk=request.record_id)
         request = DocumentRequest.objects.select_for_update().get(pk=request.pk)
         if request.state != DocumentRequestState.OPEN:
             raise DocumentRequestError("Only an open request can be withdrawn.")

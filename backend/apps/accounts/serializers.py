@@ -21,7 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
             "id", "email", "first_name", "middle_initial", "last_name",
             "role", "role_name",
             "is_staff", "is_superuser",
-            "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_verified", "is_locked", "is_active", "consent_given", "date_joined",
             "is_office_coordinator",
             "college_name", "department_name", "course_name",
         ]
@@ -38,7 +38,7 @@ class UserSerializer(serializers.ModelSerializer):
         # is an administrator's, through `PATCH /users/<id>/coordinator/`.
         read_only_fields = [
             "email", "role", "is_staff", "is_superuser",
-            "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_verified", "is_locked", "is_active", "consent_given", "date_joined",
             "is_office_coordinator",
         ]
 
@@ -69,6 +69,27 @@ class UserSerializer(serializers.ModelSerializer):
         return student.course.name if student and student.course else ""
 
 
+class AdviserOptionSerializer(UserSerializer):
+    """
+    One row of `GET /users/advisers/`, the adviser picker every signed-in user
+    can read (IR-587).
+
+    Exactly what the IR-540 data notice tells registrants an approved Adviser
+    shows to signed-in users: name, email, college and department. The account
+    state `UserSerializer` carries for RDCO -- `is_locked`, `is_verified`,
+    `is_staff`, `date_joined` and the rest -- has no reason to reach a student.
+    `college_name` has no reader in the picker today; it stays so the notice is
+    exact and two advisers with one name can be told apart.
+    """
+
+    class Meta(UserSerializer.Meta):
+        fields = [
+            "id", "first_name", "middle_initial", "last_name", "email",
+            "college_name", "department_name",
+        ]
+        read_only_fields = fields
+
+
 class MeSerializer(UserSerializer):
     """
     `GET /users/me/`: the signed-in user, plus what only they may read about
@@ -77,7 +98,8 @@ class MeSerializer(UserSerializer):
     `review_access` (spec Appendix D · B3, IR-415) says whether the user has
     review work: My Reviews' sidebar entry, its route guard and the landing
     after sign-in all read it. It is never on another user's payload -- the
-    adviser picker and the admin list use `UserSerializer` -- so nobody learns
+    adviser picker uses `AdviserOptionSerializer` and the admin list
+    `UserSerializer` -- so nobody learns
     who else reviews what.
 
     `role_request` (IR-537) is the user's latest role request while they have
