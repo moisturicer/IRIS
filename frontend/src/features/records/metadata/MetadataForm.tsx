@@ -92,7 +92,7 @@ interface MetadataFormProps {
    * Shown under the title and abstract. Publish puts its prefill here
    * (IR-409); the form itself knows nothing of where a suggestion came from.
    */
-  fieldNotes?:     Partial<Record<"title" | "abstract", ReactNode>>;
+  fieldNotes?:     Partial<Record<Extract<keyof MetadataValues, "title" | "abstract">, ReactNode>>;
 }
 
 const MAX_ABSTRACT = 5000;

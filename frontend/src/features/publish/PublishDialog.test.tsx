@@ -831,6 +831,28 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
     expect(abstract).toHaveValue(FOUND_ABSTRACT);
   });
 
+  it("does not offer a suggestion back once it was used and then edited", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { abstract: FOUND_ABSTRACT }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    await user.click(within(await screen.findByRole("group", { name: "Suggested abstract" })).getByRole("button", { name: "Use" }));
+    await user.type(screen.getByRole("textbox", { name: /^Abstract/ }), " Plus a sentence of mine.");
+
+    expect(chip("abstract")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /^Abstract/ })).toHaveValue(`${FOUND_ABSTRACT} Plus a sentence of mine.`);
+  });
+
+  it("announces the prefill once, in a polite status line", async () => {
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
+    const user = userEvent.setup();
+    openNew();
+    await completeManuscript(user);
+
+    expect(await screen.findByText("Found a title in your PDF. Suggestions are shown under each field.", { selector: "[role=status]" })).toBeInTheDocument();
+  });
+
   it("treats a resumed draft's saved title as the author's", async () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ title: "A Title I Wrote" }) } as never);
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);

@@ -59,7 +59,7 @@ import {
 } from "./draft";
 import { ManuscriptStep, type ManuscriptUpload } from "./ManuscriptStep";
 import { PrefillChip } from "./PrefillChip";
-import { usePrefill, type Suggestions } from "./prefill";
+import { usePrefill, type PrefillStatus } from "./prefill";
 import { PublishSuccess, successHeadline } from "./PublishSuccess";
 import { ReviewStep } from "./ReviewStep";
 
@@ -417,9 +417,14 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     generation: uploadGeneration,
   });
 
-  /** Fill a field from its suggestion, and put the author in it. */
+  /**
+   * Fill a field from its suggestion, and put the author in it. The chip goes
+   * for good: editing the filled text afterwards is the author's own change,
+   * not a reason to offer the suggestion back.
+   */
   function acceptSuggestion(field: PrefillField, text: string) {
     form.setValue(field, text, { shouldDirty: true, shouldValidate: true });
+    setDismissed((prev) => new Set(prev).add(field));
     form.setFocus(field);
   }
 
@@ -475,7 +480,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   /* ── What the steps show ─────────────────────────────────────────────── */
   const values = form.watch();
-  const prefillNotes = prefillFieldNotes(prefill.status, prefill.suggestions, (field) => {
+  const prefillNotes = prefillFieldNotes(prefill.status, (field) => {
     const text = prefill.suggestions[field];
     const current = values[field] ?? "";
     if (text == null || dismissed.has(field) || current === text) return null;
@@ -689,6 +694,11 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
           {step === 2 && (
             <FormProvider {...form}>
+              {/* One announcement for the prefill, where the visible lines sit
+                  under both fields and would be read twice. */}
+              <span role="status" className="sr-only">
+                {prefillAnnouncement(prefill.status, prefillNotes)}
+              </span>
               {(prefill.status === "failed" || prefill.status === "unsupported") && (
                 <p className="mb-section-sm text-small text-stone-600">{NEUTRAL_PREFILL}</p>
               )}
@@ -742,21 +752,31 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
  * runs (the fields stay editable), then each field's chip, if it has one.
  */
 function prefillFieldNotes(
-  status: string,
-  suggestions: Suggestions,
+  status: PrefillStatus,
   chipFor: (field: PrefillField) => ReactNode,
 ): Partial<Record<PrefillField, ReactNode>> {
   if (status === "pending") {
+    // A still icon: this can sit on screen for a minute and a half, and a
+    // spinner that long is motion the reduced-motion rule (spec §7) forbids.
     const reading = (
-      <p className="mt-1 flex items-center gap-1.5 text-small text-stone-600">
-        <i className="fas fa-spinner fa-spin text-label" aria-hidden />
+      <p className="mt-1 flex items-center gap-1.5 text-small text-stone-600" aria-hidden>
+        <i className="fas fa-file-lines text-label" aria-hidden />
         Reading your PDF…
       </p>
     );
     return { title: reading, abstract: reading };
   }
   if (status !== "ready") return {};
-  return Object.fromEntries(PREFILL_FIELDS.filter((f) => suggestions[f] != null).map((f) => [f, chipFor(f)]));
+  return Object.fromEntries(PREFILL_FIELDS.map((f) => [f, chipFor(f)]).filter(([, chip]) => chip != null));
+}
+
+/** What the prefill's live region says; the chips themselves carry the detail. */
+function prefillAnnouncement(status: PrefillStatus, notes: Partial<Record<PrefillField, ReactNode>>): string {
+  // The neutral line is not repeated here: it is ordinary text above the form,
+  // read in order, and a failure to prefill needs no interruption.
+  if (status === "pending") return "Reading your PDF…";
+  const found = PREFILL_FIELDS.filter((f) => notes[f] != null);
+  return found.length > 0 ? `Found a ${found.join(" and ")} in your PDF. Suggestions are shown under each field.` : "";
 }
 
 /** Where the author is: done steps say so in words, the current one is marked. */
