@@ -141,6 +141,34 @@ function openNew() {
   return renderScreen(<PublishDialog />, { route: "/?publish=new" });
 }
 
+it("opens a continuation in Publish, requires its manuscript, and keeps copied details editable", async () => {
+  vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({
+    ...COMPLETE, abstract_file: null,
+    keywords: ["clearance"], owners: [{ user: SELF_ID, email: "ada@cit.edu" }],
+    lineage: { derived_from: { id: 12, title: "Proposal", record_type_name: "Proposal" }, continued_as: null },
+  }) } as never);
+  const user = userEvent.setup();
+  renderScreen(<PublishDialog />, { route: "/?publish=42" });
+  await screen.findByRole("button", { name: "Upload manuscript" });
+  expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  dropFile(pdf("full-thesis.pdf"));
+  await screen.findByText(/uploaded/i, { selector: "p" });
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue(COMPLETE.title);
+  expect(screen.getByRole("textbox", { name: /^Abstract/ })).toHaveValue(COMPLETE.abstract);
+  expect(screen.getByRole("textbox", { name: "Keywords" })).toHaveValue("clearance");
+  expect(screen.getByRole("textbox", { name: "Owner emails" })).toHaveValue("ada@cit.edu");
+  await user.clear(screen.getByRole("textbox", { name: "Keywords" }));
+  await user.type(screen.getByRole("textbox", { name: "Keywords" }), "workflow, review");
+  await user.type(screen.getByRole("textbox", { name: "Owner emails" }), ", coauthor@cit.edu");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(recordsApi.update).toHaveBeenCalledWith(42, expect.objectContaining({
+    keywords: ["workflow", "review"], owner_emails: ["ada@cit.edu", "coauthor@cit.edu"],
+  }));
+  expect(recordsApi.create).not.toHaveBeenCalled();
+  expect(recordsApi.uploadManuscript).toHaveBeenCalledWith(42, expect.any(File), expect.any(Object));
+});
+
 async function chooseType(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   await user.click(await screen.findByRole("radio", { name }));
 }

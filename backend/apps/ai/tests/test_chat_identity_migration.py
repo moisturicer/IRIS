@@ -4,6 +4,7 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
 from .corpus import make_user
+from apps.reviews.workflow_test_helpers import model_at_current_state
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -15,7 +16,7 @@ def test_existing_multiple_conversations_and_turns_survive():
     executor.migrate([old])
     try:
         apps = executor.loader.project_state([old]).apps
-        record = apps.get_model("records", "Record").objects.create(title="Existing paper")
+        record = model_at_current_state("records", "Record").objects.create(title="Existing paper")
         conversations = apps.get_model("ai", "Conversation")
         first = conversations.objects.create(user_id=user.pk, record_id=record.pk)
         second = conversations.objects.create(user_id=user.pk, record_id=record.pk)

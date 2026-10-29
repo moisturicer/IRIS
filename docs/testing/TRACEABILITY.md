@@ -1,5 +1,15 @@
 # Requirements Traceability
 
+## IR-417 · Proposal continuation and lineage
+
+**Design:** [ADR-032 §6 and §12](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
+
+An owner of an approved Proposal may create one Thesis / Research or Project draft through `POST /records/<id>/continue-as/`. The service locks the Proposal and the unconditional `record_one_continuation` database constraint prevents duplicates, including after soft deletion. It copies title, abstract, keywords, classification, PSCED, authors, owners and Adviser without saving the Proposal or copying its manuscript, review or consent. Each lineage link is filtered through `visible_to`. The route is declared in the cross-role access matrix. Historical migration fixtures deliberately use models from the actually applied migration state: reversing another app may also reverse dependent Record migrations, while a target migration's dependency closure may omit Record columns still present in the database. Their backfill assertions are unchanged.
+
+My Library and Paper View offer the action from server-computed availability. The child opens the existing Publish dialog. Keywords and owner emails are editable in its shared Details form; owner changes require active existing accounts, retain the acting owner, exclude the Adviser, and are draft-only. A continuation requires its own manuscript before submission and enters normal adviser-first review. Direct submission remains available.
+
+**Evidence:** `apps/records/test_continuation.py` covers preservation, editable metadata, authorization, lineage visibility, manuscript upload/submission and concurrent requests (one 201, one 409, one child). `test_capabilities.py` pairs offers with endpoints. `test_my_research_list.py` includes the new availability field and constant-query check; its exact-field assertion was deliberately updated for the expanded contract. Frontend: `ContinueProposal.test.tsx`, `PublishDialog.test.tsx`, `MyLibraryPage.test.tsx`, and `PaperViewPage.test.tsx` exercise the accessible controls, refusal, Publish reuse and both lineage directions. Focused backend: 22 passed; library API: 13 passed; focused frontend: 170 passed; TypeScript passed with the lockfile's dependencies. Final full-suite and copied-database migration results are recorded on the PR.
+
 **Purpose.** The single mapping from requirement to evidence.
 **Owns.** Requirement → design → implementation → test → evidence → status, for every SRS requirement.
 **Does not own.** The requirements themselves ([`../SRS.md`](../SRS.md) is the only baseline) · test strategy ([`TEST_PLAN.md`](TEST_PLAN.md)).

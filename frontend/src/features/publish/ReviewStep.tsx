@@ -16,11 +16,14 @@ import type { ApiFailure } from "./draft";
 
 /** The server's names for the fields the Details step edits. */
 const DETAIL_FIELDS: Record<string, true> = {
+  keywords: true, owner_emails: true,
   title: true, abstract: true, adviser: true, authors: true,
   year_accomplished: true, classification: true, psced: true,
 };
 
 export interface ReviewSummary {
+  keywords?:      string;
+  ownerEmails?:   string;
   typeName:       string;
   fileName:       string | null;
   title:          string;
@@ -76,6 +79,8 @@ export function ReviewStep({
         </Row>
         <Row term="Adviser">{summary.adviserName}</Row>
         <Row term="Authors">{summary.authors.join(", ")}</Row>
+        {summary.keywords && <Row term="Keywords">{summary.keywords}</Row>}
+        {summary.ownerEmails && <Row term="Owners">{summary.ownerEmails}</Row>}
         <Row term="Year">{String(summary.year)}</Row>
       </Group>
 

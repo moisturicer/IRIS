@@ -11,6 +11,7 @@ import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
 import { waitingHref } from "@/features/records/waitingOnYou";
+import { ContinueProposal } from "@/features/records/ContinueProposal";
 
 import { groupResearch, type ResearchSection } from "./researchSections";
 
@@ -78,7 +79,7 @@ function ResearchItem({ item }: { item: MyResearchItem }) {
             <ClearedChips item={item} />
           </>
         }
-        actions={action}
+        actions={item.can_continue ? <ContinueProposal recordId={item.id} /> : action}
       />
     </li>
   );

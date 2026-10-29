@@ -33,6 +33,8 @@ export const METADATA_FIELD_IDS: Record<keyof MetadataValues, string> = {
   abstract: "metadata-abstract",
   adviser: "metadata-adviser",
   authors: "metadata-author-input",
+  keywords: "metadata-keywords",
+  owner_emails: "metadata-owner-emails",
   year: "metadata-year",
   classification: "metadata-classification",
   psced: "metadata-psced",
@@ -43,7 +45,7 @@ export const METADATA_FIELD_IDS: Record<keyof MetadataValues, string> = {
 
 /** The order fields appear in, which is the order focus should try them. */
 export const METADATA_FIELD_ORDER: Array<keyof MetadataValues> = [
-  "title", "abstract", "adviser", "authors", "year", "classification", "psced",
+  "title", "abstract", "adviser", "authors", "keywords", "owner_emails", "year", "classification", "psced",
 ];
 
 /** Fields that live inside More details, which must be open to be focused. */
@@ -57,6 +59,8 @@ export const FORM_FIELD: Record<string, keyof MetadataValues> = {
   abstract: "abstract",
   adviser: "adviser",
   authors: "authors",
+  keywords: "keywords",
+  owner_emails: "owner_emails",
   year_accomplished: "year",
   classification: "classification",
   psced: "psced",
@@ -159,6 +163,21 @@ export function MetadataForm({
         />
         {fieldNotes?.title}
       </Field>
+
+      <Field label="Keywords" htmlFor={ids.keywords} error={errors.keywords?.message} errorId={errorId("keywords")}>
+        <input id={ids.keywords} {...register("keywords")}
+          aria-invalid={Boolean(errors.keywords)} aria-describedby={describedBy("keywords", "keywords-hint")}
+          className={fieldClasses(Boolean(errors.keywords))} />
+        <p id="keywords-hint" className="text-small text-stone-600">Separate keywords with commas.</p>
+      </Field>
+      {!submitted && (
+        <Field label="Owner emails" htmlFor={ids.owner_emails} error={errors.owner_emails?.message} errorId={errorId("owner_emails")}>
+          <input id={ids.owner_emails} {...register("owner_emails")}
+            aria-invalid={Boolean(errors.owner_emails)} aria-describedby={describedBy("owner_emails", "owner-emails-hint")}
+            className={fieldClasses(Boolean(errors.owner_emails))} />
+          <p id="owner-emails-hint" className="text-small text-stone-600">Existing account emails, separated by commas. Include yourself and exclude the Adviser.</p>
+        </Field>
+      )}
 
       <div>
         <div className="flex items-baseline justify-between gap-3">
