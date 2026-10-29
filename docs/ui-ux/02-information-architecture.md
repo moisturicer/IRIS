@@ -121,6 +121,7 @@ Client-side gating is **UX only**; enforcement is server-side (`S-02`…`S-05`).
 | Delete Requests | — | — | ✅ | — | — | — |
 | Audit log | — | — | ✅ | — | — | — |
 | Role approvals | — | — | ✅ | — | — | — |
+| Users *(roles, lock, office coordinators; restored by IR-478)* | — | — | ✅ | — | — | — |
 
 **✅** full · **◐** scoped to your own or assigned records — the server decides which, not the client (`IR-153`) · **—** hidden in nav *and* 403 on direct URL.
 
@@ -133,6 +134,8 @@ Client-side gating is **UX only**; enforcement is server-side (`S-02`…`S-05`).
 **Amended 2026-09-06, and one row is narrower than it was.** Submission was listed as Student / Adviser / **RDCO**. SRS Use Cases M2-2.1 and M2-2.2 both name the actor *"Record Owner (Student or Adviser)"*, and the SRS outranks this document — so RDCO is removed. The reasoning matters as much as the source: RDCO performs **both** intake and final review, so authoring would mean reviewing its own record at two of the three gates. That is a sharper conflict than the one that (correctly) keeps ITSO, IERC and KTTO out. RDCO's genuine need to file for others is served by **Import Records** instead. Recorded rather than silently reconciled.
 
 **Manage Users and Active Sessions left this table**, and the React app with them: account administration is the Django admin site's job. The SRS names seven user classes; the role enum has six, and the missing one is *System Administrators* — `is_staff` had been standing in for it, which is what produced the defect above. Self-service session management ("your devices") is a different, per-user screen and is tracked as `IR-124`.
+
+**Amended 2026-10-29 (project lead, IR-478): Users is back, for RDCO.** The move above never happened: `User` was never registered with the Django admin site, so from IR-160 on nothing could change a role, lock an account or grant a coordinator except by calling the API by hand. Meanwhile IR-165 made RDCO IRIS's administrator (`ADMIN_ROLES = {RDCO}`) and left the superuser no API standing, and IR-415 gated `PATCH /users/<id>/coordinator/` to RDCO. So ADR-032 §4's "granted by a system administrator" means RDCO, in the app. `/admin/users` returns under Administration, RDCO only, with Change role, Lock/Unlock and Make/Remove coordinator. Active Sessions stays out. Any RDCO account may grant coordinator status, as built; narrowing that to RDCO's coordinators would be an ADR-032 amendment and is proposed separately.
 
 **Enforced, not just documented.** `frontend/src/lib/access.ts` is this table in code; the router and the sidebar both read it, so a nav item cannot exist without a matching gate. `frontend/src/lib/access.test.ts` asserts every role against every screen in both directions.
 

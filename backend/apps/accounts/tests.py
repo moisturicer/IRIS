@@ -284,3 +284,51 @@ class AdviserPickerTests(APITestCase):
         self.assertEqual(row["email"], "adviser@cit.edu")
         self.assertEqual(row["college_name"], self.college.name)
         self.assertEqual(row["department_name"], self.department.name)
+
+
+class UserListTests(APITestCase):
+    """
+    `GET /users/` behind RDCO's Users page (IR-478). The page reads each row's
+    active and coordinator state, and its search box sends `?search=`.
+    """
+
+    def setUp(self):
+        self.url = reverse("user-list")
+        self.client.force_authenticate(make_user("rdco@cit.edu", "RDCO"))
+
+    def emails(self, **params):
+        response = self.client.get(self.url, params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return {row["email"] for row in response.data["results"]}
+
+    def test_search_matches_email_and_name(self):
+        """It was ignored: `UserListView` named no `search_fields`, so every search listed everyone."""
+        ivan = make_user("ivan.santos@cit.edu", "ITSO")
+        ivan.first_name, ivan.last_name = "Ivan", "Santos"
+        ivan.save(update_fields=["first_name", "last_name"])
+        make_user("elena@cit.edu", "IERC")
+
+        self.assertEqual(self.emails(search="ivan.santos"), {"ivan.santos@cit.edu"})
+        self.assertEqual(self.emails(search="Santos"), {"ivan.santos@cit.edu"})
+
+    def test_each_row_says_whether_the_account_is_active_and_coordinates(self):
+        """The Status column read `is_active`, which the serializer never sent, so every row said Inactive."""
+        coordinator = make_user("itso.coordinator@cit.edu", "ITSO")
+        coordinator.is_office_coordinator = True
+        coordinator.save(update_fields=["is_office_coordinator"])
+
+        rows = {row["email"]: row for row in self.client.get(self.url).data["results"]}
+
+        self.assertIs(rows["itso.coordinator@cit.edu"]["is_active"], True)
+        self.assertIs(rows["itso.coordinator@cit.edu"]["is_office_coordinator"], True)
+        self.assertIs(rows["rdco@cit.edu"]["is_office_coordinator"], False)
+
+    def test_is_active_cannot_be_changed_through_the_own_profile(self):
+        """`/users/me/` is open to every user; an account cannot reactivate itself there."""
+        user = make_user("student@cit.edu", "Student")
+        self.client.force_authenticate(user)
+
+        self.client.patch(reverse("user-me"), {"is_active": False}, format="json")
+
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)

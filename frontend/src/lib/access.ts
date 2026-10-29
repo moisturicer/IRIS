@@ -134,6 +134,10 @@ export const SCREEN_ACCESS = {
   // --- RDCO coordination -------------------------------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
                  nav: { label: "Import Records", icon: "fa-file-import", section: "Administration" } },
+  // Restored for RDCO by IR-478 after IR-160 removed it: the Django admin it
+  // was to move to never registered `User`, so nothing could reach this.
+  users:         { path: "/admin/users", roles: COORDINATOR,
+                 nav: { label: "Users", icon: "fa-users", section: "Administration" } },
   roleRequests:  { path: "/admin/role-requests", roles: COORDINATOR,
                  nav: { label: "Role Requests", icon: "fa-user-check", section: "Administration" } },
   downloadRequests: { path: "/admin/download-requests", roles: COORDINATOR,
