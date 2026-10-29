@@ -214,6 +214,15 @@ endpoint with exactly one collection route. IR-529 adds a read-only CSV collecti
 The test now exercises GET/PUT/PATCH/DELETE on a specific event URL and requires 404;
 both collection routes separately reject writes. The immutability guarantee remains.
 
+**Executed evidence (2026-10-30):** the Docker PostgreSQL run of `apps/audit`
+passed all 56 tests using a separate `DB_NAME=ir529_verification` test namespace
+(the pre-existing default test schema had a duplicate-column migration error).
+The four Audit Log page tests passed, including axe checks. With locked frontend
+dependencies installed, the full frontend suite passed 1,282 tests in 103 files;
+`tsc --noEmit`, changed-file ESLint, the production build, audit flake8 and
+`manage.py check` passed (existing Axes configuration warning). Full backend and
+PR CI results are recorded in the linked IR-529 pull request.
+
 **Recorded deviation from the card:** its "Clocks" rule starts a clock at `RESUBMITTED` for
 `reset_parties`. A party that asked never stopped its clock, so none restarts for it. The
 author's revision time is measured as `RESUBMISSION_REQUESTED` → `RESUBMITTED` instead
