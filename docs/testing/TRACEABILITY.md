@@ -18,7 +18,9 @@
 
 **Verification (2026-10-29):** 109 focused backend tests pass (107 conversation/answer/queued/identity regressions, followed by the corrected intentional-disconnect test and non-empty migration test); 145 affected frontend page/API tests pass. TypeScript and AI-app flake8 pass; `makemigrations --check --dry-run` finds no missing migration (its database-history check warned about a transient Docker DNS failure). The full frontend run has three unrelated Sidebar failures caused by a Node/jsdom AbortSignal mismatch after fixing the affected Paper Chat mock. The full backend run could not complete: one attempt failed loading the harness with `Cannot allocate memory`, and the retry exited without a result.
 
-**Status:** implemented and focused tests verified; full-suite verification and independent human approval remain outstanding. Deterministic provider tests establish call counts, not production vendor performance.
+**CI follow-up:** [PR #309's initial full run](https://github.com/moisturicer/IRIS/actions/runs/40795166357) passed Frontend (lint, tests, build), Security and Docker Compose. Backend ran 4,278 passing tests and found one vocabulary-guard collision: submission-response `pending` is not a workflow request status. The guard's existing documented allowlist now excludes `ai/submissions.py` for that separate meaning; no workflow value or behavior changes. Migration 0033 was also rolled back and reapplied successfully on a restored development-database copy, preserving its 19 Records; that copy had no Conversations, so the separate non-empty history fixture supplies Conversation/Turn preservation evidence. The disposable database and snapshot were removed.
+
+**Status:** implemented and focused tests verified; CI rerun and independent human approval remain outstanding. Deterministic provider tests establish call counts, not production vendor performance.
 
 ## IR-625 the submitter sees where their record is and what waits on them
 
