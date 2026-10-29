@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cells import (
-    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, STUB, Call, Case, KnownDefect, Ref, Upload, row,
+    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, STUB, Call, Case, Ref, Upload, row,
 )
 
 # -- shorthands -------------------------------------------------------------
